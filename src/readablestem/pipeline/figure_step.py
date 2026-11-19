@@ -78,10 +78,10 @@ would be without it; the answer, or why there is none, is recorded on
 `Fix.verifications` either way.
 
 With the Anthropic provider the job's verifier is the Claude check (`models.claude_verifier`,
-T2-20): another Claude model, an audit prompt, yes/no answers. In shadow mode (the default,
-CLAUDE_SECOND_CHECK=shadow) the answer is recorded with mode "shadow" and nothing else
-happens: no check, no note, no change of review. Only CLAUDE_SECOND_CHECK=enforce gives the
-note above, from the same threshold.
+T2-20): another Claude model, an audit prompt, yes/no answers. In shadow mode
+(CLAUDE_SECOND_CHECK=shadow; the default is off) the answer is recorded with mode "shadow"
+and nothing else happens: no check, no note, no change of review. Only
+CLAUDE_SECOND_CHECK=enforce gives the note above, from the same threshold.
 """
 
 from __future__ import annotations

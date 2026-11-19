@@ -20,13 +20,15 @@ from readablestem.core.types import (
     Kind,
     Link,
     Notice,
+    Run,
     ScriptRun,
     Status,
     inline_marker,
 )
-from readablestem.pipeline.combine import CombineError, Part, join
+from readablestem.pipeline.combine import CombineError, Part, common_language, join
 from readablestem.pipeline.combine import combine as combine_html
 from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.text_pass import set_document_language
 
 PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
@@ -63,7 +65,7 @@ def part_result(
                     heading=HeadingFix(level=1 if page == 0 else 2, text=f"{tag} heading {n}")),
             )  # fmt: skip
         marker = inline_marker(f"p{n}-e2")
-        text = f"{tag} speed {marker} then a link here and H2O end"
+        text = f"{tag} speed {marker} then a link here and H2O end, not 3 but 4"
         start = text.index("a link")
         add(
             Element(id=f"p{n}-e1", kind=Kind.PARAGRAPH, page=page, bbox=(0, 1, 1, 2), order=0,
@@ -71,7 +73,9 @@ def part_result(
                     links=[Link(start=start, end=start + 6, kind="internal",
                                 target_id=f"p{n}-e3")],
                     script_runs=[ScriptRun(start=text.index("H2O") + 1,
-                                           end=text.index("H2O") + 2, kind="sub")]),
+                                           end=text.index("H2O") + 2, kind="sub")],
+                    runs=[Run(start=text.index("3"), end=text.index("3") + 1,
+                              kind="deleted")]),
         )  # fmt: skip
         add(
             Element(id=f"p{n}-e2", kind=Kind.EQUATION, page=page, bbox=(0, 1, 1, 2), order=0,
@@ -149,6 +153,8 @@ def test_equation_markers_and_offsets_are_moved_together():
     assert text[link.start : link.end] == "a link" and link.target_id == "p3-e3"
     [script] = paragraph.script_runs
     assert text[script.start : script.end] == "2"  # the 2 of H2O
+    [struck] = paragraph.runs
+    assert (text[struck.start : struck.end], struck.kind) == ("3", "deleted")
     assert paragraph.parent_id is None
     inline = next(e for e in joined.elements if e.id == "p3-e2")
     assert inline.parent_id == "p3-e1" and inline.page == 2
@@ -221,10 +227,101 @@ def test_a_part_with_a_pdf_contents_page_keeps_it_and_no_second_list_is_made():
     assert "<nav" not in combine_html([first, second], title="Chapter")
 
 
-def test_the_language_is_the_one_most_parts_have():
+@pytest.mark.parametrize(
+    ("entries", "headings", "linked"),
+    [
+        # a part holds one namesake: its number is not the entry's
+        (["3.1 The model"], ["2.1 The model"], [None]),
+        # two namesakes: the number says which one each entry means
+        (
+            ["2.1 The model", "3.1 The model"],
+            ["2.1 The model", "3.1 The model"],
+            ["2.1 The model", "3.1 The model"],
+        ),
+        # a number on one side only, or none: the title decides as before
+        (["The model"], ["2.1 The model"], ["2.1 The model"]),
+        (["Appendix A Tables"], ["Appendix A  Tables"], ["Appendix A  Tables"]),
+        # a section number against an outline's roman numeral: not compared, the title decides
+        (["4.1 Scope", "4.2 Method"], ["I. Scope", "II. Method"], ["I. Scope", "II. Method"]),
+    ],
+)
+def test_a_contents_entry_links_to_the_heading_with_its_number_not_a_namesake(
+    entries, headings, linked
+):
+    result, _ = part_result("A", pages=1, headings=0)
+    box = {"bbox": (0, 0, 1, 1), "page": 0, "order": 0}
+    result.fixes = []
+    result.elements = [
+        Element(id=f"p1-e{i}", kind=Kind.LIST_ITEM, text=text, reasons=["contents entry"], **box)
+        for i, text in enumerate(entries)
+    ] + [
+        Element(id=f"p1-e{len(entries) + i}", kind=Kind.HEADING, text=text, **box)
+        for i, text in enumerate(headings)
+    ]
+    for order, element in enumerate(result.elements):
+        element.order = order
+    joined = join([Part(result, {}, [0])]).elements
+    by_id = {e.id: e for e in joined}
+    got = [
+        by_id[e.links[0].target_id].text if e.links else None
+        for e in joined
+        if "contents entry" in e.reasons
+    ]
+    assert got == linked
+
+
+def lang_of(html: str, text: str) -> str | None:
+    """The `lang` on the block that holds `text`, None when it has none of its own."""
+    block = re.search(rf"<(?:p|h\d|li)\b([^>]*)>[^<]*{text}", html)
+    assert block, text
+    found = re.search(r'\blang="([^"]+)"', block.group(1))
+    return found.group(1) if found else None
+
+
+def test_the_language_is_the_one_most_parts_have_and_a_part_in_another_keeps_its_own():
     parts = three()
-    parts[0].result.lang, parts[1].result.lang, parts[2].result.lang = "de", "fr", "fr"
+    parts[0].result.lang, parts[1].result.lang, parts[2].result.lang = "de", "fr", "fr-CA"
     assert join(parts).lang == "fr"
+    html = combine_html(parts, title="Chapter")
+    assert '<html lang="fr">' in html
+    # the part in German is read with a German voice; the French ones are the file's language
+    assert [lang_of(html, f"{t} speed") for t in "ABC"] == ["de", None, None]
+    assert [lang_of(html, f"{t} heading 1") for t in "ABC"] == ["de", None, None]
+    # a passage the part found in another language keeps it
+    parts[0].result.elements[1].lang = "es"
+    assert lang_of(combine_html(parts, title="Chapter"), "A speed") == "es"
+
+
+def test_a_language_nobody_confirmed_votes_for_nothing_and_marks_nothing():
+    parts = three()
+    parts[0].result.lang, parts[1].result.lang, parts[2].result.lang = "en", "fr", "fr"
+    parts[0].result.notices = [Notice(code="lang_assumed", review="required")]
+    joined = join(parts)
+    assert joined.lang == "fr"
+    html = combine_html(parts, title="Chapter")
+    assert lang_of(html, "A speed") is None  # a guess is not written as the part's language
+    # the owner answers on the part's own page: the file follows, and the part now marks itself
+    done = set_document_language(parts[0].result, "German")
+    assert join([Part(done, parts[0].crops, parts[0].pages), *parts[1:]]).lang == "fr"
+    changed = combine_html([Part(done, parts[0].crops, parts[0].pages), *parts[1:]], title="C")
+    assert lang_of(changed, "A speed") == "de"
+
+
+@pytest.mark.parametrize(
+    ("langs", "waiting", "tag", "check"),
+    [
+        (["en", "en", "fr"], [False] * 3, "en", ""),
+        (["en", "en-US", "fr"], [False] * 3, "en", ""),
+        (["en", "fr"], [False] * 2, "en", "split"),
+        (["fr", "en", "de"], [False] * 3, "fr", "split"),
+        (["en", "fr", "fr"], [True, False, False], "fr", "unconfirmed"),
+        (["en", "en"], [True, True], "en", "unconfirmed"),
+    ],
+)
+def test_one_check_when_a_language_is_waiting_or_the_parts_have_no_majority(
+    langs, waiting, tag, check
+):
+    assert common_language(list(zip(langs, waiting, strict=True))) == (tag, check)
 
 
 @pytest.mark.parametrize(

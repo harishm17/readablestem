@@ -27,13 +27,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline import combine, output_chars
+from readablestem.pipeline import assemble, checked_words, combine, language, output_chars
 from readablestem.web import ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
 _PART_SUFFIX = re.compile(r"\s*\(pages [^)]*\)\s*$")
 DEFAULT_TITLE = "Combined document"
+NAMED_AT_MOST = 3  # parts a sentence names before "and N more" (as the review screen's notices)
 
 
 @dataclass(frozen=True)
@@ -80,13 +81,52 @@ def kept_parts(session: Session, job: Job, now: datetime | None = None) -> list[
 
 
 def title_of(first: Job) -> str:
-    """What the file is called: the title the instructor chose for the first part, else the
-    source's file name without the part tag and extension. It names the Word and EPUB files
-    too, so a character that is not text in it is written as `output_chars.UNREADABLE`."""
-    if first.title_override and first.title_override.strip():
-        return output_chars.plain(first.title_override.strip())
-    stem = _PART_SUFFIX.sub("", first.filename.rpartition(".")[0] or first.filename)
-    return output_chars.plain(" ".join(stem.split())) or DEFAULT_TITLE
+    """What the file is called (`assemble.document_title`): the title the instructor chose for
+    the first part, else the title of the file the parts came from (its name without the part
+    tag, the extension and separators), never one part's own heading. It names the Word and
+    EPUB files too, so a character that is not text in it is written as
+    `output_chars.UNREADABLE`."""
+    stem, dot, extension = first.filename.rpartition(".")
+    name = f"{_PART_SUFFIX.sub('', stem)}{dot}{extension}" if dot else first.filename
+    found = assemble.document_title(first.title_override, "", (), name)
+    return DEFAULT_TITLE if found.source == assemble.TITLE_STOCK else output_chars.plain(found.text)
+
+
+def language_check(kept: list[KeptPart]) -> str:
+    """The one sentence the combine page says about the file's language ("" when there is
+    nothing to say): asked once for the whole, whatever the number of parts, when a part's
+    language was assumed or mixed and is not yet confirmed, or when the parts disagree and no
+    language has most of them (`combine.common_language`). The answer is made on the part's
+    own page, where the language is changed."""
+    parts = []
+    for item in kept:
+        data = item.job.result_json or {}
+        codes = [n.get("code") for n in data.get("notices") or [] if isinstance(n, dict)]
+        parts.append((str(data.get("lang") or language.DEFAULT_LANG), combine.unconfirmed(codes)))
+    pages = [f"pages {item.job.part_label}" for item in kept]  # as the page's rows say them
+    if len(parts) < 2:
+        return ""
+    tag, check = combine.common_language(parts)
+    name = language.language_name(tag)
+    if check == "unconfirmed":
+        named = [pages[n] for n, (_, unconfirmed) in enumerate(parts) if unconfirmed]
+        waiting = len(named)
+        more = waiting - NAMED_AT_MOST
+        listed = ", ".join(named[:NAMED_AT_MOST]) + (f" and {more} more" if more > 0 else "")
+        return (
+            f"The language of {checked_words.plural(waiting, 'part')} was assumed or could not be "
+            f"settled, so the combined file reads {'it' if waiting == 1 else 'them'} in {name}. "
+            f"Open the {'part' if waiting == 1 else 'parts'} for {listed}, then confirm the "
+            "language before you share the file: a screen reader reads each passage in the "
+            "voice of its language."
+        )
+    if check == "split":
+        return (
+            f"The parts are in different languages and no language has most of them, so the "
+            f"combined file is set to {name}; each part is read in its own language. Check each "
+            "part's language before you share the file."
+        )
+    return ""
 
 
 def combined_html(

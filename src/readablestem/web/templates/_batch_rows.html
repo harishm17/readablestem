@@ -1,3 +1,4 @@
+{% from "components/forms.html" import form with context %}
 {# The documents of one upload with their status now, what to do next, and "Download all"
    (routes/batch.py). While a document is waiting or converting, htmx polls this address and
    swaps this block (204 while nothing changed; the version includes the minute, so the elapsed
@@ -6,7 +7,7 @@
    change. Every link keeps its id, so htmx puts focus back on the same link after a swap.
    Without JavaScript this is a plain list: reload the page. A document's file name leads when
    several came out with the same title. #}
-<div id="batch-rows"{% if unfinished %} hx-get="/app/batch/{{ result_id }}?v={{ version }}" hx-trigger="every 4s" hx-swap="outerHTML"{% endif %}>
+<div id="batch-rows"{% if unfinished %} hx-get="/app/batch/{{ result_id }}?v={{ version }}" hx-trigger="{{ poll_trigger }}" hx-swap="outerHTML"{% endif %}>
   {% if oob|default(false) %}<p id="batch-summary" class="batch-summary" hx-swap-oob="innerHTML">{{ summary }}</p>{% endif %}
   {% if rows %}
   <section aria-label="Next step" class="batch-next">
@@ -28,14 +29,19 @@
         <tr role="row">
           <th scope="row" role="rowheader">
             {% if row.state == "deleted" %}{{ row.name }}{% else %}<a id="batch-doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.name }}</a>{% endif %}
-            <span class="doc-file">{% if row.also %}{{ row.also }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }}</span>
+            <span class="doc-file">{% if row.also %}{{ row.also }} · {% endif %}{{ row.pages }}{% if row.exam_mode %} · {{ exam_words.short }}{% endif %}</span>
+            {% if row.note %}<span class="doc-file batch-scans">{{ row.note }}</span>{% endif %}
           </th>
           <td role="cell" data-label="Status">
             <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>
-            {% if row.action == "review" %}
-            <a id="batch-act-{{ row.id }}" href="/jobs/{{ row.id }}/review">Review<span class="visually-hidden"> {{ row.name }}</span></a>
-            {% elif row.action == "download" %}
-            <a id="batch-act-{{ row.id }}" href="/jobs/{{ row.id }}/download">Download<span class="visually-hidden"> {{ row.name }}</span></a>
+            {# The state's next step (web/states.py): a link, or "Try again" as a form. #}
+            {% set step = row.action %}
+            {% if step and step.form %}
+            {% call form("job.retry", step.href, {"class": "inline-form"}) %}
+              <button type="submit" id="batch-act-{{ row.id }}" class="button-secondary button-small">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></button>
+            {% endcall %}
+            {% elif step %}
+            <a id="batch-act-{{ row.id }}" href="{{ step.href }}">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></a>
             {% endif %}
           </td>
         </tr>

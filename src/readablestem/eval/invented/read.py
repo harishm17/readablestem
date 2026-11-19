@@ -353,11 +353,11 @@ def _placeholder_alts() -> list[re.Pattern[str]]:
     from readablestem.pipeline import assemble
 
     fixed = [assemble.EQUATION_NOT_CONVERTED_ALT, assemble.FIGURE_NOT_DESCRIBED_ALT]
-    templates = [alt for alt, _note in assemble.KEPT_IMAGE_WORDS.values()]
+    templates = [alt for alt, *_ in assemble.KEPT_IMAGE_WORDS.values()]
     patterns = [re.compile(re.escape(alt) + r"\.?") for alt in fixed]
     # An equation kept as an image: its number ("Equation (2.4), not converted"), or the
-    # PDF's own text for it with a marker after ("v = d / t, read from the PDF text; not
-    # checked"). That text comes from the PDF, not from a model, and is no content of ours.
+    # PDF's own text for it with a marker after ("v = d / t, as written in the PDF"). That
+    # text comes from the PDF, not from a model, and is no content of ours.
     patterns.append(re.compile(r"Equation \([^()]{1,50}\), not converted\.?"))
     for suffix in assemble.EQUATION_TEXT_ALT_SUFFIXES:
         patterns.append(

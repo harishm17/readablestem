@@ -138,6 +138,20 @@ class Settings(BaseSettings):
     # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped in the
     # change that enables it.
     layout_display_grouping: bool = False
+    # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
+    # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
+    # tree of regions from the unmerged line fragments first and orders the pages by it. Off:
+    # output is byte-identical to before. Off in production: a changed box changes a crop, so
+    # the recorded model answers of the pages it moves stop matching, and turning it on
+    # comes with a re-recording and a `PIPELINE_VERSION` bump.
+    region_tree: Literal["off", "on"] = "off"
+    # The codes of symbol and TeX fonts read as what the font draws, by the font's name
+    # (`pipeline/font_codes.py`, docs/layout.md): Symbol, Wingdings, MT-Extra and the APS
+    # math font, TeX's ligatures and accents at control codes, and a glyph that starts several
+    # lines as a bullet. Element text changes on the documents with these fonts, so the step keys
+    # of their elements change and answers stored for them are asked again. Off: only the two
+    # private-use bullets the code used to map by code point are mapped, as before.
+    font_code_tables: bool = True
     # A calibrated rule on top of the checks (`pipeline/flag_policy.py`): an accepted equation
     # that looks like the readings that turned out wrong (a small logistic model over content-free
     # features, fitted on the development splits) becomes a required decision. It only adds
@@ -221,13 +235,14 @@ class Settings(BaseSettings):
     # equations had no second look. This one asks a different Claude model (not the one
     # that read the page), with a different prompt written as an audit (prompts
     # `check_figure.md`, `check_equation.md`), whether the proposal matches the image.
-    #   off     - never asked;
+    #   off     - never asked. The default: the first real-model walkthrough (2026-11-09)
+    #             showed the shadow check changed no output and cost about 16% of the spend;
     #   shadow  - asked and recorded (agreement is counted in the aggregates and the eval),
-    #             nothing about the output changes. The default;
+    #             nothing about the output changes. Turn it on for a measured run;
     #   enforce - figures only: a flagged alt text gets the optional note "a second
     #             automated check found a possible mismatch", as the Decisions check does.
     #             Never a required decision, never a status change. Equations stay shadow.
-    claude_second_check: Literal["off", "shadow", "enforce"] = "shadow"
+    claude_second_check: Literal["off", "shadow", "enforce"] = "off"
     # Must not be the model that read the page (the cheap and main models) for the check to
     # be independent; sonnet is neither by default.
     claude_check_model: str = "claude-sonnet-5-5"
@@ -365,6 +380,15 @@ class Settings(BaseSettings):
     # Run the background worker thread inside the web process (one web service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
+    # Where conversions run. "inline": the web process starts the worker thread (`run_worker`),
+    # as always. "service": the web process starts none and the `readablestem worker` command,
+    # a process of its own, converts (`web.worker_service`); the web process then reads the
+    # worker's liveness, the AI service's health and the sandbox probe from `ops_heartbeat`
+    # (`web.worker_rows`). Rolling back is this one setting.
+    worker_mode: Literal["inline", "service"] = "inline"
+    # How many conversions the `worker` command runs at once (`worker_mode=service`); the web
+    # process's own worker thread is always one.
+    worker_slots: int = Field(default=1, ge=1, le=8)
     # Load the table detector and the structure model when the worker starts (production
     # only), while it waits for its first job, instead of inside that job: 4-5 s off the
     # first conversion after every start. Only for a conversion run in the web process: the
@@ -452,6 +476,11 @@ class Settings(BaseSettings):
     feature_long_descriptions: bool = False
     # Keep coloured text (colours adjusted to 4.5:1 contrast) and note colour references.
     feature_colour: bool = False
+    # Write marked runs of the text (`Element.runs`: struck text as `<del>`, said as
+    # "deleted"). On since F-509 was measured (docs/layout.md "Struck text"); off is the
+    # old shadow rollout: the runs are found and counted in the trace, not written. Once it
+    # has been on in production for a release the off branch goes (content model, WS16.1).
+    content_runs: bool = True
     # Per-course notation memory: hints for the equation step, spoken readings, bold
     # letters in running text as maths, "remember for this course" on the review screen.
     feature_notation_memory: bool = False
@@ -520,6 +549,29 @@ class Settings(BaseSettings):
     # rules (docs/web.md, "LaTeX source"). Only with FEATURE_LATEX_SOURCE; off until real decks
     # have been looked at (the spike used decks written for it).
     feature_beamer_source: bool = False
+    # Word (.docx) uploads read from the file itself, not from a LibreOffice PDF of it
+    # (`source.docx_reader`): headings, lists, tables with their header rows and spans, footnotes,
+    # links, the picture alt text the author wrote and the equations typed in Word (read exactly,
+    # no model). pandoc runs in the sandbox, so it needs the same conditions as LaTeX source
+    # (`FEATURE_LATEX_SOURCE` is not required, the sandbox and pandoc are). Off: a Word file goes
+    # to the PDF route as before, which also stays the route for any file the reader cannot take
+    # (it is refused or fails to start). On, the reader's result is the document; no PDF is made
+    # and no second reading is compared with it (WS18.19 to WS18.21 are not built).
+    feature_word_source: bool = False
+    # A class link (`web.links`, WS27.2): the owner of a finished document makes one link that
+    # lets whoever holds it read the published student version, with no sign-in, until an end
+    # date at most 180 days away. OFF: no section on the share page, `/s/...` answers 404 and
+    # no link can exist. Not to be turned on until the privacy, terms and limits pages say what
+    # a link holder can see and the service has terms for publishing and a takedown contact
+    # (docs/deploy-railway.md, "Before FEATURE_CLASS_LINK is turned on").
+    feature_class_link: bool = False
+    # Course grants (`web.shares`, WS27.1): the owner of a course gives a person (by the address
+    # they sign in with) the right to view or review every document in it, now and later, from
+    # the course page's "People" section. Needs `FEATURE_NOTATION_MEMORY` (the course pages).
+    # OFF: no People section, its routes answer 404 for everyone, and a grant row gives no right
+    # even if one exists. Not to be turned on until the public pages say who can see a document
+    # (docs/deploy-railway.md, "Before FEATURE_COURSE_GRANTS is turned on").
+    feature_course_grants: bool = False
     image_pages_model: str | None = None
     # Seconds the model may take to write one page (a dense page is a few thousand tokens;
     # `model_timeout_s` is for a crop's short answer).
@@ -575,6 +627,13 @@ class Settings(BaseSettings):
     # screen readers read `alttext` in place of the maths structure, which would take
     # away navigation inside the equation. Steps: docs/mathml-alttext.md.
     mathml_alttext: bool = False
+
+    # The web process keeps the review screen's page and region pictures it just made, so a page
+    # asked for again does not start MuPDF again (`web.page_images.RenderCache`). The bound is
+    # the bytes of the pictures: a 144 dpi page is 100 to 400 KB, so 32 MB holds a 100-page
+    # review, and the web process on the small production plan has little memory to give. 0
+    # keeps nothing.
+    page_image_cache_mb: int = Field(default=32, ge=0, le=512)
 
     # --- tracing (off by default; never on for private-inputs/ runs)
     tracing_enabled: bool = False
@@ -707,6 +766,12 @@ class Settings(BaseSettings):
         `max_pages_per_job`)."""
         return max(self.max_source_pages, self.max_pages_per_job)
 
+    def image_pages_estimate(self, pages: int) -> float:
+        """What reading `pages` scanned or handwritten pages may cost, in dollars: the per-page
+        setting times the pages, at most the per-job setting. The price the upload and the job
+        page say, and the cap a job that asked for them gets (`web.worker.job_caps`)."""
+        return min(self.image_pages_max_usd_per_job, pages * self.image_pages_usd_per_page)
+
     @property
     def signup_open(self) -> bool:
         """Anyone with a verified identity may sign in (`SIGNUP_MODE=open`)."""
@@ -833,6 +898,18 @@ class Settings(BaseSettings):
                     "Update the notice (web/templates/privacy.html) and the vendor sheet "
                     "(docs/vendor-information.md) first"
                 )
+        # What the settings send to a model, and what the notice says is stored and deleted:
+        # every kind of material that is on must be stated on the rendered privacy notice
+        # and the vendor line, with the day it was first stated, and every statement about
+        # storage must match its setting (`ops.launch`).
+        from readablestem.ops.launch import privacy_claim_problems, sent_material_problems
+
+        if problems := sent_material_problems(self) + privacy_claim_problems(self):
+            raise ConfigError(
+                "production start refused: "
+                + "; ".join(problems)
+                + ". State it on the page (web/templates/privacy.html, web/recipients.py) first"
+            )
         if self.image_pages_second_reader != "off":
             from readablestem.ops.launch import second_reader_problem
 

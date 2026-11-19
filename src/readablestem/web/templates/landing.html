@@ -26,7 +26,7 @@
     <a class="button-secondary" href="/demo">See an example first (no sign-in)</a>
   </p>
   {% if not user %}
-  <p class="hint hero-hint">Free during the beta. <a href="#who">Who can use it</a> and
+  <p class="hint hero-hint">Free during the beta (<a href="/pricing">pricing</a>). <a href="#who">Who can use it</a> and
     <a href="#documents">what happens to your documents</a>.</p>
   {% endif %}
 </section>
@@ -39,16 +39,16 @@
   <h2 id="hear-title">Hear the difference</h2>
   <div class="diff-rows">
     <div class="diff-row">
-      <h3>In the PDF</h3>
+      <h3 class="card-title">In the PDF</h3>
       <div class="sheet diff-eq"><img src="{{ static_url('hero/before.png') }}" width="{{ hero.crop_display_width }}" height="{{ hero.crop_display_height }}"
         alt="Equation 2.4 cut from the PDF page: delta d over delta t, number 2.4."></div>
-      <p class="diff-says"><span class="diff-says-label">A screen reader says</span> <span class="diff-says-text">{{ hero.text_layer }}</span></p>
+      <p class="diff-says"><span class="diff-says-label">What a screen reader would say, from the PDF&rsquo;s own text</span> <span class="diff-says-text">{{ hero.text_layer }}</span></p>
       <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play" data-hear-a="{{ hero.text_layer_speech }}" data-hear-a-lead="In the PDF a screen reader says"><span data-hear-label>Play</span><span class="visually-hidden"> the PDF reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
     </div>
     <div class="diff-row">
-      <h3>In the ReadableSTEM page</h3>
+      <h3 class="card-title">In the ReadableSTEM page</h3>
       <div class="sheet diff-eq"><div class="eq">{{ hero.mathml|safe }}<span class="eq-label"><span class="visually-hidden">Equation </span>{{ hero.label }}</span></div></div>
-      <p class="diff-says"><span class="diff-says-label">A screen reader says</span> <span class="diff-says-text">{{ hero.speech }}</span></p>
+      <p class="diff-says"><span class="diff-says-label">What a screen reader would say (written by the rules the converter uses)</span> <span class="diff-says-text">{{ hero.speech }}</span></p>
       <p class="hear"><button type="button" class="button-secondary button-small" data-hear hidden data-hear-idle="Play" data-hear-a="{{ hero.speech }}" data-hear-a-lead="On the converted page a screen reader says"><span data-hear-label>Play</span><span class="visually-hidden"> the converted reading</span></button><span class="hear-note" data-hear-note role="status"></span></p>
     </div>
   </div>
@@ -81,10 +81,9 @@
   <details>
     <summary id="who">Who can use it</summary>
     {% if signup_open %}
-    <p>ReadableSTEM is a free beta. Anyone with a Google account can sign in and try it,
-      including a university Google account{% if microsoft_login %}, and so can people with a
-      Microsoft account from a university that is set up for it{% endif %}. Signing in the first
-      time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day.
+    <p>ReadableSTEM is a free beta. Anyone with a {{ signup_words or "Google" }} account can sign in and try it{% if microsoft_login %}
+      (a Microsoft account must be from a university that is set up for it){% endif %}. Signing in
+      the first time makes your account. New accounts have daily limits: {{ open_page_quota }} pages a day.
       The example conversion needs no sign-in. Upload only materials you wrote or have the
       right to adapt, never student records.</p>
     {% else %}
@@ -97,7 +96,8 @@
     <p>Your file and everything made from it are deleted {{ retention_hours }} hours after you
       last work on it. You can keep a document for 7 days, or let us look at the results for
       {{ opt_in_days }} days to find mistakes in the tool. You can delete it at any time.
-      {% include "_vendor_line.html" %}</p>
+      {% include "_vendor_line.html" %}
+      <a href="/security">How the data is stored and who receives it</a>.</p>
   </details>
   <details>
     <summary>Why STEM courses need this now</summary>

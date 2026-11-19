@@ -25,6 +25,7 @@ from readablestem.config import Settings
 from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import run
+from readablestem.pipeline.assemble import CHECKER, IMAGE_PAGE_NOTE, say
 from readablestem.web import uploads
 from readablestem.web.pdf_probe import ProbeRejected, probe
 
@@ -145,9 +146,11 @@ def test_saving_an_edit_to_text_is_refused_with_the_way_to_change_it(web):
     assert "Change the words" in response.text
 
 
-def test_the_student_file_has_the_notice_and_the_original_and_it_still_downloads(web):
+def test_the_preview_has_the_notice_and_the_original_and_it_still_downloads(web):
+    # Decisions are open, so the owner's preview is a draft, written for the person who
+    # checks it: it says to check the page against the original.
     html = web.browser.get(f"/jobs/{web.job_id}/view").text
-    assert "Converted from an image of the page." in html
+    assert say(IMAGE_PAGE_NOTE, CHECKER) in html
     assert "<summary>Show the original page 1</summary>" in html
     assert web.browser.get(f"/jobs/{web.job_id}/crops/p1-e0.png").status_code == 200
 

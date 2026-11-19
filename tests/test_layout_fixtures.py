@@ -260,6 +260,85 @@ def test_worked_example_plain_italic_maths_is_inline():
     assert first.reasons == second.reasons == ["italic variable with operator"]
 
 
+# ---------------------------------------------------------------- lines broken inside a token
+
+NOTO_SANS = Path("/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf")
+
+
+@pytest.mark.skipif(not NOTO_SANS.exists(), reason="needs Noto Sans for the non-breaking hyphen")
+def test_a_date_an_address_and_a_compound_broken_at_line_ends_join_without_a_space():
+    """A break that falls inside one token leaves it whole; a sentence end, a plain
+    compound and a broken word join as they always did."""
+    lines = [
+        "The logger is easy\u2011",  # a non-breaking hyphen, as Word writes one
+        "to-use. It started on (2012-08-",
+        "17) and keeps files at project/",
+        "memspectrum/ for review. Read www.example.",
+        "org for more. The old run ended here.",
+        "The velocity was well-",
+        "known and the veloc-",
+        "ity stayed small. See www.example.org/data.",
+        "The result is in the table.",
+    ]
+    doc = pymupdf.open()
+    page = doc.new_page(width=420, height=300)
+    page.insert_font(fontname="noto", fontfile=str(NOTO_SANS))
+    for i, line in enumerate(lines):
+        page.insert_text((40, 60 + 14 * i), line, fontsize=10, fontname="noto")
+    [paragraph] = [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.PARAGRAPH]
+    assert paragraph.text == (
+        "The logger is easy\u2011to-use. It started on (2012-08-17) and keeps files at "
+        "project/memspectrum/ for review. Read www.example.org for more. The old run ended "
+        "here. The velocity was well-known and the velocity stayed small. See "
+        "www.example.org/data. The result is in the table."
+    )
+
+
+# ---------------------------------------------------------------- ActualText, chosen by page
+
+SELFMADE = Path(__file__).parent / "workflows" / "corpus" / "selfmade"
+
+
+def test_labels_a_file_replaces_with_actualtext_are_read_as_printed():
+    """A tagged PDF can give a figure's labels an ActualText of the whole figure's alt text,
+    and MuPDF then reads the label as that text: the printed words are lost."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    for i, line in enumerate(("Income per person has grown at different rates since 1870.",) * 3):
+        page.insert_text((72, 100 + 16 * i), line, fontname="helv", fontsize=11)
+    marked = (
+        b"/Span <</ActualText (Figure 1)>> BDC BT /helv 9 Tf 1 0 0 1 120 %d Tm (%s) Tj ET EMC\n"
+    )
+    stream = b"".join(marked % (y, word) for y, word in ((300, b"Switzerland"), (330, b"Nigeria")))
+    xref = page.get_contents()[-1]
+    doc.update_stream(xref, doc.xref_stream(xref) + stream)
+    # ...while a page where ActualText only says that a hyphen at a line end is a soft one (the
+    # two readings say the same words) keeps it: the file knows the word is one word.
+    page = doc.new_page()
+    page.insert_text((72, 80), "Growth.", fontname="helv", fontsize=11)
+    xref = page.get_contents()[-1]
+    soft = (
+        b"BT /helv 11 Tf 1 0 0 1 72 692 Tm (The larger model shows clear signs of over) Tj "
+        b"/Span <</ActualText <FEFF00AD>>> BDC (-) Tj EMC "
+        b"1 0 0 1 72 676 Tm (fitting on the smaller of the two sets.) Tj ET\n"
+    )
+    doc.update_stream(xref, doc.xref_stream(xref) + soft)
+    text = " ".join(e.text or "" for e in analyze(doc.tobytes()).elements)
+    assert "Switzerland" in text and "Nigeria" in text
+    assert "Figure 1" not in text
+    assert "overfitting" in text
+
+
+@pytest.mark.parametrize("name", ["d1_scripts", "d4_chinese_doc"])
+def test_a_page_whose_script_needs_actualtext_keeps_it(name):
+    """Chromium writes ActualText for Hindi conjuncts and for CJK; the glyphs alone read as
+    U+FFFD and Kangxi radicals, so those pages keep ActualText."""
+    text = "".join(e.text or "" for e in analyze((SELFMADE / f"{name}.pdf").read_bytes()).elements)
+    assert "\ufffd" not in text
+    assert not any("\u2f00" <= c <= "\u2fdf" for c in text)
+    assert sum("\u0900" <= c <= "\u097f" or "\u4e00" <= c <= "\u9fff" for c in text) > 20
+
+
 # ---------------------------------------------------------------- the files themselves
 
 
@@ -278,12 +357,30 @@ def _make_fixtures_module():
     return module
 
 
+def _fonts(pdf: Path) -> set[str]:
+    """The fonts a PDF embeds, without the subset prefix Chromium adds."""
+    with pymupdf.open(pdf) as doc:
+        return {font[3].split("+")[-1] for page in doc for font in page.get_fonts() if font[3]}
+
+
 @pytest.mark.browser
 def test_regenerated_fixtures_give_the_same_structure(tmp_path):
-    """Re-print the HTML with Chromium; fonts may move text, the structure must not."""
+    """Re-print the HTML with Chromium; fonts may move text, the structure must not.
+
+    Which fonts Chromium prints with depends on what the machine has installed (Latin Modern
+    Math from TeX Live comes ahead of Noto Sans Math for MathML, and the generic serif
+    differs), and a PDF set in other fonts is a different input, not a changed converter:
+    the same source printed on this machine and on the one that made the committed files
+    differs in which words count as maths. So the comparison runs where the print used the
+    committed fonts, and says so where it did not.
+    """
     pytest.importorskip("playwright")
     written = _make_fixtures_module().build(tmp_path)
     assert sorted(p.name for p in written) == sorted(f"{n}.pdf" for n in NAMES)
+    printed = set().union(*(_fonts(tmp_path / f"{n}.pdf") for n in NAMES))
+    committed = set().union(*(_fonts(FIXTURES / f"{n}.pdf") for n in NAMES))
+    if printed != committed:
+        pytest.skip(f"this machine prints with other fonts: {sorted(printed ^ committed)}")
     for name in NAMES:
         fresh = analyze((tmp_path / f"{name}.pdf").read_bytes())
         committed = load(name)

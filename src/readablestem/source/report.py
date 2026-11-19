@@ -19,9 +19,11 @@ logged (`summary` gives the counts that may be).
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from pathlib import Path
 
 from readablestem.core.types import SourceMark, SourceProblem, SourceReport
+from readablestem.source.support import SUPPORT, distributed
 
 MAX_LOG_BYTES = 2 * 1024 * 1024
 MAX_NAME = 120
@@ -37,7 +39,7 @@ _LINE = re.compile(
 _COMPLETE = re.compile(r"(?:Conversion|Postprocessing) complete:?.*?(\d+) errors?\b")
 _BINDING = re.compile(r"Can't find binding for (class|package) (\S+)")
 _RAW = re.compile(r"Can't find package (\S+)")
-_PACKAGES = re.compile(r"\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\]\s*)?\{([^}]*)\}")
+_BIBLIOGRAPHY = re.compile(r"Couldn't find Bibliography")
 
 
 def clean(text: str) -> str:
@@ -47,13 +49,12 @@ def clean(text: str) -> str:
 
 
 def loaded_packages(texts: dict[str, str]) -> set[str]:
-    """The packages the project's own files load by a literal `\\usepackage` (or
-    `\\RequirePackage`)."""
-    found: set[str] = set()
-    for text in texts.values():
-        for match in _PACKAGES.finditer(text):
-            found.update(p.strip() for p in match.group(1).split(",") if p.strip())
-    return found
+    """The packages the project's `.tex` files load by a literal `\\usepackage` (or
+    `\\RequirePackage`), comments removed: the same reading the upload check makes
+    (`source.intake.loaded_packages`)."""
+    from readablestem.source.intake import loaded_packages as literal
+
+    return set(literal(texts))
 
 
 def _relative(name: str, prefixes: tuple[str, ...]) -> str:
@@ -115,6 +116,13 @@ def parse(
                     report.missing.append(problem)
                 continue
             errors_here += 1
+            obj = match["object"]
+            if step == "post" and category == "missing_file":
+                # `latexmlpost` names no file of the project (its "at" is a Perl location); a
+                # bibliography it cannot find is the `.bib` file `\bibliography` asked for
+                file, number = "", None
+                if _BIBLIOGRAPHY.search(message) and not obj.endswith(".bib"):
+                    obj = f"{obj}.bib"
             report.counts[category] = report.counts.get(category, 0) + 1
             if kept.get(category, 0) >= MAX_PER_CATEGORY:
                 report.omitted[category] = report.omitted.get(category, 0) + 1
@@ -124,7 +132,7 @@ def parse(
                 SourceProblem(
                     level="fatal" if level == "Fatal" else "error",
                     category=category,
-                    name=clean(match["object"]),
+                    name=clean(obj),
                     file=file,
                     line=number,
                     step=step,
@@ -180,28 +188,39 @@ def summary(report: SourceReport) -> dict[str, int]:
         "unplaced_errors": report.unplaced_errors,
         "missing": len(report.missing),
         "warnings": report.warnings,
+        "unread_words": report.unread_words,
+        "unread_pictures": report.unread_pictures,
     }
 
 
 # ---------------------------------------------------------------------------- the stop rule
 
-# A source problem outside a formula stops the job; a problem inside a formula or a missing
-# picture is a required decision on that item; a warning never blocks. The codes, in the
-# order they are looked for (the first that applies names the cause):
+# A source problem outside a formula stops the job; a problem inside a formula whose item holds
+# a decision about it, or a missing picture, is a required decision on that item; a warning
+# never blocks. The codes, in the order they are looked for (the first that applies names the
+# cause):
 STOP_CODES = (
-    "source_missing_file",  # a file named by \input, \include, ... is not in the upload
-    "source_syntax_error",  # a brace or an environment is not closed: the rest is gone
+    "source_missing_file",  # a file named by \input, \bibliography, ... is not in the upload
+    "source_syntax_error",  # a brace or an environment is not closed, or a special character
+    # (^ _ & #) is in the text: what follows is wrong or gone
     "source_unsupported_class",  # a class with no binding, followed by errors
     "source_unsupported_package",  # commands from a package this tool cannot read
     "source_undefined",  # commands or environments that are not defined, outside a formula
     "source_failed",  # any other error LaTeXML reported outside a formula
 )
 SYNTAX = frozenset({"expected", "unexpected"})
+# A character TeX reads only in maths (^ _), between cells (&) or in a definition (#), written
+# in running text: LaTeXML says `unexpected:^` or `misdefined:&`, and the stop names it.
+CHARACTERS = {"unexpected": frozenset({"^", "_"}), "misdefined": frozenset({"&", "#"})}
 MAX_DETAIL_ITEMS = 20
 
 
 def _item(problem: SourceProblem) -> dict[str, object]:
     return {"name": problem.name, "file": problem.file, "line": problem.line}
+
+
+def _character(problem: SourceProblem) -> bool:
+    return problem.name in CHARACTERS.get(problem.category, frozenset())
 
 
 def _detail(
@@ -212,43 +231,95 @@ def _detail(
     return {"items": kept, "more": max(0, total - len(kept)), **names}
 
 
+# The elements LaTeXML's Beamer binding names in a `malformed` error on an ordinary deck,
+# with nothing lost (the decks in tests/fixtures/source/beamer convert whole with them):
+# `\titlepage` inside a frame ("<ltx:titlepage> isn't allowed in <ltx:g>", or in
+# <ltx:slide>), a list with `\pause` in it (`ltx:item` in an `ltx:inline-block`, then the
+# `ltx:itemize` and `ltx:inline-block` it cannot close) and a frame's slides nested in one
+# another (`ltx:slidesequence` in `ltx:slidesequence`).
+_BEAMER_MALFORMED = frozenset(
+    {"ltx:titlepage", "ltx:item", "ltx:itemize", "ltx:inline-block", "ltx:slidesequence"}
+)
+
+
 def _beamer_binding(problem: SourceProblem) -> bool:
-    """A complaint LaTeXML's Beamer binding makes about its own output on an ordinary deck,
-    with nothing lost: the document shape (`malformed`: a title page, or a list with
-    `\\pause`, inside a frame) and its internal frame macro (`\\end{beamer@frame}`, a name
-    no deck writes). The decks in tests/fixtures/source/beamer convert whole with them."""
-    return problem.category == "malformed" or "beamer@" in problem.name
+    """A complaint LaTeXML's Beamer binding makes about its own output on an ordinary deck:
+    a `malformed` error about one of `_BEAMER_MALFORMED`, or its internal frame macro
+    (`\\end{beamer@frame}`, a name no deck writes). A `malformed` error about any other
+    element still stops a deck. `SourceProblem` keeps the element, not the one it was put
+    in, so a list element that is malformed for another reason on a deck is let through as
+    well."""
+    if problem.category == "malformed":
+        return problem.name in _BEAMER_MALFORMED
+    return "beamer@" in problem.name
+
+
+def _origin(names: Iterable[str]) -> str | None:
+    """Where the missing packages come from, for the stop sentence: "own" when one of them is
+    not a TeX distribution package (the instructor's own), "distribution" when all are, None
+    when the image wrote no list of names (`source.support.distributed`)."""
+    found = [distributed(name) for name in names]
+    if False in found:
+        return "own"
+    if found and all(found):
+        return "distribution"
+    return None
 
 
 def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, object]] | None:
     """The stop code for a report and its details (names from the source, for the job page
-    only), or None when the source converts. Only errors of the `latexml` step stop a job:
-    `latexmlpost` checks the result's shape, and its complaints follow from those errors. On
-    a Beamer deck the binding's own complaints do not stop it (`_beamer_binding`)."""
+    only), or None when the source converts. Errors of the `latexml` step stop a job;
+    `latexmlpost` checks the result's shape and its complaints follow from those errors, except
+    a file it cannot find (a bibliography). On a Beamer deck the binding's own complaints do
+    not stop it (`_beamer_binding`).
+
+    A command in a formula is left to its decision only when every place the reader tied it
+    to holds one (`SourceMark.decided`). When a package with no binding is loaded and
+    LaTeXML's first error is a command it does not define, that package is the cause, even
+    when a syntax error follows (an mhchem charge in the text, `\\ce{SO4^2-}`)."""
     errors = [
         p for p in report.problems if p.step == "latexml" and not (beamer and _beamer_binding(p))
     ]
-    in_formula = {m.name for m in report.marks if m.in_formula}
-    if found := [p for p in errors if p.category == "missing_file"]:
+    undecided = {m.name for m in report.marks if not m.decided}
+    decided = {m.name for m in report.marks if m.in_formula and m.decided} - undecided
+    if found := [p for p in report.problems if p.category == "missing_file"]:
         return "source_missing_file", _detail([_item(p) for p in found])
-    if found := [p for p in errors if p.level == "fatal" or p.category in SYNTAX]:
-        return "source_syntax_error", _detail([_item(found[0])], total=1)
     items: dict[str, dict[str, object]] = {}  # each command once, at its first place
     for p in errors:
-        if p.category == "undefined" and p.name not in in_formula:
+        if p.category == "undefined" and p.name not in decided:
             items.setdefault(p.name, _item(p))
     for m in report.marks:  # an error node outside a formula the log did not name
         if not m.in_formula and m.name:
             items.setdefault(m.name, {"name": m.name, "file": "", "line": None})
     total = len(items) + (report.omitted.get("undefined", 0) if items else 0)
-    classes = [p for p in report.missing if p.what == "class"]
+    # A class read as an article (`source.support`) is not the cause of what follows it.
+    classes = [
+        p for p in report.missing if p.what == "class" and SUPPORT.classes.kind(p.name) != "plain"
+    ]
+    packages = [p for p in report.missing if p.what in ("package", "package_source")]
+    first = next((p for p in errors if not (p.category == "undefined" and p.name in decided)), None)
+    package_first = bool(items and packages and not classes) and (
+        first is not None and first.category == "undefined"
+    )
+    syntax = [p for p in errors if p.level == "fatal" or p.category in SYNTAX or _character(p)]
+    if syntax and not package_first:
+        if all(_character(p) for p in syntax):
+            spots = [_item(p) for p in syntax]
+            return "source_syntax_error", _detail(spots, character=syntax[0].name)
+        cause = next(p for p in syntax if not _character(p))
+        return "source_syntax_error", _detail([_item(cause)], total=1)
     if classes and (errors or report.marks):
         return "source_unsupported_class", _detail([], total=0, **{"class": classes[0].name})
-    packages = [p for p in report.missing if p.what in ("package", "package_source")]
     if items and packages:
-        return "source_unsupported_package", _detail(
+        detail = _detail(
             list(items.values()), total=total, package=", ".join(p.name for p in packages[:5])
         )
+        if origin := _origin(p.name for p in packages):
+            detail["origin"] = origin
+        if origin == "own":  # name the instructor's own: those are the ones to copy from
+            own = [p.name for p in packages if distributed(p.name) is False]
+            detail["package"] = ", ".join(own[:5])
+        return "source_unsupported_package", detail
     if items:
         return "source_undefined", _detail(list(items.values()), total=total)
     other = [p for p in errors if p.category != "undefined"]

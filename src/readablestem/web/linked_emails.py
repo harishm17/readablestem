@@ -25,6 +25,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from readablestem.web import forms
 from readablestem.web.db import LinkedEmail, User
 
 MAX_LINKED = 5
@@ -92,6 +93,7 @@ def unlink(session: Session, linked_email: str) -> bool:
     owner = session.get(User, row.user_id)
     if owner is not None:
         owner.session_version += 1
+        forms.forget_user(session, owner.id)
     session.delete(row)
     return True
 

@@ -342,6 +342,8 @@ def reviewing(tmp_path):
 
 
 BOX = {"left": "10", "top": "55", "right": "50", "bottom": "70"}
+OTHER_BOX = {"left": "10", "top": "20", "right": "50", "bottom": "35"}
+THIRD_BOX = {"left": "10", "top": "35", "right": "50", "bottom": "50"}
 ANSWER = {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
 
 
@@ -355,10 +357,10 @@ def with_model(env, sent: list | None = None) -> None:
     env.ctx.client_factory = factory
 
 
-def mark_region(env, kind: str = "equation"):
+def mark_region(env, kind: str = "equation", box: dict = BOX):
     path = f"/jobs/{env.job_id}/review"
     version = str(env.job(env.job_id).result_version or 0)
-    data = {"csrf_token": token(env.browser, path), "version": version, "kind": kind} | BOX
+    data = {"csrf_token": token(env.browser, path), "version": version, "kind": kind} | box
     if kind == "picture":
         data["alt"] = "A cart on a ramp."
     return env.browser.post(f"/jobs/{env.job_id}/pages/1/add", data=data)
@@ -368,10 +370,47 @@ def test_a_read_refused_by_the_allowance_sends_nothing_to_the_model(reviewing):
     sent: list = []
     with_model(reviewing, sent)
     mark_region(reviewing)
-    mark_region(reviewing)
-    assert len(sent) == 2
-    assert mark_region(reviewing).status_code == 422
-    assert len(sent) == 2
+    mark_region(reviewing, box=OTHER_BOX)
+    assert sum(len(c.requests) for c in sent) == 2
+    assert mark_region(reviewing, box=THIRD_BOX).status_code == 422
+    assert sum(len(c.requests) for c in sent) == 2
+    assert mark_region(reviewing).status_code == 303  # answered from the record: it asks nothing
+    assert sum(len(c.requests) for c in sent) == 2
+
+
+def reread(env, element_id: str):
+    path = f"/jobs/{env.job_id}/review"
+    data = {"csrf_token": token(env.browser, path), "action": "reread", "view": "list"}
+    data["version"] = str(env.job(env.job_id).result_version or 0)
+    return env.browser.post(f"/jobs/{env.job_id}/review/{element_id}", data=data)
+
+
+def reads_today(env) -> int:
+    from readablestem.web.quota import rereads_used
+
+    user = user_row(env, ALICE)
+    assert user is not None
+    with session_scope(env.ctx.factory) as session:
+        return rereads_used(session, user.id, utc_today())
+
+
+def test_a_read_that_comes_back_empty_is_not_counted_and_a_read_with_something_is(reviewing):
+    """A read costs one only when it reads something ("Read again", or a region marked on
+    the page): an empty answer is given back, and the card says so."""
+    empty = {"is_equation": False, "latex": "", "confidence": 0.1}
+    reviewing.ctx.client_factory = lambda settings, budget: FakeVisionClient(
+        budget=budget, defaults={"equation": empty}
+    )
+    response = reread(reviewing, "p1-e2")
+    assert response.status_code == 422, response.text[:300]
+    assert "did not count against today" in " ".join(response.text.split())
+    assert reads_today(reviewing) == 0
+    mark_region(reviewing)  # the same for a region marked on the page
+    assert reads_today(reviewing) == 0
+
+    with_model(reviewing)  # now it reads x^2 + 1
+    assert mark_region(reviewing, box=OTHER_BOX).status_code == 303
+    assert reads_today(reviewing) == 1
 
 
 # --------------------------------------------------------------------------- admin
@@ -393,7 +432,12 @@ def post_admin(env, path: str, **fields):
 
 def test_an_admin_can_block_and_unblock_an_open_tier_account(admin_web):
     carol = client_for(admin_web, CAROL)
-    response = post_admin(admin_web, "/admin/users/block", email=CAROL)
+    # The Block button and the typed address only open the question; nothing is blocked yet.
+    question = post_admin(admin_web, "/admin/users/block", email=CAROL)
+    assert question.status_code == 200 and f"Block {CAROL}?" in question.text
+    assert 'action="/admin/users/block"' in question.text and 'href="/admin"' in question.text
+    assert carol.get("/app").status_code == 200
+    response = post_admin(admin_web, "/admin/users/block", email=CAROL, confirm="yes")
     assert response.status_code == 303
     assert carol.get("/app").status_code == 303  # signed out at once
     assert login(admin_web.client(), CAROL).status_code == 403
@@ -413,13 +457,41 @@ def test_an_admin_cannot_block_themselves_or_a_stranger_and_others_cannot_block(
     assert row is not None and row.is_allowed
     assert "You cannot block yourself" in admin_web.browser.get("/admin").text
     post_admin(admin_web, "/admin/users/block", email="ghost@example.org")
-    assert "Nobody has an account under that address" in admin_web.browser.get("/admin").text
+    assert "nobody has an account under that address" in admin_web.browser.get("/admin").text
     post_admin(admin_web, "/admin/users/block", email="not an address")
 
     carol = client_for(admin_web, CAROL)
     forbidden = carol.post("/admin/users/block", data={"csrf_token": token(carol), "email": BOB})
     assert forbidden.status_code == 403
     assert carol.post("/admin/users/block", data={"email": BOB}).status_code == 403
+
+
+def test_every_admin_post_says_what_happened_and_nothing_succeeds_without_a_change(admin_web):
+    """An empty or unknown address, a repeat and a real change each get their own words on the
+    page (`Nothing changed` and the reason); nobody is labelled an instructor."""
+
+    def says(path: str, text: str, **fields) -> None:
+        response = post_admin(admin_web, path, **fields)
+        page = (
+            response.text if response.status_code == 422 else admin_web.browser.get("/admin").text
+        )
+        assert text in page, (path, fields)
+
+    says("/admin/allowlist", "Nothing changed: enter an email address", email="")
+    says("/admin/allowlist", "Added to the allowlist", email=DAVE)
+    says("/admin/allowlist", "Nothing changed: that address was already allowed", email=DAVE)
+    says("/admin/allowlist", "Changed: they are now an admin", email=DAVE, admin="on")
+    says("/admin/allowlist/remove", "Nothing changed: enter an email address", email="")
+    says("/admin/allowlist/remove", "Nothing changed: nobody has an account", email=BOB)
+    says("/admin/allowlist/remove", "Removed from the allowlist", email=DAVE, confirm="yes")
+    says("/admin/allowlist/remove", "Nothing changed: that address was already off", email=DAVE)
+    says("/admin/users/block", "Nothing changed: that account was already blocked", email=DAVE)
+    says("/admin/users/unblock", "The account was unblocked", email=DAVE)
+    says("/admin/users/unblock", "Nothing changed: that account was not blocked", email=DAVE)
+    says("/admin/users/block", "Nothing changed: enter an email address", email="")
+    says("/admin/linked-emails", "Nothing changed: enter both email addresses", email=DAVE)
+    says("/admin/linked-emails/remove", "Nothing changed: that address was not linked", other=BOB)
+    assert "<td>Instructor</td>" not in admin_web.browser.get("/admin").text  # no default label
 
 
 # --------------------------------------------------------------------------- deleting an account

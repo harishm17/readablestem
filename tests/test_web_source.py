@@ -9,20 +9,24 @@ from __future__ import annotations
 
 import html
 import io
+import re
 import stat
 import zipfile
 
 import pytest
 from sqlalchemy import select
 
+from fixtures import office
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login
 from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult, Kind, Status
+from readablestem.pipeline.checked_words import READY_ALL
 from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
+from readablestem.source import pandoc as pandoc_step
 from readablestem.source.convert import SourceFailed
 from readablestem.web.db import Blob, Job, JobStatus, QuotaDay, session_scope
-from source_support import LOSSES, fixture, make_zip, needs_latexml, png_bytes
+from source_support import LOSSES, fixture, loss_upload, make_zip, needs_latexml, png_bytes
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x^2$.\n\\end{document}\n"
 
@@ -71,6 +75,11 @@ def stored(env, job_id: str) -> Blob:
         return blob
 
 
+def blob_count(env) -> int:
+    with session_scope(env.ctx.factory) as session:
+        return len(list(session.scalars(select(Blob))))
+
+
 def refused(env, data: bytes, filename: str, **fields) -> str:
     """Upload and expect a refusal that cost nothing; the page's text."""
     response = send(env.browser, data, filename, **fields)
@@ -106,6 +115,7 @@ def test_a_zip_is_stored_with_its_main_file_and_a_longer_one_costs_more(web):
     assert response.status_code == 303
     [job] = jobs(web)
     assert job.page_count == 3 and pages_used(web) == 3
+    assert "counts as 3 pages" in web.browser.get("/app").text  # an estimate, not a count
     blob = stored(web, job.id)
     assert blob.media_type == "application/x-readablestem-zip"
     assert envelope.unwrap(bytes(blob.content))[:2] == ("zip", "paper.tex")
@@ -159,6 +169,19 @@ def test_a_plain_escape_is_refused_with_the_pdf_advice(web, snippet, words):
         assert "root:" not in text and snippet not in text  # the source is never echoed
 
 
+@pytest.mark.parametrize(
+    ("preamble", "name"),
+    [("\\documentclass[addpoints]{exam}", "exam"), ("\\usepackage{csquotes}", "csquotes")],
+    ids=["exam", "csquotes"],
+)
+def test_a_class_or_package_not_read_yet_is_refused_at_upload(web, preamble, name):
+    if "documentclass" not in preamble:
+        preamble = "\\documentclass{article}" + preamble
+    source = f"{preamble}\\begin{{document}}\\question Two?\\end{{document}}"
+    text = html.unescape(refused(web, source.encode(), "quiz.tex"))  # no job, no pages
+    assert "quiz.tex" in text and f"({name})" in text and "PDF" in text  # what, and what to do
+
+
 def zip_with_attr(name: str, data: bytes, attr: int) -> bytes:
     buffer = io.BytesIO()
     with zipfile.ZipFile(buffer, "w") as archive:
@@ -200,6 +223,7 @@ def test_a_bad_zip_is_refused_with_a_plain_message(web, data, words):
     text = refused(web, data, "project.zip")
     assert words in text and "project.zip" in text
     assert "upload the PDF instead" in text or "Zip the project again" in text
+    assert 'href="/help/latex"' in text  # the page that says what each message means
 
 
 def test_a_zip_bomb_is_refused_before_anything_is_unpacked(web):
@@ -259,9 +283,40 @@ def test_the_quota_is_enforced_for_a_source_like_for_a_pdf(tmp_path, available):
         env.allow(ALICE)
         login(client, ALICE)
         env.browser = client
-        long = "\\documentclass{article}\\begin{document}" + "word " * 7000 + "\\end{document}"
+        long = "\\documentclass{article}\\begin{document}" + "word " * 1500 + "\\end{document}"
         text = refused(env, long.encode(), "long.tex")
-        assert "page" in text and "today" in text
+        # 7,500 characters is an estimate of pages, not a count of them
+        assert (
+            "long.tex counts as 3 pages" in text and "today" in text and "long.tex has" not in text
+        )
+
+
+@pytest.mark.parametrize("kind", ["tex", "zip"])
+def test_a_source_that_does_not_fit_the_storage_limit_is_refused_like_a_pdf(web, monkeypatch, kind):
+    """The room is checked again when the job is stored (another upload may have filled it in
+    between): that is a refusal with the numbers, not a server error, for every kind of file."""
+    from types import SimpleNamespace
+
+    from readablestem.web import intake, storage
+
+    def full(*_args, **_kwargs):
+        raise storage.StorageRefused(299, 300)
+
+    monkeypatch.setattr(intake, "storage", SimpleNamespace(check_room=full))
+    data = ARTICLE.encode() if kind == "tex" else make_zip({"main.tex": ARTICLE})
+    text = refused(web, data, f"paper.{kind}")
+    assert "299 MB of the 300 MB" in html.unescape(text)
+
+
+@pytest.mark.parametrize("kind", ["tex", "zip"])
+def test_deleting_a_source_job_leaves_no_row_and_no_stored_file(web, kind):
+    data = ARTICLE.encode() if kind == "tex" else make_zip({"main.tex": ARTICLE})
+    job_id = queue_source(web, f"paper.{kind}", data)
+    assert stored(web, job_id).content  # the file as uploaded is the job's one stored copy
+    token = csrf_from(web.browser.get("/app").text)
+    gone = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token, "confirm": "yes"})
+    assert gone.status_code == 303
+    assert jobs(web) == [] and blob_count(web) == 0
 
 
 # ------------------------------------------------------------------ the job
@@ -273,14 +328,20 @@ def queue_source(web, filename: str = "paper.tex", data: bytes | None = None) ->
     return job_id_from(response)
 
 
-def test_a_failed_source_conversion_fails_the_job_cleanly(web):
+@pytest.mark.parametrize(
+    ("code", "words"),
+    [("source_failed", "Upload the PDF instead"), ("source_timeout", "Trying again will not")],
+)
+def test_a_failed_source_conversion_fails_the_job_cleanly(web, code, words):
     job_id = queue_source(web)
-    web.converter.raises = SourceFailed("source_failed")
+    web.converter.raises = SourceFailed(code)
     web.run_worker()
     job = web.job(job_id)
-    assert job.status == JobStatus.FAILED and job.error_code == "source_failed"
+    assert job.status == JobStatus.FAILED and job.error_code == code
     page = web.browser.get(f"/jobs/{job_id}")
-    assert page.status_code == 200 and "Upload the PDF instead" in page.text
+    assert page.status_code == 200 and words in page.text
+    assert "Try again" not in page.text and "splitting the PDF" not in page.text
+    assert 'href="/help/latex"' in page.text
     assert web.browser.get(f"/jobs/{job_id}/view").status_code in {404, 409, 303, 200}
     assert job.result_json is None  # nothing half-made is kept
 
@@ -292,7 +353,7 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
     result = fake_result()
     result.origin = "latex"
     html = rerender_html(result, {})
-    assert "web version of a LaTeX document from your course" in html
+    assert "web version of a LaTeX source from your course" in html
     assert "web version of a PDF" not in html
     result.origin = "pdf"
     assert "web version of a PDF from your course" in rerender_html(result, {})
@@ -304,26 +365,44 @@ def test_the_student_note_of_a_source_says_so_also_after_a_review_render():
 @needs_latexml
 @pytest.mark.parametrize("name", list(LOSSES))
 def test_a_source_that_loses_content_never_ends_as_converted(name, tmp_path, caplog):
+    """A source that would lose content stops and names why, or its file holds what it would
+    have lost and the page never claims more than it converted (SW42.2, SW42.4)."""
     import logging
 
     caplog.set_level(logging.INFO)
-    text, code, shown, _ = LOSSES[name]
+    row = LOSSES[name]
     env = WebEnv(tmp_path, feature_latex_source=True)
     env.converter = convert_pdf  # ty: ignore[invalid-assignment]
     with env.running() as client:
         env.allow(ALICE)
         login(client, ALICE)
-        response = send(client, text.encode(), f"{name}.tex")
+        data, filename = loss_upload(name)
+        response = send(client, data, filename)
         assert response.status_code == 303
         job_id = job_id_from(response)
         env.run_worker()
         job = env.job(job_id)
-        assert job.status == JobStatus.FAILED and job.error_code == code
-        assert job.result_json is None  # nothing a student could be given
         page = client.get(f"/jobs/{job_id}").text
-        assert "Everything was converted" not in page and "Try again" not in page
-        assert html.escape(shown, quote=False) in page  # the file or command is named
-    assert shown not in caplog.text  # names stay out of the logs
+        # What the page tells the person to do is something they can do: each link answers.
+        for link in re.findall(r'<a [^>]*href="(/[^"#]*)"', page.split("<main", 1)[-1]):
+            assert client.get(html.unescape(link)).status_code < 400, link
+        if row.code is None:
+            assert job.status == JobStatus.DONE and job.result_json is not None
+            assert row.shown in (job.html or "")
+            kinds = [e["kind"] for e in job.result_json["elements"]]
+            assert kinds.count("figure") == row.figures
+            if row.decision is not None:  # the item that shows it waits for the instructor
+                assert READY_ALL not in page  # SW7: never claims the whole file
+                codes = [
+                    c.get("code") for f in job.result_json["fixes"] for c in f.get("checks") or []
+                ]
+                assert row.decision in codes
+            return
+        assert job.status == JobStatus.FAILED and job.error_code == row.code
+        assert job.result_json is None  # nothing a student could be given
+        assert READY_ALL not in page and "Try again" not in page
+        assert html.escape(row.shown, quote=False) in page  # the file or command is named
+    assert row.shown not in caplog.text  # names stay out of the logs
 
 
 @needs_latexml
@@ -346,21 +425,28 @@ class TestRealConversion:
 
     def test_the_job_page_and_the_review_list_work_and_the_split_view_redirects(self, done):
         env, job_id = done
-        assert env.browser.get(f"/jobs/{job_id}").status_code == 200
+        page = env.browser.get(f"/jobs/{job_id}")
+        assert page.status_code == 200 and "LaTeX source" in page.text
+        assert "revised version" not in page.text and "?revises=" not in page.text
         split = env.browser.get(f"/jobs/{job_id}/review")
         assert split.status_code == 303 and split.headers["location"].endswith("/review/list")
         review = env.browser.get(f"/jobs/{job_id}/review/list")
         assert review.status_code == 200 and "Figure" in review.text
-        assert "of the PDF" not in review.text or "PDF" in review.text
+        assert "LaTeX source" in review.text
+        assert "in the PDF" not in review.text and "your PDF" not in review.text
         # No choice that leads nowhere (SW18.5): no link back to this list, and a link to
         # an item lands on it.
         assert f'href="/jobs/{job_id}/review"' not in review.text
         assert f"/jobs/{job_id}/review?page=" not in review.text
         result = DocumentResult.model_validate(env.job(job_id).result_json)
+        report = result.source_report  # the fixture is read whole (SW42.4)
+        assert report is not None and (report.unread_words, report.unread_pictures) == (0, 0)
         formula = next(f for f in result.fixes if f.kind is Kind.EQUATION and f.pending)
         table = next(f for f in result.fixes if f.kind is Kind.TABLE)
         to_item = env.browser.get(f"/jobs/{job_id}/review?item={formula.element_id}")
-        assert to_item.headers["location"].endswith(f"/review/list#item-{formula.element_id}")
+        assert to_item.headers["location"].endswith(
+            f"/review/list?at=item-{formula.element_id}#item-{formula.element_id}"
+        )
         # "Reject" keeps a formula as written; a table with nothing to keep is refused.
         token = csrf_from(review.text)
         for fix in (table, formula):
@@ -373,3 +459,65 @@ class TestRealConversion:
         assert after.fix_for(formula.element_id).status is Status.REJECTED  # ty: ignore[possibly-missing-attribute]
         student = env.browser.get(f"/jobs/{job_id}/view").text
         assert "not available" not in student and "\\badmacro" in student
+        assert "web version of a LaTeX source from your course" in student
+
+    def test_a_document_made_from_a_source_cannot_be_replaced_by_a_new_version(self, done):
+        """Revising a source is held (WS18.8): the page, the link and a direct request say so."""
+        env, job_id = done
+        before = len(jobs(env))
+        link = env.browser.get(f"/app?revises={job_id}")
+        assert link.status_code == 400 and "cannot be replaced with a new version" in link.text
+        sent = send(env.browser, ARTICLE.encode(), "v2.tex", revises=job_id)
+        assert sent.status_code == 400 and "cannot be replaced with a new version" in sent.text
+        assert (
+            "Upload a revised version" not in sent.text
+            and "Upload a revised version" not in link.text
+        )
+        assert len(jobs(env)) == before
+
+
+# ------------------------------------------------------- Word read from the file (WS18.14, 18.15)
+
+
+@pytest.mark.skipif(
+    not (pandoc_step.installed() and sandbox.available()),
+    reason="needs pandoc and a working sandbox (bubblewrap or Landlock)",
+)
+def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_a_pdf(tmp_path):
+    env = WebEnv(tmp_path, feature_word_source=True)
+    env.converter = convert_pdf  # ty: ignore[invalid-assignment]
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        response = send(client, office.docx_with_equation(), "notes.docx")
+        assert response.status_code == 303
+        job_id = job_id_from(response)
+        [job] = jobs(env)
+        blob = stored(env, job_id)
+        assert blob.media_type == "application/x-readablestem-docx"
+        assert envelope.unwrap(bytes(blob.content))[0] == "docx" and job.office_json is not None
+        assert env.run_worker() == job_id
+        done = env.job(job_id)
+        assert done.status == JobStatus.DONE and done.result_json is not None
+        result = DocumentResult.model_validate(done.result_json)
+        # no model call: the maths and the picture's description are the file's own
+        assert result.origin == "docx" and result.stats.model_calls == 0
+        equation = next(f for f in result.fixes if f.kind is Kind.EQUATION)
+        assert equation.status is Status.ACCEPTED and equation.equation is not None
+        assert "web version of a Word file" in (done.html or "")
+        page = client.get(f"/jobs/{job_id}").text
+        assert "was read from the file itself" in page and "turned into a tagged PDF" not in page
+        # No compile witness ran for a source, so a clean one is not "converted" in a way that
+        # implies its text was compared with a compiled copy: the page and the record say so.
+        said = " ".join(page.split())
+        assert "not compared with its printed pages" in said
+        assert READY_ALL not in said
+        assert (
+            "not compared with its printed pages" in client.get(f"/jobs/{job_id}/record.csv").text
+        )
+        assert client.get(f"/jobs/{job_id}/review/list").status_code == 200
+        # the notice says the Word file is kept as uploaded, and deleting removes every copy
+        assert "the Word .docx file" in " ".join(client.get("/privacy").text.split())
+        token = csrf_from(client.get("/app").text)
+        gone = client.post(f"/jobs/{job_id}/delete", data={"csrf_token": token, "confirm": "yes"})
+        assert gone.status_code == 303 and jobs(env) == [] and blob_count(env) == 0

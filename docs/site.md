@@ -26,7 +26,12 @@ and nothing links to it; `make site OUT=src/readablestem/web/showcase` makes one
 
 Search engines and AI crawlers: `web/seo.py` lists the public pages once (the sitemap names them;
 every other page is `noindex`), and writes `/robots.txt`, `/llms.txt` and the IndexNow key file.
-When a public page's text changes, update its date in `PUBLIC_PAGES` (or `SHOWCASE_UPDATED`).
+`PUBLIC_PAGES` is the one list: path, title, blurb and the files the page's text comes from. The
+sitemap, `llms.txt` and the structured-data dates all read it. A page's date is in
+`web/page_dates.json`, written from `git log` by `scripts/page_dates.py` (the Docker image has no
+`.git`); run it after changing a page's text. `tests/test_web_seo.py` fails when a page's files
+changed after its date. It needs the full history, so it runs on a full clone and is skipped in
+CI's shallow checkout: run the full suite locally before a release.
 
 ## Pages
 
@@ -143,3 +148,4 @@ outside request. `tests/test_design_tokens.py` checks the contrast of every toke
 The landing page's "Hear the difference" is built by `scripts/hero_assets.py` from `web/demo/` (an
 equation-only crop of the PDF page, text layer, MathML, reading, font subset into `web/static/hero/` and `vendor/fonts/`); the app never runs it and
 `tests/test_hero_assets.py` regenerates and compares. The proof tiles on /limits and the comparison chart (compact on the landing page) come from `web/proof_facts.py` (PROOF.md, parsed once into `proof_facts.json`).
+The icons and the social card are drawn from `web/static/icon.svg` (the header's mark in the accent color) by `scripts/brand_icons.py`, offline, with PyMuPDF and Pillow and the vendored fonts; the same test compares them. After a change to the mark, the accent or the card's words, run the script and commit its output. The showcase links `assets/icon.svg` and `assets/favicon.ico` (copied by `site/build.py`) and gives the same `theme-color`.

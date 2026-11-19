@@ -22,7 +22,10 @@ SUP_OPEN = "\ue000"
 SUP_CLOSE = "\ue001"
 SUB_OPEN = "\ue002"
 SUB_CLOSE = "\ue003"
-MARKS = frozenset({SUP_OPEN, SUP_CLOSE, SUB_OPEN, SUB_CLOSE})
+# A kept line end (`Element.runs`, "break"): put just before the space that stands at the end of
+# a line, so the space's place in the final text is known once the text has been cleaned.
+LINE_END = "\ue004"
+MARKS = frozenset({SUP_OPEN, SUP_CLOSE, SUB_OPEN, SUB_CLOSE, LINE_END})
 Kind = Literal["sup", "sub"]
 _OPEN: dict[Kind, str] = {"sup": SUP_OPEN, "sub": SUB_OPEN}
 _CLOSE: dict[Kind, str] = {"sup": SUP_CLOSE, "sub": SUB_CLOSE}
@@ -61,13 +64,23 @@ def split(text: str) -> tuple[str, list[ScriptRun]]:
     its leading and trailing blanks removed (what `Element.text` stores). A run left
     empty, or all blanks, by the removal is dropped; a mark that does not pair up is
     ignored."""
+    stripped, runs, _ = split_lines(text)
+    return stripped, runs
+
+
+def split_lines(text: str) -> tuple[str, list[ScriptRun], list[int]]:
+    """`split`, and where the kept line ends are: the offset in the result of the space each
+    `LINE_END` stands before (a mark not before a space in the result is dropped)."""
     if not has_marks(text):
-        return text.strip(), []
+        return text.strip(), [], []
     out: list[str] = []
     spans: list[tuple[int, int, Kind]] = []
+    ends: list[int] = []
     open_at: tuple[int, Kind] | None = None
     for char in text:
-        if char in _KIND:
+        if char == LINE_END:
+            ends.append(len(out))
+        elif char in _KIND:
             open_at = (len(out), _KIND[char])
         elif char in (SUP_CLOSE, SUB_CLOSE):
             if open_at is not None and len(out) > open_at[0]:
@@ -83,4 +96,5 @@ def split(text: str) -> tuple[str, list[ScriptRun]]:
         start, end = max(start - lead, 0), min(end - lead, len(stripped))
         if end > start and stripped[start:end].strip():
             runs.append(ScriptRun(start=start, end=end, kind=kind))
-    return stripped, runs
+    kept = [at - lead for at in ends]
+    return stripped, runs, [at for at in kept if 0 <= at < len(stripped) and stripped[at].isspace()]

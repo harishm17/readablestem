@@ -298,6 +298,9 @@ def test_two_column_handout_equations_matrices_and_numbers():
     assert "\U0001d6da" in (cross.text or "")  # bold omega (\bm, CMMIB)
     assert "1 2" in (matrix.text or "") and "3 4" in (matrix.text or "")
     assert all(n in plain(system.text) for n in "213135")
+    # both rows of the system's matrix: the second lies inside the box of the first row's
+    # tall bracket, and was left beside the equation as a paragraph of its own
+    assert "2 1 1 3" in (system.text or "")
     assert "proj" in (projection.text or "") and "fraction bar" in projection.reasons
     for equation in equations:
         number = number_rect("linear_algebra_twocol", equation)
@@ -333,3 +336,24 @@ def test_two_column_handout_records_which_letters_are_known_plain():
     assert by_text["v∈Rn"].regular_letters == "n"  # bold v in R^n: R is MSBM
     assert by_text["\u03c9"].regular_letters is None  # bold omega alone
     assert by_text["Ax=b"].regular_letters == "A"  # bold x and b
+
+
+def test_a_picture_environment_drawing_is_one_figure_and_a_font_named_for_a_line_is_text():
+    """A slanted line of LaTeX's picture environment is glyphs of the font line10 (F-550): it
+    was a paragraph of quote marks beside seven equations, with no figure. The glyphs are
+    strokes of the page, so the triangle is one figure that takes its caption. A font whose
+    name only contains "line10" is not a drawing font."""
+    layout = load("picture_environment")
+    figures = [e for e in layout.elements if e.kind == Kind.FIGURE]
+    assert len(figures) == 1
+    assert (figures[0].caption or "").startswith("Figure 1")
+    assert not any('""' in (e.text or "") for e in layout.elements)
+
+    with pymupdf.open() as doc:
+        page = doc.new_page()
+        xref = page.insert_font(fontname="helv")
+        doc.xref_set_key(xref, "BaseFont", "/Underline10")
+        words = "The slope of the ramp is found from its rise and its run. " * 2
+        page.insert_textbox(pymupdf.Rect(72, 72, 540, 200), words, fontname="helv", fontsize=11)
+        text = [e for e in analyze(doc.tobytes()).elements if e.kind == Kind.PARAGRAPH]
+    assert len(text) == 1 and "slope of the ramp" in (text[0].text or "")

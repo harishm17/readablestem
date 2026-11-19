@@ -41,7 +41,6 @@ def student(site: harness.ReplaySite, deck: str) -> lxml.html.HtmlElement:
     return site.student_file(deck)
 
 
-@harness.finding("F-014")
 def test_the_scan_box_says_what_ticking_it_costs(site: harness.ReplaySite) -> None:
     upload = site.page("/app").xpath("//main")[0]
     (box,) = upload.xpath('.//input[@name="image_pages"]')
@@ -57,18 +56,20 @@ def test_every_handwritten_page_is_read(site: harness.ReplaySite, handwritten: s
     assert [alt for alt in pictures if "not converted" in alt] == []
 
 
-@harness.finding("F-255")
-def test_the_title_slide_is_read_once(student: lxml.html.HtmlElement) -> None:
+@pytest.mark.parametrize("name", ["scanned", "mixed"])
+def test_the_title_slide_is_read_once(
+    request: pytest.FixtureRequest, site: harness.ReplaySite, name: str
+) -> None:
+    student = site.student_file(request.getfixturevalue(name))
     headings = Counter(harness.words(h) for h in student.xpath("//h1|//h2|//h3"))
     (top,) = student.xpath("//h1")
     assert headings[harness.words(top)] == 1
 
 
-@harness.finding("F-125")
 def test_a_deck_of_scanned_slides_is_named_by_its_first_slide(
     site: harness.ReplaySite, scanned: str
 ) -> None:
-    # No page of it has text, and today it is named by its file: "w_scan_slides.pdf".
+    # No page of it has text, so the name can only come from what was read on its first slide.
     (name,) = site.page(f"/jobs/{scanned}").xpath("//main//h1")
     (top,) = site.student_file(scanned).xpath("//h1")
     assert harness.words(name).casefold() == harness.words(top).casefold()

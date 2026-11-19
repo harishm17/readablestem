@@ -10,7 +10,8 @@ group (3), an optional note.
 - every mark on the page image is a link at least 24 x 24 CSS px;
 - the whole review can be completed without JavaScript, and after each decision focus is
   on the next decision's heading (with and without JavaScript);
-- keyboard shortcuts are off until turned on and never act while typing;
+- keyboard shortcuts are on until turned off, list their keys in view, never act while typing,
+  and say so when a key has nothing to act on;
 - in forced-colors mode the marks keep colours that show on the (white) page image.
 
 Run with: uv run pytest -m browser tests/test_web_review_split_browser.py
@@ -217,19 +218,44 @@ def mark_in_region(page) -> bool:
 
 @pytest.mark.parametrize(
     "viewport",
-    [NARROW, {"width": 320, "height": 180}, {"width": 844, "height": 390}, PHONE],
-    ids=["320x640", "320x180 (400% zoom)", "844x390 (landscape phone)", "390x844"],
+    [
+        NARROW,
+        {"width": 320, "height": 180},
+        {"width": 844, "height": 390},
+        PHONE,
+        DESKTOP,
+        {"width": 1280, "height": 720},
+    ],
+    ids=[
+        "320x640",
+        "320x180 (400% zoom)",
+        "844x390 (landscape phone)",
+        "390x844",
+        "1440x900",
+        "1280x720",
+    ],
 )
 @pytest.mark.parametrize("item", ["", "?item=p1-e6", f"?item={GROUP}&page=2"])
-def test_stacked_the_selected_mark_is_inside_the_page_region(site, browser, job, viewport, item):
+def test_the_selected_mark_is_inside_the_page_region_and_the_window_stays_at_the_top(
+    site, browser, job, viewport, item
+):
     """Stacked, the page region starts below the window. app.js used to add a window term
     to the region's scroll, which scrolled it to its very end: the mark sat above the
-    visible part. It must be inside, and the window must not move."""
+    visible part. Side by side, the pane was as tall as the window while it starts under the
+    header, so a low mark was below the window and the script moved the window (1280x720,
+    the figure: 40 px). The mark must be inside the region, in the window when the pane is
+    beside the decision, and the window must not move."""
     context, page = open_page(browser, site, viewport=viewport)
     page.goto(f"{site.base}/jobs/{job}/review{item}")
     wait_images(page)
     assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
     assert page.evaluate("window.scrollY") == 0
+    if viewport["width"] >= 1024 and viewport["height"] >= 600:  # side by side, pane sticky
+        edges = page.evaluate(
+            "() => { const m = document.querySelector('.box.is-current').getBoundingClientRect();"
+            " return [m.top, m.bottom, innerHeight]; }"
+        )
+        assert edges[0] >= 0 and edges[1] <= edges[2], edges
     # Scrolling the window down to the region shows the mark (nothing scrolls it away).
     page.locator(".page-scroll").scroll_into_view_if_needed()
     assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
@@ -238,27 +264,36 @@ def test_stacked_the_selected_mark_is_inside_the_page_region(site, browser, job,
 
 @pytest.mark.parametrize("viewport", [DESKTOP, PHONE, NARROW], ids=["1440", "390", "320"])
 def test_every_mark_is_a_link_of_at_least_24_css_px(site, browser, job, viewport):
+    """On each page of the document, which has its own stylesheet of mark positions."""
     context, page = open_page(browser, site, viewport=viewport)
-    page.goto(f"{site.base}/jobs/{job}/review?accepted=1")
-    wait_images(page)
-    sizes = page.eval_on_selector_all(
-        ".box",
-        "els => els.map(e => [e.id, e.tagName, e.getBoundingClientRect().width, "
-        "e.getBoundingClientRect().height])",
-    )
+    found = {}
+    for number in (1, 2):
+        page.goto(f"{site.base}/jobs/{job}/review?accepted=1&page={number}")
+        wait_images(page)
+        found[number] = page.eval_on_selector_all(
+            ".box",
+            "els => els.map(e => { const r = e.getBoundingClientRect();"
+            " return [e.id, e.tagName, r.width, r.height, r.left, r.top]; })",
+        )
     context.close()
-    assert len(sizes) == 6
-    small = [s for s in sizes if s[1] != "A" or s[2] < 24 or s[3] < 24]
-    assert not small, small
+    assert {n: len(boxes) for n, boxes in found.items()} == {1: 6, 2: 2}
+    for boxes in found.values():
+        small = [b for b in boxes if b[1] != "A" or b[2] < 24 or b[3] < 24]
+        assert not small, small
+    # The two marks of page 2 (a heading and an equation, apart on the page) do not overlap.
+    (a, b) = found[2]
+    assert a[4] + a[2] <= b[4] or b[4] + b[2] <= a[4] or a[5] + a[3] <= b[5] or b[5] + b[3] <= a[5]
 
 
 def test_marks_are_named_and_link_to_their_decision(site, browser, job):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}/review")
-    page.get_by_role("link", name="2: Figure 1, needs your decision (2 of 3)").click()
+    page.locator(".page-frame").get_by_role(
+        "link", name="2: Figure 1, needs your decision (2 of 3)"
+    ).click()
     page.wait_for_url(re.compile(r"item=p1-e6"))
     assert "Decision 2 of 3" in page.locator("#decision-title").inner_text()
-    page.get_by_role("link", name=re.compile(r"^3: Heading 2")).first.click()
+    page.locator(".page-frame").get_by_role("link", name=re.compile(r"^3: Heading 2")).first.click()
     assert "Decision 3 of 3" in page.locator("#decision-title").inner_text()
     context.close()
 
@@ -359,15 +394,15 @@ def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site
     assert (fix["status"], fix["equation"]["latex"]) == ("edited", r"\boldsymbol{\omega}")
 
 
-def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser, job):
+def test_keyboard_shortcuts_are_on_by_default_listed_in_view_and_never_fire_while_typing(
+    site, browser, job
+):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(url)
-    page.locator("main").focus()
-    page.keyboard.press("n")
-    assert page.url == url  # off by default
-    page.locator("#shortcuts summary").click()
-    page.get_by_label("Use keyboard shortcuts").check()
+    # On for someone who never chose, with the keys listed beside the switch (no disclosure).
+    assert page.get_by_label("Use keyboard shortcuts").is_checked()
+    assert page.locator("#shortcuts .keys").is_visible()
     page.locator("details.edit-box:has(#latex-p1-e2)").evaluate(
         "d => { d.open = true; }"
     )  # closed by default
@@ -376,13 +411,34 @@ def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser
     page.keyboard.type("n a p")
     assert page.url == url and "n a p" in field.input_value()
     page.locator("#decision-title").focus()
+    page.keyboard.press("Shift+N")  # a held modifier is not a shortcut
+    page.keyboard.press("Control+n")
+    assert page.url == url
+    # A key with nothing to act on says so, in the line the saved notice uses.
+    page.keyboard.press("p")
+    status = page.locator("#decision-notice")
+    page.wait_for_function(
+        "() => document.querySelector('#decision-notice').textContent.includes('no previous')"
+    )
+    assert page.url == url and status.get_attribute("role") == "status"
     page.keyboard.press("n")
     page.wait_for_url(re.compile(r"item=p1-e6"))
+    wait_images(page)
+    assert page.evaluate("document.activeElement.id") == "decision-title"  # the new card's heading
     page.keyboard.press("p")
     page.wait_for_url(re.compile(r"item=p1-e2"))
-    page.locator("#decision-title").focus()
+    wait_images(page)
+    assert page.evaluate("document.activeElement.id") == "decision-title"
     page.keyboard.press("e")
     assert page.evaluate("document.activeElement.id") == "latex-p1-e2"
+    # The same switch turns them off, and a reload keeps it off.
+    page.get_by_label("Use keyboard shortcuts").uncheck()
+    page.reload()
+    assert not page.get_by_label("Use keyboard shortcuts").is_checked()
+    page.locator("#decision-title").focus()
+    page.keyboard.press("n")
+    page.wait_for_timeout(300)
+    assert "item=p1-e6" not in page.url
     context.close()
 
 
@@ -416,4 +472,81 @@ def test_a_flagged_symbol_is_outlined_in_the_proposal(site, browser, job):
     # Same size: the proposal's font is the equation's 11 pt at the crop's scale.
     element_width_pt = 8.71 + 2 * 4 * 11  # the omega's box plus 4 font sizes each side
     assert size == pytest.approx(11 * width / element_width_pt, rel=0.05)
+    context.close()
+
+
+@pytest.fixture
+def abstained_job(site, browser) -> str:
+    """A fresh finished job whose block equation (p1-e5) the tool abstained on: no proposal."""
+    from readablestem.core.types import Status
+    from readablestem.models.fake import FakeVisionClient
+
+    output = review_output()
+    fix = output.result.fix_for("p1-e5")
+    assert fix is not None
+    fix.status, fix.equation, fix.reason, fix.review = (
+        Status.ABSTAINED,
+        None,
+        "low_confidence",
+        "required",
+    )
+    site.converter.output = output
+    answer = {"is_equation": True, "latex": "d_0 = 0", "confidence": 0.99}
+    site.ctx.client_factory = lambda settings, budget: FakeVisionClient(
+        budget=budget, defaults={"equation": answer}
+    )
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/app")
+    page.locator("#pdf").set_input_files(
+        files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": review_pdf()}]
+    )
+    page.get_by_role("button", name="Upload and convert").click()
+    page.wait_for_url(f"{site.base}/jobs/*")
+    job_id = page.url.rsplit("/", 1)[-1]
+    context.close()
+    assert site.run_worker() == job_id
+    site.converter.output = review_output()
+    return job_id
+
+
+def test_an_equation_with_no_proposal_can_be_decided_by_keyboard(
+    site, browser, abstained_job, axe_source
+):
+    """Read again, then Not an equation, by keyboard: the result is announced, focus goes
+    to the decision's heading, Save waits for something typed, and axe finds nothing."""
+    context, page = open_page(browser, site)
+    url = f"{site.base}/jobs/{abstained_job}/review?item=p1-e5"
+    page.goto(url)
+    wait_images(page)
+    page.get_by_text("Edit the LaTeX").click()  # closed until typing is the way forward
+    save = page.get_by_role("button", name=re.compile("^Save edit"))
+    assert save.is_disabled()
+    typed = page.locator("textarea[name=latex]")
+    typed.fill("d_0")
+    assert save.is_enabled()
+    typed.fill("")
+    assert save.is_disabled()
+    assert strict_axe(page, axe_source) == []
+
+    again = page.get_by_role("button", name="Read again")
+    again.focus()
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+    page.wait_for_load_state("networkidle")
+    _wait_focus(page, "decision-title")
+    assert "tool read it again" in page.get_by_role("status").inner_text()
+    assert page.locator(".cmp-math").count() == 1  # a proposal where there was none
+    assert strict_axe(page, axe_source) == []
+
+    page.goto(url)  # a fresh view of the same item
+    page.get_by_role("button", name="Not an equation").focus()
+    with page.expect_navigation():
+        page.keyboard.press("Enter")
+    page.wait_for_load_state("networkidle")
+    _wait_focus(page, "decision-title")
+    assert "now text" in page.get_by_role("status").inner_text()
+    assert page.locator("#fix-p1-e5").count() == 0
+    assert strict_axe(page, axe_source) == []
     context.close()

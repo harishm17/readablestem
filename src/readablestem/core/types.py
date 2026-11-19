@@ -175,6 +175,11 @@ class ModelCall(BaseModel):
     attempt: int = 1
     is_fallback: bool = False
     outcome: Outcome = "ok"
+    # The part of `cost_usd` charged at the reservation, not at what it cost, because a send
+    # may have reached the provider and no usage came back (a connection that failed or
+    # timed out after it was sent). 0: every dollar is a measured one. Left out of the JSON
+    # when 0, so a record of a call with none is unchanged.
+    billed_unseen_usd: float = Field(default=0.0, exclude_if=lambda v: v == 0)
 
 
 class Verification(BaseModel):
@@ -219,6 +224,11 @@ class EquationFix(BaseModel):
     latex: str
     mathml: str  # presentation MathML, <math> root, display attribute set
     speech: str  # plain-English reading, for the review screen and the report
+    # The version of the speech rules that wrote `speech` (`pipeline.speech.SPEECH_VERSION`);
+    # 0 is a reading made before rules had one, left out of the JSON. A reading older than the
+    # rules in force is made again from `mathml` where it is shown (`speech.reading_for`),
+    # unless a person wrote it (a negative version), which is never replaced.
+    speech_version: int = Field(default=0, exclude_if=lambda v: v == 0)
     display: Literal["block", "inline"] = "block"
     # The other reading of this formula when the crop's and the page witness's readings
     # differ (`pipeline.witness_reconcile`): `latex` is the one the glyphs favour (or the
@@ -274,6 +284,10 @@ class TableCell(BaseModel):
         return not (self.text.strip() or (self.latex or "").strip())
 
 
+# Where a table's header meaning came from (`TableGrid.header_source`).
+HeaderSource = Literal["model", "layout", "source", "reviewer", "none"]
+
+
 class TableGrid(BaseModel):
     """A table as a grid of `rows` x `cols` slots and the cells that cover them.
 
@@ -287,6 +301,13 @@ class TableGrid(BaseModel):
     table (text arranged in boxes), which is not written as a data table. `source`:
     "local" when built from the PDF's own words and drawn lines, "model" when the table
     step's model answer was used.
+
+    `header_source` says where the header rows and columns came from: "model" (the table
+    step's model marked the header cells), "layout" (the header rows the reader of the PDF
+    found itself: a ruled line under the row, a gap, a header the table reader marked),
+    "source" (the Word or LaTeX file marks them), "reviewer" (a person chose them on the
+    table card) or "none" (no header cell and no evidence for one: a person decides). None in
+    a result stored before the field existed, which is read as it always was.
     """
 
     rows: int = Field(ge=1, le=MAX_TABLE_ROWS)
@@ -301,6 +322,7 @@ class TableGrid(BaseModel):
     # sideways on an upright page (`pipeline.tables._page_turn`), 0 otherwise. Boxes stay in
     # the page frame.
     turned: Literal[0, 90, 270] = 0
+    header_source: HeaderSource | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 # Codes `grid_problems` can return, in the order it returns them.
@@ -381,12 +403,18 @@ class TableFix(BaseModel):
 # --------------------------------------------------------------------------- figures
 
 FigureType = Literal["chart", "diagram", "photo", "illustration", "table_image", "other"]
+# Why a figure is decoration, beyond the model's word (`pipeline.decoration`, WS6.4): its
+# picture repeats on the pages, it is a rule by its shape, or a person said so.
+Decoration = Literal["repeated", "shape", "person"]
 
 
 class FigureFix(BaseModel):
     figure_type: FigureType
     alt: str  # short alt text; "" only when decorative
     decorative: bool = False
+    # The evidence that a decorative figure is decoration; only then is it written with
+    # empty alt text. Left out of the stored result when there is none.
+    decoration: Decoration | None = Field(default=None, exclude_if=lambda v: v is None)
     # Complex figures (charts, diagrams): a longer description in plain text, written
     # after the figure. None when the figure needs none or the model gave none.
     long_description: str | None = None
@@ -451,21 +479,23 @@ class Link(_Span):
     - "uri": a PDF link to the web or an email address; `href` is http, https or mailto
       (enforced: anything else is a validation error, so it can never reach the output);
     - "internal": a PDF link to a place in this document; `target_id` is the element there;
-    - "crossref": text such as "Figure 2.3", "Equation (3)" or "Table 1"; `target_id` is
-      the figure, equation or table it names.
+    - "crossref": text such as "Figure 2.3", "Equation (3)", "Table 1", "Section 3.2" or
+      "Theorem 2.1"; `target_id` is the element it names;
+    - "typed": a web or email address typed in the text with no link in the file; `href` is
+      as for "uri" (it is not one of the file's links, so the card's link count leaves it out).
     """
 
-    kind: Literal["uri", "internal", "crossref"]
+    kind: Literal["uri", "internal", "crossref", "typed"]
     href: str | None = None
     target_id: str | None = None
 
     @model_validator(mode="after")
     def _target(self) -> Link:
-        if self.kind == "uri":
+        if self.kind in ("uri", "typed"):
             if self.href is None or not is_safe_href(self.href):
-                raise ValueError("a uri link needs an http, https or mailto href")
+                raise ValueError(f"a {self.kind} link needs an http, https or mailto href")
             if self.target_id is not None:
-                raise ValueError("a uri link has no target_id")
+                raise ValueError(f"a {self.kind} link has no target_id")
         else:
             if not self.target_id:
                 raise ValueError(f"an {self.kind} link needs a target_id")
@@ -493,6 +523,31 @@ class ScriptRun(_Span):
     which stays an inline equation)."""
 
     kind: Literal["sup", "sub"]
+
+
+# What a run of an element's text is marked as (`Run`). "deleted": text the page shows struck
+# through (a cancelled date), written as `<del>` with the words "deleted:" and "end deleted"
+# around it (`pipeline.inline_text`). "blank": a gap to fill in, written in text as underscores
+# (typed, or drawn under a gap: `layout._mark_blanks`), and "checkbox": a printed box
+# (U+2610 and its checked forms); both are written with words that say what they are.
+# "strong", "emphasis" and "code": words the page sets in bold, in italic or in a fixed-pitch
+# face inside a paragraph or list item (`<strong>`, `<em>`, `<code>`; `text_pass.style_runs`).
+# "highlight": words the page marks with a highlight annotation or a filled rectangle behind
+# them in a colour of their own (`<mark>`; `text_pass.highlight_runs`).
+# "break": a line end the page keeps (a poem, an address), one run over the space that stands
+# there in `text`, written as `<br>` in its place (`pipeline.inline_text`). It moves with its
+# space when a reviewer edits the words and is dropped when the space goes, like every span.
+# Later kinds are new values here, not new fields.
+RunKind = Literal[
+    "deleted", "blank", "checkbox", "strong", "emphasis", "code", "highlight", "break"
+]
+
+
+class Run(_Span):
+    """A run of an element's `text` with a meaning of its own (`RunKind`). The characters
+    stay in `text` as they were read: a struck date is kept and marked, never removed."""
+
+    kind: RunKind
 
 
 class HeadingFix(BaseModel):
@@ -710,6 +765,11 @@ class Element(BaseModel):
     colour_runs: list[ColourRun] = Field(default_factory=list)
     # Raised and lowered runs of the text (`ScriptRun`), written as <sup> and <sub>.
     script_runs: list[ScriptRun] = Field(default_factory=list)
+    # Marked runs of the text (`Run`: struck text). Left out of the JSON when empty, so an
+    # element without runs is stored, cached and rendered exactly as before runs existed.
+    # Every place that moves, keeps or writes the spans of an element goes through
+    # `core.inline`, so no span is dropped by one place that forgot its field.
+    runs: list[Run] = Field(default_factory=list, exclude_if=lambda v: not v)
     # BCP 47 language of this passage, only when it differs from the document's
     # (`DocumentResult.lang`); written as a `lang` attribute on its block.
     lang: str | None = None
@@ -760,6 +820,24 @@ class Fix(BaseModel):
     # the fixed words (T3-16). Cleaned and checked like any alt text (`web.review`); None
     # when there is none.
     described: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # The sources that raised this decision, the one that opened it first (`core.triage.SOURCES`).
+    # Empty is the pipeline's own flag: every result stored before sources existed. A name
+    # that is not in the table is refused, so no source outside it can ask for a person.
+    sources: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # The risk band of a required decision (`core.triage.risk_rank`), fixed when it was asked:
+    # a review changes the checks and the status the band is read from, and the review order
+    # must not move while a person works. None: not set (read from the fix as it is).
+    band: int | None = Field(default=None, exclude_if=lambda v: v is None)
+
+    @field_validator("sources")
+    @classmethod
+    def _known_sources(cls, value: list[str]) -> list[str]:
+        from readablestem.core.triage import SOURCES
+
+        unknown = [name for name in value if name not in SOURCES]
+        if unknown:
+            raise ValueError("not a source of decisions: " + ", ".join(unknown))
+        return value
 
     @model_validator(mode="before")
     @classmethod
@@ -835,13 +913,21 @@ NOTICE_CODES = frozenset(
         "code_block",  # program code, kept as plain text
         "footnote",  # a footnote, left where it falls in the text
         "colour_reference",  # the text refers to colour ("shown in red")
+        "colour_used",  # text printed in colour that the converted file does not keep
         "colour_only",  # a figure tells things apart by colour alone
         "link_scheme_dropped",  # a PDF link that is not http, https or mailto: text only
         "link_text_unclear",  # link text that says nothing on its own ("click here")
         "lang_detected",  # the document language was detected from the text
-        "lang_assumed",  # no language in the PDF and none detected: the default is used
+        "lang_assumed",  # no language chosen or found in the text, and the file's own does not fit
+        "lang_mixed",  # no one language holds most of the text: the largest is the document's
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
+        "struck_text",  # text the page shows struck through, kept and marked as deleted
+        "form_fields",  # a fillable PDF form: its fields are read as text, not as live inputs
+        "annotations_read",  # comments in the PDF's annotations, included as paragraphs
+        "attachments_not_converted",  # files attached to the PDF, not converted
+        "option_labels",  # answer options (A, B, C) that run together in one paragraph or item
+        "rtl_text",  # right-to-left words, in the order the PDF gives them
         # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text
         # and page types"). The first four have a decision: the page's (or region's)
         # FAILED figure fix with the same reason, grouped by reason.
@@ -851,6 +937,15 @@ NOTICE_CODES = frozenset(
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
+        # The page's drawings were not checked for handwriting: over a count of work, or the
+        # clock guard fired (`page_type.InkBudget`, plan WS14.9). Its typed text was read.
+        "drawings_not_analysed",
+        # A PDF that had to be repaired when it was opened (`source_facts.repair_notices`):
+        # "file_cut_off" when its last pages are empty (`page` the first of them, `count` how
+        # many; required: the owner continues with the pages before them or uploads a fresh
+        # copy), "file_repaired" when it has content on every page (optional).
+        "file_cut_off",
+        "file_repaired",
         # Review edits (T3-16): a page the reviewer left out of the student file.
         "page_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
@@ -861,6 +956,33 @@ NOTICE_CODES = frozenset(
         "second_reader_budget",
         # LaTeX source: text LaTeXML could not read (an unknown command), kept as written.
         "source_error",
+        # LaTeX source: LaTeX errors the reader could not tie to a place in the result, and
+        # pictures the source names that were not found or not read (one decision each).
+        "source_unplaced",
+        "source_figure_missing",
+        # A source job (LaTeX or Word): no compile witness ran, so its text was not compared
+        # with a compiled copy (`core.page_checks`, `source.convert`).
+        "source_not_compared",
+        # A page saved sideways (no /Rotate) that was turned to be read (`layout.document`).
+        "page_turned",
+        # LaTeX source: words or pictures no rule of the reader took (`source.report`
+        # `SourceReport.unread_words`, `unread_pictures`): `count` of them.
+        "source_unread",
+        # Word or PowerPoint upload (`web.office_census`): what the PDF route left out or kept
+        # open, counted from the file. Tracked changes still open are required; the rest are
+        # optional. `count` is the number of changes, notes, slides or comments.
+        "office_tracked_changes",
+        "office_speaker_notes",
+        "office_hidden_slides",
+        "office_comments",
+        # Word file read from the file itself (`source.docx_reader`): what the reader took
+        # out of the reading or could not carry. `count`: words, boxes, parts or changes.
+        "word_hidden_text",  # hidden text, left out as Word hides it
+        "word_text_boxes",  # text in boxes the reader did not read (words lost, counted)
+        "word_headers_footers",  # running headers and footers, not part of the text
+        "word_objects",  # SmartArt, charts or embedded objects: not read
+        "word_tracked_changes",  # tracked changes: the reader took the accepted text
+        "word_rtl_text",  # right-to-left paragraphs: words in reading order, no direction kept
     }
 )
 
@@ -871,13 +993,15 @@ class Notice(BaseModel):
     Content-free like `Check`: a category `code` (see `NOTICE_CODES`), where it is
     (0-based `page`, `element_id`, either may be None for the whole document) and how
     many times it occurs there (`count`). Never document text, so notices can be shown,
-    logged and counted after the document is deleted.
+    logged and counted after the document is deleted; the one exception is `names` below.
 
     `review` places it on the job page: "required" and "none" are listed under "Not
     handled in this file", "optional" under "Worth checking". A notice never adds a
     decision of its own: when something needs one (`review="required"`, e.g. a table
     kept as an image), the decision is the `Fix` with the same `element_id`, and only
-    fixes count towards `DocumentStats.required_decisions`.
+    fixes count towards `DocumentStats.required_decisions`. A required notice no fix
+    stands behind (open tracked changes in a Word file, right-to-left text, answer options run
+    together) keeps the job at "Ready", never "Ready to share": `web.states` lists those codes.
     """
 
     code: str
@@ -885,6 +1009,10 @@ class Notice(BaseModel):
     element_id: str | None = None
     count: int = Field(default=1, ge=1)
     review: Review = "optional"
+    # The names of the files attached to the PDF (`attachments_not_converted`, the only code
+    # that has any): the owner's own words, shown on the owner's pages and kept with the
+    # result, never logged or counted.
+    names: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
 
 
 class SourceFacts(BaseModel):
@@ -947,6 +1075,10 @@ class PageType(BaseModel):
     ink_pen_share: float = Field(default=0.0, ge=0.0, le=1.0)
     ink_size_twins: float = Field(default=0.0, ge=0.0, le=1.0)
     annot_strokes: int = Field(default=0, ge=0)
+    # Why the ink was not analysed, beside the reason "ink_not_analysed": "work" (a count of
+    # work ran out, the same on every machine) or "time" (the clock guard fired). None when
+    # it was analysed, and in a record stored before this was kept.
+    ink_cause: str | None = Field(default=None, exclude_if=lambda v: v is None)
     producer: str = "other"  # a coarse family of the producing software, a hint only
     classifier_version: str = "page-type-v5.1"
 
@@ -1103,11 +1235,14 @@ class SourceProblem(BaseModel):
 class SourceMark(BaseModel):
     """A place in the converted document where LaTeXML left an error node (`ltx_ERROR`): the
     element that holds it (None when the reader did not place it) and whether it sits in a
-    formula. `name` is the node's text (a command, as written), trimmed like `SourceProblem`."""
+    formula. `name` is the node's text (a command, as written), trimmed like `SourceProblem`.
+    `decided`: a formula's error whose element holds a required decision about it (its own
+    equation, or the table, heading or figure that shows the formula as written)."""
 
     name: str = ""
     element_id: str | None = None
     in_formula: bool = False
+    decided: bool = Field(default=False, exclude_if=lambda v: not v)
 
 
 class SourceFigure(BaseModel):
@@ -1125,7 +1260,11 @@ class SourceReport(BaseModel):
     number of error nodes the reader could not tie to an element. `counts` holds every error
     by category, content-free; `problems` keeps at most 20 named lines per category and
     `omitted` the number left out. Harmless warnings (a helper package LaTeXML's own
-    bindings ask for) are counted in `warnings` and never named."""
+    bindings ask for) are counted in `warnings` and never named.
+
+    `unread_words` and `unread_pictures` count what LaTeXML wrote that the reader neither
+    read nor left out by a named rule (`source.ltx_reader.SKIP`); `unread_start` is the
+    first of those words, as written."""
 
     problems: list[SourceProblem] = Field(default_factory=list)
     missing: list[SourceProblem] = Field(default_factory=list)
@@ -1137,12 +1276,16 @@ class SourceReport(BaseModel):
     log_errors: int = 0
     error_nodes: int = 0
     unplaced_errors: int = 0
+    unread_words: int = Field(default=0, ge=0, exclude_if=lambda v: not v)
+    unread_pictures: int = Field(default=0, ge=0, exclude_if=lambda v: not v)
+    unread_start: str = Field(default="", exclude_if=lambda v: not v)
 
     @property
     def empty(self) -> bool:
-        """Nothing to tell the instructor: no error, no missing file, no error node."""
+        """Nothing to tell the instructor: no error, no missing file, no error node, nothing
+        left unread."""
         return not (self.problems or self.missing or self.marks or self.figures) and not (
-            self.log_errors or self.error_nodes
+            self.log_errors or self.error_nodes or self.unread_words or self.unread_pictures
         )
 
 
@@ -1201,10 +1344,18 @@ class DocumentResult(BaseModel):
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.
     image_pages: ImagePagesSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # Where the document came from: "pdf" (every result before this field), "latex" (a LaTeX
-    # source converted by `readablestem.source`, which has no pages to show) or "beamer". Left
+    # source converted by `readablestem.source`, which has no pages to show), "beamer" or "docx"
+    # (a Word file read from the file itself, `source.docx_reader`). Left
     # out of the JSON for a PDF, so a stored result reads the same.
-    origin: Literal["pdf", "latex", "beamer"] = Field(
+    origin: Literal["pdf", "latex", "beamer", "docx"] = Field(
         default="pdf", exclude_if=lambda v: v == "pdf"
+    )
+    # The symbols of the job's course the conversion was handed (`web.worker`, which hands them
+    # over), for the job page's "Read with 6 symbols from ..." line. None: no record (a
+    # result from before it, a document with no course, a source file), left out of the JSON;
+    # an empty list: the course had no symbols then.
+    notation_applied: list[AppliedSymbol] | None = Field(
+        default=None, exclude_if=lambda v: v is None
     )
     # A source only: what LaTeXML reported and where its error nodes are (`SourceReport`).
     # It holds names from the source, so it lives and dies with the document. None for a PDF
@@ -1241,6 +1392,9 @@ class CallFact(BaseModel):
     attempt: int = 1
     is_fallback: bool = False
     outcome: str = "ok"
+    # The part of `cost_usd` charged at the reservation, no usage having come back
+    # (`ModelCall.billed_unseen_usd`): totaled apart from settled spend.
+    billed_unseen_usd: float = 0.0
 
 
 class StageFact(BaseModel):
@@ -1282,6 +1436,9 @@ class ShadowFact(BaseModel):
     page: int | None = None  # 0-based; None for a step over the whole document
     outcome: Literal["same", "differs", "failed"]
     error: str = ""  # the exception's class name when the outcome is "failed"
+    # A step that measures a page (`Shadow.over_line`) says its figure: a share of the page's
+    # words, 0 to 1. None for a step that only compares two answers.
+    share: float | None = None
 
 
 class StepFacts(BaseModel):
@@ -1329,6 +1486,15 @@ class NotationEntry(BaseModel):
     source: Literal["user", "review", "document"] = "user"
 
 
+class AppliedSymbol(BaseModel):
+    """One symbol a conversion was handed from its course, as the job page lists it: the key
+    (`NotationEntry.canonical`) and its meaning, nothing else (not the instructor's spelling or
+    note). User content: stored with the result, deleted with the job, never logged."""
+
+    canonical: str = Field(min_length=1, max_length=64)
+    meaning: NotationMeaning
+
+
 # --------------------------------------------------------------------------- run options
 
 
@@ -1346,6 +1512,8 @@ class ConversionOptions(BaseModel):
     tables: bool = False
     long_descriptions: bool = False
     colour: bool = False
+    # Write struck runs (CONTENT_RUNS, on by default); off, they are counted, not written.
+    content_runs: bool = True
     notation_memory: bool = False
     # A page math pass places each page's equations (ADR 0006).
     page_math: bool = False
@@ -1359,6 +1527,10 @@ class ConversionOptions(BaseModel):
     # `long_descriptions` is on. A per-job choice (the upload form), not a deployment
     # flag, so `from_settings` leaves it off.
     exam_mode: bool = False
+    # The language the person chose at upload ("Language of the document"): the document's
+    # language, stated (`text_pass`). Left out of the dump, so it is no part of a step's key:
+    # no step reads the language, only the text pass and the page's `lang`.
+    language: str | None = Field(default=None, exclude=True)
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ConversionOptions:
@@ -1367,6 +1539,7 @@ class ConversionOptions(BaseModel):
             tables=settings.feature_tables,
             long_descriptions=settings.feature_long_descriptions,
             colour=settings.feature_colour,
+            content_runs=settings.content_runs,
             notation_memory=settings.feature_notation_memory,
             page_math=settings.feature_page_math,
             page_witness=settings.feature_page_witness,

@@ -1,3 +1,6 @@
+{% from "components/forms.html" import form with context %}
+{% from "components/notices.html" import notice_box %}
+{% from "components/fields.html" import field_classes, field_error, field_aria %}
 {# The upload section of My documents (app.html): the file and its submit button together, the
    options as two short groups that each say their current setting in one line and open to
    change it (ux2-lane-a). `form_values`: what the person had set when a refusal sent the form
@@ -7,6 +10,7 @@
 {% set fv = form_values|default(none) %}
 {% set revising = revises|default(none) %}
 {% set exam_on = fv.exam if fv else exam_default|default(false) %}
+{% set chosen_language = fv.language if fv else language_default|default("") %}
 {% set pages_on = fv.image_pages if fv else image_pages_default|default(false) %}
 {% set keep_on = fv.keep if fv else keep_default|default(false) %}
 {% set share_on = fv.share if fv else false %}
@@ -15,7 +19,7 @@
 {% set acc = accepted_revision if revising else accepted %}
 {% set course_error = field_errors.get("course") %}
 {# A group opens by itself when it holds a choice that is not its default, or an error. #}
-{% set open_convert = exam_on or pages_on or picked or course_error or open_convert|default(false) %}
+{% set open_convert = pages_on or picked or course_error or open_convert|default(false) %}
 {% set open_keep = share_on or (fv and keep_on) %}
 <section aria-labelledby="upload-heading" id="upload">
   {% if revising %}
@@ -33,10 +37,9 @@
     {% if sample_job %}
     <a class="sample-link" href="/jobs/{{ sample_job }}">Practice on the sample</a>
     {% else %}
-    <form method="post" action="/sample" class="inline-form sample-link">
-      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% call form("upload.sample", "/sample", {"class": "inline-form sample-link"}) %}
       <button type="submit" class="link-button">Practice on the sample</button>
-    </form>
+    {% endcall %}
     {% endif %}
     {% endif %}
   </div>
@@ -45,34 +48,38 @@
   {# The form would only send the whole file to be refused (UX review MF20): say when
      uploads open again instead. `open_pool_closed`: only the budget set aside for new
      accounts is used up. #}
-  <div class="notice notice-warning">
+  {% call notice_box("warning") %}
     {% if open_pool_closed %}
     <p><strong>Conversions for new accounts are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
     {% else %}
     <p><strong>Conversions are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
     {% endif %}
-  </div>
+  {% endcall %}
   {% elif pages_left == 0 %}
   {# The same for this person's daily page limit (MF20): no form that can only fail. #}
-  <div class="notice" id="upload-closed" tabindex="-1">
+  {% call notice_box("info", id="upload-closed", attrs={"tabindex": "-1"}) %}
     <p><strong>You have converted all {{ page_quota }} pages {% if new_account %}a new account can convert{% else %}you can{% endif %} today.</strong>
-      Uploads open again at {{ next_reset|utc }}.</p>
-  </div>
+      {{ allowance(page_quota, page_quota, "page", next_reset) }} {{ PAGES_RULE }}</p>
+  {% endcall %}
   {% else %}
   {% set pdf_error = field_errors.get("pdf") %}
-  <form method="post" action="/jobs" enctype="multipart/form-data" novalidate class="upload-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("upload.create", "/jobs", {"enctype": "multipart/form-data", "novalidate": true, "class": "upload-form"}, token_in_action=true) %}
     {% if revising %}<input type="hidden" name="revises" value="{{ revising.id }}">{% endif %}
-    <div class="field file-field{% if pdf_error %} field-error{% endif %}">
+    <div class="{{ field_classes(pdf_error, "file-field") }}">
       <label for="pdf">{% if revising %}File{% else %}Files{% endif %}</label>
       {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
       <div class="hint" id="pdf-hint">
         <ul>
           <li>{% with accepted_types = acc %}{% include "_accepted_types.html" %}{% endwith %}</li>
-          <li>{% if not revising %}Up to {{ max_files }} files, each {% endif %}up to {{ max_pages }} pages and {{ max_upload_mb }} MB.</li>
+          <li>{% if revising %}One file, up to {{ one_document }}.{% else %}Up to {{ max_files }} files at a time, each up to {{ one_file }}.{% endif %}</li>
           {% if pages_left is not none %}
-          <li>{{ pages_left }} {{ "page" if pages_left == 1 else "pages" }} left today{% if new_account %}
-            (a new account can convert {{ page_quota }} pages a day){% endif %}; resets at {{ next_reset|utc }}.</li>
+          <li>{{ allowance(page_quota - pages_left, page_quota, "page", next_reset) }}{% if new_account %}
+            That is the limit for a new account.{% endif %} {{ PAGES_RULE }}</li>
+          {% endif %}
+          {% if latex_source and not revising %}
+          <li>Have the LaTeX file this PDF was made from? Upload that instead: its headings, lists, tables
+            and equations are then read from the file itself. From a PDF they have to be worked out
+            from how the page looks.</li>
           {% endif %}
           <li>Your own materials only, with no student records.</li>
         </ul>
@@ -81,22 +88,29 @@
         <summary>More about file types and size</summary>
         <ul>
           {% if not revising %}
-          <li>Larger files (up to {{ source_pages }} pages, {{ upload_limit_mb }} MB) are kept so you choose the pages.</li>
+          <li>A file bigger than one document ({{ one_document }}) is kept so you choose the pages; each part becomes a document.</li>
           {% endif %}
-          {% if office_kinds %}
+          {% if word_source %}
+          <li>A Word (.docx) file is read from the file itself and kept as uploaded; every
+            {{ chars_per_page }} characters or picture count as one page.{% if office_kinds %} A PowerPoint file, or a
+            Word file that cannot be read that way, becomes a PDF first, and the PDF's page count applies.{% endif %}</li>
+          {% elif office_kinds %}
           <li>Word and PowerPoint become a PDF first; its page count applies.</li>
           {% endif %}
           {% if batch_zip and not revising %}
           <li>A zip of PDFs and LaTeX projects works: each becomes a document ({{ max_files }} at a time).</li>
           {% endif %}
           {% if latex_source and not revising %}
-          <li>A LaTeX file (.tex) or project zip (up to 100 MB unpacked, 500 files) also works; every
-            3,000 characters or figure count as one page. Upload Beamer decks as PDF.</li>
+          <li>A LaTeX file (.tex) or project zip (up to {{ project_zip }}) also works; every
+            {{ chars_per_page }} characters or figure count as one page. Upload Beamer decks, and sources that
+            use the {{ refused_classes }} class or the {{ refused_packages }} package, as PDF.
+            <a href="/help/latex">What a LaTeX upload may hold</a>.</li>
           {% endif %}
         </ul>
       </details>
       {% if pdf_error %}
-      <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
+      {{ field_error("pdf-error", pdf_error) }}
+      {% if pdf_error.help %}<p class="hint"><a href="{{ pdf_error.help }}">What this message means</a></p>{% endif %}
       {% endif %}
       {# app.js checks the size and type as soon as a file is chosen and puts what is
          wrong here, before anything is sent (UX review MF21). #}
@@ -106,7 +120,7 @@
              {% if latex_source and not revising %}data-latex="1" {% endif %}{% if batch_zip and not revising %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" {% endif %}data-accepted-what="{{ acc.what }}" data-accepted-note="{{ acc.note }}" data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
              data-limit-bytes="{{ upload_limit_mb * 1024 * 1024 }}" data-limit-mb="{{ upload_limit_mb }}"
              data-max-files="{{ 1 if revising else max_files }}"
-             aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
+             {{ field_aria("pdf-error", pdf_error, "pdf-hint") }}>
     </div>
     {# Only with LaTeX source on, and only for a zip that holds more than one main file. #}
     {% if latex_source and not revising %}
@@ -120,28 +134,47 @@
     </details>
     {% endif %}
 
+    {# Exam mode (Job.exam_mode) is always in view: it changes what students get, so it is not
+       folded into a disclosure. The figure step then describes what is shown and never the
+       result. The words are `exam_words` (web/exam.py), the same on every page that says it. #}
+    <div class="field checkbox-field exam-choice">
+      <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}
+             data-name-words="{{ exam_name_words|join(' ') }}" data-hint="{{ exam_words.file_hint }}">
+      <label for="exam">{{ exam_words.choice }}</label>
+    </div>
+    {# With JavaScript, static/app.js says here, politely, when a chosen file's name reads as
+       an exam and the box is not ticked. It never ticks the box and never moves focus. #}
+    <div id="exam-hint" aria-live="polite"></div>
+
+    {# The language, when the person knows it (Job.language). "Detect it" leaves it to the
+       converter, which then asks for a confirmation when it is not sure. #}
+    <div class="field">
+      <label for="language">Language of the document</label>
+      <select id="language" name="language" aria-describedby="language-hint">
+        <option value=""{% if not chosen_language %} selected{% endif %}>Detect it</option>
+        {% for tag, name in language_options %}
+        <option value="{{ tag }}"{% if tag == chosen_language %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+      <p class="hint" id="language-hint">Screen readers use it to choose a voice. If you pick one, we use it as given and do not detect.</p>
+    </div>
+
     {# Two groups, in the order they are decided. Each says its setting in one line; the
        choices and their longer explanations open under it. #}
     <div class="option-groups">
+      {% if courses or course_error or image_pages_offered|default(false) %}
       <details class="option-group conversion-options" id="group-convert" data-summary="join"{% if open_convert %} open{% endif %}>
         <summary>
           <span class="group-name">How to convert it</span>
           <span class="group-change">Change</span>
           <span class="group-state" id="convert-state" data-group-state>
-            {%- if courses %}{{ course_name or "No course" }} · {% endif -%}
-            {{ "Exam or quiz: figures described without answers" if exam_on else "Figures described normally" }}
-            {%- if image_pages_offered|default(false) %} · {{ "Scanned and handwritten pages converted" if pages_on else "Scanned pages kept as pictures" }}{% endif %}
+            {%- if courses %}{{ course_name or "No course" }}{% endif -%}
+            {%- if courses and image_pages_offered|default(false) %} · {% endif -%}
+            {%- if image_pages_offered|default(false) %}{{ "Scanned and handwritten pages converted" if pages_on else "Scanned pages kept as pictures" }}{% endif %}
           </span>
         </summary>
         <div class="group-body">
           {% include "_course_choice.html" %}
-          {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
-             shown and never the result. #}
-          <div class="field checkbox-field exam-choice">
-            <input type="checkbox" id="exam" name="exam" value="on"{% if exam_on %} checked{% endif %}
-                   data-on="Exam or quiz: figures described without answers" data-off="Figures described normally">
-            <label for="exam">Exam or quiz: describe figures without giving answers</label>
-          </div>
           {# ADR 0007: scanned and handwritten pages are read from an image of the page when the
              owner asks (Job.image_pages). Offered by FEATURE_IMAGE_PAGES; used only for a PDF the
              server finds scanned or handwritten pages in. The first line is the rule: a PDF that
@@ -155,11 +188,13 @@
             <p class="hint" id="image-pages-hint">Needed for a PDF that is all scans or handwriting;
               it is refused without it. In a mixed PDF, scanned pages stay pictures marked
               “Not converted” unless you check it. Slower; you check every converted equation
-              and table.</p>
+              and table. {{ image_pages_cost|default("") }}{% for m in sent_material|default([]) if m.key == "scanned_pages" %} A
+              picture of each such page goes to {{ m.to|join(" and ") }}.{% endfor %}</p>
           </div>
           {% endif %}
         </div>
       </details>
+      {% endif %}
 
       {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
          `retention_hours` after the last activity. The privacy page (privacy.html) says the
@@ -196,6 +231,6 @@
       <p id="upload-status" class="upload-status" role="status"></p>
     </div>
     <p class="hint vendor-line" id="vendor-line">{% include "_vendor_line.html" %}</p>
-  </form>
+  {% endcall %}
   {% endif %}
 </section>

@@ -2,8 +2,8 @@
 
 Four unconverted equations in a multiple-choice list were four identical "Equation not
 converted" answers. The alt text is now the text the PDF holds for the equation's region,
-said to be what the PDF holds and not checked; without usable text it names the equation's
-number; it never says anything the PDF did not.
+said to be what the PDF holds (and, in a draft, not checked); without usable text it names the
+equation's number; it never says anything the PDF did not.
 """
 
 from __future__ import annotations
@@ -16,9 +16,11 @@ import pytest
 from readablestem.core.types import Element, Fix, Kind, Status
 from readablestem.eval.invented.read import _placeholder_alts
 from readablestem.pipeline.assemble import (
+    CHECKER,
     EQUATION_FLAT_ALT_SUFFIX,
     EQUATION_NOT_CONVERTED_ALT,
     EQUATION_TEXT_ALT_SUFFIX,
+    STUDENT,
     equation_alt,
     render_html,
 )
@@ -50,12 +52,12 @@ def alts(html: str) -> list[str]:
 @pytest.mark.parametrize(
     ("text", "label", "alt"),
     [
-        ("6.0 m/s", None, "6.0 m/s, read from the PDF text; not checked"),
-        ("v = d / t", "(2.4)", "Equation (2.4): v = d / t, read from the PDF text; not checked"),
+        ("6.0 m/s", None, f"6.0 m/s{EQUATION_TEXT_ALT_SUFFIX}"),
+        ("v = d / t", "(2.4)", f"Equation (2.4): v = d / t{EQUATION_TEXT_ALT_SUFFIX}"),
         (
             "  v   =\n d / t ",
             "2.4",
-            "Equation (2.4): v = d / t, read from the PDF text; not checked",
+            f"Equation (2.4): v = d / t{EQUATION_TEXT_ALT_SUFFIX}",
         ),
         (None, "(2.4)", "Equation (2.4), not converted"),
         ("", "Eq. 2.4", "Equation (2.4), not converted"),
@@ -76,7 +78,7 @@ def test_equation_alt(text, label, alt):
 def test_text_that_may_have_lost_its_fractions_and_exponents_says_so(reason):
     alt = equation_alt(equation("v2 = v20 + 2ad", reasons=["relation symbol", reason]))
     assert alt == f"v2 = v20 + 2ad{EQUATION_FLAT_ALT_SUFFIX}"
-    assert "fractions and exponents may run together" in alt and alt.endswith("not checked")
+    assert "fractions and exponents may run together" in alt
     plain = equation_alt(equation("v = 5", reasons=["relation symbol", "math font"]))
     assert plain == f"v = 5{EQUATION_TEXT_ALT_SUFFIX}"
 
@@ -101,18 +103,40 @@ def test_text_that_looks_like_markup_is_escaped_in_the_attribute():
         crops={"p1-e1": crop()},
     )  # fmt: skip
     assert "<script>" not in html
-    assert alts(html) == [
-        "a &lt; b &quot;and&quot; &lt;script&gt;, read from the PDF text; not checked"
-    ]
+    assert alts(html) == [f"a &lt; b &quot;and&quot; &lt;script&gt;{EQUATION_TEXT_ALT_SUFFIX}"]
+
+
+def test_only_a_draft_tells_the_checker_the_text_was_not_checked():
+    """The student file's alt text says where the words are from; the sentence that the PDF's
+    text was not compared with the page is written to the person who checks, so only a
+    draft's page (`audience="checker"`) has it."""
+    for flat in ((), ("fraction bar",)):
+        element = equation("v = d / t", "(2.4)", reasons=list(flat))
+        student, checker = equation_alt(element), equation_alt(element, CHECKER)
+        assert "checked" not in student and student.startswith("Equation (2.4): v = d / t")
+        assert checker.endswith("not checked") and checker.startswith(student.split(", as ")[0])
+    pages = {
+        audience: render_html(
+            title="T",
+            lang="en",
+            elements=[equation("v = 5")],
+            fixes=[failed()],
+            crops={"p1-e1": crop()},
+            audience=audience,
+        )
+        for audience in (STUDENT, CHECKER)
+    }
+    assert "not checked" not in pages[STUDENT] and "not checked" in pages[CHECKER]
 
 
 def test_the_invented_content_reader_does_not_count_these_alts_as_content():
     patterns = _placeholder_alts()
     for alt in (
         "Equation (2.4), not converted",
-        "6.0 m/s, read from the PDF text; not checked",
-        "Equation (2.4): v = d / t, read from the PDF text; not checked",
+        f"6.0 m/s{EQUATION_TEXT_ALT_SUFFIX}",
+        f"Equation (2.4): v = d / t{EQUATION_TEXT_ALT_SUFFIX}",
         f"v2 = v20{EQUATION_FLAT_ALT_SUFFIX}",
+        "6.0 m/s, read from the PDF text; not checked",
         EQUATION_NOT_CONVERTED_ALT,
     ):
         assert any(p.fullmatch(alt) for p in patterns), alt

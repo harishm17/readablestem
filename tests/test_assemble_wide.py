@@ -15,7 +15,17 @@ from pathlib import Path
 
 import pytest
 
-from readablestem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
+from readablestem.core.types import (
+    Element,
+    EquationFix,
+    Fix,
+    Kind,
+    Status,
+    TableCell,
+    TableFix,
+    TableGrid,
+    inline_marker,
+)
 from readablestem.pipeline.assemble import (
     render_html,
     sanitize_mathml,
@@ -78,9 +88,8 @@ def opening_tag(html: str, element_id: str) -> str:
 def test_only_wide_equations_become_named_tab_stops():
     html = document([SHORT, long_sum(), long_sum()], [None, None, "(2.4)"])
     assert "tabindex" not in opening_tag(html, "p1-e0")
-    assert opening_tag(html, "p1-e1") == (
-        '<div class="equation" id="p1-e1" tabindex="0" role="group" aria-label="Equation">'
-    )
+    wide = opening_tag(html, "p1-e1")
+    assert 'tabindex="0"' in wide and 'role="group"' in wide and 'aria-label="Equation"' in wide
     assert 'aria-label="Equation (2.4)"' in opening_tag(html, "p1-e2")
     assert all(c.passed for c in static_checks(html))
 
@@ -110,7 +119,19 @@ MEASURE = """() => ({
 })"""
 
 
-def in_chromium(html: str, script: str, *, keys: list[str] | None = None, until: str | None = None):
+def in_chromium(
+    html: str,
+    script: str,
+    *,
+    focus: str | None = None,
+    keys: list[str] | None = None,
+    until: str | None = None,
+    width: int = 320,
+    media: str | None = None,
+):
+    """`script`'s result before and after the keyboard. `focus` is a JavaScript condition:
+    Tab is pressed until it holds (the skip link and the notice's link come first, and how
+    many links the page opens with is not what these tests are about)."""
     sync_api = pytest.importorskip("playwright.sync_api")
     with sync_api.sync_playwright() as playwright:
         try:
@@ -118,9 +139,18 @@ def in_chromium(html: str, script: str, *, keys: list[str] | None = None, until:
         except sync_api.Error:
             pytest.skip("Playwright's Chromium is not installed")
         try:
-            page = browser.new_page(viewport={"width": 320, "height": 640})
+            page = browser.new_page(viewport={"width": width, "height": 640})
+            if media:
+                page.emulate_media(media=media)
             page.set_content(html)
             before = page.evaluate(script)
+            for _ in range(8 if focus else 0):
+                page.keyboard.press("Tab")
+                if page.evaluate(focus):
+                    break
+            else:
+                if focus:
+                    raise AssertionError(f"Tab never reached: {focus}")
             for key in keys or []:
                 page.keyboard.press(key)
             if until:  # keyboard scrolling is smooth, so it ends a little later
@@ -151,8 +181,12 @@ def test_the_keyboard_reaches_and_scrolls_a_wide_equation():
                        document.getElementById('p1-e0').scrollLeft]"""
     scrolled = "document.getElementById('p1-e0').scrollLeft > 0"
     before, after = in_chromium(
-        html, script, keys=["Tab", "Tab", "ArrowRight"], until=scrolled
-    )  # skip link, then the box
+        html,
+        script,
+        focus="document.activeElement.id === 'p1-e0'",
+        keys=["ArrowRight"],
+        until=scrolled,
+    )
     assert before == ["", 0]
     assert after[0] == "p1-e0" and after[1] > 0
 
@@ -180,11 +214,15 @@ def test_a_wide_inline_equation_scrolls_in_its_box_and_the_page_does_not():
       return {page: [document.documentElement.scrollWidth,
                      document.documentElement.clientWidth],
               overflows: box.scrollWidth > box.clientWidth + 1,
-              active: document.activeElement.className};
+              active: document.activeElement.classList.contains('equation-scroll')};
     }"""
-    before, after = in_chromium(paragraph_with([SHORT, long_sum()]), script, keys=["Tab", "Tab"])
+    before, after = in_chromium(
+        paragraph_with([SHORT, long_sum()]),
+        script,
+        focus="document.activeElement.classList.contains('equation-scroll')",
+    )
     assert before["page"][0] <= before["page"][1] and before["overflows"]
-    assert after["active"] == "equation-scroll"  # the first tab stop after the skip link
+    assert after["active"]  # the keyboard reaches the wide one
 
 
 @pytest.mark.browser
@@ -197,3 +235,50 @@ def test_axe_finds_no_problems_with_wide_equations():
     if len(checks) == 1 and checks[0].code == "skipped":
         pytest.skip("axe-core needs Playwright and its Chromium")
     assert [c.name for c in checks] == ["axe"] and checks[0].passed
+
+
+def table_and_equations() -> str:
+    """A table of nine columns of unbreakable numbers (far wider than a sheet) between a
+    long chain of terms, a medium one that fits when scaled, and a short one."""
+    cells = [TableCell(row=0, col=c, text=f"Reading {c}", header="col") for c in range(9)]
+    cells += [TableCell(row=1, col=c, text=f"0.{c}12345678901234") for c in range(9)]
+    grid = TableGrid(rows=2, cols=9, cells=cells, header_rows=1, caption="Table 3 Readings.")
+    elements = [Element(id="t", kind=Kind.TABLE, page=0, bbox=(0, 0, 1, 1), order=0, table=grid)]
+    fixes = [Fix(element_id="t", kind=Kind.TABLE, status=Status.ACCEPTED,
+                 table=TableFix(grid=grid))]  # fmt: skip
+    for i, mathml in enumerate([long_sum(60), long_sum(10), SHORT], start=1):
+        elements.append(
+            Element(id=f"e{i}", kind=Kind.EQUATION, page=0, bbox=(0, i, 1, i + 1), order=i,
+                    display="block")
+        )  # fmt: skip
+        fixes.append(
+            Fix(element_id=f"e{i}", kind=Kind.EQUATION, status=Status.ACCEPTED, confidence=0.95,
+                equation=EquationFix(latex="x", mathml=mathml, speech="x", display="block"))
+        )  # fmt: skip
+    return render_html(title="Wide", lang="en", elements=elements, fixes=fixes, crops={})
+
+
+PAPER = """() => {
+  const sheet = window.innerWidth;
+  const table = document.querySelector('table').getBoundingClientRect();
+  const noted = (box) => box.classList.contains('pw')
+    && getComputedStyle(box, '::after').display !== 'none';
+  return {
+    pageScrolls: document.documentElement.scrollWidth > sheet,
+    tableInside: table.left >= 0 && table.right <= sheet + 1,
+    // Each equation is inside the sheet or says on paper that it is not.
+    equations: [...document.querySelectorAll('.equation')].map((box) =>
+      box.querySelector('math').getBoundingClientRect().right <= sheet + 1 || noted(box)),
+    notes: [...document.querySelectorAll('.equation')].map(noted),
+  };
+}"""
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize("sheet", [720, 480])  # Letter at 100% and at 150% (0.5 in margins)
+def test_on_paper_a_wide_table_and_a_long_equation_are_not_cut_without_a_note(sheet):
+    facts, _ = in_chromium(table_and_equations(), PAPER, width=sheet, media="print")
+    assert not facts["pageScrolls"]
+    assert facts["tableInside"]  # the table wraps inside the sheet, it does not scroll
+    assert all(facts["equations"])
+    assert facts["notes"] == [True, False, False]  # only the one too wide even when scaled

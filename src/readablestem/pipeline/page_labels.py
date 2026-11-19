@@ -27,6 +27,8 @@ from collections.abc import Iterable
 
 import pymupdf
 
+from readablestem.pipeline import page_type
+
 MAX_LABEL = 16
 # A label from the PDF: letters, digits, and the few joiners real labels use ("A-3", "2.1").
 _LABEL = re.compile(rf"[A-Za-z0-9][A-Za-z0-9.\-]{{0,{MAX_LABEL - 1}}}")
@@ -94,7 +96,9 @@ def _margin_number(page: pymupdf.Page) -> tuple[str, int] | None:
     """("arabic" | "roman", value) of the number printed alone in the top or bottom margin."""
     height = page.rect.height
     found: list[tuple[str, int]] = []
-    for _x0, y0, _x1, y1, text, *_ in page.get_text("blocks"):
+    for _x0, y0, _x1, y1, text, *_ in page.get_text(
+        "blocks", flags=pymupdf.TEXTFLAGS_BLOCKS | page_type.actualtext_flag(page)
+    ):
         if not (y1 <= BAND * height or y0 >= (1 - BAND) * height):
             continue
         for line in str(text).splitlines():
@@ -147,6 +151,7 @@ def read(pdf_bytes: bytes, pages: Iterable[int]) -> dict[int, str]:
                 continue
             with contextlib.suppress(Exception):
                 page = doc[index]
+                page_type.turn_page(page)
                 if label := pdf_label(page):
                     labels[index] = label
                 elif (number := _margin_number(page)) is not None:

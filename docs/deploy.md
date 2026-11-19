@@ -253,6 +253,28 @@ Things that differ from OpenAI, all on by default and safe to leave:
   could not make a single call and every element came back "not converted"
   (`budget_job_usd`). `tests/test_models_pricing_images.py` keeps the reservation an upper
   bound of what a call can bill.
+- **Measured sizes (WS10.4).** For the steps that were measured, the reservation is the
+  smaller of that worst case and a size fixed from the calls of the corpus replay (39
+  uploads, 1,376 calls, measured 2026-11-18; `models/pricing.py`, `RESERVATIONS`): twice
+  the dearest call of the step and model, rounded up. Equations $0.0015 (`claude-haiku-5-5`)
+  and $0.046 (`claude-opus-5-5`); figures $0.0015 and $0.065; image pages $0.142 (opus);
+  tables $0.012 and $0.12. The worst case was $0.0020 to $0.0036 on haiku and $0.10 to $0.27
+  on opus. A step with no row (`page_math`, `page_witness`, OpenAI) keeps the worst case: no
+  call of those steps is in the recordings. The table has no setting: a size changes with a
+  new measurement. In the replay no call settled above its reservation. A call that is
+  charged at its reservation because no usage came back (a timeout after the send) is stored
+  with `job_calls.billed_unseen_usd` and is totaled apart from settled spend on `/admin` and
+  in `ops step-report`.
+- **A cap never refuses what a settle would free.** A reservation that does not fit under a
+  job or day cap while other calls of the job are in flight waits for one of them to settle
+  (at most 120 s) and is tried once more; the job stops only if it still does not fit. A
+  `--max-usd`, or a `MAX_USD_PER_JOB` set in production, below one largest reservation for
+  each step the job runs at once (`ops.limits.in_flight_usd`) is refused when it is set.
+- **Spent and held.** `jobs.cost_usd` is spent plus what the calls in flight hold, because
+  the caps count both. `jobs.held_usd` is the part of it that is held, and
+  `Job.settled_usd` (`cost_usd - held_usd`) is what the job has spent. A page that shows a
+  running cost shows `settled_usd`, which never exceeds the final figure, and may say
+  "up to $X held" from `held_usd`.
 
 ### Spend limits
 
@@ -292,7 +314,7 @@ calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 | `SIGNUP_MODE` | `allowlist` (default), **`open`** for a beta anyone can try | any | See "Open sign-up" below |
 | `OPEN_TIER_DAILY_PAGE_QUOTA` / `OPEN_TIER_DAILY_REREADS` | **150** / **30** | any | A new account can convert one full-size (100-page) document and a shorter one, or several handouts, and read 30 marked regions a day. At $0.015 a page, 150 pages is $2.25: two accounts at their quota would use the pool below |
 | `MAX_NEW_ACCOUNTS_PER_DAY` | **100** | any | 100 accounts x 150 pages x $0.015 is $225 if every one used its quota, far more than the pool pays for: the pool, not the count, is the bound on money |
-| `OPEN_TIER_DAILY_SPEND_CAP_USD` | **$4** | any | Inside `DAILY_SPEND_CAP_USD`; about 260 dense pages a day for all new accounts together |
+| `OPEN_TIER_DAILY_SPEND_CAP_USD` | **$4** | any | Inside `DAILY_SPEND_CAP_USD`; about 260 dense pages a day for all new accounts together, or about 725 pages at the measured median of $0.0055 a page (`eval cost`, 2026-11); pages dense with equations use more of it, and `/limits` says so. The value is not in `ops/production.profile.toml` (it is listed there as an operations setting, never valued), and the live value was not read: $4 is the code default |
 
 If you set `MAX_USD_PER_PAGE`/`MAX_USD_PER_JOB` yourself, they apply to whichever provider
 is selected. The worst case for the day: $10 a day is $300 a month; the Anthropic
@@ -363,7 +385,7 @@ at the next deploy: put it in the file. Choices for the beta, and why:
 | `FEATURE_NOTATION_MEMORY` | on | A course's second chapter reads its notation hints. It stores course names and notation; the privacy page says so (`launch-check` verifies) |
 | `FEATURE_TABLES` | **on** | The owner's decision of 2026-10-21 (docs/tables.md, "The decision"). Off, a table stays an image with a required decision and its formulas are lost. On: real `<table>` for $0.007 each, but the worst-case reservation rises to $0.53 a call, so the page cap must be at least $0.53 and the job cap at least $5.71 (the Claude defaults, $1.00 and $6.00, pass; `deploy/deploy.env.example` sets `MAX_USD_PER_PAGE=2.20`, which lets a one-page job hold four calls at once). Known: tables of unruled lists and of long wrapped text are missed (real-document recall 0.56), which stay as they were with the flag off |
 | `FEATURE_COLOUR` | off | No eval has turned it on |
-| Everything else | Railway only | `deploy.sh` passes only the switches in this table. The settings added later (`FEATURE_IMAGE_PAGES`, `FEATURE_PAGE_WITNESS`, `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP`) are not in the script's list, so a Cloud Run deployment runs with their code defaults (all off). Which are on in production: the production profile, `src/readablestem/ops/production.profile.toml` |
+| Everything else | Railway only | `deploy.sh` passes only the switches in this table. The settings added later (`FEATURE_IMAGE_PAGES`, `FEATURE_PAGE_WITNESS`, `CONTENT_RUNS`, `EQUATION_GLYPH_RECONCILE`, `EQUATION_GLYPH_CHECKS`, `EQUATION_LINE_CONTEXT`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `REGION_TREE`, `FEATURE_LATEX_SOURCE`, `FEATURE_BEAMER_SOURCE`, `FEATURE_BATCH_ZIP`) are not in the script's list, so a Cloud Run deployment runs with their code defaults (all off except `CONTENT_RUNS`, which is on). Which are on in production: the production profile, `src/readablestem/ops/production.profile.toml` |
 | `DECISIONS_*` | off with Claude | The Decisions API is OpenAI's. With `MODEL_PROVIDER=anthropic` the script writes the three switches as `false`; the app ignores them for that provider either way |
 | `FEEDBACK_URL` | empty | The footer then links to an email to `CONTACT_EMAIL`. A form service is a new data processor; name it on the privacy page first |
 
@@ -794,6 +816,14 @@ fixes (`Kind.TABLE`, made whatever `FEATURE_TABLES` says), which a release befor
 table returns 500 on its job page and review screens (the download still works) until
 traffic goes forward again; jobs without tables, and the schema, are fine. Roll back
 below 0.4.0 only for a short time, or not at all.
+
+The same limit stands at 0.5.12. A result it stores can hold values the release before
+it (0.5.10) refuses to load: a link of kind `typed` (an address typed in the text), the
+notice codes that are new (`colour_used`, `struck_text`, `annotations_read`,
+`source_not_compared` and others), the run kinds, and the origin `docx`. A rollback below
+0.5.12 is safe only until the first document is converted, or converted again, by the new
+release: after that each such document returns 500 on its job page and review screens
+until traffic goes forward again. Once anything has been converted, fix forward.
 
 If data has to come back, restore a backup (this overwrites the instance's current
 data):

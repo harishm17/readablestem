@@ -1,4 +1,6 @@
+{% from "components/forms.html" import form with context -%}
 <!doctype html>
+{% from "components/notices.html" import notice_box %}
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -28,9 +30,14 @@
   <meta name="twitter:image" content="{{ site_url }}{{ static_url('social-card.png') }}">
   <meta name="twitter:image:alt" content="ReadableSTEM: accessible HTML from STEM course PDFs. An equation from a PDF beside the note that the web page has it as real maths (MathML) a screen reader can read.">
   <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true, "selfRequestsOnly": true}'>
+  {# The icons are drawn from static/icon.svg by scripts/brand_icons.py; the .ico is the fallback. #}
+  <link rel="icon" href="{{ static_url('icon.svg') }}" type="image/svg+xml" sizes="any">
   <link rel="icon" href="/favicon.ico" sizes="48x48">
-  <link rel="icon" href="{{ static_url('icon-192.png') }}" type="image/png" sizes="192x192">
   <link rel="apple-touch-icon" href="{{ static_url('apple-touch-icon.png') }}">
+  <link rel="manifest" href="/site.webmanifest">
+  {# The page background (--bg in tokens.css), for the browser's own bar. #}
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0f1115" media="(prefers-color-scheme: dark)">
   <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-400.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="/static/vendor/fonts/source-sans-3-5.3.1-latin-700.woff2" as="font" type="font/woff2" crossorigin>
   {% block font_preload %}{% endblock %}
@@ -49,8 +56,6 @@
   {{ json_ld(request.url.path, self.title() ~ " | ReadableSTEM", self.description()) }}
   {% endif %}
 </head>
-{# A page asks for the short footer with a top-level `{% set footer_mode = "minimal" %}` (the
-   sign-in pages). #}
 <body class="{% block body_class %}{% endblock %}">
   <a class="skip-link" href="#main">Skip to main content</a>
   {# A page can add its own skip links here (the review screen: "Skip to the decision"). #}
@@ -90,12 +95,11 @@
       </details>
       <div class="account">
         {% if user %}
-        <form method="post" action="/logout" class="inline-form">
-          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        {% call form("signout", "/logout", {"class": "inline-form"}) %}
           <span class="visually-hidden">Signed in as {{ user.email }}. </span>
           <button type="submit" class="link-button">Sign out</button>
-        </form>
-        {% else %}
+        {% endcall %}
+        {% elif request is not defined or not request.url.path.startswith(("/login", "/dev-login")) %}
         <a class="button-secondary button-small" href="/login">Sign in</a>
         {% endif %}
       </div>
@@ -106,105 +110,17 @@
     {# A live region present at page load is not announced, so the first one-time notice
        (after a POST-redirect, e.g. "deleted") takes focus instead. #}
     {% for item in flash if not item.element_id %}
-    <div class="notice" role="status" tabindex="-1"{% if loop.first %} autofocus{% endif %}><p>{{ item.message }}</p></div>
+    {{ notice_box(item.kind|default("info"), body=item.message, role="status", attrs={"tabindex": "-1", "autofocus": true if loop.first else none}) }}
     {% endfor %}
     {% block content %}{% endblock %}
   </main>
 
-  {% if footer_mode|default("") == "minimal" %}
-  {# Sign-in pages: one task, so only the notices that bear on it. #}
-  <footer class="site-footer site-footer-compact">
-    <div class="{{ self.main_class() }}">
-      <nav aria-label="Footer">
-        <ul class="footer-compact-links">
-          <li><a href="/terms">Terms</a></li>
-          <li><a href="/privacy">Privacy</a></li>
-          <li><a href="/limits">Known limits</a></li>
-          <li><a href="/status">Service status</a></li>
-          <li><a href="/terms#open-source">Open source</a></li>
-        </ul>
-      </nav>
-    </div>
-  </footer>
-  {% elif compact_footer|default(false) %}
-  {# Signed-in pages: the help and trust links on one line (the guides and the page for
-     accessibility offices are reached from the header and the guides page). Public pages keep
-     the full footer. #}
-  <footer class="site-footer site-footer-compact">
-    <div class="{{ self.main_class() }}">
-      <nav aria-label="Footer">
-        <ul class="footer-compact-links">
-          <li><a href="/help/posting">Posting in your course</a></li>
-          <li><a href="/limits">Known limits</a></li>
-          <li><a href="/privacy">Privacy</a></li>
-          <li><a href="/terms">Terms</a></li>
-          <li><a href="/status">Service status</a></li>
-          {% if feedback_url %}
-          <li><a href="{{ feedback_url }}">Send feedback</a></li>
-          {% elif contact_email %}
-          <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
-          {% endif %}
-        </ul>
-      </nav>
-      <p class="footer-note">Built and maintained by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>.
-        <a href="/for-accessibility-offices#continuity">Support and continuity</a>.
-        <a href="/terms#open-source">Open source</a>.</p>
-    </div>
-  </footer>
-  {% else %}
-  <footer class="site-footer">
-    <div class="{{ self.main_class() }}">
-      <nav aria-label="Footer" class="footer-cols">
-        <div>
-          <h2>Product</h2>
-          <ul>
-            <li><a href="/demo"{% if active == "demo" %} aria-current="page"{% endif %}>Demo</a></li>
-            <li><a href="/help/posting"{% if active == "posting" %} aria-current="page"{% endif %}>Posting in your course</a></li>
-            <li><a href="/status"{% if active == "status" %} aria-current="page"{% endif %}>Service status</a></li>
-            {% if showcase_on %}
-            <li><a href="/showcase/examples/">Worked examples</a></li>
-            {% endif %}
-          </ul>
-        </div>
-        <div>
-          <h2>Trust</h2>
-          <ul>
-            <li><a href="/privacy"{% if active == "privacy" %} aria-current="page"{% endif %}>Privacy</a></li>
-            <li><a href="/terms"{% if active == "terms" %} aria-current="page"{% endif %}>Terms</a></li>
-            <li><a href="/limits"{% if active == "limits" %} aria-current="page"{% endif %}>Known limits</a></li>
-            <li><a href="/for-accessibility-offices"{% if active == "offices" %} aria-current="page"{% endif %}>For accessibility offices</a></li>
-          </ul>
-        </div>
-        <div>
-          <h2>Guides</h2>
-          <ul>
-            <li><a href="/guides"{% if active == "guides" %} aria-current="page"{% endif %}>All guides</a></li>
-            <li><a href="/guides/ada-title-ii-stem-course-materials"{% if active == "guide-ada" %} aria-current="page"{% endif %}>ADA Title II guide</a></li>
-            <li><a href="/guides/readablestem-mathpix-latexml"{% if active == "guide-compare" %} aria-current="page"{% endif %}>Choosing a tool</a></li>
-          </ul>
-        </div>
-        <div>
-          <h2>Source</h2>
-          <ul>
-            <li><a href="{{ source_url }}">Source code</a></li>
-            <li><a href="/terms#open-source">Open source</a></li>
-            {% if showcase_on %}
-            <li><a href="/showcase/method/">Method and limits</a></li>
-            {% endif %}
-            {% if feedback_url %}
-            <li><a href="{{ feedback_url }}">Send feedback</a></li>
-            {% elif contact_email %}
-            <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
-            {% endif %}
-          </ul>
-        </div>
-      </nav>
-      <p class="footer-note">Built and maintained by <a href="https://harishmanoharan.com/?ref=readablestem">Harish Manoharan</a>.
-        <a href="/for-accessibility-offices#continuity">Support and continuity</a>.
-        <a href="{{ source_url }}">Open source</a>{% if contact_email %} · <a href="mailto:{{ contact_email }}">Contact</a>{% endif %}</p>
-    </div>
-  </footer>
-  {% endif %}
+  {# The footer partial holds the one list of links; a page asks for the short footer with a
+     top-level `{% set footer_mode = "minimal" %}` (the sign-in pages), and signed-in pages get
+     the compact one (`compact_footer`, web.deps). #}
+  {% with frame_mode = "minimal" if footer_mode|default("") == "minimal" else ("compact" if compact_footer|default(false) else "full"), frame_wrap = self.main_class() %}
+  {% include "_footer.html" %}
+  {% endwith %}
   {% for event in analytics_events %}
   <span hidden data-ph-event="{{ event.name }}" data-ph-props='{{ event.props|tojson }}'></span>
   {% endfor %}

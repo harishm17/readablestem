@@ -28,6 +28,12 @@ the way the PDF probe is (`web.pdf_probe`, `web.uploads`):
 - The file is written to a private temporary directory (mode 0700) for the seconds the
   conversion takes, because LibreOffice reads files and not pipes; the directory is
   removed in a `finally`. The container's file system is not kept across restarts.
+- **What the PDF route does with the file** (`Census`, counted by `preflight` in the same child
+  from the parts the checks already read): counts only, no text. One pass of the hardened
+  parser over each part it needs, a parser target that builds no tree, and the declared size of
+  the part as its limit, as for the checks. The job keeps the counts (`jobs.office_json`) and
+  `web.office_census` says from them what the PDF does not carry and what it shows that it
+  should not.
 - A file that fails any check, or that LibreOffice cannot open, makes no PDF. Nothing is
   logged by the child; the parent logs a category code only.
 
@@ -44,6 +50,7 @@ from __future__ import annotations
 import contextlib
 import json
 import os
+import posixpath
 import re
 import shutil
 import signal
@@ -51,11 +58,12 @@ import subprocess
 import sys
 import tempfile
 import zipfile
-from dataclasses import dataclass
+from collections import Counter
+from dataclasses import asdict, dataclass
 from functools import lru_cache
 from io import BytesIO
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, BinaryIO
 
 from readablestem.core.childenv import child_env
 
@@ -109,8 +117,9 @@ def looks_like_office(data: bytes) -> bool:
     return data[:4] == ZIP_MAGIC or data[:8] == OLE_MAGIC
 
 
-def preflight(data: bytes) -> str:
-    """The kind ("docx" or "pptx") of a safe-looking Office file, else raise `OfficeRejected`.
+def preflight(data: bytes) -> Census:
+    """What a safe-looking Office file is and holds (`Census`: its kind, "docx" or "pptx", and
+    counts, never text), else raise `OfficeRejected`.
 
     Codes: "office_old_or_locked" (an old binary format or a password-protected file),
     "unreadable" (not a readable ZIP), "encrypted", "office_unsupported" (a ZIP that is not
@@ -127,7 +136,7 @@ def preflight(data: bytes) -> str:
         raise OfficeRejected("unreadable") from None
     with archive:
         try:
-            return _check_archive(archive)
+            return _census(archive, _check_archive(archive))
         except OfficeRejected:
             raise
         except Exception:  # a zip that fails in a way nobody planned for fails closed
@@ -219,6 +228,239 @@ def _check_relationships(data: bytes) -> None:
         looks_remote = "://" in target or target.startswith(("\\\\", "//"))
         if (external or looks_remote) and not rel.get("Type", "").endswith(_HYPERLINK):
             raise OfficeRejected("office_unsafe")
+
+
+# --------------------------------------------------------------------------- the census
+
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
+_P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+_A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+_R = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+_MATH = "{http://schemas.openxmlformats.org/officeDocument/2006/math}oMath"
+_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
+_MODERN_COMMENT = "{http://schemas.microsoft.com/office/powerpoint/2018/8/main}cm"
+# The only elements a part is searched for: counting every name would let a hostile part make
+# the table as big as it likes.
+_COUNTED = frozenset(
+    {_W + "ins", _W + "del", _W + "moveTo", _W + "moveFrom", _W + "cellIns", _W + "cellDel"}
+    | {_W + "comment", _MATH, _P + "cm", _MODERN_COMMENT}
+)
+# Tracked changes by what they do to the text: words (or a table cell) put in, and words taken
+# out, which LibreOffice still prints. Text moved with tracking on is both: it is printed where
+# it was and where it went.
+_PUT_IN = (_W + "ins", _W + "moveTo", _W + "cellIns")
+_TAKEN_OUT = (_W + "del", _W + "moveFrom", _W + "cellDel")
+# The parts of a Word file whose text the PDF shows: the body, its notes, headers and footers.
+_WORD_PARTS = re.compile(r"word/(?:document|header\d*|footer\d*|footnotes|endnotes)\.xml")
+_PAGES = re.compile(rb"<(?:\w+:)?Pages>\s*(\d{1,6})\s*<")
+_NOTES_TYPE = "/relationships/notesSlide"
+_SLIDE_TYPE = "/relationships/slide"
+
+
+@dataclass(frozen=True)
+class Census:
+    """What an Office file holds that the PDF route does something with: counts only, never a
+    word of the file, so it can be kept and shown after the file is gone.
+
+    `tracked_insertions`, `tracked_deletions`: changes made with change tracking on that nobody
+    accepted or rejected (LibreOffice prints the deleted words, and moved text in both of its
+    places; a move is one of each); `comments`; `speaker_notes`:
+    slides whose notes hold text; `hidden_slides`; `typed_equations`: equations typed in the
+    editor of Word or PowerPoint, which the PDF holds as glyphs. `units` is what a charge could
+    count before the PDF exists: for a deck its own slide list, hidden slides counted
+    (`units_exact` when every entry of the list is a slide part; an entry with no part is not
+    counted); for a Word file the page count its properties state, which is an estimate, or
+    None when they state none."""
+
+    kind: str
+    tracked_insertions: int = 0
+    tracked_deletions: int = 0
+    comments: int = 0
+    speaker_notes: int = 0
+    hidden_slides: int = 0
+    typed_equations: int = 0
+    units: int | None = None
+    units_exact: bool = False
+    # a Word file the reader took itself (`FEATURE_WORD_SOURCE`): no PDF was made of it
+    read_from_file: bool = False
+
+    def to_json(self) -> dict[str, object]:
+        return asdict(self)
+
+    @staticmethod
+    def from_json(data: object) -> Census:
+        """The census the child sent or the job kept; `ValueError` when it is not one."""
+        if not isinstance(data, dict) or data.get("kind") not in KINDS:
+            raise ValueError("not a census")
+        counts: dict[str, int] = {}
+        for name in (
+            "tracked_insertions", "tracked_deletions", "comments", "speaker_notes",
+            "hidden_slides", "typed_equations",
+        ):  # fmt: skip
+            value = data.get(name, 0)
+            if not isinstance(value, int) or isinstance(value, bool) or value < 0:
+                raise ValueError("not a census")
+            counts[name] = value
+        units = data.get("units")
+        if units is not None and (not isinstance(units, int) or isinstance(units, bool)):
+            raise ValueError("not a census")
+        return Census(
+            kind=str(data["kind"]), units=units, units_exact=data.get("units_exact") is True,
+            read_from_file=data.get("read_from_file") is True, **counts,
+        )  # fmt: skip
+
+
+class _Tally:
+    """An expat target that counts the elements of `_COUNTED` and notes the few facts the
+    census wants of one part. It builds no tree, so a part of any size costs no memory, and it
+    skips what a `Fallback` holds (the second copy of a text box or an equation)."""
+
+    def __init__(self) -> None:
+        self.count: Counter[str] = Counter()
+        self.show = ""  # the `show` attribute of a slide
+        self.slide_ids: list[str] = []
+        self.slide_overflow = 0
+        self.notes_text = False  # the body placeholder of a notes slide holds text
+        self._skip = 0
+        self._root = True
+        self._body = False
+        self._in_text = False
+
+    def start(self, tag: str, attrib: dict[str, str]) -> None:
+        if self._root:
+            self._root = False
+            self.show = attrib.get("show", "")
+        if self._skip or tag == _FALLBACK:
+            self._skip += 1
+        elif tag in _COUNTED:
+            self.count[tag] += 1
+        elif tag == _P + "sldId":
+            if len(self.slide_ids) < MAX_ENTRIES:
+                self.slide_ids.append(attrib.get(_R + "id", ""))
+            else:
+                self.slide_overflow += 1
+        elif tag == _P + "sp":
+            self._body = False
+        elif tag == _P + "ph":
+            self._body = attrib.get("type") == "body"
+        elif tag == _A + "t":
+            self._in_text = True
+
+    def end(self, tag: str) -> None:
+        if self._skip:
+            self._skip -= 1
+        elif tag == _A + "t":
+            self._in_text = False
+
+    def data(self, text: str) -> None:
+        if self._in_text and self._body and text.strip():
+            self.notes_text = True
+
+    def close(self) -> None:
+        return None
+
+
+def _scan(archive: zipfile.ZipFile, name: str) -> _Tally | None:
+    """The tally of part `name`, read once in chunks (the part's declared size caps the read, as
+    in `_check_xml_part`); None when the part is not there. A part that is not well formed is a
+    file that cannot be read (`OfficeRejected("office_failed")`, what LibreOffice says of a broken
+    main part): a count that stops at the fault would miss what comes after it and say nothing."""
+    from defusedxml.common import DefusedXmlException
+    from defusedxml.ElementTree import DefusedXMLParser, ParseError
+
+    try:
+        part = archive.open(name)
+    except KeyError:
+        return None
+    tally = _Tally()
+    parser = DefusedXMLParser(target=tally, forbid_dtd=True)
+    try:
+        with part:
+            while chunk := part.read(_CHUNK):
+                parser.feed(chunk)
+        parser.close()
+    except (ParseError, DefusedXmlException, zipfile.BadZipFile, ValueError):
+        raise OfficeRejected("office_failed") from None
+    return tally
+
+
+def _relationships(archive: zipfile.ZipFile, name: str) -> list[tuple[str, str, str]]:
+    """(id, type, path) of each internal relationship of a `.rels` part, the path as a name in
+    the package; none for a part that is absent or not well formed."""
+    from defusedxml import ElementTree
+    from defusedxml.common import DefusedXmlException
+
+    try:
+        root = ElementTree.fromstring(_read(archive, name, MAX_RELS_BYTES), forbid_dtd=True)
+    except (KeyError, ElementTree.ParseError, DefusedXmlException, ValueError, OfficeRejected):
+        return []
+    folder = posixpath.dirname(posixpath.dirname(name))  # the folder of the part it is about
+    found = []
+    for rel in root.iter():
+        if not rel.tag.endswith("Relationship") or rel.get("TargetMode", "").lower() == "external":
+            continue
+        target = rel.get("Target", "")
+        path = target.lstrip("/") if target.startswith("/") else posixpath.join(folder, target)
+        found.append((rel.get("Id", ""), rel.get("Type", ""), posixpath.normpath(path)))
+    return found
+
+
+def _census(archive: zipfile.ZipFile, kind: str) -> Census:
+    names = set(archive.namelist())
+    if kind == "docx":
+        body: Counter[str] = Counter()
+        for name in sorted(n for n in names if _WORD_PARTS.fullmatch(n)):
+            if tally := _scan(archive, name):
+                body.update(tally.count)
+        comments = _scan(archive, "word/comments.xml")
+        return Census(
+            kind,
+            tracked_insertions=sum(body[tag] for tag in _PUT_IN),
+            tracked_deletions=sum(body[tag] for tag in _TAKEN_OUT),
+            comments=comments.count[_W + "comment"] if comments else 0,
+            typed_equations=body[_MATH],
+            units=_stated_pages(archive, names),
+        )
+    listed = _scan(archive, "ppt/presentation.xml")
+    slide_parts = {
+        rid: path
+        for rid, rtype, path in _relationships(archive, "ppt/_rels/presentation.xml.rels")
+        if rtype.endswith(_SLIDE_TYPE)
+    }
+    slides = [slide_parts.get(rid, "") for rid in (listed.slide_ids if listed else [])]
+    found = [slide for slide in slides if slide in names]
+    equations = hidden = noted = 0
+    for slide in found:
+        if tally := _scan(archive, slide):
+            equations += tally.count[_MATH]
+            hidden += tally.show in ("0", "false")
+        folder, base = posixpath.split(slide)
+        for _, rtype, path in _relationships(archive, f"{folder}/_rels/{base}.rels"):
+            if rtype.endswith(_NOTES_TYPE) and path in names:
+                noted += bool((notes := _scan(archive, path)) and notes.notes_text)
+    comments = 0
+    for name in sorted(n for n in names if n.startswith("ppt/comments/") and n.endswith(".xml")):
+        if tally := _scan(archive, name):
+            comments += tally.count[_P + "cm"] + tally.count[_MODERN_COMMENT]
+    return Census(
+        kind,
+        comments=comments,
+        speaker_notes=noted,
+        hidden_slides=hidden,
+        typed_equations=equations,
+        units=len(found) if listed else None,
+        units_exact=bool(listed) and len(found) == len(slides) and not listed.slide_overflow,
+    )
+
+
+def _stated_pages(archive: zipfile.ZipFile, names: set[str]) -> int | None:
+    """The page count the properties of a Word file state, an estimate (absent or wrong in 3 of
+    6 files probed), or None."""
+    if "docProps/app.xml" not in names:
+        return None
+    with archive.open("docProps/app.xml") as part:
+        found = _PAGES.search(part.read(_CHUNK))
+    return (int(found.group(1)) or None) if found else None
 
 
 # --------------------------------------------------------------------------- LibreOffice
@@ -419,11 +661,14 @@ def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
     limit_memory(WRAPPER_MEMORY_BYTES)
     out = sys.stdout.buffer
+    if args[:1] == ["--check"]:
+        return _check_main(out)
     try:
         soffice = args[0]
         timeout_s = float(args[1]) if len(args) > 1 else DEFAULT_TIMEOUT_S
         data = sys.stdin.buffer.read()
-        kind = preflight(data)
+        census = preflight(data)
+        kind = census.kind
         if kind not in available_kinds(soffice):
             raise OfficeRejected("office_unavailable")
         pdf = convert(data, kind, soffice, timeout_s)
@@ -433,7 +678,30 @@ def main(argv: list[str] | None = None) -> int:
     except Exception:  # fails closed, with no message that could carry file content
         out.write(json.dumps({"ok": False, "code": "office_failed"}).encode() + b"\n")
         return 0
-    out.write(json.dumps({"ok": True, "kind": kind}).encode() + b"\n" + pdf)
+    header = json.dumps({"ok": True, "kind": kind, "census": census.to_json()})
+    out.write(header.encode() + b"\n" + pdf)
+    return 0
+
+
+def _check_main(out: BinaryIO) -> int:
+    """`--check`: the gate of the Word reader (`source.docx_package.check`) on the file on stdin,
+    in a child like the conversion's, so a damaged zip is parsed here and not in the web
+    process. One JSON line: the census and the pages the file will count as, or the refusal."""
+    from readablestem.source import docx_package
+
+    # Run as `-m`, this module is `__main__`: the gate raises the class of the imported module.
+    rejected_type = docx_package.OfficeRejected
+    try:
+        data = sys.stdin.buffer.read()
+        census = docx_package.check(data)
+        pages = docx_package.prepare(data, census).facts.pages()
+    except rejected_type as rejected:
+        out.write(json.dumps({"ok": False, "code": rejected.code}).encode() + b"\n")
+        return 0
+    except Exception:  # fails closed, with no message that could carry file content
+        out.write(json.dumps({"ok": False, "code": "unreadable"}).encode() + b"\n")
+        return 0
+    out.write(json.dumps({"ok": True, "census": census.to_json(), "pages": pages}).encode() + b"\n")
     return 0
 
 

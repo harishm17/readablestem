@@ -8,8 +8,10 @@ when, and only when, the item is the same item:
 - **Same item** means the same kind and the same content fingerprint. For an equation, a
   figure or a table that is the SHA-256 of its crop (the picture cut from the page), plus
   the display mode of an equation and the caption of a figure, which the figure's alt text
-  is written for. For a heading it is its words, size and weight. A crop that differs by a
-  single pixel is a different fingerprint: a changed item never inherits a decision.
+  is written for. For a heading it is its words, size and weight. For a paragraph or list item
+  with a decision (`pipeline.notices.text_decisions`) it is its words, and the decision is
+  carried only onto the same words. A crop that differs by a single pixel is a different
+  fingerprint: a changed item never inherits a decision.
 - **Position** chooses between items that share a fingerprint (the same small figure on
   twenty pages): the nearest one on the page and in the reading order is matched first, one
   earlier item to one new item. It also finds the items that *changed*: an earlier decided
@@ -33,7 +35,9 @@ changes are returned as `web.review.ReviewChange`-like records so the caller can
 
 from __future__ import annotations
 
+import hashlib
 from collections import defaultdict
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -46,6 +50,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
+from readablestem.pipeline.notices import TEXT_DECISION_KINDS, TEXT_NOTICE_OF
 
 # A decision is carried only onto the kinds a person decides on the review screen.
 CARRIED_KINDS = (Kind.EQUATION, Kind.FIGURE, Kind.TABLE, Kind.HEADING)
@@ -58,6 +63,17 @@ SAME_PLACE = 0.5
 # (usage counts show "review:carried") and without a write number, so Undo never takes
 # back a whole carry at once.
 CARRIED_ACTION = "carried"
+# What an earlier change by hand was, as the list of changes not made again names it
+# (`web.carry_edits` kinds).
+NOT_REAPPLIED_WORDS = {
+    "text": "words you changed",
+    "heading": "paragraph you made a heading",
+    "picture": "picture you added",
+    "equation": "equation you marked",
+    "page_left_out": "page you left out",
+    "not_equation": "equation you gave back to the text",
+    "read_again": "equation you had read again",
+}
 
 
 @dataclass
@@ -78,6 +94,8 @@ class CarryReport:
     # earlier ones were not carried because the item they were made on changed.
     edits: list[str] = field(default_factory=list)
     edits_dropped: int = 0
+    # Which of them, by kind and 1-based page (None: the page is not known).
+    edits_not_applied: list[tuple[str, int | None]] = field(default_factory=list)
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -88,6 +106,7 @@ class CarryReport:
             "removed": self.removed,
             "edits": self.edits,
             "edits_dropped": self.edits_dropped,
+            "edits_not_applied": [list(item) for item in self.edits_not_applied],
         }
 
     @classmethod
@@ -101,6 +120,16 @@ class CarryReport:
 
         removed = data.get("removed")
         dropped = data.get("edits_dropped")
+        held = data.get("edits_not_applied")
+        not_applied: list[tuple[str, int | None]] = []
+        for item in held if isinstance(held, list) else []:
+            if (
+                isinstance(item, list)
+                and len(item) == 2
+                and item[0] in NOT_REAPPLIED_WORDS
+                and (item[1] is None or isinstance(item[1], int))
+            ):
+                not_applied.append((item[0], item[1]))
         return cls(
             carried=ids("carried"),
             suggestion_changed=ids("suggestion_changed"),
@@ -109,6 +138,7 @@ class CarryReport:
             removed=removed if isinstance(removed, int) and removed > 0 else 0,
             edits=ids("edits"),
             edits_dropped=dropped if isinstance(dropped, int) and dropped > 0 else 0,
+            edits_not_applied=not_applied,
         )
 
 
@@ -129,18 +159,29 @@ def _words(text: str | None) -> str:
     return uid.words(text)
 
 
-def fingerprint(element: Element, crops: dict[str, bytes]) -> str | None:
+# The picture of an item (its crop), or only its SHA-256 as hex: all a fingerprint needs of
+# it, and all the snapshot of an earlier version keeps (`web.carry_snapshot`).
+Crop = bytes | str
+
+
+def crop_digest(png: bytes) -> str:
+    return hashlib.sha256(png).hexdigest()
+
+
+def fingerprint(element: Element, crops: Mapping[str, Crop]) -> str | None:
     """The content of one item, or None when it has nothing to compare (no crop, no
     words). Two items with the same fingerprint are the same item. It is the fingerprint
     stable ids are made from (`core.uid.fingerprint`), with the crop as the content of an
     equation, a figure or a table."""
-    if element.kind is Kind.HEADING:
+    if element.kind in (Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM):
         if not _words(element.text):
             return None
         return uid.fingerprint(element)
     if element.kind in (Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
         png = crops.get(element.id)
-        return uid.fingerprint(element, png) if png else None
+        if not png:
+            return None
+        return uid.fingerprint(element, crop_sha=png if isinstance(png, str) else crop_digest(png))
     return None
 
 
@@ -203,7 +244,18 @@ def _proposal(fix: Fix) -> dict[str, Any]:
 
 
 def _same_proposal(old: Fix, new: Fix) -> bool:
+    if new.kind in TEXT_DECISION_KINDS:
+        return True  # the proposal is the element's own words: the same fingerprint, the same
     return _proposal(old) == _proposal(new) and bool(_proposal(new))
+
+
+def _carried(fix: Fix) -> bool:
+    """A fix of a kind a person decides on the review screen: the four kinds, and a paragraph
+    or list item only for a text decision (`pipeline.notices.text_decisions`), not for the
+    fix of a paragraph on a scanned page."""
+    if fix.kind in CARRIED_KINDS:
+        return True
+    return fix.kind in TEXT_DECISION_KINDS and fix.reason in TEXT_NOTICE_OF
 
 
 def _wants_decision(fix: Fix) -> bool:
@@ -222,9 +274,9 @@ def _carry_one(old: Fix, new: Fix) -> str | None:
 
 def carry_decisions(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, Crop],
     new: DocumentResult,
-    new_crops: dict[str, bytes],
+    new_crops: Mapping[str, Crop],
 ) -> tuple[CarryReport, list[CarriedChange]]:
     """Put the decisions made on `old` onto `new` (in place) where the item is the same.
 
@@ -240,11 +292,11 @@ def carry_decisions(
 
     old_fixes: dict[str, Fix] = {}
     for fix in old.fixes:
-        if fix.kind in CARRIED_KINDS and fix.element_id in old_elements:
+        if _carried(fix) and fix.element_id in old_elements:
             old_fixes.setdefault(fix.element_id, fix)
     new_fixes: dict[str, Fix] = {}
     for fix in new.fixes:
-        if fix.kind in CARRIED_KINDS and fix.element_id in new_elements:
+        if _carried(fix) and fix.element_id in new_elements:
             new_fixes.setdefault(fix.element_id, fix)
 
     # Fingerprints of both sides, by kind.
@@ -381,6 +433,7 @@ class CarrySummary:
     waiting: int  # of the changed and new ones, how many are still waiting now
     edits: int = 0  # edits to words, headings, added items and pages left out, carried
     edits_dropped: int = 0  # earlier edits whose item changed: to be made again
+    not_applied: list[str] = field(default_factory=list)  # "Page 3: picture you added"
 
     @property
     def any(self) -> bool:
@@ -414,4 +467,11 @@ def summary(report: CarryReport, result: DocumentResult) -> CarrySummary:
         waiting=len(waiting),
         edits=len(report.edits),
         edits_dropped=report.edits_dropped,
+        not_applied=[
+            f"Page {page}: {words}" if page else words.capitalize()
+            for kind, page in sorted(
+                report.edits_not_applied, key=lambda item: (item[1] or 0, item[0])
+            )
+            for words in [NOT_REAPPLIED_WORDS[kind]]
+        ],
     )

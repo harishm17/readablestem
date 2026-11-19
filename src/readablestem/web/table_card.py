@@ -14,7 +14,7 @@ what the card shows.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 from markupsafe import Markup
 
@@ -28,7 +28,12 @@ from readablestem.pipeline.assemble_tables import (
     text_html,
 )
 from readablestem.pipeline.table_html import render_table
-from readablestem.pipeline.table_step import NOTE_CODES, STRUCTURE_PROBLEMS
+from readablestem.pipeline.table_step import (
+    STRUCTURE_PROBLEMS,
+    CellDifference,
+    maths_differences,
+    text_differences,
+)
 from readablestem.web.messages import explain_check
 from readablestem.web.review import (
     cell_label,
@@ -38,11 +43,15 @@ from readablestem.web.review import (
     first_row_is_header,
     grid_as_text,
     grid_problem_sentence,
+    headers_required,
     is_maths_cell,
     usable_local_grid,
 )
 
 CELL_PREVIEW_CHARS = 40  # of a cell's text in the "Change a cell" list
+DIFFERENCES_SHOWN = 8  # cells listed under one failed check; the rest are counted
+HEADER_PREVIEW_CHARS = 30  # of a header's text in the place of a cell that differs
+VALUE_CHARS = 120  # of a cell's value, in the proposal or the PDF, in that list
 
 
 @dataclass(frozen=True)
@@ -64,13 +73,26 @@ class CellChoice:
 
 
 @dataclass(frozen=True)
+class Difference:
+    """One cell where the proposal and the PDF's text differ, as the card lists it."""
+
+    place: str  # "Row 2 (Cart), column 3 (Time (s))"
+    proposal: str  # the cell in the proposal ("(empty)" when it has no text)
+    pdf: str  # the PDF's text where the cell stands ("(nothing)" when it has none)
+
+
+@dataclass(frozen=True)
 class Finding:
     """One thing wrong with the table, in a sentence that names the row, header, cell or grid
-    it is about, and the one correction the card can make for it (`fix`)."""
+    it is about, and the one correction the card can make for it (`fix`). A failed check of
+    the words or of a math cell also lists the cells that differ (`differences`, at most
+    `DIFFERENCES_SHOWN`, then `more` counts the rest)."""
 
     text: str
     fix: str = ""  # "headers" (one click), "grid" (one click), "edit" (the place below), or none
     label: str = ""  # the correction's words ("Use the first row as headers")
+    differences: tuple[Difference, ...] = ()
+    more: int = 0
 
 
 # What each failed check or structural problem asks for. A one-click correction is only
@@ -107,9 +129,11 @@ class TableCard:
     problems: list[str] = field(default_factory=list)  # structural, in plain English
     editing: CellChoice | None = None  # the cell whose form is open ("Change a cell")
     local_flat: bool = False  # the grid read from the PDF gives maths flat: not the main action
-    # The only thing the checks found is that no cell is a header (T1-19): "Use the first
-    # row as headers" is the main action, and one click settles the table.
-    only_headers_missing: bool = False
+    # No cell is a header (T1-19, WS5.2): a person chooses the first row, the first column,
+    # both, or "not a table"; there is no Accept, whatever else the checks found.
+    needs_headers: bool = False
+    # The first column can be the header too (a table of one column has none to offer).
+    can_header_col: bool = False
     # "This grid is not a table" (T3-11): its words can be written one after another.
     can_text: bool = False
     # What is wrong with the proposal, each with the correction that answers it (the failed
@@ -171,10 +195,91 @@ def cell_choices(
     return out
 
 
-def _rendered(grid: TableGrid, prefix: str) -> Markup:
+def _rendered(
+    grid: TableGrid, prefix: str, marked: frozenset[tuple[int, int]] = frozenset()
+) -> Markup:
     # Escaped and sanitised by the serialiser (cell text escaped, MathML rebuilt from an
-    # allowlisted tree): the same HTML the student gets.
-    return Markup(render_table(grid, id_prefix=prefix, math_display="inline"))
+    # allowlisted tree): the same HTML the student gets, with the cells that differ marked.
+    return Markup(render_table(grid, id_prefix=prefix, math_display="inline", marked=marked))
+
+
+# The failed checks that name cells, by (check, code): which comparison finds them. The notes
+# (`whitespace_differs`, `style_cosmetic`) are left out: they are differences the check does
+# not count.
+_DIFFERENCE_CHECKS = {
+    ("table.cell_text", "text_mismatch"): "words",
+    ("table.cell_text", "cell_mismatch"): "words",
+    ("table.cell_text", "row_mismatch"): "words",
+    ("table.math_symbols", "symbol_mismatch"): "symbols",
+    ("table.math_signs", "sign_mismatch"): "signs",
+    ("table.math_style", "style_mismatch"): "style",
+}
+
+
+def _clip(text: str, chars: int) -> str:
+    shown = " ".join(text.split())
+    return shown if len(shown) <= chars else shown[: chars - 1].rstrip() + "…"
+
+
+def _place(grid: TableGrid, cell: TableCell) -> str:
+    """ "Row 2 (Cart), column 3 (Time (s))": the cell's row and column numbers, each with the
+    nearest header of the proposal that names it, where the table has one."""
+
+    def header(cells: list[TableCell], key) -> str:
+        named = [h for h in cells if not h.is_empty]
+        return _clip((max(named, key=key).text or "") if named else "", HEADER_PREVIEW_CHARS)
+
+    above = [
+        h
+        for h in grid.cells
+        if h.header == "col" and h.col <= cell.col < h.col + h.col_span and h.row < cell.row
+    ]
+    left = [
+        h
+        for h in grid.cells
+        if h.header == "row" and h.row <= cell.row < h.row + h.row_span and h.col < cell.col
+    ]
+    row, col = cell_label(cell).split(", ")
+    row_head, col_head = header(left, lambda h: h.col), header(above, lambda h: h.row)
+    if row_head:
+        row = f"{row} ({row_head})"
+    if col_head:
+        col = f"{col} ({col_head})"
+    return f"{row}, {col}"
+
+
+def _difference(grid: TableGrid, found: CellDifference) -> Difference:
+    cell = found.cell
+    return Difference(
+        place=_place(grid, cell),
+        proposal=_clip(cell.latex or cell.text, VALUE_CHARS) or "(empty)",
+        pdf=_clip(found.pdf, VALUE_CHARS) or "(nothing)",
+    )
+
+
+def _differences(
+    fix: Fix, grid: TableGrid, element: Element | None
+) -> dict[str, list[CellDifference]]:
+    """The cells that differ, by the kind of failed check that names them ("words",
+    "symbols", "signs", "style"). Worked out from the proposal and the grid read from the
+    PDF, with the table step's own comparison, so nothing is stored and a difference the
+    check does not count is not listed. Empty when no such check failed or the two grids
+    cannot be compared cell by cell."""
+    kinds = {
+        kind
+        for c in fix.failed_checks
+        if (kind := _DIFFERENCE_CHECKS.get((c.name, c.code or ""))) is not None
+    }
+    if element is None or not kinds or not grid.is_data:
+        return {}
+    found: dict[str, list[CellDifference]] = {}
+    if "words" in kinds:
+        found["words"] = text_differences(grid, element)
+    if kinds - {"words"}:
+        maths = maths_differences(grid, element)
+        for kind in kinds - {"words"}:
+            found[kind] = maths.get(kind, [])
+    return {kind: cells for kind, cells in found.items() if cells}
 
 
 def _same_table(one: TableGrid, other: TableGrid) -> bool:
@@ -186,7 +291,7 @@ def _same_table(one: TableGrid, other: TableGrid) -> bool:
             (c.model_copy(update={"bbox": None}) for c in grid.cells),
             key=lambda c: (c.row, c.col),
         )
-        return grid.model_copy(update={"source": "local", "cells": cells})
+        return grid.model_copy(update={"source": "local", "cells": cells, "header_source": None})
 
     return plain(one) == plain(other)
 
@@ -197,12 +302,14 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
     grid = fix.table.grid if fix.table is not None else None
     if local is not None and grid is not None and _same_table(local, grid):
         local = None  # the proposal is the grid read from the PDF: nothing else to offer
+    differing = _differences(fix, grid, element) if grid is not None else {}
+    marked = frozenset((d.cell.row, d.cell.col) for found in differing.values() for d in found)
     if grid is not None and not grid.is_data:
         # Written as text: the card shows the text as the student gets it.
         caption = grid.caption or (element.caption if element is not None else None)
         proposal: Markup | None = Markup(text_html(grid, caption))
     else:
-        proposal = _rendered(grid, f"tp-{eid}") if grid is not None else None
+        proposal = _rendered(grid, f"tp-{eid}", marked) if grid is not None else None
     card = TableCard(
         proposal=proposal,
         is_data=grid.is_data if grid is not None else True,
@@ -217,8 +324,9 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
         card.problems = [
             grid_problem_sentence(p) for p in grid_problems(grid) if not _reported(p, fix)
         ]
-        card.only_headers_missing = _only_headers_missing(fix, grid, card)
-        card.findings = _findings(fix, grid, card)
+        card.needs_headers = _needs_headers(fix, grid, card)
+        card.can_header_col = grid.cols >= 2
+        card.findings = _findings(fix, grid, card, differing)
     card.can_text = grid_as_text(fix, element) is not None and not (
         card.in_document and not card.is_data
     )
@@ -249,35 +357,35 @@ def _finding(code: str, text: str, grid: TableGrid, card: TableCard) -> Finding:
     return Finding(text, fix, labels.get(fix, ""))
 
 
-def _findings(fix: Fix, grid: TableGrid, card: TableCard) -> list[Finding]:
+def _findings(
+    fix: Fix, grid: TableGrid, card: TableCard, differing: dict[str, list[CellDifference]]
+) -> list[Finding]:
     """What the checks and the grid found, named for the table: a failed check says so in
     its own words (`web.messages`; one with no sentence of its own is named by the part of the
-    table it is about), a structural problem the checks did not report says which row, header
-    or cell it is."""
+    table it is about) and, for the words or a math cell, lists the cells that differ; a
+    structural problem the checks did not report says which row, header or cell it is."""
     out = []
     for check in fix.failed_checks:
-        out.append(_finding(check.code or "", explain_check(check).text, grid, card))
+        finding = _finding(check.code or "", explain_check(check).text, grid, card)
+        cells = differing.get(_DIFFERENCE_CHECKS.get((check.name, check.code or ""), ""), [])
+        if cells:
+            finding = replace(
+                finding,
+                differences=tuple(_difference(grid, c) for c in cells[:DIFFERENCES_SHOWN]),
+                more=max(len(cells) - DIFFERENCES_SHOWN, 0),
+            )
+        out.append(finding)
     for problem in grid_problems(grid):
         if not _reported(problem, fix):
             out.append(_finding(problem, grid_problem_sentence(problem), grid, card))
     return out
 
 
-def _only_headers_missing(fix: Fix, grid: TableGrid, card: TableCard) -> bool:
-    """A table still waiting whose one finding is "no cell is marked as a header" and whose
-    first row can be that header: a data table of at least two rows with nothing else wrong
-    (no other failed check, no structural problem)."""
-    failed = fix.failed_checks
-    return (
-        fix.pending
-        and grid.is_data
-        and card.in_document
-        and not card.header_row
-        and grid.rows >= 2
-        and not card.problems
-        and any(c.code == "no_headers" for c in failed)
-        and all(c.code in {"no_headers", *NOTE_CODES} for c in failed)
-    )
+def _needs_headers(fix: Fix, grid: TableGrid, card: TableCard) -> bool:
+    """A table still waiting in which no cell is a header and whose first row can be one
+    (`review.headers_required`, WS5.2): whatever else the checks found, it is not accepted as
+    it is. The card offers the first row, the first column, both, or "not a table"."""
+    return fix.pending and _can_use_first_row(grid, card) and headers_required(fix)
 
 
 def _reported(problem: str, fix: Fix) -> bool:

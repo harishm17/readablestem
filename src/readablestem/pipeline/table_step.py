@@ -94,10 +94,10 @@ Status rules, in order:
    read from the PDF that can be written (none, no text, or maths its text gives flat)
    ABSTAINED "not_data_table" (required; the image is kept). A grid of numbers
    (`numeric_grid`) is not written as text: its values would lose their columns. The
-   grid read from the PDF with first-row headers is proposed instead, NEEDS_REVIEW
+   grid read from the PDF with the header rows it found itself is proposed instead, NEEDS_REVIEW
    (check `table.kind`, code `numbers_not_a_table`);
 3. no usable answer from any attempt (the API unavailable, or answers that cannot be a
-   grid) -> the local grid with first-row headers, NEEDS_REVIEW (check `table.source`,
+   grid) -> the local grid with the header rows it found itself, NEEDS_REVIEW (check `table.source`,
    code `local_grid`); without a local grid FAILED "model_<outcome>" or "invalid_table";
 4. every check passed -> ACCEPTED, review "none";
 5. only notes failed (`NOTE_CODES`: spacing, a cosmetic maths style, row headers
@@ -530,8 +530,14 @@ def _header_policy(grid: TableGrid) -> tuple[TableGrid, bool]:
         elif header == "row" and cell.col not in row_columns:
             header = None
         out.append(cell if header == cell.header else cell.model_copy(update={"header": header}))
+    marked = any(c.header for c in out)
     policy = grid.model_copy(
-        update={"cells": out, "header_rows": header_rows, "header_cols": header_cols}
+        update={
+            "cells": out,
+            "header_rows": header_rows,
+            "header_cols": header_cols,
+            "header_source": "model" if marked else "none",
+        }
     )
     return policy, dropped
 
@@ -564,22 +570,27 @@ def numeric_grid(local: TableGrid) -> bool:
     return sum(any(ch.isdigit() for ch in text) for text in body) >= NUMERIC_SHARE * len(body)
 
 
-def first_row_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
-    """The local grid as a proposal when no model answer is usable: its first row as the
-    column headers (what the source most often does), no row headers."""
-    header_rows = 1 if local.rows > 1 else 0
+def layout_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
+    """The local grid as a proposal when no model answer is usable: the header rows the
+    reader of the PDF found itself (`header_source` "layout": a ruled line under the row, a
+    gap, a header the table reader marked), no row headers. Where it found none the grid has
+    no header cell (`header_source` "none") and a person chooses: a first row is never made
+    a header only because it is first."""
+    header_rows = local.header_rows if local.rows > local.header_rows else 0
     cells = [
         c.model_copy(update={"header": "col" if c.row < header_rows and not c.is_empty else None})
         for c in local.cells
     ]
+    found = any(c.header for c in cells)
     return local.model_copy(
         update={
             "cells": cells,
-            "header_rows": header_rows,
+            "header_rows": header_rows if found else 0,
             "header_cols": 0,
             "caption": caption,
             "is_data": True,
             "source": "local",
+            "header_source": "layout" if found else "none",
         }
     )
 
@@ -650,6 +661,18 @@ def _maths_symbols(cells: Iterable[TableCell]) -> Counter[str]:
     return bag
 
 
+def _text_cells(
+    grid: TableGrid, local: TableGrid, owner: dict[tuple[int, int], int], maths: set[int]
+) -> list[tuple[TableCell, list[TableCell]]]:
+    """Each text cell of the model's grid with the PDF cells in its place, leaving out the
+    ones that stand where the model put maths (those are compared by the maths checks)."""
+    return [
+        (cell, [local.cells[i] for i in _counterparts(cell, owner) if i not in maths])
+        for cell in grid.cells
+        if not cell.latex
+    ]
+
+
 def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
     """The bijection row by row, for grids of the same size: the PDF words of the local
     cells that stand where the model put maths are compared by the maths checks instead."""
@@ -671,11 +694,7 @@ def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
     if _spans(grid) == _spans(local):
         # Each text cell against the PDF cell in its place: a value in the wrong column
         # (a blank cell the model left out, two values swapped) keeps its row's words.
-        cells = [
-            ([cell], [local.cells[i] for i in _counterparts(cell, owner) if i not in maths])
-            for cell in grid.cells
-            if not cell.latex
-        ]
+        cells = [([cell], under) for cell, under in _text_cells(grid, local, owner, maths)]
     else:  # merged cells differ (spans_differ): rows are the finest pairing
         cells = pairs
     if all(bag(m) == bag(p) for m, p in cells):
@@ -687,6 +706,41 @@ def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
     if sum((bag(m) for m, _ in pairs), Counter()) == sum((bag(p) for _, p in pairs), Counter()):
         return "row_mismatch"
     return "text_mismatch"
+
+
+@dataclass(frozen=True)
+class CellDifference:
+    """A cell of the model's grid and the PDF's text where it stands. Not stored: the review
+    card works it out from the two grids when it is shown."""
+
+    cell: TableCell
+    pdf: str
+
+
+def text_differences(grid: TableGrid, element: Element) -> list[CellDifference]:
+    """The text cells whose words differ from the PDF's in their place: what
+    `cell_text_code` compares, so a difference in spacing, or in the spelling of a symbol
+    that it folds, or in nothing but spacing ("1 0" for "10": `whitespace_differs`), is not
+    one. Empty when the grids cannot be compared cell by cell: no PDF words, another number
+    of rows or columns, or merged cells that differ."""
+    local = _local(element)
+    if (
+        local is None
+        or not any(words(c.text) for c in local.cells)
+        or not _aligned(grid, local)
+        or _spans(grid) != _spans(local)
+    ):
+        return []
+    owner = _owners(local)
+    maths = {i for c in grid.cells if c.latex for i in _counterparts(c, owner)}
+    out = []
+    for cell, under in _text_cells(grid, local, owner, maths):
+        if Counter(words(cell.text)) != Counter(
+            w for c in under for w in words(c.text)
+        ) and _joined([cell]) != _joined(under):
+            pdf = " ".join(t for t in (c.text.strip() for c in under) if t)
+            out.append(CellDifference(cell, pdf))
+    return out
 
 
 def cell_text_code(grid: TableGrid, element: Element) -> str | None:
@@ -730,6 +784,11 @@ class _MathsVerdict:
     symbols: bool = False  # a letter, digit or Greek letter differs
     signs: bool = False  # a sign or relation differs
     style: str | None = None  # "meaning" or "cosmetic" (the worst seen)
+    # The cells behind each flag, by flag ("symbols", "signs", "style": a meaning-level one).
+    cells: dict[str, list[CellDifference]] = field(default_factory=dict)
+
+    def add(self, flag: str, cell: TableCell, layer: str) -> None:
+        self.cells.setdefault(flag, []).append(CellDifference(cell, layer))
 
 
 # MathML layouts whose digits a text layer may run together or reorder (a fraction's
@@ -821,18 +880,35 @@ def maths_verdict(grid: TableGrid, local: TableGrid) -> _MathsVerdict:
             if _mathml_symbols(cell.mathml):
                 verdict.compared += 1
                 verdict.symbols = True
+                verdict.add("symbols", cell, layer)
             continue
         verdict.compared += 1
         differ = differ or maths_numbers_or_case_differ(layer, cell.mathml)
         verdict.symbols = verdict.symbols or differ
+        if differ:
+            verdict.add("symbols", cell, layer)
         similarity = text_layer_similarity(layer, cell.mathml)
         if similarity is None or similarity >= TEXT_LAYER_MISMATCH_BELOW:
             signs = compare_signs(_DIGIT_DASH.sub("\N{MINUS SIGN}", layer), cell.mathml)
             verdict.signs = verdict.signs or (signs is not None and signs.mismatch)
+            if signs is not None and signs.mismatch:
+                verdict.add("signs", cell, layer)
         style = text_layer_style(layer, cell.mathml)
         if style == "meaning" or (style == "cosmetic" and verdict.style is None):
             verdict.style = style
+        if style == "meaning":
+            verdict.add("style", cell, layer)
     return verdict
+
+
+def maths_differences(grid: TableGrid, element: Element) -> dict[str, list[CellDifference]]:
+    """The maths cells behind each failed maths check, by check: "symbols"
+    (`table.math_symbols`), "signs" (`table.math_signs`) and "style" (`table.math_style`,
+    a style that changes the meaning). Empty when the grids cannot be compared cell by cell."""
+    local = _local(element)
+    if local is None or not _aligned(grid, local):
+        return {}
+    return maths_verdict(grid, local).cells
 
 
 def structure_checks(grid: TableGrid) -> list[Check]:
@@ -1099,7 +1175,7 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
             # Numbers written as loose items lose which value is in which column, and the
             # local check called the grid data: the verdict is doubted. The PDF's own grid
             # is proposed as a table, for a person to check against the image.
-            grid = first_row_headers(local, caption=caption_of(element))
+            grid = layout_headers(local, caption=caption_of(element))
             doubt = Check(
                 name="table.kind", passed=False, severity="warning", code="numbers_not_a_table"
             )
@@ -1115,7 +1191,7 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
         if local is not None:
             # No model could read it: the PDF's own grid, for a person to check. Its words
             # are the PDF's, so only its structure is checked.
-            grid = first_row_headers(local, caption=caption_of(element))
+            grid = layout_headers(local, caption=caption_of(element))
             source = Check(name="table.source", passed=False, severity="warning", code="local_grid")
             checks = [source, *structure_checks(grid), *flattened_check(grid)]
             return make(Status.NEEDS_REVIEW, grid=grid, checks=checks)

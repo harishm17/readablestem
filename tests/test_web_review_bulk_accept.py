@@ -29,7 +29,7 @@ from readablestem.core.types import (
     Status,
     Verification,
 )
-from readablestem.web import bulk_accept, report_item
+from readablestem.web import bulk_accept
 from readablestem.web.db import ReviewEdit, session_scope
 from readablestem.web.review import BULK_KEY, WRITE_KEY
 
@@ -163,6 +163,13 @@ def test_only_undecided_items_with_nothing_failed_are_candidates():
     assert [f.element_id for f in bulk_accept.candidates(result, "figures")] == FIGURE_CANDIDATES
     offers = {o.slug: o.count for o in bulk_accept.offers(result)}
     assert offers == {"equations": 2, "figures": 2}
+    # A single item is decided on its card: "Accept many figures (1)" is not offered.
+    result.fix_for("p2-e12").status = Status.ACCEPTED
+    assert {o.slug: o.count for o in bulk_accept.offers(result)} == {"equations": 2}
+    # A reading made again that passes every check keeps the band of the failure it replaced:
+    # a decision asked in band 1 to 3 is never accepted in bulk.
+    result.fix_for("p2-e7").band = 2
+    assert [f.element_id for f in bulk_accept.candidates(result, "equations")] == ["p1-e2"]
 
 
 def test_a_heading_group_or_kept_page_is_never_a_candidate():
@@ -200,6 +207,28 @@ def test_accepting_changes_only_the_listed_items_in_one_write_marked_bulk(scaled
     assert all(e.action == "accept" and e.before["status"] == "needs_review" for e in recorded)
     fixes = {f.element_id: f for f in stored(scaled).fixes}
     assert all(fixes[e].reviewed for e in EQUATION_CANDIDATES)
+
+
+def test_a_long_list_is_paged_and_the_button_accepts_the_page_it_shows(scaled, monkeypatch):
+    monkeypatch.setattr(bulk_accept, "PAGE_SIZE", 1)
+    shown = re.findall(r'name="ids" value="([^"]+)"', confirm_page(scaled, "equations").text)
+    assert shown == ["p1-e2"]  # the first page; the other candidate is on page 2
+    assert "page=2" in confirm_page(scaled, "equations").text
+    # Whatever the form says, only what is a candidate and was listed is accepted.
+    response = accept(scaled, "equations", ids=["p1-e2", "p2-e8"])
+    assert response.status_code == 303
+    assert response.headers["location"].startswith(f"/jobs/{scaled.job_id}/accept/equations")
+    after = statuses(scaled)
+    assert (after["p1-e2"], after["p2-e7"], after["p2-e8"]) == (
+        "accepted",
+        "needs_review",
+        "needs_review",
+    )
+    # What is left comes up as the first page; a form with no list accepts every candidate.
+    shown = re.findall(r'name="ids" value="([^"]+)"', confirm_page(scaled, "equations").text)
+    assert shown == ["p2-e7"]
+    assert accept(scaled, "equations").status_code == 303
+    assert statuses(scaled)["p2-e7"] == "accepted"
 
 
 def test_undo_takes_the_whole_action_back_as_one_step(scaled):
@@ -247,7 +276,7 @@ def test_another_person_cannot_see_or_accept_them(scaled):
 def test_a_page_drawn_before_the_last_change_is_refused_and_nothing_is_accepted(scaled):
     stale = version(scaled)
     first = scaled.browser.post(
-        f"/jobs/{scaled.job_id}/review/p1-e6",
+        f"/jobs/{scaled.job_id}/review/p1-e2",
         data={
             "csrf_token": token(scaled.browser, f"/jobs/{scaled.job_id}/review"),
             "view": "list",
@@ -259,8 +288,15 @@ def test_a_page_drawn_before_the_last_change_is_refused_and_nothing_is_accepted(
     before = statuses(scaled)
     refused = accept(scaled, "equations", version=stale)
     assert refused.status_code == 409
+    assert "Equation 1 changed in another tab or window" in refused.text  # it says which
     assert statuses(scaled) == before
-    assert [e.element_id for e in edits(scaled)] == ["p1-e6"]
+    assert [e.element_id for e in edits(scaled)] == ["p1-e2"]
+    # Nothing of another kind changed, so the figures drawn at the same version are accepted,
+    # and so is a page of equations that did not list the one decided.
+    assert accept(scaled, "figures", version=stale).status_code == 303
+    assert statuses(scaled)["p1-e6"] == "accepted"
+    assert accept(scaled, "equations", version=stale, ids=["p2-e7"]).status_code == 303
+    assert statuses(scaled)["p2-e7"] == "accepted"
 
 
 def test_an_unknown_kind_is_not_found(scaled):
@@ -309,8 +345,8 @@ def test_nothing_matching_says_so_and_bad_values_are_ignored(scaled):
 # --------------------------------------------------------------------------- report this item
 
 
-def test_the_link_names_the_job_and_the_item_and_nothing_from_the_document(tmp_path):
-    env = WebEnv(tmp_path, contact_email="help@example.org")
+def test_the_link_opens_the_report_form_with_the_item_and_nothing_from_the_document(tmp_path):
+    env = WebEnv(tmp_path)  # no contact address: the report form needs none
     env.converter.output = scaled_output()
     with env.running() as client:
         env.allow(ALICE)
@@ -319,30 +355,12 @@ def test_the_link_names_the_job_and_the_item_and_nothing_from_the_document(tmp_p
         env.job_id = job_id_from(upload(client, review_pdf()))
         env.run_worker()
         listing = client.get(f"/jobs/{env.job_id}/review/list").text
-        link = re.search(r'<a href="(mailto:[^"]+)"[^>]*data-role="report-item"', listing)
+        link = re.search(r'<a href="([^"]+)"[^>]*data-role="report-item"', listing)
         assert link, "a report link on a card"
         target = unescape(link.group(1))
-        assert target.startswith("mailto:help@example.org?subject=")
-        assert env.job_id in target and "Item%3A%20p" in target
-        for secret in ("Teacher Support", "omega", "A car on a road"):
-            assert secret not in target
+        assert re.fullmatch(rf"/jobs/{env.job_id}/report\?item=p[0-9]+-e[0-9]+", target), target
         split = client.get(f"/jobs/{env.job_id}/review?item=p1-e2").text
-        assert 'data-role="report-item"' in split
-        assert "Item%3A%20p1-e2" in unescape(split)
-
-
-def test_item_url_uses_the_feedback_url_when_there_is_one_and_nothing_without():
-    class S:
-        feedback_url = "https://forms.example.org/f?x=1"
-        contact_email = "help@example.org"
-
-    url = report_item.item_url(S, "abc123", "p2-e3")  # type: ignore[arg-type]
-    assert url == "https://forms.example.org/f?x=1&job=abc123&item=p2-e3"
-    S.feedback_url = None  # type: ignore[assignment]
-    mail = report_item.item_url(S, "abc123", "p2-e3")  # type: ignore[arg-type]
-    assert mail and mail.startswith("mailto:help@example.org?") and "abc123" in mail
-    S.contact_email = None  # type: ignore[assignment]
-    assert report_item.item_url(S, "abc123", "p2-e3") is None  # type: ignore[arg-type]
+        assert f"/jobs/{env.job_id}/report?item=p1-e2" in unescape(split)
 
 
 # --------------------------------------------------------------------------- leave a page out
@@ -443,7 +461,7 @@ def test_a_decision_in_a_filtered_list_comes_back_to_the_filtered_list(scaled):
         follow_redirects=False,
     )
     assert response.status_code == 303
-    assert "/review/list?kind=equations&page=2#" in response.headers["location"]
+    assert "/review/list?kind=equations&page=2&at=item-p2-e8#" in response.headers["location"]
     assert "evil" not in response.headers["location"]
     plain = scaled.browser.post(
         f"/jobs/{scaled.job_id}/review/p2-e8",
@@ -455,7 +473,7 @@ def test_a_decision_in_a_filtered_list_comes_back_to_the_filtered_list(scaled):
         },
         follow_redirects=False,
     )
-    assert "?" not in plain.headers["location"].split("#")[0]
+    assert "kind=" not in plain.headers["location"] and "page=" not in plain.headers["location"]
 
 
 def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_checks_say():
@@ -474,10 +492,58 @@ def test_an_item_read_from_an_image_is_never_a_bulk_candidate_whatever_its_check
     assert is_image_page_item(element)
     assert not bulk_accept.is_bulk_candidate(fix, "equations", element)
     assert "p1-e2" not in [f.element_id for f in bulk_accept.candidates(result, "equations")]
-    offers = {o.slug: o.count for o in bulk_accept.offers(result)}
-    assert offers["equations"] == len(EQUATION_CANDIDATES) - 1
+    assert len(bulk_accept.candidates(result, "equations")) == len(EQUATION_CANDIDATES) - 1
+    assert "equations" not in {o.slug for o in bulk_accept.offers(result)}  # one: its own card
     changes = bulk_accept.accept_all(result, "equations")
     assert "p1-e2" not in [c.element_id for c in changes]
     assert result.fix_for("p1-e2").pending  # type: ignore[union-attr]
     # the table rule too: an image-page table is not a clean table
     assert not is_clean_table(result.fixes[0], element)
+
+
+# --------------------------------------------------------------------------- parts of the list
+
+
+@pytest.fixture
+def long_list(tmp_path):
+    """The review document with 60 more equations waiting, so the list is several views."""
+    output = scaled_output()
+    for i in range(60):
+        element, fix = _equation(f"p2-m{i}", 1, 200 + i, status=Status.NEEDS_REVIEW)
+        output.result.elements.append(element)
+        output.result.fixes.append(fix)
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        yield env
+
+
+def test_a_long_list_is_cut_into_parts_that_keep_the_filter_and_the_links_to_items(long_list):
+    get = long_list.browser.get
+    base = f"/jobs/{long_list.job_id}/review/list"
+    first = get(f"{base}?kind=equations").text
+    on_first = set(re.findall(r'<li id="item-(p\d-[em]\d+)"', first))
+    assert 20 < len(on_first) < 40  # a view holds a fixed number of cards, not all 60
+    assert re.search(r"Showing items 1 to \d+ of \d+", first)
+    nxt = re.search(r'href="([^"]+)" rel="next"', first)
+    assert nxt is not None and "kind=equations" in unescape(nxt.group(1))  # the filter is kept
+    second = get(unescape(nxt.group(1)).split("#")[0]).text
+    on_second = set(re.findall(r'<li id="item-(p\d-[em]\d+)"', second))
+    assert on_second and not on_second & on_first
+    # A link to an item on a later part lands on the part that holds it.
+    later = sorted(on_second)[0]
+    landed = get(f"{base}?kind=equations&at=item-{later}#item-{later}").text
+    assert f'id="item-{later}"' in landed
+    # The count a reader is told is the number of items on the view.
+    shown = re.search(r"Showing items (\d+) to (\d+) of (\d+)", landed)
+    assert shown is not None
+    assert int(shown.group(2)) - int(shown.group(1)) + 1 == len(
+        re.findall(r'<li id="item-', landed)
+    )
+    # An item that is not in the list gives the first part, not an error.
+    assert get(f"{base}?at=item-nothing&part=999").status_code == 200

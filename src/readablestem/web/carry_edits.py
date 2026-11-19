@@ -16,6 +16,8 @@ here, and only onto an item that is the same as the one they were made on:
   region, looks exactly as it did (the caller compares the two PDFs: `Unchanged`), the
   same page, and where the tool has found nothing in that place this time. A picture the
   tool now finds itself is its own item, and the hand-made one is not added twice.
+- **"Not an equation"** is made again on the equation that has the same picture and the
+  same words under it, when exactly one waiting equation of the new file does.
 - **Pages left out** are left out again only when the page looks exactly as it did.
 
 Anything else is counted as not carried (`EditsCarried.dropped`) and the instructor is told
@@ -28,7 +30,7 @@ from __future__ import annotations
 
 import re
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -54,7 +56,11 @@ HEADING = "heading"
 PICTURE = "picture"
 EQUATION = "equation"
 PAGE_LEFT_OUT = "page_left_out"
-KINDS = (TEXT, HEADING, PICTURE, EQUATION, PAGE_LEFT_OUT)
+NOT_EQUATION = "not_equation"
+# A page operation that is never made again (a try-again or a revision starts from the
+# pipeline's reading): an equation read again. It is listed, by name and page, as not re-applied.
+READ_AGAIN = "read_again"
+KINDS = (TEXT, HEADING, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
 CARRIED_KEY = "carried_edit"
 
 # `ReviewEdit.action` values of the edits that change the text or the kind of an element.
@@ -77,16 +83,24 @@ class EditRow:
 @dataclass
 class EditsCarried:
     """What was put on the new result: (kind, id in the new result) pairs (a page left out
-    is `page_edits.page_key`), how many earlier edits were not carried, and the crops of
+    is `page_edits.page_key`), how many earlier edits were not carried, which ones (kind and
+    1-based page of the earlier file; None when the page is not known), and the crops of
     the pictures and equations added back."""
 
     items: list[tuple[str, str]] = field(default_factory=list)
     dropped: int = 0
+    not_applied: list[tuple[str, int | None]] = field(default_factory=list)
     crops: dict[str, bytes] = field(default_factory=dict)
+
+    def drop(self, kind: str, page: int | None) -> None:
+        """An earlier edit that was not made again: `page` is 0-based, as an element's."""
+        self.dropped += 1
+        self.not_applied.append((kind, None if page is None else page + 1))
 
     def extend(self, other: EditsCarried) -> None:
         self.items.extend(other.items)
         self.dropped += other.dropped
+        self.not_applied.extend(other.not_applied)
         self.crops.update(other.crops)
 
     @property
@@ -181,7 +195,7 @@ def _markers(text: str) -> list[str]:
 
 def _typed_text(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     old_element: Element,
     origin: Origin,
     new: DocumentResult,
@@ -214,7 +228,7 @@ def _typed_text(
 
 def _carry_words(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     new_crops: dict[str, bytes],
     rows: list[EditRow],
@@ -260,14 +274,20 @@ def _carry_words(
     old_fixes = {f.element_id: f for f in old.fixes}
     for old_id, origin in edited.items():
         new_id = matched.get(old_id)
-        if new_id is None:
-            out.dropped += 1
-            continue
-        kind = _apply_words(
-            old, old_crops, old_by[old_id], origin, old_fixes.get(old_id), new, new_crops, new_id
-        )
-        if kind is None:
-            out.dropped += 1
+        kind = None
+        if new_id is not None:
+            kind = _apply_words(
+                old,
+                old_crops,
+                old_by[old_id],
+                origin,
+                old_fixes.get(old_id),
+                new,
+                new_crops,
+                new_id,
+            )
+        if kind is None or new_id is None:
+            out.drop(HEADING if "make_heading" in origin.ops else TEXT, old_by[old_id].page)
         else:
             out.items.append((kind, new_id))
     return out
@@ -275,7 +295,7 @@ def _carry_words(
 
 def _apply_words(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     old_element: Element,
     origin: Origin,
     old_fix: Fix | None,
@@ -337,9 +357,30 @@ def _found_there_now(old: DocumentResult, added: Element, new: DocumentResult) -
     return False
 
 
+def _added_by_hand(old: DocumentResult) -> list[Element]:
+    """The pictures and equations added by hand to the earlier version, in reading order."""
+    added = [
+        e
+        for e in old.elements
+        if ADDED_ID.fullmatch(e.id) and e.kind in (Kind.FIGURE, Kind.EQUATION)
+    ]
+    return sorted(added, key=lambda e: e.order)
+
+
+def regions_compared(old: DocumentResult) -> list[tuple[int, Box | None]]:
+    """The places `carry_structure` and `carry_omitted` ask `Unchanged` about, for the earlier
+    version with its omitted pages back: the region of each added picture or equation, and
+    each page left out. A snapshot of the earlier version keeps how these looked
+    (`web.carry_snapshot`), so the question can be answered once that file is gone."""
+    asked: list[tuple[int, Box | None]] = [
+        (e.page, _clip(e.bbox)) for e in _added_by_hand(old)[:MAX_CHECKS]
+    ]
+    return asked + [(page, None) for page in old.omitted_pages]
+
+
 def _carry_added(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     unchanged: Unchanged,
     job_pages: int,
@@ -347,37 +388,103 @@ def _carry_added(
     out = EditsCarried()
     pages = page_edits.page_count(new, job_pages)
     fixes = {f.element_id: f for f in old.fixes}
-    added = [
-        e
-        for e in old.elements
-        if ADDED_ID.fullmatch(e.id) and e.kind in (Kind.FIGURE, Kind.EQUATION)
-    ]
-    for index, element in enumerate(sorted(added, key=lambda e: e.order)):
+    for index, element in enumerate(_added_by_hand(old)):
         fix = fixes.get(element.id)
         png = old_crops.get(element.id)
+        kind = PICTURE if element.kind is Kind.FIGURE else EQUATION
         if (
             fix is None
-            or png is None
+            or not isinstance(png, bytes)  # the picture itself, not only its digest
             or index >= MAX_CHECKS
             or element.page >= pages
             or element.page in new.omitted_pages
             or page_edits.added_count(new) >= page_edits.MAX_ADDED
+            or _found_there_now(old, element, new)
+            or not unchanged(element.page, _clip(element.bbox))
         ):
-            out.dropped += 1
-            continue
-        if _found_there_now(old, element, new):
-            out.dropped += 1
-            continue
-        if not unchanged(element.page, _clip(element.bbox)):
-            out.dropped += 1
+            out.drop(kind, element.page)
             continue
         new_id = page_edits.next_added_id(new, element.page)
         page_edits.insert_element(new, element.model_copy(update={"id": new_id, "order": 0}))
         new.fixes.append(fix.model_copy(deep=True, update={"element_id": new_id}))
         out.crops[new_id] = png
-        out.items.append((PICTURE if element.kind is Kind.FIGURE else EQUATION, new_id))
+        out.items.append((kind, new_id))
     if out.items:
         _recount(new)
+    return out
+
+
+# --------------------------------------------------------------------------- not an equation
+
+
+def _held_element(row: EditRow) -> Element | None:
+    """The equation as it was when it was given back to the text (the row's `before`)."""
+    structure = (row.before or {}).get(STRUCTURE_KEY)
+    held = ((structure or {}).get("elements") or {}).get(row.element_id)
+    if not isinstance(held, dict):
+        return None
+    try:
+        element = Element.model_validate(held)
+    except ValueError:
+        return None
+    return element if element.kind is Kind.EQUATION else None
+
+
+def _carry_not_equation(
+    old_crops: Mapping[str, carry.Crop],
+    new: DocumentResult,
+    new_crops: dict[str, bytes],
+    rows: list[EditRow],
+) -> EditsCarried:
+    out = EditsCarried()
+    for row in rows:
+        if row.action != NOT_EQUATION:
+            continue
+        held = _held_element(row)
+        png = old_crops.get(row.element_id)
+        if held is None or not png:
+            out.drop(NOT_EQUATION, held.page if held is not None else None)
+            continue
+        print_ = carry.fingerprint(held, {held.id: png})
+        waiting = {f.element_id for f in new.fixes if f.kind is Kind.EQUATION and f.pending}
+        found = [
+            e
+            for e in new.elements
+            if e.id in waiting
+            and e.kind is Kind.EQUATION
+            and (e.text or "") == (held.text or "")
+            and carry.fingerprint(e, new_crops) == print_
+        ]
+        if len(found) != 1:
+            out.drop(NOT_EQUATION, held.page)
+            continue
+        try:
+            page_edits.not_an_equation(new, found[0].id)
+        except (ReviewInvalid, LookupError):
+            out.drop(NOT_EQUATION, held.page)
+            continue
+        out.items.append((NOT_EQUATION, found[0].id))
+    return out
+
+
+# --------------------------------------------------------------------------- read again
+
+
+def _carry_read_again(old: DocumentResult, rows: list[EditRow]) -> EditsCarried:
+    """An equation read again is not made again: the new file has the tool's own reading.
+    It is listed as not re-applied, unless it was undone (a structural undo row on the same
+    item takes back the latest edit before it)."""
+    out = EditsCarried()
+    made: defaultdict[str, list[str]] = defaultdict(list)
+    for row in rows:
+        if row.action == READ_AGAIN:
+            made[row.element_id].append(row.action)
+        elif row.action == "undo" and STRUCTURE_KEY in (row.before or {}) and made[row.element_id]:
+            made[row.element_id].pop()
+    pages = {e.id: e.page for e in old.elements}
+    for element_id, actions in made.items():
+        for _ in actions:
+            out.drop(READ_AGAIN, pages.get(element_id))
     return out
 
 
@@ -386,7 +493,7 @@ def _carry_added(
 
 def carry_structure(
     old: DocumentResult,
-    old_crops: dict[str, bytes],
+    old_crops: Mapping[str, carry.Crop],
     new: DocumentResult,
     new_crops: dict[str, bytes],
     rows: list[EditRow],
@@ -402,6 +509,8 @@ def carry_structure(
     out = _carry_words(old, old_crops, new, new_crops, rows)
     added = _carry_added(old, old_crops, new, unchanged, job_pages)
     out.extend(added)
+    out.extend(_carry_not_equation(old_crops, new, new_crops, rows))
+    out.extend(_carry_read_again(old, rows))
     return out
 
 
@@ -415,12 +524,12 @@ def carry_omitted(
     pages = page_edits.page_count(new, job_pages)
     for page in old.omitted_pages:
         if page >= pages or page in new.omitted_pages or not unchanged(page, None):
-            out.dropped += 1
+            out.drop(PAGE_LEFT_OUT, page)
             continue
         try:
             page_edits.omit_page(new, page, pages=pages)
         except ReviewInvalid:
-            out.dropped += 1
+            out.drop(PAGE_LEFT_OUT, page)
             continue
         out.items.append((PAGE_LEFT_OUT, page_edits.page_key(page)))
     return out

@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.9 as of 2026-11-04; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.12 as of 2026-11-19; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,12 +43,25 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-figures.json` | 2026-10-14 | 0.5.0 | same |
-| `latest-headings.json` | 2026-11-02 | 0.5.1 | same (the task calls no model; run with the fake client, model fields kept from the earlier run; `baseline-headings.json` stays the 2026-10-14 file) |
-| `latest-equations.json`, `latest-document.json`, `latest-tables-local.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`) |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.12 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
+| `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
+
+**What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
+report is held to its baseline only when this pipeline version made it (`eval gate
+--require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
+so CI's `eval-gate` job gates those two, re-made at 0.5.12. Equations, figures and document
+need a paid run: their latest and baseline reports are historical records of the 0.5.0
+system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
+the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
+answered). `eval-live.yml` re-measures them weekly on the current code and compares them
+with the baselines; a paid recording of the three is owed before they can gate a pull
+request again. The same job replays the corpus against the committed record (`eval burden
+--same`, "The replay record, and CI" under `eval burden`) when a change touches the package,
+which finds a change of behavior that a version number alone would not.
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
-latest report from going stale is the gate's `--require-current` check on prompt versions and
+latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions and
 model ids, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
@@ -191,6 +204,7 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `exact_strict` | share whose normalised MathML equals the gold exactly (see the `eval/equations.py` docstring for the normalisation) |
 | `exact_lenient` | same, after lenient normalisation (`mi`/`mn`/`mtext` alike, trailing sentence punctuation dropped) |
 | `exact_lenient_ci95` | Wilson 95% interval for `exact_lenient` |
+| `exact_printed` | share whose LaTeX and the gold's LaTeX print the same (below); printed beside `exact_lenient` for one release. Only where the gold has LaTeX (the real-world sets; the OpenStax sample is MathML only, so it has none), and absent from a report made before it existed |
 | `mean_teds` | mean of TEDS = 1 - TED / max(nodes), Zhang-Shasha tree edit distance on normalised trees; 0 with no proposal |
 | `proposal_rate` | share where the step proposed MathML at all |
 | `secondary_stream_v2` | the labeled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
@@ -198,6 +212,39 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `by_route` | same, per route: `cheap` (cheap model only), `main` (main model only), `escalated` (cheap first, then main), `fallback` (any call made as a fallback), `none` (no call) |
 | `by_display` | same, per gold `display` (block, inline) |
 | `selective` | for t = 0.50, 0.55, ..., 0.95: keep only proposals with confidence >= t. `coverage` = kept / n; `accuracy` = `exact_lenient` among kept (n/a when none kept); `kept`; `mean_teds` among kept. A useful confidence makes accuracy rise with t |
+
+#### The printed-form score (`exact_printed`)
+
+`exact_lenient` compares the MathML trees of the answer and the gold. Two LaTeX sources that print
+the same can have different trees (`\dots` against `\ldots`, braces round a single letter,
+`\mathrm{sin}` against `\sin`, `\to` against `\rightarrow`), and on the five development parts of
+the real-world set 669 accepted equations were called wrong for that reason or because the gold
+was paired with another region. `exact_printed` (`eval/equations_printed.py`) compares the two
+LaTeX sources after one spelling is chosen for every notation that prints alike: style commands
+(`\rm`, `\bf`, `\mathrm`), spacing and sizing commands, braces that only group, alignment
+environment names, dot commands, `\dfrac` and `\frac`, the order of a prime and a subscript, and
+a few symbols that have two names.
+
+What it still calls wrong: a different character, a different sign, relation or operator, an
+accent on one side only, a prime added or missing, a difference in structure (a fraction against
+a slash, a grouping that changes what is under a script), and a bold, script or double-struck
+letter against a plain one. Where the two sources set the same letters in the same styles but
+spell the style two ways, that is one style, and it scores right. An answer with no LaTeX, or a
+gold with none, scores wrong.
+
+A *pairing miss* is a pair that `exact_printed` calls wrong where the answer's letters and digits
+equal those of the file's own text for that region and the gold's do not. The gold was matched to
+another region, so the pair says nothing about the reading. It is counted in its own number
+(`pairing_misses` in the document metrics, `pairing_miss` on each pair) wherever the score is
+summed, and it is never counted as right. `matched_exact_printed_without_pairing_misses` takes
+them out of the denominator.
+
+`exact_lenient` stays beside the new score for one release, and every report that printed it
+prints both. No gate threshold, target or public figure reads the new score. On the development
+parts: 8,035 matched pairs, `exact_lenient` right on 6,556, `exact_printed` right on 7,182, 284
+pairing misses among the pairs it calls wrong; and 13 pairs right under the old score and wrong
+under the new one, each a real difference in style (a `\text` subscript against a `\textbf` one,
+an upright letter against an italic one, `\mathds{1}` against `1`).
 
 `review_load` (see "Review load" below): `required`, `optional`, per item and per
 section, the reasons for each tier, `flags` and `flags_excluding_scorer_gaps`
@@ -243,6 +290,30 @@ scorer; the eighth wrong equation, a required decision, has no stored answer. Th
 stay wrong are real differences: a subscript the answer key sets bold
 (`\mathbf{v}_{\text{avg}}` against a bold `avg`), and a comma the model copied from the
 text layer.
+
+**The document task reads the output as the student's file states it.** Two things the
+equation scorer used to leave out, which made correct output count as "not found" or "wrong"
+(`pipeline_eval.document_page_item`, `with_table_maths`, `read_mathml`):
+
+- *Table cells.* A rebuilt table is one TABLE element, but its cells hold formulas, and the
+  output HTML a student reads has them inside the table. Every math cell (validated MathML),
+  and every cell of text that states math with raised or lowered characters (`x²`,
+  `10^(-3)`), is an inline equation of the page that the scorer aligns to the gold. This used
+  to be a second reading kept beside the registered one (`table_maths_reading`, read by
+  `flag_features.read_items`); it is the one reading now, and items recorded before this change
+  keep the old key, which `read_items` still merges.
+- *Math written as text with raised or lowered characters.* An equation element the pipeline
+  left as text (`Element.script_runs`: `H₂O`, `cm³`) and a text token with Unicode
+  superscript or subscript characters or a `^(...)` run are read as scripts, `<msub>` or
+  `<msup>` of the atom before the run, as the gold writes them (`equations_v2.read_scripts`,
+  `mathml_of_text`), not as the order of their characters. The primary scorer's rules are
+  unchanged; an element with no proposal whose text states scripts is scored from that
+  reading by every scorer, and one with no raised or lowered characters is still "no proposal".
+
+No numbers in this document change with it: the stored outputs and the answer key of the
+374-equation set this was found on are not in the repository or the corpus cache, so the
+before and after counts have to be taken by running `eval pipeline` (a replay of stored answers
+costs nothing) on that set.
 
 ### headings
 
@@ -352,6 +423,8 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `detection_recall` | matched / gold equations |
 | `detection_recall_by_display` | recall for gold block and inline equations separately |
 | `matched_exact_lenient` | `exact_lenient` over matched pairs (no proposal = wrong) |
+| `matched_exact_printed`, `end_to_end_exact_printed` | the same two figures under `exact_printed` (above), for one release; a pairing miss is wrong in both. Absent from a report made before it existed |
+| `pairing_misses`, `matched_exact_printed_without_pairing_misses` | the matched pairs whose answer is what the file says and whose gold is another region's, counted apart; and `matched_exact_printed` without them |
 | `matched_mean_teds` | mean TEDS over matched pairs |
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
 | `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (math OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
@@ -554,6 +627,9 @@ Compares a current report with a baseline report of the same task.
 | `document_axe_violations` | document | rises at all (`max_increase`, limit 0) |
 | `document_cost` (`cost.per_item_usd`) | document | rises by more than 25% |
 
+The gate also prints `exact_printed`, `matched_exact_printed` and `pairing_misses` of the two
+reports as lines under the table. Nothing is gated on them.
+
 Exit 0: all within tolerance. Exit 1: a tracked metric regressed, or is missing from the
 current report. Exit 2: not comparable, so no verdict: different task, different gold
 manifest, different item selection (e.g. another `--limit`), a partial run on either
@@ -564,7 +640,9 @@ Changed pipeline version, step prompt versions, model ids or client are listed u
 table (they are usually why the gate is being run). With `--require-current` (CI uses
 it) the gate also refuses (`stale_report`) a current report produced with other prompts
 or models than the code under test, so a prompt change cannot pass on an old committed
-`latest-<task>.json`. Tolerances live in `data/eval/tolerances.json`; an entry with only
+`latest-<task>.json`. The pipeline version counts too (`pipeline X (code: Y)`): a report made
+by another version than the code's is refused whatever its prompts and models were, and a
+`--fake` report has no models to compare. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -625,6 +703,20 @@ including predicted LaTeX, MathML or alt text. These come from public OpenStax p
 harness never reads anything from `private-inputs/`, except the tables task's
 real-document check, which reads `private-inputs/tables/` and reports counts only (see
 "Tables").
+
+## Public benchmark at $0 (`eval parsing-bench`)
+
+`readablestem eval parsing-bench [--fetch] [--run-dir DIR] [--only CATEGORY] [--out FILE]` runs
+the categories of olmOCR-Bench that the text path answers without a model (order, headers and
+footers, long tiny text, tables, baseline) through the product's own conversion with a client
+that refuses every request, and scores them with the benchmark's own checker. Pages that need a
+model (scans, with or without an OCR layer) are dropped and counted; equations and old scans
+are reported as not run. The benchmark is fetched to `~/.cache/readablestem/bench/` (outside the
+repository, nothing from it is committed); page files go in `--run-dir` so a stopped run
+resumes. At most 3 conversions run at once. The record (`data/eval/parsing-bench-olmocr.json`)
+holds scores per category with n, the benchmark revision, the pipeline version and the profile
+hash. Results and the failures by cause: `docs/eval-parsing-benchmark.md`. The adapter is
+`eval/olmocr_bench.py`; the checker's runner is `proof/parsers/runners/olmocr_check.py`.
 
 ## How to rerun
 
@@ -809,7 +901,7 @@ only under the older key is answered from that row, and the row is appended unde
 with its parts (`answers_file.answers_file_rekeyed` counts them). Run it once, with the code and settings
 the file was recorded with, then drop the flag; a request that changed since the recording is
 a miss either way.
-The Claude second check (shadow by default) asks the model as well; from 2026-10-14 its
+The Claude second check (off by default since WS10.5; `CLAUDE_SECOND_CHECK=shadow` turns it on) asks the model as well; from 2026-10-14 its
 answers are kept in the same file (the report's `answers_file.second_check`), so a replay and
 `--answers-offline` spend nothing on it. The baselines of "Baselines and the gate" were
 recorded before that, so their check answers are not in `.local/answers-baseline.jsonl`: the
@@ -980,13 +1072,27 @@ tables local and document; `image_page*.md`, `IMAGE_PAGES_MODEL` and
 `ANTHROPIC_EFFORT_IMAGE_PAGES`: `latest-image-pages.json`, a run of the scanned and handwritten
 pages pass (the document task reads typed PDFs and never calls that pass; no such report is committed
 yet, the first prompt change adds it, and the practice-set run in docs/eval-handwriting.md, "Doubtful
-symbols: tried, not shipped", is the model for it); any other prompt: document); a change to the Claude model pair
+symbols: tried, not shipped", is the model for it); `page_audit.md`, `PAGE_AUDIT_MODEL` and
+`ANTHROPIC_EFFORT_PAGE_AUDIT`: `latest-page-audit.json`, the audit's own run (`eval page-audit`,
+below: it runs in shadow and changes no output, so the document task does not measure it; no such
+report is committed yet); any other prompt: document); a change to the Claude model pair
 needs all four Claude reports (equations, headings, figures, document); the OpenAI pair
 needs the tables report, which records it; any other model setting needs the document
 report.
 
-Opt-out, for a change that does not alter what a model is asked or which model answers (a
-renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
+**What decides acceptance.** A change to a rule that decides whether a reading is accepted or
+goes to a person needs the replay record, `data/eval/burden-corpus.json` ("The replay
+record"), re-made in the same pull request. The rule is small and has no line numbers. A
+module under `src/readablestem/pipeline/` with a function that sets `Status.ACCEPTED` or
+`Status.NEEDS_REVIEW` decides acceptance: its module-level `UPPER_CASE` constants and those
+deciding functions are the rules, and so is a `config.py` setting with `accept` in its name.
+They are compared by parsed value (`ast`; a function without its docstring), so a comment, a
+docstring or `0.80` written `0.8` is no change, and a constant in a module that decides
+nothing (`layout/`) is not a rule. A module is found by what it does, so a new step that
+sets a status is covered without a list to update.
+
+Opt-out, for a change that does not alter what a model is asked, which model answers or what
+is accepted (a renamed constant, a comment): add the label `eval-unchanged` to the pull request, or put a
 trailer `Eval-Unchanged: <reason>` in the last paragraph of any of its commit messages (the reason is required). The guard
 prints the waiver and the reports it did not need, so a reviewer sees it. Prompt text a
 model reads is never a refactor: change it and re-run.
@@ -1355,7 +1461,9 @@ is one: `private-inputs/tables/` (git-ignored; or `--real-dir`) with the PDFs an
 ```
 
 Pages are 0-based; boxes are PDF points in PyMuPDF's page frame (`Element.bbox`'s);
-`pages` (optional) limits the check to the pages that were labeled. A predicted data
+`pages` (optional) limits the check to the pages that were labeled. A page saved sideways with
+no /Rotate is read turned, so its labeled boxes are mapped into the turned frame before the
+comparison (`labelled_as_read`). A predicted data
 table is a real table when it shares at least half of the smaller box with a labeled one;
 a labeled table is found at full extent when one prediction covers at least 90% of it and
 at least 75% of that prediction lies inside it (not cut short, not merged with a plot).
@@ -2655,10 +2763,12 @@ exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only
 that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
 replay pays nothing.
 
-**Answers still owed.** Ten files ask for 126 answers that were never recorded (pictures
-that changed since the first recording, and files added after it). `harness.OWED` lists
-them with the count for each, and the replay test fails if a file misses more or fewer than
-its count. Their conversions still finish: a part with no answer is left for the reviewer,
+**Answers still owed.** 29 files ask for 1,260 answers that are not in the recording
+(2026-11-19). Until wave 1a it was ten files and 126 answers (pictures that changed since the
+first recording, and files added after it). Wave 1a changed what a conversion asks on 18
+files (words with their styles, kept line ends, new boxes) and paid for no recording, so one
+refresh owes them all. `harness.OWED` lists them with the count for each, and the replay
+test fails if a file misses more or fewer than its count. Their conversions still finish: a part with no answer is left for the reviewer,
 as when a model is unavailable.
 
 **Refreshing.** `scripts/corpus_refresh.py` runs the same tests against a working copy of
@@ -3179,15 +3289,53 @@ number of uploads.
 |---|---|
 | 0 | the bar is met, or no record was given |
 | 1 | the set or a page kind asks for more than before; the lines name each |
-| 2 | not judged: other documents, or a different number of uploads measured |
+| 2 | not judged: other documents, or a different number of uploads measured (with `--same`: no upload was measured) |
 
 **Fewer is not better by itself.** A change that stops asking about something wrong lowers
 this figure and raises the errors nobody is told about. The bar is read with the counts of
 silent errors (the lane evals and the page audit), never alone.
 
-Baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
-pages; `data/eval/burden-corpus.json`). The ten uploads left out are the ones the cost
-report leaves out, for the same 126 answers.
+**The replay record, and CI.** `data/eval/burden-corpus.json` is also the record CI's eval
+gate holds a pull request to. With `--same` the bar is not "no more decisions" but "the
+decisions the record has": every upload measured now must ask for exactly the decisions, on
+exactly the pages, that the record has, fewer as well as more, because a rule that stops
+asking about something wrong is as much a change as one that asks more (and raises the
+silent errors the lane evals count). An upload measured now and not in the record is a
+difference; an upload the record has and this machine cannot replay is not compared. CI
+holds the public files only: the answers for the CC BY-NC-SA files are kept out of the
+repository (`corpus.KEPT_OUT`), so CI replays about half the uploads and the box replays
+all. The record is made on the box, with the kept-out answers, by this command and never by
+hand:
+
+```bash
+uv run readablestem eval burden --out data/eval/burden-corpus.json
+uv run readablestem eval burden --against data/eval/burden-corpus.json --same   # what CI runs
+```
+
+A pull request that changes the pipeline fails the second command when its change moves any
+upload's decisions, and passes when the record was re-made in the same pull request. The
+eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
+decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
+
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.12 by
+`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 58 decisions,
+0.496 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
+MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
+capitals, equation numbers and kept line ends) make the pipeline ask questions the
+recording does not hold, so 30 uploads are left out for 1,298 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 74,
+`w_solutions_1802` 50). The decisions a page of the records are not comparable: the dense
+mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
+0.5.11 record (2026-11-18, 45 uploads, 70 decisions), the 42 uploads in both ask the same;
+`r15_openstax_chem_ch3`, `r19_poster_codesign` and `r20_newsletter_drp` left the record (2, 4
+and 2 answers missing) and `w_mixed_slides+image_pages` came back. **A paid recording of the
+answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
+the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
+compare them.
+
+First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
+pages; the figures below are that record's, no longer the file's). The ten uploads left out
+are the ones the cost report leaves out, for the same 126 answers.
 
 | | |
 |---|---|
@@ -3281,7 +3429,7 @@ the document's words. Each place is counted once.
 | `out_table_header` | a table has no header cell where the page's has one |
 | `out_heading` | a heading is empty or skips a level, or the title is said twice |
 | `out_lang` | the file states no language, or another than the document's |
-| `out_note_lost` | a note of the page is not in the output |
+| `out_note_lost` | a note of the page is not in the output (its back-link is no part of the note) |
 | `out_hole` | a sentence has a gap: a space before its full stop or comma, "the -x" |
 | `out_notice_missing` | an open decision or a kept picture has no note at its place |
 
@@ -3392,6 +3540,25 @@ What none of the reports has yet:
 - A LaTeX source, a Word or a PowerPoint file: the corpus has none whose answers are
   recorded, so the `source` kind has no row.
 - How long a background (batch) check takes to come back: no batch answer is recorded.
+
+### `eval say-once`
+
+The words of each page said by no element, and said twice (`pipeline/say_once.py`,
+[steps.md](steps.md), "Say once"), over the corpus. Each file is read by layout as a job reads
+it, with no model, and counted by the function the conversion runs at its end in shadow
+(`page_missing`, [eval-say-once.md](eval-say-once.md) has the figures). Counts only: no word
+or page text is kept in the record.
+
+```bash
+uv run readablestem eval say-once --out say-once.json
+uv run readablestem eval say-once --only r18_arxiv_opt        # one file
+```
+
+It spends nothing and gates nothing, and reads the corpus as a development set. The record is
+the usual one (`measure.record`: the split by document, the profile, the commit) with, under
+`metrics`, the pages by share in no element and said twice at each line, the words by code,
+what layout left out by rule, and the pages over the line. It does not see wrong reading order
+(`eval order`). Exit code 0: measured; 2: nothing could be measured.
 
 ## The page audit in shadow (`eval page-audit`)
 
@@ -3580,11 +3747,14 @@ file at full speed. At a quarter of the speed the time ran out, one page was typ
 its ink and so was not seen as handwriting, and its page type, elements, fixes and HTML all
 changed with nothing saying why. The stop now writes the fact (`page_type` with
 `time_limit` for each such page, and `ink_strokes` when the strokes were not read), and the
-test passes with an empty `KNOWN` list. The budget is still a clock: a slower machine can
-still give that file a different document, and now says so. Making it a count of work is
-the next step for it. The table search's time limit was not reached by any corpus upload at
-a quarter of the speed; it is listed in the clock table and gets its own fact with the
-table work.
+test passes with an empty `KNOWN` list. Since plan WS14.9 (2026-11-11) the budget is a count
+of work for each page (`page_type.INK_MAX_ITEMS`, `INK_MAX_SEGMENTS`) and the clock only a
+guard against a hang (`INK_GUARD_S`, 60 s a page), so which pages are read for handwriting
+no longer depends on how fast the machine is. Measured again that day, that upload kept its
+page at a quarter of the speed under the old budget too, so the loss itself was not
+reproduced; what the test shows is that a clock ten times faster or slower gives the same
+document. The table search's time limit was not reached by any corpus upload at a quarter of
+the speed; it is listed in the clock table and gets its own fact with the table work.
 
 Not covered: a document long enough to reach the limits by its size. The corpus's longest
 upload is short of that, so a 100-page math-heavy document converted under several CPU

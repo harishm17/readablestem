@@ -38,9 +38,10 @@ from readablestem.core.types import (
 )
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline.assemble import RENDER_META, RENDER_VERSION
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.web.app import create_app
 from readablestem.web.auth import set_allowed
-from readablestem.web.db import Job, session_scope
+from readablestem.web.db import LARGE_COLUMNS, Job, session_scope
 from readablestem.web.email_senders import LoginEmail, register_sender
 from readablestem.web.worker import Worker
 
@@ -159,12 +160,14 @@ def fake_result() -> DocumentResult:
         Fix(element_id="p1-e2", kind=Kind.EQUATION, status=Status.ACCEPTED, confidence=0.97,
             equation=EquationFix(latex="v = d / t", mathml="<math><mi>v</mi><mo>=</mo>"
                                  "<mi>d</mi><mo>/</mo><mi>t</mi></math>",
-                                 speech="v equals d over t", display="inline"),
+                                 speech="v equals d over t", display="inline",
+                                 speech_version=SPEECH_VERSION),
             checks=[Check(name="latex.allowed_commands", passed=True)], calls=[call]),
         Fix(element_id="p1-e3", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, confidence=0.55,
             equation=EquationFix(latex=r"\SECRETLATEX{x}", mathml="<math display=\"block\">"
                                  "<mi>x</mi><mo>+</mo><mn>1</mn></math>",
-                                 speech="x plus 1", display="block"),
+                                 speech="x plus 1", display="block",
+                                 speech_version=SPEECH_VERSION),
             checks=[Check(name="latex.allowed_commands", passed=False, severity="warning",
                           code="unknown_command")], calls=[call]),
         Fix(element_id="p1-e4", kind=Kind.FIGURE, status=Status.NEEDS_REVIEW, confidence=0.6,
@@ -288,7 +291,11 @@ class WebEnv:
             self.settings, converter=self.converter, client_factory=fake_client_factory
         )
         self.ctx = self.app.state.ctx
-        if self.settings.feature_latex_source or self.settings.feature_batch_zip:
+        if (
+            self.settings.feature_latex_source
+            or self.settings.feature_batch_zip
+            or self.settings.feature_word_source
+        ):
             self.ctx.sandbox.set("pass")  # as if the probe had passed on this machine
 
     @contextmanager
@@ -318,7 +325,7 @@ class WebEnv:
 
     def job(self, job_id: str) -> Job:
         with session_scope(self.ctx.factory) as session:
-            job = session.get(Job, job_id)
+            job = session.get(Job, job_id, options=LARGE_COLUMNS)
             assert job is not None
             return job
 
@@ -341,9 +348,12 @@ def upload(
     share: bool = False,
     exam: bool = False,
     image_pages: bool = False,
+    language: str | None = None,
     csrf: str | None = None,
 ):
     fields = {"csrf_token": csrf if csrf is not None else token(client)}
+    if language:
+        fields["language"] = language
     if image_pages:
         fields["image_pages"] = "on"
     if keep:

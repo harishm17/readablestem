@@ -101,7 +101,7 @@ def test_worker_converts_a_job_and_stores_everything(env):
     assert job.result_json is not None and "html" not in job.result_json
     assert job.result_json["fixes"][2]["status"] == "needs_review"
     assert job.html is not None and "SECRET-DOC-TEXT" in job.html
-    assert job.html_stale is False
+    assert job.html_stale is True  # made again on first view, with its version id
     assert set(blobs(env, job_id, "crop")) == {"p1-e3", "p1-e4", "p1-e5"}
     assert env.converter.calls[0]["pdf"] == pdf
 
@@ -128,6 +128,32 @@ def test_model_calls_made_by_a_job_are_counted_in_the_daily_spend(env):
         day = session.scalar(select(SpendDay))
         assert day is not None
         assert day.spent_usd > 0 and day.held_usd == pytest.approx(0.0)
+
+
+def test_a_running_jobs_spend_is_what_settled_and_never_more_than_it_ends_at(env):
+    job_id = queue_job(env)
+    seen: list[tuple[float, float, float]] = []
+
+    def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
+        def look() -> None:
+            job = env.job(job_id)
+            seen.append((job.settled_usd, job.held_usd, job.cost_usd))
+
+        held = client.budget.reserve(0.05)  # a call in flight
+        look()
+        client.budget.settle(held, 0.01)
+        look()
+        return env.converter.output.model_copy(deep=True)
+
+    worker = env.worker()
+    worker.converter = converter
+    worker.run_once()
+    (in_flight, settled) = seen
+    assert in_flight[:2] == pytest.approx((0.0, 0.05))  # the hold is counted apart from spend
+    assert settled[:2] == pytest.approx((0.01, 0.0))
+    final = env.job(job_id)
+    assert final.status == "done" and final.held_usd == 0
+    assert in_flight[0] <= settled[0] <= final.settled_usd == pytest.approx(final.cost_usd)
 
 
 def test_claims_take_the_oldest_job_first_and_never_the_same_job_twice(env):
@@ -258,14 +284,16 @@ def test_a_stale_worker_cannot_overwrite_a_requeued_job(env):
 
 
 def test_worker_thread_runs_in_the_app_lifespan(tmp_path):
-    env = WebEnv(tmp_path, run_worker=True, worker_poll_s=0.05)
+    # The poll is far longer than the wait below: only an upload that wakes the worker gets
+    # the job converted in time.
+    env = WebEnv(tmp_path, run_worker=True, worker_poll_s=30)
     with env.running() as client:
         worker = env.ctx.worker
         assert worker is not None and worker._thread is not None and worker._thread.is_alive()
         env.allow(ALICE)
         login(client, ALICE)
         job_id = upload(client, make_pdf(1)).headers["location"].rsplit("/", 1)[-1]
-        deadline = time.monotonic() + 60
+        deadline = time.monotonic() + 15
         while env.job(job_id).status != "done" and time.monotonic() < deadline:
             time.sleep(0.05)
         assert env.job(job_id).status == "done"
@@ -343,6 +371,28 @@ def test_deleting_a_running_job_stops_its_model_calls_at_once(env, caplog):
     messages = [r.getMessage() for r in caplog.records]
     assert any(m.startswith("job_cancelled") for m in messages)
     assert not any(m.startswith("job_failed") for m in messages)
+
+
+def test_canceling_a_running_job_stops_its_model_calls_and_keeps_the_upload(env):
+    browser = env.client()
+    login(browser, ALICE)
+    job_id = job_id_from(upload(browser, make_pdf(1)))
+    csrf = token(browser, f"/jobs/{job_id}")
+    sent: list[int] = []
+
+    def cancel_now() -> None:
+        assert browser.post(f"/jobs/{job_id}/cancel", data={"csrf_token": csrf}).status_code == 303
+
+    worker = env.worker()
+    worker.converter = paged_converter(5, after_page={1: cancel_now}, sent=sent)
+    assert worker.run_once() == job_id
+    assert sent == [1]  # nothing was sent to the model after "Cancel"
+    job = env.job(job_id)
+    assert (job.status, job.error_code) == ("failed", "canceled")
+    assert job.lease_until is None and job.result_json is None
+    assert blobs(env, job_id, "upload")  # the upload is kept, so it can be converted later
+    page = browser.get(f"/jobs/{job_id}").text
+    assert "Canceled" in page and "Convert it" in page
 
 
 def test_the_heartbeat_notices_a_deleted_job_without_any_progress(env, caplog):
@@ -658,17 +708,17 @@ class RecordingTracer:
 
 
 def test_a_job_whose_cap_cannot_hold_that_many_calls_runs_fewer_steps(tmp_path):
-    """One page on Claude is capped at $1.00 and a call can hold $0.14: seven at once."""
+    """One page capped at $0.30 on Claude, where a call can hold $0.065: four at once."""
     from readablestem.ops.limits import largest_reservation_usd
 
-    env = WebEnv(tmp_path, model_provider="anthropic")
+    env = WebEnv(tmp_path, model_provider="anthropic", max_usd_per_page=0.30)
     with env.running():
         env.allow(ALICE)
         queue_job(env)
         env.run_worker()
     cap, _ = job_caps(env.settings, 1)
-    assert cap == 1.0
+    assert cap == pytest.approx(0.30)
     assert env.converter.calls[0]["concurrency"] == int(
         cap // largest_reservation_usd(env.settings)
     )
-    assert env.converter.calls[0]["concurrency"] == 7
+    assert env.converter.calls[0]["concurrency"] == 4

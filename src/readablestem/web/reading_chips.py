@@ -30,6 +30,7 @@ from markupsafe import Markup
 
 from readablestem.core.types import Element, Fix, ReadingAlternatives, SymbolAlternative
 from readablestem.pipeline import reading_alternatives
+from readablestem.pipeline.speech import CAP, in_full_words
 from readablestem.pipeline.validate import has_errors
 from readablestem.web.mathml import try_sanitize_mathml
 
@@ -76,7 +77,7 @@ def phrase(symbol: SymbolAlternative, option: str) -> str:
     said = _say(option) or option
     greek = option.startswith("\\") and option[1:].isalpha()
     if symbol.kind == "case":
-        return said if said.lower().startswith("capital") else f"small {said}"
+        return in_full_words(said) if said.startswith(f"{CAP} ") else f"small {said}"
     if symbol.kind == "greek_latin":
         return f"Greek {said}" if greek else f"the letter {said}"
     if symbol.kind == "digit_letter":

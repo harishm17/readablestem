@@ -26,17 +26,32 @@
 
 /* The player: a compact transport (Play, Previous, Next) that stays in view while the
    transcript scrolls (listen.js follows the item being spoken unless "Follow along" is off).
-   When Play is off, the reason is the line right under it. listen.js measures the transport's
-   real height into --listen-sticky (tokens.css), so an item scrolled into view lands below it
-   however many lines it wraps to; the layer is --z-sticky. In a short window it does not stick. */
+   When Play needs a word about the voice, the line is right under it. listen.js measures what
+   sticks into --listen-sticky (tokens.css), so an item scrolled into view lands below it
+   however many lines it wraps to; the layer is --z-sticky.
+   In a short window (a laptop at 200% or 400% zoom is 450 or 225 CSS px tall) the block does
+   not stick: only the bar does, one compact row (Play or Pause, Previous, Next, the place) of
+   at most a third of the window, and the voice note scrolls with the page. */
 .listen-controls[hidden], .listen-transport[hidden], .listen-controls [hidden], .listen-filter[hidden] { display: none; }
 .listen-transport { position: sticky; top: 0; z-index: var(--z-sticky); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-2) var(--space-3); margin: var(--space-3) 0; }
-.listen-transport .listen-row { margin: 0; align-items: center; }
-.listen-transport button { min-height: 2.5rem; }
-@media (max-height: 32rem) { .listen-transport { position: static; } }
-@media (forced-colors: active) { .listen-transport { border-color: CanvasText; } }
+.listen-bar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; margin: 0; }
+.listen-bar button { min-height: 2.5rem; min-width: 2.75rem; }
+.listen-tail { display: inline; }
+@media (max-height: 32rem) {
+  .listen-transport { display: contents; }
+  .listen-bar { position: sticky; top: 0; z-index: var(--z-sticky); gap: var(--space-1) var(--space-2); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-1) var(--space-2); margin: var(--space-2) 0; }
+  .listen-bar button { min-height: 2rem; min-width: 1.5rem; flex: 0 0 auto; padding-inline: var(--space-2); }
+  /* Beside the buttons when they fit; on its own short line under them at 320 px. */
+  .listen-bar .listen-position { flex: 1 1 auto; min-width: 6rem; font-size: var(--step--1); line-height: 1.2; }
+  .listen-bar .listen-position:empty { display: none; }
+  /* "Resume from item 5 of 12": the place is beside it, so only the first word shows here
+     (the button's name for a screen reader stays whole). */
+  .listen-tail { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+}
+@media (forced-colors: active) { .listen-transport, .listen-bar { border-color: CanvasText; } }
 .listen-voice-note { margin: var(--space-2) 0 0; color: var(--ink); max-width: var(--prose-max); }
 .listen-voice-note[hidden] { display: none; }
+@media (max-height: 32rem) { .listen-voice-note { margin: 0 0 var(--space-2); } }
 .listen-voice-note .link-button { min-height: 2rem; padding: 0; }
 .listen-voice-note [hidden] { display: none; }
 .listen-voice-note a, .listen-voice-note .link-button { margin-left: var(--space-2); }
@@ -50,7 +65,7 @@
 /* The index and the filter: quiet, collapsed until wanted. */
 .listen-index { margin: 0 0 var(--space-3); max-width: var(--prose-max); }
 .listen-index > summary, .listen-before > summary { cursor: pointer; font-weight: 700; min-height: 1.5rem; }
-.listen-index h3 { font-size: var(--step-0); margin: var(--space-3) 0 var(--space-1); }
+.listen-index h3 { margin: var(--space-3) 0 var(--space-1); }
 .listen-index-list { margin: 0; padding-left: var(--space-5); max-height: 16rem; overflow: auto; }
 .listen-index-list li { margin: 0 0 var(--space-1); }
 .listen-filter { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: flex-end; margin: 0 0 var(--space-3); }
@@ -60,17 +75,31 @@
 
 /* The transcript: one line per thing a screen reader says, each with its role, divided by
    a hairline and not boxed, so a long document reads as a document and not a stack of cards.
-   On a wide screen the role sits in its own column. */
+   The transcript has the reading width (--prose-max), the role a small line above the text.
+   On a wide window a second column draws the selected item (an equation, a picture, a table):
+   the page's .listen-layout. It is for the eyes only (aria-hidden, no focus, no live region)
+   and hidden below the width where it would crowd the text. */
 [data-listen-transcript] { max-width: var(--prose-max); }
 .listen-transcript { list-style: none; margin: 0 0 var(--space-4); padding: 0; }
-.listen-item { border-top: 1px solid var(--border-subtle); padding: var(--space-2) var(--space-2); margin: 0; overflow-wrap: anywhere; scroll-margin-top: calc(var(--listen-sticky) + var(--space-3)); }
+/* What sticks covers the top of the window, so anything scrolled into view, by a link, a hash or
+   the Tab key, stops below it (WCAG 2.4.11). listen.js keeps --listen-sticky on the page's root. */
+html { scroll-padding-top: calc(var(--listen-sticky) + var(--space-3)); }
+.listen-item { border-top: 1px solid var(--border-subtle); padding: var(--space-2) var(--space-2); margin: 0; overflow-wrap: anywhere; }
 .listen-item[hidden], .listen-before[hidden] { display: none; }
 .listen-transcript:last-child .listen-item:last-child { border-bottom: 1px solid var(--border-subtle); }
 .listen-role { display: block; font-size: var(--step--1); font-weight: 700; color: var(--ink-muted); }
-@media (min-width: 40rem) {
-  .listen-item { display: grid; grid-template-columns: 10rem 1fr; gap: var(--space-3); }
-  .listen-item .visually-hidden { grid-column: 1 / -1; }
+.listen-place { display: inline-block; margin-top: var(--space-1); font-size: var(--step--1); }
+.listen-layout { display: block; }
+.listen-thing { display: none; }
+@media (min-width: 64rem) {
+  .listen-layout { display: grid; grid-template-columns: minmax(0, var(--prose-max)) minmax(16rem, 1fr); gap: var(--space-5); align-items: start; }
+  .listen-thing:not([hidden]) { display: block; position: sticky; top: calc(var(--listen-sticky) + var(--space-3)); max-height: calc(100vh - var(--listen-sticky) - var(--space-5)); overflow: auto; border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--surface); padding: var(--space-4); }
+  .listen-thing math { font-size: 1.6em; }
+  .listen-thing img { max-width: 100%; height: auto; }
+  .listen-thing table { border-collapse: collapse; }
+  .listen-thing th, .listen-thing td { border: 1px solid var(--border-subtle); padding: var(--space-1) var(--space-2); text-align: left; }
 }
+@media (min-width: 64rem) and (forced-colors: active) { .listen-thing:not([hidden]) { border-color: CanvasText; } }
 .listen-item[data-kinds^="heading"] .listen-text { font-weight: 700; }
 .listen-item[data-kinds^="landmark"], .listen-item[data-kinds^="title"], .listen-item[data-kinds^="language"], .listen-item[data-kinds^="page-break"] { color: var(--ink-muted); }
 .listen-item[data-kinds^="not-converted"] { border: 1px solid var(--warn); border-radius: var(--radius-control); background: var(--warn-tint); }
@@ -79,6 +108,7 @@
 .listen-before .listen-transcript { margin-top: var(--space-2); }
 
 /* The item being spoken: a tint and a full outline (never colour alone). */
+[data-listen-player].is-live .listen-item { cursor: pointer; }
 .listen-item.is-current { background: var(--accent-tint); outline: 2px solid var(--mark-current); outline-offset: -2px; }
 .listen-item.is-current .listen-role { color: var(--ink); }
 @media (forced-colors: active) {

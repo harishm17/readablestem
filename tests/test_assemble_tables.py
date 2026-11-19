@@ -20,9 +20,10 @@ from readablestem.core.types import (
     TableGrid,
 )
 from readablestem.pipeline import html_checks
-from readablestem.pipeline.assemble import FLAGGED_NOTE, render_html
-from readablestem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
 from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.student_sheet import TABLE as TABLE_CSS
 
 
 def png() -> bytes:
@@ -85,7 +86,7 @@ def test_a_rebuilt_table_is_a_table_in_a_scroll_box():
     ) in html
     assert '<th scope="col">Time (s)</th>' in html
     assert all(c.passed for c in static_checks(html)), static_checks(html)
-    assert FLAGGED_NOTE not in html  # the student note: nothing shown as an image
+    assert "could not be converted" not in html  # the student note: nothing is a picture
 
 
 def test_a_table_waiting_for_review_is_shown_as_rebuilt():
@@ -110,7 +111,8 @@ def test_a_table_not_rebuilt_keeps_its_image_flagged():
     assert f'<span class="flag-label">Not converted.</span> {TABLE_NOTE}' in html
     assert "<table>" not in html and TABLE_CSS not in html
     assert all(c.passed for c in static_checks(html))
-    assert FLAGGED_NOTE in html  # the student note says some parts are pictures
+    # The student note says how many parts are pictures.
+    assert "1 part could not be converted and is shown as a picture of the original" in html
 
 
 @pytest.mark.parametrize(
@@ -250,6 +252,11 @@ def table_failures(html: str) -> list[str | None]:
             "<p>TABLE 3: Results</p>",
             ["table_caption_missing"],
         ),
+        (
+            '<p>Table IV. Source parameters.</p><table><tr><th scope="col">A</th></tr>'
+            "<tr><td>1</td></tr></table>",
+            ["table_caption_missing"],
+        ),
     ],
 )
 def test_table_rules_fail_on_broken_tables(body, codes):
@@ -311,9 +318,10 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
             page = browser.new_page(viewport={"width": 320, "height": 640})
             page.set_content(html)
             facts = page.evaluate(MEASURE)
-            page.keyboard.press("Tab")  # the skip link is the first tab stop
-            page.keyboard.press("Tab")
-            focused = page.evaluate("() => document.activeElement.id")
+            stops = []  # what Tab visits: the skip link, the notice's link, then the content
+            for _ in range(6):
+                page.keyboard.press("Tab")
+                stops.append(page.evaluate("() => document.activeElement.id"))
         finally:
             browser.close()
     scroll_width, client_width = facts["page"]
@@ -322,7 +330,7 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
         {"id": "p1-e1", "overflows": False, "focusable": False},
         {"id": "p1-e2", "overflows": True, "focusable": True},
     ]
-    assert focused == "p1-e2"  # the only tab stop
+    assert "p1-e2" in stops and "p1-e1" not in stops  # only the wide table is a tab stop
 
 
 @pytest.mark.parametrize(

@@ -3,7 +3,6 @@ nothing in a file that is right."""
 
 import json
 from collections import Counter
-from dataclasses import replace
 
 import pytest
 
@@ -55,7 +54,8 @@ id="pagebreak-2"><span aria-hidden="true">Page 2</span></div>
 alt="A hand sketch of the track." width="10" height="10">\
 <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span> \
 This sketch is shown as a picture of the original.</p></div>
-<div role="doc-footnote" id="p2-e5"><p>The slope is three metres long.</p></div>
+<div role="doc-footnote" id="p2-e5"><p>The slope is three metres long. \
+<a role="doc-backlink" href="#noteref-p2-e5">Back to the text</a></p></div>
 </main>
 <footer id="about-conversion" class="about readablestem">
 <p>This is a web version of a PDF from your course.</p>
@@ -104,7 +104,7 @@ EXPORT_DEFECTS = (
     ),
     ('<h2 id="p2-e0">Measured values</h2>', '<h4 id="p2-e0">Measured values</h4>'),  # out_heading
     ('<html lang="en">', "<html>"),  # out_lang
-    ("<p>The slope is three metres long.</p>", ""),  # out_note_lost
+    ("<p>The slope is three metres long.", ""),  # out_note_lost
     (f'<img src="{PNG}" alt="the red button" width="10" height="10">, then', " , then"),  # out_hole
     (  # out_notice_missing
         '<p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.'
@@ -134,7 +134,7 @@ PAGE_DEFECTS = (
     ),
     ('<h2 id="p2-e0">Measured values</h2>', '<h4 id="p2-e0">Measured values</h4>'),  # out_heading
     ('<html lang="en">', "<html>"),  # out_lang
-    ("three metres long.</p>", "three the -metres long.</p>"),  # out_hole
+    ("three metres long. ", "three the -metres long. "),  # out_hole
     (  # out_notice_missing: a kept picture with nothing to say so
         '<div class="flagged" id="p2-e4" data-status="failed">',
         '<div id="p2-e4">',
@@ -165,19 +165,7 @@ def test_one_defect_of_each_kind_is_one_count_of_each(output, defects, kinds):
 
 
 def test_the_built_files_of_a_page_that_is_right_have_no_count():
-    # Without its note: a note's mark is an empty footnote in the Word file today (F-566),
-    # and the audit counts that. Without its link to the figure: pandoc before 3.2 (the
-    # version the image pins, and CI's) writes no bookmark for a figure, so the link leads
-    # nowhere in the Word file today (F-581), and the audit counts that too.
-    page = _changed(
-        PAGE,
-        ('<a id="noteref-p2-e5" role="doc-noteref" href="#p2-e5">1</a>', ""),
-        ('<div role="doc-footnote" id="p2-e5"><p>The slope is three metres long.</p></div>\n', ""),
-        ('<a href="#p1-e6">Figure 1</a>', "Figure 1"),
-    )
-    facts = replace(FACTS, order=FACTS.order[:-1])
-
-    audit = outputs.audit_files(page, facts, {})
+    audit = outputs.audit_files(PAGE, FACTS, {})
 
     assert audit["places"] == []
     assert set(audit["failed"]) <= (set() if export_docx.available() else {output_audit.DOCX})

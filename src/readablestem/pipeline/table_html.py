@@ -5,10 +5,14 @@ Follows the W3C WAI tables tutorial (https://www.w3.org/WAI/tutorials/tables/):
 - `<caption>` only when the grid has one (a "Table N" caption found in the PDF; never
   invented). It gets the id `{id_prefix}-caption` so a wrapper can be named by it.
 - The first `header_rows` rows go in `<thead>`, the rest in `<tbody>`.
-- A header cell that is only maths gets its reading (`speech.mathml_to_speech`) as
-  visually hidden text, the MathML hidden from assistive technology: browsers name a
-  `<th>` from its text, never from MathML, and screen readers announce a cell's
-  headers by name.
+- Maths in a cell is written as maths in the text is (`assemble.converted_mathml`): the
+  sanitized `<math display="inline">`, with the reading as its `alttext` when the page writes
+  readings (`Settings.mathml_alttext`). A cell stores no reading, so it is made the way
+  `speech.reading_for` makes one for a stored equation with no current reading. A header with
+  maths in it also gets that reading as its `aria-label`: browsers name a `<th>` from its text,
+  never from MathML, and screen readers announce a cell's headers by name. The MathML stays
+  in the tree, so a braille display gets the maths. Where no reading can be made the header
+  has no name, and the table check `html.table_header_text` says so.
 - Header cells are `<th>`: a column header ("col") gets `scope="col"`, or
   `scope="colgroup"` when it is in the first row and spans several columns (the column
   groups are then written as `<colgroup>` elements, which that scope needs); a row
@@ -40,9 +44,15 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from readablestem.core.types import TableCell, TableGrid
+from readablestem.core.types import EquationFix, TableCell, TableGrid
 from readablestem.pipeline.equation_step import read_latex
-from readablestem.pipeline.safe_html import Display, escape_text, sanitize_mathml
+from readablestem.pipeline.safe_html import (
+    Display,
+    alttext_from_speech,
+    escape_text,
+    sanitize_mathml,
+)
+from readablestem.pipeline.speech import reading_for
 from readablestem.pipeline.table_cells import cell_pieces
 from readablestem.pipeline.validate import (
     LatexConversionError,
@@ -187,15 +197,27 @@ def _needs_ids(layout: _Layout) -> bool:
     return False
 
 
-def render_table(grid: TableGrid, *, id_prefix: str, math_display: Display = "inline") -> str:
+def render_table(
+    grid: TableGrid,
+    *,
+    id_prefix: str,
+    math_display: Display = "inline",
+    math_alttext: bool = False,
+    marked: frozenset[tuple[int, int]] = frozenset(),
+) -> str:
     """The grid as one `<table>` element (see the module docstring). `id_prefix` must be
-    unique in the document (e.g. the element id); every id written starts with it."""
+    unique in the document (e.g. the element id); every id written starts with it.
+    `math_alttext`: write each formula's reading as its `alttext`, as the text's equations are
+    (`Settings.mathml_alttext`). `marked` is for the review card only: the (row, column) of
+    cells that get `class="cell-differs"`; no output of the document passes it."""
     if not _ID_PREFIX.fullmatch(id_prefix):
         raise ValueError("id_prefix must be a plain id (a letter, then letters, digits, -_.:)")
     layout = _Layout.of(grid)
     if not grid.is_data:
-        return _layout_table(layout, math_display)
-    writer = _Writer(layout, id_prefix, math_display, ids=_needs_ids(layout))
+        return _layout_table(layout, math_display, math_alttext)
+    writer = _Writer(
+        layout, id_prefix, math_display, math_alttext, ids=_needs_ids(layout), marked=marked
+    )
     parts = ["<table>"]
     if grid.caption and grid.caption.strip():
         caption = escape_text(" ".join(grid.caption.split()))
@@ -214,9 +236,9 @@ def render_table(grid: TableGrid, *, id_prefix: str, math_display: Display = "in
     return "".join(parts)
 
 
-def _layout_table(layout: _Layout, math_display: Display) -> str:
+def _layout_table(layout: _Layout, math_display: Display, math_alttext: bool) -> str:
     """A layout table (`is_data` False): cells only, no headers, marked presentational."""
-    writer = _Writer(layout, "", math_display, ids=False, plain=True)
+    writer = _Writer(layout, "", math_display, math_alttext, ids=False, plain=True)
     return f'<table role="presentation">{writer.rows(range(layout.rows))}</table>'
 
 
@@ -225,8 +247,10 @@ class _Writer:
     layout: _Layout
     id_prefix: str
     math_display: Display
+    math_alttext: bool
     ids: bool  # write headers/id (irregular table)
     plain: bool = False  # layout table: every cell a <td>, no scope
+    marked: frozenset[tuple[int, int]] = frozenset()  # cells to mark (the review card)
 
     def rows(self, rows: range) -> str:
         return "".join(f"<tr>{self.row(r)}</tr>" for r in rows)
@@ -256,30 +280,32 @@ class _Writer:
             headers = self.headers_of(placed)
             if headers:
                 attrs += f' headers="{" ".join(headers)}"'
+        if (placed.row, placed.col) in self.marked:
+            attrs += ' class="cell-differs"'
         tag = "th" if header else "td"
         content = self.content(placed.cell)
         if header and "<math" in content:
-            content = self.named_maths(placed.cell, content)
+            # Browsers give a header cell no name from MathML, and screen readers announce a
+            # column's or a row's header by its name as they move through the cells. The
+            # name is the cell's reading, the same one its `<math>` takes as `alttext`; the
+            # MathML itself stays exposed (a braille display needs it).
+            name = self.reading(placed.cell.mathml or "")
+            if name:
+                attrs += f' aria-label="{escape_text(name)}"'
         return f"<{tag}{attrs}>{content}</{tag}>"
 
-    def named_maths(self, cell: TableCell, mathml: str) -> str:
-        """A header that is only maths, with its reading as text: browsers give a header
-        cell no name from MathML, and screen readers announce a column's or a row's
-        header by its name as they move through the cells. The MathML is hidden from
-        them so the header is not read twice; the reading is the tool's own English."""
-        from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+    def reading(self, mathml: str) -> str:
+        """The words for a formula: what `speech.reading_for` says for an equation with no
+        current stored reading, which is the way the text's equations are read where theirs
+        is old. "" when none can be made."""
+        said = reading_for(EquationFix(latex="", mathml=mathml, speech=""))
+        return " ".join(said.split())
 
-        try:
-            reading = mathml_to_speech(cell.mathml or "")
-        except SpeechError:
-            reading = ""
-        reading = " ".join((reading or cell.text or cell.latex or "").split())
-        if not reading:
-            return mathml
-        return (
-            f'<span class="visually-hidden {AUTHORED_CLASS}">{escape_text(reading)}</span>'
-            f'<span aria-hidden="true">{mathml}</span>'
-        )
+    def math(self, mathml: str) -> str | None:
+        """One formula as the text writes an equation (`assemble.converted_mathml`), or None
+        when it cannot be shown."""
+        alttext = alttext_from_speech(self.reading(mathml)) if self.math_alttext else None
+        return sanitize_mathml(mathml, display=self.math_display, alttext=alttext)
 
     def scope(self, placed: _Placed) -> str:
         if placed.cell.header == "col":
@@ -293,7 +319,7 @@ class _Writer:
             mixed = self.words_and_maths(cell)
             if mixed is not None:
                 return mixed
-            mathml = sanitize_mathml(cell.mathml, display=self.math_display)
+            mathml = self.math(cell.mathml)
             if mathml is not None:
                 return mathml
         return escape_text(cell.text)
@@ -314,9 +340,7 @@ class _Writer:
             if has_errors(check_latex(latex)):
                 return None  # e.g. a `\\ce` outside the subset: never a half-read formula
             try:
-                mathml = sanitize_mathml(
-                    safe_latex_to_mathml(latex, "inline"), display=self.math_display
-                )
+                mathml = self.math(safe_latex_to_mathml(latex, "inline"))
             except LatexConversionError:
                 return None
             if mathml is None:

@@ -18,8 +18,8 @@ import re
 import time
 import unicodedata
 from collections.abc import Iterator, Mapping
-from dataclasses import asdict, dataclass
-from datetime import datetime, timedelta
+from dataclasses import asdict, dataclass, replace
+from datetime import datetime
 from functools import partial
 from typing import Annotated, Any
 from urllib.parse import quote
@@ -30,6 +30,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from readablestem.config import Settings
 from readablestem.core import sandbox, uid
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import (
@@ -41,31 +42,48 @@ from readablestem.pipeline import (
     text_pass,
 )
 from readablestem.pipeline import language as languages
+from readablestem.pipeline.page_type import ImagePageCount
 from readablestem.source import envelope as source_envelope
 from readablestem.source import intake as source_intake
 from readablestem.source import latexml
+from readablestem.source import pandoc as pandoc_step
+from readablestem.source.support import SUPPORT
 from readablestem.web import (
     access,
     analytics,
     batch_intake,
+    bundle,
     documents,
     events,
+    export_store,
+    links,
     notation,
     office_convert,
     output,
     pending,
+    poll,
     retention,
     sample,
     shares,
+    states,
     upload_result,
 )
 from readablestem.web import combine as combine_rules
 from readablestem.web import feedback as feedback_questions
 from readablestem.web import job_page as page_rules
+from readablestem.web import outcome as outcome_words
 from readablestem.web import retry as retry_rules
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
+from readablestem.web.db import (
+    SOURCE_MEDIA_PREFIX,
+    Blob,
+    Job,
+    JobStatus,
+    User,
+    session_scope,
+    utcnow,
+)
 from readablestem.web.deps import (
     CSRF_FIELD,
     ELEMENT_ID,
@@ -80,10 +98,13 @@ from readablestem.web.deps import (
     enforce,
     flash,
     get_ctx,
+    give_back,
     limited,
     render,
     require_csrf,
+    say_new_time,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are documented here)
     MAX_LIVE_JOBS_PER_USER,
     QuotaRefused,
@@ -92,23 +113,34 @@ from readablestem.web.intake import (  # noqa: F401  (re-exported: the caps are 
     store_job,
 )
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.outcome import JobOutcome, job_outcome
+from readablestem.web.pdf_probe import IMAGE_PAGE_REFUSALS, MAX_PAGE_SIDE_PT
 from readablestem.web.pending import MAX_PENDING_PER_USER
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import (
+    give_back_pages,
+    next_day_start,
+    pages_left,
+    retry_after,
+    try_consume_pages,
+)
 from readablestem.web.security import VIEW_CSP
+from readablestem.web.seo import is_head
 from readablestem.web.shares import OWNER, VIEW
 from readablestem.web.uploads import (
+    FORM_OVERHEAD_BYTES,
     INSPECT_TIMEOUT_S,
     UploadedFile,
     UploadRejected,
+    check_word_isolated,
     convert_office_isolated,
     inspect_pdf_detail,
     inspect_pdf_isolated,
     is_office_upload,
     max_upload_bytes,
+    one_file,
     read_upload_form,
+    zip_limits,
 )
-from readablestem.web.views import JobView, job_view, last_decision
+from readablestem.web.views import JobView, combine_view, job_view, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -144,9 +176,9 @@ FRESH_COPY = (
     "If it opens on your computer, save a fresh copy (File > Save As, or Print to PDF) "
     "and upload that."
 )
-# The refusals of a PDF that is only scans or handwriting, and what is offered instead when
-# the deployment offers the conversion of such pages (ADR 0007).
-IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
+# What is offered instead of the refusals of a PDF that is only scans or handwriting
+# (`pdf_probe.IMAGE_PAGE_REFUSALS`) when the deployment offers the conversion of such pages
+# (ADR 0007).
 # With that option offered, the refusal says the pages were not asked for (not that the tool
 # cannot convert them), and what to tick. What the person had set stays on the form; the file
 # has to be chosen again.
@@ -165,11 +197,21 @@ STORAGE_FULL_TITLE = "Uploads are paused while storage catches up"
 STORAGE_FULL_MESSAGE = (
     "The service holds as much uploaded material as it can for now. Documents are deleted "
     "{hours} hours after their owners last work on them, so room frees up through the day. "
-    "Try again in an hour. Nothing was uploaded."
+    "Try again {wait}. Nothing was uploaded."
 )
+# What a busy conversion and a busy gate ask a person to wait: said and sent as one number
+# (`quota.retry_after`; a full store's is `storage.FULL_WAIT_S`).
+OFFICE_BUSY_WAIT_S = 60
+UPLOAD_BUSY_WAIT_S = 10
 # A refused upload costs nothing: the probe runs before the daily page count.
 PDF_ADVICE = " Save a copy as a PDF first."
 NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
+# A document made from a source file (LaTeX, Word) has no revised version yet: what carries a
+# decision over to a new version is the picture of the item, and a source item has none.
+SOURCE_REVISE_REFUSED = (
+    "A document made from a LaTeX or Word file cannot be replaced with a new version yet. "
+    "Upload the new file as a new document. " + NOTHING_TAKEN
+)
 
 
 def upload_error_message(
@@ -180,20 +222,28 @@ def upload_error_message(
     left: int | None = None,
     *,
     office: bool = False,
+    estimated: bool = False,
     tier: str = access.INVITED,
 ) -> str:
     """What went wrong with an upload, naming the file (and its pages) when known. The
     file name is shown to its owner only, never logged. `left`: pages left today, for
     "page_quota", which counts against `tier`'s daily pages (`web.access`). `office`: the file
     was a Word or PowerPoint file, made into a PDF first (T3-30), so the advice about pages
-    is about the document and not about a PDF."""
+    is about the document and not about a PDF. `estimated`: `pages` is what a Word file read
+    from the file itself, a LaTeX file or a project zip counts as, not a printed count."""
     s = ctx.settings
     name = filename or "This file"
     limit = s.source_page_limit
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
+    side = MAX_PAGE_SIDE_PT / 72 * 0.0254  # the longest side a page may have, in meters
     if code == "page_quota":
         return _quota_message(
-            name, pages, left, access.page_quota(s, tier), new_account=access.is_open(tier)
+            name,
+            pages,
+            left,
+            access.page_quota(s, tier),
+            new_account=access.is_open(tier),
+            estimated=estimated,
         )
     # One statement of what is taken, for the page and for this message (T3-30, D-009).
     accepted = ctx.accepted_types()
@@ -206,8 +256,8 @@ def upload_error_message(
         "bad_form": "The upload did not arrive complete. Please try again.",
         "empty": f"{name} is empty. Choose a file that has content.",
         "not_pdf": not_accepted,
-        "too_large": f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
-        "files and upload each one.",
+        "too_large": f"{name} is larger than {s.upload_limit_mb} MB, the most one file can be. "
+        "Split it into smaller files and upload each one.",
         "too_many_files": f"You chose more than {access.files_per_upload(tier)} files. Upload "
         f"{access.files_per_upload(tier)} or fewer at a time.",
         "revise_one_file": "A revised version replaces one document: choose one file. To "
@@ -232,7 +282,8 @@ def upload_error_message(
         "office_failed": f"{name} could not be turned into a PDF. It may be damaged or too "
         "complicated. Open it in Word or PowerPoint, save it as a PDF, and upload that.",
         "office_busy": "Another Word or PowerPoint file is being converted at the moment. "
-        f"Wait a minute, then upload {name} again. Nothing was uploaded.",
+        f"Try again {retry_after(OFFICE_BUSY_WAIT_S).words}: upload {name} again. Nothing was "
+        "uploaded.",
         "office_budget": f"{name} was not converted: Word and PowerPoint files take a while, "
         "and this upload had used up its time. Upload it again on its own. Nothing was "
         "uploaded.",
@@ -243,14 +294,14 @@ def upload_error_message(
         f"downloading. {FRESH_COPY}",
         "no_pages": f"{name} has no pages. Check that you chose the right file.",
         "too_many_pages": f"{too_many} once it is made into a PDF (the count can differ from "
-        f"Word's or PowerPoint's); the limit is {limit} per upload. Split it into parts of "
-        f"up to {limit} pages and upload each part."
+        f"Word's or PowerPoint's); one file is up to {one_file(s)}. Split it into parts of "
+        f"up to {s.max_pages_per_job} pages and upload each part."
         if office
-        else f"{too_many}; the limit is {limit} per upload. Split it into parts "
-        f"of up to {limit} pages (in Acrobat: Organize Pages, then Split) and upload each "
-        "part.",
-        "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
-        "large to convert. Course documents are usually Letter or A4 size.",
+        else f"{too_many}; one file is up to {one_file(s)}. Split it into parts "
+        f"of up to {s.max_pages_per_job} pages (in Acrobat: Organize Pages, then Split) and "
+        "upload each part.",
+        "page_too_large": f"{name} has a page larger than {side:.2f} meters on a side, which "
+        "is too large to convert. Course documents are usually Letter or A4 size.",
         "image_too_large": f"{name} has a picture that is too large to read. Export the PDF "
         "again with its pictures at a normal size (300 dpi is plenty) and upload that.",
         "content_too_large": f"{name} is too large to read: a page of it, or the file as a "
@@ -280,11 +331,12 @@ def upload_error_message(
         "unknown_revision": "The document you wanted to replace with a new version was not "
         f"found. It may have been deleted. Upload {name} as a new document, or choose "
         "another document to revise.",
+        "revise_source": SOURCE_REVISE_REFUSED,
         "too_many_active": f"You already have {access.files_per_upload(tier)} documents waiting or "
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
         **source_messages(name, s.max_pages_per_job),
-        **batch_messages(name, access.files_per_upload(tier)),
+        **batch_messages(name, access.files_per_upload(tier), zip_words(s)),
         "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
         f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
         "uploaded.",
@@ -292,13 +344,15 @@ def upload_error_message(
         "storage_user": f"You are storing {pages or 0} MB of the {left or 0} MB you can keep, "
         f"and {name} would go over it. Delete documents you no longer need (My documents, "
         f"then Delete), then upload {name} again. Nothing was uploaded.",
-        "storage_full": STORAGE_FULL_MESSAGE.format(hours=s.retention_hours),
+        "storage_full": STORAGE_FULL_MESSAGE.format(
+            hours=s.retention_hours, wait=retry_after(stored_bytes.FULL_WAIT_S).words
+        ),
     }.get(code, f"{name} cannot be converted.")
     if code in IMAGE_PAGE_REFUSALS and s.feature_image_pages:
         # Not "cannot convert it": the pages are read when asked for, and this upload did not.
         return (
             f"{name} {IMAGE_PAGE_WHAT[code]}, which are read only when you ask. "
-            f"{NOTHING_TAKEN} {IMAGE_PAGES_ADVICE}"
+            f"{NOTHING_TAKEN} {IMAGE_PAGES_ADVICE} {outcome_words.image_pages_cost(s)}"
         )
     return message
 
@@ -315,8 +369,8 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
         "source_bad_zip": f"{name} could not be opened as a zip file. It may be damaged or "
         f"protected with a password. Zip the project again without a password, or {pdf}",
         "source_zip_limits": f"{name} is too big or has too many files. A project zip may be up "
-        "to 20 MB, 100 MB unpacked and 500 files. Remove what the document does not use, or "
-        f"{pdf}",
+        f"to {zip_limits()}. Remove what the document "
+        f"does not use, or {pdf}",
         "source_unsafe_zip": f"{name} has a file with a path or a link this tool will not open. "
         f"Zip the project again with plain files only, or {pdf}",
         "source_unsupported_file": f"{name} has a kind of file this tool does not read (such as "
@@ -331,18 +385,35 @@ def source_messages(name: str, max_pages: int) -> dict[str, str]:
         "convert in “Main file” and upload it again.",
         "source_beamer": f"{name} is a Beamer slide deck, which this tool cannot convert from "
         "source yet. Upload the compiled PDF.",
+        # Refused by name (`source.support`): the list is named, so the sentence stays true
+        # as it grows.
+        "source_unsupported_class": f"{name} uses a document class this tool cannot read from "
+        f"source yet ({', '.join(sorted(SUPPORT.classes.refused))}). Compile the version "
+        f"students should see to a PDF and upload that. {NOTHING_TAKEN}",
+        "source_unsupported_package": f"{name} loads a package this tool cannot read yet "
+        f"({', '.join(sorted(SUPPORT.packages.refused))}). Compile it to a PDF and upload "
+        f"that. {NOTHING_TAKEN}",
         "source_too_many_pages": f"{name} is longer than one conversion takes (about "
         f"{max_pages} pages). Split the project into parts, or {pdf}",
     }
 
 
-def batch_messages(name: str, limit: int) -> dict[str, str]:
+def zip_words(settings: Settings) -> str:
+    """The limits of a zip of documents: what one request may unpack is the budget its intake
+    makes (`batch_intake.RequestBudget.for_upload_limit`)."""
+    budget = batch_intake.RequestBudget.for_upload_limit(
+        settings.upload_limit_bytes, max_upload_bytes(settings.max_upload_mb)
+    )
+    return zip_limits(budget.total)
+
+
+def batch_messages(name: str, limit: int, zip_limits: str) -> dict[str, str]:
     """What went wrong with a zip of documents (`web.batch_intake`) or one of its documents."""
     return {
         "zip_bad": f"{name} could not be opened as a zip file. It may be damaged or protected "
         "with a password. Zip the files again without a password, or upload them one by one.",
-        "zip_limits": f"{name} is too big or has too many files. A zip may be up to 20 MB, "
-        "80 MB unpacked and 500 files. Split it into smaller zips, or upload the files one by one.",
+        "zip_limits": f"{name} is too big or has too many files. A zip may be up to "
+        f"{zip_limits}. Split it into smaller zips, or upload the files one by one.",
         "zip_unsafe": f"{name} has a file with a path or a link this tool will not open. Zip the "
         "files again as plain files, or upload them one by one.",
         "zip_unsupported": f"{name} has a kind of file this tool does not read (such as another "
@@ -369,23 +440,27 @@ def _quota_message(
     quota: int | None,
     *,
     new_account: bool = False,
+    estimated: bool = False,
 ) -> str:
     """The daily page limit refused an upload (UX review MF20, MF21): the file, its
     pages, what is left, and when the count starts again (the page under it says when
     in the reader's own time). A new account (open tier) is told the number is the limit
     for new accounts, not a fault."""
-    has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
+    has = (
+        f"{name} {'counts as' if estimated else 'has'} {pages} {'page' if pages == 1 else 'pages'}"
+    )
     whose = "a new account can convert" if new_account else "you can convert"
+    again = retry_after().words  # the same time the refusal's `Retry-After` counts down to
     if not left:
         return (
             f"{has}, and you have used all {quota} pages {whose} today. Upload it "
-            "again after the count starts again at midnight UTC. Nothing was uploaded."
+            f"again after the count starts again {again}. Nothing was uploaded."
         )
     limit = f"the {quota} pages {whose} today" if new_account else f"today's {quota} pages"
     return (
         f"{has}, but you have {left} of {limit} left. Upload a part of up "
         f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
-        "count starts again at midnight UTC. Nothing was uploaded."
+        f"count starts again {again}. Nothing was uploaded."
     )
 
 
@@ -404,7 +479,9 @@ def job_access(
     `"owner"` is everything else (delete, retry, settings, sharing, a revision, combining
     parts). The owner has every right. Someone the owner shared the document with by email
     has the right they were given (`web.shares`), read from the database on every request,
-    so a share that was removed stops working at once. Anyone else gets the **same** 404 as
+    so a share that was removed stops working at once; with `FEATURE_COURSE_GRANTS` on, so
+    does a right the owner of the document's course gave them for the whole course
+    (`shares.role_of` is the one place that reads either). Anyone else gets the **same** 404 as
     for an id that does not exist, so job ids cannot be probed. A shared person asking for
     more than they have gets a 403 page that says what they can do.
 
@@ -418,10 +495,12 @@ def job_access(
     job = session.get(Job, job_id, with_for_update=lock or None)
     if job is None:
         raise _missing(session, job_id, user, job)
+    if expired(job):  # before any share or course grant is read
+        raise _missing(session, job_id, user, job)
     role = shares.role_of(session, job, user)
-    if role is None and not expired(job) and shares.names_unproved(session, job, user):
+    if role is None and shares.names_unproved(session, job, user):
         raise PageError(403, *SIGN_IN_AGAIN)
-    if role is None or expired(job):
+    if role is None:
         raise _missing(session, job_id, user, job)
     if shares.RANK[role] < shares.RANK[need]:
         raise PageError(403, *_TOO_LITTLE[need], context={"job_id": job.id})
@@ -431,8 +510,7 @@ def job_access(
 SIGN_IN_AGAIN = (
     "Sign in again to open this document",
     "This document was shared with your email address, but this sign-in did not confirm the "
-    "address. Sign out, then sign in again with Google or your university's Microsoft "
-    "account, using that address.",
+    "address. Sign out, then sign in again using that address.",
 )
 
 _TOO_LITTLE = {
@@ -458,12 +536,16 @@ def role_of(session: Session, job: Job, user: CurrentUser) -> str:
     return shares.role_of(session, job, user) or VIEW
 
 
-def restart_owner_clock(job: Job, user: CurrentUser, settings) -> None:
+def restart_owner_clock(
+    job: Job, user: CurrentUser, settings, request: Request | None = None
+) -> None:
     """Restart the deletion clock (`retention.restart_clock`) when the owner acted. What a
     person the document was shared with does never keeps it longer (G1): retention is the
-    owner's choice."""
+    owner's choice. With the request, the notice that follows the action says the new time."""
     if is_owner(job, user):
-        retention.restart_clock(job, settings)
+        note = retention.restart_clock_and_say(job, settings)
+        if request is not None:
+            say_new_time(request, note)
 
 
 def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) -> PageError:
@@ -471,19 +553,15 @@ def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) 
     why (an expired row still waiting for the purge, or the upload in their own usage
     events); anyone else learns nothing, not even that the id exists."""
     if job is not None and job.user_id == user.id:
-        kept = (as_utc(job.retain_until) or utcnow()) - (as_utc(job.created_at) or utcnow())
-        return PageError(404, *DELETED, template="job_deleted.html", context={"kept": _kept(kept)})
-    if job is None and events.uploaded_at(session, user.id, job_id) is not None:
-        return PageError(404, *DELETED, template="job_deleted.html", context={"kept": ""})
+        deleted_on, created = as_utc(job.retain_until), as_utc(job.created_at)
+        kept = retention.span_words(deleted_on - created) if deleted_on and created else ""
+        said = retention.deleted_line(deleted_on, created, kept)
+        return PageError(404, *DELETED, template="job_deleted.html", context={"deleted_line": said})
+    uploaded = events.uploaded_at(session, user.id, job_id) if job is None else None
+    if uploaded is not None:
+        said = retention.deleted_line(None, uploaded, "")
+        return PageError(404, *DELETED, template="job_deleted.html", context={"deleted_line": said})
     return PageError(404, *NOT_FOUND)
-
-
-def _kept(delta: timedelta) -> str:
-    """'24 hours', '30 days': how long a job was kept."""
-    hours = round(delta.total_seconds() / 3600)
-    if hours >= 48 and hours % 24 == 0:
-        return f"{hours // 24} days"
-    return f"{hours} {'hour' if hours == 1 else 'hours'}"
 
 
 def expired(job: Job, now: datetime | None = None) -> bool:
@@ -492,7 +570,7 @@ def expired(job: Job, now: datetime | None = None) -> bool:
 
 
 def require_done(job: Job) -> None:
-    if job.status != JobStatus.DONE or (job.html is None and not job.html_stale):
+    if job.status != JobStatus.DONE or not (job.html_stale or job.has_html):
         raise PageError(
             409,
             "Not ready yet",
@@ -505,7 +583,7 @@ def _out_of_date(job: Job) -> bool:
     """A review write marked the file out of date, or an older renderer made it."""
     if job.html_stale:
         return True
-    return job.html is not None and assemble.render_version(job.html) < assemble.RENDER_VERSION
+    return job.has_html and (job.html_version or 0) < assemble.RENDER_VERSION
 
 
 def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
@@ -553,6 +631,37 @@ def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
     return job
 
 
+def served_html(ctx: AppContext, session: Session, job: Job, state: output.ExportState) -> str:
+    """The HTML as it leaves, for a `job` whose file is up to date (`current_html`).
+
+    A finished file is the stored student file as it is. A draft is made again from the stored
+    result in the checker's words (`assemble.CHECKER`: "Check it against the original." and
+    the like), marked as a draft, and not stored: those sentences are written to the person
+    who checks the file, so no stored page, student file or export of one holds them. If the
+    page cannot be made again the stored one is served, marked, which has fewer notes and
+    no other difference."""
+    if not state.draft:
+        return job.html or ""
+    from readablestem.pipeline.assemble import CHECKER
+    from readablestem.web.review import rerender_job_html
+
+    html = job.html or ""
+    try:
+        result = DocumentResult.model_validate(job.result_json or {})
+        with notation.in_force(ctx.factory, ctx.settings, job.id):
+            html = rerender_job_html(
+                job,
+                result,
+                _crops(session, job.id),
+                checked_on=last_decision(session, job),
+                math_alttext=ctx.settings.mathml_alttext,
+                audience=CHECKER,
+            )
+    except Exception as exc:
+        log_exception(logger, "draft_page_not_remade", exc, job_id=job.id)
+    return output.marked(html, state)
+
+
 # --------------------------------------------------------------------------- /app
 
 
@@ -565,6 +674,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         # My documents as a to-do list (web/documents.py); expired jobs count as deleted.
         listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
         left = pages_left(session, user.id, quota=quota, day=utc_today())
+        ready = documents.ready_newest_first(listing.rows)
         # The upload form's course choice (notation memory); None hides it.
         courses = (
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
@@ -583,9 +693,17 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
                 ),
                 "role": shares.ROLE_WORDS.get(item.role, item.role),
                 "owner": item.owner,
+                "course": item.course,
             }
             for item in shares.shared_with(session, user, now)
         ]
+        # Those reached through a course grant are listed under the course (and its owner, so
+        # two courses with one name stay apart); the rest are listed as before.
+        shared_courses: dict[tuple[str, str], list[dict]] = {}
+        for row in shared:
+            if row["course"]:
+                shared_courses.setdefault((row["course"], row["owner"]), []).append(row)
+        shared = [row for row in shared if not row["course"]]
         # Large files waiting for their pages to be chosen (T3-3).
         waiting = [
             {
@@ -601,6 +719,10 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     return {
         "documents": listing,
         "shared_documents": shared,
+        "shared_courses": [
+            {"name": name, "owner": owner, "items": items}
+            for (name, owner), items in shared_courses.items()
+        ],
         "pages_left": left,
         "page_quota": quota,
         # A new account (open tier) is told its limits are the ones for new accounts.
@@ -611,7 +733,6 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "open_pool_closed": closed == "open",
         # Daily limits and today's budget start again then (shown in local time by app.js).
         "next_reset": next_day_start(now),
-        "active": "app",
         "courses": courses,
         "pending": waiting,
         "sample_available": sample.available(),
@@ -620,27 +741,37 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "max_files": access.files_per_upload(user.access_tier),
         "batch_zip": ctx.settings.feature_batch_zip,
         "upload_limit_mb": ctx.settings.upload_limit_mb,
-        "source_pages": ctx.settings.source_page_limit,
-        "ready_documents": sum(
-            1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
+        "ready_documents": len(ready),
+        # What "Download all" holds: the newest `bundle.limit` ready documents (routes/bundle.py
+        # takes them in this order); the others are named on the page.
+        "zip_rest": ready[bundle.limit("html") :],
+        "zip_held_back": sum(
+            1 for row in listing.rows if row.status == JobStatus.DONE and row.open_decisions
         ),
         "word_export": export_docx.available(),  # "Download all as Word" needs pandoc
         # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.
         "office_kinds": kinds,
         # "Convert scanned or handwritten pages" is offered (ADR 0007, FEATURE_IMAGE_PAGES).
         "image_pages_offered": ctx.settings.feature_image_pages,
+        "image_pages_cost": outcome_words.image_pages_cost(ctx.settings),
         # `.tex` files and zips of a LaTeX project are taken (FEATURE_LATEX_SOURCE).
         "latex_source": ctx.latex_source_on,
+        "word_source": ctx.word_source_on,
         "keep_default": keep_default,
     }
 
 
 @router.get("/app")
-def app_home(request: Request, user: UserDep, revises: str = "") -> Response:
+def app_home(request: Request, user: UserDep, revises: str = "", image_pages: str = "") -> Response:
     ctx = get_ctx(request)
+    if revises and _users_revision(ctx, user, revises) and _is_source_job(ctx, revises):
+        return _upload_error_page(request, user, "revise_source", 400)
     context = app_context(ctx, user)
     if revises:
         context |= revision_context(ctx, user, revises)
+        if image_pages == "on" and context.get("revises"):
+            # The job page's "Upload it again with the box checked" (`states._offer`).
+            context["image_pages_default"] = True
     return render(request, "app.html", context)
 
 
@@ -661,15 +792,25 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
             or job.is_sample
         ):
             return {}
-        title = documents.display_title(
-            (job.result_json or {}).get("title"), job.filename, job.title_override
-        )
+        title = documents.document_title(job).text
         return {
             "revises": {"id": job.id, "title": title, "filename": job.filename},
             "chosen_course": job.course_id or "",
             "exam_default": bool(job.exam_mode),
+            "language_default": job.language or "",
             "image_pages_default": bool(job.image_pages),
         }
+
+
+def _list_page(ctx: AppContext, user: CurrentUser, course_id: str | None) -> str:
+    """The page that holds a documents list: the person's own course's, else "My documents".
+    A course's address is built from the stored row's id, not from the address asked for."""
+    if course_id:
+        with session_scope(ctx.factory) as session:
+            owned = notation.owned_course(session, course_id, user.id)
+            if owned is not None:
+                return f"/courses/{owned.id}"
+    return "/app"
 
 
 @router.get("/app/documents")
@@ -678,11 +819,13 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
     converting. 204 (no swap) while nothing changed, so an open tab costs one small
     query every few seconds; when something did, the whole list, with a `<title>` that
     htmx moves into the tab title ("My documents (4 of 6 finished)")."""
+    course_id = course if JOB_ID.match(course) else None
     ctx = get_ctx(request)
+    if not poll.is_htmx(request):  # opened as a page: the page that holds the list
+        return RedirectResponse(_list_page(ctx, user, course_id), status_code=303)
     spend_closed = conversions_closed(ctx, user) is not None
     now = utcnow()
     # The list of one course's documents (the course page, T3-4) polls with its own id.
-    course_id = course if JOB_ID.match(course) else None
     with session_scope(ctx.factory) as session:
         if v and v == documents.list_version(
             session, user.id, now=now, budget_closed=spend_closed, course_id=course_id
@@ -695,8 +838,7 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
         "documents": listing,
         "list_url": f"/app/documents?course={course_id}" if course_id else "/app/documents",
     }
-    if request.headers.get("HX-Request") == "true":
-        context["page_title"] = listing.page_title
+    context["page_title"] = listing.page_title  # htmx moves it into the tab title
     return render(request, "_documents.html", context)
 
 
@@ -712,12 +854,13 @@ def _upload_error_page(
     course: str = "",
     revises: str = "",
     office: bool = False,
+    estimated: bool = False,
     fields: Mapping[str, str] | None = None,
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code, office=office)
     message = upload_error_message(
-        code, ctx, filename, pages, left, office=office, tier=user.access_tier
+        code, ctx, filename, pages, left, office=office, estimated=estimated, tier=user.access_tier
     )
     context = app_context(ctx, user)
     # The course chosen stays chosen (the form marks it only among the user's courses),
@@ -746,17 +889,27 @@ def _upload_error_page(
     else:
         summary_field = field_id
     errors = [{"field_id": summary_field, "message": summary}]
+    # A refused LaTeX upload links to the page that says what each of its messages means.
+    help_link = "/help/latex" if code.startswith("source_") else ""
     context |= {
         "errors": errors,
-        "field_errors": {"pdf": {"field_id": field_id, "message": message}},
+        "field_errors": {"pdf": {"field_id": field_id, "message": message, "help": help_link}},
     }
     return render(request, "app.html", context, status_code=status, headers=headers)
+
+
+def chosen_language(fields: Mapping[str, str]) -> str:
+    """The upload form's "Language of the document": a tag the job page's control offers
+    (`pipeline.language.LANGUAGE_NAMES`), or "" for "Detect it" and for anything else."""
+    value = (fields.get("language") or "").strip()
+    return value if value in languages.LANGUAGE_NAMES else ""
 
 
 def form_values(fields: Mapping[str, str]) -> dict[str, Any]:
     """The upload form's options as the person sent them, to show the form again as it was."""
     return {
         "exam": fields.get("exam") == "on",
+        "language": chosen_language(fields),
         "image_pages": fields.get("image_pages") == "on",
         "keep": fields.get("keep") == "on",
         "share": fields.get("share") == "on",
@@ -765,27 +918,34 @@ def form_values(fields: Mapping[str, str]) -> dict[str, Any]:
 
 
 @router.post("/jobs", dependencies=[limited("upload")])
+@submit_once("upload.create", from_form=False)
 async def create_job(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
-    enforce(request, "upload_user", user.id)  # before anything is read or any process starts
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
-        raise PageError(*conversions_paused(closed, kept=False), headers={"Retry-After": "3600"})
+        raise conversions_paused(closed, kept=False)
     if await run_in_threadpool(_storage_full, ctx):  # before the body is read
         log_event(logger, "upload_rejected", code="storage_full")
+        wait = retry_after(stored_bytes.FULL_WAIT_S)
         raise PageError(
             503,
             STORAGE_FULL_TITLE,
-            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours),
-            headers={"Retry-After": "3600"},
+            STORAGE_FULL_MESSAGE.format(hours=ctx.settings.retention_hours, wait=wait.words),
+            headers={"Retry-After": wait.header},
         )
     if (refused := ctx.uploads.enter(user.id)) is not None:
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
-        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+        raise upload_busy(refused)
     try:
+        enforce(request, "upload_user", user.id)  # before anything is read or any process starts
+        request.state.upload_counted, request.state.upload_accepted = 1, 0
         return await _take_upload(request, ctx, user)
     finally:
         ctx.uploads.leave(user.id)
+        # The per-person rule counts accepted files only: a refusal gives its count back.
+        counted = getattr(request.state, "upload_counted", 0)
+        accepted = getattr(request.state, "upload_accepted", 0)
+        give_back(request, "upload_user", user.id, counted - accepted)
 
 
 def _storage_full(ctx: AppContext) -> bool:
@@ -793,43 +953,54 @@ def _storage_full(ctx: AppContext) -> bool:
         return stored_bytes.global_full(session, ctx.settings)
 
 
-def conversions_paused(closed: str, *, kept: bool) -> tuple[int, str, str]:
-    """Status, title and message of the page for an upload turned away because no model
-    spend is left today (`deps.conversions_closed`): the day's cap, or the pool for new
-    accounts. `kept`: the file is still waiting for its pages to be chosen."""
+def conversions_paused(closed: str, *, kept: bool) -> PageError:
+    """The page for an upload turned away because no model spend is left today
+    (`deps.conversions_closed`): the day's cap, or the pool for new accounts. `kept`: the
+    file is still waiting for its pages to be chosen. Both reset at the day's start, so the
+    words and `Retry-After` are the time left to it."""
     nothing = "Nothing was started; this file is kept." if kept else "Nothing was uploaded."
+    wait = retry_after()
+    headers = {"Retry-After": wait.header}
     if closed == "open":
-        return (
+        return PageError(
             503,
             "Conversions for new accounts are paused for today",
             "The share of today's budget set aside for new accounts has been used up. "
-            f"Uploads from new accounts open again after midnight UTC. {nothing} "
+            f"Uploads from new accounts open again {wait.words}. {nothing} "
             "Accounts that were invited are not affected.",
+            headers=headers,
         )
-    return (
+    return PageError(
         503,
         "Conversions are paused for today",
-        "Today's budget for conversions has been used up. New uploads open again "
-        f"after midnight UTC. {nothing}",
+        f"Today's budget for conversions has been used up. New uploads open again {wait.words}. "
+        f"{nothing}",
+        headers=headers,
     )
 
 
-# Status, title and message when the upload gate (web/uploads.py) turns someone away.
-UPLOAD_BUSY = {
-    "busy": (
+def upload_busy(refused: str) -> PageError:
+    """The page when the upload gate (web/uploads.py) turns someone away: `"busy"` (the
+    server is taking as many as it will) or `"own_upload"` (one of theirs is still being
+    checked)."""
+    wait = retry_after(UPLOAD_BUSY_WAIT_S)
+    headers = {"Retry-After": wait.header}
+    if refused == "own_upload":
+        return PageError(
+            429,
+            "Another upload of yours is still being checked",
+            "A document you uploaded a moment ago, perhaps in another tab, is still being "
+            f"checked. Try again {wait.words}: go back and upload this one again. Nothing was "
+            "uploaded this time.",
+            headers=headers,
+        )
+    return PageError(
         503,
         "Too many uploads right now",
-        "Several documents are being uploaded at this moment. Wait a few seconds, then "
-        "go back and upload again. Nothing was uploaded.",
-    ),
-    "own_upload": (
-        429,
-        "Another upload of yours is still being checked",
-        "A document you uploaded a moment ago, perhaps in another tab, is still being "
-        "checked. Wait a few seconds, then go back and upload this one again. Nothing was "
-        "uploaded this time.",
-    ),
-}
+        "Several documents are being uploaded at this moment. Try again "
+        f"{wait.words}: go back and upload again. Nothing was uploaded.",
+        headers=headers,
+    )
 
 
 @dataclass
@@ -849,6 +1020,30 @@ class Placed:
     left: int | None = None
     retry_after: str = ""
     office: bool = False  # the file was Word or PowerPoint, made into a PDF first (T3-30)
+    estimated: bool = False  # `pages` is what the file counts as (a source), not a page count
+    # Scanned and handwritten pages the box was not checked for (`page_type.ImagePageCount`
+    # as a dict): kept as pictures, with the price of reading them said beside the document.
+    scans: dict[str, int] | None = None
+
+
+def _storage_placed(
+    filename: str, exc: stored_bytes.StorageRefused | stored_bytes.StorageFull, office: bool = False
+) -> Placed:
+    """The answer for a file that did not fit what the person (or the service) may store,
+    whatever kind of file it is: PDF, Word, PowerPoint or LaTeX source."""
+    if isinstance(exc, stored_bytes.StorageFull):
+        log_event(logger, "upload_rejected", code="storage_full")
+        return Placed(
+            filename,
+            code="storage_full",
+            status=503,
+            retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
+            office=office,
+        )
+    log_event(logger, "upload_rejected", code="storage_user")
+    return Placed(
+        filename, exc.used_mb, code="storage_user", status=413, left=exc.limit_mb, office=office
+    )
 
 
 # How long the probes of one upload may take in all: each file has its own 30 s, but ten
@@ -863,6 +1058,13 @@ OFFICE_BUDGET_S = 180.0
 async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> Response:
     """Read, check and store an upload of one or several files (inside the upload gate)."""
     s = ctx.settings
+    declared = request.headers.get("content-length", "")
+    if declared.isdigit():  # a body that cannot fit what the person may still store is not read
+        refused = await run_in_threadpool(
+            _storage_refusal, request, ctx, user, int(declared) - FORM_OVERHEAD_BYTES
+        )
+        if refused is not None:
+            return refused
     try:
         form = await read_upload_form(
             request,
@@ -891,13 +1093,15 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 status,
                 filename,
                 course=chosen,
-                revises=revises or "",
+                revises="" if code == "revise_source" else revises or "",  # no revise form
                 fields=form.fields,
             )
         )
 
     if revises is not None and not await run_in_threadpool(_users_revision, ctx, user, revises):
         return await refuse("unknown_revision", 400, form.filename)
+    if revises is not None and await run_in_threadpool(_is_source_job, ctx, revises):
+        return await refuse("revise_source", 400, form.filename)
     if revises is not None and len(form.files) > 1:
         return await refuse("revise_one_file")
     if not form.files:
@@ -906,18 +1110,31 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         return await run_in_threadpool(_course_error_page, request, user, form.fields)
     for _ in form.files[1:]:  # every file after the first is an upload for the rate limits
         enforce(request, "upload_user", user.id)
+        request.state.upload_counted += 1
     mode = retention.mode_for_upload(
         keep=form.fields.get("keep") == "on", share=form.fields.get("share") == "on"
     )
     # "Exam or quiz": figures are described without giving answers (T1-14).
     exam = form.fields.get("exam") == "on"
+    language = chosen_language(form.fields) or None
     # "Convert scanned or handwritten pages" (ADR 0007): offered by FEATURE_IMAGE_PAGES, used
     # only for a file whose probe finds such pages.
     image_pages = form.fields.get("image_pages") == "on" and s.feature_image_pages
     main_file = (form.fields.get("main_file") or "").strip()[:200] or None
     placed = await run_in_threadpool(
-        _place_files, ctx, user, form.files, mode, course_id, exam, revises, image_pages, main_file
+        _place_files,
+        ctx,
+        user,
+        form.files,
+        mode,
+        course_id,
+        exam,
+        revises,
+        image_pages,
+        main_file,
+        language,
     )
+    request.state.upload_accepted = sum(1 for item in placed if item.job_id or item.pending_id)
     for item in placed:  # product analytics (web.analytics): counts only, never a file name
         if item.job_id or item.pending_id:
             analytics.queue_event(
@@ -931,6 +1148,33 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     return await run_in_threadpool(_results_redirect, ctx, user, placed)
 
 
+def _storage_refusal(
+    request: Request, ctx: AppContext, user: CurrentUser, incoming: int
+) -> Response | None:
+    """The page for an upload whose body is more than the person may still store (their limit,
+    or the service's: `storage.check_room`), or None. `incoming` is what the body's declared
+    length leaves for the files once the form's own fields are taken off, so a file that would
+    have fitted is never turned away; the words are those of a file refused after being read."""
+    try:
+        with session_scope(ctx.factory) as session:
+            stored_bytes.check_room(session, ctx.settings, user.id, max(incoming, 0))
+    except stored_bytes.StorageRefused as exc:
+        log_event(logger, "upload_rejected", code="storage_user")
+        return _upload_error_page(
+            request, user, "storage_user", 413, pages=exc.used_mb or None, left=exc.limit_mb
+        )
+    except stored_bytes.StorageFull:
+        log_event(logger, "upload_rejected", code="storage_full")
+        return _upload_error_page(
+            request,
+            user,
+            "storage_full",
+            503,
+            headers={"Retry-After": retry_after(stored_bytes.FULL_WAIT_S).header},
+        )
+    return None
+
+
 def _place_files(
     ctx: AppContext,
     user: CurrentUser,
@@ -941,6 +1185,7 @@ def _place_files(
     revises: str | None,
     image_pages: bool = False,
     main_file: str | None = None,
+    language: str | None = None,
 ) -> PlacedList:
     """Check each file and queue it, or keep it for choosing its pages, or say why not.
     A refusal of one file does not stop the others: each is its own document."""
@@ -955,13 +1200,22 @@ def _place_files(
         if s.feature_latex_source and source_intake.kind_of(file.filename, file.data):
             placed.append(
                 _place_source(
-                    ctx, user, file, mode, course_id, exam, revises, main_file, len(files)
+                    ctx, user, file, mode, course_id, exam, revises, main_file, len(files), language
                 )
             )
             continue
+        # A Word file the reader takes (`FEATURE_WORD_SOURCE`) is read from the file itself:
+        # no PDF is made. Anything it will not take goes on as below.
+        if s.feature_word_source:
+            word = _place_word(
+                ctx, user, file, mode, course_id, exam, revises, len(files), language
+            )
+            if word is not None:
+                placed.append(word)
+                continue
         # A Word or PowerPoint file is made into a tagged PDF first (T3-30); from here on the
         # PDF is what is probed, stored, split into parts and converted, as for any upload.
-        data, office = file.data, False
+        data, office, census = file.data, False, None
         try:
             if is_office_upload(file.data) and office_convert.input_kinds(s):
                 office = True
@@ -969,7 +1223,7 @@ def _place_files(
                     raise UploadRejected("office_budget")
                 started = time.monotonic()
                 try:
-                    data = _office_to_pdf(
+                    data, census = _office_to_pdf(
                         ctx, file.data, timeout_s=min(s.office_timeout_s, office_left)
                     )
                 finally:
@@ -980,15 +1234,21 @@ def _place_files(
             if remaining < 1.0:
                 raise UploadRejected("unreadable")
             limit_s = min(INSPECT_TIMEOUT_S, remaining)
-            if image_pages:  # also counts the scanned and handwritten pages
+            # With the offer on, the same probe counts the scanned and handwritten pages
+            # (`page_type.ImagePageCount`): they are read when asked, and said when not.
+            if s.feature_image_pages:
                 pages, found = inspect_pdf_detail(
-                    data, max_pages=s.source_page_limit, timeout_s=limit_s, allow_image_pages=True
+                    data,
+                    max_pages=s.source_page_limit,
+                    timeout_s=limit_s,
+                    allow_image_pages=image_pages,
+                    count_image_pages=True,
                 )
+                may_have = image_pages and found.possible
             else:
                 pages = inspect_pdf_isolated(data, max_pages=s.source_page_limit, timeout_s=limit_s)
-                found = 0
-            # The request applies to a file with scanned or handwritten pages and to no other.
-            convert_images = image_pages and found > 0
+                found, may_have = ImagePageCount(), False
+            convert_images = image_pages and may_have
             if len(data) > s.upload_limit_bytes:  # the PDF made from a Word file can be big
                 raise UploadRejected("too_large")
         except UploadRejected as exc:
@@ -998,12 +1258,16 @@ def _place_files(
                     exc.pages or 0,
                     code=exc.code,
                     status=exc.status_code,
-                    retry_after="10" if exc.code == "office_busy" else "",
+                    retry_after=retry_after(OFFICE_BUSY_WAIT_S).header
+                    if exc.code == "office_busy"
+                    else "",
                     office=office,
                 )
             )
             continue
         too_big = len(data) > max_upload_bytes(s.max_upload_mb)
+        # Scanned and handwritten pages the box was not checked for (`scans_note` says them).
+        scans = asdict(found) if found.possible and not convert_images else None
         if pages > s.max_pages_per_job or too_big:
             placed.append(
                 _keep_for_parts(
@@ -1016,10 +1280,35 @@ def _place_files(
                     exam,
                     revises,
                     convert_images,
+                    office=census.to_json() if census else None,
+                    scans=scans,
+                    language=language,
                 )
             )
             placed[-1].office = office
             continue
+        if scans and found.mostly(pages) and revises is None:
+            # More than half the pages are scans or handwriting: the file waits for the
+            # person's choice before anything is converted or counted (WS7.8). When it cannot
+            # wait (the room for waiting files is full), it is converted as for any file.
+            held = _keep_for_parts(
+                ctx,
+                user,
+                UploadedFile(file.filename, data),
+                pages,
+                mode,
+                course_id,
+                exam,
+                revises,
+                convert_images,
+                office=census.to_json() if census else None,
+                scans=scans,
+                language=language,
+            )
+            if held.pending_id:
+                held.office = office
+                placed.append(held)
+                continue
         try:
             job_id = store_job(
                 ctx.factory,
@@ -1031,39 +1320,19 @@ def _place_files(
                 mode,
                 course_id=course_id,
                 exam=exam,
+                language=language,
                 image_pages=convert_images,
                 revises=revises,
                 now=utcnow(),
+                office=census.to_json() if census else None,
             )
         except TooManyJobs as exc:
             placed.append(
                 Placed(file.filename, code=exc.code, status=429, retry_after="60", office=office)
             )
             continue
-        except stored_bytes.StorageRefused as exc:
-            log_event(logger, "upload_rejected", code="storage_user")
-            placed.append(
-                Placed(
-                    file.filename,
-                    exc.used_mb,
-                    code="storage_user",
-                    status=413,
-                    left=exc.limit_mb,
-                    office=office,
-                )
-            )
-            continue
-        except stored_bytes.StorageFull:
-            log_event(logger, "upload_rejected", code="storage_full")
-            placed.append(
-                Placed(
-                    file.filename,
-                    code="storage_full",
-                    status=503,
-                    retry_after="3600",
-                    office=office,
-                )
-            )
+        except (stored_bytes.StorageRefused, stored_bytes.StorageFull) as exc:
+            placed.append(_storage_placed(file.filename, exc, office))
             continue
         except QuotaRefused as exc:
             placed.append(
@@ -1073,11 +1342,12 @@ def _place_files(
                     code="page_quota",
                     status=429,
                     left=exc.left,
-                    retry_after="3600",
+                    retry_after=retry_after().header,
                     office=office,
                 )
             )
             continue
+        ctx.wake_worker()
         log_event(
             logger,
             "job_created",
@@ -1090,7 +1360,8 @@ def _place_files(
         events.record_upload(
             ctx.factory, s, user_id=user.id, job_id=job_id, data=file.data, pages=pages
         )
-        placed.append(Placed(file.filename, pages, job_id=job_id, office=office))
+        # Pages kept as pictures for want of the box are said at once (`scans_note`).
+        placed.append(Placed(file.filename, pages, job_id=job_id, office=office, scans=scans))
     return placed
 
 
@@ -1187,6 +1458,7 @@ def _place_source(
     revises: str | None,
     main_file: str | None,
     files: int,
+    language: str | None = None,
 ) -> Placed:
     """Check a `.tex` or `.zip` and queue it as a job, or say why not. The pages counted
     against the day's quota are an estimate made from the source (`source.intake`)."""
@@ -1217,16 +1489,20 @@ def _place_source(
             mode,
             course_id=course_id,
             exam=exam,
+            language=language,
             now=utcnow(),
             media_type=SOURCE_MEDIA_TYPES[info.kind],
         )
     except TooManyJobs as exc:
         return Placed(file.filename, code=exc.code, status=429, retry_after="60")
+    except (stored_bytes.StorageRefused, stored_bytes.StorageFull) as exc:
+        return _storage_placed(file.filename, exc)
     except QuotaRefused as exc:
         return Placed(
             file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
-            retry_after="3600",
+            retry_after=retry_after().header, estimated=True,
         )  # fmt: skip
+    ctx.wake_worker()
     log_event(
         logger, "job_created", job_id=job_id, pages=info.pages, source=info.kind,
         opt_in=mode == "dev", retention=mode, files=files,
@@ -1234,9 +1510,76 @@ def _place_source(
     return Placed(file.filename, info.pages, job_id=job_id)
 
 
+def _place_word(
+    ctx: AppContext,
+    user: CurrentUser,
+    file: UploadedFile,
+    mode: str,
+    course_id: str | None,
+    exam: bool,
+    revises: str | None,
+    files: int,
+    language: str | None = None,
+) -> Placed | None:
+    """A `.docx` the Word reader takes, queued as a source job (`source.docx_reader`), or None:
+    the file goes the PDF route instead (a revision, a file that is not a Word file, no sandbox
+    or pandoc here, one the reader's gate cannot read, or one longer than a job takes; the PDF route
+    has its own gate and says why when it refuses too). A file the gate calls unsafe is refused
+    here and does not go on to LibreOffice. Pages are counted from the file's
+    characters and pictures (`docx_package.Facts.pages`)."""
+    s = ctx.settings
+    if (
+        revises is not None
+        or not file.data.startswith(b"PK\x03\x04")
+        or not (pandoc_step.installed() and sandbox.available() and ctx.sandbox.allows_source())
+    ):
+        return None
+    try:
+        census, pages = check_word_isolated(file.data)
+    except UploadRejected as exc:
+        if exc.code == "office_unsafe":  # unsafe for the reader is unsafe for LibreOffice too
+            return Placed(file.filename, code=exc.code, status=exc.status_code, office=True)
+        return None
+    if census.kind != "docx" or pages > s.max_pages_per_job:
+        return None  # a long file is split into parts by pages, which only the PDF route can do
+    blob = source_envelope.wrap("docx", file.filename, None, file.data)
+    try:
+        job_id = store_job(
+            ctx.factory,
+            s,
+            user.id,
+            file.filename,
+            blob,
+            pages,
+            mode,
+            course_id=course_id,
+            exam=exam,
+            language=language,
+            now=utcnow(),
+            media_type=SOURCE_MEDIA_TYPES["docx"],
+            office=replace(census, read_from_file=True).to_json(),
+        )
+    except TooManyJobs as exc:
+        return Placed(file.filename, code=exc.code, status=429, retry_after="60")
+    except (stored_bytes.StorageRefused, stored_bytes.StorageFull) as exc:
+        return _storage_placed(file.filename, exc)
+    except QuotaRefused as exc:
+        return Placed(
+            file.filename, exc.pages, code="page_quota", status=429, left=exc.left,
+            retry_after="3600", estimated=True,
+        )  # fmt: skip
+    ctx.wake_worker()
+    log_event(
+        logger, "job_created", job_id=job_id, pages=pages, source="docx",
+        opt_in=mode == "dev", retention=mode, files=files,
+    )  # fmt: skip
+    return Placed(file.filename, pages, job_id=job_id)
+
+
 SOURCE_MEDIA_TYPES = {
-    "tex": "application/x-readablestem-tex",
-    "zip": "application/x-readablestem-zip",
+    "tex": SOURCE_MEDIA_PREFIX + "tex",
+    "zip": SOURCE_MEDIA_PREFIX + "zip",
+    "docx": SOURCE_MEDIA_PREFIX + "docx",
 }
 
 
@@ -1250,9 +1593,13 @@ def _keep_for_parts(
     exam: bool,
     revises: str | None,
     image_pages: bool = False,
+    office: dict | None = None,
+    scans: dict[str, int] | None = None,
+    language: str | None = None,
 ) -> Placed:
     """A file over the page or size limit is kept for the person to choose its pages
-    (T3-3, `web.pending`); nothing is converted or counted until they do."""
+    (T3-3, `web.pending`); nothing is converted or counted until they do. `scans`: the count of
+    scanned and handwritten pages, kept with it so the page it waits on says them (WS7.8)."""
     if revises is not None:
         return Placed(file.filename, pages, code="revision_too_large", status=422)
     try:
@@ -1267,7 +1614,10 @@ def _keep_for_parts(
                 mode=mode,
                 course_id=course_id,
                 exam=exam,
+                language=language,
                 image_pages=image_pages,
+                office=office,
+                scans=scans,
             )
             pending_id = row.id
     except pending.TooManyPending:
@@ -1279,9 +1629,14 @@ def _keep_for_parts(
         )
     except stored_bytes.StorageFull:
         log_event(logger, "upload_rejected", code="storage_full")
-        return Placed(file.filename, code="storage_full", status=503, retry_after="3600")
+        return Placed(
+            file.filename,
+            code="storage_full",
+            status=503,
+            retry_after=retry_after(stored_bytes.FULL_WAIT_S).header,
+        )
     log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
-    return Placed(file.filename, pages, pending_id=pending_id)
+    return Placed(file.filename, pages, pending_id=pending_id, scans=scans)
 
 
 async def _answer_one(
@@ -1295,6 +1650,8 @@ async def _answer_one(
     """The answer to an upload of one file: its job page, the page for choosing its pages,
     or the upload form again with the reason."""
     if item.job_id:
+        if note := scans_note(get_ctx(request).settings, item):
+            flash(request, note, undo=False)
         return RedirectResponse(f"/jobs/{item.job_id}", status_code=303)
     if item.pending_id:
         return RedirectResponse(f"/uploads/{item.pending_id}", status_code=303)
@@ -1313,9 +1670,19 @@ async def _answer_one(
             course=chosen,
             revises=revises,
             office=item.office,
+            estimated=item.estimated,
             fields=fields,
         )
     )
+
+
+def scans_note(settings: Settings, item: Placed) -> str:
+    """What is said of a document's scanned and handwritten pages when the box was not
+    checked: how many, that they stay pictures, and what reading them would cost ("" when it
+    has none). The upload's answer and the batch page's row both say it, from the stored counts."""
+    if not item.scans or not settings.feature_image_pages:
+        return ""
+    return outcome_words.image_pages_offer(ImagePageCount(**item.scans), settings)
 
 
 def _results_redirect(ctx: AppContext, user: CurrentUser, placed: list[Placed]) -> Response:
@@ -1350,9 +1717,11 @@ UPLOAD_RESULT_GONE = (
 )
 
 
-def _office_to_pdf(ctx: AppContext, data: bytes, *, timeout_s: float | None = None) -> bytes:
-    """A Word or PowerPoint upload as PDF bytes (`web.office_convert`); `UploadRejected`
-    when this server cannot take it."""
+def _office_to_pdf(
+    ctx: AppContext, data: bytes, *, timeout_s: float | None = None
+) -> tuple[bytes, office_convert.Census]:
+    """A Word or PowerPoint upload as PDF bytes with its census (`web.office_convert`);
+    `UploadRejected` when this server cannot take it."""
     s = ctx.settings
     soffice = office_convert.soffice_command(s.soffice_path)
     if not office_convert.input_kinds(s):
@@ -1362,18 +1731,26 @@ def _office_to_pdf(ctx: AppContext, data: bytes, *, timeout_s: float | None = No
     )
 
 
-def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, str] | None:
-    """The course the job is read for (id and name), for the job page; None without
-    one or with the feature off."""
+def _job_course(
+    request: Request, job_id: str, user: CurrentUser, job: JobView
+) -> dict[str, Any] | None:
+    """The course the job is read for, for the job page: its id and name, and `applied`, the
+    symbols the conversion was handed ("bold d is a vector"; None where no record was kept).
+    Only its owner and a person who reviews it get it (`views.audience_of`), and only with the
+    feature on; the owner alone gets the link to the course (`id`)."""
     ctx = get_ctx(request)
-    if not notation.enabled(ctx.settings):
+    if not notation.enabled(ctx.settings) or job.audience == "reader":
         return None
     with session_scope(ctx.factory) as session:
-        job = job_access(session, job_id, user, VIEW)
-        if not is_owner(job, user):  # the course and its notation are the owner's
-            return None
-        course = notation.job_course(session, job)
-        return {"id": course.id, "name": course.name} if course is not None else None
+        stored = job_access(session, job_id, user, VIEW)
+        course = notation.job_course(session, stored)
+    if course is None and job.notation_applied is None:
+        return None
+    return {
+        "id": course.id if course is not None and job.is_owner else None,
+        "name": course.name if course is not None else None,
+        "applied": job.notation_applied,
+    }
 
 
 def _job_suggestions(request: Request, job_id: str, user: CurrentUser) -> dict[str, Any]:
@@ -1403,6 +1780,14 @@ def _users_course(ctx: AppContext, user: CurrentUser, course_id: str) -> bool:
         return False
     with session_scope(ctx.factory) as session:
         return notation.owned_course(session, course_id, user.id) is not None
+
+
+def _is_source_job(ctx: AppContext, job_id: str) -> bool:
+    """The finished document was read from a source file (`DocumentResult.origin`)."""
+    with session_scope(ctx.factory) as session:
+        job = session.get(Job, job_id)
+        origin = ((job.result_json if job is not None else None) or {}).get("origin", "pdf")
+        return origin != "pdf"
 
 
 def _users_revision(ctx: AppContext, user: CurrentUser, job_id: str) -> bool:
@@ -1438,56 +1823,72 @@ def _course_error_page(
 # --------------------------------------------------------------------------- status
 
 
-def load_job_status(
-    request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, JobOutcome | None]:
-    """The job's view model (with the job page's data) plus its outcome (`web.outcome`),
-    from one read."""
+def load_job_status(request: Request, job_id: str, user: CurrentUser) -> JobView:
+    """The job's view model with the job page's data and its state (`web.states`), from one
+    read."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = current_html(ctx, session, job_access(session, job_id, user, VIEW))
-        view = job_view(
+        # Today's budget matters to a waiting job and to the parts listed beside one.
+        waits = job.status == JobStatus.QUEUED or bool(job.part_group)
+        closed = waits and conversions_closed(ctx, user) is not None
+        return job_view(
             session,
             job,
             with_page=True,
             role=shares.role_of(session, job, user) or VIEW,
+            context=states.Context(budget_closed=closed, settings=ctx.settings),
         )
-        status, error_code, result_json = str(job.status), job.error_code, job.result_json
-    budget_closed = status == JobStatus.QUEUED and conversions_closed(ctx, user) is not None
-    outcome = job_outcome(
-        status=status,
-        error_code=error_code,
-        result_json=result_json,
-        budget_closed=budget_closed,
-        image_pages_offered=ctx.settings.feature_image_pages,
-    )
-    return view, outcome
 
 
-def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
+def status_context(request: Request, job: JobView) -> dict[str, Any]:
     """What `_job_status.html` needs. `status_version` changes whenever the fragment
-    would look different, outcome included (htmx polling answers 204 until then)."""
-    version = f"{job.version}-{outcome.code}" if outcome is not None else job.version
-    counts = job.summary.counts if job.summary is not None else None
-    audience = "owner" if job.is_owner else ("review" if job.can_review else "view")
-    headline = page_rules.headline(job.status, job.status_detail, outcome, counts, audience)
+    would look different, the state included (htmx polling answers 204 until then)."""
+    state = job.state
+    assert state is not None  # `load_job_status` always works it out
+    version = f"{job.version}-{state.key}"
     # The AI service is not answering right now (T3-1, `web.provider_health`): said on a
     # document that is waiting or converting, and beside "Try again". The status version
     # changes with it, so a page left open hears when it starts and stops.
-    from readablestem.web.provider_health import HEALTH
-
-    down = HEALTH.is_down()
+    down = get_ctx(request).provider_health().is_down()
     if down:
         version += "-down"
     return {
         "job": job,
-        "outcome": outcome,
+        "state": state,
         "status_version": version,
-        "headline": headline,
-        "open_line": page_rules.open_decisions_line(counts.decisions, audience) if counts else "",
         "provider_down": down,
         "conversion_event": analytics.conversion_props(job),  # product analytics, if enabled
     }
+
+
+def job_page_context(
+    request: Request, job_id: str, user: CurrentUser, job: JobView
+) -> dict[str, Any]:
+    """Everything the job page prints beyond the status box: the page itself, and the body a
+    finished job sends in place of the waiting one (`job_status`)."""
+    context = status_context(request, job)
+    context["course"] = _job_course(request, job_id, user, job)  # notation memory
+    context |= _job_suggestions(request, job_id, user)  # notation found in the document
+    context["after_download"] = after_download_state(request, job_id, user)  # ux-a
+    context["word_export"] = export_docx.available()  # the Word button needs pandoc
+    # When "Keep for 7 days" would delete it (None: the button is not offered). Only a state
+    # with something to keep offers it (F-316).
+    keeps = job.state is not None and job.state.keeps
+    keep_until = retention.keep_offer(job.retention_mode, job.retain_until) if keeps else None
+    settings = get_ctx(request).settings
+    context["keep_until"] = keep_until
+    context["keep_hint"] = retention.keep_hint(keep_until) if keep_until else ""
+    context["keep_label"] = retention.keep_label()
+    link_until = None
+    if settings.feature_class_link and job.is_owner:  # the class link that decides the time
+        with session_scope(get_ctx(request).factory) as session:
+            row = session.get(Job, job_id)
+            link_until = links.keeping(session, row, settings) if row is not None else None
+    context["retention_line"] = retention.kept_line(
+        settings, job.retention_mode, job.retain_until, link_until
+    )
+    return context
 
 
 @router.get("/jobs/{job_id}")
@@ -1495,40 +1896,40 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     """Status page. Without JavaScript it reloads itself only if the user opted in
     (`?auto=1`, offered in a <noscript> link); htmx polls otherwise.
 
-    `outcome` (label, message, `partial`) is in the context for the status box, which
-    shows it instead of the plain status when the job is incomplete or waiting.
+    `state` (`web.states`) is in the context: the status box, the tab title and the next
+    steps all print it.
     """
-    job, outcome = load_job_status(request, job_id, user)
-    context = status_context(job, outcome) | {"auto_reload": auto == "1"}
-    context["course"] = _job_course(request, job_id, user)  # notation memory
-    context |= _job_suggestions(request, job_id, user)  # notation found in the document
-    context["after_download"] = after_download_state(request, job_id, user)  # ux-a
-    context["word_export"] = export_docx.available()  # the Word button needs pandoc
-    # When "Keep for 7 days" would delete it (None: the button is not offered).
-    context["keep_until"] = retention.keep_offer(job.retention_mode, job.retain_until)
-    # No `active` nav item: this page is not "My documents" itself (aria-current="page"
-    # would announce it as such).
-    return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
+    job = load_job_status(request, job_id, user)
+    context = job_page_context(request, job_id, user, job) | {"auto_reload": auto == "1"}
+    # A person the document was shared with to read gets their own page, not the owner's
+    # (SW16); a reviewer gets the owner's page without the owner's blocks.
+    template = "job_reader.html" if job.audience == "reader" else "job.html"
+    return render(request, template, context | {"auto_reload_s": AUTO_RELOAD_S})
 
 
 @router.get("/jobs/{job_id}/status")
 def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Response:
-    """Status fragment polled by htmx. 204 (no swap) while nothing changed.
+    """Status fragment polled by htmx (SW8). 204 (no swap) while nothing changed.
 
-    Once the job finishes, the fragment says so and links to the results instead of
-    reloading the page (HX-Refresh did that before): a reload nobody asked for sends a
-    screen reader back to the top of the page and loses the reader's place, while the
-    status region already announces the change and the link is one step away.
+    When the job has finished, the answer is the status box and, out of band, the heading
+    and `#job-body` of the finished page, so the waiting page becomes the finished one where
+    the person is reading: no reload, the focus stays where it was, and the live region
+    says the new state once. Without scripts the page's "Refresh the status" link reloads it.
     """
-    job, outcome = load_job_status(request, job_id, user)
-    context = status_context(job, outcome)
+    job = load_job_status(request, job_id, user)
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job.id}"):  # the stored id
+        return redirect
+    context = status_context(request, job)
     if v and v == context["status_version"]:
         return Response(status_code=204)
-    context["results_link"] = job.finished
-    if request.headers.get("HX-Request") == "true":
-        # htmx sets document.title from a top-level <title> in the fragment.
-        headline: page_rules.Headline = context["headline"]
-        context["page_title"] = f"{headline.label}: {job.title}"
+    # htmx sets document.title from a top-level <title> in the fragment.
+    context["page_title"] = f"{context['state'].label}: {job.title}"
+    if job.finished:
+        context = job_page_context(request, job_id, user, job) | {
+            "page_title": context["page_title"],
+            "oob": True,
+            "finished_swap": True,
+        }
     return render(request, "_job_status.html", context)
 
 
@@ -1537,7 +1938,14 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     """The list of steps with their counts, polled by htmx outside the status box's live
     region (so a screen reader is not told every element). 204 while unchanged; once the
     job has finished, an empty fragment that stops polling."""
-    job, _ = load_job_status(request, job_id, user)
+    # The steps need the job's status and progress only: no state, summary or page, so a
+    # poll (even of a job that has finished) reads neither the result nor the file.
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        row = job_access(session, job_id, user, VIEW)
+        job = job_view(session, row, role=shares.role_of(session, row, user) or VIEW)
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job.id}"):  # the stored id
+        return redirect
     if v and v == job.progress_version:
         return Response(status_code=204)
     return render(request, "_job_progress.html", {"job": job})
@@ -1562,7 +1970,7 @@ def draft(
     the main way on. Every download of a draft without this page's confirm is sent here
     (`output.check`), with the file type it asked for. With no decision open, the job page's
     finish line. A person who can only view is never offered a draft."""
-    job, _ = load_job_status(request, job_id, user)
+    job = load_job_status(request, job_id, user)
     if job.status != JobStatus.DONE or job.page is None:
         raise PageError(409, "Not ready yet", "This document has not finished converting.",
                         context={"job_id": job_id})  # fmt: skip
@@ -1617,6 +2025,7 @@ def confirm_draft(
 
 
 @router.post("/jobs/{job_id}/language", dependencies=[Depends(require_csrf)])
+@submit_once("job.language")
 def set_language(
     request: Request, job_id: str, user: UserDep, lang: Annotated[str, Form()] = ""
 ) -> Response:
@@ -1645,6 +2054,7 @@ def set_language(
         crops = _crops(session, job.id)
         from readablestem.web.review import bump_result_version, rerender_job_html
 
+        output.output_changed(job, output.LANGUAGE)  # counted first: the file says its version
         job.html = rerender_job_html(
             job,
             result,
@@ -1655,26 +2065,60 @@ def set_language(
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = False  # made from the stored result, review writes included
         bump_result_version(job)  # review forms open in other tabs are now stale
-        retention.restart_clock(job, get_ctx(request).settings)
+        say_new_time(request, retention.restart_clock_and_say(job, get_ctx(request).settings))
     log_event(logger, "language_set", job_id=job_id)
     flash(
         request,
         f"The language is now {page_rules.language_label(result.lang)}. "
         "The HTML file was made again with it.",
+        kind="success",
     )
     # No fragment: the confirmation (the flash at the top) takes focus on load, as after
     # any other change; a fragment would scroll past it and keep focus on the page.
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
+@router.post("/jobs/{job_id}/cut-off", dependencies=[Depends(require_csrf)])
+@submit_once("job.cut_off")
+def continue_cut_off(request: Request, job_id: str, user: UserDep) -> Response:
+    """The owner of a PDF that looks cut off (`file_cut_off`) continues with the pages before the
+    empty ones: the notice stops holding the document back and stays, so the job page and the
+    student file still say those pages are not in the file. The student file does not change."""
+    from readablestem.pipeline import notices as notice_rules
+
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        owned_id = job.id
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        if not notice_rules.cut_off_pages(result.notices, open_only=True):
+            raise PageError(
+                409,
+                "Nothing to continue",
+                "This document is not waiting for an answer about empty pages. It may have been "
+                "answered in another tab or window, so there is nothing more to do here.",
+                context={"job_id": job_id},
+            )
+        result = notice_rules.continue_cut_off(result)
+        job.result_json = result.model_dump(mode="json", exclude={"html"})
+        from readablestem.web.review import bump_result_version
+
+        bump_result_version(job)  # review forms open in other tabs are now stale
+        say_new_time(request, retention.restart_clock_and_say(job, get_ctx(request).settings))
+    log_event(logger, "cut_off_continued", job_id=job_id)
+    flash(request, "You chose to continue with the pages before the empty ones.", kind="success")
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
+
+
 # --------------------------------------------------------------------------- try again
 
+RETRY_ALREADY = "This document is already waiting or being converted. Nothing was changed."
 RETRY_REFUSED = {
     "not_stopped": (
         409,
         "Nothing to try again",
-        "This document is not stopped: it is still waiting or being converted, or it has "
-        "finished completely. Nothing was changed.",
+        "This document is not stopped: it has finished completely, so it can be used as it is. "
+        "Nothing was changed.",
     ),
     "too_many_active": (
         429,
@@ -1682,19 +2126,29 @@ RETRY_REFUSED = {
         "You already have as many documents waiting or being converted as one person may. "
         "Wait for one to finish, then try again. Nothing was changed.",
     ),
+    "over_quota": (
+        429,
+        "Not enough pages left today",
+        "This document's pages no longer fit in what is left of today's pages. Try again after "
+        "the limit starts again. Nothing was changed.",
+    ),
 }
 
 
 @router.post("/jobs/{job_id}/retry", dependencies=[limited("retry"), Depends(require_csrf)])
+@submit_once("job.retry")
 def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Try again" on a stopped or partly converted document (T3-1, `web.retry`): the same
-    job goes back in the queue. Nothing is counted against the daily pages (this is not an
+    job goes back in the queue. "Convert it again" on a finished document made by an older
+    converter (WS10.15) is the same route, with a spend limit of its own. Nothing is counted
+    against the daily pages (this is not an
     upload), the finished steps and the decisions made are kept, and every limit holds: the
     daily budget (a queued job waits for it), the job's own spend caps, the documents
     waiting or converting at once, the tries per job and the rate limit."""
     ctx = get_ctx(request)
     enforce(request, "retry_user", user.id)
     refused = ""
+    started = "retry"
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id  # the redirect is built from the owned row, not the request
@@ -1710,14 +2164,26 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             )
             or 0
         )
+        # A document canceled before any worker began it had its pages given back: converting
+        # it counts them again (a canceled one that had begun kept them counted).
+        recount = job.error_code == states.CANCELED and not job.attempts
         try:
-            retry_rules.start(
+            started = retry_rules.start(
                 job, active_others=others, max_active=access.files_per_upload(user.access_tier)
             )
         except retry_rules.RetryRefused as exc:
             refused, tries = exc.code, job.retries or 0
+            if refused == "not_stopped" and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
+                refused = "already_queued"
         else:
-            retention.restart_clock(job, ctx.settings)
+            quota = access.page_quota(ctx.settings, user.access_tier)
+            if recount and not try_consume_pages(
+                session, user.id, job.page_count, quota=quota, day=utc_today()
+            ):
+                session.rollback()  # it stays canceled, and nothing was counted
+                refused = "over_quota"
+            else:
+                say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
             tries = job.retries or 0
     if refused == "no_tries_left":
         raise PageError(
@@ -1727,15 +2193,71 @@ def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
             "new document. Nothing was changed.",
             context={"job_id": job_id},
         )
+    if refused == "already_queued":
+        # Waiting or converting is what Try again asks for (often a second click): the
+        # job page, as the first click got (SW43, "already in that state").
+        flash(request, RETRY_ALREADY, undo=False)
+        return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
     if refused:
         status, title, message = RETRY_REFUSED[refused]
         raise PageError(status, title, message, context={"job_id": job_id})
-    log_event(logger, "job_retried", job_id=job_id, tries=tries)
+    log_event(
+        logger, "job_rerun" if started == "rerun" else "job_retried", job_id=job_id, tries=tries
+    )
     flash(
         request,
         "Your document is queued again. What was already converted is kept, and nothing "
-        "was counted against your daily pages.",
+        "was counted against your daily pages."
+        if started == "retry"
+        else "Your document is queued to be converted again with the current version. Your "
+        "decisions are kept, and nothing was counted against your daily pages.",
         undo=False,
+        kind="success",
+    )
+    return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
+
+
+@router.post("/jobs/{job_id}/cancel", dependencies=[limited("retry"), Depends(require_csrf)])
+@submit_once("job.cancel")
+def cancel_job(request: Request, job_id: str, user: UserDep) -> Response:
+    """Cancel a document that is waiting or converting (WS11.3a). A document no worker has
+    begun stops at once and its pages come back (when they were counted today); one a worker
+    has begun is asked to stop, and the worker ends it at its next beat (`web.worker`) with
+    nothing returned. Either way the upload is kept: "Convert it" starts it again, or it can be
+    deleted."""
+    ctx = get_ctx(request)
+    enforce(request, "retry_user", user.id)
+    now = utcnow()
+    gave_back = False
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, OWNER, lock=True)
+        owned_id = job.id
+        if job.status == JobStatus.QUEUED:
+            job.status = JobStatus.FAILED
+            job.error_code = states.CANCELED
+            job.finished_at = now
+            if not job.attempts and utc_today(as_utc(job.created_at)) == utc_today(now):
+                gave_back = give_back_pages(session, user.id, job.page_count, day=utc_today(now))
+            stopped = True
+        elif job.status == JobStatus.RUNNING:
+            job.cancel_requested_at = job.cancel_requested_at or now
+            stopped = True
+        else:
+            stopped = False
+    if not stopped:
+        raise PageError(
+            409,
+            "Nothing to cancel",
+            "This document is not waiting or converting, so there is nothing to stop. It may "
+            "have finished or been canceled in another tab or window. Nothing was changed.",
+            context={"job_id": job_id},
+        )
+    log_event(logger, "job_cancel_requested", job_id=owned_id, pages_given_back=gave_back)
+    flash(
+        request,
+        "Canceled. Your file is kept; you can convert it later or delete it.",
+        undo=False,
+        kind="success",
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
@@ -1776,16 +2298,37 @@ def content_disposition(filename: str) -> str:
     return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 
+def head_reply(media_type: str, disposition_name: str) -> Response:
+    """The answer to a HEAD request for a download: the status and content headers the GET
+    would send and no body (the middleware, `web.seo`, removes it), without a Content-Length,
+    which only the built file knows. Nothing is built, the deletion clock is not restarted and
+    no download is recorded: a link checker asking what a link is does not take the file. It
+    comes after the same access and draft checks as the GET, so those answer as they do for
+    a GET (a missing document is a 404, one still converting a 409)."""
+    response = Response(
+        media_type=media_type,
+        headers={
+            "Content-Disposition": content_disposition(disposition_name),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+    del response.headers["content-length"]
+    return response
+
+
 @router.get("/jobs/{job_id}/download")
 def download(request: Request, job_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         state = output.check(request, job, role_of(session, job, user), "html")
+        if is_head(request):  # the headers need the name only, not a re-render
+            title = documents.document_title(job).text
+            name = output.file_name(download_filename(title, job.id), state)
+            return head_reply("text/html; charset=utf-8", name)
         job = current_html(ctx, session, job)
-        result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename, job.title_override)
-        html = output.marked(job.html or "", state)
+        title = documents.document_title(job).text
+        html = served_html(ctx, session, job, state)
         name = output.file_name(download_filename(title, job.id), state)
         still_open = state.open_decisions
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
@@ -1823,8 +2366,20 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             context={"job_id": job_id},
         )
     ctx = get_ctx(request)
-    export, title, job_ref, state = _canvas_export(request, user, job_id, "canvas", number)
+    html, title, job_ref, state, version = _canvas_source(request, user, job_id, "canvas", number)
     name = canvas_filename(title, job_ref)
+    if is_head(request):
+        return head_reply("application/zip", output.file_name(name, state))
+    data = export_store.get_or_build(
+        lambda: session_scope(ctx.factory),
+        job_ref,
+        version,
+        "canvas",
+        html,
+        title,
+        lambda: export_canvas.build_zip(_canvas_export(html, title, job_ref, number)),
+        options=f"course={number or ''}",
+    )
     events.record_download(
         ctx.factory,
         ctx.settings,
@@ -1834,7 +2389,7 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
         file_type="canvas",
     )
     return Response(
-        export_canvas.build_zip(export),
+        data,
         media_type="application/zip",
         headers={
             "Content-Disposition": content_disposition(output.file_name(name, state)),
@@ -1854,8 +2409,19 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
     which Canvas, Blackboard, Moodle and D2L import. A GET like the other downloads, for the
     owner only."""
     ctx = get_ctx(request)
-    export, title, job_ref, state = _canvas_export(request, user, job_id, "cartridge", None)
+    html, title, job_ref, state, version = _canvas_source(request, user, job_id, "cartridge", None)
     name = cartridge_filename(title, job_ref)
+    if is_head(request):
+        return head_reply("application/zip", output.file_name(name, state))
+    data = export_store.get_or_build(
+        lambda: session_scope(ctx.factory),
+        job_ref,
+        version,
+        "cartridge",
+        html,
+        title,
+        lambda: export_cartridge.build_cartridge(_canvas_export(html, title, job_ref, None)),
+    )
     events.record_download(
         ctx.factory,
         ctx.settings,
@@ -1865,13 +2431,47 @@ def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response
         file_type="cartridge",
     )
     return Response(
-        export_cartridge.build_cartridge(export),
+        data,
         media_type="application/zip",
         headers={
             "Content-Disposition": content_disposition(output.file_name(name, state)),
             "Content-Security-Policy": VIEW_CSP,
         },
     )
+
+
+def _combine_page(request: Request, session: Session, job: Job) -> Response:
+    """The combine page for `job`'s source: a row per part with its state and what it still
+    needs, and the button to join the ready ones when there are two or more."""
+    if not job.part_group:
+        raise PageError(
+            404,
+            "This document is not a part of a larger file",
+            "Only the parts of a file converted in parts can be combined.",
+            context={"job_id": job.id},
+        )
+    view = combine_view(session, job)
+    first = combine_rules.kept_parts(session, job)
+    return render(
+        request,
+        "combine.html",
+        {
+            "job_id": job.id,
+            "name": combine_rules.title_of(first[0].job if first else job),
+            "view": view,
+            "word_export": export_docx.available(),
+        },
+    )
+
+
+@router.get("/jobs/{job_id}/combine/parts")
+def combine_page(request: Request, job_id: str, user: UserDep) -> Response:
+    """The parts of this document's source and what each needs before they can be joined.
+    Always answers for the owner of a part, even with nothing ready: it is where "Combine
+    parts" starts, and where a part with decisions open is sent for them."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, OWNER)
+        return _combine_page(request, session, job)
 
 
 @router.get("/jobs/{job_id}/combine")
@@ -1892,14 +2492,16 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
         job = job_access(session, job_id, user, OWNER)
         require_done(job)
         kept = combine_rules.kept_parts(session, job)
-        if len(kept) < 2:
-            raise PageError(
-                409,
-                "Nothing to combine yet",
-                "Combining needs at least two finished parts of this file that you still "
-                "have. A part you deleted, or one that has not finished or still has a "
-                "decision to make, cannot be joined.",
-                context={"job_id": job.id},
+        if len(kept) < 2:  # nothing to join yet: the page says what each part still needs
+            return _combine_page(request, session, job)
+        if is_head(request):  # the name and type only: nothing joined, no clock restarted
+            head_name = download_filename(
+                f"{combine_rules.title_of(kept[0].job)} combined", job.part_group or job.id
+            )
+            if file_type == "html":
+                return head_reply("text/html; charset=utf-8", head_name)
+            return head_reply(
+                exports.media_type(file_type), head_name.removesuffix(".html") + "." + file_type
             )
         try:
             html, title = combine_rules.combined_html(
@@ -1975,25 +2577,38 @@ def export_failed_words(version: str, code: str) -> str:
     )
 
 
-def _canvas_export(
+def _canvas_source(
     request: Request, user: CurrentUser, job_id: str, file_type: str, number: str | None
-) -> tuple[export_canvas.CanvasExport, str, str, output.ExportState]:
-    """The finished document, exported for Canvas (done, up to date, through the draft gate
-    `output.check`; a draft carries its banner). A picture the export cannot hold is a 409
-    page, and the HTML file stays available."""
+) -> tuple[str, str, str, output.ExportState, int]:
+    """(html, title, job id, state, result version) of the finished document for a Canvas
+    download: done, up to date, through the draft gate `output.check` (a draft carries its
+    banner). The deletion clock restarts, except for a HEAD, which only asks (`head_reply`)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         role = role_of(session, job, user)
         state = output.check(request, job, role, file_type, course=number or "")
+        if is_head(request):  # the headers need the title only, not a re-render
+            return "", documents.document_title(job).text, job.id, state, 0
         job = current_html(ctx, session, job)
-        result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename)
-        html, job_ref = output.marked(job.html or "", state), job.id
+        title = documents.document_title(job).text
+        html, job_ref, version = (
+            served_html(ctx, session, job, state),
+            job.id,
+            job.result_version or 0,
+        )
         if is_owner(job, user):  # only the owner's use keeps a document longer (G1)
             retention.restart_clock(job, ctx.settings)  # a download is activity, as for the HTML
+    return html, title, job_ref, state, version
+
+
+def _canvas_export(
+    html: str, title: str, job_ref: str, number: str | None
+) -> export_canvas.CanvasExport:
+    """The document's HTML exported for Canvas. A picture the export cannot hold is a 409
+    page, and the HTML file stays available."""
     try:
-        export = export_canvas.export_canvas(
+        return export_canvas.export_canvas(
             html,
             title=title,
             folder=export_canvas.folder_name(title, job_ref),
@@ -2007,7 +2622,6 @@ def _canvas_export(
             export_failed_words("Canvas version", exc.code),
             context={"job_id": job_ref},
         ) from None
-    return export, title, job_ref, state
 
 
 @router.get("/jobs/{job_id}/view")
@@ -2016,23 +2630,37 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         require_done(job)
-        # The preview can be saved as it is, so a draft says so here as in its download.
-        state = output.export_state(job)
-        html = output.marked(current_html(ctx, session, job).html or "", state)
+        # The preview can be saved as it is, so a draft says so here as in its download; a
+        # reader is never shown one (`output.shown`).
+        state = output.shown(job, role_of(session, job, user))
+        html = served_html(ctx, session, current_html(ctx, session, job), state)
     events.record(
         ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True
     )
+    return student_page(html)
+
+
+def student_page(html: str, headers: dict[str, str] | None = None) -> Response:
+    """The student version as the browser gets it: the bare HTML under the sandboxing policy
+    (`VIEW_CSP`: no script, no form, no access to the app). The one function that serves it, for
+    the owner's preview here and for a class link (`routes.class_link`), which adds its own
+    headers."""
     return Response(
-        html, media_type="text/html; charset=utf-8", headers={"Content-Security-Policy": VIEW_CSP}
+        html,
+        media_type="text/html; charset=utf-8",
+        headers={"Content-Security-Policy": VIEW_CSP, **(headers or {})},
     )
 
 
 def after_download_state(
     request: Request, job_id: str, user: CurrentUser
 ) -> feedback_questions.AfterDownload:
-    """What `_after_download.html` shows under the download link (web/feedback.py)."""
+    """What `_after_download.html` shows under the download link (web/feedback.py). The two
+    questions are about the owner's own plans to post the file, so only the owner is asked."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
+        if session.scalar(select(Job.user_id).where(Job.id == job_id)) != user.id:
+            return feedback_questions.AfterDownload()
         return feedback_questions.after_download(session, ctx.settings, user.id, job_id)
 
 
@@ -2066,7 +2694,7 @@ def _confirm_delete_page(
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, OWNER)
         result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename, job.title_override)
+        title = documents.document_title(job).text
         decided = documents.decided_by_you(result.get("fixes"))
         filename, uploaded = job.filename, as_utc(job.created_at)
     context = {
@@ -2093,6 +2721,7 @@ def confirm_delete(
 
 
 @router.post("/jobs/{job_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("job.delete")
 async def delete_job(request: Request, job_id: str, user: UserDep) -> Response:
     """Delete only with `confirm=yes`; any other POST (the "Delete" buttons) gets the
     confirmation page first. Deleting user data cannot be undone, so it is confirmed
@@ -2112,5 +2741,5 @@ def _delete_now(request: Request, job_id: str, user: CurrentUser) -> Response:
         delete_jobs(session, [job.id])
         events.forget_upload(session, job_id)  # the file's fingerprint goes with it
     log_event(logger, "job_deleted", job_id=job_id, reason="user")
-    flash(request, "Your document and everything made from it have been deleted.")
+    flash(request, "Your document and everything made from it have been deleted.", kind="success")
     return RedirectResponse("/app", status_code=303)

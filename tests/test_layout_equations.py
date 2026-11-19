@@ -121,6 +121,32 @@ def test_a_prefixed_equation_number_close_to_the_maths_becomes_its_label(label, 
     assert equation.bbox[2] < 250 + width + gap  # the number is not in the crop
 
 
+def test_a_number_at_the_right_edge_is_never_a_paragraph_of_its_own():
+    """The numbers of an aligned display set left of the page's column gutter were in the
+    other column from the equation and became paragraphs; so did a symbolic tag "(*)", and a
+    number centered between two lines set far apart."""
+
+    def fill(page):
+        prose(page, 100, "The model is written as the following aligned equations,")
+        for i, (lhs, number) in enumerate([("r = b - d", "(2)"), ("K = N + x", "(3)")]):
+            page.insert_text((140, 140 + 22 * i), lhs, fontsize=12, fontname="Times-Italic")
+            page.insert_text((520, 140 + 22 * i), number, fontsize=12)
+        prose(page, 200, "A tagged equation and two lines with one number between them follow.")
+        page.insert_text((250, 240), "v = d / t", fontsize=12, fontname="Times-Italic")
+        page.insert_text((520, 240), "(*)", fontsize=12)
+        page.insert_text((250, 290), "p = m v", fontsize=12, fontname="Times-Italic")
+        page.insert_text((250, 340), "E = m c", fontsize=12, fontname="Times-Italic")
+        page.insert_text((520, 315), "(4)", fontsize=12)
+        prose(page, 380, "The equations above hold for every week in the table below.")
+        for i in range(18):  # two columns of text: the page has a gutter
+            page.insert_text((72, 420 + 14 * i), f"left column line {i} with words", fontsize=10)
+            page.insert_text((320, 420 + 14 * i), f"right column line {i} with words", fontsize=10)
+
+    elements = analyze(one_page(fill)).elements
+    assert {e.equation_label for e in equations(elements)} >= {"(2)", "(3)", "(*)", "(4)"}
+    assert not [e for e in elements if e.kind != Kind.EQUATION and "(" in (e.text or "")]
+
+
 # ---------------------------------------------------------------- rows of a table
 
 

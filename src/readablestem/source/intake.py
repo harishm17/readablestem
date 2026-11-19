@@ -14,7 +14,13 @@ the day's quota can be taken at upload as for a PDF.
 Refusals are `SourceRefused(code)` with the codes the upload page words (`web.messages`):
 `source_bad_zip`, `source_zip_limits`, `source_unsafe_zip`, `source_unsupported_file`,
 `source_unsafe`, `source_no_main`, `source_many_mains`, `source_not_utf8`, `source_beamer`,
-`source_too_many_pages`.
+`source_unsupported_class`, `source_unsupported_package`, `source_too_many_pages`.
+
+Classes and packages (`check_support`): the main file's literal `\\documentclass` and the
+literal `\\usepackage` lines of the `.tex` files are looked up in `source.support.SUPPORT`, and
+one on its `refused` list is refused here, before anything is queued or counted. A name built
+by a macro, or one on no list, goes on to LaTeXML; the report stops the job if errors follow
+(`source.report.stop`).
 """
 
 from __future__ import annotations
@@ -26,6 +32,7 @@ from dataclasses import dataclass
 
 from readablestem.source import lint
 from readablestem.source.envelope import EnvelopeError, is_envelope, unwrap, wrap
+from readablestem.source.support import SUPPORT
 from readablestem.web import archive_intake as arc
 
 CHARS_PER_PAGE = 3000
@@ -51,16 +58,20 @@ _INCLUDE = re.compile(
     r"\\(?:input|include|subfile|subimport)\b\s*(?:\{[^}]*\}\s*)?\{?([^\s{}]+)\}?"
 )
 _FRAMES = re.compile(r"\\begin\s*\{frame\}|\\frame\s*\{")
+_PACKAGES = re.compile(r"\\(?:usepackage|RequirePackage)\s*(?:\[[^\]]*\]\s*)?\{([^}]*)\}")
 _FIGURES = re.compile(r"\\includegraphics\b|\\begin\s*\{tikzpicture\}")
 PREFERRED_MAINS = ("main", "ms", "paper", "article", "document", "slides", "thesis", "report")
 
 
 class SourceRefused(ValueError):
-    """The source is refused before it is queued; `code` is a category, safe to log."""
+    """The source is refused before it is queued; `code` is a category, safe to log. `name`:
+    the class or package refused by name (always one of `source.support`'s own names, never
+    free text from the source)."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, name: str | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.name = name
 
 
 @dataclass(frozen=True)
@@ -212,6 +223,7 @@ def inspect(
         if lint.problem(text) is not None:
             raise SourceRefused("source_unsafe")
     chosen = find_main(texts, main)
+    check_support(texts, chosen)
     beamer = _is_beamer(texts[chosen])
     if beamer and not beamer_ok:
         raise SourceRefused("source_beamer")
@@ -221,18 +233,53 @@ def inspect(
     return SourceInfo(kind=kind, main=chosen, pages=pages, beamer=beamer, files=len(texts))
 
 
-def _is_beamer(text: str) -> bool:
+def document_class(text: str) -> str | None:
+    """The class a main file names in its first `\\documentclass`, as written (a name built by
+    a macro comes back as the macro), or None."""
     match = _DOCUMENTCLASS.search(lint.strip_comments(text))
-    return bool(match and match.group(1).strip().lower() == "beamer")
+    return match.group(1).strip() if match else None
+
+
+def loaded_packages(texts: dict[str, str]) -> list[str]:
+    """The packages the `.tex` files load by a literal `\\usepackage` or `\\RequirePackage`, in
+    order, comments removed. LaTeXML does not read a `.sty` of the upload, so what one loads
+    does not count."""
+    found: dict[str, None] = {}
+    for path, text in texts.items():
+        if not path.lower().endswith((".tex", ".ltx")):
+            continue
+        for match in _PACKAGES.finditer(lint.strip_comments(text)):
+            found.update(dict.fromkeys(p.strip() for p in match.group(1).split(",") if p.strip()))
+    return list(found)
+
+
+def check_support(texts: dict[str, str], main: str) -> None:
+    """Refuse a source whose class, or a package it loads, is on `SUPPORT`'s `refused` list
+    (`source_unsupported_class`, `source_unsupported_package`). Names are compared in lower
+    case: a class written `Exam` falls back to the same guess as `exam`."""
+    name = document_class(texts[main])
+    if name and name.lower() in SUPPORT.classes.refused:
+        raise SourceRefused("source_unsupported_class", name.lower())
+    for package in loaded_packages(texts):
+        if package.lower() in SUPPORT.packages.refused:
+            raise SourceRefused("source_unsupported_package", package.lower())
+
+
+def _is_beamer(text: str) -> bool:
+    name = document_class(text)
+    return bool(name and name.lower() == "beamer")
 
 
 __all__ = [
     "EnvelopeError",
     "SourceInfo",
     "SourceRefused",
+    "check_support",
+    "document_class",
     "inspect",
     "is_envelope",
     "kind_of",
+    "loaded_packages",
     "unwrap",
     "wrap",
 ]

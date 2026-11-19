@@ -65,6 +65,46 @@ def test_an_oversized_body_is_refused_before_the_pdf_is_opened(web, monkeypatch)
     assert opened == [] and rows(web, Job) == 0 and pages_used(web) == 0
 
 
+def test_reading_an_upload_holds_the_file_once_not_twice():
+    """A 100 MB file peaked at 200 MB while it was read (the parser's copy and the copy made to
+    hand it over). Python's own allocations are counted, so the answer does not depend on how busy
+    the machine is."""
+    import asyncio
+    import tracemalloc
+
+    from starlette.requests import Request
+
+    file = bytes(8 * 1024 * 1024)
+    head = (
+        b'--b\r\nContent-Disposition: form-data; name="pdf"; filename="a.pdf"\r\n'
+        b"Content-Type: application/pdf\r\n\r\n"
+    )
+    pieces = [memoryview(head), memoryview(file), memoryview(b"\r\n--b--\r\n")]
+
+    async def receive():
+        if not pieces:
+            return {"type": "http.request", "body": b"", "more_body": False}
+        chunk, rest = pieces[0][:65536], pieces[0][65536:]
+        pieces[0:1] = [rest] if len(rest) else []
+        return {"type": "http.request", "body": bytes(chunk), "more_body": bool(pieces)}
+
+    scope = {
+        "type": "http",
+        "method": "POST",
+        "headers": [(b"content-type", b"multipart/form-data; boundary=b")],
+    }
+    tracemalloc.start()
+    try:
+        form = asyncio.run(
+            uploads.read_upload_form(Request(scope, receive), max_bytes=16 * 1024 * 1024)
+        )
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+    assert len(form.files[0].data) == len(file)
+    assert peak < 1.3 * len(file)
+
+
 def test_a_streamed_body_with_no_length_is_cut_off_at_the_limit(tmp_path):
     """A real server, a chunked body with no Content-Length: the limit holds while the body
     streams in, so the server stops reading long before the end of a huge body."""
@@ -157,7 +197,7 @@ def test_too_many_parts_or_files_is_a_bad_form_not_a_crash(web):
 def test_too_many_pages_is_refused_without_spending_the_daily_allowance(web):
     response = upload(web.browser, make_pdf(6))
     assert response.status_code == 422
-    assert "limit is 5" in response.text
+    assert "one file is up to 5 pages" in response.text
     assert rows(web, Job) == 0 and rows(web, Blob) == 0 and pages_used(web) == 0
 
 

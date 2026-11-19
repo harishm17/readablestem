@@ -18,7 +18,7 @@ symbols-wrong equations are a required decision; the chatbots flag none). Spend 
 
 ## 1. What was changed
 
-- **Column order** (`pipeline/layout.py`): a column's full-width line is no longer a section break, and a caption held
+- **Column order** (`pipeline/layout/`): a column's full-width line is no longer a section break, and a caption held
   with its column fills the column. Text that was read in the wrong order across columns is read in the right one.
 - **Table cells of words with math** (`pipeline/table_cells.py`, `pipeline/table_html.py`): a cell of words with a
   formula in it is read as words and math, not as one formula. After the fresh3 run a test showed one case it

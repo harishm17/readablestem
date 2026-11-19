@@ -21,14 +21,17 @@ import threading
 import zipfile
 from html import unescape
 from pathlib import Path
+from xml.etree import ElementTree as ET
 
 import docx
 import pytest
 
 import readablestem.cli.main as cli
 from readablestem.pipeline import export_docx as ed
-from readablestem.pipeline.assemble import ABOUT_TITLE
-from readablestem.pipeline.export_canvas import _parse
+from readablestem.pipeline import export_epub as ee
+from readablestem.pipeline.assemble import ABOUT_TITLE, CONTACT
+from readablestem.pipeline.export_canvas import _parse, export_canvas
+from readablestem.web import listen
 from test_export_canvas import DATA_URI, source_html, source_ids
 
 pytestmark = pytest.mark.skipif(not ed.available(), reason="pandoc is not installed")
@@ -97,18 +100,43 @@ def test_every_equation_is_a_native_equation(made):
     assert len(equations) == count(html, "math") == export.equations
 
 
-def test_the_note_about_this_version_is_in_the_file():
-    """The student note is a `<footer>`, which pandoc drops with its text (F-127)."""
-    html = source_html("demo")
-    about = re.search(r'<footer id="about-conversion".*?</footer>', html, re.S)
+@pytest.mark.parametrize(
+    "fixture",
+    ["golden/sample", "golden/stored_demo_0_2_0", "latex/tables.pdf", "latex/problem_set.pdf"],
+)
+def test_the_note_about_this_version_is_in_every_output_once(fixture):
+    """One page, one note: the Word file, the EPUB, the Canvas page and Listen's transcript
+    each carry the note's facts, said once (pandoc reads only `<main>`, F-127). Its first
+    sentence names the file it is (a PDF, a LaTeX source) and the version it sits in: only
+    the web page says "a web version" (SW18.6)."""
+    html = source_html(fixture)
+    about = re.search(r'<section id="about-conversion".*?</section>', html, re.S)
     assert about is not None
     lines = [
         " ".join(unescape(re.sub(r"<[^>]+>", "", p)).split())
         for p in re.findall(r"<p\b[^>]*>(.*?)</p>", about.group(0), re.S)
     ]
-    words = [" ".join(p.text.split()) for p in open_docx(ed.export_docx(html).data).paragraphs]
     assert lines[0] == ABOUT_TITLE and len(lines) >= 3
-    assert all(line in words for line in lines)
+    opening = lines[1]
+    assert opening.startswith("This is a web version of a ")
+    word = open_docx(ed.export_docx(html).data)
+    canvas = export_canvas(html, title="Doc", folder="doc-3f9a2b", course_number="12345")
+    texts = {
+        "word": [" ".join(p.text.split()) for p in word.paragraphs],
+        "epub": plain(ee.export_epub(html).content),
+        "canvas": plain(canvas.page_html or ""),
+        "listen": [item.text for item in listen.build_transcript(html, {})],
+    }
+    versions = {"word": "a Word", "epub": "an EPUB", "canvas": "a Canvas", "listen": "a web"}
+    for name, text in texts.items():
+        joined = " ".join(text) if isinstance(text, list) else text
+        assert all(line in joined for line in lines[2:]), name
+        assert opening.replace("a web", versions[name], 1) in joined, name
+        assert joined.count(CONTACT) == 1, name
+
+
+def plain(markup: str) -> str:
+    return " ".join(unescape(re.sub(r"<[^>]+>", " ", markup)).split())
 
 
 def test_headings_are_word_heading_styles(made):
@@ -265,6 +293,100 @@ def test_a_file_that_lacks_an_equation_is_refused(tmp_path):
     assert error.value.code == "equations"
 
 
+def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
+    """A poem's `<br>` is a line break; an algorithm (a code block with a formula in a step)
+    is lines of a paragraph with its indentation, and its formula an Office equation."""
+    html = (
+        '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
+        "<p>Whose woods these are<br>His house is in the village</p>"
+        "<pre><code>for each word do\n  if x then\n    <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
+        "\n  end if\nend for</code></pre></main></body></html>"
+    )
+    export = ed.export_docx(html)
+    assert export.equations == 1
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        xml = archive.read("word/document.xml").decode()
+    assert len(re.findall(r"<w:br ?/>", xml)) == 5  # one in the poem, four between the steps
+    assert "\N{NO-BREAK SPACE}" * 4 + "<m:oMath>" in xml.replace(
+        "</w:t></w:r><m:oMath>", "<m:oMath>"
+    )
+
+
+def test_one_equation_pandoc_cannot_write_does_not_fail_the_file():
+    """F-502: a bold `"` (an instructor's edit) makes pandoc leave raw TeX in the text, and an
+    empty `<math>` leaves nothing. The file is made; each such equation is words in its place
+    (its reading and the sentence, in the Not Converted style), the export names its element,
+    the other equations are Office equations, and no TeX is left."""
+    bad = '<mi mathvariant="bold">&quot;</mi>'
+    html = (
+        '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
+        f'<p>a <math id="m1" alttext="quote">{bad}</math> b <math id="m2"><mi>x</mi></math>'
+        ' c <math id="m3"></math></p>'
+        f'<div class="equation" id="m4"><math display="block">{bad}</math></div>'
+        '<div class="equation" id="m5"><math display="block"><mi>y</mi></math></div>'
+        "</main></body></html>"
+    )
+    export = ed.export_docx(html)
+    assert export.not_word == ["m1", "m3", "m4"]
+    assert export.equations == 2
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        xml = archive.read("word/document.xml").decode()
+    assert xml.count("<m:oMath>") == 2
+    assert xml.count("it is complete on the web page") == 3
+    assert xml.count('<w:rStyle w:val="NotConverted" />') == 3
+    assert "quote. This equation could not be written" in xml
+    assert "$" not in xml and "mathbf" not in xml
+    # A reading too long to write would leave nothing of the equation in the file: no file.
+    long_reading = html.replace('alttext="quote"', f'alttext="{"a plus b " * 60}"')
+    with pytest.raises(ed.DocxExportError) as error:
+        ed.export_docx(long_reading)
+    assert error.value.code == "equations"
+
+
+LINKS = (
+    '<html lang="en"><head><title>T</title></head><body><nav><a href="#h1">One</a></nav><main>'
+    '<h1 id="h1">One</h1><p id="p1">Text<a id="noteref-n1" role="doc-noteref" href="#n1">1</a>'
+    ' and <a role="doc-noteref" href="#n1">1</a>: <a href="#p3">a paragraph</a>,'
+    ' <a href="#fig">a figure</a>, <a href="#l2">a list</a>, <a href="#c">a cell</a>,'
+    ' <a href="#d">a description</a>, <a href="#pic">a picture</a>,'
+    ' <a href="#gone">nothing</a>.</p>'
+    '<p id="p3">Three</p><figure id="fig"><p>words</p><figcaption>F</figcaption></figure>'
+    '<ul id="l2"><li>a</li></ul><table><tr><th>h</th></tr><tr><td id="c">x</td></tr></table>'
+    '<details id="d"><summary>S</summary><p>long</p></details>'
+    f'<figure id="pic"><img src="{DATA_URI}" alt="A dot" width="1" height="1">'
+    "<figcaption>G</figcaption></figure>"
+    '<div role="doc-footnote" id="n1"><p>The note says <math><mi>x</mi></math>.'
+    ' <a role="doc-backlink" href="#noteref-n1">Back to the text</a></p></div>'
+    "</main></body></html>"
+)
+
+
+def test_every_link_in_a_word_file_lands_and_a_note_is_a_word_footnote():
+    """F-514, F-566: pandoc keeps an id on a heading, a div or a span and drops it on a
+    paragraph, figure, list or cell, so most links led nowhere; a footnote's mark was an empty
+    Word footnote beside a body paragraph. Now a link lands on a bookmark, the note's words are
+    in the Word footnote (its equation too), and the one link with no target is its words."""
+    export = ed.export_docx(LINKS)
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        body = ET.fromstring(archive.read("word/document.xml"))
+        notes = ET.fromstring(archive.read("word/footnotes.xml"))
+    bookmarks = {b.get(f"{W}name") for b in body.iter(f"{W}bookmarkStart")}
+    anchors = [h.get(f"{W}anchor") for h in body.iter(f"{W}hyperlink")]
+    assert anchors == ["h1", "p3", "fig", "l2", "c", "d", "pic"]
+    assert set(anchors) <= bookmarks
+    # One bookmark to a name, with any pandoc: 3.7 writes a figure's own id as well as the span.
+    names = [b.get(f"{W}name") for b in body.iter(f"{W}bookmarkStart")]
+    assert len(names) == len(set(names))
+    assert export.links_unlinked == 1  # "nothing" is text
+    real = [n for n in notes if n.get(f"{W}type") is None]
+    assert len(real) == 1
+    note = "".join(t.text or "" for t in real[0].iter(f"{W}t"))
+    assert "The note says" in note and "Back to the text" not in note
+    assert len(list(real[0].iter(f"{M}oMath"))) == 1 == export.equations
+    assert len(list(body.iter(f"{W}footnoteReference"))) == 1
+    assert "The note says" not in "".join(t.text or "" for t in body.iter(f"{W}t"))
+
+
 def test_output_that_is_not_a_word_file_is_refused(tmp_path):
     program = fake_pandoc(
         tmp_path,
@@ -322,3 +444,27 @@ def test_the_command_says_when_it_cannot(tmp_path, capsys):
     bad.write_text("words", encoding="utf-8")
     assert cli.main(["export", "docx", str(bad), str(tmp_path / "o.docx")]) == 2
     assert "cannot write a Word file: invalid" in capsys.readouterr().err
+
+
+# ------------------------------------------------------ pictures kept whole (F-114)
+
+
+def test_three_kept_pages_say_why_each_time_and_the_explanation_once_in_every_output():
+    from readablestem.core.types import Element, Fix, Kind, Status
+    from readablestem.pipeline.assemble import render_html
+
+    elements = [
+        Element(id=f"p{n}-e0", kind=Kind.FIGURE, page=n - 1, bbox=(0, 0, 500, 700), order=n)
+        for n in (1, 2, 3)
+    ]
+    fixes = [
+        Fix(element_id=e.id, kind=Kind.FIGURE, status=Status.FAILED, reason="scanned_page")
+        for e in elements
+    ]
+    html = render_html(title="Notes", lang="en", elements=elements, fixes=fixes, crops={})
+    word = ed.export_docx(html).data
+    xml = zipfile.ZipFile(io.BytesIO(word)).read("word/document.xml").decode()
+    said = [getattr(item, "say", "") for item in listen.build_transcript(html)]
+    for words in (plain(html), plain(xml), "\n".join(said)):
+        assert words.count("A scanned page.") == 3
+        assert words.count("A screen reader cannot read what a picture shows") == 1

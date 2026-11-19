@@ -57,6 +57,45 @@ def test_cron_prints_counts_only(database, capsys):
     assert SENTINEL not in out
 
 
+def test_storage_report_counts_bytes_per_table_and_per_finished_document(database, capsys):
+    with db.session_scope(database) as s:
+        user = add_user(s)
+        done = add_job(s, user, result=sentinel_result(), blobs=3)
+        add_job(s, user, status=db.JobStatus.QUEUED, blobs=1)  # not finished: not counted
+    assert main(["ops", "storage-report"]) == 0
+    out = capsys.readouterr().out
+    assert SENTINEL not in out  # sizes and ids only
+    assert "Finished documents: 1" in out
+    crops = 3 * len(SENTINEL)
+    assert f"{done}" in out and f"crops {crops}" in out
+    assert any(line.startswith("  blobs ") for line in out.splitlines())  # a table, with its size
+    assert "the database itself" in out
+
+
+def test_cron_runs_both_canaries_and_records_their_status_in_the_heartbeat(
+    database, capsys, monkeypatch
+):
+    """`ops cron` is what runs in production: it asks for both daily canaries (each claims its
+    own UTC day, `maybe_run_daily`) and notes their status in the cron heartbeat. The canaries
+    are faked here: no model call is made."""
+    from sqlalchemy import select
+
+    from readablestem.ops import canary, claude_canary
+
+    asked: list[str] = []
+    monkeypatch.setattr(
+        canary, "maybe_run_daily", lambda *a, **k: asked.append("decisions") or "ok"
+    )
+    monkeypatch.setattr(
+        claude_canary, "maybe_run_daily", lambda *a, **k: asked.append("claude") or "drift"
+    )
+    assert main(["ops", "cron"]) == 0
+    assert asked == ["decisions", "claude"]
+    with db.session_scope(database) as s:
+        beat = s.scalars(select(db.OpsHeartbeat).where(db.OpsHeartbeat.name == "cron")).one()
+        assert "decisions_canary=ok claude_canary=drift" in (beat.detail or "")
+
+
 def test_export_writes_opted_in_jobs_only_and_prune_honours_their_deadline(
     database, capsys, tmp_path
 ):

@@ -11,6 +11,7 @@ test_web_review*.py; axe, reflow and keyboard in test_web_review_split_browser.p
 
 from __future__ import annotations
 
+import copy
 import re
 from collections import Counter
 from html import unescape
@@ -121,6 +122,67 @@ def test_a_style_the_pdf_text_cannot_show_is_not_called_a_difference(tmp_path):
 
 
 # --------------------------------------------------------------------------- deciding
+
+
+def test_a_decision_sent_twice_is_saved_once(split):
+    """The one submit rule (SW43): the same request token again gets the first answer and
+    saves nothing; a new token for the decision the item has now gets "Already saved"; a
+    form without a token is checked as before."""
+    from readablestem.web.db import RequestToken
+
+    page = panel(screen(split, "?item=p1-e2"))
+    sent = re.search(r'name="request_token" value="([^"]+)"', page)
+    assert sent, "the decision form carries a request token"
+    first = post(split, "p1-e2", action="accept", version="0", request_token=sent.group(1))
+    again = post(split, "p1-e2", action="accept", version="0", request_token=sent.group(1))
+    assert first.status_code == again.status_code == 303
+    assert again.headers["location"] == first.headers["location"]
+    job = split.job(split.job_id)
+    assert job.result_version == 1
+    with session_scope(split.ctx.factory) as session:
+        assert len(session.scalars(select(ReviewEdit)).all()) == 1
+        (row,) = session.scalars(select(RequestToken)).all()
+        assert row.route == "review.decide"
+        assert set(row.outcome) == {"status", "location", "notices"}  # no content
+    # No token, drawn at the old version: the item has that decision, by this reviewer.
+    fresh = post(split, "p1-e2", action="accept", version="0")
+    assert fresh.status_code == 303
+    assert "Already saved" in text_of(split.browser.get(fresh.headers["location"]).text)
+    # No token, another decision from the old page: refused as before.
+    assert post(split, "p1-e2", action="reject", version="0").status_code == 409
+    assert split.job(split.job_id).result_version == 1
+
+
+def test_fix_something_on_a_page_opens_that_pages_tools_first_with_no_decision(split):
+    """WS19.6: the job page offers the way in; page mode puts the page's tools first under
+    "Page N", shows no decision, lists that page's optional checks, and keeps the mode when
+    the reviewer moves to another page."""
+    job_page = split.browser.get(f"/jobs/{split.job_id}").text
+    assert "/review?mode=page&amp;page=1" in job_page and "Fix something on a page" in job_page
+    html = screen(split, "?mode=page&page=2")
+    shown = panel(html)
+    before_tools = shown.split('id="page-tools"')[0]
+    heading = re.search(r'id="decision-title"[^>]*>([^<]*)<', shown)
+    assert heading and heading.group(1) == "Page 2"
+    assert "Decision" not in text_of(before_tools)  # nothing of a decision above the tools
+    assert "Decision 1 of" not in text_of(html) and 'class="steps"' not in html
+    assert "No optional checks." in html  # the one note is on page 1
+    assert "?page=1&amp;mode=page#decision-title" in html  # the page chips keep the mode
+    # An address that names an item is the ordinary screen.
+    assert "Decision 1 of" in text_of(screen(split, "?mode=page&page=2&item=p1-e2"))
+
+
+def test_the_live_check_answers_a_signed_out_session_quietly(split):
+    """F-088: signed out in another tab, the session's CSRF token is gone with it; the
+    check answers 204 and an empty body, not a 403 dropped into the page."""
+    path = f"/jobs/{split.job_id}/review/p1-e2/check"
+    csrf = token(split.browser, f"/jobs/{split.job_id}/review")
+    assert split.browser.post(path, data={"csrf_token": csrf, "latex": "x"}).status_code == 200
+    forged = split.browser.post(path, data={"csrf_token": "forged", "latex": "x"})
+    assert forged.status_code == 403
+    split.browser.post("/logout", data={"csrf_token": csrf})
+    gone = split.browser.post(path, data={"csrf_token": csrf, "latex": "x"})
+    assert (gone.status_code, gone.text) == (204, "")
 
 
 def test_a_decided_group_can_be_decided_again_for_all_its_headings(split):
@@ -234,7 +296,7 @@ def test_results_stored_before_page_sizes_and_tiers_still_load(split):
     assert "5 decisions to make." in page
     # Page sizes come from the PDF itself, so the marks are still placed.
     assert "The marks could not be placed" not in page
-    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
+    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=1").text
     assert "#box-p1-e2{left:" in css
 
 
@@ -250,5 +312,153 @@ def test_without_page_sizes_a_failed_probe_leaves_the_decisions_usable(split, mo
     assert "Decision 1 of 5" in panel(page)
     assert "No marks on this page." in page
     assert boxes(page) == {}
-    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css").text
+    css = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=1").text
     assert "#box-" not in css
+
+
+def test_marks_are_served_per_page_and_asked_again_only_to_be_told_nothing_changed(
+    split, monkeypatch
+):
+    """Each page has its own stylesheet and tag. A repeat with the tag is a 304 and places no
+    mark; moving a mark on page 2 changes only page 2's tag; a decision changes none."""
+    from readablestem.web import marks
+
+    def sheet(number: int, tag: str = ""):
+        headers = {"If-None-Match": tag} if tag else {}
+        return split.browser.get(
+            f"/jobs/{split.job_id}/review/marks.css?page={number}", headers=headers
+        )
+
+    first, second = sheet(1), sheet(2)
+    assert "#box-p1-e2{" in first.text and "#box-p1-e2{" not in second.text
+    assert "#box-p2-e0{" in second.text and "#box-p2-e0{" not in first.text
+    assert first.headers["cache-control"] == "private, no-cache"
+    tags = {1: first.headers["etag"], 2: second.headers["etag"]}
+    assert tags[1] != tags[2]
+    for number in (0, 3, "x"):
+        assert (
+            split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page={number}").status_code
+            == 404
+        )
+    assert split.browser.get(f"/jobs/{split.job_id}/review/marks.css").status_code == 404
+
+    # The screen links the stylesheet of the page it shows.
+    linked = re.search(r"marks.css\?page=2&amp;v=(\w+)", screen(split, "?item=p2-e2&page=2"))
+    assert linked is not None
+    # Its tag is the page's own: the browser keeps the file, and asks again only for another.
+    kept = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=2&v={linked[1]}")
+    assert tags[2] == f'"{linked[1]}"' and "immutable" in kept.headers["cache-control"]
+    stale = split.browser.get(f"/jobs/{split.job_id}/review/marks.css?page=2&v=0")
+    assert stale.headers["cache-control"] == "private, no-cache"
+
+    def placed(*args, **kwargs):
+        raise AssertionError("a mark was placed")
+
+    monkeypatch.setattr(marks, "place", placed)
+    for number, tag in tags.items():
+        again = sheet(number, tag)
+        assert (again.status_code, again.content) == (304, b"")
+        assert again.headers["etag"] == tag
+    monkeypatch.undo()
+
+    # A decision is a class on the card, not new geometry: no tag changes.
+    assert post(split, "p1-e2", action="accept", version="0").status_code == 303
+    assert {n: sheet(n).headers["etag"] for n in (1, 2)} == tags
+
+    # An element that moves on page 2: that page's stylesheet is new, page 1's is not.
+    with session_scope(split.ctx.factory) as session:
+        job = session.get(Job, split.job_id)
+        assert job is not None and job.result_json is not None
+        data = copy.deepcopy(job.result_json)
+        for element in data["elements"]:
+            if element["id"] == "p2-e2":
+                element["bbox"] = [element["bbox"][0] + 40, *element["bbox"][1:]]
+        job.result_json = data
+    moved = sheet(2, tags[2])
+    assert moved.status_code == 200 and moved.headers["etag"] != tags[2]
+    assert sheet(1, tags[1]).status_code == 304
+
+
+def test_a_long_difference_list_is_folded_and_the_latex_box_opens_tall(tmp_path):
+    """An array the PDF's text reads column by column differs in many numbers (F-077): the
+    first rows show, the rest are one fold away, and the box for the LaTeX has room."""
+    from readablestem.core.types import EquationFix
+    from readablestem.pipeline.validate import safe_latex_to_mathml
+
+    output = review_output()
+    latex = r"v = 63\ 25\ 17\ 81\ 49\ 34\ 56"
+    for element in output.result.elements:
+        if element.id == "p1-e5":
+            element.text = "v = 36 52 71 18 94 43 65"
+    fix = output.result.fix_for("p1-e5")
+    assert fix is not None
+    fix.equation = EquationFix(latex=latex, mathml=safe_latex_to_mathml(latex, "block"), speech="")
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        body = panel(screen(env, "?item=p1-e5"))
+        rows = re.findall(r'<tr class="diff-', body)
+        folded = re.findall(
+            r'<tr class="diff-', section(body, '<details class="diff-more"', "</details>")
+        )
+        assert len(rows) > 5 and len(rows) - len(folded) <= 5
+        box = re.search(r'<textarea id="latex-p1-e5"[^>]*rows="(\d+)"', body)
+        assert box is not None and int(box.group(1)) >= 6
+
+
+def test_the_marks_of_a_page_are_listed_as_text_in_reading_order(split):
+    """WS19.5: under the image, every mark of the page is a text link to the item its frame
+    opens, in reading order, with the first words of the item where it has text."""
+    html = screen(split, "?page=1&accepted=1")
+    frames = boxes(html)
+    link = {i: re.search(r'href="([^"]+)"', frame) for i, frame in frames.items()}
+    in_order = sorted(frames, key=lambda i: int(i.split("-e")[1]))
+    listed = section(html, 'id="mark-list-title"', "</ol>")
+    assert re.findall(r'<a href="([^"]+)"', listed) == [link[i].group(1) for i in in_order]
+    assert "1 Vectors" in text_of(listed)  # the first words of the heading
+
+
+def evidence_env(tmp_path, *, scanned: bool):
+    from readablestem.core.types import PageType
+
+    output = review_output()
+    fix = output.result.fix_for("p1-e2")
+    assert fix is not None and fix.equation is not None
+    fix.equation.speech = "omega"
+    for element in output.result.elements:
+        if element.id == "p1-e4":
+            element.text = "Discuss vectors. As Figure 1 shows, a car moves from home to school."
+    if scanned:
+        output.result.page_types = [PageType(page=0, kind="scan_no_text", route="vision_page")]
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    return env
+
+
+@pytest.mark.parametrize("scanned", [False, True])
+def test_a_card_states_its_evidence_in_words(tmp_path, scanned):
+    """WS19.7: an equation card gives the sentence around it with the proposal read aloud
+    in its place; where the page has no text layer, or a figure has no caption and no
+    sentence that refers to it, the card says it can only be checked against the page image."""
+    env = evidence_env(tmp_path, scanned=scanned)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        equation = text_of(panel(screen(env, "?item=p1-e2")))
+        figure = text_of(panel(screen(env, "?item=p1-e6")))
+    only = "This can only be checked against the page image."
+    if scanned:
+        assert only in equation and only in figure
+        assert "angular velocity omega" not in equation
+    else:
+        assert "A rigid body turning with angular velocity omega moves a point" in equation
+        assert only not in equation and only not in figure  # the caption is there
+        assert "Where the text refers to it: “As Figure 1 shows, a car moves" in figure

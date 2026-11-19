@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 import pymupdf
 
 from readablestem.core.types import BBox, Element, Kind
-from readablestem.pipeline import layout, validate
+from readablestem.pipeline import layout, page_type, validate
 from readablestem.pipeline.layout import REASON_TAGGED
 
 log = logging.getLogger(__name__)
@@ -107,7 +107,11 @@ def _struct_headings(page: pymupdf.Page, number: int) -> list[TaggedHeading]:
             else:
                 walk(block.get("blocks", ()), depth + 1)
 
-    flags = pymupdf.TEXT_COLLECT_STRUCTURE | pymupdf.TEXT_PRESERVE_WHITESPACE
+    flags = (
+        pymupdf.TEXT_COLLECT_STRUCTURE
+        | pymupdf.TEXT_PRESERVE_WHITESPACE
+        | page_type.actualtext_flag(page)
+    )
     walk(page.get_text("dict", flags=flags).get("blocks", ()), 0)
     return out
 
@@ -159,6 +163,7 @@ def _struct_figures(doc: pymupdf.Document, pages: set[int]) -> list[TaggedFigure
             with contextlib.suppress(ValueError):
                 x0, y0, x1, y1 = (float(v) for v in raw.strip("[] ").split())
                 page = doc[number]
+                page_type.turn_page(page)  # the display frame layout read the page in
                 if not page.rotation % 360:  # the tag's frame is the page's unrotated one
                     rect = pymupdf.Rect(x0, y0, x1, y1) * page.transformation_matrix
                     box = (rect.x0, rect.y0, rect.x1, rect.y1)
@@ -188,6 +193,7 @@ def read(pdf_bytes: bytes, pages: Iterable[int]) -> TaggedPdf:
             for number in sorted(wanted):
                 if 0 <= number < doc.page_count:
                     try:
+                        page_type.turn_page(doc[number])
                         tagged.headings.extend(_struct_headings(doc[number], number))
                     except Exception as exc:  # one page's tags unreadable: the others count
                         log.warning("tagged: a page could not be read: %s", type(exc).__name__)

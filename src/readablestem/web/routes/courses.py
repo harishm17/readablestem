@@ -1,11 +1,15 @@
 """Courses and their notation: /courses, a course's page, and "remember for this course".
 
 Only with `FEATURE_NOTATION_MEMORY` on; otherwise every route here is a 404, like any
-address that does not exist. Each course belongs to one user: `_course` answers 404 for
-a course that does not exist *or* is someone else's, so ids cannot be probed. Every
-change is a normal form POST with the CSRF token, answered with a redirect (or the form
-again with its errors), so it all works without JavaScript. Deleting a course asks
-first (WCAG 3.3.4); removing one symbol does not (it is typed back in a moment).
+address that does not exist. With `FEATURE_COURSE_GRANTS` also on, the course page has a
+"People" section and two more owner-only POSTs (add or change a person, remove one) that give
+a person the right to view or review every document of the course (`web.shares`); with it off
+those two are 404 for everyone. The course pages themselves are the owner's alone either way.
+Each course belongs to one user: `_course` answers 404 for a course that does not exist *or*
+is someone else's, so ids cannot be probed. Every change is a normal form POST with the CSRF
+token, answered with a redirect (or the form again with its errors), so it all works without
+JavaScript. Deleting a course asks first (WCAG 3.3.4); removing one symbol does not (it is
+typed back in a moment).
 
 The data rules live in `web.notation`. Course names, symbols and notes are user
 content: only ids and counts are logged.
@@ -25,7 +29,7 @@ from readablestem.core.notation import canonical_symbol
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import export_docx
 from readablestem.pipeline.notation_memory import describe, phrase
-from readablestem.web import documents, notation
+from readablestem.web import documents, notation, shares
 from readablestem.web.db import Course, CourseNotation, Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -39,35 +43,58 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access
-from readablestem.web.shares import OWNER, REVIEW
+from readablestem.web.shares import OWNER, REVIEW, ShareError
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 Field = Annotated[str, Form()]
 
+# A second Add for something already there (SW43): the page it would have led to, and this.
+COURSE_EXISTS = "You already have a course with this name, so nothing new was added. Here it is."
+ENTRY_EXISTS = "This course already has {what} with that meaning, so nothing new was added."
+# The same words for a course that never existed, one that was deleted and another person's
+# (like `routes.jobs.NOT_FOUND` for a document): the page must not say which.
+COURSE_NOT_FOUND = (
+    "Page not found",
+    "There is no course at this address that this account can open. Check the address and "
+    "your account.",
+)
+# Why a chosen document is not added (`notation.attach_documents`).
+NOT_ADDED = "a document joins a course only when it is finished, yours and in no other course"
+
 
 def _require_feature(request: Request) -> None:
     if not notation.enabled(get_ctx(request).settings):
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
 
 
 def _course(session: Session, course_id: str, user: CurrentUser) -> Course:
     if not JOB_ID.match(course_id):
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
     course = notation.owned_course(session, course_id, user.id)
     if course is None:
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
     return course
 
 
 def _entry(course: Course, entry_id: str) -> CourseNotation:
     row = next((r for r in course.notation if r.id == entry_id), None)
     if row is None or not JOB_ID.match(entry_id):
-        raise PageError(404, *NOT_FOUND)
+        raise PageError(404, *COURSE_NOT_FOUND)
     return row
+
+
+def _not_saved(reason: str) -> PageError:
+    """A form the review screen never builds (a hand-made post): which check it failed."""
+    return PageError(
+        400,
+        "That could not be saved",
+        f"Nothing was saved: {reason}. Go back to the review screen and choose again.",
+    )
 
 
 def _errors(exc: notation.NotationInvalid) -> dict[str, Any]:
@@ -88,7 +115,6 @@ def _courses_page(
         "courses": courses,
         "values": {},
         "max_courses": notation.MAX_COURSES,
-        "active": "courses",
     }
     return render(request, "courses.html", context | (extra or {}), status_code=status)
 
@@ -100,6 +126,7 @@ def courses_page(request: Request, user: UserDep) -> Response:
 
 
 @router.post("/courses", dependencies=[Depends(require_csrf)])
+@submit_once("course.create")
 def create_course(request: Request, user: UserDep, name: Field = "") -> Response:
     _require_feature(request)
     try:
@@ -107,10 +134,17 @@ def create_course(request: Request, user: UserDep, name: Field = "") -> Response
             course = notation.create_course(session, user.id, name)
             course_id = course.id
     except notation.NotationInvalid as exc:
+        with session_scope(get_ctx(request).factory) as session:
+            existing = notation.course_named(session, user.id, name)
+        if existing is not None:
+            # The course is there already (often a second click): open it, as the first
+            # click did, and say nothing new was added (SW43, "identical repeat").
+            flash(request, COURSE_EXISTS, undo=False)
+            return RedirectResponse(f"/courses/{existing}", status_code=303)
         extra = _errors(exc) | {"values": exc.values or {"name": name}}
         return _courses_page(request, user, extra, status=422)
     log_event(logger, "course_created", course_id=course_id)
-    flash(request, "Course added. Add the symbols your course uses below.")
+    flash(request, "Course added. Add the symbols your course uses below.", kind="success")
     return RedirectResponse(f"/courses/{course_id}", status_code=303)  # the new row's own id
 
 
@@ -152,8 +186,27 @@ def _course_page(
             "starter": notation.STARTER if not course.notation else (),
             "attachable": _attachable(session, user, course),
             "attach_cap": notation.MAX_ATTACH,
+            "people": _people(ctx.settings, session, course),
+            "people_typed": "",
+            "people_typed_role": shares.VIEW,
         }
     return render(request, "course.html", context | (extra or {}), status_code=status)
+
+
+def _people(settings, session: Session, course: Course) -> dict[str, Any] | None:
+    """What the "People" section prints (WS27.1): who has a grant on this course and with what
+    right, the form's rights and the limit. None, so no section, while course grants are off."""
+    if not notation.course_grants_enabled(settings):
+        return None
+    return {
+        "rows": [
+            {"id": g.id, "email": g.email, "role": g.role}
+            for g in shares.grants_of(session, course.id)
+        ],
+        "roles": [(r, shares.ROLE_WORDS[r], shares.ROLE_HELP[r]) for r in shares.ROLES],
+        "role_words": shares.ROLE_WORDS,
+        "max": shares.MAX_GRANTS_PER_COURSE,
+    }
 
 
 def _attachable(session: Session, user: CurrentUser, course: Course) -> list[documents.DocumentRow]:
@@ -184,6 +237,7 @@ def course_page(request: Request, course_id: str, user: UserDep) -> Response:
 
 
 @router.post("/courses/{course_id}/rename", dependencies=[Depends(require_csrf)])
+@submit_once("course.rename")
 def rename_course(request: Request, course_id: str, user: UserDep, name: Field = "") -> Response:
     _require_feature(request)
     try:
@@ -195,7 +249,7 @@ def rename_course(request: Request, course_id: str, user: UserDep, name: Field =
         extra = _errors(exc) | {"rename_value": exc.values.get("rename", name)}
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "course_renamed", course_id=course_id)
-    flash(request, "Course renamed.")
+    flash(request, "Course renamed.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -213,6 +267,7 @@ def confirm_delete(request: Request, course_id: str, user: UserDep) -> Response:
 
 
 @router.post("/courses/{course_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("course.delete")
 def delete_course(request: Request, course_id: str, user: UserDep, confirm: Field = "") -> Response:
     """Delete only with `confirm=yes`; the "Delete course" button gets the question
     first. The documents converted for the course keep their results."""
@@ -222,14 +277,109 @@ def delete_course(request: Request, course_id: str, user: UserDep, confirm: Fiel
     with session_scope(get_ctx(request).factory) as session:
         notation.delete_course(session, _course(session, course_id, user))
     log_event(logger, "course_deleted", course_id=course_id)
-    flash(request, "The course and its notation have been deleted.")
+    flash(request, "The course and its notation have been deleted.", kind="success")
     return RedirectResponse("/courses", status_code=303)
+
+
+# --------------------------------------------------------------------------- people (WS27.1)
+
+# What the owner is told, by what happened. No address is in a notice (the session cookie holds
+# it). Nobody is told anything by the service: the owner must.
+GRANT_OUTCOME = {
+    shares.ADDED: (
+        "Added with the right to {right} on every document in this course, now and later. "
+        "Nothing was sent: tell the person yourself. They must sign in with that address."
+    ),
+    shares.CHANGED: "Changed. Their right is now {right}. Nothing was sent.",
+    shares.UNCHANGED: "No change: that person already has the right to {right}.",
+}
+
+
+def _require_people(request: Request) -> None:
+    """404 for everyone, as for any address that is not there, while course grants are off.
+    Asked before the course, so the answer does not say whether the course exists."""
+    if not notation.course_grants_enabled(get_ctx(request).settings):
+        raise PageError(404, *COURSE_NOT_FOUND)
+
+
+@router.post("/courses/{course_id}/people", dependencies=[Depends(require_csrf)])
+@submit_once("people.add")
+def add_person(
+    request: Request, course_id: str, user: UserDep, email: Field = "", role: Field = ""
+) -> Response:
+    """Give a person access to every document of the course, or change their right. Only the
+    course's owner (`_course` answers 404 for anyone else). A mistake is the course page again
+    (422) with the reason beside the field and what was typed kept."""
+    _require_people(request)
+    refused: dict[str, Any] | None = None
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        owned_id = course.id  # redirects are built from the owned row, not the request
+        try:
+            row, outcome = shares.grant(session, course, user.email, email, role)
+            kept_role = row.role
+        except ShareError as exc:
+            log_event(logger, "course_grant_refused", course_id=owned_id, code=exc.code)
+            field = "people-role" if exc.code == "bad_role" else "people-email"
+            refused = {
+                "errors": [{"field_id": field, "message": exc.message}],
+                "field_errors": {field: {"field_id": field, "message": exc.message}},
+                "people_typed": email[:320],
+                "people_typed_role": role if role in shares.ROLES else shares.VIEW,
+            }
+    if refused is not None:
+        return _course_page(request, owned_id, user, refused, status=422)
+    log_event(logger, "course_grant_set", course_id=owned_id, role=kept_role)
+    flash(
+        request,
+        GRANT_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]),
+        undo=False,
+        kind="info" if outcome == shares.UNCHANGED else "success",
+    )
+    return RedirectResponse(f"/courses/{owned_id}#people-heading", status_code=303)
+
+
+@router.post("/courses/{course_id}/people/{grant_id}/remove", dependencies=[Depends(require_csrf)])
+@submit_once("people.remove")
+def remove_person(
+    request: Request, course_id: str, grant_id: str, user: UserDep, confirm: Field = ""
+) -> Response:
+    """Take a person's access to the course away; it stops on their next request. Only with
+    `confirm=yes`: the "Remove" button gets the question first, as the answer to this POST (as
+    the admin page's Block does), so the person's address is never in a URL."""
+    _require_people(request)
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        owned_id = course.id
+        row = next((g for g in shares.grants_of(session, owned_id) if g.id == grant_id), None)
+        if row is not None and confirm != "yes":
+            context = {
+                "course_id": owned_id,
+                "name": course.name,
+                "grant_id": row.id,
+                "email": row.email,
+                "role": shares.ROLE_WORDS[row.role],
+            }
+            return render(request, "course_person_remove_confirm.html", context)
+        removed = row is not None and shares.revoke_grant(session, owned_id, row.id)
+    if removed:
+        log_event(logger, "course_grant_removed", course_id=owned_id)
+    # Not there (often a second click on Remove): the access is gone either way.
+    flash(
+        request,
+        "Access removed. They cannot open this course's documents any more, unless you "
+        "shared a document with them by itself.",
+        undo=False,
+        kind="success",
+    )
+    return RedirectResponse(f"/courses/{owned_id}#people-heading", status_code=303)
 
 
 # --------------------------------------------------------------------------- entries
 
 
 @router.post("/courses/{course_id}/entries", dependencies=[Depends(require_csrf)])
+@submit_once("course.add_entry")
 def add_entry(
     request: Request,
     course_id: str,
@@ -244,12 +394,17 @@ def add_entry(
         with session_scope(get_ctx(request).factory) as session:
             course = _course(session, course_id, user)
             owned_id = course.id  # redirects are built from the owned row, not the request
+            if notation.same_entry(course, entry) is not None:
+                # The same symbol with the same meaning and note (often a second click):
+                # nothing to add, and no error to fix (SW43, "identical repeat").
+                flash(request, ENTRY_EXISTS.format(what=describe(entry.canonical)), undo=False)
+                return RedirectResponse(f"/courses/{owned_id}", status_code=303)
             notation.add_entry(session, course, entry)
     except notation.NotationInvalid as exc:
         extra = _errors(exc) | {"values": exc.values}
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "notation_added", course_id=course_id, source="user")
-    flash(request, f"Added: {phrase(entry.canonical, entry.meaning)}.")
+    flash(request, f"Added: {phrase(entry.canonical, entry.meaning)}.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -282,6 +437,7 @@ def entry_page(request: Request, course_id: str, entry_id: str, user: UserDep) -
 
 
 @router.post("/courses/{course_id}/entries/{entry_id}", dependencies=[Depends(require_csrf)])
+@submit_once("course.save_entry")
 def save_entry(
     request: Request,
     course_id: str,
@@ -302,11 +458,28 @@ def save_entry(
         extra = _errors(exc) | {"values": exc.values}
         return _entry_page(request, course_id, entry_id, user, extra, status=422)
     log_event(logger, "notation_changed", course_id=course_id)
-    flash(request, f"Saved: {phrase(entry.canonical, entry.meaning)}.")
+    flash(request, f"Saved: {phrase(entry.canonical, entry.meaning)}.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
+@router.get("/courses/{course_id}/entries/{entry_id}/delete")
+def confirm_remove_entry(
+    request: Request, course_id: str, entry_id: str, user: UserDep
+) -> Response:
+    """The question the entry page's "Remove" link opens: it names the symbol and the course."""
+    _require_feature(request)
+    with session_scope(get_ctx(request).factory) as session:
+        course = _course(session, course_id, user)
+        row = _entry(course, entry_id)
+        context = {
+            "course": notation.CourseView(course.id, course.name, len(course.notation)),
+            "entry": next(v for v in notation.entries(course) if v.id == row.id),
+        }
+    return render(request, "course_entry_delete_confirm.html", context)
+
+
 @router.post("/courses/{course_id}/entries/{entry_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("course.remove_entry")
 def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep) -> Response:
     _require_feature(request)
     with session_scope(get_ctx(request).factory) as session:
@@ -316,7 +489,7 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
         words = describe(row.canonical)
         session.delete(row)
     log_event(logger, "notation_removed", course_id=course_id)
-    flash(request, f"Removed {words}. To keep it after all, add it again below.")
+    flash(request, f"Removed {words}. To keep it after all, add it again below.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -324,6 +497,7 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
 
 
 @router.post("/courses/{course_id}/suggestions", dependencies=[Depends(require_csrf)])
+@submit_once("course.suggestions")
 def add_suggestions(
     request: Request,
     course_id: str,
@@ -360,7 +534,12 @@ def add_suggestions(
             offered = notation.course_suggestions(session, ctx.settings, course, row)
             added, skipped = notation.add_suggested(session, course, offered, chosen)
     if not chosen:
-        flash(request, "Check the symbols to add first. Nothing was added.", undo=False)
+        flash(
+            request,
+            "Check the symbols to add first. Nothing was added.",
+            undo=False,
+            kind="warning",
+        )
     else:
         log_event(logger, "notation_added", course_id=course_id, source="document", n=len(added))
         if not added:
@@ -371,7 +550,7 @@ def add_suggestions(
             parts = [f"Added {len(added)} symbols to {course.name}."]
         if skipped:
             parts.append(f"{skipped} could not be added: already in the course, or not found.")
-        flash(request, " ".join(parts), undo=False)
+        flash(request, " ".join(parts), undo=False, kind="success" if added else "info")
     return RedirectResponse(back, status_code=303)
 
 
@@ -379,6 +558,7 @@ def add_suggestions(
 
 
 @router.post("/courses/{course_id}/starter", dependencies=[Depends(require_csrf)])
+@submit_once("course.starter")
 def add_starter(
     request: Request,
     course_id: str,
@@ -401,7 +581,12 @@ def add_starter(
         added, refused = notation.add_starter(session, course, rows[: notation.MAX_ENTRIES])
         name = course.name
     if not rows:
-        flash(request, "Check the symbols to add first. Nothing was added.", undo=False)
+        flash(
+            request,
+            "Check the symbols to add first. Nothing was added.",
+            undo=False,
+            kind="warning",
+        )
     else:
         log_event(logger, "notation_added", course_id=course_id, source="user", n=len(added))
         parts = []
@@ -418,7 +603,7 @@ def add_starter(
                 f"{len(refused)} could not be added: this tool cannot read the symbol, or the "
                 "course already has it."
             )
-        flash(request, " ".join(parts), undo=False)
+        flash(request, " ".join(parts), undo=False, kind="success" if added else "info")
     return RedirectResponse(back, status_code=303)
 
 
@@ -426,6 +611,7 @@ def add_starter(
 
 
 @router.post("/courses/{course_id}/documents", dependencies=[Depends(require_csrf)])
+@submit_once("course.attach")
 def add_documents(
     request: Request,
     course_id: str,
@@ -435,24 +621,37 @@ def add_documents(
     """Add documents already converted, with no course yet, to this course. They are listed
     under it and their review screen uses its notation; they are not converted again."""
     _require_feature(request)
-    ids = [j for j in job if JOB_ID.match(j)]
+    ids = list(dict.fromkeys(j for j in job if JOB_ID.match(j)))
     with session_scope(get_ctx(request).factory) as session:
         course = _course(session, course_id, user)
         back = f"/courses/{course.id}#course-documents"  # from the owned row, not the request
         count = notation.attach_documents(session, course, ids) if ids else 0
         name = course.name
     if not ids:
-        flash(request, "Check the documents to add first. Nothing was added.", undo=False)
+        flash(
+            request,
+            "Check the documents to add first. Nothing was added.",
+            undo=False,
+            kind="warning",
+        )
     elif count:
         log_event(logger, "course_documents_added", course_id=course_id, n=count)
+        left = len(ids) - count
         flash(
             request,
             f"Added {count} {'document' if count == 1 else 'documents'} to {name}. "
-            "They were not converted again.",
+            "They were not converted again."
+            + (f" {left} you chose could not be added: {NOT_ADDED}." if left else ""),
             undo=False,
+            kind="success",
         )
     else:
-        flash(request, "Nothing was added: those documents are not available to add.", undo=False)
+        flash(
+            request,
+            f"Nothing was added: {NOT_ADDED}. Check the ones you chose.",
+            undo=False,
+            kind="warning",
+        )
     return RedirectResponse(back, status_code=303)
 
 
@@ -467,6 +666,7 @@ def _stored_element_id(job: Job, wanted: str) -> str | None:
 
 
 @router.post("/courses/{course_id}/remember", dependencies=[Depends(require_csrf)])
+@submit_once("course.remember")
 def remember(
     request: Request,
     course_id: str,
@@ -484,8 +684,13 @@ def remember(
     if not JOB_ID.match(job):
         raise PageError(404, *NOT_FOUND)
     canonical = canonical_symbol(symbol)
-    if canonical is None or canonical != symbol or meaning not in notation.MEANINGS:
-        raise PageError(400, "That could not be saved", "Go back and try again.")
+    shown = symbol[:20]
+    if canonical is None:
+        raise _not_saved(f"{shown!r} is not a letter or symbol a course can remember")
+    if canonical != symbol:
+        raise _not_saved(f"{shown!r} is not written in the standard form of that symbol")
+    if meaning not in notation.MEANINGS:
+        raise _not_saved(f"{meaning[:30]!r} is not one of the meanings a course can record")
     with session_scope(get_ctx(request).factory) as session:
         owned = job_access(session, job, user, OWNER)
         course = _course(session, course_id, user)
@@ -504,12 +709,14 @@ def remember(
             notation.add_entry(session, course, entry, source="review")
         except notation.NotationInvalid as exc:
             message = exc.errors[0].message  # already there, or the course is full
+            kind = "warning"
         else:
             message = f"Remembered for {course.name}: {phrase(canonical, meaning)}."
+            kind = "success"
             log_event(logger, "notation_added", course_id=course_id, source="review")
     # Remembering is no review write: the Undo shown under a decision's notice would
     # take back the decision before it, so none is offered here.
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind=kind)
     return RedirectResponse(back, status_code=303)
 
 

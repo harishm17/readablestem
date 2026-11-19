@@ -13,6 +13,7 @@ import shlex
 from pathlib import Path
 
 from readablestem.cli.main import build_parser
+from readablestem.config import Settings
 from readablestem.web.routes.pages import router as pages_router
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -118,3 +119,10 @@ def test_microsoft_sign_in_variables_are_declared_on_web_only():
     assert {"MS_CLIENT_ID", "MS_CLIENT_SECRET", "MS_ALLOWED_TENANTS"} <= names
     assert "...webOnlyVariables" in service_block("web")
     assert "MS_" not in service_block("cron")
+
+
+def test_the_claude_second_check_is_off_unless_a_run_asks_for_it():
+    """The check changed no output and cost about 16% of the spend (WS10.5): off in code,
+    and the setting stays declared on web so production can turn it on for a measured run."""
+    assert Settings(_env_file=None).claude_second_check == "off"
+    assert '"CLAUDE_SECOND_CHECK"' in IAC.read_text()

@@ -4,12 +4,15 @@ with its live status and its summary line, polling, "Download all", and who may 
 
 from __future__ import annotations
 
+import copy
 import re
+from datetime import timedelta
 
 import pytest
 from sqlalchemy import select
 
 from fixtures.web.support import (
+    ADMIN,
     ALICE,
     BOB,
     WebEnv,
@@ -20,8 +23,17 @@ from fixtures.web.support import (
 )
 from readablestem.core import sandbox
 from readablestem.source import latexml
-from readablestem.web import access
-from readablestem.web.db import Job, QuotaDay, User, session_scope
+from readablestem.web import access, states
+from readablestem.web.database import utc_today
+from readablestem.web.db import (
+    Job,
+    JobStatus,
+    QuotaDay,
+    SpendDay,
+    User,
+    session_scope,
+    utcnow,
+)
 from source_support import make_zip
 
 ARTICLE = "\\documentclass{article}\n\\begin{document}\nHello $x$.\n\\end{document}\n"
@@ -97,11 +109,22 @@ def test_a_zip_of_pdfs_becomes_a_document_each_and_the_batch_page(web):
         assert name in text
 
 
-def test_a_bad_document_in_a_zip_is_one_refusal_beside_the_others(web):
-    data = make_zip({"good.pdf": make_pdf(1), "bad.pdf": b"not a pdf"})
+@pytest.mark.parametrize(
+    ("bad", "words"),
+    [
+        ({"bad.pdf": b"not a pdf"}, "bad.pdf is not a PDF"),
+        (  # a project folder in an exam class: refused by name, like an upload of its own
+            {"Quiz 3/main.tex": "\\documentclass{exam}\\begin{document}x\\end{document}"},
+            "Quiz 3.zip uses a document class",
+        ),
+    ],
+    ids=["not-a-pdf", "exam-project"],
+)
+def test_a_bad_document_in_a_zip_is_one_refusal_beside_the_others(web, bad, words):
+    data = make_zip({"good.pdf": make_pdf(1), **bad})
     url = batch_url(send_zip(web.alice, data))
     text = text_of(web.alice.get(url).text)
-    assert "1 of 2 files uploaded" in text and "bad.pdf is not a PDF" in text
+    assert "1 of 2 files uploaded" in text and words in text
     assert [j.filename for j in jobs(web)] == ["good.pdf"]
     assert pages_used(web) == 1  # a refusal costs nothing
 
@@ -325,3 +348,139 @@ def test_a_deleted_document_is_a_deleted_row(web):
     assert delete.status_code in {200, 303}
     text = text_of(web.alice.get(url).text)
     assert "1 deleted" in text
+
+
+# --------------------------------------------------------------------------- one state table
+
+
+def _decide_all(result: dict) -> dict:
+    result = copy.deepcopy(result)
+    for fix in result["fixes"]:
+        fix["status"], fix["review"], fix["reason"] = "accepted", "none", None
+    return result
+
+
+def _set_state(job: Job, key: str) -> None:
+    """Stored facts that make `key` (`web.states`), on a converted job with 3 decisions open."""
+    now = utcnow()
+    if key in {"waiting", "restarting"}:
+        job.status, job.attempts, job.attempts_at_retry = JobStatus.QUEUED, 0, 0
+        job.attempts = 1 if key == "restarting" else 0  # put back after a lost attempt
+    elif key in {"converting", "stopping"}:
+        job.status, job.lease_until, job.pages_done = JobStatus.RUNNING, now + timedelta(hours=1), 0
+        job.cancel_requested_at = now if key == "stopping" else None
+    elif key == "canceled":
+        job.status, job.error_code = JobStatus.FAILED, "canceled"
+    elif key.startswith("stopped_"):
+        job.status = JobStatus.FAILED
+        job.error_code = {
+            "stopped_service": "timeout",
+            "stopped_no_tries": "timeout",
+            "stopped_file": "encrypted",
+            "stopped_limit": "budget_job_usd",
+            "stopped_unknown": "a_code_this_version_does_not_know",
+        }[key]
+        job.retries = 3 if key == "stopped_no_tries" else 0
+    elif key in {
+        "partly_converted",
+        "ready",
+        "ready_remains",
+        "sample",
+        "confirm_language",
+        "file_cut_off",
+    }:
+        job.result_json = _decide_all(job.result_json or {})
+        if key in {"confirm_language", "file_cut_off"}:  # a question nobody has answered yet
+            asks = {"code": "lang_assumed", "review": "required"}
+            if key == "file_cut_off":  # the file's last page is empty after a repair
+                asks = {"code": "file_cut_off", "page": 1, "count": 1, "review": "required"}
+            job.result_json = {
+                **job.result_json,
+                "notices": [*job.result_json.get("notices", []), asks],
+            }
+        if key == "ready":  # and every part converted: nothing a picture, no check failing
+            result = dict(job.result_json)
+            result["elements"] = [e for e in result["elements"] if e["kind"] == "heading"]
+            result["fixes"], result["html_checks"] = [], []
+            job.result_json = (
+                result  # stored as the app stores one: assigned, never changed in place
+            )
+        job.error_code = "pages_not_converted" if key == "partly_converted" else None
+        job.is_sample = key == "sample"
+    elif key == "deleted":
+        job.retain_until = now - timedelta(minutes=1)
+
+
+def _badge(html: str, start: str) -> str:
+    at = html.index(start)
+    found = re.search(r'status-badge[^"]*">([^<]*)<', html[at : html.index("</tr>", at)])
+    assert found, start
+    return found.group(1).strip()
+
+
+# Every key of the table that stored facts make on this branch; `waiting_reset` needs the
+# day's budget spent and is checked after the others.
+# `being_checked` is what a reader is told of "needs_decisions": the owner's surfaces never
+# print it, and the reader page has its own test (tests/test_job_shares.py).
+WALKED = [k for k in states.TABLE if k not in {"waiting_reset", "being_checked"}]
+
+
+def test_every_state_reads_the_same_on_every_surface_from_the_one_table(web):
+    """F-033, F-046, F-213: the job page, My documents, the batch page, the parts list and the
+    admin queue all print a state's label from `states.TABLE`; none keeps its own words."""
+    keys = ["host", *WALKED]
+    url = batch_url(send_zip(web.alice, make_zip({f"{k}.pdf": make_pdf(1) for k in keys})))
+    run_all(web)
+    by_key: dict[str, str] = {}
+    with session_scope(web.ctx.factory) as session:
+        for n, job in enumerate(sorted(session.scalars(select(Job)), key=lambda j: j.filename)):
+            key = job.filename.removesuffix(".pdf")
+            by_key[key] = job.id
+            job.part_group, job.part_label = "one-file", f"{n + 1}-{n + 1}"
+            _set_state(job, key)
+    admin = web.client()
+    web.allow(ADMIN, admin=True)
+    login(admin, ADMIN)
+
+    def check(key: str, label: str) -> None:
+        job_id = by_key[key]
+        batch = web.alice.get(url).text
+        if key == "deleted":
+            assert label.split("{")[0] in text_of(batch[batch.index("deleted.pdf") :])
+            return
+        page = web.alice.get(f"/jobs/{job_id}").text
+        assert re.search(r"<title>\s*" + re.escape(label) + ":", page), (key, label)
+        listing = web.alice.get("/app/documents", headers={"HX-Request": "true"}).text
+        assert _badge(listing, f'id="doc-{job_id}"').startswith(label), key
+        assert _badge(batch, f'id="batch-doc-{job_id}"').startswith(label), key
+        parts = web.alice.get(f"/jobs/{by_key['host']}").text
+        assert f'href="/jobs/{job_id}">Pages ' in parts and f"({label})" in text_of(parts), key
+        assert f"<dt>{label}</dt>" in admin.get("/admin").text, key
+
+    for key in WALKED:
+        check(key, states.TABLE[key].label)
+    with session_scope(web.ctx.factory) as session:
+        session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))  # the day's cap
+    check("waiting", states.TABLE["waiting_reset"].label.format(time="00:00 UTC"))
+
+
+def test_the_owner_of_a_file_that_looks_cut_off_continues_and_is_asked_once(web):
+    """WS14.5: the answer "continue with the pages before the empty ones" stops the notice
+    holding the document back, and there is nothing to answer a second time."""
+    send_zip(web.alice, make_zip({"cut.pdf": make_pdf(1)}))
+    run_all(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.scalars(select(Job)).one()
+        _set_state(job, "file_cut_off")
+        page = f"/jobs/{job.id}"
+    asked = states.TABLE["file_cut_off"].label
+
+    def title() -> str:
+        return text_of(re.search(r"<title>(.*?)</title>", web.alice.get(page).text, re.S)[1])
+
+    assert title().startswith(asked + ":")
+    answer = {"csrf_token": csrf_from(web.alice.get(page).text)}
+    sent = web.alice.post(page + "/cut-off", data=answer)
+    assert (sent.status_code, sent.headers["location"]) == (303, page)
+    assert title().startswith(states.TABLE["ready_remains"].label + ":")
+    assert web.alice.post(page + "/cut-off", data=answer).status_code == 409

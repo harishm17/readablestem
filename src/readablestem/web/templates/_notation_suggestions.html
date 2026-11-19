@@ -1,3 +1,5 @@
+{# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
 {# Notation the course's documents use, offered as course entries (T3-12; routes/courses.py
    `add_suggestions`). Needs `course` (id, name) and `suggestions` (web.notation.SuggestionView
    rows); `suggest_job` is the job id when the list is for one document. Nothing is added
@@ -10,8 +12,7 @@
   <p>{{ "This document uses" if suggest_job else "Your documents use" }}
     {{ suggestions|length }} {{ "symbol" if suggestions|length == 1 else "symbols" }} not in
     {{ course.name }} yet. Check the ones to add; the meaning is a guess, so correct it.</p>
-  <form method="post" action="/courses/{{ course.id }}/suggestions" class="suggestion-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.suggestions", "/courses/" ~ course.id ~ "/suggestions", {"class": "suggestion-form"}) %}
     {% if suggest_job %}<input type="hidden" name="job" value="{{ suggest_job }}">{% endif %}
     <ul class="suggestion-list">
       {% for row in suggestions %}
@@ -32,6 +33,6 @@
       {% endfor %}
     </ul>
     <button type="submit" class="button">Add the checked symbols to {{ course.name }}</button>
-  </form>
+  {% endcall %}
 </section>
 {% endif %}

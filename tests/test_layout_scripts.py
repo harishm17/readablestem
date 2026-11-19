@@ -22,13 +22,14 @@ UP, DOWN = 3.5, -1.8  # raise and lowering of a script, pt
 
 class Line:
     """One line of text put on a page piece by piece: (text, kind) with kind None for
-    body text, "sup" or "sub" for a script, "italic" for an italic body-size piece."""
+    body text, "sup" or "sub" for a script, "italic" for an italic body-size piece, "caps"
+    for small capitals (80 % size, on the baseline)."""
 
     def __init__(self, page: pymupdf.Page, y: float, x: float = 72.0) -> None:
         self.page, self.y, self.x = page, y, x
 
     def add(self, text: str, kind: str | None = None) -> Line:
-        size = SMALL if kind in ("sup", "sub") else BODY
+        size = SMALL if kind in ("sup", "sub") else 0.8 * BODY if kind == "caps" else BODY
         rise = {"sup": UP, "sub": DOWN}.get(kind or "", 0.0)
         font = "heit" if kind == "italic" else "helv"
         self.page.insert_text((self.x, self.y - rise), text, fontsize=size, fontname=font)
@@ -127,3 +128,39 @@ def _row(parts: list[tuple[str, float, float]], *, font: str = "CMR10") -> layou
             )
             x += 4
     return layout._Row(chars)
+
+
+def test_small_capitals_are_text_and_real_capital_scripts_are_not():
+    """A name set in small capitals (a full-size capital, then smaller ones on the baseline) is
+    one word, not a base with scripts: no equation, and the letters are what the source had.
+    A capital that is raised or lowered, on the same page, is still a script."""
+    pdf = build(
+        [
+            [
+                ("The L", None),
+                ("OTKA", "caps"),
+                ("-V", None),
+                ("OLTERRA", "caps"),
+                (" model and ", None),
+                ("L", None),
+                ("ONG", "caps"),
+                ("M", None),
+                ("EM", "caps"),
+                ("E", None),
+                ("VAL", "caps"),
+                (" ", None),
+                ("AND", "caps"),
+                (" more", None),
+            ],
+            [("Take X", None), ("T", "sup"), (" and Y", None), ("N", "sub"), (" here", None)],
+        ]
+    )
+    elements = layout.analyze(pdf).elements
+    assert not [e for e in elements if e.kind is Kind.EQUATION]
+    names, scripts = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    # "AND" in small capitals only: the line's other small capitals say what it is.
+    assert names.text == "The Lotka-Volterra model and LongMemEval and more"
+    assert [(scripts.text[r.start : r.end], r.kind) for r in scripts.script_runs] == [
+        ("T", "sup"),
+        ("N", "sub"),
+    ]

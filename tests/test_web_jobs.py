@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from starlette.requests import Request
 
 from fixtures.web.support import (
@@ -74,6 +75,23 @@ def test_upload_queues_a_job_with_the_pdf_and_24_hour_retention(web):
         assert blob is not None and blob.kind == "upload" and blob.content == pdf
 
 
+def test_an_upload_sent_twice_with_its_request_token_makes_one_document(web):
+    """The one submit rule (SW43): the upload form's token rides in its action (the
+    handler reads the body itself); sent again, the first answer comes back and nothing
+    is uploaded twice."""
+
+    action = re.search(r'action="(/jobs\?request_token=[^"]+)"', web.browser.get("/app").text)
+    assert action, "the upload form carries a request token"
+    pdf = {"pdf": ("notes.pdf", make_pdf(2), "application/pdf")}
+    sent = [
+        web.browser.post(action.group(1), data={"csrf_token": token(web.browser)}, files=pdf)
+        for _ in range(2)
+    ]
+    assert [r.status_code for r in sent] == [303, 303]
+    assert sent[0].headers["location"] == sent[1].headers["location"]
+    assert count(web, Job) == 1
+
+
 def test_sharing_with_the_developer_keeps_the_job_for_30_days(web):
     job = web.job(job_id_from(upload(web.browser, make_pdf(1), share=True)))
     assert job.opt_in_retention is True and job.retention_mode == "dev"
@@ -123,7 +141,7 @@ def test_upload_rejects_encrypted_pdfs(web):
 def test_upload_rejects_too_many_pages(web):
     response = upload(web.browser, make_pdf(6))  # max_pages_per_job=5 in tests
     assert response.status_code == 422
-    assert "notes.pdf has 6 pages; the limit is 5 per upload" in response.text
+    assert "notes.pdf has 6 pages; one file is up to 5 pages" in response.text
     assert count(web, Job) == 0
 
 
@@ -238,6 +256,32 @@ def test_daily_page_quota_returns_429_and_changes_nothing(web):
     assert 'action="/jobs"' not in page.text
 
 
+@pytest.mark.parametrize("hour", [3, 22])
+def test_a_refusal_that_says_to_come_back_sends_the_time_it_says(web, monkeypatch, hour):
+    """The daily allowance and the day's spend pause both start again at midnight UTC: the
+    words say so and `Retry-After` is the time left to it, whatever the time of day (it
+    was an hour, always)."""
+    from readablestem.web import quota
+
+    class At(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 11, 18, hour, 30, tzinfo=UTC)
+
+    monkeypatch.setattr(quota, "datetime", At)
+    left = int(timedelta(hours=24 - hour, minutes=-30).total_seconds())
+    for _ in range(4):
+        assert upload(web.browser, make_pdf(5)).status_code == 303
+    response = upload(web.browser, make_pdf(1))
+    assert response.status_code == 429 and "starts again at midnight UTC" in response.text
+    assert int(response.headers["retry-after"]) == left
+    with session_scope(web.ctx.factory) as session:
+        session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))  # cap is $5
+    paused = upload(web.browser, make_pdf(1))
+    assert paused.status_code == 503 and "open again at midnight UTC" in paused.text
+    assert int(paused.headers["retry-after"]) == left
+
+
 def test_quota_is_per_user(web):
     for _ in range(4):
         upload(web.browser, make_pdf(5))
@@ -289,6 +333,59 @@ def test_status_poll_after_the_session_ends_sends_the_page_to_sign_in(web):
     response = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
     assert response.status_code == 401
     assert response.headers["hx-redirect"] == "/login"  # not a sign-in page swapped in
+
+
+@pytest.mark.parametrize("poll", ["status", "progress"])
+def test_a_poll_of_a_job_still_converting_does_not_read_its_stored_result(web, poll):
+    """A retried job is converting again but still holds its earlier result and page, which
+    are megabytes for a long document. A poll runs every few seconds and needs neither."""
+    job_id = finished_job(web)
+    with session_scope(web.ctx.factory) as session:
+        session.get(Job, job_id).status = "running"
+    read: list[str] = []
+
+    def spy(conn, cursor, statement, parameters, context, executemany):
+        head = statement.split(" FROM ")[0]
+        if "jobs.result_json" in head or "jobs.html," in head or head.endswith("jobs.html"):
+            read.append(statement)
+
+    engine = web.ctx.factory.kw["bind"]
+    event.listen(engine, "before_cursor_execute", spy)
+    try:
+        response = web.browser.get(f"/jobs/{job_id}/{poll}", headers={"HX-Request": "true"})
+    finally:
+        event.remove(engine, "before_cursor_execute", spy)
+    assert response.status_code == 200
+    assert read == []
+
+
+@pytest.mark.parametrize(
+    ("fragment", "page"),
+    [
+        ("/jobs/{id}/status", "/jobs/{id}"),
+        ("/jobs/{id}/progress", "/jobs/{id}"),
+        ("/app/documents", "/app"),
+    ],
+)
+def test_a_fragment_opened_directly_leads_to_the_page_that_holds_it(web, fragment, page):
+    job_id = job_id_from(upload(web.browser, make_pdf(1)))
+    direct = web.browser.get(fragment.format(id=job_id))
+    assert direct.status_code == 303 and direct.headers["location"] == page.format(id=job_id)
+    polled = web.browser.get(fragment.format(id=job_id), headers={"HX-Request": "true"})
+    assert polled.status_code == 200 and "<html" not in polled.text
+
+
+def test_the_status_answer_of_a_job_that_finishes_carries_the_finished_page(web):
+    """A waiting page that polls gets, once the job is done, its heading and body for the
+    finished page (out of band), so it needs no reload."""
+    job_id = job_id_from(upload(web.browser, make_pdf(1)))
+    waiting = web.browser.get(f"/jobs/{job_id}").text
+    assert 'id="job-body"' in waiting and "Refresh the status" in waiting
+    web.run_worker()
+    done = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"}).text
+    assert 'id="job-body" hx-swap-oob="true"' in done
+    assert 'id="job-heading" hx-swap-oob="true"' in done
+    assert "Refresh the status" not in done and "Download" in done
 
 
 def test_status_poll_for_a_deleted_job_reloads_the_page(web):
@@ -415,8 +512,9 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
     assert response.status_code == 303 and response.headers["location"] == "/app"
     assert count(web, Job) == 0 and count(web, Blob) == 0
     page = web.browser.get("/app").text
-    assert "have been deleted" in page
-    assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
+    # The notice takes focus: a live region present at page load is not announced.
+    box = re.search(r"<div[^>]*>\s*<p>[^<]*have been deleted", page)
+    assert box and 'role="status"' in box.group(0) and " autofocus>" in box.group(0)
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
     # The upload's usage event stays for the counts, without the file's fingerprint.
     from readablestem.web.db import Event
@@ -424,6 +522,20 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
     with session_scope(web.ctx.factory) as session:
         uploads = session.scalars(select(Event).where(Event.job_ref == job_id)).all()
         assert [(e.name, e.code) for e in uploads if e.name == "uploaded"] == [("uploaded", None)]
+
+
+def test_a_delete_sent_twice_with_its_request_token_gets_the_first_answer(web):
+    """The one submit rule (SW43): the question's button, clicked again, is answered as the
+    first click was (a second delete would be 'Page not found')."""
+    job_id = finished_job(web)
+    asked = web.browser.get(f"/jobs/{job_id}/delete").text
+    sent = re.search(r'name="request_token" value="([^"]+)"', asked)
+    assert sent, "the question's form carries a request token"
+    data = {"csrf_token": token(web.browser), "confirm": "yes", "request_token": sent.group(1)}
+    answers = [web.browser.post(f"/jobs/{job_id}/delete", data=data) for _ in range(2)]
+    assert [r.status_code for r in answers] == [303, 303]
+    assert answers[0].headers["location"] == answers[1].headers["location"] == "/app"
+    assert count(web, Job) == 0
 
 
 def test_a_job_past_its_retention_time_is_gone_before_the_purge_runs(web):

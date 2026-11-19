@@ -18,6 +18,7 @@ from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.ops.report import render_report
 from readablestem.pipeline import image_page, run
+from readablestem.pipeline.assemble import CHECKER, IMAGE_PAGE_NOTE, say
 
 
 def settings(**kw: Any) -> Settings:
@@ -136,11 +137,11 @@ def test_a_scanned_page_becomes_elements_and_fixes_with_a_tier_each():
 def test_the_output_page_has_the_notice_and_the_original_page_to_open():
     result = convert(scan_pdf())
     html = result.html
-    assert "Converted from an image of the page." in html
-    assert "Check it against the original." in html
+    assert IMAGE_PAGE_NOTE.student in html  # said to the student: small errors are possible
+    assert say(IMAGE_PAGE_NOTE, CHECKER) not in html  # what only the person who checks is told
     assert 'class="image-page-note' in html
     assert "<details" in html and "<summary>Show the original page 1</summary>" in html
-    assert 'alt="Original of page 1, shown for checking the converted text."' in html
+    assert 'alt="Original of page 1."' in html
     assert "data:image/jpeg;base64," in html
     assert "<script" not in html
     assert "Page 1 was converted from an image of the page" in html  # the note for students
@@ -179,6 +180,30 @@ def test_a_page_that_is_not_a_scan_is_never_sent_to_the_pass():
     result = convert(out.tobytes(), fake=fake)
     assert "image_page" not in [r.step for r in fake.requests]
     assert result.image_pages is None and result.image_only_pages == []
+
+
+def test_a_page_of_ink_the_guard_stopped_is_read_and_keeps_its_typed_title(monkeypatch):
+    """Every kept page the box asked for is read: also a page of drawings whose ink was not
+    analysed (kind "unread"), which used to stay a picture with no call made. The title typed
+    over it is kept when the read leaves it out."""
+    from pathlib import Path
+
+    from readablestem.pipeline import page_type
+
+    monkeypatch.setattr(page_type, "INK_GUARD_S", 0.0)
+    doc = pymupdf.open(Path(__file__).parent / "fixtures" / "handwriting" / "ink_no_layer.pdf")
+    doc[0].insert_text((72, 60), "Kinematics", fontsize=22)
+    fake = client()
+    result = convert(doc.tobytes(), fake=fake)
+    assert [r.step for r in fake.requests].count("image_page") == 1
+    assert result.image_only_pages == []
+    assert result.image_pages is not None and result.image_pages.converted == 1
+    said = [e.text for e in result.elements if e.kind in (Kind.HEADING, Kind.PARAGRAPH)]
+    assert "Motion in one dimension" in said and "Kinematics" in said
+
+    # With the box off no page is read, and nothing says one was.
+    off = convert(doc.tobytes(), on=False)
+    assert off.image_pages is None and off.image_only_pages == [0]
 
 
 # ------------------------------------------------------------- review changes the output

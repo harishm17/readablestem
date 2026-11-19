@@ -1,0 +1,33 @@
+% Layout fixture: a drawing set with LaTeX's picture environment. The slanted side of the triangle
+% is a row of glyphs of the font line10 (each a short piece of the line), not a path: it is one
+% figure, not a paragraph of quote marks (F-550). The paragraphs around it are plain text.
+% Written for ReadableSTEM's tests; no third-party text.
+\documentclass[11pt]{article}
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage[margin=1in]{geometry}
+% The layout reads TeX conventions only from a PDF that says TeX made it (/Creator); Tectonic's
+% own creator string does not, so the fixture sets one as a pdfLaTeX file has it.
+\usepackage[pdfcreator={LaTeX with hyperref}]{hyperref}
+\pagestyle{empty}
+\setlength{\unitlength}{1mm}
+
+\begin{document}
+
+The ramp in the next figure rises 3.5 m over a horizontal run of 6 m. Use it to find the length
+of the slope, and say what angle the slope makes with the ground.
+
+\begin{center}
+\begin{picture}(80,45)
+ \put(10,5){\line(1,0){60}} \put(70,5){\line(0,1){35}} \put(10,5){\line(5,3){60}}
+ \put(38,0){$a = 6$} \put(72,20){$b = 3.5$} \put(30,25){$c$}
+ \put(15,7){$\theta$} \put(66,7){\framebox(4,4){}}
+ \put(5,2){$A$} \put(71,2){$B$} \put(71,41){$C$}
+\end{picture}
+
+Figure 1: A right triangle with legs $a$ and $b$.
+\end{center}
+
+The slope is the longest side of the triangle, and the ground is the shortest horizontal one.
+
+\end{document}

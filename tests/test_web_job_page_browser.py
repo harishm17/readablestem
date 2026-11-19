@@ -15,7 +15,7 @@ from datetime import timedelta
 
 import pytest
 
-from fixtures.web.support import ALICE, PNG, WebEnv, fake_output, make_pdf
+from fixtures.web.support import ALICE, PNG, WebEnv, as_current, fake_output, make_pdf
 from readablestem.core.types import ConversionOutput, Notice, SourceFacts, Status
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
@@ -68,8 +68,17 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
     from readablestem.pipeline import assemble
 
     patch = pytest.MonkeyPatch()
-    # The language control re-renders the file; the fake result's file is a stub.
-    patch.setattr(assemble, "render_html", lambda **kw: f'<html lang="{kw["lang"]}"></html>')
+    # The file is made again from the stored result on first use and by the language control;
+    # the fake result's file is a stub, so the page made from it is one too (with a body: the
+    # Word and EPUB files are made from it).
+    patch.setattr(
+        assemble,
+        "render_html",
+        lambda **kw: as_current(
+            f'<html lang="{kw["lang"]}"><head><title>Kinematics</title></head>'
+            "<body><main><h1>Kinematics</h1><p>Text.</p></main></body></html>"
+        ),
+    )
     env = WebEnv(tmp_path_factory.mktemp("job-browser"), per_user_daily_page_quota=1000)
     port = free_port()
     server = uvicorn.Server(
@@ -231,9 +240,47 @@ def test_the_steps_update_without_touching_the_live_region(site, browser, jobs):
     assert region.inner_text() == before
     site.converter.output = card_output()  # 3 decisions open
     finish(site, job_id)
-    page.locator("#job-status").get_by_role("link", name="Start the review").wait_for(timeout=15000)
-    assert page.title() == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
+    page.get_by_role("link", name="Review 3 decisions").wait_for(timeout=15000)
+    # The tab title follows the finished state (the state table's label), then the document.
+    title = page.title()
+    assert title.endswith(": SECRET-HEADING Kinematics | ReadableSTEM")
+    assert not title.startswith(("Waiting", "Converting", "Restarting"))
     assert page.locator("#job-progress li").count() == 0
+    context.close()
+
+
+def test_a_job_that_finishes_while_its_page_is_open_becomes_the_finished_page(
+    site, browser, axe_source
+):
+    """No navigation: the heading, the finished body and the title replace the waiting ones, the
+    waiting-only link is gone, the focus stays where it was, and the swapped page passes axe."""
+    job_id = upload(site, browser)
+    set_progress(site, job_id, equations=(1, 21))
+    context, page = open_page(browser, site)
+    page.goto(f"{site.base}/jobs/{job_id}")
+    assert page.get_by_role("link", name="Refresh the status").count() == 1
+    page.get_by_role("link", name="Skip to main content").focus()  # outside what is swapped
+    focused = page.evaluate("document.activeElement.outerHTML")
+    navigations: list[str] = []
+    page.on("framenavigated", lambda frame: navigations.append(frame.url))
+    site.converter.output = card_output()
+    finish(site, job_id)
+    page.get_by_role("link", name="Review 3 decisions").wait_for(timeout=15000)
+    assert page.get_by_role("link", name="Refresh the status").count() == 0
+    assert page.locator("h1").inner_text() == "SECRET-HEADING Kinematics"
+    assert page.evaluate("document.activeElement.outerHTML") == focused
+    assert navigations == []
+    assert not strict_axe(page, axe_source)
+    context.close()
+
+
+def test_cancel_on_the_waiting_page_stops_the_document_and_offers_to_convert_it(site, browser):
+    job_id = upload(site, browser)
+    context, page = open_page(browser, site)
+    page.goto(f"{site.base}/jobs/{job_id}")
+    page.get_by_role("button", name="Cancel").click()
+    page.get_by_role("button", name="Convert it").wait_for(timeout=15000)
+    assert "Canceled" in page.locator("#job-status").inner_text()
     context.close()
 
 
@@ -296,4 +343,45 @@ def test_the_word_and_epub_buttons_download_in_one_click(site, browser, jobs):
         with page.expect_download() as download:
             link.click()
         assert download.value.suggested_filename.endswith(f"-{jobs['ready'][:6]}{ending}")
+    context.close()
+
+
+def test_a_hidden_tab_does_not_poll_and_asks_again_when_it_is_shown(site, browser, jobs):
+    """A tab the person is not looking at sends no status request (3 poll intervals pass), and
+    one within an interval of the tab being shown. The headless browser cannot hide a tab, so
+    the page is told it is hidden the way the browser tells it: `document.hidden` and a
+    `visibilitychange` event."""
+    from readablestem.web.poll import POLL_S
+
+    context, page = open_page(browser, site)
+    context.add_init_script(
+        "window.__hidden = false;"
+        "Object.defineProperty(document, 'hidden', {get: () => window.__hidden});"
+        "Object.defineProperty(document, 'visibilityState',"
+        " {get: () => window.__hidden ? 'hidden' : 'visible'});"
+    )
+    asked: list[str] = []
+
+    def note(request) -> None:
+        if request.url.split("?")[0].endswith(("/status", "/progress")):
+            asked.append(request.url)
+
+    page.on("request", note)
+
+    def show(hidden: bool) -> None:
+        page.evaluate(
+            "hidden => { window.__hidden = hidden;"
+            " document.dispatchEvent(new Event('visibilitychange')); }",
+            hidden,
+        )
+
+    page.goto(f"{site.base}/jobs/{jobs['running']}")
+    page.wait_for_load_state("networkidle")
+    show(True)
+    asked.clear()
+    page.wait_for_timeout((3 * POLL_S + 1) * 1000)
+    assert asked == []
+    show(False)
+    page.wait_for_timeout((POLL_S + 1) * 1000)
+    assert 1 <= len(asked) <= 2  # the status box and the progress list each poll once
     context.close()

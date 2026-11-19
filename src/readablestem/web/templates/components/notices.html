@@ -1,0 +1,39 @@
+{#- The one notice (SW44, WS24.2). Import without context:
+    `{% from "components/notices.html" import notice_box %}`. The classes `notice`,
+    `notice-success`, `notice-warning` and `error-summary` are written here and nowhere else.
+    Look: static/app.css, "Notices" and "Errors".
+
+    notice_box(kind, title, body, ...): a box that says one thing outside the flow of a form.
+      kind    `info` (the default), `success` (something was saved or done: the ok tint and a
+              check shape, so it is not color alone), `warning` (it needs a look or a
+              decision) or `error` (the error summary and the stale-page notice: a thick
+              error-colored frame, the title and a list of links to the fields).
+      title   an optional heading, `level` 2 by default, in the card-title size.
+      body    an optional sentence, written in a paragraph; a body with markup, a list or
+              several paragraphs goes in a `{% call notice_box(...) %}` block instead.
+      role    what a screen reader does with it: `status` (announced politely), `alert`
+              (interrupts) or none. `success` is `status` and `error` is `alert` unless this
+              says otherwise; `info` and `warning` have none unless it is passed, because a
+              notice that is already on the page when it loads is not announced either way.
+      id, title_id, extra, attrs
+              the box's id, the id of its heading (the error kind names it with
+              aria-labelledby), classes to add, and other attributes (`tabindex`, `autofocus`,
+              `data-*`) as a dict; a value of `true` writes the bare attribute, `none` or
+              `false` leaves it out.
+
+    The one named exception: `kind="error"` is written by `_error_summary.html` and
+    `_stale_notice.html` only, because it holds the page's focus (autofocus, tabindex -1) and
+    static/app.js finds its links by `.error-summary a`; they call this macro, so the class is
+    still written here. `decision-notice` (the Undo line under a review decision) and the
+    `.notice-*` helper classes inside a body (names, excerpts, actions) are other things and
+    stay where they are. -#}
+{% macro notice_box(kind="info", title="", body="", id="", title_id="", role="", level=2, extra="", attrs={}) -%}
+{%- set classes = {"info": "notice", "success": "notice notice-success", "warning": "notice notice-warning", "error": "error-summary"}[kind] -%}
+{%- set role = role or {"success": "status", "error": "alert"}.get(kind, "") -%}
+{%- set heading_id = title_id or (id ~ "-title" if id and kind == "error" else "") -%}
+<div class="{{ classes }}{% if extra %} {{ extra }}{% endif %}"{% if id %} id="{{ id }}"{% endif %}{% if role %} role="{{ role }}"{% endif %}{% if kind == "error" and heading_id %} aria-labelledby="{{ heading_id }}"{% endif %}{{ attrs|attrs }}>
+  {% if title %}<h{{ level }}{% if heading_id %} id="{{ heading_id }}"{% endif %} class="card-title">{{ title }}</h{{ level }}>{% endif %}
+  {% if body %}<p>{{ body }}</p>{% endif %}
+  {% if caller is defined %}{{ caller() }}{% endif %}
+</div>
+{%- endmacro %}

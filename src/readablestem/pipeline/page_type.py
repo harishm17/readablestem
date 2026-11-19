@@ -51,11 +51,13 @@ Content-free: kinds, reason codes and counts, never text (`to_record`).
 
 from __future__ import annotations
 
+import functools
 import itertools
 import math
 import re
 import statistics
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -63,7 +65,9 @@ from typing import TYPE_CHECKING, Any
 
 import pymupdf
 
+from readablestem.core.images import within_budget
 from readablestem.core.types import PageType
+from readablestem.pipeline import contrast
 
 if TYPE_CHECKING:  # ink_strokes imports this module; the helpers are imported where used
     from readablestem.pipeline import ink_strokes
@@ -91,6 +95,17 @@ BBox = tuple[float, float, float, float]
 # 0, but it carries the CLIPPED flag and is visible, so alpha alone never hides it.
 INVISIBLE_OPACITY = 0.05  # alpha at or under this paints nothing a reader can see
 INVISIBLE_ALPHA = round(INVISIBLE_OPACITY * 255)  # 13 on rawdict's 0-255 scale
+# Text a sighted reader cannot see although it is painted (WS14.2): a span drawn under
+# TINY_PT points (`drawn_size`: a bitmap TeX font states a size far under what it draws),
+# or one whose box on the rendered page is flat, its lightest and darkest pixels under
+# FLAT_CONTRAST (WCAG contrast ratio) apart: white on white, navy on navy, black on a black
+# box. Visible text leaves glyph-coloured pixels beside background ones. The render is made
+# only for a page with a span that could be flat (`_may_be_flat`): light text, or text over
+# an image or an opaque fill; dark text on the bare page is seen without one.
+TINY_PT = 2.0
+FLAT_CONTRAST = 1.25
+FLAT_DPI = 100
+FLAT_LIGHT = 2.0  # text lighter than this contrast against white can be lost on the page
 CHAR_FILLED, CHAR_STROKED, CHAR_CLIPPED = 16, 32, 64  # mupdf.FZ_STEXT_FILLED, ...
 IMAGE_FLAGS = pymupdf.TEXT_PRESERVE_IMAGES | pymupdf.TEXT_MEDIABOX_CLIP
 # The flags of the one text extraction per page (`layout.TEXT_FLAGS` is this): defined
@@ -171,6 +186,10 @@ ZIGZAG_MAX = 0.3  # share of turns that are sharp and reverse the last sharp tur
 SIG_GRID = 0.2  # pt / pt^2: perimeter and area rounded to this are compared for repeats
 SIG_TURN = 0.25  # rad: total turning rounded to this; coarse, as PDF coordinates are
 #                  written with few decimals and copies differ by rounding noise
+# A circle's arc (`_arc`), not a pen stroke: every turn per unit length within this share
+# of their mean, all one way. A printed seal's open ring turns evenly; a pen's curvature
+# changes as it goes.
+ARC_SPREAD = 0.25
 
 # Pen consistency (filled ribbons only): one pen gives one ribbon width. Share of filled
 # strokes whose width is within PEN_BAND x the median of strokes of the same colour.
@@ -209,14 +228,41 @@ VECTOR_MIN_PATHS = 3
 # share of the page across; shorter or joined horizontal and vertical lines are marks.
 RULE_MIN_SHARE = 0.5
 
-# Time budget (C1.6). The ink analysis is pure Python and dense pages are slow (up to
-# 0.9 s a page measured; 30 dense pages took 34 s on one core). A document gets
-# INK_BUDGET_S of it, and a page with more than INK_MAX_ITEMS path items is not analysed
-# at all. A page not analysed says so (reason "ink_not_analysed"); with drawings and no
-# visible text at all, it is kept as a page image with a decision (`kept_reason`),
-# never answered "unreadable".
-INK_BUDGET_S = 10.0
+# Work budget (C1.6, plan WS14.9). The ink analysis is pure Python and dense pages are slow
+# (the densest corpus page, 117,162 path items, takes about 1.6 s). Each page is bounded by
+# counts of work, which are the same on every machine, so what a page holds never depends on
+# the machine or on how long the pages before it took: a page with more than INK_MAX_ITEMS
+# path items, or whose paths the analysis cuts into more than INK_MAX_SEGMENTS pieces, is not
+# analysed (cause INK_WORK). Measured on the corpus (2026-11-11, 329 pages): at most 117,162
+# items and 207,522 pieces on a page, so the limits leave 1.7 and 2.4 times that. A clock stays
+# only as a guard against a hang, INK_GUARD_S a page, about 40 times the slowest corpus page
+# (cause INK_TIME). A page not analysed says so (reason "ink_not_analysed" and its cause);
+# with drawings and no visible text at all, it is kept as a page image with a decision
+# (`kept_reason`), never answered "unreadable".
 INK_MAX_ITEMS = 200_000
+INK_MAX_SEGMENTS = 500_000
+INK_GUARD_S = 60.0
+INK_WORK = "work"
+INK_TIME = "time"
+# The upload probe (`document_refusal`, `image_page_count`) runs inside the upload request, in a
+# child that is killed after 30 s (`web.uploads.INSPECT_TIMEOUT_S`). What bounds its ink analysis
+# is work, as everywhere here (`InkBudget`): the whole document has an allowance of path items
+# (50,000, a page of dense handwriting has 35,000), and the guard is a clock only against a hang,
+# one deadline for the document. The allowance is small because the exact analysis is the
+# conversion's first step, which runs it for every page with its own allowance (INK_MAX_ITEMS a
+# page, INK_GUARD_S) and fails a document of nothing but handwriting or scans
+# (`web.worker.result_outcome`, which gives the pages back): with 1,000,000 items, notes of 20
+# to 100 dense pages made the request take 4 to 8 s, and take 1.3 to 4.3 s with 50,000 (measured
+# 2026-11-18, generated pages: 0.5 s per 100,000 items analysed, and 0.07 s for the drawings of a
+# page of 35,000 items even when it is not analysed, which is why a page past the allowance is not
+# read at all, `_probe_ink`). Such a page is never refused, and with less than a line of text it
+# still counts as an unread page (`ImagePageCount`), so notes with no text keep the same count
+# for "more than half are scans or handwriting"; the split between handwritten and unread, the
+# pages with a typed title over ink, and the refusal of a document that is only handwriting wait
+# for the job. Every fixture of tests/fixtures/handwriting is inside the allowance (the most
+# items on its analysed pages is 9,795), and a clearly typed page is never analysed.
+PROBE_MAX_ITEMS = 50_000
+PROBE_GUARD_S = 20.0
 # The page cap (docs/layout.md "Time budget"). Every analysis step after the drawings are
 # extracted costs time and memory for each path (a page of 86,000 strokes took 5 to 9 s
 # and 50 MB of Python objects in layout alone, 30 such pages 4 minutes and 1.8 GB), so a
@@ -267,13 +313,179 @@ HANDWRITING_REGION = "handwriting"
 # ---------------------------------------------------------------------------- visibility
 
 
+def drawn_size(span: dict[str, Any]) -> float:
+    """The size a span's glyphs are drawn at, in points. It is the span's stated size, except
+    for a font whose glyphs are measured in pixels: dvips writes each bitmap font as a Type 3
+    font with the matrix [1 0 0 -1 0 0] and sets it at 72 over the printer's resolution, so
+    10 pt text is stated as 0.24 pt (300 dpi) or 0.12 pt (600 dpi). There the font's height in
+    its own units times the stated size is what the reader sees. Layout writes this over the
+    span's `size` where it reads the text (`layout._text_blocks`)."""
+    size = float(span.get("size", TINY_PT))
+    if size >= TINY_PT:
+        return size
+    height = float(span.get("ascender", 1.0)) - float(span.get("descender", 0.0))
+    return size * height if size * height >= TINY_PT else size
+
+
 def span_hidden(span: dict[str, Any]) -> bool:
-    """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), or an alpha
-    of 5 % or less, unless it is text used as a clip (C1.4)."""
+    """A rawdict span nobody sees: render mode 3 (neither filled nor stroked), drawn under
+    TINY_PT points (`drawn_size`), or an alpha of 5 % or less, unless it is text used as a
+    clip (C1.4). Text in the colour of what is behind it needs the rendered page
+    (`_flat_spans`)."""
+    return _unpainted(span) or drawn_size(span) < TINY_PT
+
+
+def _unpainted(span: dict[str, Any]) -> bool:
+    """Render mode 3 or an alpha near 0: how an OCR program or a tablet writes its guess at
+    a page's words. Text that is painted and cannot be seen (tiny, or in the colour of what
+    is behind it) is hidden too, and says nothing about the page being a scan."""
     flags = int(span.get("char_flags", CHAR_FILLED))
     if not flags & (CHAR_FILLED | CHAR_STROKED):
         return True
     return int(span.get("alpha", 255)) <= INVISIBLE_ALPHA and not flags & CHAR_CLIPPED
+
+
+# A sideways page (WS14.3): at least SIDEWAYS_SHARE of the characters of a page with no
+# /Rotate run up the page (turn it 90 degrees clockwise to read it) or down it (270), and
+# the page has SIDEWAYS_MIN_CHARS characters. A label set sideways on an upright page (a
+# figure's axis, an arXiv stamp) is nowhere near it.
+SIDEWAYS_SHARE = 0.8
+SIDEWAYS_MIN_CHARS = 60
+
+
+def sideways_turn(page: pymupdf.Page) -> int:
+    """How far to turn the page clockwise to read it: 90 or 270 when it was saved sideways
+    with no /Rotate (a landscape page printed to PDF, `sidewaystable`), else 0. Only visible
+    text votes (`span_hidden`)."""
+    if page.rotation % 360:
+        return 0
+    up = down = total = 0
+    for block in page.get_text("dict", flags=0)["blocks"]:
+        for line in block.get("lines", ()):
+            n = sum(
+                1
+                for span in line["spans"]
+                if not span_hidden(span)
+                for ch in span["text"]
+                if _ink(ch)
+            )
+            total += n
+            dx, dy = line["dir"]
+            if abs(dx) < 0.02 and dy < 0:
+                up += n
+            elif abs(dx) < 0.02 and dy > 0:
+                down += n
+    if total < SIDEWAYS_MIN_CHARS:
+        return 0
+    if up >= SIDEWAYS_SHARE * total:
+        return 90
+    return 270 if down >= SIDEWAYS_SHARE * total else 0
+
+
+def turn_page(page: pymupdf.Page) -> int:
+    """Set the page's /Rotate to the turn that reads it (`sideways_turn`) and return it. In
+    the open document only: everything that reads the page after this sees it upright, in
+    the display frame a /Rotate page has. Every reader that opens a PDF and works with
+    layout's boxes calls this on the pages it uses."""
+    turn = sideways_turn(page)
+    if turn:
+        page.set_rotation(turn)
+    return turn
+
+
+# ActualText: a file can replace the characters a span draws by the text it says they mean
+# (Chrome writes it for Hindi conjuncts and CJK, tagged PDFs for a figure's label or a scan's
+# hidden layer). MuPDF applies it to every span it covers; the plain reading
+# (`pymupdf.TEXT_IGNORE_ACTUALTEXT`: each glyph's own character) keeps the labels a replacement
+# drops but turns the script ActualText exists for into U+FFFD, Kangxi radicals or private-use
+# codes. `actualtext_flag` chooses once per page.
+MAX_XREF_SCAN = 200_000  # objects looked at for "/ActualText"; a file with more reads as today
+
+
+def _undecoded(char: str) -> bool:
+    """U+FFFD, a Kangxi radical (U+2F00 to U+2FDF) or a private-use character: what the
+    glyphs of a script come out as when its text is not decoded."""
+    return char == "\ufffd" or "\u2f00" <= char <= "\u2fdf" or unicodedata.category(char) == "Co"
+
+
+def _printed(text: str) -> str:
+    """A reading without what ActualText may change at no loss: spaces, hyphens (a file marks a
+    hyphen at a line end as a soft one), format characters, and composed against decomposed
+    forms. Two readings equal in this say the same words."""
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFKC", text)
+        if not c.isspace() and c not in "-\u2010\u2011" and unicodedata.category(c) != "Cf"
+    )
+
+
+class _ActualTextFacts:
+    """What is known of one open document's ActualText, kept on the document object (PyMuPDF
+    documents take attributes, and nothing else is shared between the steps that read a
+    page: the text pass, the equation readers and the probe open the file on their own), so
+    that each reader of a page finds the choice made for it."""
+
+    def __init__(self) -> None:
+        self.carries: bool | None = None  # an object or a form says "/ActualText" somewhere
+        self.flags: dict[int, int] = {}  # page number -> the flag its readers add
+
+
+def _carries_actualtext(doc: pymupdf.Document) -> bool:
+    """Whether some object (a structure element, a property list) or form XObject of the
+    document holds ActualText. It can sit in any of them, so the objects are read once; a
+    page's own content is read by `actualtext_flag`."""
+    try:
+        for xref in range(1, min(doc.xref_length(), MAX_XREF_SCAN)):
+            text = doc.xref_object(xref, compressed=False)
+            if "/ActualText" in text:
+                return True
+            if (
+                "/Form" in text
+                and doc.xref_is_stream(xref)
+                and b"ActualText" in (doc.xref_stream(xref) or b"")
+            ):
+                return True
+    except (RuntimeError, ValueError):  # a damaged object: read as today
+        return False
+    return False
+
+
+def actualtext_flag(page: pymupdf.Page) -> int:
+    """`pymupdf.TEXT_IGNORE_ACTUALTEXT` where the page is to be read without ActualText, else 0.
+    Every reader of a page's characters adds it to the flags it reads with, so that no two
+    steps disagree about what the page says.
+
+    A page that carries ActualText is read both ways. It keeps ActualText where the two
+    readings say the same words (`_printed`: what differs is then a soft hyphen or a space the
+    file knows better), and where the plain reading holds more U+FFFD, Kangxi radicals and
+    private-use characters than the reading with it (the script ActualText exists for); any
+    other page reads without it, so the labels a replacement dropped come back. No choice is
+    made per span. A page with no ActualText is not read twice, and its flag is 0. Made once
+    a page and kept on the document."""
+    doc = page.parent
+    if doc is None:  # a page whose document is gone cannot be read twice
+        return 0
+    facts = vars(doc).setdefault("_actualtext_facts", _ActualTextFacts())
+    if page.number not in facts.flags:
+        if facts.carries is None:
+            facts.carries = _carries_actualtext(doc)
+        facts.flags[page.number] = _choose(page, facts.carries)
+    return facts.flags[page.number]
+
+
+def _choose(page: pymupdf.Page, carries: bool) -> int:
+    try:
+        if not carries and b"ActualText" not in page.read_contents():
+            return 0
+        with_text = page.get_text("text", flags=TEXT_FLAGS)
+        plain = page.get_text("text", flags=TEXT_FLAGS | pymupdf.TEXT_IGNORE_ACTUALTEXT)
+    except (RuntimeError, ValueError):  # a page that cannot be read twice reads as today
+        return 0
+    if _printed(plain) == _printed(with_text):
+        return 0
+    if sum(map(_undecoded, plain)) > sum(map(_undecoded, with_text)):
+        return 0
+    return pymupdf.TEXT_IGNORE_ACTUALTEXT
 
 
 def origin_key(origin: Sequence[float]) -> tuple[int, int]:
@@ -294,6 +506,10 @@ class TextStats:
     visible_chars: int = 0
     invisible_chars: int = 0  # render mode 3 or alpha ~0
     covered_chars: int = 0  # painted, then covered by an image or a fill painted later
+    # Painted where nobody can see it: under TINY_PT, or flat on the rendered page. Left out
+    # and counted in the notice like the two above, and not evidence of an OCR layer: a typed
+    # page with a long white sentence is still a typed page (`untrusted` leaves it out).
+    unseen_chars: int = 0
     ocr_font_chars: int = 0  # GlyphLessFont (Tesseract), Apple ".SF..." (iOS)
     clipped_chars: int = 0  # text used as a clip: kept, recorded only
     # Origins (`origin_key`) of the characters layout must leave out although their span
@@ -314,11 +530,16 @@ class TextStats:
     def untrusted(self) -> int:
         return self.invisible_chars + self.covered_chars
 
+    @property
+    def left_out(self) -> int:
+        """Every character of the page's text layer that the reader leaves out."""
+        return self.untrusted + self.unseen_chars
+
 
 @dataclass
 class InkStats:
-    analysed: bool = True  # False: over the time budget or the item cap
-    out_of_time: bool = False  # ... and it was the time budget (`InkBudget`)
+    analysed: bool = True  # False: over a count of work, or the clock guard fired
+    cause: str = ""  # ... why: INK_WORK or INK_TIME (`InkBudget`)
     over_cap: bool = False  # too many drawings to read at all (`too_complex`)
     paths: int = 0  # visible drawings
     marks: int = 0  # ... that are not only straight lines (a paper template's rules)
@@ -360,6 +581,9 @@ class PageTypeResult:
     ink: InkStats
     image_coverage: float
     producer: str = "other"
+    # The clockwise turn (90 or 270) a page saved with no /Rotate was read with (`turn_page`),
+    # else 0. Not in the stored record: the notice `page_turned` says it.
+    turn: int = 0
 
     def to_record(self, page: int) -> PageType:
         """The content-free record stored on the result (`core.types.PageType`)."""
@@ -379,27 +603,81 @@ class PageTypeResult:
             ink_pen_share=round(self.ink.pen_share, 3),
             ink_size_twins=round(self.ink.size_twins, 3),
             annot_strokes=self.ink.annot_strokes,
+            ink_cause=None if self.ink.analysed else self.ink.cause or INK_WORK,
             producer=self.producer,
             classifier_version=CLASSIFIER_VERSION,
         )
 
 
-class InkBudget:
-    """How long the ink analysis may still run for one document (C1.6): `INK_BUDGET_S`
-    unless given. `ran_out` says it was asked after that time, so something was left
-    unread; whoever made the budget says so in the conversion's facts
-    (`core.types.NotFinished`), because a slower machine reaches this and a faster one
-    does not."""
+class InkOverrun(Exception):
+    """The ink analysis of a page stopped: `cause` is INK_WORK (a count ran out) or INK_TIME
+    (the clock guard fired)."""
 
-    def __init__(self, seconds: float | None = None) -> None:
-        self.deadline = time.monotonic() + (INK_BUDGET_S if seconds is None else seconds)
+    def __init__(self, cause: str) -> None:
+        super().__init__(cause)
+        self.cause = cause
+
+
+class InkBudget:
+    """What the ink analysis may spend (C1.6, plan WS14.9). Counted in work, per page: at most
+    INK_MAX_SEGMENTS pieces of path (`cut`), with INK_MAX_ITEMS checked by the callers. A
+    clock is only a guard against a hang: `seconds` (INK_GUARD_S unless given) from the start
+    of each page (`page`), or with `per_page` False one deadline for everything (the upload
+    probe). `items` is an allowance of path items for the whole document (`take`; None, the
+    conversion's case, for none). `ran_out` says the guard fired, so something was left
+    unread; whoever made the budget says so in the conversion's facts
+    (`core.types.NotFinished`), because a slower machine reaches it and a faster one does not."""
+
+    def __init__(
+        self,
+        seconds: float | None = None,
+        *,
+        per_page: bool = True,
+        items: int | None = None,
+        segments: int | None = None,
+    ) -> None:
+        self.seconds = INK_GUARD_S if seconds is None else seconds
+        self.per_page = per_page
+        self.items_left = items
+        self.segments = INK_MAX_SEGMENTS if segments is None else segments
         self.ran_out = False
+        self._cut = 0
+        self._deadline = time.monotonic() + self.seconds
+
+    def page(self) -> None:
+        """A page starts: nothing of it is cut yet, and with a guard per page its clock
+        starts again."""
+        self._cut = 0
+        if self.per_page:
+            self._deadline = time.monotonic() + self.seconds
+
+    def take(self, items: int) -> bool:
+        """Spend `items` path items of the document's allowance; False when they do not fit,
+        and then nothing is left for the pages after it either."""
+        if self.items_left is None:
+            return True
+        if items > self.items_left:
+            self.items_left = 0
+            return False
+        self.items_left -= items
+        return True
+
+    def cut(self, pieces: int) -> None:
+        """Count `pieces` of path the analysis made; over the page's allowance it stops."""
+        self._cut += pieces
+        if self._cut > self.segments:
+            raise InkOverrun(INK_WORK)
 
     def left(self) -> bool:
-        if time.monotonic() < self.deadline:
+        if time.monotonic() < self._deadline:
             return True
         self.ran_out = True
         return False
+
+    def check(self) -> None:
+        """Stop the analysis when the guard has fired."""
+        if not self.left():
+            raise InkOverrun(INK_TIME)
 
 
 # ---------------------------------------------------------------------------- geometry
@@ -510,6 +788,8 @@ def text_stats(
     spans: list[BBox] = []
     glyphs: list[BBox] = []  # what the visible text covers, for the shares
     clips: list[tuple[BBox, list[tuple[int, int]], int]] = []
+    fills = _fill_boxes(images, drawings)
+    maybe_flat: list[tuple[BBox, list[tuple[int, int]], int]] = []  # `_flat_spans`
     for block in raw_blocks:
         if block.get("type") != 0:
             continue
@@ -524,7 +804,10 @@ def text_stats(
                 if flags & CHAR_CLIPPED:
                     stats.clipped_chars += n
                 if span_hidden(span):
-                    stats.invisible_chars += n
+                    if _unpainted(span):
+                        stats.invisible_chars += n
+                    else:
+                        stats.unseen_chars += n
                     continue
                 stats.visible_chars += n
                 b = span["bbox"]
@@ -543,6 +826,15 @@ def text_stats(
                     )
                 if (run := _clip_run(span)) is not None:
                     clips.append(run)
+                elif _may_be_flat(span, b, fills):
+                    # A thin or no-break space paints nothing anywhere: not "text left out".
+                    origins = [
+                        origin_key(ch["origin"])
+                        for ch in span["chars"]
+                        if _ink(ch["c"]) and not ch["c"].isspace()
+                    ]
+                    if origins:
+                        maybe_flat.append(((b[0], b[1], b[2], b[3]), origins, len(origins)))
     _text_shares(page, stats, glyphs, images)
     if spans and _maybe_covered(spans, images, drawings):
         covered = _covered(page, _thick_strokes(drawings))
@@ -554,12 +846,110 @@ def text_stats(
         hidden = _cover_test(page, clips)
         for (_, origins, _), gone in zip(clips, hidden, strict=True):
             if gone:  # a clip that nothing was painted through: nobody sees it
-                new = {o for o in origins if o not in stats.covered}
-                stats.covered |= new
-                n = min(len(new), stats.visible_chars)
-                stats.invisible_chars += n
-                stats.visible_chars -= n
+                _hide(stats, origins)
+    # Text the render shows nothing of (`_flat_spans`): left out like text in render mode 3.
+    # What a cover already hides is not looked at again.
+    maybe_flat = [run for run in maybe_flat if not stats.covered.issuperset(run[1])]
+    if maybe_flat:
+        for (_, origins, _), gone in zip(maybe_flat, _flat_spans(page, maybe_flat), strict=True):
+            if gone:
+                _hide(stats, origins, seen_by_nobody=True)
     return stats
+
+
+def _hide(
+    stats: TextStats, origins: Iterable[tuple[int, int]], *, seen_by_nobody: bool = False
+) -> None:
+    """Characters nobody sees although their span looks visible: their origins are what
+    layout leaves out (`TextStats.covered`). A clip nothing was painted through is counted
+    as invisible; text that is flat on the render (`seen_by_nobody`) as unseen."""
+    new = {o for o in origins if o not in stats.covered}
+    stats.covered |= new
+    n = min(len(new), stats.visible_chars)
+    if seen_by_nobody:
+        stats.unseen_chars += n
+    else:
+        stats.invisible_chars += n
+    stats.visible_chars -= n
+
+
+def _fill_boxes(
+    images: Sequence[BBox], drawings: Sequence[dict[str, Any]] | None
+) -> list[BBox] | None:
+    """What can lie behind text and change its background: the images (MuPDF's image
+    blocks include shadings) and the opaque filled shapes, each at least 4 pt^2. None when
+    the drawings were not read (`_maybe_covered` looks at the paint order then)."""
+    if drawings is None:
+        return None
+    shapes = list(images)
+    for d in drawings:
+        fill = d.get("fill")
+        opacity = d.get("fill_opacity")
+        if fill is None or (isinstance(opacity, int | float) and opacity <= INVISIBLE_OPACITY):
+            continue
+        rect = d.get("rect")
+        if rect is not None and _area(rect) >= 4.0:
+            shapes.append((rect[0], rect[1], rect[2], rect[3]))
+    return shapes
+
+
+@functools.cache
+def _linear_levels() -> Any:
+    """Linear light of each of the 256 levels of an sRGB channel, as a numpy array."""
+    import numpy as np
+
+    return np.array([contrast.relative_luminance((v, v, v)) for v in range(256)])
+
+
+def _may_be_flat(span: dict[str, Any], box: Sequence[float], fills: Sequence[BBox] | None) -> bool:
+    """The span could be lost on the page: its colour is light (`FLAT_LIGHT` against white),
+    or it lies over an image or an opaque fill. Dark text on the bare page is seen, and
+    needs no render."""
+    if fills is None:
+        return False  # drawings not read: a page that complex is kept as its image anyway
+    rgb = int(span.get("color") or 0)
+    white = contrast.contrast_ratio((rgb >> 16 & 0xFF, rgb >> 8 & 0xFF, rgb & 0xFF), contrast.WHITE)
+    if white < FLAT_LIGHT:
+        return True
+    return any(f[0] < box[2] and box[0] < f[2] and f[1] < box[3] and box[1] < f[3] for f in fills)
+
+
+def _flat_spans(
+    page: pymupdf.Page, runs: Sequence[tuple[BBox, list[tuple[int, int]], int]]
+) -> list[bool]:
+    """For each run (a span's box, unrotated): is the rendered page flat inside it? One
+    render of the page at FLAT_DPI, with its annotations (the whole page: MuPDF paints a
+    clipped region of a picture whose stated size is not its real one as one black patch).
+    The lightest and darkest pixels of the box are compared as WCAG luminance; a box whose
+    contrast is under FLAT_CONTRAST shows no text. Nothing is rendered, and no text is hidden,
+    on a page with a picture over the pixel budget (`core.images`: it is never decoded), or
+    when the page cannot be rendered: the text is kept."""
+    import numpy as np
+
+    try:
+        if not all(within_budget(i["width"], i["height"]) for i in page.get_image_info()):
+            return [False] * len(runs)
+        pix = page.get_pixmap(dpi=FLAT_DPI, colorspace=pymupdf.csRGB, alpha=False)
+    except Exception:  # a page MuPDF cannot paint: its text is kept
+        return [False] * len(runs)
+    pixels = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.height, pix.width, 3)
+    scale = FLAT_DPI / 72
+    display = _Display(page)
+    levels, weights = _linear_levels(), np.array([0.2126, 0.7152, 0.0722])
+    verdicts = []
+    for run in runs:
+        x0, y0, x1, y1 = display.box(run[0])
+        # One pixel more on every side: a hairline glyph (a minus sign, a bar) has a box thinner
+        # than a pixel, and its ink lands on the rows beside it. Ink next to the box can only
+        # keep text, never hide it.
+        left, top = max(0, int(x0 * scale) - 1), max(0, int(y0 * scale) - 1)
+        right, bottom = min(pix.width, int(x1 * scale) + 2), min(pix.height, int(y1 * scale) + 2)
+        if right <= left or bottom <= top:
+            verdicts.append(False)
+            continue
+        lum = levels[pixels[top:bottom, left:right]] @ weights
+        verdicts.append((float(lum.max()) + 0.05) / (float(lum.min()) + 0.05) < FLAT_CONTRAST)
+    return verdicts
 
 
 def _furniture(
@@ -665,18 +1055,10 @@ def _maybe_covered(
     overlaps it sideways, so a box over one word of a line counts (`_covered` then looks
     glyph by glyph). Annotations count: MuPDF lists their appearance with the drawings.
     MuPDF's image blocks include shadings."""
-    shapes = list(images)
-    if drawings is None:
-        shapes.append((-1e9, -1e9, 1e9, 1e9))  # unknown: look at the paint order
+    shapes = _fill_boxes(images, drawings)
+    if shapes is None:
+        shapes = [*images, (-1e9, -1e9, 1e9, 1e9)]  # unknown: look at the paint order
     else:
-        for d in drawings:
-            fill = d.get("fill")
-            opacity = d.get("fill_opacity")
-            if fill is None or (isinstance(opacity, int | float) and opacity <= INVISIBLE_OPACITY):
-                continue
-            rect = d.get("rect")
-            if rect is not None and _area(rect) >= 4.0:
-                shapes.append((rect[0], rect[1], rect[2], rect[3]))
         shapes += _thick_strokes(drawings) or []
     return any(_across(s, b) for s in spans for b in shapes)
 
@@ -837,6 +1219,66 @@ ICON_ANNOTS = frozenset(
         pymupdf.mupdf.PDF_ANNOT_CARET,
     }
 )
+
+
+# What a reviewer draws over a page, whose appearance is not the page's own art: the icons
+# above, the marks on text (highlight, underline, squiggle, strike-out), the shapes and lines
+# around it, and the box of a text box. Its drawings are not figures and not handwriting
+# (`without_annotation_art`). A pen stroke (Ink) is not here: it is read as handwriting.
+ANNOTATION_ART = ICON_ANNOTS | {
+    pymupdf.mupdf.PDF_ANNOT_HIGHLIGHT,
+    pymupdf.mupdf.PDF_ANNOT_UNDERLINE,
+    pymupdf.mupdf.PDF_ANNOT_SQUIGGLY,
+    pymupdf.mupdf.PDF_ANNOT_STRIKE_OUT,
+    pymupdf.mupdf.PDF_ANNOT_SQUARE,
+    pymupdf.mupdf.PDF_ANNOT_CIRCLE,
+    pymupdf.mupdf.PDF_ANNOT_LINE,
+    pymupdf.mupdf.PDF_ANNOT_POLYGON,
+    pymupdf.mupdf.PDF_ANNOT_POLY_LINE,
+    pymupdf.mupdf.PDF_ANNOT_FREE_TEXT,
+}
+_ART_SLACK = 1.0  # pt: an appearance is inside its annotation's box, bar rounding
+_NOT_SHOWN = pymupdf.mupdf.PDF_ANNOT_IS_HIDDEN | pymupdf.mupdf.PDF_ANNOT_IS_NO_VIEW
+
+
+def without_annotation_art(
+    page: pymupdf.Page, drawings: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+    """`page.get_cdrawings()` without the drawings that annotations paint (`ANNOTATION_ART`).
+
+    Annotations are painted after the page's own content, so their drawings are the last of
+    the list: from the end, every drawing that lies inside the box of a shown annotation is
+    one of theirs, and the first that does not is the page's. Of those, the ones inside the
+    box of an annotation of `ANNOTATION_ART` are left out; a pen stroke's stay. The page's own
+    drawings keep their places in the list. Nothing is changed on the page: the hidden-text
+    checks still see an annotation that covers words."""
+    if page.first_annot is None:
+        return drawings
+    turned = page.rotation  # the drawings are in unrotated space, a sticky note's box is not
+    page.set_rotation(0)
+    try:
+        shown = [a for a in page.annots() or () if not a.flags & _NOT_SHOWN]
+        boxes = [tuple(a.rect) for a in shown]
+        art = [tuple(a.rect) for a in shown if a.type[0] in ANNOTATION_ART]
+    finally:
+        page.set_rotation(turned)
+    if not art:
+        return drawings
+
+    def inside(rect: Sequence[float], within: Sequence[Sequence[float]]) -> bool:
+        s = _ART_SLACK
+        return any(
+            b[0] - s <= rect[0]
+            and b[1] - s <= rect[1]
+            and rect[2] <= b[2] + s
+            and rect[3] <= b[3] + s
+            for b in within
+        )
+
+    start = len(drawings)
+    while start > 0 and inside(drawings[start - 1]["rect"], boxes):
+        start -= 1
+    return [d for i, d in enumerate(drawings) if i < start or not inside(d["rect"], art)]
 
 
 def _drop_icons(page: pymupdf.Page) -> None:
@@ -1039,16 +1481,19 @@ def _candidate(
     closed: bool,
     filled: bool,
     width: float,
-    display: _Display,
+    display: _Display | None,
     sources: tuple[int, ...],
     colour: tuple = (),
+    max_side: float = STROKE_MAX_SIDE,
 ) -> _Candidate | None:
-    """None for anything that cannot be a pen stroke (too small, too big, rectilinear)."""
+    """None for anything that cannot be a pen stroke (too small, too big, rectilinear).
+    `display` None leaves the box in the drawing's own frame; `max_side` is raised only by
+    `pen_line`."""
     if len(pts) < 2:
         return None
     x0, y0, x1, y1 = _box(pts)
     side = max(x1 - x0, y1 - y0)
-    if side < STROKE_MIN_SIDE or side > STROKE_MAX_SIDE:
+    if side < STROKE_MIN_SIDE or side > max_side:
         return None
     oblique = 0
     perimeter = 0.0
@@ -1083,7 +1528,7 @@ def _candidate(
         prev = (dx, dy)
     if curves == 0 and oblique < OBLIQUE_MIN:
         return None  # rectangles, rules, ticks, table grids, step lines
-    box = display.box((x0, y0, x1, y1))
+    box = display.box((x0, y0, x1, y1)) if display else (x0, y0, x1, y1)
     if closed:
         ax, ay = pts[-1]
         bx, by = pts[0]
@@ -1106,7 +1551,40 @@ def _candidate(
         ok, machine = False, True  # a blob (disc, region, island), not a pen ribbon
     if ok and zig > ZIGZAG_MAX:
         ok, machine = False, True  # jagged: random-step decorations, random walks
+    if ok and not closed and _arc(pts):
+        ok, machine = False, True  # a circle's arc: a printed seal's open ring
     return _Candidate(box, sig, ok, filled and closed, ribbon, sources, colour, machine)
+
+
+def pen_line(items: Sequence[Any], width: float) -> bool:
+    """One open stroked path that the pen tests take for a pen stroke at any length: its
+    subpaths run on end to end as one line, which has enough points, bends more than half
+    a circle, is not jagged and is not a circle's arc (`_candidate`, with no
+    STROKE_MAX_SIDE). For layout's small drawings (`_leftover_drawings`): a signature or a
+    wavy underline runs past the size limit that keeps plot lines and frames out of the
+    page's own ink count, which this does not change."""
+    pts: list[tuple[float, float]] = []
+    curves = lines = 0
+    for sub in _subpaths(items):
+        flat, c, n = _flatten(sub)
+        if not flat or (pts and math.dist(flat[0], pts[-1]) >= 0.3):
+            return False  # a rectangle, or a second stroke
+        pts.extend(flat[1:] if pts else flat)
+        curves, lines = curves + c, lines + n
+    found = _candidate(pts, curves, lines, False, False, width, None, (), max_side=math.inf)
+    return found is not None and found.stroke
+
+
+def _arc(pts: Sequence[tuple[float, float]]) -> bool:
+    """The line turns one way at an even rate (ARC_SPREAD): a circle's arc, printed."""
+    rates = []
+    for a, b, c in zip(pts, pts[1:], pts[2:], strict=False):
+        ux, uy, vx, vy = b[0] - a[0], b[1] - a[1], c[0] - b[0], c[1] - b[1]
+        run = (math.hypot(ux, uy) + math.hypot(vx, vy)) / 2
+        if run:
+            rates.append(math.atan2(ux * vy - uy * vx, ux * vx + uy * vy) / run)
+    mean = sum(rates) / len(rates) if rates else 0.0
+    return bool(mean) and all(abs(r - mean) <= ARC_SPREAD * abs(mean) for r in rates)
 
 
 def _size_twin_share(boxes: Sequence[BBox]) -> float:
@@ -1193,12 +1671,13 @@ def ink_stats(
     seen: Sequence[tuple[bool, bool]] | None = None,
 ) -> InkStats:
     """Handwriting evidence from the drawings layout extracted. Counts the visible paths
-    always; the stroke analysis only within the budget and the item cap. `seen` is
-    `paint_visibility` of these drawings when the caller has it already."""
+    always; the stroke analysis only within the item cap and the `budget` (`InkBudget`: a
+    count of path pieces, the document's allowance of items when it has one, and the clock
+    guard). `seen` is `paint_visibility` of these drawings when the caller has it already."""
     stats = InkStats()
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
     if too_complex(drawings):  # nothing below is worth its time on such a page
-        stats.analysed, stats.over_cap = False, True
+        stats.analysed, stats.over_cap, stats.cause = False, True, INK_WORK
         stats.paths = stats.marks = len(drawings)  # unknown: not blank, not refused
         stats.items = sum(len(d.get("items") or ()) for d in drawings)
         return stats
@@ -1217,15 +1696,30 @@ def ink_stats(
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_INK]) or []:
         stats.annot_strokes += len(annot.vertices or [])
     if stats.items > INK_MAX_ITEMS:
-        stats.analysed = False
-        return stats
-    if budget is not None and stats.paths and not budget.left():
-        stats.analysed = False
-        stats.out_of_time = True
+        stats.analysed, stats.cause = False, INK_WORK
         return stats
     if not stats.paths:
         return stats
-    cands = _ink_candidates(page, drawings, seen)
+    if budget is not None:
+        budget.page()
+        if not budget.take(stats.items):
+            stats.analysed, stats.cause = False, INK_WORK
+            return stats
+    try:
+        if budget is not None:
+            budget.check()
+        cands = _ink_candidates(page, drawings, seen, budget)
+        if budget is not None:
+            budget.check()
+    except InkOverrun as stop:
+        return InkStats(
+            analysed=False,
+            cause=stop.cause,
+            paths=stats.paths,
+            marks=stats.marks,
+            items=stats.items,
+            annot_strokes=stats.annot_strokes,
+        )
     return _summarise(page, stats, cands)
 
 
@@ -1233,9 +1727,11 @@ def _ink_candidates(
     page: pymupdf.Page,
     drawings: Sequence[dict[str, Any]],
     seen: Sequence[tuple[bool, bool]] | None = None,
+    budget: InkBudget | None = None,
 ) -> list[_Candidate]:
     """Every subpath that could be a pen stroke. /Ink annotation appearances are in the
-    drawings already (MuPDF traces them), so they are not added again."""
+    drawings already (MuPDF traces them), so they are not added again. The pieces each path
+    is cut into are counted against the `budget` (`InkOverrun` when it is spent)."""
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
     display = _Display(page)
     cands: list[_Candidate] = []
@@ -1271,6 +1767,8 @@ def _ink_candidates(
     if seen is None:
         seen = paint_visibility(drawings, image_boxes(page)[0])
     for index, d in enumerate(drawings):
+        if budget is not None and not index & 255:
+            budget.check()
         filled, stroked = seen[index]
         if not (filled or stroked):
             continue
@@ -1280,6 +1778,8 @@ def _ink_candidates(
         if rect[2] - rect[0] < STROKE_MIN_SIDE and rect[3] - rect[1] < STROKE_MIN_SIDE and filled:
             for sub in _subpaths(d.get("items") or []):  # a dot is a sample of a stroke still
                 pts = _flatten(sub)[0]
+                if budget is not None:
+                    budget.cut(len(pts))
                 prim = _sample_prim(pts, d, index, page, tones) if filled else None
                 if prim is None:
                     other()
@@ -1290,6 +1790,8 @@ def _ink_candidates(
         width = float(d.get("width") or 0.0)
         for sub in _subpaths(d.get("items") or []):
             pts, curves, lines = _flatten(sub)
+            if budget is not None:
+                budget.cut(len(pts))
             if not pts:
                 if not filled:
                     flush()
@@ -1667,12 +2169,16 @@ def classify(
     producer: str = "other",
     images: tuple[list[BBox], float] | None = None,
     seen: Sequence[tuple[bool, bool]] | None = None,
+    covers: Sequence[dict[str, Any]] | None = None,
 ) -> PageTypeResult:
     """The page's type, from the rawdict blocks and drawings layout already extracted.
     `images` (`image_boxes`) and `seen` (`paint_visibility` of these drawings and those
-    images) are passed by a caller that has them already."""
+    images) are passed by a caller that has them already. `covers`: the drawings the
+    hidden-text check reads, when they are more than `drawings` (which the ink analysis
+    reads): the annotations' drawings, left out of the ink (`without_annotation_art`), can
+    still hide words."""
     boxes, coverage = images if images is not None else image_boxes(page)
-    text = text_stats(page, raw_blocks, boxes, drawings)
+    text = text_stats(page, raw_blocks, boxes, drawings if covers is None else covers)
     ink = ink_stats(page, drawings, budget, seen)
     return decide(text, ink, coverage, producer)
 
@@ -1688,9 +2194,9 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     """The Fix reason when this app keeps the whole page as its image (nothing on it is
     converted), else None. There is no handwriting or scan conversion: handwritten and
     scanned pages are kept as images, and so is a page with drawings and less than a line
-    of visible text whose ink could not be analysed in time (C1.6: a page of notes with a
-    typed title, after the budget ran out, may be handwriting; its title is kept in the
-    page image). Works on a classifier result and on the stored record alike."""
+    of visible text whose ink was not analysed (C1.6: a page of notes with a typed title,
+    over a count of work or stopped by the clock guard, may be handwriting; its title is
+    kept in the page image). Works on a classifier result and on the stored record alike."""
     if page.kind in HANDWRITTEN_KINDS:
         return HANDWRITTEN_PAGE
     if page.kind == "scan_no_text" and _visible_chars(page):
@@ -1711,23 +2217,45 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     return None
 
 
-def out_of_time(pages: Mapping[int, PageTypeResult]) -> list[int]:
-    """The pages whose ink was not analysed because the document's time for it had run out
-    (`InkBudget`), in page order. Such a page is typed without its ink."""
-    return sorted(number for number, page in pages.items() if page.ink.out_of_time)
+def ink_stops(pages: Mapping[int, PageTypeResult]) -> dict[int, str]:
+    """The pages whose ink was not analysed, each with its cause (INK_WORK: a count ran out,
+    the same on every machine; INK_TIME: the clock guard fired), in page order. Such a page
+    is typed without its ink."""
+    return {
+        number: page.ink.cause or INK_WORK
+        for number, page in sorted(pages.items())
+        if not page.ink.analysed
+    }
+
+
+def image_kind(page: PageTypeResult | PageType) -> str | None:
+    """What the image page pass reads this page as ("scanned", "handwritten" or "unread"), or
+    None when it does not read it (ADR 0007). The one predicate for every place that asks:
+    the pass itself (`image_page.kept_reads`) and the count (`count_image_pages`). A kept page
+    whose content is a picture or ink is read when the instructor asked for scans and
+    handwriting to be converted: a scanned or handwritten page, a picture of a page under a
+    text layer that does not cover it (`TEXT_NOT_COVERING`: a scan as far as the pass is
+    concerned), and an unread page of vector ink (notes under a typed title whose ink was not
+    analysed, a page over the drawings cap). Not a full-page picture with a few typed
+    characters and nothing hidden: it may be a title slide on a photo (`kept_reason`). Works
+    on a classifier result and on the stored record alike."""
+    reason = kept_reason(page)
+    if reason == HANDWRITTEN_PAGE:
+        return "handwritten"
+    if reason == SCANNED_PAGE:
+        return "scanned"
+    if reason != UNREAD_PAGE:
+        return None
+    if page.kind == "scan_no_text":
+        return "scanned" if TEXT_NOT_COVERING in page.reasons else None
+    # A page over the drawings cap may be a typed page with one dense plot: its typed text is
+    # exact and stays as layout read it. Only a page with less than a line of type is ink.
+    return "unread" if _visible_chars(page) < TEXT_MIN else None
 
 
 def reads_image(page: PageTypeResult | PageType) -> bool:
-    """Is this page one the image page pass reads (ADR 0007)? A scanned or handwritten kept
-    page, and a picture of a page under a text layer that does not cover it
-    (`TEXT_NOT_COVERING`): kept as an unread page, its visible text read, but it is a scan
-    as far as the pass is concerned. Works on a classifier result and on the stored record."""
-    reason = kept_reason(page)
-    if reason in (SCANNED_PAGE, HANDWRITTEN_PAGE):
-        return True
-    return (
-        reason == UNREAD_PAGE and page.kind == "scan_no_text" and TEXT_NOT_COVERING in page.reasons
-    )
+    """Is this page one the image page pass reads (`image_kind`)?"""
+    return image_kind(page) is not None
 
 
 def keeps_text(page: PageTypeResult | PageType) -> bool:
@@ -1881,56 +2409,111 @@ def _text_misses_picture(text: TextStats, coverage: float) -> bool:
     )
 
 
-def document_refusal(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -> str | None:
-    """`refusal_code` for a whole open document (the upload probe). Reads the text of
-    each page first and stops at the first clearly typed page, so only documents with
-    no such page pay for the drawings and the ink analysis (within `budget_s`)."""
-    texts: list[tuple[int, pymupdf.Page, TextStats, float]] = []
+def _probe_budget(budget_s: float) -> InkBudget:
+    """The upload probe's budget: the document's allowance of path items, and one deadline
+    for the whole document as the guard."""
+    return InkBudget(budget_s, per_page=False, items=PROBE_MAX_ITEMS)
+
+
+def _probe_ink(page: pymupdf.Page, budget: InkBudget) -> InkStats:
+    if not budget.left():  # the guard: not even the drawings are read
+        return InkStats(analysed=False, cause=INK_TIME, paths=1, marks=1)  # unknown
+    if budget.items_left == 0:  # the allowance is spent: reading the drawings would cost more
+        return InkStats(analysed=False, cause=INK_WORK, paths=1, marks=1)  # than analysing them
+    return ink_stats(page, page.get_cdrawings(), budget)
+
+
+def document_refusal(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> str | None:
+    """`refusal_code` for a whole open document (the upload probe): `probe_pages` without the
+    count, so the text is read only as far as the first clearly typed page."""
+    return probe_pages(doc, budget_s=budget_s)[0]
+
+
+def probe_pages(
+    doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S, count: bool = False
+) -> tuple[str | None, ImagePageCount]:
+    """`(refusal_code, image page count)` of a whole open document (the upload probe). Reads
+    the text of each page first, so only a page that is not clearly typed pays for the drawings
+    and the ink analysis (within `PROBE_MAX_ITEMS` path items, and `budget_s` as the guard). A
+    page whose ink was not analysed is never refused: the conversion keeps it as an image with
+    a decision. Without `count` the text is read only as far as the first clearly typed page
+    (the document is then not refused and its count is not made); with it every page is read,
+    and the refusal and the count come from one analysis of the same pages (`count_image_pages`,
+    `ImagePageCount.unanalysed` for a page whose ink was not analysed)."""
+    candidates: list[tuple[int, pymupdf.Page, TextStats, float]] = []
+    typed = False
     for number in range(doc.page_count):
         page = doc[number]
-        raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
+        raw = page.get_text("rawdict", flags=TEXT_FLAGS | actualtext_flag(page))["blocks"]
         images, coverage = image_boxes(page)
         stats = text_stats(page, raw, images, None)
         if clearly_convertible(stats, coverage):
-            return None
-        texts.append((number, page, stats, coverage))
-    budget = InkBudget(budget_s)
-    hint = producer_hint(doc)
-    records = []
-    for number, page, stats, coverage in texts:
-        drawings = page.get_cdrawings() if budget.left() else None
-        if drawings is None:
-            ink = InkStats(analysed=False, paths=1, marks=1)  # unknown: never refused
+            typed = True
+            if not count:
+                return None, ImagePageCount()
         else:
-            ink = ink_stats(page, drawings, budget)
-        records.append(decide(stats, ink, coverage, hint).to_record(number))
-    return refusal_code(records)
-
-
-def image_page_count(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -> int:
-    """How many pages of an open document are scanned or handwritten, the pages the image
-    page pass reads (ADR 0007: `kept_reason` "scanned_page" or "handwritten_page"). Typed
-    pages are told from their text alone, so only a page that is not clearly typed pays for the
-    drawings and the ink analysis, within `budget_s` (a page not analysed in time is not counted:
-    the conversion keeps such a page as an image, never reads it)."""
-    candidates: list[tuple[int, pymupdf.Page, TextStats, float]] = []
-    for number in range(doc.page_count):
-        page = doc[number]
-        raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
-        images, coverage = image_boxes(page)
-        stats = text_stats(page, raw, images, None)
-        if not clearly_convertible(stats, coverage):
             candidates.append((number, page, stats, coverage))
     if not candidates:
-        return 0
-    budget = InkBudget(budget_s)
+        return None, ImagePageCount()
+    budget = _probe_budget(budget_s)
     hint = producer_hint(doc)
-    found = 0
-    for number, page, stats, coverage in candidates:
-        drawings = page.get_cdrawings() if budget.left() else None
-        if drawings is None:
-            continue
-        ink = ink_stats(page, drawings, budget)
-        record = decide(stats, ink, coverage, hint).to_record(number)
-        found += reads_image(record)
-    return found
+    records = [
+        decide(stats, _probe_ink(page, budget), coverage, hint).to_record(number)
+        for number, page, stats, coverage in candidates
+    ]
+    return (None if typed else refusal_code(records)), count_image_pages(records)
+
+
+@dataclass(frozen=True)
+class ImagePageCount:
+    """How many pages the image page pass reads (`image_kind`), by kind, and `unanalysed`
+    pages whose ink was not analysed, any of which may be one more."""
+
+    scanned: int = 0
+    handwritten: int = 0
+    unread: int = 0  # unread pages of ink or drawings (`image_kind`)
+    unanalysed: int = 0
+
+    @property
+    def found(self) -> int:
+        return self.scanned + self.handwritten + self.unread
+
+    @property
+    def at_least(self) -> bool:
+        return self.unanalysed > 0
+
+    @property
+    def possible(self) -> bool:
+        """The document may have such a page: one was found, or one could not be told."""
+        return self.found > 0 or self.unanalysed > 0
+
+    @property
+    def words(self) -> str:
+        """The count as a sentence says it: "3", or "at least 3"."""
+        return f"at least {self.found}" if self.at_least else str(self.found)
+
+    def mostly(self, pages: int) -> bool:
+        """More than half of a file's `pages` are pages the image page pass reads (WS7.8): the
+        upload says so, as a choice, before it converts anything."""
+        return pages > 0 and self.found * 2 > pages
+
+
+def count_image_pages(pages: Iterable[PageType]) -> ImagePageCount:
+    """The count by kind of the pages the image page pass reads (`image_kind`) among page
+    records: the one place a count is made, for the upload probe and for a stored result. A
+    page the pass does not read whose ink was not analysed is counted apart: it may be
+    handwriting."""
+    kinds: Counter[str] = Counter()
+    unanalysed = 0
+    for page in pages:
+        if (kind := image_kind(page)) is not None:
+            kinds[kind] += 1
+        elif "ink_not_analysed" in page.reasons:
+            unanalysed += 1
+    return ImagePageCount(kinds["scanned"], kinds["handwritten"], kinds["unread"], unanalysed)
+
+
+def image_page_count(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> ImagePageCount:
+    """How many pages of an open document the image page pass reads, by kind
+    (`probe_pages`); "at least" when a page's ink was not analysed (`ImagePageCount`)."""
+    return probe_pages(doc, budget_s=budget_s, count=True)[1]

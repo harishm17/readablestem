@@ -13,14 +13,21 @@ preview) asks `export_state` before it builds anything. The answer is one of:
   to the draft page (`DraftConfirm`), so the question cannot be skipped. The file's name
   ends in `-draft` (`file_name`), and the file itself says so first
   (`pipeline.assemble.mark_draft`). A person the document was shared with to view only is
-  never given a draft: they cannot make the decisions, and the route refuses.
+  never given a draft: they cannot make the decisions, and the route refuses (so do the
+  student preview and Listen, `shown`).
   The zips and "Combine parts" never take a draft: they hold it back and say how many.
 - `not available`: not finished (or nothing written yet). Nothing leaves.
 
-"Decisions still open" is read in one place, `open_required`, which today counts the open
-item fixes of the stored result as the job page does (a group of repeated headings is one).
-The state table (SW1) and the review counter of part 5 replace that one function; nothing
-else here changes when they do.
+Every change that reaches the stored file goes through `output_changed` (WS20.1): it counts
+the change on the job (`Job.output_version`, from 1, and `Job.output_changed_at`) and marks the
+stored HTML out of date, so two copies of one document can be told apart by the version id the
+file, the head of its page and the job page say (`b9487b-12`: the first six characters of the
+job id and the counter). The lazy render of a stale page (`routes.jobs.current_html`) stamps what
+it writes and does not count.
+
+"Decisions still open" is read in one place, `open_required`: the count of the summary of
+what was checked (`pipeline.checked.open_required`, which is `core.triage.review_load`), so
+the draft gate, the job's state and the student note never disagree (SW7).
 """
 
 from __future__ import annotations
@@ -29,13 +36,15 @@ import hashlib
 import hmac
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from urllib.parse import urlencode
 
 from starlette.requests import Request
 
-from readablestem.pipeline.assemble import mark_draft
+from readablestem.pipeline.assemble import Stamp, mark_draft
 from readablestem.web import documents, shares
-from readablestem.web.db import Job, JobStatus
+from readablestem.web.database import as_utc
+from readablestem.web.db import Job, JobStatus, utcnow
 from readablestem.web.deps import SESSION_CSRF, PageError, csrf_token
 
 READY = "ready"
@@ -62,9 +71,9 @@ NOT_FINISHED = (
     "This document has not finished converting, so there is nothing to show yet.",
 )
 DRAFT_NOT_FOR_VIEWERS = (
-    "This document is still a draft",
-    "Decisions are still open in it, and only the owner or a reviewer can make them. You can "
-    "read it here; a file to download is offered once the decisions are made.",
+    "The owner is still checking this document",
+    "Nothing of it is shown or offered to download until the owner has made the decisions "
+    "still open in it. Come back later.",
 )
 
 
@@ -88,15 +97,19 @@ class DraftConfirm(Exception):
 
 
 def open_required(job: Job) -> int:
-    """The decisions still open that make a file a draft. The one place the later counter
-    (SW1's state, part 5's `review_load()`) replaces."""
+    """The decisions still open that make a file a draft: the summary's own count
+    (`pipeline.checked.open_required`), read through `documents.open_decisions`."""
+    if job.open_decisions is None:  # a row from before the column: read once, stored
+        job.result_json = job.result_json
+    if job.open_decisions is not None:
+        return job.open_decisions
     return documents.open_decisions((job.result_json or {}).get("fixes"))
 
 
 def export_state(job: Job) -> ExportState:
     """What may leave for this job: `ready`, `draft` (with the open count) or `not
     available`. Who is asking is the route's question (`check`): this is the document's."""
-    if job.status != JobStatus.DONE or (job.html is None and not job.html_stale):
+    if job.status != JobStatus.DONE or not (job.html_stale or job.has_html):
         return ExportState(NOT_AVAILABLE)
     still_open = open_required(job)
     return ExportState(DRAFT, still_open) if still_open else ExportState(READY)
@@ -116,6 +129,17 @@ def check(request: Request, job: Job, role: str, file_type: str, **query: str) -
         raise PageError(403, *DRAFT_NOT_FOR_VIEWERS, context={"job_id": job.id})
     if not token_valid(request, job, request.query_params.get(TOKEN_PARAM, "")):
         raise DraftConfirm(confirm_url(job.id, file_type, **query))
+    return state
+
+
+def shown(job: Job, role: str) -> ExportState:
+    """The gate of a page that shows the document without handing out a file (the student
+    preview and Listen): the same answer as `check`, so a person who may not take a draft is
+    not shown one either. The owner and a reviewer are shown a draft, with its banner
+    (`marked`). Raises the refusal for a reader; the caller has made sure the job is done."""
+    state = export_state(job)
+    if state.draft and not may_take_draft(role):
+        raise PageError(403, *DRAFT_NOT_FOR_VIEWERS, context={"job_id": job.id})
     return state
 
 
@@ -172,3 +196,45 @@ def file_name(filename: str, state: ExportState) -> str:
 def marked(html: str, state: ExportState) -> str:
     """The HTML as it leaves: a draft carries its banner and its state (`mark_draft`)."""
     return mark_draft(html, state.open_decisions) if state.draft else html
+
+
+# --------------------------------------------------------------------------- identity (WS20.1)
+
+# Why the stored file changed. Only a change a reader would see counts; the first conversion is
+# version 1 and sets the time without counting. A write that leaves the output alone (keeping
+# the document 7 more days, a share) does not call `output_changed` at all.
+CONVERTED = "converted"  # the first file of a job: the worker's finish, a sample
+RERUN = "rerun"  # the worker made the file again for a job that already had one
+DECISION = "decision"  # a review write: one item, a group, a page group, an undo
+PAGE_EDIT = "page_edit"  # a page edit (text, heading, picture, equation, page left out)
+LANGUAGE = "language"
+TITLE = "title"
+CONTACT = "contact"
+CAUSES = (CONVERTED, RERUN, DECISION, PAGE_EDIT, LANGUAGE, TITLE, CONTACT)
+
+
+def output_changed(job: Job, cause: str, now: datetime | None = None) -> None:
+    """The only code that marks a job's stored HTML out of date or replaces it for a reason a
+    reader would see (the caller then writes the file, or leaves it to `current_html`): count
+    the change (`Job.output_version`), set its time (`Job.output_changed_at`) and mark the file
+    out of date, so a file made before this change is made again with the new stamp. The first
+    conversion (`CONVERTED`) sets the time and leaves the count at 1. The caller holds the row
+    (the review writes lock it) and commits."""
+    if cause not in CAUSES:
+        raise ValueError(f"unknown cause of an output change: {cause}")
+    if cause != CONVERTED:
+        job.output_version = (job.output_version or 1) + 1
+    job.output_changed_at = now or utcnow()
+    job.html_stale = True
+
+
+def stamp_of(job: Job) -> Stamp:
+    """The version id and day written into the job's file. A row with no time (inserted by an
+    older release) says the day it finished, or was uploaded."""
+    when = as_utc(job.output_changed_at or job.finished_at or job.created_at) or utcnow()
+    return Stamp.of(job.id, job.output_version or 1, when)
+
+
+def version_id(job: Job) -> str:
+    """The id shown to people: the first six characters of the job id, a hyphen, the count."""
+    return stamp_of(job).version_id

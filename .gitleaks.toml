@@ -15,3 +15,10 @@ regexes = ['''phc_nT2JxCxLcAiSQGP4d4iJ2mWef6k3gNa6ptFaEJmz5cJ9''']
 description = "OpenStax page slugs in figure gold"
 regexTarget = "line"
 regexes = ['''"page_key": "[a-z0-9-]+"''']
+
+# An Alembic revision id (12 hex characters) in the migration tests, under a name that holds
+# the word "tokens" (the request_tokens table): tests/test_web_jobs_migrations.py.
+[[allowlists]]
+description = "Alembic revision id of the request_tokens migration"
+regexTarget = "line"
+regexes = ['''REQUEST_TOKENS = "[0-9a-f]{12}"''']

@@ -127,6 +127,8 @@ def live_sample(session: Session, user_id: str, now: datetime | None = None) -> 
 def open_for(factory: sessionmaker[Session], settings: Settings, user_id: str) -> str:
     """The id of the person's sample document: the one they have, else a new one made now
     from the recorded result (no model, no pages, no spend)."""
+    from readablestem.web import output  # output imports the app's deps
+
     sample = load()  # outside the transaction: the first call crops the pages
     now = utcnow()
     with session_scope(factory) as session:
@@ -153,6 +155,7 @@ def open_for(factory: sessionmaker[Session], settings: Settings, user_id: str) -
         )
         job.result_json = sample.result.model_dump(mode="json", exclude={"html"})
         job.html = sample.html
+        output.output_changed(job, output.CONVERTED, now)  # version 1, made again with its id
         session.add(job)
         session.flush()
         session.add(

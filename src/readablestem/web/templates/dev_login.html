@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
 {% block title %}{% if error %}Error: {% endif %}Development sign-in{% endblock %}
 {% block content %}
 <h1>Development sign-in</h1>
@@ -10,14 +12,11 @@
   address that has no account gets one, in the open tier. A blocked address is refused.{% else %}
   The allowlist still applies: the address must be allowed (for example with
   <code>readablestem users allow EMAIL</code>, or listed in <code>ADMIN_EMAILS</code>).{% endif %}</p>
-<form method="post" action="/dev-login" novalidate>
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <div class="field{% if error %} field-error{% endif %}">
-    <label for="email">Email address</label>
-    {% if error %}<p class="error-message" id="email-error"><span class="visually-hidden">Error: </span>{{ error }}</p>{% endif %}
+{% call form("signin.dev", "/dev-login", {"novalidate": true}) %}
+  {% call(aria) field("email", "Email address", error=error) %}
     <input type="email" id="email" name="email" autocomplete="email" spellcheck="false"
-           value="{{ email }}"{% if error %} aria-invalid="true" aria-describedby="email-error"{% endif %}>
-  </div>
+           value="{{ email }}"{{ aria }}>
+  {% endcall %}
   <button type="submit" class="button">Sign in</button>
-</form>
+{% endcall %}
 {% endblock %}

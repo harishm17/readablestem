@@ -1,4 +1,4 @@
-# Layout analysis (`pipeline/layout.py`, `pipeline/heading_step.py`)
+# Layout analysis (`pipeline/layout/`, `pipeline/heading_step.py`)
 
 Step 1 of the conversion: a PDF becomes a list of `Element`s (headings, paragraphs, list
 items, display and inline equations, figures, data tables) in reading order, with no model
@@ -14,9 +14,10 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048, tag_dpi=False) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped; `tag_dpi` writes the resolution into the PNG header (equation crops for the student file, `pipeline/equation_scale.py`) |
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
-| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span color, for the text pass |
+| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space), span color and size, and its face's weight, slant and pitch, for the text pass |
+| `page_paint(page) -> (list[Strike], list[Highlight])` | thin horizontal rules and bars, and StrikeOut annotation quads, of an open page, with its Highlight annotation quads and filled rectangles within 36 × 600 pt (display space), from one read of its drawings, for the text pass |
 | `heading_step.heading_fixes(elements) -> list[Fix]` | one `HeadingFix` per heading, outline repaired, with checks and confidence |
-| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour) -> TextPassResult` | the elements with links, color runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
+| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour, runs) -> TextPassResult` | the elements with links, color runs, struck runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
 
 Element conventions:
 
@@ -29,11 +30,20 @@ Element conventions:
   the math was. Display equations have `display="block"` and no parent.
 - **Equation numbers** ("2.4", "(2.4)", "[2.4]", "Eq. 2.4") of a display equation are in
   `equation_label`, as printed, and are not in its `text` or `bbox`, so they are not in
-  the crop the model transcribes.
+  the crop the model transcribes. A symbolic tag ("(*)", "(†)") is one too. A number at the
+  right edge is never a paragraph of its own: it is the label of the equation piece on its
+  baseline (in either column of a page with a two-column section below, the same column
+  first), or, when it is centered between lines, of the nearest piece within 2.5 font sizes
+  that has no number yet and is not level with a numbered line; a number that fits none
+  stays text. A number of one column does not go to the math of the other when text of its
+  own column stands within two lines of it. Equation pieces that
+  `display_grouping` does not join keep a number each, or none. A number set less than a
+  font size from its equation (a `multline`'s) is not cut off and stays in the equation's text.
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
   `text` does not include the marker.
-- **Boxes** are PDF points in display space: the page's `/Rotate` is applied, so a
+- **Boxes** are PDF points in display space: the page's `/Rotate` is applied (and the turn of
+  a page saved sideways with none, "A page saved sideways" below), so a
   landscape page reports `(792, 612)` in `page_sizes` and `crop` uses the boxes as they are.
   The origin is the top-left of the CropBox; content outside it is ignored and figure boxes
   are clipped to the page.
@@ -41,11 +51,14 @@ Element conventions:
   `"larger font"`, `"raster image"`, ...). They never contain document text.
 - **Text** is copied from the PDF with whitespace collapsed and invisible characters
   (zero-width and control characters) removed. Text nobody sees on the page is never
-  content: render mode 3, 5 % opacity or less, or painted over by an image or a filled
-  shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
+  content: render mode 3, 5 % opacity or less, under 2 pt, in the color of what is behind it,
+  or painted over by an image or a filled shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
   look-alikes `〚` `〛` (U+301A/U+301B) in every piece of document text, so a PDF cannot
-  fake a marker: every marker in an element's `text` is a real inline child of it. Word's
-  private-use Symbol bullet (U+F0B7) becomes `•`.
+  fake a marker: every marker in an element's `text` is a real inline child of it. Private-use
+  codes of symbol fonts (Word's Symbol bullet U+F0B7 is `•`) are mapped by `font_codes`, by font name.
+- A `"Table N ..."` or `"Figure N ..."` line is a caption by one pattern, `core/captions.py`
+  (N Arabic or Roman; "Table 2 shows that ..." is not one), shared by the table step, the
+  figure step and the HTML check.
 - Figures carry the nearby `"Figure N ..."` text in `caption` and any labels drawn inside
   or right next to them (axis titles, tick labels) in `text`.
 - **Tables** (since pipeline 0.4.0) are `Kind.TABLE`: `table` is the grid built from the
@@ -55,6 +68,51 @@ Element conventions:
   `"aligned text grid"`, `"box extended along rules"`, `"SLANet-plus grid"`,
   `"drawn cell grid"`, `"PyMuPDF grid"`, `"continued from previous page"`). How tables
   are found: [tables.md](tables.md).
+
+## Where the code is (`pipeline/layout/`)
+
+The layout step is a package of one module per stage, in the order a document is read. A module
+imports only from the ones above it in this list, so there is no import cycle and a stage can be
+read with the stages before it. `pipeline/layout/__init__.py` holds the package docstring (how a
+page is read) and re-exports every name that code or a test outside the package uses
+(`analyze`, `crop`, `release`, `Layout`, `LayoutError`, `REASON_*` and the private helpers the
+tests import), so `from readablestem.pipeline import layout` and `layout.analyze` work as before.
+
+| Module | What it holds |
+|---|---|
+| `context` | `_Document`, the document context (below), the result types `Layout`, `LayoutError`, `PageStatus`, and the page guard that keeps one failing page from stopping a document |
+| `access` | opening the PDF under the one lock, the document cache, the probe process (see "Untrusted PDFs"), the content budget, `crop`, `crop_line`, `render_page`, `page_ink`, `release` |
+| `glyphs` | `_Char`, font classes and styles, character classes, text cleaning, `glyph_style` |
+| `shared` | the types the stages hand to each other (`_Row`, `_Block`, `_Run`, `_Figure`, `_Region`, `_Path`, ...) and the few helpers more than one stage needs |
+| `entries` | where a list of entries (an index, a glossary, key terms, an outline) starts a new entry, asked only with the region tree on |
+| `rows` | lines merged into rows, form fields, ligatures, right-to-left text, stacked fractions, scripts, big operators, reaction arrows; `line_glyphs`, `page_glyphs`, `page_paint` |
+| `drawings` | the vector paths of a page: lines, turns, boxes, radicals, rules, axes |
+| `figures` | raster images and their budgets, vector clusters, diagrams, plots, labels and their owners, page furniture bands |
+| `furniture` | margins: running heads, page numbers, margin notes |
+| `order` | columns, the gutter, full-width lines and reading order |
+| `inline_runs` | inline math, math pictures, chemistry and nuclides |
+| `display` | display equations and the number beside them |
+| `lists` | list markers and levels |
+| `blocks` | rows grouped into paragraphs, headings, list items, captions, code, contents lists, entries, with their text |
+| `tables` | table claims: the cells of a found table taken out of the page, their math and key terms |
+| `regions` | the region tree (`REGION_TREE`, off): the page cut into regions before its lines are made, and the reading order taken from it ("The region tree") |
+| `page` | one page, from its rows to its blocks (`_page_blocks`); figure labels, pen marks, drawn rules, footnote marks |
+| `joins` | passes over the whole document: run-in labels, numbered headings, paragraphs that go on over a page break |
+| `bold` | bold-letter runs and glossary entries |
+| `notices` | what was left out or could not be read |
+| `elements` | blocks turned into `Element`s, with contents and footnote links |
+| `document` | `analyze`, `_analyze_document` (the steps in order), slide decks, heading levels |
+
+A step that runs for one page is called by `_analyze_document` (in `document`), so a test that
+makes a step fail patches it in the module that calls it, not in `layout`.
+
+**The document context.** What is known about the document being read (made by TeX, a slide
+deck, how it spells its compounds, whether its displays are grouped) and the ink and detector
+budgets are one `_Document`, made by `analyze` and passed as `document=` to the steps that read
+it. Nothing about a document is kept in a module, so two documents read at once (one in the
+middle of the other, through the page-math hook) cannot change each other. `_PLAIN`, the
+document with none of these set, is what a caller outside a read gets by default. `_LOCK`
+guards PyMuPDF, its warning store and the caches, nothing else.
 
 ## How a page is read
 
@@ -73,13 +131,50 @@ Element conventions:
    is off.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
-   line and cannot be told apart. Ligatures are expanded.
+   line and cannot be told apart. Ligatures are expanded. A glyph the file's own table does
+   not decode is read by the name the font gives it (`pipeline/glyph_names.py`, "Glyph names"
+   below), then, for a font with no usable table, as what the font draws
+   (`pipeline/font_codes.py`, "Font code tables" below); one that stays undecoded is a gap mark.
+   **ActualText** is chosen once per page (`page_type.actualtext_flag`). A file can give a span
+   the text it means in place of the glyphs' own (Chromium does for Hindi conjuncts and CJK;
+   a tagged PDF does for a figure's labels, and a scan's hidden layer may). A page that carries
+   it is read both ways, with and without (`TEXT_IGNORE_ACTUALTEXT`). It keeps ActualText when
+   the two readings say the same words (they differ only in spaces, hyphens, format
+   characters or composed forms: a hyphen at a line end that the file marks as a soft one
+   stays soft), and when the reading without it holds more U+FFFD, Kangxi radicals (U+2F00 to
+   U+2FDF) and private-use characters. It is read without it otherwise, so the printed labels
+   a replacement dropped are read. A page is never mixed, a span at a time. A page with no
+   ActualText is not read twice and does not change. Every reader of a page's characters
+   (rows, `line_glyphs`, `page_glyphs` for the text pass, the page type, the page labels, the
+   tagged headings, the bold letters of equations, the page audit's words, and the review
+   probe's region text and glyph marks) adds the page's flag to its own, so no two steps
+   disagree about what the page says. The choice is kept on the open document.
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
-   two), unless it stands out and changes: a line at least 1.15 x body size or bold whose
-   exact text differs between pages (`Problem 3 (15 points)` at the top of each page) is
-   content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size. The
+   two), unless it stands out and changes: a line at least 1.15 x body size, or bold and
+   within 0.5 pt of the body size or larger, whose exact text differs between pages
+   (`Problem 3 (15 points)` at the top of each page) is
+   content and stays. A fixed text (`PHYS 101 Lecture Notes`) goes whatever its size.
+   A running head whose words change with the section (a textbook's chapter title on the
+   right pages and the section title on the left ones, with the page number beside it) is
+   found by its place instead, in the top or bottom 10 % of the page (textbook heads sit
+   lower than the 7 % of an exact repeat): a line that sits at the same height (within 2 pt)
+   and size (within 0.5 pt) on at least half of the left pages, or of the right pages (and at
+   least two), and is apart from the body (smaller than it by 0.5 pt, italic, or another font
+   family) goes when the line is a head's or a foot's by more than its place: a whole
+   number on it goes up by the pages between, from one page of the place to the next, on
+   half of those steps (the page number; an excerpt joined from parts of a book jumps at
+   each join), or the same words with letters in them stand at the place on two pages. The
+   place alone would also take the last line of a footnote, a one-line footnote or a slide's
+   source line, which sit at one height in small type on page after page. So a row less
+   than 0.6 of its height from a kept row next to it towards the middle of the page stays
+   (it goes on from the text), and a row that opens with a character at most 0.85 of its
+   size (a note's mark) is never a head. A repeated heading (`Solution`, `Example`) is bold
+   and as big as the body or bigger, so it is not apart from it and stays; a first line of
+   the body in the band stays too. A bare page number that shares a line with a line that
+   stays (a table cell) is not dropped, and a number set at heading size is a chapter
+   number, not a page number. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
@@ -93,17 +188,17 @@ Element conventions:
    labels in the footer band dropped as page numbers, an axis title repeated under each
    chart of a deck dropped as a running footer, and a repeated rotated y-axis title
    dropped as a watermark). A dropped row is a label when it is at most 40 characters,
-   not diagonal, and within 8 x its font size of a figure or of the short rows just
-   beside it (its tick labels), level with it for a rotated row. Bare numbers count only
+   not diagonal, and the one label rule below takes it (`_label_owners`: within one font
+   size of the figure's nearest stroke, or of a label the figure holds already; a rotated
+   row 2.5 times as far, up to 40 characters). Bare numbers count only
    two or more on one baseline (tick labels), or alone when level with a figure (the
    axis title `v` at the top of a full-page plot's y-axis, which the page-number rule
    reads as a roman numeral) and the same band of the other pages holds no changing
    number there (a page number beside a figure that reaches into the band stays a page
    number; since 2026-10-12); other text only when it is beside a figure on every analyzed page it was
    dropped from (`_label_keys`), so a running footer that also runs under pages of text
-   stays dropped. The rows taken back are the figure's labels, in its text and its crop,
-   however far from it within that reach (`_take_labels`; before, tick labels 6 pt under
-   the x-axis were read as paragraphs of one digit each). A short footer repeated under a
+   stays dropped. The rows taken back are the figure's labels, in its text and its crop
+   (before, tick labels 6 pt under the x-axis were read as paragraphs of one digit each). A short footer repeated under a
    chart on every page of a document is read as text (noise, not a loss).
 3. **Columns.** Narrow lines (at most 55 % of the text width) are projected onto the x-axis.
    A gap of at least 8 pt in the middle half that no narrow line touches (or at most two,
@@ -137,8 +232,31 @@ Element conventions:
    font size matches (within 1 pt or 12 %), the baseline step is at most 1.3 x the typical
    body line pitch, it starts within the paragraph's horizontal span, it is not a first-line
    indent after a short line (LaTeX paragraphs), and it does not start a list item or a
-   `Figure N` caption. A row continuing a list item never starts left of the item's
-   marker (so the paragraph after a list is not swallowed by its last item). A change
+   `Figure N` caption. While a run holds only its first line, and that line is indented,
+   runs to the right edge of its column (`_RightEdges`: the end that a quarter of the
+   column's lines of that size reach), is no list item or caption and does not end a
+   sentence, the next line may start up to 4 em to its left (`INDENT_REACH`): the second
+   line of a paragraph that opens with a typewriter's tab is not a new paragraph. Two lines
+   centered on one another (an author over an affiliation) and a line that opens with a
+   reference number ("[20]") are not that. A
+   two-line paragraph whose second line falls short of the first stays cut. A row continuing a list item never starts left of the item's
+   marker (so the paragraph after a list is not swallowed by its last item).
+   An entry of a glossary, an index or a bibliography is a block of its own (SW34b), by three
+   signals that need no heading over them: a lead term (bold, italic or small capitals, at a
+   line's start at the paragraph's left edge, ending in a period or a colon, after a line that
+   does not end in a lead term or run full to the right edge in mid-sentence; `_lead_end`,
+   `_starts_entry`); a single capital letter alone on a line, bold or larger than the text, with
+   the line right under it starting with that letter, three or more different letters set that
+   way in one size and typeface through the document (`_letter_rows`: a heading one level
+   under the section's, `REASON_LETTER`; the test reads the line under the letter and not the
+   order of the columns, so it holds on an index of three columns and never takes the panel
+   labels of a figure); and a hanging indent shared by three or more entries in a row, each a
+   line at the left edge with lines that start 1 to 4 em further right, the same distance for
+   every entry, the lines that go on running to the right edge or stopping where the next
+   line's first word no longer fits (`_hanging_entries`, `_flows`; a contents list nested by
+   indent stops where each title does, so it is not one). An entry of one line between such
+   entries, at their left edge and short of the right edge, is an entry too (`_one_line`). A one-line entry followed by an indented paragraph starts a paragraph of its own
+   (`_continues`). A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
    pitch is the last line of the sentence above (`... exactly one solution,` / `x =
@@ -161,6 +279,21 @@ Element conventions:
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
    counted, so a break never vouches for itself.
+   Two lines that end and start in a script written without spaces (Han, Hiragana, Katakana,
+   Thai, Lao, Khmer, and their full-width punctuation) join with no separator
+   (`blocks._line_break`).
+   A break that falls inside one token leaves it whole (`hyphens.joins_inside_token`, for
+   paragraph text, headings, captions, list items and the cells of a table): a digit, a
+   hyphen and a digit keep the hyphen with no space (`(2012-08-` / `17)`); a line that ends
+   in `/`, `.`, `_`, `-` or `=` inside an address (a scheme or `www.` start, or a `/` or `@`
+   in the word) goes on from it (`project/` / `memspectrum/`), with the hyphen of an address
+   never dropped; a full stop joins only a host that still lacks its suffix (`www.example.` /
+   `org`, with a lowercase start), so a sentence that ends with an address keeps its space
+   and so does an address with a path that ends in a full stop; a non-breaking hyphen
+   (U+2011, also U+FE63 and U+FF0D) after a letter or digit is a compound that must not
+   break (`easy-` / `to-use`), kept as written. The address test reads the word before the
+   break; the page's link annotations, which would settle the ambiguous cases, are not read
+   yet.
    Inline math that wraps from one line to the next is one equation (`_wrapped_inline`): a
    relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
    minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),
@@ -172,13 +305,16 @@ Element conventions:
    a page (footnotes in smaller type below it, and the running header and footer the margin
    filter dropped, are not in the way) does not end a sentence, the top block of the next
    page starts with a lower-case letter, and the two share size, typeface, weight and left
-   edge with no first-line indent, both at the text area's edges. The element keeps the
+   edge (or the left edge of another body block of its page: a two-column page that ends in
+   the right column and goes on in the left column of the next, which needs a tail of two
+   rows or more, since a one-line tail across columns is too often a license line) with
+   no first-line indent, both at the text area's edges. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
    part keeps its own page for its crop. A hyphen at the page break is repaired like one at
-   a line break. A paragraph that starts with math, a break between a column on one page
-   and a column on the next, and a list item (a lowercase paragraph after a list item at a
-   page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
+   a line break. A paragraph that starts with math, a break onto a column that is not at the
+   left edge of a body block of the next page, and a list item (a lowercase paragraph after
+   a list item at a page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
    the last part (None when it ends on its own page). The assembler writes the page markers
    of the pages after `page` up to `last_page` right after the joined paragraph (`marks_after`),
    never inside it, so the markers stay in order and continuous (Page 1, Page 2, Page 3) and the
@@ -191,6 +327,82 @@ Element conventions:
    joined ones, are not carried and are shown as "decide again" or counted in
    `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
    unchanged.
+
+### The region tree (`REGION_TREE`, off in code and in production)
+
+`pipeline/layout/regions.py` (and `entries.py`). The reader above finds one gutter for the page,
+merges the page's fragments into lines and then orders the lines. A page with three columns, a
+notes column, text on both sides of a picture or a boxed sidebar has no one gutter, so its lines
+are read across the columns. With `REGION_TREE=on` the page is cut into regions first and read
+from the tree; with `off` (the default) none of this code runs and the output is byte-identical
+(a hash of `layout.analyze` over 996 PDF-and-variant pairs: 0 differences).
+
+**What a region is.** A node of a tree, with four kinds. A `leaf` holds lines read top to bottom
+(and, in a leaf, baselines are merged: a line never runs across a column, a picture or a box,
+because merging happens only inside one leaf). A `stack` is horizontal cuts: its children are
+read from the top. `cols` is one vertical cut: its children are read left to right, with a notes
+column last. A `grid` is a set of labeled cells read in label order. The items cut are the
+unmerged line fragments, the page's raster pictures (they occupy space), the rectangles drawn
+round text, and nothing else; tables are claimed before the rows are made (`_claim_tables`), so
+their cells are not items.
+
+**The cuts.**
+
+- *Horizontal.* Items are grouped in bands (items that overlap vertically). A run of bands that
+  keep one set of white channels is a segment. A band that does not (a line that spans the
+  region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
+  only when the band below is side by side (rule 6).
+- *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
+  lines each side (two on a slide) and a line of three words or more cuts it in two. Each side is
+  cut again, so a page has at most three columns. A column at most 0.35 of its neighbor's width
+  and at most 0.6 filled is a notes column: it is read after the body block it stands beside (at
+  block level) or after the whole body (at row level).
+- *Boxes (rule 2).* A rectangle drawn at least 40 x 18 pt and less than 0.8 of the page, holding
+  at least two lines and crossed by none, is cut as a region of its own, ordered inside itself
+  and read as one item. Touching filled pieces are joined. With text beside it, it is read at
+  the first block break below its bottom edge.
+
+**The rules, in the order they run.** The numbers are the plan's (WS15.1).
+
+1. Flat bands: one-column bands continue a one-column segment.
+2. Box regions (above).
+3. Section breaks in a column pair: `order._section_break` with `_ColumnExtent`, captions in the
+   extents, items taller than 2.5 body lines skipped, one line of large type allowed to be as
+   wide as its column; a short item directly above a spanning item opens it.
+5. Footnote zones: lines at most 0.92 of the body size at the foot of a column, at most 40 % of
+   it, are read at the end of the page.
+6. Wide gap (above).
+8. Options in label order: `(A) (B)` over `(C) (D)` and `(A) (C)` over `(B) (D)` read A, B, C, D;
+   a grid of labeled cells is a `grid` node.
+9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
+   on): on a page of 20 or more lines, half ending in a page number, median line seven words or
+   fewer, a line at the entry margin after a line that ends in a number starts a new entry.
+10. Entry lists: a line at the first line's edge starts a new paragraph when the run hangs (a
+    glossary), or when both open with a section number or a bold term.
+12. Numbered runs, the reordering only: where a run of six or more numbered labels is out of
+    sequence, the column-by-column reading is used if it makes the run consecutive.
+
+Rules 4 (a foot heading), 7 (the question rule) and 11 (labels given back to the text) were
+built, measured and taken out: leaving each out changed no page of the development sets, or
+adding it changed none. Rule 13 was not ported, and rule 12's page check was not built.
+
+**How it is wired.** `RegionTree` stands where the gutter stood: `order._Ordering` is a protocol,
+`Gutter` is `tuple | _Ordering | None`, and `order._reading_order` hands the boxes to
+`gutter.order(...)` when it is not a pair. `page._prepare_rows` returns the tree when
+`_Document.region_tree` is set; the row-level and the block-level calls differ (`blocks=True` only
+on the final block-level order of `_page_blocks`). Row `column` names are the tree's
+(`L`, `R`, `LL`, a `#k` suffix for a box, `~index` on an index page). The setting is
+`Settings.region_tree` (`off` or `on`), passed by `run.py` and the say-once report as
+`layout.analyze(region_tree=True)`.
+
+**Measured** (`eval order --set layout-dev-1` and the corpus gold pages, no model, scored on
+the elements): 267 development pages, 141 right off, 154 on (22 made right, 9 made wrong);
+91 corpus gold pages, 69 right off, 82 on (13 made right, none made wrong). Added alone on top
+of rules 1 to 8: rule 9 made 1 page right, rule 10 made 8, rule 12 made 1, none made one wrong.
+Leaving one of rules 1 to 8 out (pages that stop being right / pages that become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4 and 7 0/0. Speed: 0.575
+(off) and 0.578 s per page (on).
+
+**Why it is off.** It makes 9 development pages wrong while making 22 right, and the 9 are mostly pages with a table, an algorithm box or a figure at the top of one column (the other column's first lines are read first or the table is read after the text below it), two pages where a paragraph is joined across the columns or an inline formula line is read into its paragraph, and a page with line numbers in the margin, where every line becomes its own element. Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION` bump and a recorded re-measurement first.
 
 ### Headings
 
@@ -444,6 +656,13 @@ the capitals drawn in an RSFS or EUSM face (`scr`): `docs/steps.md`, "Correction
   left alone. Not read: a glossary set as an unruled two-column table (the Word fixture
   in the dev set), an entry split across a page break, and terms and definitions that
   share a line without a bold term.
+  Outside such a section, three or more paragraph blocks in a row that open with a lead term
+  are entries too when their terms are in alphabetical order (`_lead_entries`,
+  `_listed_terms`): the run is one `<dl>`. Two are a sentence with a bold start. A theorem
+  and its proof, the cases of a proof ("Case 1:", "Part A:") and the speakers of a dialogue
+  ("Simon: ...") open with a lead too and are not a list of terms: their leads are in no
+  alphabetical order, carry numbers, or differ only in the last word, and they stay
+  paragraphs, each a block of its own. One term in ten may be out of place.
 - **Teacher tags.** OpenStax's level tags at the start of a paragraph or item, `[BL]`,
   `[OL]`, `[AL]`, `[All]` and runs of them (`[BL][OL] Describe a scenario ...`), are dropped
   (`_strip_teacher_tags`); a screen reader would spell them out. Only those four, in
@@ -455,7 +674,8 @@ A row starts a list item when it begins with a marker followed by the item's tex
 within 3 x font size:
 
 - a bullet glyph (`•` `◦` `▪` `▫` `■` `□` `●` `○` `‣` `⁃` `➢` `✓` `►` `▸` `▶` `▹` `◆`,
-  Word's private-use Symbol bullet, beamer's AMS triangle `▶`);
+  Word's Symbol and Wingdings bullets (private-use codes, mapped by `font_codes` before this
+  step), beamer's AMS triangle `▶`);
 - a bullet drawn as a small shape (at most 0.6 x font size) just left of the row at its
   height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
   filled squares "▪";
@@ -495,9 +715,16 @@ it becomes inline equations with the item as their parent.
 
 Every character is classified: **math** (a math font such as CMMI, CMSY, MSBM, STIX,
 Cambria Math, Latin Modern Math, Noto Sans Math, Symbol; a Unicode math-italic letter like
-`𝑣`; Greek; a symbol that only occurs in math such as `∑ √ ≤ × →`), **digit**, **operator**
+`𝑣`; a Greek letter that is not part of a Greek word (below); a symbol that only occurs in math
+such as `∑ √ ≤ × →`), **digit**, **operator**
 (`+ - * / = < > ^` and the minus/plus-minus signs), bracket, letter, code (monospaced) or
 other. A minus sign alone is not math evidence: groff prints command-line options as `−d`.
+A run of two or more letters of the Greek script (U+0370 to U+03FF and U+1F00 to U+1FFF,
+accented letters included) in a text font is a Greek word, and prose (`glyphs.mark_greek_words`,
+set when the rows are read); so is the article "η" or "ο" with a Greek word beside it. Two
+letters count as a word only on a line that holds a Greek word of three or more letters: alone
+in a line of another language ("Δθ") they are two symbols. A lone Greek letter, and Greek in a
+math font, stay math.
 
 - **Display equation rows**: `parse.equation_score >= 0.5`, no prose word (3+ plain
   letters other than `sin`, `log`, units like `mol`; or English two-letter words like `is`,
@@ -648,10 +875,12 @@ other. A minus sign alone is not math evidence: groff prints command-line option
   with a real minus sign (`−3`); or a relation with operands on both sides (`x = 5`, not
   markup such as `<a><b/>`). Without a math character the run's brackets must also
   open and close in order. A lone italic word, `[3]`, `10-12` and `2019` are not math.
-  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run; math
+  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run, and a run
+  starts at the accent TeX sets before its first letter (left in the prose, the accent was
+  lost: 7 inline equations in the first four pages of 15 arXiv papers); math
   function names (`sin`, `lim`, `proj`, `rank`, `diag` ...) are not English words. List
-  bullets (`•`, `▪`, Word's private-use Symbol bullet U+F0B7, and a `·` or `∙` that
-  starts a line) are never math, even in the Symbol font Word draws them in.
+  bullets (`•`, `▪`, Word's Symbol bullet (U+F0B7, mapped to `•` by `font_codes`), and a
+  `·` or `∙` that starts a line) are never math, even in the Symbol font Word draws them in.
 - When `,` `.` `;` `:` or `?` follows an inline equation, its box's right edge moves left by
   up to `CROP_PAD` (crop's default padding, 2 pt) so the padded crop ends where the
   punctuation starts and still holds every glyph. The mark stays in the paragraph after
@@ -671,6 +900,28 @@ Modern Sans):
 - MuPDF's superscript flag is set on any span that starts above the previous one, which
   in TeX output is most of a line after an inline fraction, so a character is a script
   only if it is smaller, or flagged and raised by at least 0.2 x font size.
+- **Small capitals are text.** Word, LibreOffice and TeX with a scaled font print the lower-case
+  letters of "Lotka" as capitals at 80 % of the size, on the baseline, in the same font: a
+  full-size "L" and the smaller "OTKA". Size alone made them a base with scripts, and an inline
+  equation in the middle of a name. A script is off the baseline (a Word subscript is lowered by
+  12 % of the row size, the least `SCRIPT_OFFSET` accepts is 4 %). `shared.mark_small_capitals`
+  sets `_Char.small_cap` when the rows are read. Its unit is a word of capital letters in one
+  font, all on the baseline (to within `SMALL_CAP_BASELINE`, 5 % of the row size), with no letter
+  or digit next to it. A letter smaller than the word's largest (`SCRIPT_RATIO`) is a small
+  capital, and that is a lower-case letter of the source: the word is lower-cased there ("Lotka",
+  "Volterra", "LongMemEval" printed as `L ONG M EM E VAL`), so search and speech get the word. A
+  word of small capitals only is lower-cased as well when its font and size are those of a small
+  capital found on the same line ("and" in `P OLICIES AND P ROCEDURES`: 68 such words in 10 of
+  the 19 corpus PDFs the rule touches). On a line with no such word it is left to the size rule,
+  as is a capital next to a lower-case letter or a digit: an all-small-caps "OTKA" by itself does
+  not say whether it is a name, an acronym or the name of a function in a formula (`OPT(x)` in a
+  set: read as text it cut that formula in three, measured on a corpus upload), so it reads as
+  before.
+  `_Row.is_script` and the tests of a glyph's size against its row's that decide "script" from
+  size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip `small_cap` glyphs; the
+  tests that also look at the baseline (`_script_glyphs`, `_Row.size`, `_stack_position`,
+  `_over_arrow`) need nothing. TeX's `\textsc` in a font of its own (CMCSC10) is one size with the
+  lower-case letters in the file: it reads as typed and was never affected.
 - Beamer sets math letters in Latin Modern Sans Oblique, a text font. Short italic runs
   (at most three letters) are variables, not words, when the row also has upright
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
@@ -683,14 +934,44 @@ after the page rows are read, before the margin filter) shows `slides.detect` ev
 page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
 
 - **Detect.** At least 80 % of the pages are slide-shaped (landscape 4:3, 16:9 or 16:10, within
-  2 %; a landscape Letter or A4 sheet is not), and either `/Creator` says Beamer or, for any other
-  file, the pages have at least two different labels and the labels group some pages and not all
-  (a label tree with a prefix and no numbers labels every page alike and is not evidence). Anything
-  else is read as before (`_SLIDE_DECK` False: no rule below applies). A page kept whole as its
-  image (a photographed slide) has no text, is never dropped, and never makes the pages beside it a
-  frame.
+  2 %; a landscape Letter or A4 sheet is not), and the file is one of: `/Creator` says Beamer; the
+  pages have at least two different labels and the labels group some pages and not all (a label
+  tree with a prefix and no numbers labels every page alike and is not evidence); or at least
+  70 % of the pages have a title (`slides.TITLED_SHARE`): the largest text in the top third, or a
+  title slide's title (below). The last needs no Beamer and no labels, which is what a PowerPoint
+  or Keynote deck exported as PDF has. 70 % is chosen from the files measured: the decks have a
+  title on 91 to 100 % of their pages and the slide-shaped files that are not decks (photographed
+  and pictured slides, a template page) on 0 to 33 %, so any share in between separates them;
+  70 % keeps a deck with a third of its pages untitled (a picture slide, a credits page). For
+  the titles route a Letter or A4 sheet on its side counts as a slide page too: a deck printed to
+  PDF is on one (the one such file among the corpus uploads, 39 pages, has a title on 97 % of
+  them; the corpus holds no landscape sheet that is not a deck, so the titles are the only guard
+  measured). Beamer and page labels still need the slide shape. A landscape file with no titles,
+  a portrait document and a landscape table are not decks and are read as before (`_SLIDE_DECK`
+  False: no rule below applies). A
+  page kept whole as its image (a photographed slide) has no text, is never dropped, never makes
+  the pages beside it a frame, and is untitled.
+- **Several decks in one file** (`slides._decks`). A deck ends where the page size changes, and
+  where a title slide comes when the file's first page is one too. A title slide is a page whose
+  largest line is at least 1.25 x an ordinary slide's title (the median title size of the file)
+  and which has at most three other lines in its body (the top and bottom 12 % are headline and
+  footline): a title, a subtitle, an author, a date. Its title may be anywhere on the page. A deck
+  that starts on a title slide has that slide's title as its title (`Deck.starts`); the title's
+  lines are one title when they follow each other in one size. When the file has more than one
+  deck, or a deck has a title, every heading on a deck's pages gets the reason `slide_deck N`
+  (`slides.DECK_REASON`) and a deck title also `slide_deck_title`. `layout.heading_levels` then
+  judges heading sizes deck by deck: a deck's title is level 1, the other headings of the deck
+  are clustered by size from level 2, and a heading with no deck (the pages of a portrait part
+  between two decks) is judged on its own. So two lectures in one file have titles at one level
+  and slide titles one level below, whatever sizes each uses; `assemble.title_plan` (the one H1,
+  SW6c) then writes the document's title above the deck titles, or makes the only deck title the
+  H1. A file with one deck and no title slide gets no reasons and the levels it had.
 - **Frames.** Consecutive pages with the same label are one frame (hyperref gives every overlay
-  step of a Beamer frame its number); without labels, the same title text. The labels are read
+  step of a Beamer frame its number); without labels, the same title text. In a deck found by its
+  titles alone (no Beamer, no labels) a frame is a run of pages each of which extends the page
+  before it: every line and every picture or drawing of the earlier page is on the later one
+  (`slides._repeats`, the same test as below), at the same size. Two slides that share a title
+  and differ in content ("Example", "Example, continued") are two frames. The labels are read
   by `page_labels.pdf_label`, which decodes the UTF-16 form PyMuPDF returns for xdvipdfmx files
   (`<FEFF0031>`): `clean_label` refused it, so no Tectonic deck's own labels were used before
   (the page markers fell back to the number printed in the footline).
@@ -700,7 +981,9 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   and every picture and drawing is there too. Pictures are every raster image (a digest of its
   pixels, `get_image_info(hashes=True)`, empty ones skipped) and the vector drawings in the body
   (kind, color and box; the top fifth and bottom 12 % are the headline and footline), each within
-  3 pt of where it was. So `\pause`, `\item<n->` and `\uncover`, which only add, collapse, and a
+  3 pt of where it was. A page's pictures and drawings are read only when its rows are all on
+  the frame's last page (`slides.LazyMarks`), so a file that is not a deck never decodes its pictures
+  for this. So `\pause`, `\item<n->` and `\uncover`, which only add, collapse, and a
   step with a different picture, a changed row or a reordering stays. A dropped page is removed
   before margins, page types, tables and rows are read, so it costs no crop and no model call, and
   it is not in `Layout.pages`, `page_sizes` or `page_types` (as if the user had not selected it).
@@ -708,7 +991,8 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   pages of the frame are numbered: the title heading says "(step 1 of 2)". Measured on the
   fixtures: `beamer_overlay` 6 pages to 2 (67 % fewer), `slides_steps` 13 to 6 (54 % fewer).
 - **Frame titles.** A page's title is its largest text in the top third, at least 1.15 x the
-  deck's body size. It is always a heading (reason `slide_title`, plus `larger font` so the
+  deck's body size (the lines that follow it in the same size, each within half a line of the one
+  before, are part of it). It is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
   title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
   Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a
@@ -738,6 +1022,57 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   among its characters (`_spread_ligatures`) wherever layout reads characters from the PDF: the
   rows (so tables, whose cells come from them), `line_glyphs` and `page_glyphs`. Text running down
   the page is shared along y; other angles are left as MuPDF has them.
+- **Glyph names** (`pipeline/glyph_names.py`, `data/glyph-names.tsv`; every file). The text layer
+  decodes a glyph through the font's table to Unicode, or through its name when Adobe's list has
+  it. TeX's extension fonts (CMEX10, CMEX9, txex, LMMathExtension10) have neither for their sum and
+  integral signs, radicals, big brackets and the pieces of built-up ones, so MuPDF gives U+FFFD or
+  one of Adobe's private-use codes. The file still names each glyph inside the embedded font
+  program. `_text_blocks` runs a ladder over the page's raw text: (1) the file's own table
+  (MuPDF); (2) `glyph_names.recover`: the glyph's name, read with MuPDF (`fz_get_glyph_name`,
+  through PyMuPDF, so no font parser is added), looked up in one table kept as data (the names of
+  TeX's extension fonts; a sized variant such as `summationdisplay` is its base character, a
+  built-up piece the Unicode piece character: `⎧ ⎨ ⎩ ⎪ ⎮ ⎯ ⏐`); (3) `font_codes.remap`, by font
+  name; (4) `glyph_names.mark_gaps`: a glyph still undecoded becomes `output_chars.GAP` (U+2BD1), not
+  U+FFFD and not dropped. A raw character says how it was read in `"how"`: `"name"`, `"font"` or
+  `"gap"` (no key: the file's own table). Nothing reads the key yet; it is there to tell a
+  recovered character from a decoded one. A raw character becomes a glyph by font and origin
+  (`page.get_texttrace()` lists the glyph ids MuPDF drew), and by the character the text layer gave
+  it, because TeX draws an overlay (the slash of `\l`) at the origin of the letter it crosses; a
+  glyph two names would fit is left alone. A glyph's name is read once per font and page, and only
+  on a page that holds an undecoded glyph. The gap mark is not a private-use character: the output
+  filter (`output_chars.NOT_TEXT`) turns it into "[unreadable character]" on the student page, the
+  lint (`html_checks`) fails on it as it does on U+FFFD, and the sign check reads it as an
+  unnamed glyph that may be any sign (`signs._unnamed`). To rebuild the table:
+  `scripts/make_glyph_names.py` (source and license: `pipeline/data/README.md`).
+- **Font code tables** (`pipeline/font_codes.py`, `FONT_CODE_TABLES`, on; every file). A font with
+  no usable ToUnicode gives its codes as control characters, private-use code points or plain
+  letters that are not what is printed. `_text_blocks` rewrites them, before rows, markers, math
+  detection or any output read the page, so this module is the one place a code is mapped. Tables,
+  keyed on the font's base name (subset prefix removed): the Symbol family (Symbol, SymbolMT,
+  SymbolPS, Standard Symbols; OpenSymbol for its private-use codes), for private-use codes
+  (U+F061 is alpha) and Latin letters (SymbolMT's "h" is eta); Wingdings (not 2 or 3), the five
+  codes Word uses for bullets and an arrow (U+F0A7 `▪`, U+F0D8 `➢`, U+F0FC `✓`, U+F076 `❖`,
+  U+F0E0 `→`, or the Latin-1 letters a font with no ToUnicode gives); MT-Extra (U+F06C `ℓ`); the
+  APS math font AdvP4C4E74 (thorn is "+",
+  one-quarter "=", eth and capital thorn the parentheses); and the MathTime Pro 2 fonts (MT2MIT,
+  MT2MIS, MT2MIF, MT2BMIT, MT2SYT, MT2SYS, MT2SYF, MT2SYAT, MT2EXA: their parentheses read as "."
+  and "/", "+" and "=" as "C" and "D", their big delimiters, sums and bracket pieces as digits
+  and capitals). A MathTime row is keyed on the font and on what its glyph is read as, which is
+  the same in every form of the font a file holds. A glyph the reader gives as U+FFFD or a
+  private-use code is keyed on the name the file gives it (`_Table.named`, asked by
+  `glyph_names.recover` before its own table: a Type 1 slot name such as "NUL", or for the CID
+  form the glyph number as text); the names the table knows must agree on one character. A big
+  delimiter is the character it is sized from, a piece of a built-up one the Unicode piece
+  character. Glyphs not settled by eye have no row (a lozenge in MT2SYAT, the stretched part of
+  a long brace in MT2EXE) and a glyph read as a space cannot have one. The same code is another glyph in
+  another font (U+F0A7 is a club in Symbol), so a code is never mapped without its font. Also, for
+  fonts with no table: TeX's ligatures, dashes and quotes at control codes (OT1 or T1, told by the
+  font's own codes), a spacing accent printed over a letter becomes the accented letter ("Ren´e"),
+  and an unreadable glyph that starts two or more lines of a page, set off from the text by a gap
+  and nowhere inside a line, is a bullet. A code with no row stays as it was (and is a gap
+  mark by the end of `_text_blocks`). Left out: Wingdings 2 and 3, Webdings, ZapfDingbats, MSAM, the other MathTime fonts (MT2BMIS, MT2EXE and any not named above), and MSBM, whose
+  double-struck letters `_Char.styled` already gives equation text (`_LETTER_STYLE_FONTS`). With the setting
+  off, only U+F0B7 and U+F0A7 are mapped (to `•` and `▪`), whatever the font.
 
 Known gaps: Beamer's ball and circle bullets (Warsaw, Madrid and the other infolines themes) are
 small pictures, not drawn shapes, so a list in those themes is one paragraph (the default theme's
@@ -813,7 +1148,9 @@ OpenStax print from Chromium, where emphasis is italic and the unit is inside th
   `Element.caption_marked` has an inline marker where each formula was, and each formula is an
   equation element whose `parent_id` is the figure (id right after the figure's). `assemble` writes the
   math into the `<figcaption>`; the equation step reads them as any inline equation. Table captions
-  are not cut this way (the table step owns them).
+  are not cut this way (the table step owns them): a table caption is joined as a cell is, with its
+  raised and lowered glyphs marked (`tables._line_text`, "CP³" stays "CP³" in the layout output and
+  in the HTML).
 - **Bold italic.** `CMMIB`, newtx's `bmi`, Nimbus `MediItal` and `BoldItalic` fonts give bold-italic code
   points in the equation's text layer (`_Char.styled`), so the equation step can tell `\boldsymbol{x}` from
   `\mathbf{x}` (docs/steps.md "Letter-style check").
@@ -994,6 +1331,36 @@ Not done: equations that Word exports as vector drawings (EMF/WMF, drawn as path
 considered when the layout already made them a figure by `_vector_figures`; they are
 classified like a raster picture, but they have not been measured; handwritten equations.
 
+### Answer options and right-to-left text (WS2.4a, SW54a)
+
+Two things layout does not get right are never left silent: both set a reason on the
+paragraph or list item (`Element.reasons`). The run turns each into a decision on that
+element (`notices.text_decisions`, WS16.6 part 1): the element's own `Fix` with
+`status=NEEDS_REVIEW`, `review="required"` and the reason `text.rtl_order` or
+`text.option_labels`, the same fix shape a scanned page's paragraph has. Its proposal is the
+element's own words; the person says "Looks right", changes the words, or uses the page
+tools. A block with both flags has one decision, `text.rtl_order` (the words in the wrong
+order change what is read more than options run together do); the other flag keeps its bare
+required notice. The notice (`option_labels`, `rtl_text`, listed under "Not handled in this
+file") is derived from the pending decision (`notices.from_fixes`) and goes when it is made.
+A result stored before this has only the reason; `notices.from_reasons` still lists the
+notice, and `web.states` still holds that job at "Ready" (there is nothing to decide).
+Not built: the page record, the document card, and the per-source switch.
+
+- **Option labels** (`option_labels`, `_later_labels`, `_split_options`): a block that
+  starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
+  its text, set off by a gap wider than half an em, is a grid of options that reading order
+  merged. A line of text that stands alone is cut at each later label, one run per option;
+  any other block is kept whole and flagged. Where a table is detected over the grid, the
+  table keeps it (WS2.4b).
+- **Right-to-left text** (`rtl_text`, `_rtl_words`): a block with two or more words that
+  have a strong right-to-left letter (bidi class R or AL) is flagged, because the order of
+  the words in the row is the PDF's, which is not always the reading order (the reorder,
+  SW54b, is on hold). A lam-alef ligature glyph (`_swap_lam_alef`) comes out of MuPDF with
+  its two letters reversed ("إىل" for "إلى"); where an alef-family letter and a lam share
+  one glyph box they are put back in order, in `_text_blocks`, so every reader of
+  characters sees it.
+
 ### Bold letters in prose
 
 Only with `FEATURE_NOTATION_MEMORY` on (the run's `ConversionOptions.notation_memory`);
@@ -1003,7 +1370,7 @@ give as a plain letter, heard as the article "a" (UX review MF2). Layout makes i
 inline equation, and the equation step fixes it without a model call
 (docs/steps.md "Course notation").
 
-Two functions in `layout.py`, nothing else in the page flow changes:
+Two functions in `layout/` (`blocks._bold_letter_runs`, `bold._settle_bold_letters`), nothing else in the page flow changes:
 
 1. `_bold_letter_runs`, per paragraph row, beside the inline math runs:
    - a math run that is one bold letter (a bold omega in CMMIB, a math bold code point)
@@ -1176,11 +1543,31 @@ math by the document's evidence; the equation step's own tiers then decide it.
   sweep: a warning icon, a benzene ring, a number line, math drawn as glyph outlines, a
   hand check mark). On a page with a line of text or more, they are grouped (within 24 pt) and
   each group is kept when it is at least 6 pt on its longer side or has 3 marks in
-  different places. Pen marks (most of their paths are the page type's pen strokes, or
-  every path is an open stroked line or curve, or a hand mark over typed text, below: a
-  check mark, a cross, a signature; never a ruler's straight lines) become a handwriting
-  region (below, never sent to the figure model); any other drawing a figure for the
-  figure model. On a `mixed_ink` page all of them are cut out with the handwriting; on a
+  different places. Pen marks become a handwriting region (below, never sent to the
+  figure model); any other drawing a figure for the figure model. A group is a pen mark
+  when every path is a hand mark over typed text (below), or when half its paths or more
+  carry pen evidence in the stroke itself:
+  - a page-type pen stroke (`page_type._candidate`: enough points, bends more than half a
+    circle, not jagged, not a blob; since 2026-11-11 not a circle's arc either, a turn
+    rate within 25% of its mean all along, all one way (`ARC_SPREAD`): a printed seal's
+    open ring);
+  - an open stroke the same tests take for a pen stroke at any length
+    (`page_type.pen_line`: a signature or a wavy line longer than the 90 pt stroke limit,
+    which the page's own ink count keeps);
+  - a short open stroke of straight lines, too few points for those tests (a tick, a
+    cross, a slash: `_short_lines`, `_hand_strokes`), when every line runs more than
+    about 5 degrees off both axes, its lines are not all one length within 2% (a printed
+    chevron), no end comes within 0.75 pt of another stroke's end or lies in a filled
+    shape of the group (an arrowhead), no line lies alongside another stroke's line,
+    parallel within 1 degree (a double bond), and no line has the length of another
+    stroke's line to rounding precision (0.1%, the page type's size-twin test: machine
+    drawings repeat sizes, hands do not; a printed cross of two equal lines).
+
+  Being an open stroke is no evidence by itself (2026-11-11, WS6.10): a skeletal
+  structure's single straight bonds, meeting at their ends or running parallel, were cut
+  out as "handwriting, not converted" on typeset exams (F-400); they now go to the
+  figure step as drawings, while a grader's tick, cross or signature stays handwriting.
+  On a `mixed_ink` page all of them are cut out with the handwriting; on a
   page with ink the checks rejected or did not analyze, the safety net keeps the page
   image instead. Not counted: a drawn list bullet, a mark repeated in the header or
   footer band (a logo), horizontal and vertical lines and boxes alone (an empty answer
@@ -1248,6 +1635,102 @@ math by the document's evidence; the equation step's own tiers then decide it.
   photo and a report's screenshots under their captions were dropped as backgrounds,
   with no decision). Only a plain picture (a colored panel or a wash drawn as an image,
   `_plain_image`) under running text is a background and is dropped.
+- **One label rule by distance** (`_label_owners`, `_claim_labels`, SW40, WS6.12's reaches
+  made one): a row is a label of a figure when it lies within `LABEL_REACH` (1.0) x its
+  font size of the figure's nearest drawn stroke (`_stroke_gap`: the distance to the
+  strokes, not to the drawing's box, which reaches over blank ground beside a diagonal or
+  an L; a path drawn by a few straight lines counts by those lines, `_Path.edges`, any
+  other by its box) or of a label the figure holds already, or when most of it lies
+  inside the drawing's box (any length: the text in a flowchart's boxes); the rule runs
+  again from the figure and what it holds until nothing more is found, since an axis
+  title stands a line beyond the tick labels. A row two figures could claim goes to the
+  nearer. Outside the drawing a label is short (`LABEL_SHORT`, 25 characters, or the
+  tick or category labels of an axis set in one row, or several short ones far apart on
+  one line: a timeline's events). A turned row (an axis title) is never a line of a
+  paragraph, so it may stand up to `LABEL_TURNED` = 2.5 times as far and hold
+  `LABEL_SHORT_TURNED` = 40 characters. Any kind of row counts, math and rotated ones
+  too: a circuit's "R1 = 4 ohm", a triangle's sides and angle, a force arrow's "N". Never
+  a label: a line of running text (a paragraph that passes by a figure, a title; for a
+  row inside the drawing, found among the rows inside it), a caption, a line of code.
+  Measured (SW40, 2026-11-18, 116 tracked PDFs and the 28-file corpus, short rows outside
+  a vector figure's box, by distance to the nearest stroke in font sizes): the rows that
+  were labels all lie within 1.0; beyond 1.0 the rows are prose fragments, headings and
+  list items; turned rows that are labels reach about 2.0 and no turned row that is not
+  one lies nearer than 2.5. So one reach, 1.0, with the turned rows' 2.5 times that.
+  Not a label either: a short numbered title (a problem's "5. Blocks and springs"), a row
+  that starts like a list item, a marker of one or two characters ("5.", "(a)", "B)") and
+  a word of three letters or more (`_starts_like_item`). The list markers are not known yet
+  where the labels are found, so the row's own start is read. A title taken as a figure's
+  label is lost as a heading, and a label kept out stays a paragraph as before, so the
+  rule leans toward the title. Measured (2026-11-18, the labels the rule claimed outside their figure and not
+  turned, on the tracked files and in the corpus; the corpus has one title among them, the
+  tracked files none): a row a candidate would keep out of the labels, tracked / corpus.
+  A marker and a word of three letters: 0 / 1, the title, so no label released. A font
+  larger than the figure's other labels: 5 / 62, nearly all true labels (chart titles,
+  braces) and the title too. Bold unlike the others: 0 / 2, not the title. At the left
+  margin with the figure to its right: 1 / 8. Running text below it: 20 / 175, and the
+  title has none. Only the first keeps the title and releases no true label.
+  A slide's footer bar set in from the page's edge (`_edge_band`, a rule or box at least 85
+  % of the page wide inside the top or bottom 15 %) is furniture like one that touches
+  the edge: before, a line of code or a total just above it was read as the bar's label
+  (the 6.0001 deck, 35 pages, each with an empty figure for the bar). The tail line of a
+  caption counts as the caption's own, not a label (`_running_text`).
+  A picture has no strokes: only the rows on it are its labels. The figure's box, and so
+  the picture cut for the figure step, grows to its labels. Replaces `_absorb_labels`,
+  `_absorb_outer_labels` and the dropped rows' own reach (`_take_labels`), five reaches
+  that disagreed: the figure with no tick labels took nothing, a circuit's part names
+  were equations (the label take refused math of more than three glyphs), a triangle's
+  four labels stayed equations. Before, a chart's category names stayed in the body as
+  a stray paragraph and its crop had no axis values, so the model estimated them
+  (2026-11-11, WS6.12, F-399).
+- **Shapes that vanished** (WS6.15, 2026-11-18). A timeline's ruler (a long thin line
+  with ticks, 5 pt tall) fell under the 24 pt a figure needs on both sides, so it was a
+  small drawing; no label was held for it and the paragraph's block took its labels, so
+  its drawing was dropped and the labels were a paragraph in scrambled order: a ruler at
+  least 96 pt long with ticks standing out of the line (more than 1 pt) is a figure
+  (`thin_ruler`, `_vector_figures`; a table's header rule alone stays a rule). A free-body diagram's
+  force arrows, each thin and 20 pt off its box, were separate small drawings that
+  joined the box only within 12 pt: a small drawing joins a figure within
+  `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves. A circuit's
+  parts were not found as labels, see the label rule above.
+- **A drawing made of text fragments** (`_fragment_figures`, WS2.9a): the labels of a drawn
+  structure, circuit or diagram whose strokes are too short and plain for a drawing cluster
+  were written as dozens of loose paragraphs and one-symbol equations, each its own
+  decision. A group of 12 or more text rows of 3 characters or fewer, within 3 body sizes
+  of each other and outside the figures and tables already found, with at least half a
+  short stroke per fragment among them (a stroke between 0.5 and 6 body sizes long: a
+  contents page's leader dots are not strokes, and a derivation has a fraction bar or two)
+  is one figure, reason `drawing_fragments`, its rows kept as its labels and written as
+  text no more. A region whose rows have a median length of 4 characters or more, or one
+  with a row of three words, is text and stays text. Found after the drawing clusters,
+  before the page's text is read, so the rows are out of the reading order.
+- **Glyphs drawn as outlines in a line of text** (`_glyph_outlines`, 2026-11-11, WS6.10,
+  F-364): a page-type pen stroke inside a typed line (within its height, a tenth of it
+  over at most, with typed glyphs on both sides) whose drawing is a fill with no stroke
+  that lies in the line too is outline math (an italic variable, the digits of a
+  quantity), not handwriting: it becomes a small figure for the figure step.
+- **Glyphs drawn as lines** (`pipeline/glyph_strokes.py`, 2026-11-17, WS6.11, F-550): LaTeX's
+  picture environment sets a slanted line, an arrowhead or an arc as glyphs of a drawing font,
+  and xy-pic does the same with its own: `line10` and `linew10`, `lcircle10` and `lcirclew10`,
+  and `xyatip`, `xybtip`, `xybsql`, `xycirc`, `xycmat`, `xycmbt`, `xydash`, `xyeuat`, `xyeubt`,
+  `xyline`, `xyluat`, `xylubt`, `xymisc` and `xyqc` at their sizes (the TFMs of a TeX Live
+  install). A font is one of these when its whole name after the subset prefix is (`LINE10`,
+  `IIMURR+LINE10`); a font whose name only contains "line" or "circle" is text. A triangle's
+  slanted side was a paragraph of 17 quote marks beside seven equations, and no figure existed
+  to hold the drawing. `_text_blocks`, the one place layout reads characters, takes those
+  glyphs out of the text it returns, so rows, the text pass's glyphs and the line reader see
+  text without them, and leaves them in one block of type 2. `_read_page`, where a page's
+  drawings are gathered, turns that block into entries of the page's drawing list (what
+  `get_cdrawings` gives), before the page type, the ink analysis and the path classification
+  read it, so the figure clustering sees a drawing. A glyph's geometry is its outline as
+  MuPDF draws it (the page's SVG with text as paths, read once on a page that has such
+  glyphs): a thin straight outline (its width at most 12 % of its length, as a line's glyph
+  is) is the segment it draws, stroked; any other outline (an arrowhead, an arc) is a filled
+  path. A glyph the SVG has no outline for is left out. Labels join the figure by the rules
+  above, none of them new: the labels of the picture-environment triangle that sit within
+  their reach (`c`, `θ`, `a = 6`) are the figure's, the ones further out stay equations (the
+  one label rule is SW40). Glyphs in a font that is not on the list are not read this way:
+  none of the 28 corpus files and 116 tracked test PDFs has a stroke set in another font.
 - **Captions**: a run starting `Figure N` / `Fig. N` followed by punctuation or a capital
   letter ("Figure 2 shows ..." is prose) attaches to the nearest figure that overlaps it
   horizontally, below or above within 36 pt (below wins ties). An unattached caption stays
@@ -1258,7 +1741,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
 `title` is the PDF metadata title unless it is empty, a file name (`notes.docx`) or a tool
 default (`Untitled document`, `Microsoft Word - ...`); otherwise the first level-1 heading.
 `lang` is the catalog `/Lang` when it looks like a language tag, else `en`. The text pass
-decides the document's language from there (it detects one when the PDF has none).
+decides the document's language from there (the chosen language, then the text, then
+`/Lang`; see "Language" below).
 
 ### Code blocks, footnotes and contents pages (T2-16, T2-17)
 
@@ -1277,7 +1761,7 @@ and its inline math is not looked for. The assembler writes `<pre><code>` with t
 escaped and the CSS added only when a document has code; a block with a line over 36
 characters is a tab stop named "Program code" (axe `scrollable-region-focusable`, as
 equations are). A box drawn round one line of code is its frame, not a figure
-(`_absorb_labels`). The notice `code_block` (review "none") is still given, now saying the
+(`_backdrop`). The notice `code_block` (review "none") is still given, now saying the
 code keeps its line breaks and indentation but not its highlighting.
 
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
@@ -1285,6 +1769,26 @@ its mark in the text above it also links to it (the output writes the mark as `d
 text by the ten characters printed before it, and a mark that cannot be found exactly once
 gets no link (`_footnote_links`; an internal `Link` made by layout, which the text pass
 keeps and which wins over a PDF link on the same text).
+
+A file that names its footnotes is read from the file (WS2.8 g, `pipeline.named_links`, the one
+place that reads destinations and links from PyMuPDF). LaTeX's hyperref writes a named
+destination `Hfootnote.N` about 2 pt above the footnote's line and a link to it from the mark in
+the text. The line a destination points at starts a footnote (`_mark_notes` gives the rows from
+there their own run, which is why a footnote set in a mono font, a URL, is not a code block);
+the link's rectangle is the mark. In such a file a block it does not name is not made a
+footnote by its place and size alone (a listing's line numbers in small type were 40
+"footnotes" in one file, and a numbered list at the foot of a page was one too), and a file that
+names none behaves as before.
+
+A raised number is set off from the word it touches where the glyphs are cut (`_mark_notes`,
+`SET_OFF_FLAG`), not by repairing the string afterwards: the mark that opens a note's own text
+("2 We built"), a mark in the body that a link names, and a raised digit that ends a heading (a
+note mark, not one of the heading's words). The blank is one the nuclide rule (`_before_symbol`)
+leaves alone, so "2Feehly" no longer happens. An exponent is not touched, and nor is a raised
+mark of a table: in a file that names its footnotes only the glyphs a footnote link covers are
+marks, and in a file that names none only a raised digit or sign that opens a line of smaller
+type low on the page, or a raised run at the end of a heading that is the same as the opening
+of such a line on the page.
 
 **Contents pages.** A page with at least two lines that end in dot leaders (five dots, or
 an ellipsis counting for three) is a contents page (`_contents_rows`). Each such line is a
@@ -1295,9 +1799,96 @@ bold). Items nest by indent (`list_level`). The page numbers are the printed boo
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document
 whose title is the same once section numbers are left out (`_contents_links`); when the
-PDF's own links already say where it goes, the text pass keeps those. Before, the
+entry and the heading both print a number ("2.1", "A.1", "Appendix A", "Chapter 4", "II."; one
+reading, `layout.elements.heading_number`, which the references below use too) it must be
+the same number, so "3.1 The model" does not link to "2.1 The model" when only that one is
+here (a part of a book), and of two headings with one title the entry's number picks one. With a
+number on one side only, or none, the title decides; so it does when one is a section number and
+the other an outline's roman numeral ("4.1 Scope" and "I. Scope"), which are not compared. When the PDF's own links already say where
+it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section
 lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
+
+A contents list with no leaders is found by its shape (WS2.7, `_shape_entries`): three or
+more lines one after the other in one column, each ending in a page number (or followed on
+its baseline by a line that is only that number, in a column of its own), the numbers at one
+right edge (within 1.5 em; a list of six or more lines may have each number follow its
+title instead) and not decreasing (roman numbers of the front matter come first), under a "Contents" heading or on one of the first three pages. Each line is an entry
+that keeps its number as its last word ("Motion 3"), joined to it where the number stood
+apart; a line with no number ends the list, so the section heading right after it is not
+taken in. It is tried before a grid is taken for a table: a table whose lines are mostly the
+list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`), so the
+reason `contents entry` fires and no second contents list is written. An entry with a number
+links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). Not read: a
+list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
+it, a title that wraps onto a second line with the number on the second, and a two-column
+page (the columns are not known when tables are claimed).
+
+### Kept line ends, the abstract and algorithms (SW53 a and e, WS2.6, F-261)
+
+**Kept line ends (SW53 a).** A paragraph joins its lines with a space. A poem, an address
+or a list of short statements needs its line ends, so a paragraph of at least
+`KEPT_MIN_LINES` (3) lines keeps them when every line but the last starts at one left edge
+(within `KEPT_LEFT_SPREAD` 1 em) and stops at least `KEPT_SHORT_BY` (8) em short of the right
+edge its column's text reaches (`_RightEdges`, the edge a quarter of the lines reach), none
+ending in a broken word (`_keeps_lines`, set on `_Block.lines` in `_page_blocks`). A paragraph
+that wraps runs to the edge in every line but the last, a centered line starts each line
+elsewhere, and a slide deck's text box is not measured by its page's edge (slide decks are
+left out), so none of them is one. Two more guards come from the corpus: justified text in a
+column narrower than the edge measured (a two-column page, a text box beside a figure) has at
+least `KEPT_JUSTIFIED` (60%, and two) of its lines ending at one place (within
+`KEPT_SAME_END`, 0.3 em), and a narrow ragged paragraph wraps in mid-sentence, so when at
+least `KEPT_WRAPPED` (25%) of its line ends have no stop (`KEPT_STOPS`: . ? ! : ; ) and
+closing quotes) with a lower-case letter starting the next line, it is a paragraph. It is stored as a `Run` of kind `break` on the single
+space that joins two lines (`script_marks.LINE_END`, a private-use mark put in the text by
+`_append_row` and taken out, with its offset, by `script_marks.split_lines`); the writer
+puts `<br>` there (`inline_text`), and Listen already pauses at a `<br>`. A block that keeps
+its line ends is not joined with the block after a page or column break (`_goes_on`). Not
+read: a poem alone on its page (no line reaches a right edge, so none is "short"), and a
+paragraph of one or two short lines. `break` runs are moved with their space by a page edit
+and dropped when the space is (`web/page_edits.remap_spans`, `core/inline`).
+
+**The abstract (SW53 e).** A single line that says "Abstract" (or "Abstract.", "Abstract:")
+and nothing else, in bold or centered in its column (at least 2 em in from the column's
+left edge, within 1 em of its middle), is a heading with the reason `abstract label`
+(`_label_abstracts`). A heading step reads that reason as strong evidence (confidence
+0.88, like a numbered heading), and `heading_levels` gives it the level under the title (2
+when the document has a heading set larger than the body, else 1). "Abstract" at the start
+of a sentence or run in before its text is not one. A line that begins "Keywords:", "Key
+words -" or "Index Terms -" starts a block of its own (`_KEYWORDS_LINE`, in `_runs`). There
+are no roles and no `keywords` role.
+
+**Algorithms (WS2.6 b).** The lines under a line that opens "Algorithm 2" are read as one
+block, `Element.preformatted`, when at least `ALGORITHM_MIN_ROWS` (3) of them follow, at
+least `ALGORITHM_MIN_WORDS` (2) of them begin with a step word (for, if, else, while, repeat,
+until, end, return, input, output, require, ensure, function, procedure, do, then ...),
+each line in one column and one size and within 2.2 lines of the one above (`_algorithm_groups`).
+A line belongs to the block if it begins with a step word, holds an assignment ("count = 0",
+"c <- 0", `:=`), is a line of math, or starts further right than the first step; the first
+line that is none of these ends the block. The caption stays a block of its own. The text has
+one line to a step and the step's indent level (its distance from the leftmost step in units
+of the smallest step between two left edges) as `ALGORITHM_INDENT` (2) spaces per level
+(`_indents`, `_paragraph_pieces`). Unlike program code its inline math stays math: a math
+row inside it becomes text, the formulas in it are inline equations as in any paragraph, and
+`assemble.code_block` writes them with the equation markup. In the Word file a code block
+that holds an equation is written as lines of a paragraph (pandoc would flatten the
+equation to its characters), the indentation as no-break spaces (`export_docx._lines_of`).
+Not read: an algorithm set under a rule only (no "Algorithm n" line), line numbers beside
+the steps (they make every step start at one edge, so the indentation is lost), and a step
+that wraps to a second line at the left edge.
+
+**Monospaced quotations (WS2.6 c).** A block of monospaced lines that has none of the
+punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier followed by
+`(`, an option such as ` -x`, `//`, `->`), has no line that ends in ":" over a body set
+further right, has at least `QUOTATION_MIN_WORDS` (8) words and a sentence ending in a full
+stop, comma, question mark or exclamation mark is prose, not code (`_is_quotation`). A shell
+command, a name or a short snippet stays code.
+
+**Code joined across prose (WS2.6 a), not built.** Monospaced lines already make one code
+block with their printed indentation (`preformatted`). Joining two listings that only a
+caption or a comment sets apart was measured on the corpus before it was built: of the 37
+places where prose sits between two listings, every one introduces the next listing ("The
+output is:"), so joining them would have made one block of two. The two stay two blocks.
 
 ### Tagged PDFs (T2-18, `pipeline/tagged.py`)
 
@@ -1317,6 +1908,14 @@ figures), used as proposals (`apply`):
   description (failed, abstained, or a description that fails an error check) the tag's
   text is the proposal, NEEDS_REVIEW and required, with the warning `figure.source_alt` /
   `source_alt_unchecked`. It is never written into the output unchecked.
+
+Lists and table header cells are not read from the tags (WS14.11, measured 2026-11-18): the
+only tagged files in the measured sets are generated test files (21 of 332 PDFs; no real
+upload is tagged), and on them layout already calls every list item a list item where the
+tag's text equals one element (37 of 37), and no tagged table sits over a grid that has no
+header cells (0 of 7). Read them when a real tagged file shows a missed list item or header
+cell: the generated files write `Lbl` then `NonStruct` (not `LBody`), a list item can wrap a
+heading, and a tag's header cells belong on the table step's answer, never in its request.
 
 Fixture: `tests/fixtures/tagged/` (HTML exported by LibreOffice as a tagged PDF, two
 edits to look like Word's export; `make_tagged_pdf.py`). The eval documents are printed
@@ -1380,6 +1979,12 @@ the pass cannot read stays a kept image exactly as described here.
 **What is never content** (`_page_rows`, the same extraction as before, no second one):
 
 - a span in render mode 3 (MuPDF's char flags show neither fill nor stroke);
+- a span drawn under 2 pt (`page_type.TINY_PT`). The size is the one the glyphs are drawn at
+  (`page_type.drawn_size`): dvips writes a bitmap TeX font as a Type 3 font measured in
+  pixels and sets 10 pt text at a stated 0.24 pt (300 dpi) or 0.12 pt (600 dpi), so the
+  stated size times the font's height in its own units is used, and layout reads that size
+  everywhere (`layout._text_blocks`). Before 2026-11-18 such a page was typed blank and came
+  out empty;
 - a span at 5 % opacity or less (rawdict `alpha` <= 13), unless it is text used as a
   clip (render mode 7, a gradient- or picture-filled title: MuPDF gives it alpha 0 with
   the CLIPPED flag), `page_type.span_hidden`. Clip text is visible only when something
@@ -1400,7 +2005,41 @@ the pass cannot read stays a kept image exactly as described here.
   stencil masks, constant alpha, blend modes and a yellow highlight all let the text
   show, and then it is kept. Up to 24 runs are tested per page, the rest follow them.
 
+- a span the rendered page shows nothing of: white on white, navy on a navy box, black on a
+  black box, a grey too faint to read. The page is rendered once (100 dpi, with its
+  annotations) and the lightest and darkest pixels inside the span's box are compared: under
+  a contrast ratio of 1.25 (WCAG's measure) the box is flat and the span is left out
+  (`page_type._flat_spans`). The render is made only for a page with a span that could be
+  flat, text lighter than 2:1 against white or text over an image or an opaque fill (dark
+  text on the bare page is seen), and never on a page with a picture over the pixel budget.
+  The earlier test that compared fill colors gave false positives and is not used. Their
+  characters are counted with the other hidden ones (`hidden_text_ignored`) and leave
+  `Element.text`, Listen, Word, EPUB and the other outputs at the row. They, and the spans
+  under 2 pt, are painted text and not the mark of an OCR layer, so they do not count toward
+  calling the page a scan under a text layer: a typed page with a long white sentence stays
+  a typed page. The glyph reads for
+  an equation's line (`line_glyphs`) and the text pass (`page_glyphs`) do not look at the
+  render: they skip only the spans of the first three kinds above, as they skip covered
+  ones.
+
 The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
+
+**A page saved sideways.** A page with no `/Rotate` whose text runs up or down the page (a
+landscape page printed to PDF, a `sidewaystable` page) has only "vertical" rows if it is read
+as it is. When at least 80 % of its visible characters (60 or more of them) run one way,
+the page is turned before anything reads it (`page_type.turn_page`: 90 degrees clockwise when
+the text runs up, 270 when it runs down): its `/Rotate` is set in the open document, so
+rows, headings, reading order, tables, crops and page sizes are in the turned frame, as for a
+page that has a `/Rotate`. Every reader that opens the PDF again and uses layout's boxes
+calls the same function on the pages it uses (the crop cache, the text pass, tagged figures,
+the source facts, the page labels and the review page image in `web/pdf_probe.py`). A table
+set sideways on an otherwise upright page is still turned by the table step alone
+(`tables._page_turn`); a short label set sideways (an axis title, an arXiv stamp) turns
+nothing. The turn is in the document the readers open, not in the PDF file: layout keeps it on
+the page's `PageTypeResult.turn` (not in the stored page type) and says it with the notice
+`page_turned` (information, one per page, listed under "Handled in this file": "N pages saved
+sideways in the PDF and turned upright to be read"), so the pictures of the page, which show
+the turned page, are accounted for.
 
 **Page types.** `page_type.classify` reads the rawdict and the drawings layout already
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
@@ -1412,7 +2051,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
-| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple for the stroke test (a tick, a cross, a one-stroke signature) are cut out too ("Small drawings on a typed page") |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analyzed in time; its visible text is read, its drawings are not sent to the figure model |
@@ -1498,18 +2137,28 @@ The decisions in the rules, with the measured values next to each threshold in t
   that holds its middle is not near-white (a dark slide's background, a colored panel),
   or no fill holds it and a picture does. A dark slide's white diagram and its white
   chalk-style writing were dropped as invisible; a white box on the white page still is.
-- **Time budget** (C1.6): the ink analysis (pure Python) gets 10 s per document
-  (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analyzed
-  (`INK_MAX_ITEMS`); such a page says `ink_not_analysed`. Measured on this machine,
-  pinned to one core: the upload probe on a 19.6 MB file of 17 pages of dense synthetic
-  ink (no text layer) took 13.8 s alone and 17.4 s with another busy process on the same
-  core, under the probe's 30 s limit; the file was accepted, because pages not analyzed
-  in time never refuse an upload. Not measured on the host's CPU allowance. A page not analyzed
-  with less than a line of typed text is kept as its image beside that text; with a line
-  or more it is read as before (its drawings are figures for the figure model), unless a
-  drawing fills the page, which keeps the page image (the safety net below). So writing
-  under a long typed header that does not fill the page becomes a figure the model
-  describes, once the budget has run out.
+- **Work budget** (C1.6, plan WS14.9): the ink analysis (pure Python) is bounded per page by
+  counts of work, which are the same on every machine (`page_type.InkBudget`). A page with
+  more than 200,000 path items (`INK_MAX_ITEMS`), or whose paths the analysis cuts into more
+  than 500,000 pieces (`INK_MAX_SEGMENTS`), is not analyzed. On the corpus (2026-11-11, 329
+  pages) the most a page has is 117,162 items and 207,522 pieces, and the slowest page takes
+  1.6 s, so no corpus page reaches a limit. Because the budget is per page, what a page holds
+  never depends on how long the pages before it took. A clock stays only as a guard against
+  a hang: 60 s a page (`INK_GUARD_S`), about 40 times the slowest corpus page. Such a page says
+  `ink_not_analysed`, and its stored page type says why (`ink_cause`: `work` or `time`); the
+  conversion writes a "not finished" fact for it (`page_type`, `work_budget` or `time_limit`),
+  and a page read for its text gets the notice `drawings_not_analysed` ("Worth checking"), so
+  the job page does not say "Everything was converted". A page not analyzed with less than a
+  line of typed text is kept as its image beside that text; with a line or more it is read as
+  before (its drawings are figures for the figure model), unless a drawing fills the page,
+  which keeps the page image (the safety net below).
+- **The upload probe's budget**: the probe reads every page that is not clearly typed inside a
+  child that is killed after 30 s, so the document has an allowance of 1,000,000 path items
+  (`PROBE_MAX_ITEMS`; the corpus's largest, a handwritten upload, has 386,717 on such pages)
+  and one deadline of 20 s as the guard (`PROBE_GUARD_S`). A page past either is not analyzed:
+  it never refuses the upload, and the count of scanned and handwritten pages
+  (`image_page_count`) says "at least N" (`ImagePageCount`); a request to read such pages
+  then still applies.
 - **Page cap** (`page_type.PAGE_MAX_PATHS` = 50,000 drawings, `PAGE_MAX_ITEMS` = 500,000
   path items): the budget above is checked only after the work that costs most, and one
   dense page costs seconds and tens of megabytes of Python objects whatever the budget (a
@@ -1897,9 +2546,11 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 - Regions are a proximity guess: tightly spaced lines become one region (use `lines`), and a far
   superscript or answer can be a region of its own.
 - Limits and time: the caps and the budget are `page_type`'s (`PAGE_MAX_PATHS`, `INK_MAX_ITEMS`,
-  `InkBudget`, `INK_BUDGET_S`); `extract_ink` takes the document's `InkBudget`, checks it in
-  every phase and inside the loops, and over a cap, more than 20,000 strokes (`MAX_STROKES`) or
-  the budget returns an empty result with `analysed` false. Grouping finds neighbors with a
+  `INK_MAX_SEGMENTS`, `InkBudget`, `INK_GUARD_S`); `extract_ink` counts the pieces its curves
+  are cut into against the budget, checks the clock guard in every phase and inside the loops,
+  and over a cap, more than 20,000 strokes (`MAX_STROKES`) or the budget returns an empty
+  result with `analysed` false and its `cause`. The budget is per page, so a fresh one (a
+  stored result shown again, `run.recrop`) reads a page as the conversion did. Grouping finds neighbors with a
   grid hash, so it is near linear: 50,000 strokes in a column, a row or at random group in
   1 to 3 s on this machine; strokes piled on one spot (over 1,000 in one grid cell) are an
   overrun, not a stall. Reading outlines costs about 3 ms a stroke (0.5 s for the 150 strokes
@@ -1913,7 +2564,7 @@ GoodNotes, Notability, OneNote or Xournal++ export has been read yet.
 A handwritten page whose ink `ink_strokes` can read is read from its picture as before (one
 vision call, ADR 0007); the strokes are used beside it, never instead of it. A page qualifies
 when `page_type` calls it `handwritten` (or `handwritten_ocr`) and `extract_ink` analyzed it
-within the document's ink budget with at least 3 strokes (`image_page_vector.analyse`, through
+within the page's ink budget with at least 3 strokes (`image_page_vector.analyse`, through
 `layout.page_ink`). A scan, a photo, a typed page and a page over the caps go through the pass
 exactly as before. Measured on the vector dev set, a clean re-render of the ink does not make the
 reader read better than a scan (docs/eval-handwriting.md), so the strokes serve pictures a person
@@ -1990,8 +2641,8 @@ markers are left out of the text side). The alignment is monotonic, so a dehyphe
 word, an extra glyph from another block inside a merged box or an inline equation's
 glyphs only leave characters unplaced; an unplaced character never starts or ends a link
 or a color run on its own. Alignment runs only for elements a link rectangle touches,
-and (with color on) for elements that have glyphs in a run color; text over 20,000
-characters is not aligned.
+and for elements that have glyphs in a run color, a style (bold, italic or fixed pitch) or
+a strike; text over 20,000 characters is not aligned.
 
 A link covers the characters whose glyph box is at least half inside its rectangle
 (`MIN_GLYPH_OVERLAP`), so a rectangle that grazes the next word does not take it. Offsets
@@ -2050,7 +2701,16 @@ one target has its number; a bare "(3)" only when an equation prints exactly "(3
 beside it (an equation numbered "2.4" without brackets is not named by "(2.4)"). No link
 when two targets share a number, when none has it, when it would overlap a PDF link or
 an inline equation, or at the very start of a paragraph that reads like an unattached
-caption ("Figure 2: ...").
+caption ("Figure 2: ..."). The same table holds the other numbered things: a heading that
+starts with "3.2" is "Section 3.2", one that starts "Chapter 4" is "Chapter 4", one that
+starts "Appendix A" (or "B.2") is "Appendix A" ("Appendix B.2": `APPENDIX_REF` finds "Appendix A",
+"Appendix B.2", "Appendix 1" and "Appendices A and B"; the letter is a capital, so "an appendix a
+reader" is not one), and a
+paragraph or heading that starts "Theorem 2.1." (or "(name)." or ":" after the number) is
+that theorem; Lemma, Proposition, Corollary, Definition and "Example" (capital E, so "for
+example 3" is not one) work the same. A reference is never linked to the element it is in.
+`typed_addresses` makes "typed" links of the web and email addresses in the text that no PDF
+link covers.
 
 hyperref links only the number of `Figure~\ref{fig}` or `\eqref{eq}`; such a PDF link is
 widened to the whole reference ("Figure 1", "Equation (1)") so the link text says what
@@ -2060,20 +2720,34 @@ it points at, keeping the PDF's own target (`widen_internal`).
 
 The document's language (`DocumentResult.lang`, `lang_source`):
 
-1. the catalog `/Lang` when it is a tag whose language is a real two- or three-letter
-   code (`language.document_tag`; "x-none" and "und" do not count): source "pdf";
-2. else detected from the body text: source "detected" and the notice `lang_detected`;
-3. else "en": source "default" and the notice `lang_assumed`.
+1. the language chosen at upload (`ConversionOptions.language`, from `Job.language`):
+   source "user", no notice. It is not part of a step's key (`exclude=True`), as no model
+   request reads the language;
+2. else the body text (`language.document_language`): source "detected" and the notice
+   `lang_detected`, or "pdf" when the catalog `/Lang` names the same language;
+3. else the catalog `/Lang`, when it is a tag whose language is a real two- or
+   three-letter code (`language.document_tag`; "x-none" and "und" do not count) and its
+   script fits the text (`language.fits_text`): source "pdf". It is below the text because
+   Word writes `en-US` into files in other languages;
+4. else "en": source "default" and the notice `lang_assumed`.
 
-Both notices are optional; the job page lets the instructor confirm or change the
-language (`text_pass.set_document_language`, source "user").
+No language holding 60 % of the letters adds `lang_mixed`. `lang_assumed` and
+`lang_mixed` are required checks (`web.states`): the job is not "Ready to share" until the
+owner confirms or changes the language on the job page
+(`text_pass.set_document_language`, source "user"). `lang_detected` stays optional.
 
-Detection (`pipeline/language.py`) classifies words only: inline equations, numbers,
+Detection (`pipeline/language.py`) counts letters by script (Chinese, Japanese and Korean
+count like any other text) and classifies words only: inline equations, numbers,
 single letters (mostly variables), symbols, styled math letters and code-like tokens
-(anything with a digit, an underscore or a bracket in it) are left out. The document
-needs at least 100 letters of such prose and a probability of 0.90; a language other
-than English needs at least 250 letters and 0.99, and Latin and the constructed
-languages (Esperanto, Volapük) are never taken from detection alone: py3langid reads a
+(anything with a digit, an underscore or a bracket in it) are left out. Kana, Hangul,
+Hebrew, Greek and Thai fix the language by script; Han with no kana is Chinese. Latin,
+Cyrillic and Arabic text goes to the detector, restricted to the languages written in that
+script, and one table maps the labels with no voice ("ary", "arz") to the tag a voice
+exists for ("ar"). The document needs at least 100 letters of such text (a letter of Chinese,
+Japanese, Korean or Thai counts three, as it carries about that much) and a
+probability of 0.90, the same for every language (an earlier rule asked 250 letters and
+0.99 of any language other than English). Latin and the constructed languages
+(Esperanto, Volapük) are never taken from detection alone: py3langid reads a
 one-page list of English terms (reagents, element names, species) as Latin at 0.99,
 and a wrong document language puts the whole file in the wrong voice, while the
 default only asks for a check. A paragraph or list
@@ -2124,7 +2798,197 @@ A light grey is a run (it is a contrast problem: the output darkens it); so is a
 color. Headings get no color runs. Running text that names a color ("in red", "shown
 in blue", "highlighted in yellow", "the green curve", "red arrows") on or within two
 paragraphs of colored text on the same page gets the optional notice
-`colour_reference`. With the flag off there are no runs and no such notices.
+`colour_reference`.
+
+With the flag off the color runs are still found (the same rules, from the glyphs already
+read) and counted (`colour_runs` in the trace), but not stored or written: the text is in the
+body color, and the job gets one notice for the whole document, `colour_used`, with the number
+of colored passages as its count and no text of the document. It tells the instructor that the
+converted file does not keep color, so a meaning that only color carried (answers in red) has
+to be said in words. No color is named: the pass has no table of color names. `colour_reference`
+is made only with the flag on.
+
+### Bold, italic and fixed-pitch words (F-510, `CONTENT_RUNS`)
+
+Each glyph the text pass reads carries its face's weight, slant and pitch (`Glyph.bold`,
+`italic` and `mono`, set once per span by `glyphs.face_traits`: the tests `_Char` makes for
+`Element.bold` and the mono share of a code line, the font's flags then its name; a face
+in a math font has none, so a variable or a bold vector in CMMI or CMMIB is never emphasis).
+The pass makes no second read: the page's glyphs are read once, on every page, for color,
+links, strikes and these runs. For a paragraph or list item, `text_pass.style_runs` maps each
+style onto the text the way it maps color (`labelled_runs`, `across_markers=False`, so a run
+stops at an inline equation) and writes a `strong`, `emphasis` or `code` run for each
+stretch, trimmed of spaces and only with a letter or a digit in it. Three rules keep it from
+inventing emphasis:
+
+- a style that covers 70% or more of the element's placed characters is the block's own
+  style (a paragraph set in italic, a bold caption), and makes no run (`STYLE_SHARE`);
+- one italic letter is not a run: it is a variable the equation path left in the text, and
+  the letters it took are inline-equation markers, which are never placed on a glyph;
+- a PDF with no italic face has no italic glyph, so it has no italic runs. Slant is not
+  guessed from geometry.
+
+Headings, program code (`preformatted`) and glossary entries get none; `Element.bold` stays the
+whole-line evidence heading detection uses. Corpus counts (996 files) are in the changelog.
+
+### Highlighted words (SW51c, `CONTENT_RUNS`)
+
+A highlight is a run of kind `highlight`, written as `<mark>`, on a paragraph or list item.
+Two marks make one, both read with the strikes in `layout.page_paint` (one read of the page's
+drawings and annotations, no second pass):
+
+- the quads of a Highlight annotation: every glyph whose middle is inside one is highlighted;
+- a filled rectangle behind the glyphs (a visible fill, at most 36 pt tall and 600 pt wide, a
+  single rectangle) whose color is a color of its own and whose shape is one line of text
+  (`text_pass.highlighted_glyphs`). The color is lighter than 0.5 (OKLCH; a darker fill is a
+  bar or reversed text), not near white (0.96 or more: the page's own or a faint tint) and not a
+  grey (chroma below 0.035: the shade of a table header, a code block or a boxed theorem). The
+  height is 0.6 to 1.5 times the size of the glyphs it holds, so a box with padding round a line
+  or round several lines is not a highlight. Three or more rectangles of one color, top and
+  bottom on a page are shading (a table's header row, a heat map) and none is a highlight
+  (`text_pass.highlight_marks`).
+
+The glyphs map onto the text the way struck glyphs do (`labelled_runs`, `across_markers=False`:
+a run stops at an inline equation), trimmed of spaces and kept only with a letter or a digit in
+them. Table cells, headings, program code and glossary entries get none, because only
+paragraphs and list items take runs. The color of the mark is not kept: the page's own
+stylesheet writes every `<mark>` the same way (docs/output.md "Highlighted text"). `CONTENT_RUNS`
+off finds and counts them (`highlight_runs` in the trace) and writes none.
+
+### Struck text (F-509, `CONTENT_RUNS`)
+
+Text struck through on the page is kept and marked as a `deleted` run (`Element.runs`), so
+"October 3 October 10" with the first date struck is not read as two live dates. The marks
+come from `layout.page_paint`: every visible horizontal stroked line and every filled bar
+no thicker than 3 pt (curves are skipped; a page too complex to read its drawings gives its
+annotations only), and the quads of each StrikeOut annotation. A glyph is struck
+(`text_pass.struck_glyphs`) when:
+
+- a StrikeOut quad holds its center; or
+- a rule crosses it between 25% and 65% of the glyph's height from its bottom, no thicker
+  than 0.12 of its font size, and the rule crosses at least half of the glyphs of that row
+  it touches. The glyphs whose vertical middle lies in the band of those it crosses are
+  struck with them, so a rule drawn at x-height also covers the capitals and digits beside.
+
+A rule under the text (an underline) or under a blank ("Name: ____") crosses no glyph in
+that band and strikes nothing (`baseline_rules.classify`, below). Struck glyphs become runs the same way as color
+(`labelled_runs`, across inline markers), kept only with a letter, a digit or math in them,
+on paragraphs, list items and headings. Each element with runs gets the optional notice
+`struck_text` (with its page; no required decision). Glyphs are read on every page.
+
+Two checks beyond the band rule, both in `text_pass`. A drawn mark that would strike text must
+also show on the page (`drawn_strikes`): a strip of the page along it is rendered (8 pixels to
+the point) and 90% of its columns must be inked, since a vector figure can keep a legend
+sample in its drawings that its clip hides, and a reader who sees no line sees no deleted
+text. Only marks that cross glyphs are rendered. And an inline equation the page strikes
+through (a majority of its glyphs struck) is a run that is its marker alone (`deleted_runs`).
+What is not found, named: a struck table cell (cells carry no runs) and a struck display
+equation (equation elements carry no runs). `layout.page_paint` still lists marks that the
+page clips away or covers (`layout.py`, `page_paint`: it reads `get_cdrawings()` without the
+clip entries), which is why the text pass renders the ones that matter.
+
+With `CONTENT_RUNS` off (the shadow rollout, the default until 2026-11-18) the runs are found and counted
+(`TextPassResult.deleted_runs`, trace `deleted_runs` and `deleted_runs_written: 0`) but not
+stored, and no notice is raised. The LaTeX path follows the same switch for its `\sout` runs.
+
+### Annotation comments and attached files (F-541, F-362)
+
+A reviewer's comments live in the PDF's annotations, not in its text, so a student who heard the
+page heard the stale words alone. `text_pass.page_marks` reads each page's shown annotations
+(not the Hidden or NoView ones) while the pass already has the file open: a sticky note, a caret,
+a highlight, underline, squiggle, strike-out, box, circle, line, polygon or polyline with a
+non-empty `/Contents`. A text box (FreeText) is not a note: its words are
+already text on the page. A popup is the window of its parent's comment and is read once;
+a file-attachment annotation's `/Contents` is the label of the file and is not a note. A page is
+read for at most 500 comments and a comment for 10,000 characters. The box of an annotation is
+read with the page turned upright (PyMuPDF gives it unreliably on a page with `/Rotate`) and then
+turned into the display space the elements use.
+
+`text_pass.comment_notes` writes each comment as a paragraph, "Note on the page: <comment>", after
+the element whose text its box covers most (an annotation that covers none: the nearest element
+beside it, a margin sticky note included, by overlap, then vertical, then horizontal distance).
+A reply (`/IRT`) stands after the comment it answers. A caret that the file calls a replacement
+(`/IT /Replace`, or a reply to a strike-out) says "replace with <text>", and stands after the struck
+words it replaces; any other caret is the text alone. A highlight or underline without a comment
+adds nothing and no new kind of run exists. The paragraph is made by the text pass, after the
+passage languages, so no model request changes (the context texts were cut before). Ids are one past the
+highest on the page and only `order` is renumbered. Layout keeps no `notes` field (WS16.3), so a
+note is a paragraph whose words an edit can change like any other. The notice `annotations_read`
+(required, the whole document, a count) says how many were read, and holds the job at "Ready".
+
+An attached file (an annotation on a page or an entry of the file's embedded files) is not
+converted. The optional notice `attachments_not_converted` carries the count and, in
+`Notice.names`, each file's name (cut to 120 characters, 20 names): a name is document content, so it
+is shown to the owner (the job page line, "The files: “rubric.txt”") and kept in the record, and it
+is never logged. `Notice.names` is empty for every other notice and is left out of a stored notice
+then. Counts by annotation type are not stored.
+
+The drawings of annotations are not the page's art. A sticky note's balloon, a caret, a pushpin, a
+highlight's fill and a box are painted after the page's own content, so they are the last of
+`page.get_cdrawings()`. `page_type.without_annotation_art` takes, from the end of that list, those
+that lie in the box of a shown annotation of a kind in `ANNOTATION_ART` (`ICON_ANNOTS`, the marks on text, the shapes
+and lines, FreeText), and drops them. It is applied where the page's drawings are first read:
+`layout/document.py` `_read_page` (the one list that figure, handwriting and ink detection use), and
+the slide-mark pass of the same file. The hidden-text check still sees every drawing
+(`classify(covers=...)`): a box drawn over a line is a fake redaction. A pen stroke (Ink) is kept: it is
+handwriting. Known limits: a drawing of the page itself that was painted last and lies inside such a box is dropped
+with them; the budgeted ink probe (`page_type._probe_ink`) and `ink_strokes.extract_ink` read the unfiltered list.
+
+### Rules near a baseline, blanks, boxes and form fields (SW36, SW39)
+
+One function answers "what is this rule near a baseline": `pipeline/baseline_rules.classify`
+takes the rule's box and the ink (box, size, baseline) of the row it sits in and says
+`strike` (it crosses the glyphs between 25% and 65% of their height, see above), `underline`
+(it lies 1 pt above to 4 pt below the baseline and covers at least half of the glyph run over
+it), `blank` (it lies there with nothing over it, at least 12 pt wide, and a word of the row
+within two font sizes of it), or `rule` (a table or border rule, anything else). The struck
+text test (`text_pass.struck_glyphs`) and the blank test (`layout._mark_blanks`) both ask it,
+so a rule has one meaning. A rule that crosses a vertical edge of another drawn path (the plate
+of a battery on its wire, within 2.5 pt of the edge: boxes leave out the stroke width) is part
+of a drawing and is not asked, and neither is a rule with text over or under it in any row (a
+fraction, division or radical bar, an underbrace): that rule is part of the math.
+`layout._mark_blanks` runs in `_prepare_rows`, on the fragments of each line before
+`_merge_baselines` joins them, so a blank at the start of a line is in the line when it is
+made and cannot split a paragraph.
+
+Three things stand beside a rule on its baseline and are not text of its row, so the rule is
+no blank after them (measured over 277 development files: 82 of 203 drawn blanks were one of
+these, in 17 papers, and none of the 117 blanks of the 12 forms and worksheets changed):
+
+- a row that holds only the pieces of a big math sign (`_sign_pieces`: a radical sign, the
+  corners and middle of a brace, any glyph of a math symbol or extension font): the rule after
+  it is the sign's own bar;
+- a word across the gutter of a two-column page: a rule in one column is no blank of a line in
+  the other;
+- a word across an upright line or the side of a frame that spans the rule's height
+  (`_parted`): a tick label, a plot's axis, then a legend's sample line.
+
+`_parted` looks only at the nearest word on each side within two font sizes, and the rule
+stays a blank when a word on either side has no wall between. Still read as blanks (4 in
+those files): a fraction bar or an overline whose numerator and denominator sit in other rows.
+
+A blank is written into the row as five underscores at the rule's place (a space on each side
+where the text has none), so a drawn blank and a typed run of three or more underscores read
+the same. The text pass (`text_pass.token_runs`) marks every run of three or more underscores
+as a `blank` run and each of U+2610, U+2611 and U+2612 as a `checkbox` run, from the text alone
+(no flag: nothing in them depends on a model or a setting). A rule that fills no gap in a row,
+and an underline, change nothing.
+
+A fillable form (AcroForm) is read the same way. `layout.take_form_fields` reads each text,
+choice, check box, radio button and signature field of a page and takes it off the open copy
+of the page (the file is not written to), so what a field draws (its value, a tick, a frame,
+a picture of a signature) is in no later read of the page's text, drawings or images and
+cannot be a stray paragraph or a figure; push buttons stay. `layout._field_rows` puts each
+field back as a row on the baseline and in the size of the line it stands in, which merges
+with its label: an empty text field is a blank, a filled one or a choice field is its value, a
+check box or radio button is U+2610 or U+2611 for its state, a signature field is a blank
+followed by "(signature field)". The text pass reads the fields again for the value (the
+first place in the element, under the field, where its text stands, is a `blank` run) and
+raises one document notice `form_fields` ("Not handled in this file") with the number of
+fields. Fields are written as described text, not as live inputs: the converted file cannot be
+filled in. Not done: a radio group as one list of its options (each button is its own box),
+a choice field's other options, and the field's own label from its tooltip (the label is the
+text beside it).
 
 ### Source facts
 
@@ -2215,7 +3079,7 @@ time limit) belongs to the worker, which owns the job lifecycle.
 
 ## Cropping, the cache and threads
 
-PyMuPDF is not thread-safe, so every PyMuPDF call in `layout.py` runs under one module lock;
+PyMuPDF is not thread-safe, so every PyMuPDF call in `layout/` runs under one module lock (`access._LOCK`);
 concurrent callers are safe but serialised (crop on one thread; a thread pool only helps the
 model calls). `analyze` opens the document for that call only and closes it. `crop` caches
 opened documents (4 at most), keyed by the identity of the bytes object and, failing that,

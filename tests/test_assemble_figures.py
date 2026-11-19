@@ -128,22 +128,21 @@ def test_values_printed_in_the_pdf_are_not_called_approximate():
     assert ">Data shown in Figure 2.3</caption>" in block
 
 
-def test_without_a_figure_number_the_summary_names_the_figure_by_its_alt_text():
-    # Two unnumbered figures must not both be "Description of the figure" in a screen
-    # reader's list of controls (WCAG 2.4.6): the start of the alt text tells them apart.
-    fix = figure_fix(long_description=LONG)
-    assert fix.figure is not None
-    words = fix.figure.alt.split()
-    html = render(fix, figure_element(caption=None))
-    start = html.index('<summary class="readablestem">Description of the figure \u201c')
-    summary = html[start : html.index("</summary>", start)]
-    assert " ".join(words[:3]) in summary
-    from readablestem.pipeline import figure_details
-
-    short = fix.figure.model_copy(update={"alt": "A cart."})
-    assert figure_details.figure_name(short, None) == "the figure \u201cA cart\u201d"
-    assert figure_details.figure_name(short.model_copy(update={"alt": ""}), None) == "the figure"
-    assert figure_details.figure_name(short, "Figure 2.3 A cart.") == "Figure 2.3"
+def test_a_figure_is_named_by_its_label_or_as_the_figure_and_the_alt_text_is_not_quoted():
+    # F-118: the picture already has its alt text, so neither the summary nor the data
+    # table's caption says it again.
+    fix = figure_fix(long_description=LONG, data_table=grid(), data_table_added=True)
+    said = []
+    for caption in ("Figure 2.3 Position of a car.", None):
+        block = details(render(fix, figure_element(caption=caption)))
+        summary = re.search(r"<summary[^>]*>(.*?)</summary>", block, re.S)
+        table_caption = re.search(r"<caption[^>]*>(.*?)</caption>", block, re.S)
+        assert summary and table_caption
+        said.append((summary.group(1), table_caption.group(1)))
+    assert said == [
+        ("Description of Figure 2.3", "Data read from Figure 2.3; the values are approximate"),
+        ("Description of the figure", "Data read from the figure; the values are approximate"),
+    ]
 
 
 def test_model_text_in_the_description_is_escaped():
@@ -263,6 +262,84 @@ def test_equation_images_are_left_alone():
     assert embedded(html) == [("image/png", crop)]
 
 
+# ---------------------------------------------------------------------- decoration
+
+
+def decorated_pdf() -> bytes:
+    """Three pages of text with a logo at the same place on each, a thin rule on the first
+    and a photo on the second: each a picture of its own pixels, none plain."""
+    doc = pymupdf.open()
+    logo = png(60, 60, noise=True)
+    for n in range(3):
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((72, 90), f"Section {n + 1}", fontsize=20)
+        for i in range(6):
+            line = f"Paragraph {i} of page {n + 1} says something about motion and force."
+            page.insert_text((72, 130 + 18 * i), line, fontsize=11)
+        page.insert_image(pymupdf.Rect(480, 260, 540, 320), stream=logo)
+        if n == 0:
+            page.insert_image(pymupdf.Rect(90, 400, 522, 414), stream=png(432, 14, noise=True))
+        if n == 1:
+            page.insert_image(pymupdf.Rect(150, 400, 450, 625), stream=png(200, 150, noise=True))
+        page.insert_text((72, 700), "More words below the picture for the reader.", fontsize=11)
+    return doc.tobytes()
+
+
+DECORATIVE_ANSWER = {"figure_type": "other", "decorative": True, "alt": "", "confidence": 0.99}
+
+
+@pytest.mark.parametrize(
+    "answer", [DECORATIVE_ANSWER, None], ids=["model-says-decorative", "reading-failed"]
+)
+def test_only_decoration_with_evidence_has_empty_alt_text_in_every_output(answer):
+    """WS6.4 (F-246): a logo repeated on every page and a thin rule are decoration; a photo
+    the model calls decorative, or could not read, is not: every output writes "Figure not
+    described" for it, and the job has a required decision for it, until a person decides
+    it is decoration."""
+    import zipfile
+    from io import BytesIO
+
+    from readablestem.config import Settings
+    from readablestem.core import triage
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline import export_canvas, export_docx, export_epub
+    from readablestem.pipeline.run import convert_pdf
+    from readablestem.web import listen, review
+
+    client = FakeVisionClient(defaults={"figure": answer} if answer else {})
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    output = convert_pdf(decorated_pdf(), settings=settings, client=client)
+    result, html = output.result, output.result.html
+    expected = sorted(["", "", "", "", FIGURE_NOT_DESCRIBED_ALT])  # 3 logos, the rule, the photo
+
+    def alts(page: str) -> list[str]:
+        return sorted(re.findall(r'<img\b[^>]*?\balt="([^"]*)"', page.split("<main", 1)[-1]))
+
+    assert alts(html) == expected
+    assert alts(export_epub.export_epub(html).content) == expected
+    assert alts(export_canvas.export_canvas(html, title="T", folder="t").index_html) == expected
+    heard = [i for i in listen.build_transcript(html) if i.role.startswith("Image")]
+    assert [FIGURE_NOT_DESCRIBED_ALT in i.text for i in heard] == [True]  # decoration: silent
+    if export_docx.available():
+        with zipfile.ZipFile(BytesIO(export_docx.export_docx(html, title="T").data)) as docx:
+            xml = docx.read("word/document.xml").decode()
+        described = sorted(
+            re.search(r'\bdescr="([^"]*)"', tag)[1] if "descr=" in tag else ""
+            for tag in re.findall(r"<wp:docPr\b[^>]*>", xml)
+        )
+        assert described == expected
+    # The evidenced decoration passes the output's checks; the photo is the one decision.
+    assert all(c.passed for c in static_checks(html) if c.name.startswith("html.img_alt"))
+    (photo,) = [e for e in result.elements if e.kind is Kind.FIGURE and e.bbox[3] - e.bbox[1] > 100]
+    assert result.fix_for(photo.id).review == "required"
+    assert triage.required_decisions(result.fixes) == 1
+    # A person's decision is evidence: accepting "decorative", or checking "Decorative".
+    action, form = ("accept", {}) if answer else ("edit", {"alt": "", "decorative": "on"})
+    review.apply_review(result, photo.id, action, form)
+    assert alts(review.rerender_html(result, output.crops)) == [""] * 5
+    assert triage.open_decisions(result.fixes) == 0
+
+
 # ---------------------------------------------------------------------- browser
 
 
@@ -314,9 +391,11 @@ def test_the_keyboard_opens_the_description_and_reaches_the_table_at_320_px():
         try:
             page = browser.new_page(viewport={"width": 320, "height": 640})
             page.set_content(described_page())
-            page.keyboard.press("Tab")  # the skip link is the first tab stop
-            page.keyboard.press("Tab")
-            focused = page.evaluate("() => document.activeElement.tagName")
+            for _ in range(8):  # the skip link and the notice's link come first
+                page.keyboard.press("Tab")
+                focused = page.evaluate("() => document.activeElement.tagName")
+                if focused == "SUMMARY":
+                    break
             page.keyboard.press("Enter")
             is_open = page.evaluate("() => document.querySelector('details').open")
             page.keyboard.press("Tab")
@@ -332,3 +411,26 @@ def test_the_keyboard_opens_the_description_and_reaches_the_table_at_320_px():
     name, table_overflows, page_width, viewport = box
     assert name == "table-scroll" and table_overflows  # the table scrolls in its box...
     assert page_width <= viewport  # ...and the page does not (WCAG 1.4.10)
+
+
+@pytest.mark.browser
+def test_a_folded_description_and_its_wide_table_are_in_the_printed_file():
+    """Paper has nobody to open a folded description (F-436) or scroll a table: the printed
+    file holds the description's words and the table's last column."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch()
+        except sync_api.Error:
+            pytest.skip("Playwright's Chromium is not installed")
+        try:
+            page = browser.new_page()
+            page.set_content(described_page())
+            page.emulate_media(media="print")
+            pdf = page.pdf(format="Letter", margin={"left": "0.5in", "right": "0.5in"})
+        finally:
+            browser.close()
+    document = pymupdf.open(stream=pdf, filetype="pdf")
+    printed = " ".join(" ".join(p.get_text().split()) for p in document)
+    assert "Position rises in a straight line" in printed
+    assert "cart 7" in printed

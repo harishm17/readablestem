@@ -165,7 +165,7 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
         "Elements:    4 (1 headings, 1 paragraphs, 0 list items, 2 equations, 0 figures)",
         "Model calls: 2",
         "(fake client, nothing billed)",
-        "Checks:      static 16/16 passed",
+        "Checks:      static 17/17 passed",
         f"wrote {out}",
         f"wrote {report}",
     ):
@@ -185,30 +185,34 @@ def test_pages_are_one_based_and_in_document_order(pdf, tmp_path, pipeline, page
     assert pipeline.analyze_pages == expected
 
 
-def test_a_small_run_cap_suggests_fewer_steps_at_once(pdf, tmp_path, pipeline, monkeypatch, capsys):
-    """Each step in flight holds a worst-case reservation against --max-usd, so with a
-    small cap the reservations, not the spend, stop the run. Without --concurrency the
-    run takes only as many steps as the cap can hold, so it needs no hint; one asked for
-    explicitly is used as it is."""
+def test_a_run_cap_that_cannot_hold_its_steps_is_refused_and_a_stopped_run_is_a_draft(
+    pdf, tmp_path, pipeline, monkeypatch, capsys
+):
+    """Each step in flight holds a reservation against --max-usd, so a cap below one for each
+    step that runs at once is refused when it is set (WS10.4): the run would stop before it
+    began. Without --concurrency the run takes only as many steps as the cap can hold. A limit
+    reached during the run stops items instead, and they wait for a decision."""
     monkeypatch.setattr(
         models,
         "make_vision_client",
         lambda settings, budget, *, fake: FakeVisionClient(budget=budget),
         raising=False,
     )
-    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "0.0001") == 0
-    assert "try --concurrency" not in capsys.readouterr().out  # already one at a time
-    # Items the cap stopped wait for a decision, and nothing is reviewed here: the file is a
+    out = tmp_path / "o.html"
+    assert run(pdf, "--out", out, "--max-usd", "0.0001") == 2
+    assert "raise the cap or run fewer steps at once" in capsys.readouterr().err
+    assert not out.exists()
+    assert run(pdf, "--out", out, "--max-usd", "0.04", "--concurrency", "4") == 2  # holds 1
+    assert run(pdf, "--out", out, "--max-usd", "0.04") == 0  # as many at once as fit: 1
+    assert '<meta name="readablestem-state" content="draft">' not in out.read_text("utf-8")
+    # Items a limit stopped wait for a decision, and nothing is reviewed here: the file is a
     # draft and says so before anything else (SW21).
-    html = (tmp_path / "o.html").read_text(encoding="utf-8")
+    one_call = cli_settings().model_copy(update={"max_model_calls_per_job": 1})
+    monkeypatch.setattr(convert_cli, "get_settings", lambda: one_call)
+    assert run(pdf, "--out", out, "--max-usd", "0.04") == 0
+    html = out.read_text(encoding="utf-8")
     assert '<meta name="readablestem-state" content="draft">' in html
     assert re.search(r"<body[^>]*><p class=\"draft-mark\"[^>]*><strong>Draft:</strong>", html)
-    args = ("--max-usd", "0.0001", "--concurrency", "4")
-    assert run(pdf, "--out", tmp_path / "q.html", *args) == 0
-    assert "with a small --max-usd try --concurrency 1" in capsys.readouterr().out
-    args = ("--max-usd", "0.0001", "--concurrency", "1")
-    assert run(pdf, "--out", tmp_path / "p.html", *args) == 0
-    assert "try --concurrency" not in capsys.readouterr().out
 
 
 def test_axe_flag_runs_axe_and_summarises_rule_ids(pdf, tmp_path, pipeline, monkeypatch, capsys):

@@ -228,6 +228,17 @@ def tie_of(elements: Iterable[Element], equation_id: str) -> tuple[Element, Tabl
     return None
 
 
+def tied_ids(elements: Iterable[Element]) -> frozenset[str]:
+    """The ids of the equations that are a table's cells (`tie_of` for all of them)."""
+    return frozenset(
+        cell.equation_id
+        for element in elements
+        if element.kind is Kind.TABLE and element.table is not None
+        for cell in element.table.cells
+        if cell.equation_id
+    )
+
+
 def cell_for(grid: TableGrid, local: TableGrid, local_cell: TableCell) -> TableCell | None:
     """The table step's cell that stands where the local `local_cell` does (and only there)."""
     owner = table_step._owners(local)

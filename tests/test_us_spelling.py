@@ -53,8 +53,10 @@ BRITISH = re.compile(
 ALLOWED: set[tuple[str, str]] = {
     # The CSS class `equation-labelled` (a name, never shown), inside the exported page's style.
     ("src/readablestem/pipeline/assemble.py", "labelled"),
+    ("src/readablestem/pipeline/student_sheet.py", "labelled"),
     # Block reasons kept for the evaluation reports and tests; no page or export shows them.
-    ("src/readablestem/pipeline/layout.py", "maths"),
+    ("src/readablestem/pipeline/layout/blocks.py", "maths"),
+    ("src/readablestem/pipeline/layout/tables.py", "maths"),
 }
 
 # Folders whose text reaches a page, an export, an email or the public site.

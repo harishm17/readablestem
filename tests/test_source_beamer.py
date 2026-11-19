@@ -229,6 +229,44 @@ def beamer_on(monkeypatch):
     get_settings.cache_clear()
 
 
+# What LaTeXML wrote for the fixture decks (latexml.out): the Beamer binding's own complaints.
+BINDING = (
+    "Error:malformed:ltx:titlepage <ltx:titlepage> isn't allowed in <ltx:g> at deck.tex; line 8",
+    "Error:malformed:ltx:item <ltx:item> isn't allowed in <ltx:inline-block> at deck.tex; line 18",
+    "Error:malformed:ltx:itemize Closing </ltx:itemize> whose open descendents do not auto-close"
+    " at deck.tex; line 18 col 0",
+    "Error:malformed:ltx:inline-block Attempt to close </ltx:inline-block>, which isn't open"
+    " at deck.tex; line 18 col 0",
+    "Error:malformed:ltx:slidesequence <ltx:slidesequence> isn't allowed in <ltx:slidesequence>"
+    " at String; line 0 col 0",
+    "Error:unexpected:\\end{beamer@frame} Can't close environment beamer@frame;"
+    " at deck.tex; line 6 col 0",
+)
+
+
+@pytest.mark.parametrize(
+    ("other", "code"),
+    [
+        (None, None),
+        # A malformed error about anything else still stops a deck, with its name.
+        ("Error:malformed:ltx:tabular <ltx:tabular> isn't allowed in <ltx:p> at deck.tex; line 30",
+         "source_failed"),
+    ],
+)  # fmt: skip
+def test_a_deck_stops_only_on_errors_that_are_not_the_beamer_bindings_own(tmp_path, other, code):
+    from readablestem.source import report as source_report
+
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "latexml.out").write_text("\n".join([*BINDING, *([other] if other else [])]) + "\n")
+    report = source_report.parse(out, project=tmp_path)
+    assert len(report.problems) == len(BINDING) + (other is not None)
+    found = source_report.stop(report, beamer=True)
+    assert (found and found[0]) == code
+    if found:
+        assert [i["name"] for i in found[1]["items"]] == ["ltx:tabular"]  # type: ignore[union-attr]
+
+
 @needs_latexml
 @pytest.mark.parametrize("name", DECKS)
 def test_the_spike_decks_convert_with_no_unknown_command(name, beamer_on):
@@ -237,7 +275,9 @@ def test_the_spike_decks_convert_with_no_unknown_command(name, beamer_on):
     ).result
     assert result.origin == "beamer"
     assert not [n for n in result.notices if n.code == "source_error"]  # no frame hit an error
+    report = result.source_report  # and the reader read every frame whole
+    assert report is not None and (report.unread_words, report.unread_pictures) == (0, 0)
     headings = [e for e in result.elements if e.kind is Kind.HEADING]
     assert len(headings) >= 3
-    assert "web version of a slide deck" in result.html
+    assert "web version of a LaTeX slide deck" in result.html
     assert all(f.status is Status.ACCEPTED for f in result.fixes if f.kind is not Kind.FIGURE)

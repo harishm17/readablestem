@@ -29,6 +29,7 @@ from readablestem.models.pricing import (
     THINKING_ALLOWANCE_TOKENS,
     cost_usd,
     estimate_max_cost_usd,
+    reservation_usd,
 )
 
 PNG = PNG_SIGNATURE + b"tiny test image"
@@ -288,11 +289,16 @@ def test_rate_limit_is_retried_after_the_wait_the_server_asked_for(no_backoff):
 
 def test_a_timeout_after_sending_is_charged_its_full_reservation():
     budget = make_budget()
-    estimate = estimate_max_cost_usd(HAIKU, n_images=1, text_chars=0, max_output_tokens=1024)
+    estimate = reservation_usd(
+        "equation",
+        HAIKU,
+        estimate_max_cost_usd(HAIKU, n_images=1, text_chars=0, max_output_tokens=1024),
+    )
     wire = Wire(httpx2.ReadTimeout("slow"))
     parsed, call = run(wire, budget=budget)
     assert (parsed, call.outcome) == (None, "timeout")
     assert call.cost_usd == pytest.approx(estimate)
+    assert call.billed_unseen_usd == pytest.approx(estimate)  # marked: no usage came back
     assert budget.spent_usd == pytest.approx(estimate)
 
 

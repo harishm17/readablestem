@@ -6,9 +6,10 @@ Reads the items of each arm that was run (ReadableSTEM `runs/PART/rs/items.jsonl
 `runs/PART/chat/ARM.items.jsonl` made by `realworld_run.py chat-items`) and the gold, and prints:
 
 - the registered metrics, pooled, with 95% cluster bootstrap intervals over papers
-  (`proof.stats.cluster_bootstrap`, 10,000 resamples, seed 0): primary `exact_lenient`, symbols
-  credited (the secondary), detection recall and precision, wrong equations nobody is asked
-  about per 100 gold, unsupported predictions per prediction, cost per PDF page;
+  (`proof.stats.cluster_bootstrap`, 10,000 resamples, seed 0): primary `exact_lenient` (with
+  `exact_printed` and the pairing misses beside it for one release), symbols credited (the
+  secondary), detection recall and precision, wrong equations nobody is asked about per 100
+  gold, unsupported predictions per prediction, cost per PDF page;
 - paired differences ReadableSTEM minus each chatbot on the papers both ran on (cluster bootstrap
   and the sign-flip test), for the primary and the symbols-credited scores;
 - the buckets of docs/eval-page-math.md (correct, scorer, span, recognition, no proposal,
@@ -96,6 +97,7 @@ def load_buckets_module():
 COLUMNS = (
     "gold", "exact", "symbols_credit", "matched", "pred", "wrong_unasked", "unsupported",
     "cost", "pages", "required", "sym_wrong", "sym_wrong_flagged", "extra", "required_all",
+    "printed", "printed_gold", "pairing_miss",
 )  # fmt: skip
 COL = {name: i for i, name in enumerate(COLUMNS)}
 
@@ -126,6 +128,13 @@ def paper_counts(item: dict) -> list[float]:
     vec[COL["sym_wrong_flagged"]] = sum(p.get("review") == "required" for p in sym_wrong)
     vec[COL["extra"]] = len(item["unmatched"])
     vec[COL["required_all"]] = item["review"]["required_decisions"]
+    # The canonical-form score, beside `exact_lenient` for one release (eval.equations_printed).
+    # An item made before it existed (or a chatbot item file of the registration) has no such
+    # field: its paper adds nothing here, so the pooled figure covers the papers that have it.
+    if all("exact_printed" in p for p in pairs):
+        vec[COL["printed"]] = sum(p["exact_printed"] for p in pairs)
+        vec[COL["printed_gold"]] = item["n_gold"]
+        vec[COL["pairing_miss"]] = sum(bool(p.get("pairing_miss")) for p in pairs)
     return vec
 
 
@@ -140,6 +149,10 @@ def ratio_of(num: str, den: str, scale: float = 1.0):
 
 METRICS = {
     "exact_lenient (primary)": ratio_of("exact", "gold"),
+    "exact_printed (beside it for one release)": ratio_of("printed", "printed_gold"),
+    "  pairing misses (counted apart, never right), per gold equation": ratio_of(
+        "pairing_miss", "printed_gold"
+    ),
     "symbols, credited (secondary)": ratio_of("symbols_credit", "gold"),
     "detection recall": ratio_of("matched", "gold"),
     "detection precision": ratio_of("matched", "pred"),
@@ -388,6 +401,17 @@ def main() -> int:
             rows_in = [spoken.refold(r, gold) for r in rows_in]
         items[label] = [r for r in rows_in if not any(e in r["id"] for e in args.exclude)]
     result: dict = {"part": args.part, "arms": {}}
+    if args.spoken:
+        for label, its in items.items():
+            moved = [p for r in its for p in r["pairs"] if p.get("spoken_moved")]
+            strict = sum(1 for p in moved if p["spoken_strict"])
+            result["arms"].setdefault(label, {})["spoken_moved"] = {
+                "moved": len(moved), "strict": strict, "alike_but_different": len(moved) - strict,
+            }  # fmt: skip
+            print(
+                f"spoken, {label}: {len(moved)} pairs moved wrong to right, {strict} of them one "
+                f"print (strict), {len(moved) - strict} said alike but printed differently"
+            )
     print(f"## {args.part}: " + ", ".join(f"{k}: {len(v)} papers" for k, v in items.items()))
     # pooled metrics with cluster intervals
     rows = []

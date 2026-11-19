@@ -11,7 +11,9 @@ Run locally: `readablestem serve --reload` (see docs/web.md).
 from __future__ import annotations
 
 import functools
+import gc
 import logging
+import re
 import secrets
 from collections.abc import AsyncGenerator, Callable
 from contextlib import asynccontextmanager
@@ -22,7 +24,7 @@ from typing import Any
 
 import itsdangerous
 import jinja2
-from fastapi import FastAPI, Request
+from fastapi import APIRouter, FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
@@ -41,11 +43,14 @@ from readablestem.core import sandbox
 from readablestem.observability.logging import configure_logging, request_logging_middleware
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
-from readablestem.web import analytics, dev_only, output, seo
+from readablestem.pipeline import checked_words, language
+from readablestem.web import analytics, dev_only, forms, notation, output, page_images, poll, seo
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
-from readablestem.web.database import as_utc, prepare_database
+from readablestem.web.bundle import limit as zip_limit
+from readablestem.web.database import prepare_database
+from readablestem.web.dates import format_when, time_tag
 from readablestem.web.db import make_engine, make_sessionmaker
 from readablestem.web.deps import (
     AppContext,
@@ -55,16 +60,26 @@ from readablestem.web.deps import (
     current_user,
     render,
 )
+from readablestem.web.exam import EXAM_WORDS, NAME_WORDS
+from readablestem.web.exam import word_in as exam_word_in
 from readablestem.web.health import stop_worker_on_sigterm
 from readablestem.web.listen import speakable
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.return_to import decision_link, remember_return, signed_out_page
+from readablestem.web.quota import PAGES_RULE, allowance_phrase
+from readablestem.web.reread import SHARED_NOTE as REREAD_SHARED_NOTE
+from readablestem.web.return_to import (
+    build_pages,
+    decision_link,
+    remember_return,
+    signed_out_page,
+)
 from readablestem.web.routes import (
     account,
     admin,
     batch,
     bulk,
     bundle,
+    class_link,
     courses,
     cron,
     dev,
@@ -80,13 +95,15 @@ from readablestem.web.routes import (
     pages,
     parts,
     record,
+    reports,
     review,
     sample,
     sharing,
     split,
 )
-from readablestem.web.sandbox_status import run_probe
+from readablestem.web.sandbox_status import SandboxStatus, run_probe
 from readablestem.web.security import (
+    CompressionMiddleware,
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
     SecurityHeadersMiddleware,
@@ -101,6 +118,7 @@ from readablestem.web.worker import (
     default_client_factory,
     default_converter,
 )
+from readablestem.web.worker_rows import RowReader
 
 logger = logging.getLogger(__name__)
 
@@ -147,8 +165,14 @@ ERROR_TEXT = {
 
 
 def _utc_text(value: datetime | None) -> str:
-    value = as_utc(value)
-    return f"{value:%b} {value.day}, {value.year}, {value:%H:%M} UTC" if value else ""
+    return format_when(value, "short")
+
+
+def _allowance(
+    used: int, total: int | None, unit: str, resets_at: datetime | None = None
+) -> Markup:
+    """`quota.allowance_phrase` for a template: the reset is written as a `<time>`."""
+    return Markup(allowance_phrase(used, total, unit, _utc(resets_at) if resets_at else None))
 
 
 def _speakable(text: str | None) -> str:
@@ -159,16 +183,29 @@ def _speakable(text: str | None) -> str:
 
 
 def _utc(value: datetime | None) -> Markup:
-    """A time for the page body: `<time datetime>` saying it in UTC, which app.js rewrites
-    in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
-    JavaScript the UTC text stays (UX review MF16). Not for <title> or attributes: use
-    `utc_text` there."""
-    value = as_utc(value)
-    if value is None:
-        return Markup("")
-    stamp = value.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return Markup('<time class="local-time" datetime="{}">{}</time>').format(
-        stamp, _utc_text(value)
+    """The `utc` template filter: a time for the page body as a `<time>` (`web.dates`)
+    (UX review MF16)."""
+    return time_tag(value)
+
+
+_BREAK_AFTER = re.compile(r"([@._-])")
+
+
+def _breakable(text: str | None) -> Markup:
+    """A long value (an address, a file name) with places it may wrap, after the characters
+    @ . _ and -, so it never breaks in the middle of a word."""
+    return Markup(_BREAK_AFTER.sub(r"\1<wbr>", str(Markup.escape(text or ""))))
+
+
+def _attrs(values: dict[str, object]) -> Markup:
+    """The `attrs` template filter: a dict as HTML attributes, each with a space before it.
+    `True` writes the bare name (`novalidate`, `autofocus`: jinja's `xmlattr` writes
+    `autofocus="True"`, which is not a valid boolean attribute); `None` and `False` leave the
+    attribute out."""
+    return Markup("").join(
+        Markup(" {}").format(name) if value is True else Markup(' {}="{}"').format(name, value)
+        for name, value in values.items()
+        if value is not None and value is not False
     )
 
 
@@ -185,18 +222,51 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.globals["zip_limit"] = zip_limit  # ty: ignore[invalid-assignment]
+    env.globals["allowance"] = _allowance  # ty: ignore[invalid-assignment]
+    env.globals["PAGES_RULE"] = PAGES_RULE  # ty: ignore[invalid-assignment]
+    # Beside a button that starts a model read, for a person the document was shared with.
+    env.globals["REREAD_SHARED_NOTE"] = REREAD_SHARED_NOTE  # ty: ignore[invalid-assignment]
     env.filters["utc_text"] = _utc_text
+    env.filters["breakable"] = _breakable
+    env.filters["attrs"] = _attrs
     env.filters["usd"] = _usd
     env.filters["speakable"] = _speakable
     # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)
+    env.globals["poll_trigger"] = poll.TRIGGER  # ty: ignore[invalid-assignment]
     env.globals["static_url"] = static_url  # ty: ignore[invalid-assignment]
     # Absolute address for link previews (og:image and og:url must be absolute); empty in
     # tests, where the tags fall back to relative addresses.
     env.globals["site_url"] = site_url.rstrip("/")  # ty: ignore[invalid-assignment]
+    # Every sentence about what was converted, checked or reviewed (SW7): templates print
+    # these, read from a `pipeline.checked.CheckedSummary`, and compose none of their own.
+    env.globals["checked_words"] = checked_words  # ty: ignore[invalid-assignment]
+    # The upload form's "Language of the document" choices: the same tags and names as the job
+    # page's language control, by name.
+    env.globals["language_options"] = sorted(  # ty: ignore[invalid-assignment]
+        language.LANGUAGE_NAMES.items(), key=lambda item: item[1]
+    )
+    # The exam choice's words (web/exam.py), the same on every page that says it.
+    env.globals["exam_words"] = EXAM_WORDS  # ty: ignore[invalid-assignment]
+    # The exam word a document's title or file name holds, for the job page's hint.
+    env.globals["exam_word"] = exam_word_in  # ty: ignore[invalid-assignment]
+    env.globals["exam_name_words"] = NAME_WORDS  # ty: ignore[invalid-assignment]
     # Structured data for the public pages (web.seo), with the same absolute address.
     env.globals["json_ld"] = functools.partial(  # ty: ignore[invalid-assignment]
         seo.page_json_ld, site_url.rstrip("/")
     )
+    # The LaTeX classes and packages refused at upload by name (`source.support`), so the
+    # upload help and /limits name what is not taken from the same lists the check uses.
+    from readablestem.source.support import SUPPORT
+
+    env.globals["refused_classes"] = ", ".join(sorted(SUPPORT.classes.refused))  # ty: ignore[invalid-assignment]
+    env.globals["refused_packages"] = ", ".join(sorted(SUPPORT.packages.refused))  # ty: ignore[invalid-assignment]
+    # The one submit rule (SW43): the `form(key)` macro looks its key up, mints a request
+    # token per drawn form and writes the busy label (`web.forms`).
+    env.globals["form_row"] = forms.form_row  # ty: ignore[invalid-assignment]
+    env.globals["mint_request_token"] = forms.mint_token  # ty: ignore[invalid-assignment]
+    env.globals["busy_label"] = forms.busy_label  # ty: ignore[invalid-assignment]
+    env.globals["request_token_field"] = forms.REQUEST_TOKEN_FIELD  # ty: ignore[invalid-assignment]
     return Jinja2Templates(env=env)
 
 
@@ -245,9 +315,9 @@ def _on_draft_confirm(request: Request, exc: Exception) -> Response:
 
 def _on_csrf_failed(request: Request, exc: Exception) -> Response:
     log_event(logger, "csrf_rejected", logging.WARNING)
-    back = decision_link(request)  # a review decision or Undo (web.return_to)
-    if back and current_user(request) is None:  # its session's cookie expired, token too
+    if current_user(request) is None:  # the session ended and took the form's token with it
         return signed_out_page(request, status_code=403)
+    back = decision_link(request)  # a review decision or Undo (web.return_to)
     message = "For your security, forms stop working when you sign in again or after a while. "
     message += (
         "Go back to the decision and choose again."
@@ -408,7 +478,11 @@ def create_app(
     settings.check_production()
     check_web_secrets(settings)
     engine = make_engine(settings.database_url)
-    factory = make_sessionmaker(engine)
+    factory = make_sessionmaker(
+        engine, course_grants=lambda: notation.course_grants_enabled(settings)
+    )
+    page_images.CACHE.configure(settings.page_image_cache_mb * 1024 * 1024)
+    forms.install(factory)  # a form's request token rides on its action's commit (SW43)
     ctx = AppContext(
         settings=settings,
         engine=engine,
@@ -426,6 +500,12 @@ def create_app(
         tracer=_job_tracer(settings),
         uploads=UploadGate(limit=settings.max_concurrent_uploads),
     )
+    if settings.worker_mode == "service":
+        # The worker is another process (`readablestem worker`): what it says about itself, the
+        # AI service and the sandbox probe is read from `ops_heartbeat` (`web.worker_rows`).
+        ctx.rows = RowReader(factory)
+        ctx.sandbox = SandboxStatus(read=ctx.rows.sandbox)
+    inline_worker = settings.run_worker and ctx.rows is None
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
@@ -435,11 +515,16 @@ def create_app(
         if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
+        # A finished document is one 2.5 MB result of some 100,000 small objects that a review
+        # click reads and writes whole. At the stock threshold (700) the collector keeps
+        # passing over them: 115 of the 250 ms of an Accept on a 100-page file (writing the
+        # result takes 18 ms with it off). Cycles still go, only less often.
+        gc.set_threshold(20_000, 20, 50)
         sandbox.make_undumpable()  # TeX of the same user cannot read our /proc/<pid>/environ
-        if settings.sandbox_probe_at_startup:
+        if settings.sandbox_probe_at_startup and ctx.rows is None:
             # In the background: neither start-up nor /healthz waits for it.
             run_probe(ctx.sandbox, timeout_s=settings.sandbox_probe_timeout_s)
-        if settings.run_worker:
+        if inline_worker:
             ctx.worker = Worker(
                 settings,
                 factory,
@@ -455,7 +540,7 @@ def create_app(
             logger,
             "app_started",
             env=settings.env,
-            worker=settings.run_worker,
+            worker=inline_worker,
             tracing=ctx.tracer is not None,
             fake_models=settings.fake_models,
         )
@@ -480,8 +565,8 @@ def create_app(
     )
     app.state.ctx = ctx
 
-    # Added inner-first: SecurityHeaders > SafeError > RequestSizeLimit > Session >
-    # CrawlerRequests (HEAD, www and trailing-slash redirects) > routes.
+    # Added inner-first: Compression > SecurityHeaders > SafeError > RequestSizeLimit >
+    # Session > CrawlerRequests (HEAD, www and trailing-slash redirects) > routes.
     app.add_middleware(CrawlerRequestsMiddleware, base_url=settings.base_url)
     app.add_middleware(
         RotatingSessionMiddleware,
@@ -495,6 +580,7 @@ def create_app(
     app.add_middleware(RequestSizeLimitMiddleware)
     app.add_middleware(SafeErrorMiddleware, error_page=_plain_500_page_for(settings.contact_email))
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.env == "prod")
+    app.add_middleware(CompressionMiddleware)
     # Outermost: logs method, route template, status and latency only (no query, headers).
     app.middleware("http")(request_logging_middleware)
 
@@ -508,6 +594,7 @@ def create_app(
         app.add_exception_handler(unavailable, _on_database_unavailable)
 
     app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
+    routers: list[APIRouter] = []
     for module in (
         pages,
         account,
@@ -525,18 +612,23 @@ def create_app(
         edits,
         inventory,
         feedback,
+        reports,
         admin,
         cron,
         courses,
         record,
         listen,
+        class_link,
         email_login,
         discovery,
     ):
-        app.include_router(module.router)
-    app.include_router(auth_router)
+        routers.append(module.router)
+    routers.append(auth_router)
     if dev_only.available(settings):  # builder pages (web.dev_only): 404 in production
-        app.include_router(dev.router)
+        routers.append(dev.router)
     if settings.analytics_enabled:  # the /m/ proxy to PostHog (web.analytics); absent when off
-        app.include_router(analytics.router)
+        routers.append(analytics.router)
+    for router in routers:
+        app.include_router(router)
+    app.state.return_pages = build_pages(routers)  # the pages sign-in comes back to
     return app

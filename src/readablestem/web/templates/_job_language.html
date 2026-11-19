@@ -1,3 +1,5 @@
+{# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
 {# The document's language and where it came from, on one line with a "Change" control
    (POST /jobs/{id}/language: CSRF-checked, owner only; the HTML file is made again with
    the new language). Screen readers choose their voice from it. T1-11: one line, the
@@ -8,8 +10,7 @@
     <p>Language: {{ pg.language }}.{% if pg.language_check %} Screen readers use it to choose a voice, so check that it is right.{% endif %}</p>
     <details class="inline-details"{% if pg.language_check %} id="change-language"{% endif %}>
       <summary>Change<span class="visually-hidden"> the language</span></summary>
-      <form method="post" action="/jobs/{{ job.id }}/language">
-        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      {% call form("job.language", "/jobs/" ~ job.id ~ "/language") %}
         <div class="field">
           <label for="document-language">Language of this document</label>
           <select id="document-language" name="lang">
@@ -19,7 +20,7 @@
           </select>
         </div>
         <button type="submit" class="button-secondary">{{ "Confirm this language" if pg.language_check else "Use this language" }}</button>
-      </form>
+      {% endcall %}
     </details>
   </div>
 </section>

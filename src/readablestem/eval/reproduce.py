@@ -37,6 +37,7 @@ from pathlib import Path
 from readablestem.eval import pipeline_eval as pe
 from readablestem.eval import tables as tables_eval
 from readablestem.eval.equations import score_latex
+from readablestem.eval.equations_printed import exact_printed
 from readablestem.eval.gold_scoring import iter_gold_records, load_predictions, score_equations
 
 GOLD_DIR = Path("data/gold")
@@ -47,8 +48,9 @@ RERUN_DIR = Path(".local/reproduce")
 # Reports that `eval pipeline` writes as data/eval/latest-<task>.json; the tables task
 # writes latest-tables-<mode>.json.
 RERUN_TASKS = (
-    # Headings call no model; the command still wants a cap, so it gets the smallest one.
-    ("headings", ["--task", "headings", "--max-usd", "0.01"], "latest-headings.json"),
+    # Headings call no model, so the run is made with the fake client (the command would ask
+    # for a key otherwise); it still wants a cap, so it gets the smallest one.
+    ("headings", ["--task", "headings", "--fake", "--max-usd", "0.01"], "latest-headings.json"),
     ("tables (local)", ["--task", "tables", "--mode", "local"], "latest-tables-local.json"),
 )
 TOLERANCE = 1e-9
@@ -157,10 +159,16 @@ def check_scorer_ceiling(root: Path, predictions: Path | None = None) -> Check:
         return Check(name, False, f"{len(wrong)} row(s) disagree with the fixture", wrong[:10])
     summary = score_equations(list(gold.values()), load_predictions(path))["summary"]
     n = len(rows)
+    # Beside it for one release: the same known-correct LaTeX under the canonical-form score.
+    # It needs gold LaTeX, which the OpenStax sample does not have: then it says so.
+    has_latex = all(gold[r["id"]].get("latex") for r in rows)
+    printed = sum(exact_printed(r["latex"], gold[r["id"]].get("latex")) for r in rows)
+    printed_text = f"{printed / n:.3f} ({printed} of {n})" if has_latex else "n/a (no gold LaTeX)"
     matched = sum("known_gap" not in r for r in rows)
     ok = math.isclose(summary["exact_lenient"], matched / n, abs_tol=TOLERANCE)
     detail = (
         f"exact_lenient {summary['exact_lenient']:.3f} ({matched} of {n}), "
+        f"exact_printed {printed_text}, "
         f"exact_strict {summary['exact_strict']:.3f}, mean TEDS {summary['mean_teds']:.3f}; "
         f"{n - matched} known normalisation gaps, so equation scores understate quality "
         f"by up to {1 - matched / n:.0%}; the secondary stream scorer (T2-12) matches "

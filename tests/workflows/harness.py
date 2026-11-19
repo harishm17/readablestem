@@ -39,8 +39,9 @@ from typing import Any
 import lxml.html
 import pytest
 from fastapi.testclient import TestClient
+from sqlalchemy import select
 
-from fixtures.web.support import fetch, job_id_from, login, make_settings, upload
+from fixtures.web.support import fetch, job_id_from, login, make_settings, token, upload
 from readablestem.config import Settings
 from readablestem.core.types import DocumentResult
 from readablestem.eval import corpus
@@ -53,7 +54,17 @@ from readablestem.web.auth import set_allowed
 from readablestem.web.db import Job, session_scope
 from readablestem.web.worker import Worker, default_client_factory
 
-__all__ = ["OWED", "UPLOADS", "Ran", "ReplaySite", "document", "fetch", "finding", "words"]
+__all__ = [
+    "OWED",
+    "UPLOADS",
+    "Ran",
+    "ReplaySite",
+    "document",
+    "fetch",
+    "finding",
+    "waits_for",
+    "words",
+]
 
 OWNER = "owner@example.org"
 MODE = os.environ.get("CORPUS_ANSWERS_MODE", "offline")
@@ -75,16 +86,37 @@ UPLOADS = corpus.UPLOADS
 # Files whose conversion asks for answers that are not recorded yet, with how many: the
 # next refresh owes them (docs/eval.md, "Recording and replay").
 OWED = {
-    "w_lecture_5111": 2,
-    "d1_scripts": 14,
+    # Wave 1a changed what these files' conversions ask (words with their styles, kept line
+    # ends, new boxes), and no recording was paid for in it. One refresh owes them all.
+    "w_lecture_5111": 30,
+    "w_exam_5111": 38,
+    "w_notes_6042_ch2": 646,
+    "w_pset_801": 6,
+    "w_slides_60001_lec1": 48,
+    "w_slides_60001_lec10": 98,
+    "w_solutions_1802": 50,
+    "r01_syllabus_16851": 6,
+    "r05_labmanual_5310_lab1": 22,
+    "r07_labnotebook_5310": 8,
+    "r09_handout_14451": 18,
+    "r14_exam_513": 44,
+    "r16_openstax_physics_ch4_end": 20,
+    "r17_arxiv_ligo": 74,
+    "r18_arxiv_opt": 34,
+    "r21_infographic_orcid": 8,
+    "s15_charts_figures": 4,
+    "d1_scripts": 8,
     "e1_mc_columns": 6,
     "e2_solutions_rubric": 6,
     "e3_calendar": 2,
-    "f1_notation": 50,
-    "f2_figures": 30,
+    "f1_notation": 46,
+    "f2_figures": 14,
     "f4_matrices": 12,
     "ar3_sideways90": 2,
     "ar4_sideways270": 2,
+    "r15_openstax_chem_ch3": 2,
+    "r19_poster_codesign": 4,
+    "r20_newsletter_drp": 2,
 }
 
 
@@ -99,6 +131,16 @@ def finding(ident: str) -> pytest.MarkDecorator:
     if not (re.fullmatch(r"F-\d{3}", ident) and 1 <= int(ident[2:]) <= LAST_FINDING):
         raise ValueError(f"{ident!r} is not a finding (F-001 to F-{LAST_FINDING})")
     return pytest.mark.xfail(strict=True, reason=ident)
+
+
+def waits_for(entry_id: str) -> pytest.MarkDecorator:
+    """Marks a test that reads what a model's answers give, on a file whose recording lacks
+    them (`OWED`): the parts it reads are left for the reviewer, as when a model is
+    unavailable, so the test says nothing about the product until the refresh. The mark is
+    refused once the file is off the list, so it is removed with the refresh."""
+    if entry_id not in OWED:
+        raise ValueError(f"{entry_id} owes no answers (harness.OWED): take the mark off")
+    return pytest.mark.skip(reason=f"{entry_id}: {OWED[entry_id]} answers owed (harness.OWED)")
 
 
 def words(node: lxml.html.HtmlElement) -> str:
@@ -280,18 +322,15 @@ class ReplaySite:
             said = " ".join(sent.text.split())
             pytest.fail(f"{entry_id}: the upload was refused ({sent.status_code}): {said[-600:]}")
         replayable(entry_id)
+        held = sent.headers["location"]
+        if held.startswith("/uploads/"):
+            # Mostly scans, and the box not ticked: the file waits for the choice (WS7.8). A
+            # person who ticked nothing leaves the choice as offered: the scans stay pictures.
+            answer = {"csrf_token": token(self.browser, held), "whole": "1", "images": "pictures"}
+            sent = self.browser.post(held, data=answer)
+            assert sent.status_code == 303, sent.text[-300:]
         job_id = job_id_from(sent)
-        worker = Worker(
-            self.settings,
-            self.ctx.factory,
-            converter=self.ctx.converter,
-            client_factory=self._client,
-        )
-        assert worker.run_once() == job_id
-        clients = self._clients[before:]
-        missed: Counter[str] = Counter()
-        for client in clients:
-            missed.update(client.missed_because)
+        clients, missed = self._run_queued(job_id, before)
         if LOG:
             line = {
                 "entry": entry_id,
@@ -317,6 +356,64 @@ class ReplaySite:
             )
         return job_id
 
+    def _run_queued(self, job_id: str, before: int) -> tuple[list[Any], Counter[str]]:
+        """Runs the queued job and returns the model clients it used (those made after
+        `before`) with the answers the recording did not hold."""
+        worker = Worker(
+            self.settings,
+            self.ctx.factory,
+            converter=self.ctx.converter,
+            client_factory=self._client,
+        )
+        assert worker.run_once() == job_id
+        clients = self._clients[before:]
+        missed: Counter[str] = Counter()
+        for client in clients:
+            missed.update(client.missed_because)
+        return clients, missed
+
+    def convert_file(
+        self, filename: str, data: bytes, *, image_pages: bool = False, exam: bool = False
+    ) -> str:
+        """Upload a file made for the test (`builders`, or bytes written in the test) as the
+        owner and convert it. Returns the job's id. Fails the test when the upload is
+        refused. Model answers the recording does not hold are refused and the step carries
+        on without them, as it does in production when a model fails: a test that needs an
+        answer says so."""
+        before = len(self._clients)
+        sent = upload(self.browser, data, filename=filename, image_pages=image_pages, exam=exam)
+        if sent.status_code != 303:
+            said = " ".join(sent.text.split())
+            pytest.fail(f"{filename}: the upload was refused ({sent.status_code}): {said[-600:]}")
+        job_id = job_id_from(sent)
+        self._run_queued(job_id, before)
+        return job_id
+
+    def convert_parts(self, filename: str, data: bytes, parts: list[str]) -> list[str]:
+        """Upload a file over the page limit, which the site keeps, choose these parts of it
+        as a person does, and convert each. Returns the jobs' ids in the order of `parts`."""
+        sent = upload(self.browser, data, filename=filename)
+        location = sent.headers.get("location", "")
+        if sent.status_code != 303 or not location.startswith("/uploads/"):
+            pytest.fail(f"{filename}: not kept for parts ({sent.status_code}): {sent.text[-300:]}")
+        chosen = self.browser.post(
+            location,
+            data={"csrf_token": token(self.browser, location), "parts": "\n".join(parts)},
+        )
+        assert chosen.status_code == 303, chosen.text[-300:]
+        with session_scope(self.ctx.factory) as session:
+            rows = session.scalars(select(Job).where(Job.part_group == location.rsplit("/", 1)[-1]))
+            by_label = {job.part_label: job.id for job in rows}
+        for _ in parts:
+            worker = Worker(
+                self.settings,
+                self.ctx.factory,
+                converter=self.ctx.converter,
+                client_factory=self._client,
+            )
+            assert worker.run_once() in by_label.values()
+        return [by_label[label] for label in parts]
+
     def page(self, path: str) -> lxml.html.HtmlElement:
         """The page at `path` as the owner gets it, parsed. A download that is still a draft
         is confirmed the way a person confirms it."""
@@ -336,4 +433,7 @@ class ReplaySite:
             return job
 
     def result(self, job_id: str) -> DocumentResult:
-        return DocumentResult.model_validate(self.job(job_id).result_json)
+        with session_scope(self.ctx.factory) as session:
+            job = session.get(Job, job_id)
+            assert job is not None
+            return DocumentResult.model_validate(job.result_json)

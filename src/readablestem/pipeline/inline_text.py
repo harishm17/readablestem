@@ -6,7 +6,8 @@ cross-references", "Language", "Coloured text"):
 
 - `render_inline_text`: the one place inline text becomes HTML (paragraphs, list items,
   headings, captions). It escapes the text, puts each inline equation at its marker,
-  and writes the element's links (`<a href>`) and colour runs (`<span class>`).
+  and writes the element's spans (`core.inline`): links (`<a href>`), colour runs
+  (`<span class>`) and struck text (`<del>`).
   Offsets are into `Element.text` as stored, markers included. A span that starts or
   ends inside a marker, reaches past the text or overlaps an earlier span of its own
   kind is skipped; a web link is written only while `core.types.is_safe_href` still
@@ -16,7 +17,24 @@ cross-references", "Language", "Coloured text"):
   spans sit inside links and may wrap maths, which takes the colour too. Raised and
   lowered runs (`Element.script_runs`: Na+, H2O, cm3) are written as `<sup>` and `<sub>`,
   innermost; a lowered and a raised run side by side (SO4 2-, the two numbers before a
-  nuclide's symbol) are written as one stacked pair (`STACK_CSS`).
+  nuclide's symbol) are written as one stacked pair (`student_sheet.SCRIPT_STACK`). Struck text
+  (`Element.runs`, kind "deleted": a cancelled date) sits inside links and outside colour
+  and `<sup>`/`<sub>` (a colour span cut in two is not heard; a struck run cut in two would
+  be said twice), and is written as `<del>` with the tool's own words "deleted:" before
+  it and "end deleted" after it, visually hidden, so a listener hears that the words are
+  struck whether or not the screen reader announces `<del>` (most do not by default), and
+  a format that keeps text but not the tag (Word keeps both) still says so.
+  Highlighted, bold, italic and fixed-pitch words (`Element.runs`, kinds "highlight",
+  "strong", "emphasis" and "code") are written as `<mark>`, `<strong>`, `<em>` and `<code>`,
+  in that order from the outside, inside
+  colour and outside raised and lowered text, so every combination nests: the text is cut at
+  each edge of each run, and a piece is wrapped in the tags of the runs that cover it. The
+  kinds may overlap each other (bold and italic on the same words); two runs of one kind
+  that overlap are one run, the earliest. An inline equation is never inside one (a run
+  that reaches a marker is written in two pieces around it), and neither is a blank or a
+  checkbox.
+  A kept line end (`Element.runs`, kind "break": a poem's line, an address line) is the one
+  space it covers, written as `<br>` in its place, inside whatever else covers it.
 - `passage_attrs`: ` lang="..."` on the element's own block (`<p>`, `<li>`, `<h2>`...)
   when `Element.lang` is set.
 
@@ -25,7 +43,8 @@ one CSS rule (`add_style`) with the colour made dark enough for 4.5:1 contrast o
 output's white background, its hue kept (`pipeline.contrast`), and a second rule inside
 the dark-scheme `@media` block with the printed colour lightened as far as the dark page
 needs (no colour reaches 4.5:1 on both pages). Text without links or colour runs is written
-exactly as before these features existed.
+exactly as before these features existed, and so is text without struck runs: the `<del>`
+rule (`student_sheet.DELETED`) is added to the stylesheet only for a document that has one.
 
 Rendering reads the stored element only (no options), so the review screen's re-render
 of a stored result writes the same file.
@@ -34,21 +53,24 @@ of a stored result writes the same file.
 from __future__ import annotations
 
 import re
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 
+from readablestem.core import inline
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     ColourRun,
     Element,
     Link,
+    Run,
     ScriptRun,
     is_safe_href,
 )
-from readablestem.pipeline import contrast
+from readablestem.pipeline import contrast, student_sheet
 from readablestem.pipeline.language import is_language_tag
 from readablestem.pipeline.safe_html import escape_text
+from readablestem.pipeline.table_html import AUTHORED_CLASS
 
 # HTML for the inline equation with this element id, or None when the id is not an
 # equation of this document (the marker then stays as text: a layout bug made visible).
@@ -65,13 +87,28 @@ COLOUR_CLASS_PREFIX = "tc-"
 # direction of the column. Added to the stylesheet only for a document that has one.
 STACK_CLASS = "script-stack"
 STACK_LOW_FIRST = "script-stack-low-first"  # the lowered run comes first in the text
-STACK_CSS = (
-    f".{STACK_CLASS} {{ display: inline-flex; flex-direction: column; vertical-align: -0.5em;"
-    f" font-size: 0.75em; line-height: 1.1; text-align: left; }}\n"
-    f".{STACK_CLASS}.{STACK_LOW_FIRST} {{ flex-direction: column-reverse; }}\n"
-    f".{STACK_CLASS} sup, .{STACK_CLASS} sub {{ font-size: inherit; vertical-align: baseline;"
-    f" line-height: inherit; }}\n"
-)
+# Struck text: the words said around it (the tool's own words, so they carry its class and
+# are marked English like every other word of the tool's), and its look. The line through is
+# a text decoration, which forced colors keep, in the text's own colour, so it shows on a
+# dark page too; it is drawn thicker than a browser's default so it is not lost at small
+# sizes. Added to the stylesheet only for a document that has struck text.
+DELETED_BEFORE = "deleted: "
+DELETED_AFTER = " end deleted"
+DELETED_CLASS = "deleted-run"
+# Blanks and printed checkboxes (`Element.runs`, kinds "blank" and "checkbox"; found by
+# `text_pass.token_runs`). The characters the page printed are kept, hidden from a screen
+# reader (`aria-hidden`), and the tool's own words stand in for them, visually hidden, so a
+# blank is heard as "blank" and a box as "Checkbox, not checked:" (SW36). A format that keeps
+# text but not the tags (Word) shows both, which still says what the line is.
+TOKEN_KINDS = ("blank", "checkbox")
+BLANK_WORDS = "blank"
+FILLED_WORDS = "blank, filled in: "  # a form field that has a value (SW39)
+CHECKBOX_WORDS = {"not checked": "Checkbox, not checked: ", "checked": "Checkbox, checked: "}
+CHECKED_BOXES = frozenset("\u2611\u2612")  # ballot box with check, ballot box with X
+# The runs that mark words by how they are set, with the tag each is written as (outermost first).
+STYLE_TAGS = {"highlight": "mark", "strong": "strong", "emphasis": "em", "code": "code"}
+INLINE_CODE_CLASS = "inline-code"
+HIGHLIGHT_CLASS = "highlight-run"
 # An element id a link may point at ("p3-e12"), as the assembler writes ids.
 LINK_TARGET = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
 
@@ -81,28 +118,15 @@ def colour_class(rgb: tuple[int, int, int]) -> str:
     return COLOUR_CLASS_PREFIX + contrast.hex_colour(rgb)[1:]
 
 
-def colour_css(rgb: tuple[int, int, int]) -> str:
-    """The rules for that class: the colour at 4.5:1 or more on the white page, and, for
-    readers who prefer dark colours, the printed colour lightened as far as it needs on the
-    dark page. No colour reaches 4.5:1 on both (that needs a luminance of at most 0.18 on
-    one and at least 0.20 on the other), so every class has both rules."""
-    name = colour_class(rgb)
-    shown = contrast.hex_colour(contrast.with_contrast(rgb))
-    dark = contrast.hex_colour(contrast.with_contrast(rgb, contrast.DARK_BACKGROUND))
-    return (
-        f".{name} {{ color: {shown}; }}\n{contrast.DARK_MEDIA} {{ .{name} {{ color: {dark}; }} }}\n"
-    )
-
-
 def _href(link: Link) -> str | None:
-    if link.kind == "uri":
+    if link.kind in ("uri", "typed"):
         return link.href if link.href and is_safe_href(link.href) else None
     if link.target_id and LINK_TARGET.fullmatch(link.target_id):
         return f"#{link.target_id}"
     return None
 
 
-def _usable[S: (Link, ColourRun, ScriptRun)](
+def _usable[S: (Link, ColourRun, ScriptRun, Run)](
     spans: Sequence[S], text: str, markers: Sequence[tuple[int, int]]
 ) -> list[S]:
     """Spans inside the text, not starting or ending inside a marker, without overlaps
@@ -129,6 +153,10 @@ class _Segment:
     link: int | None  # index into the usable links
     colour: tuple[int, int, int] | None
     script: str | None = None  # "sup" or "sub" when this piece is a raised or lowered run
+    deleted: bool = False  # inside struck text
+    token: int | None = None  # index of the blank or checkbox run this piece is
+    line_end: bool = False  # the space of a kept line end, written as `<br>`
+    styles: tuple[str, ...] = ()  # the style kinds ("strong", ...) that cover this piece
 
 
 def render_inline_text(
@@ -158,23 +186,44 @@ def render_inline_text(
     links: list[tuple[Link, str]] = []
     runs: list[ColourRun] = []
     scripts: list[ScriptRun] = []
+    struck: list[Run] = []
+    tokens: list[Run] = []
+    line_ends: list[Run] = []
+    styled: dict[str, list[Run]] = {}
     if element is not None:
-        scripts = _usable(element.script_runs, text, markers)
-        for link in _usable(element.links, text, markers):
+        found = inline.spans(element)
+        scripts = _usable(found.scripts, text, markers)
+        for link in _usable(found.links, text, markers):
             href = _href(link)
             if href is not None:
                 links.append((link, href))
         if add_style is not None:
-            runs = _usable(element.colour_runs, text, markers)
-    if not links and not runs and not scripts:
+            runs = _usable(found.colours, text, markers)
+        struck = _usable([r for r in found.runs if r.kind == "deleted"], text, markers)
+        tokens = _usable([r for r in found.runs if r.kind in TOKEN_KINDS], text, markers)
+        line_ends = [r for r in found.runs if r.kind == "break" and text[r.start : r.end].isspace()]
+        for kind in STYLE_TAGS:
+            if mine := _usable([r for r in found.runs if r.kind == kind], text, markers):
+                styled[kind] = mine
+    if not (links or runs or scripts or struck or tokens or styled or line_ends):
         return _plain(text, placed)
-    segments = _segments(text, placed, [k for k, _ in links], runs, scripts)
+    segments = _segments(
+        text, placed, [k for k, _ in links], runs, scripts, struck, tokens, styled, line_ends
+    )
     for rgb in sorted({s.colour for s in segments if s.colour is not None}):
         if add_style is not None:
-            add_style(f"colour-{colour_class(rgb)}", colour_css(rgb))
+            add_style(f"colour-{colour_class(rgb)}", student_sheet.colour(colour_class(rgb), rgb))
     if add_style is not None and _stacked(segments):
-        add_style(STACK_CLASS, STACK_CSS)
-    return _write(text, segments, [href for _, href in links], [k for k, _ in links], link_attrs)
+        add_style(STACK_CLASS, student_sheet.SCRIPT_STACK)
+    if add_style is not None and struck:
+        add_style(DELETED_CLASS, student_sheet.DELETED)
+    if add_style is not None and any("code" in s.styles for s in segments):
+        add_style(INLINE_CODE_CLASS, student_sheet.INLINE_CODE)
+    if add_style is not None and any("highlight" in s.styles for s in segments):
+        add_style(HIGHLIGHT_CLASS, student_sheet.HIGHLIGHT)
+    return _write(
+        text, segments, [href for _, href in links], [k for k, _ in links], link_attrs, tokens
+    )
 
 
 def _plain(text: str, placed: dict[int, tuple[int, str]]) -> str:
@@ -195,12 +244,25 @@ def _segments(
     links: list[Link],
     runs: list[ColourRun],
     scripts: Sequence[ScriptRun] = (),
+    struck: Sequence[Run] = (),
+    tokens: Sequence[Run] = (),
+    styled: Mapping[str, Sequence[Run]] | None = None,
+    line_ends: Sequence[Run] = (),
 ) -> list[_Segment]:
     """The text cut at every marker, link and run edge, each piece with what covers it."""
+    styled = styled or {}
     cuts = {0, len(text)}
     for start, (end, _) in placed.items():
         cuts |= {start, end}
-    for span in (*links, *runs, *scripts):
+    for span in (
+        *links,
+        *runs,
+        *scripts,
+        *struck,
+        *tokens,
+        *line_ends,
+        *(r for v in styled.values() for r in v),
+    ):
         cuts |= {span.start, span.end}
     edges = sorted(cuts)
     segments = []
@@ -214,7 +276,29 @@ def _segments(
         script = next(
             (r.kind for r in scripts if r.start <= start and end <= r.end and maths is None), None
         )
-        segments.append(_Segment(start, end, maths, link, colour, script))
+        deleted = any(r.start <= start and end <= r.end for r in struck)
+        token = next(
+            (
+                i
+                for i, r in enumerate(tokens)
+                if r.start <= start and end <= r.end and maths is None
+            ),
+            None,
+        )
+        # Maths and blanks are written as they are: no style tag goes round them.
+        styles = (
+            ()
+            if maths is not None or token is not None
+            else tuple(
+                kind
+                for kind in STYLE_TAGS
+                if any(r.start <= start and end <= r.end for r in styled.get(kind, ()))
+            )
+        )
+        line_end = maths is None and any(r.start <= start and end <= r.end for r in line_ends)
+        segments.append(
+            _Segment(start, end, maths, link, colour, script, deleted, token, line_end, styles)
+        )
     return segments
 
 
@@ -223,15 +307,40 @@ def _stacked(segments: Sequence[_Segment]) -> bool:
     return any(a.script and b.script and a.script != b.script for a, b in pairwise(segments))
 
 
-def _inner(text: str, segments: Sequence[_Segment]) -> str:
+def _token(kind: str, shown: str) -> str:
+    """A blank or a checkbox as the page printed it, with the words that say it."""
+    if kind == "blank" and shown.strip("_"):  # a filled field: its value is what is said
+        return f'<span class="blank">{_hidden(FILLED_WORDS)}{escape_text(shown)}</span>'
+    if kind == "blank":
+        return (
+            f'<span class="blank">{_hidden(BLANK_WORDS)}'
+            f'<span aria-hidden="true">{escape_text(shown)}</span></span>'
+        )
+    state = "checked" if shown in CHECKED_BOXES else "not checked"
+    return (
+        f'<span class="checkbox">{_hidden(CHECKBOX_WORDS[state])}'
+        f'<span aria-hidden="true">{escape_text(shown)}</span></span>'
+    )
+
+
+def _inner(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) -> str:
     """The pieces as HTML: maths as written, raised and lowered runs in `<sup>` and `<sub>`
-    (a pair side by side in one stacked span), the rest escaped."""
+    (a pair side by side in one stacked span), blanks and checkboxes with their words, the
+    rest escaped."""
     out: list[str] = []
     i = 0
     while i < len(segments):
         seg = segments[i]
-        if seg.maths:
+        if seg.token is not None:
+            # One run cut by a link, colour or struck edge is written once, whole, where it
+            # starts: its later pieces may be in another group of the callers above.
+            run = tokens[seg.token]
+            if seg.start == run.start:
+                out.append(_token(run.kind, text[run.start : run.end]))
+        elif seg.maths:
             out.append(seg.maths)
+        elif seg.line_end:
+            out.append("<br>")
         elif seg.script:
             tag = seg.script
             following = segments[i + 1] if i + 1 < len(segments) else None
@@ -239,7 +348,7 @@ def _inner(text: str, segments: Sequence[_Segment]) -> str:
             if following is not None and following.script and following.script != tag:
                 other = following.script
                 that = f"<{other}>{escape_text(text[following.start : following.end])}</{other}>"
-                # Text order for the reader; the raised run is drawn on top (`STACK_CSS`).
+                # Text order for the reader; the raised run is drawn on top (`SCRIPT_STACK`).
                 css = STACK_CLASS if tag == "sup" else f"{STACK_CLASS} {STACK_LOW_FIRST}"
                 out.append(f'<span class="{css}">{this}{that}</span>')
                 i += 1
@@ -251,14 +360,59 @@ def _inner(text: str, segments: Sequence[_Segment]) -> str:
     return "".join(out)
 
 
-def _coloured(text: str, segments: Sequence[_Segment]) -> str:
+def _hidden(words: str) -> str:
+    return f'<span class="visually-hidden {AUTHORED_CLASS}">{words}</span>'
+
+
+def _struck(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) -> str:
+    """The pieces with each stretch of struck text as `<del>`, said as struck (`DELETED_*`)."""
+    out: list[str] = []
+    i = 0
+    while i < len(segments):
+        j = i
+        while j < len(segments) and segments[j].deleted == segments[i].deleted:
+            j += 1
+        inner = _coloured(text, segments[i:j], tokens)
+        if segments[i].deleted:
+            inner = f"{_hidden(DELETED_BEFORE)}<del>{inner}</del>{_hidden(DELETED_AFTER)}"
+        out.append(inner)
+        i = j
+    return "".join(out)
+
+
+def _styled(
+    text: str,
+    segments: Sequence[_Segment],
+    tokens: Sequence[Run] = (),
+    kinds: Sequence[str] = tuple(STYLE_TAGS),
+) -> str:
+    """The pieces with each stretch under a run of style in its tag (`STYLE_TAGS`, the first
+    kind outermost): the pieces are grouped by the first kind, each group by the next inside
+    it, so a bold run that italic starts and stops in is one `<strong>`, not three."""
+    if not kinds:
+        return _inner(text, segments, tokens)
+    kind, rest = kinds[0], kinds[1:]
+    out: list[str] = []
+    i = 0
+    while i < len(segments):
+        covered = kind in segments[i].styles
+        j = i
+        while j < len(segments) and (kind in segments[j].styles) == covered:
+            j += 1
+        inner = _styled(text, segments[i:j], tokens, rest)
+        out.append(f"<{STYLE_TAGS[kind]}>{inner}</{STYLE_TAGS[kind]}>" if covered else inner)
+        i = j
+    return "".join(out)
+
+
+def _coloured(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) -> str:
     out: list[str] = []
     i = 0
     while i < len(segments):
         j = i
         while j < len(segments) and segments[j].colour == segments[i].colour:
             j += 1
-        inner = _inner(text, segments[i:j])
+        inner = _styled(text, segments[i:j], tokens)
         rgb = segments[i].colour
         out.append(f'<span class="{colour_class(rgb)}">{inner}</span>' if rgb else inner)
         i = j
@@ -271,6 +425,7 @@ def _write(
     hrefs: list[str],
     links: Sequence[Link] = (),
     link_attrs: LinkAttrs | None = None,
+    tokens: Sequence[Run] = (),
 ) -> str:
     out: list[str] = []
     i = 0
@@ -278,7 +433,7 @@ def _write(
         j = i
         while j < len(segments) and segments[j].link == segments[i].link:
             j += 1
-        inner = _coloured(text, segments[i:j])
+        inner = _struck(text, segments[i:j], tokens)
         link = segments[i].link
         shown = "".join(text[s.start : s.end] for s in segments[i:j])
         if link is not None and shown.strip():

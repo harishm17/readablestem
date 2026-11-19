@@ -52,7 +52,13 @@ class Rule:
 # Rule name -> allowance. Generous for people, tight for scripts: a shared university
 # address (a whole department behind one NAT) still has room.
 RULES: dict[str, Rule] = {
-    "login": Rule(10, 300),  # starting a sign-in: the buttons on /login
+    # Starting a sign-in, one rule for each way in, so ten emailed-link requests do not block
+    # the Google button. Each is counted after the form's CSRF check: an expired form is not
+    # an attempt.
+    "login_google": Rule(10, 300),
+    "login_microsoft": Rule(10, 300),
+    "login_email": Rule(10, 300),
+    "login_dev": Rule(10, 300),
     "callback": Rule(20, 300),  # coming back from Google or Microsoft
     # New accounts made by open sign-up (SIGNUP_MODE=open), per address: counted when a
     # sign-in is about to create one, not on every sign-in. A shared university or office
@@ -74,6 +80,20 @@ RULES: dict[str, Rule] = {
     # for a script; the job's spend caps are the other bound.
     "edit_region": Rule(60, 600),
     "reread": Rule(20, 600),
+    # A zip of the person's documents (`/app/download`, a course's, a batch's and
+    # `/account/export`): each builds every ready document's files in one request, and
+    # `/account/export` three file types of each. A person fetching their term's courses
+    # in turn, in each file type, is a dozen builds that take a minute each, so 15 in ten
+    # minutes is out of reach for a person and a stop for a script. Per signed-in person.
+    "zip_user": Rule(15, 600),
+    # A problem report to the operator (`web.reports`), per signed-in person: more than five in
+    # ten minutes is a script or a loop, not a person with five problems.
+    "report": Rule(5, 600),
+    # Class links (`web.links`, `/s/{token}`), per address, with no sign-in to count: every
+    # request (a class opening the page together from one campus address has room), and
+    # separately the ones that opened nothing, which only a person trying tokens makes.
+    "class_link": Rule(600, 600),
+    "class_link_miss": Rule(20, 600),
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound
 
@@ -102,6 +122,16 @@ class RateLimiter:
                 return max(1, int(hits[0] + rule.window_s - now) + 1)
             hits.append(now)  # refused attempts are not counted: the wait always ends
             return None
+
+    def give_back(self, rule_name: str, key: str, count: int = 1) -> None:
+        """Take back `count` attempts counted for `key`, newest first: a refusal that used no
+        allowance (the per-person upload rule counts accepted files only)."""
+        with self._lock:
+            hits = self._hits.get((rule_name, key))
+            if hits is None:
+                return
+            for _ in range(min(count, len(hits))):
+                hits.pop()
 
     def _forget(self, now: float) -> None:
         """Drop keys with nothing inside their window; if that is not enough, the oldest."""

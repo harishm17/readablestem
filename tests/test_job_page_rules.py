@@ -25,8 +25,7 @@ from readablestem.core.types import (
     SourceFacts,
     Status,
 )
-from readablestem.web import job_page
-from readablestem.web.outcome import job_outcome
+from readablestem.web import job_page, states
 
 MATH = "http://www.w3.org/1998/Math/MathML"
 
@@ -73,13 +72,62 @@ def outage_result(failed: int, total: int) -> dict:
 
 
 def test_an_ai_outage_is_not_finished():
-    outcome = job_outcome(status="done", error_code=None, result_json=outage_result(3, 4))
-    assert outcome is not None and outcome.code == "model_outage" and outcome.partial
-    assert outcome.label == "Stopped: the AI service did not answer"
-    assert "3 of 4 equations and figures" in outcome.message
-    assert "Nothing is wrong with your PDF" in outcome.message
-    assert job_outcome(status="done", error_code=None, result_json=outage_result(2, 4)) is None
-    assert job_outcome(status="done", error_code=None, result_json=outage_result(0, 4)) is None
+    def state(failed: int, total: int) -> states.State:
+        facts = states.Facts(id="j", status="done", result_json=outage_result(failed, total))
+        return states.state_of(facts)
+
+    outage = state(3, 4)
+    assert outage.key == "partly_converted" and not outage.shareable
+    assert [g.code for g in outage.gaps] == ["service_outage"]
+    assert "3 of 4 equations and figures" in outage.message
+    assert "Nothing is wrong with your PDF" in outage.message
+    assert outage.retry is not None and outage.retry.kind == "missing"
+    # No outage gap; without a summary of what was converted the job is never "Ready to
+    # share" (SW7), only "Ready".
+    assert state(2, 4).key == "ready_remains" and state(0, 4).key == "ready_remains"
+
+
+def test_a_notice_no_decision_stands_behind_holds_back_ready_to_share():
+    from readablestem.pipeline import checked
+
+    whole = states.counts_of(checked.summarize(elements=[], fixes=[], html_checks=[]))
+
+    def state(code: str, review: str) -> states.State:
+        result = {"notices": [{"code": code, "review": review}]}
+        return states.state_of(states.Facts(id="j", status="done", result_json=result), whole)
+
+    assert state("office_comments", "optional").key == "ready"
+    # a formula LaTeX could not read has its own decision: the notice is not a second hold
+    assert state("source_error", "required").key == "ready"
+    held = state("office_tracked_changes", "required")
+    assert held.key == "ready_remains" and "tracked changes" in held.message
+    assert state("rtl_text", "required").key == state("option_labels", "required").key == held.key
+    # a PDF's comments are in the student file, and one may be the instructor's own note
+    assert state("annotations_read", "required").key == held.key
+
+
+def test_a_text_decision_is_what_holds_the_job_not_its_notice():
+    from readablestem.pipeline import checked
+    from readablestem.pipeline import notices as notice_rules
+
+    element = Element(
+        id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 10, 10), order=0,
+        text="שלום", reasons=["rtl_text"],
+    )  # fmt: skip
+    (decision,) = notice_rules.text_decisions([element], {})
+
+    def state(fix: Fix) -> states.State:
+        summary = checked.summarize(elements=[element], fixes=[fix], html_checks=[])
+        result = {
+            "notices": [{"code": "rtl_text", "element_id": "p1-e0", "review": "required"}],
+            "fixes": [fix.model_dump(mode="json")],
+        }
+        facts = states.Facts(id="j", status="done", result_json=result)
+        return states.state_of(facts, states.counts_of(summary))
+
+    assert state(decision).key == "needs_decisions"
+    decision.status, decision.reviewed = Status.ACCEPTED, True
+    assert state(decision).shareable
 
 
 # --------------------------------------------------------------------------- reading
@@ -162,8 +210,12 @@ def test_the_card_rows_say_what_is_lost_specifically_and_never_score():
     assert maths.html == "3 of 4 are MathML, read with their structure; 1 is shown as an image."
     assert rows["tell a bold vector from a plain letter"].pdf.startswith("No: 3 bold letters")
     assert rows["hear what a figure shows"].html == "1 of 1 figure has a short description."
-    assert rows["jump from section to section"].html == "Yes: 1 heading in one outline."
-    assert rows["hear lists as lists"].html == "Yes: 1 list with 2 items."
+    # One equation is a picture, so only the converted parts have the structure (SW7).
+    assert (
+        rows["jump from section to section"].html
+        == "In the converted parts: 1 heading in one outline."
+    )
+    assert rows["hear lists as lists"].html == "In the converted parts: 1 list with 2 items."
     # T1-15: the count says how many were kept, not "Yes" or "Not yet".
     assert rows["follow the links"].html == "0 of 2 links kept."
     for row in card.rows:

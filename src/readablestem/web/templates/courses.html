@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
 {# Courses (routes/courses.py): only with FEATURE_NOTATION_MEMORY on. The list comes first
    (documents and symbols per course, and the next step for each); adding a course is below it,
    or first when there are none. #}
@@ -8,24 +10,18 @@
   {% if courses|length >= max_courses %}
   <p>You have {{ max_courses }} courses, the most allowed. Delete one to add another.</p>
   {% else %}
-  <form method="post" action="/courses" novalidate>
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    {% set err = field_errors.get("name") %}
-    <div class="field{% if err %} field-error{% endif %}">
-      <label for="name">Course name</label>
-      <p class="hint" id="name-hint">For example “Physics 1”. Only you see it.</p>
-      {% if err %}<p class="error-message" id="name-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}
-      <input type="text" id="name" name="name" maxlength="200" autocomplete="off" value="{{ values.get('name', '') }}"
-             aria-describedby="name-hint{% if err %} name-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
-    </div>
+  {% call form("course.create", "/courses", {"novalidate": true}) %}
+    {% call(aria) field("name", "Course name", error=field_errors.get("name"), hint="For example “Physics 1”.") %}
+      <input type="text" id="name" name="name" maxlength="200" autocomplete="off" value="{{ values.get('name', '') }}"{{ aria }}>
+    {% endcall %}
     <button type="submit" class="button">Add course</button>
-  </form>
+  {% endcall %}
   {% endif %}
 {% endmacro %}
 {% block content %}
 <h1>Your courses</h1>
 {% include "_error_summary.html" %}
-<p class="lede">A course keeps your notation, such as “bold d is a vector”, so letters are read your way.</p>
+<p class="lede">A course keeps your notation, such as “bold d is a vector”, so letters are read your way. {{ notation_words.course }}</p>
 
 {% if courses %}
 <section aria-labelledby="list-heading">

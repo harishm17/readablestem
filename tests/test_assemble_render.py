@@ -25,13 +25,10 @@ from readablestem.core.types import (
 from readablestem.pipeline.assemble import (
     ABOUT_TITLE,
     ABOUT_WORDING,
-    CHECKED,
     CONTACT,
     EQUATION_NOT_CONVERTED_ALT,
+    FIGURE_LABEL,
     FIGURE_NOT_DESCRIBED_ALT,
-    FLAGGED_NOTE,
-    MATHS_NOTE,
-    NOT_CHECKED_YET,
     render_html,
     sanitize_mathml,
 )
@@ -119,7 +116,7 @@ def test_document_skeleton(sample_html):
         '<html lang="en">',
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
-        "<title>Speed and Velocity</title>",
+        "<title>2.2 Speed and Velocity</title>",  # the H1's text (SW6c)
         "<style>",
         ABOUT_WORDING,
     ):
@@ -160,7 +157,7 @@ def test_block_equation_is_display_block_mathml(sample_html):
     [
         ("p1-e5", "failed", EQUATION_NOT_CONVERTED_ALT, "Not converted."),
         ("p2-e2", "rejected", EQUATION_NOT_CONVERTED_ALT, "Not converted."),
-        ("p1-e7", "abstained", FIGURE_NOT_DESCRIBED_ALT, "Needs a description."),
+        ("p1-e7", "abstained", FIGURE_NOT_DESCRIBED_ALT, FIGURE_LABEL.student),
     ],
 )
 def test_not_converted_items_keep_the_original_with_a_visible_note(
@@ -194,7 +191,7 @@ def test_decorative_image_without_caption_is_not_an_empty_figure(sample_html):
 
 
 def test_headings_follow_fixes_and_rejected_ones_become_paragraphs(sample_html):
-    assert '<h1 id="p1-e0">2.2 Speed and Velocity</h1>' in sample_html
+    assert re.search(r'<h1 id="p1-e0"[^>]*>2.2 Speed and Velocity</h1>', sample_html)
     assert '<h2 id="p2-e0">Instantaneous velocity</h2>' in sample_html  # needs_review: kept
     # A rejected bold heading is bold text, as in the PDF ("Make them bold text").
     assert '<p id="p2-e3"><strong>NOTE TO STUDENTS</strong></p>' in sample_html
@@ -287,6 +284,7 @@ def test_hostile_text_is_escaped_everywhere():
     assert not [a for a in parsed.attrs if a[1].startswith("on")]
     assert {tag for tag, _, _ in parsed.attrs} <= {
         "html", "meta", "img", "h1", "p", "figure", "footer", "h2", "span", "div", "a",
+        "section",  # the notice that opens an unreviewed page (SW7)
     }  # fmt: skip
     assert "&lt;script&gt;alert(&#x27;p&#x27;)&lt;/script&gt;" in html
     assert 'alt="&quot;&gt;&lt;img src=x onerror=alert(4)&gt;"' in html
@@ -441,47 +439,142 @@ def test_inline_equation_without_its_marker_is_rendered_at_its_own_position():
 
 
 def about(html: str) -> str:
-    start = html.index('<footer id="about-conversion"')
-    return html[start : html.index("</footer>", start)]
+    start = html.index('<section id="about-conversion"')
+    return html[start : html.index("</section>", start)]
 
 
-def test_the_student_note_comes_after_main_and_speaks_to_students(sample_html):
+def test_the_student_note_ends_main_and_speaks_to_students(sample_html):
     """The note is for the people who read the file (MF7 of the UX review): what it is,
-    whether the instructor has checked it, who to tell. No counts and no review words."""
+    how much of it a person reviewed and what is a picture (SW7: with their counts, so it
+    never says more than was done), who to tell. No review screen's words."""
     note = about(sample_html)
-    assert sample_html.index("</main>") < sample_html.index('<footer id="about-conversion"')
-    # Its title labels the footer region; it is not a heading in the outline (T3-13).
+    assert sample_html.index('<section id="about-conversion"') < sample_html.index("</main>")
+    assert sample_html.count("About this version</p>") == 1
+    # Its title labels the region; it is not a heading in the outline (T3-13).
     assert f'<p id="about-conversion-title" class="about-title">{ABOUT_TITLE}</p>' in note
     assert 'aria-labelledby="about-conversion-title"' in note and "<h" not in note
-    assert ABOUT_WORDING in note and MATHS_NOTE in note and CONTACT in note
-    assert NOT_CHECKED_YET in note  # the sample has decisions still open
-    assert FLAGGED_NOTE in note
+    assert ABOUT_WORDING in note and CONTACT in note
+    assert "2 of its 5 equations are written so that screen readers can read them aloud" in note
+    # Decisions are still open: the 2 a person made are counted, the 4 still open are not.
+    assert "Your instructor reviewed 2 of 6 parts the tool flagged." in note
+    assert "4 parts could not be converted and are shown as pictures of the original" in note
     assert "<p>Test note.</p>" in note
-    for word in ("needs review", "rejected", "accepted", "reviewer", "("):
+    for word in ("needs review", "rejected", "accepted", "reviewer", "checked"):
         assert word not in note.lower(), word
-    text = re.sub(r"<[^>]+>", "", note).replace("readablestem", "")
-    assert not re.search(r"\d", text)  # no counts
 
 
-def test_the_note_says_checked_with_the_date_once_every_decision_is_made():
+def test_the_note_says_reviewed_with_the_date_once_a_person_decided():
     pairs = [heading("a", 0, 1), heading("b", 1, 2, Status.NEEDS_REVIEW)]
     elements, fixes = [e for e, _ in pairs], [f for _, f in pairs]
     draft = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
                         checked_on=date(2026, 10, 9))  # fmt: skip
-    assert NOT_CHECKED_YET in about(draft) and "2026" not in about(draft)
+    assert "<p>This version has not been reviewed by a person.</p>" in about(draft)
+    assert "2026" not in about(draft)
     fixes[1].status, fixes[1].reviewed = Status.ACCEPTED, True
     done = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
                        checked_on=date(2026, 10, 9))  # fmt: skip
-    assert f"<p>{CHECKED} on October 9, 2026.</p>" in about(done)
+    said = "<p>Your instructor reviewed 1 of 1 part the tool flagged, on October 9, 2026.</p>"
+    assert said in about(done)
     undated = render(elements, fixes)
-    assert f"<p>{CHECKED}.</p>" in about(undated)
+    assert "<p>Your instructor reviewed 1 of 1 part the tool flagged.</p>" in about(undated)
 
 
 def test_about_section_without_fixes_and_defaults():
     para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text="x")
     html = render([para], [], title="  ", lang="")
-    assert ABOUT_WORDING in html and MATHS_NOTE not in html  # no equations, no maths line
+    assert ABOUT_WORDING in html and "equations" not in html  # no equations, no maths line
     assert "<title>Converted document</title>" in html
     assert '<html lang="en">' in html
     assert "could not be converted" not in html
     assert [c for c in static_checks(html) if not c.passed] == []
+
+
+# --------------------------------------------------------------------------- audiences
+
+
+def _four_cases():
+    """A document with a page read from an image, an equation kept as a picture, a table kept
+    as a picture and a figure with no description."""
+    from readablestem.core.types import IMAGE_PAGE_ORIGINAL_REASON, TableCell, TableGrid
+
+    def element(eid, kind, page, order, **more):
+        return Element(id=eid, kind=kind, page=page, bbox=(72, 100, 300, 160), order=order, **more)
+
+    grid = TableGrid(
+        rows=1, cols=1, cells=[TableCell(row=0, col=0, text="x")], header_rows=0, source="local"
+    )
+    elements = [
+        element("p1-e0", Kind.HEADING, 0, 0, text="Motion", level=1),
+        element("p1-e1", Kind.EQUATION, 0, 1, text="v = d / t", equation_label="(2.4)"),
+        element("p1-e4", Kind.EQUATION, 0, 6, text="v2 = 2ad", reasons=["fraction bar"]),
+        element("p1-e2", Kind.FIGURE, 0, 2, caption="Figure 1 A cart."),
+        element("p1-e3", Kind.TABLE, 0, 3, table=grid),
+        element("p2-e0", Kind.FIGURE, 1, 4, reasons=[IMAGE_PAGE_ORIGINAL_REASON]),
+        element("p2-e1", Kind.PARAGRAPH, 1, 5, text="Read from a scan."),
+    ]
+    fixes = [
+        Fix(element_id="p1-e1", kind=Kind.EQUATION, status=Status.FAILED, reason="model_refused"),
+        Fix(element_id="p1-e4", kind=Kind.EQUATION, status=Status.FAILED, reason="model_refused"),
+        Fix(element_id="p1-e2", kind=Kind.FIGURE, status=Status.ABSTAINED, reason="low_confidence"),
+        Fix(element_id="p1-e3", kind=Kind.TABLE, status=Status.FAILED, reason="table_not_rebuilt"),
+    ]
+    pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 60, 20), False)
+    pixmap.set_rect(pixmap.irect, (20, 20, 20))
+    crops = {e.id: pixmap.tobytes("png") for e in elements if e.kind is not Kind.PARAGRAPH}
+    return elements, fixes, crops
+
+
+def test_no_sentence_written_to_the_checker_is_in_the_student_file_or_a_file_made_from_it():
+    """A notice written to the person who checks ("Check it against the original.") is only in
+    a draft's page (`audience="checker"`): not in the student file, and so not in the Word file,
+    the EPUB, the Canvas zip, the cartridge or the Listen transcript made from it."""
+    import io
+    import zipfile
+
+    from readablestem.pipeline import (
+        assemble,
+        checked_words,
+        export_cartridge,
+        export_docx,
+        export_epub,
+    )
+    from readablestem.pipeline import export_canvas as canvas
+    from readablestem.web import listen
+
+    elements, fixes, crops = _four_cases()
+    checker_words = [
+        w.checker for w in vars(assemble).values() if isinstance(w, assemble.Words) and w.checker
+    ] + [checked_words.CHECK_BEFORE_USE]
+    checker_words = [words.replace("{page}", "2") for words in checker_words]
+    made = {
+        audience: render_html(
+            title="Motion", lang="en", elements=elements, fixes=fixes, crops=crops,
+            audience=audience,
+        )
+        for audience in (assemble.STUDENT, assemble.CHECKER)
+    }  # fmt: skip
+    student = made[assemble.STUDENT]
+    # The draft's page has every one of them, so the check below can fail.
+    assert all(words in made[assemble.CHECKER] for words in checker_words), checker_words
+
+    def zipped(data: bytes) -> str:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            return "\n".join(
+                archive.read(n).decode("utf-8", "replace")
+                for n in archive.namelist()
+                if not n.lower().endswith((".png", ".jpg", ".jpeg"))
+            )
+
+    exported = canvas.export_canvas(student, title="Motion", folder="doc-1")
+    files = {
+        "student file": student,
+        "Canvas zip": zipped(canvas.build_zip(exported)),
+        "cartridge": zipped(export_cartridge.build_cartridge(exported)),
+        "EPUB": zipped(export_epub.build_epub(export_epub.export_epub(student))),
+        "Listen transcript": "\n".join(i.text + i.say for i in listen.build_transcript(student)),
+    }
+    if export_docx.available():
+        files["Word file"] = zipped(export_docx.export_docx(student).data)
+    for name, text in files.items():
+        for words in checker_words:
+            assert words not in text, f"{name} says {words!r}"

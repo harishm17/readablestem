@@ -19,8 +19,10 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 
+from readablestem.core.types import DocumentResult, Kind
 from readablestem.web import inventory
 from readablestem.web.deps import UserDep, flash, pop_flash, render, require_csrf
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import ReviewInvalid, ReviewStale
 from readablestem.web.routes.edits import write_review
@@ -74,7 +76,8 @@ def _page(
         "stale": {
             "title": "This page is out of date",
             "message": "The document changed after this page was opened, so nothing was changed.",
-            "now": "",
+            "now": "Look at the page as it is now, then make the change again if you still "
+            "want it.",
             "href": f"/jobs/{job.id}/symbols?view={view}",
         }
         if stale
@@ -91,7 +94,13 @@ def symbols_page(request: Request, job_id: str, user: UserDep, view: str = "") -
     return _page(request, job_id, user, view=_view(view))
 
 
+def _all_equations(result: DocumentResult) -> list[str]:
+    """Every equation: the items a relettering may write."""
+    return [f.element_id for f in result.fixes if f.kind is Kind.EQUATION]
+
+
 @router.post("/jobs/{job_id}/symbols", dependencies=[Depends(require_csrf)])
+@submit_once("review.symbols")
 def relabel(
     request: Request,
     job_id: str,
@@ -121,7 +130,9 @@ def relabel(
         return done.changes
 
     try:
-        changes, _, owned_id = write_review(request, job_id, user, version, make, kind="group")
+        changes, _, owned_id = write_review(
+            request, job_id, user, version, make, kind="group", acts_on=_all_equations
+        )
     except ReviewStale:
         log_event(logger, "review_stale", job_id=job_id)
         return _page(request, job_id, user, view=view, stale=True, status_code=409)
@@ -138,5 +149,5 @@ def relabel(
         left=len(done.left),
         left_out=len(left_out),
     )
-    flash(request, inventory.done_message(done), element_id=SYMBOLS_FLASH)
+    flash(request, inventory.done_message(done), element_id=SYMBOLS_FLASH, kind="success")
     return RedirectResponse(symbols_url(owned_id, view), status_code=303)

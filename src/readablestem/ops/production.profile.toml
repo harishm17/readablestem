@@ -84,6 +84,8 @@ operations = [
   "SESSION_SECRET_PREVIOUS",
   "RUN_WORKER",
   "WORKER_POLL_S",
+  "WORKER_MODE",
+  "WORKER_SLOTS",
   "PRELOAD_TABLE_MODELS",
   "CONVERSION_MEMORY_MB",
   "TRUSTED_PROXY_HOPS",
@@ -131,6 +133,8 @@ EQUATION_LINE_CONTEXT = { value = true, source = "docs/web.md:62 at 693cca24, st
 EQUATION_GLYPH_CHECKS = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:117, on since 2026-11-03" }
 EQUATION_GLYPH_RECONCILE = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:125, on since 2026-11-04" }
 LAYOUT_DISPLAY_GROUPING = { value = false, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:130" }
+REGION_TREE = { value = "off", source = "not stated; code default (new in feat/region-tree, off until a re-recording, docs/layout.md \"The region tree\")" }
+FONT_CODE_TABLES = { value = true, source = "not stated; code default (new in fix/font-code-tables 3db4e23c, no value set in Railway per docs/deploy-railway.md, 2026-11-11)" }
 FLAG_POLICY = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:139, on since 2026-11-03" }
 FIGURE_MODEL_MAX_EDGE_PX = { value = "unset", source = "not stated; code default" }
 EQUATION_DISPLAY_FIRST_CHEAP = { value = false, source = "not stated; code default" }
@@ -161,6 +165,7 @@ IMAGE_PAGES_SECOND_READER = { value = "off", source = "docs/deploy-railway.md:17
 FEATURE_TABLES = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
 FEATURE_LONG_DESCRIPTIONS = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
 FEATURE_COLOUR = { value = false, source = "docs/web.md:59 at 693cca24, stated 2026-11-04 (not among the flags turned on)" }
+CONTENT_RUNS = { value = true, source = "turned on 2026-11-18 (content model WS16.1, F-509) after the measurement in docs/layout.md 'Struck text'; code default; off is the old shadow rollout: struck runs counted in the trace, not written" }
 FEATURE_NOTATION_MEMORY = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
 FEATURE_PAGE_MATH = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
 PAGE_MATH_MODEL = { value = "unset", source = "not stated; code default" }
@@ -179,6 +184,9 @@ FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-
 # "Download all" for one file (audit findings F-029, F-100).
 FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04" }
 FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04" }
+FEATURE_WORD_SOURCE = { value = false, source = "not stated; code default" }
+FEATURE_CLASS_LINK = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done" }
+FEATURE_COURSE_GRANTS = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done" }
 IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default" }
 IMAGE_PAGES_DPI = { value = 200, source = "not stated; code default" }
 IMAGE_PAGES_OMISSION_CHECK = { value = true, source = "not stated; code default" }
@@ -189,12 +197,14 @@ IMAGE_PAGES_VECTOR_CHECKS = { value = true, source = "not stated; code default" 
 IMAGE_PAGES_SECOND_READING = { value = false, source = "not stated; code default" }
 IMAGE_PAGES_ACCEPT_AGREED = { value = false, source = "not stated; code default" }
 MATHML_ALTTEXT = { value = false, source = "not stated; code default" }
+PAGE_IMAGE_CACHE_MB = { value = 32, source = "not stated; code default" }
 
 # What the production image carries, written by the image build (`readablestem ops image-facts
 # --write`, Dockerfile), never typed. In the repository every fact is "unknown", and every
 # reader treats unknown as not present: a switch that needs a program (`NEEDS_PROGRAM` in
 # ops/profile.py) counts as off unless its program is here. "none" means the build looked and
 # it is not installed. lxml is a development-only dependency, so the image should say "none".
+# tex_names is how many TeX distribution names the build wrote for source/support.py.
 # This table must stay the last one in the file: the build replaces it to the end.
 [image_facts]
 tex = "unknown"
@@ -203,3 +213,4 @@ latexml = "unknown"
 pandoc = "unknown"
 libreoffice = "unknown"
 lxml = "unknown"
+tex_names = "unknown"

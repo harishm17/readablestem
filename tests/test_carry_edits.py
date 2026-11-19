@@ -241,6 +241,7 @@ def test_a_picture_is_not_added_back_onto_a_page_that_looks_different():
     new, new_crops = fresh()
     done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(change), CHANGED)
     assert done.items == [] and done.dropped == 1
+    assert done.not_applied == [(carry_edits.PICTURE, 1)]  # named, with its page
     assert not [e for e in new.elements if e.id.startswith("p1-x")]
 
 
@@ -314,6 +315,7 @@ def test_a_page_that_looks_different_is_not_left_out():
     new.stats.pages = 3
     done, _, _ = carry_all(old, old_crops, new, new_crops, [], CHANGED)
     assert done.items == [] and done.dropped == 1
+    assert done.not_applied == [(carry_edits.PAGE_LEFT_OUT, 2)]
     assert new.omitted_pages == [] and [e for e in new.elements if e.page == 1]
 
 
@@ -372,10 +374,33 @@ def test_a_description_is_never_put_on_a_picture_that_changed():
 # --------------------------------------------------------------------------- the report
 
 
+def test_an_equation_read_again_is_listed_as_not_made_again_unless_it_was_undone():
+    old, old_crops = fresh()
+    new, new_crops = fresh()
+    structure = {review.STRUCTURE_KEY: {}}
+    read = carry_edits.EditRow(EQUATION, "read_again", structure, structure)
+    undone = carry_edits.EditRow(EQUATION, "undo", structure, {})
+    done, _, _ = carry_all(old, old_crops, new, new_crops, [read])
+    assert done.not_applied == [(carry_edits.READ_AGAIN, 2)] and done.dropped == 1
+    done, _, _ = carry_all(old, old_crops, new, new_crops, [read, undone])
+    assert done.not_applied == []
+
+
 def test_the_report_counts_the_edits_and_holds_only_ids():
-    report = carry.CarryReport(edits=["p1-e4", "page-2"], edits_dropped=3)
+    report = carry.CarryReport(
+        edits=["p1-e4", "page-2"],
+        edits_dropped=3,
+        edits_not_applied=[("picture", 3), ("text", 1), ("read_again", None)],
+    )
     again = carry.CarryReport.from_json(report.to_json())
     assert again.edits == ["p1-e4", "page-2"] and again.edits_dropped == 3
+    assert again.edits_not_applied == report.edits_not_applied
+    summary_lines = carry.summary(again, fresh()[0]).not_applied
+    assert summary_lines == [
+        "Equation you had read again",
+        "Page 1: words you changed",
+        "Page 3: picture you added",
+    ]
     assert carry.CarryReport.from_json({"edits": [1, "p1-e4"], "edits_dropped": -2}).edits == [
         "p1-e4"
     ]

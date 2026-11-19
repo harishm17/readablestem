@@ -25,6 +25,15 @@ daily spend remain. A new table with a user id must be added there.
 
 Usage events (`web.events`) outlive the jobs they mention, by design, but not for ever:
 the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
+
+Class links (`web.links`) keep a document until their last day plus the window it goes back to,
+which is in its `retain_until`, so this purge needs no rule for them. It deletes the published
+copy of every document no link keeps (`links.purge_copies`), and link rows go with their
+document and 30 days after they close or are removed (`links.purge_rows`).
+
+Problem reports (`web.reports`) go with their sender's account (`erase_user`), `CLOSED_DAYS`
+(30) after they are closed, and `MAX_DAYS` (180) after they were made, whatever their state
+(`purge_closed_reports`, `purge_old_reports`, run by the same purge).
 """
 
 from __future__ import annotations
@@ -50,17 +59,20 @@ from readablestem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
+from readablestem.web import forms, links, reports
 from readablestem.web.database import insert_ignore
 from readablestem.web.db import (
     AuthIdentity,
     Blob,
     Course,
+    CourseGrant,
     CourseNotation,
     DeletedAccount,
     ErasureLedger,
     Event,
     Job,
     JobCall,
+    JobLink,
     JobNotFinished,
     JobShare,
     JobStage,
@@ -68,6 +80,8 @@ from readablestem.web.db import (
     LoginLink,
     PendingUpload,
     QuotaDay,
+    Report,
+    RequestToken,
     ReviewEdit,
     StepRecord,
     UploadResult,
@@ -88,10 +102,15 @@ class PurgeStats:
     pending_deleted: int = 0  # large files waiting for their pages to be chosen (T3-3)
     results_deleted: int = 0  # answers to uploads of several files, past their hour (T3-4)
     tombstones_deleted: int = 0  # deleted-account records of earlier days (web.tombstones)
+    tokens_deleted: int = 0  # request tokens older than a session lives (web.forms)
+    reports_deleted: int = 0  # problem reports past their closed or their longest clock
 
 
 def purge_expired(
-    factory: sessionmaker[Session], now: datetime | None = None, *, source: str = "cron"
+    factory: sessionmaker[Session],
+    now: datetime | None = None,
+    *,
+    source: str = "cron",
 ) -> PurgeStats:
     """Delete every job whose `retain_until` is before `now` (default: current UTC time).
 
@@ -103,6 +122,8 @@ def purge_expired(
     """
     now = _as_utc(now or datetime.now(UTC))
     stats = PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
+    with session_scope(factory) as session:
+        links.purge_copies(session, now)
     while True:
         with session_scope(factory) as session:
             batch = _purge_batch(session, now)
@@ -116,6 +137,9 @@ def purge_expired(
         stats.pending_deleted = purge_pending(session, now)
         stats.results_deleted = purge_upload_results(session, now)
         stats.tombstones_deleted = purge_tombstones(session, now)
+        stats.tokens_deleted = forms.purge(session, now)
+        stats.reports_deleted = purge_closed_reports(session, now) + purge_old_reports(session, now)
+        links.purge_rows(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -126,6 +150,8 @@ def purge_expired(
         pending_deleted=stats.pending_deleted,
         results_deleted=stats.results_deleted,
         tombstones_deleted=stats.tombstones_deleted,
+        tokens_deleted=stats.tokens_deleted,
+        reports_deleted=stats.reports_deleted,
     )
     return stats
 
@@ -157,8 +183,23 @@ def purge_old_events(session: Session, now: datetime) -> int:
     return _deleted(session.execute(delete(Event).where(Event.created_at < cutoff)))
 
 
+def purge_closed_reports(session: Session, now: datetime) -> int:
+    """Delete problem reports closed more than `reports.CLOSED_DAYS` ago, in the caller's
+    transaction. Returns how many."""
+    cutoff = _as_utc(now) - timedelta(days=reports.CLOSED_DAYS)
+    return _deleted(session.execute(delete(Report).where(Report.closed_at < cutoff)))
+
+
+def purge_old_reports(session: Session, now: datetime) -> int:
+    """Delete problem reports made more than `reports.MAX_DAYS` ago, open or closed, in the
+    caller's transaction. Returns how many."""
+    cutoff = _as_utc(now) - timedelta(days=reports.MAX_DAYS)
+    return _deleted(session.execute(delete(Report).where(Report.created_at < cutoff)))
+
+
 def aggregate_and_purge(
-    factory: sessionmaker[Session], now: datetime | None = None
+    factory: sessionmaker[Session],
+    now: datetime | None = None,
 ) -> tuple[int | None, PurgeStats]:
     """The cron task: aggregate, then purge even if aggregation raised.
 
@@ -254,6 +295,7 @@ def delete_jobs(
     blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     session.execute(delete(JobShare).where(JobShare.job_id.in_(ids)))
+    session.execute(delete(JobLink).where(JobLink.job_id.in_(ids)))
     session.execute(delete(StepRecord).where(StepRecord.job_id.in_(ids)))
     session.execute(delete(JobCall).where(JobCall.job_id.in_(ids)))
     session.execute(delete(JobStage).where(JobStage.job_id.in_(ids)))
@@ -262,8 +304,10 @@ def delete_jobs(
     # The student-file images made from the figures are kept in memory for a while
     # (`pipeline.figure_images`); a deleted document's go with it.
     from readablestem.pipeline import figure_images
+    from readablestem.web import page_images
 
     figure_images.clear_cache()
+    page_images.forget_job(ids)  # and the review screen's page pictures (this process's memory)
     return PurgeStats(jobs_deleted=jobs, blobs_deleted=blobs, unaggregated_deleted=unaggregated)
 
 
@@ -278,10 +322,10 @@ def erase_user(
 
     Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
     before parents and without relying on ON DELETE CASCADE (see the module docstring):
-    review edits they made on any job, shares of other people's documents that name their
-    address, their courses' notation entries, their courses, their usage events, sign-in
-    identities, linked Google addresses, email sign-in links and daily page counts, and the
-    user row.
+    review edits they made on any job, shares of other people's documents and course grants
+    that name their address, their courses' notation entries and grants, their courses, their
+    usage events, their problem reports, sign-in identities, linked Google addresses, email
+    sign-in links and daily page counts, and the user row.
     With `tombstone_key`, what the account used today is first recorded under a hash of its
     address (`web.tombstones`), so that signing up again today does not reset the day's limits.
     The erasure is also written to the ledger (`erasure_ledger`: a hash of the user id and the
@@ -305,15 +349,22 @@ def erase_user(
     person_email = session.scalar(select(User.email).where(User.id == user_id))
     if person_email is not None:
         session.execute(delete(JobShare).where(JobShare.email == person_email.strip().lower()))
+        # and course grants that name it (the grants of their own courses go with the courses)
+        session.execute(
+            delete(CourseGrant).where(CourseGrant.email == person_email.strip().lower())
+        )
     session.execute(delete(PendingUpload).where(PendingUpload.user_id == user_id))
     session.execute(delete(UploadResult).where(UploadResult.user_id == user_id))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))
+    session.execute(delete(CourseGrant).where(CourseGrant.course_id.in_(courses)))
     session.execute(delete(Course).where(Course.user_id == user_id))
     session.execute(delete(Event).where(Event.user_id == user_id))
+    session.execute(delete(Report).where(Report.from_user_id == user_id))
     session.execute(delete(AuthIdentity).where(AuthIdentity.user_id == user_id))
     session.execute(delete(LinkedEmail).where(LinkedEmail.user_id == user_id))
     session.execute(delete(LoginLink).where(LoginLink.user_id == user_id))
     session.execute(delete(QuotaDay).where(QuotaDay.user_id == user_id))
+    session.execute(delete(RequestToken).where(RequestToken.user_id == user_id))
     session.execute(delete(User).where(User.id == user_id))
     record_erasure(session, user_id, now)
     return stats

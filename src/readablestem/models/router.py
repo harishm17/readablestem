@@ -31,6 +31,10 @@ from readablestem.models.base import T, VisionClient, VisionRequest
 log = logging.getLogger(__name__)
 
 RETRYABLE = {"api_error", "timeout", "invalid_output", "refused"}
+# What sends a whole-page step to the other model: a refusal or a service error. A page
+# answer that is not valid ran into its output limit, and the step has its own way to ask
+# again for that (`page_witness` splits the page).
+PAGE_RETRYABLE = frozenset({"api_error", "timeout", "refused"})
 
 
 class FallbackBudgetExceeded(BudgetExceeded):
@@ -50,9 +54,15 @@ def calls_made(exc: BudgetExceeded) -> list[ModelCall]:
 
 
 def call_with_fallback(
-    client: VisionClient, request: VisionRequest, schema: type[T], *, settings: Settings
+    client: VisionClient,
+    request: VisionRequest,
+    schema: type[T],
+    *,
+    settings: Settings,
+    retry_on: frozenset[str] | set[str] = RETRYABLE,
 ) -> tuple[T | None, list[ModelCall]]:
-    """Try request.model; on a RETRYABLE outcome try settings.fallback_for[model] once.
+    """Try request.model; on an outcome in `retry_on` (RETRYABLE) try
+    settings.fallback_for[model] once.
 
     Returns the parsed result (or None) and every attempt's ModelCall. BudgetExceeded from
     the first reservation propagates unchanged; if the fallback reservation is refused, a
@@ -62,7 +72,7 @@ def call_with_fallback(
     parsed, first = client.run(request, schema)
     calls = [_numbered(first, 1)]
     fallback_model = settings.fallback_for.get(request.model)
-    if first.outcome not in RETRYABLE or fallback_model is None:
+    if first.outcome not in retry_on or fallback_model is None:
         return parsed, calls
 
     log.info(

@@ -14,16 +14,34 @@ What each part becomes:
   existing sanitiser (`web.mathml`, ADR 0008) and spoken by the usual reading. A formula LaTeXML
   could not read (`ltx_ERROR`, an unknown macro) is a required decision showing the TeX, with our
   own LaTeX conversion as the proposal when that works (`\\ce` is one);
+- a link to a web or mail address is a link; a link to a place in the document (LaTeXML wrote
+  `\\ref`, `\\eqref`, `\\autoref`, `\\cite`, `\\pageref` and a contents entry as `#id`) is an
+  internal link to the element that id became (`link_internal`): a heading, a numbered
+  equation, a theorem's paragraph, a figure, a table, a bibliography or list item, or the
+  paragraph that holds the id. The words stay as they are; an id that became no element
+  (`Reading` made nothing there), a link inside the element it names and one in a place that
+  holds no links (a table cell, a caption, a note, a heading) make no link;
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
-  no usable picture the figure is a required decision (`source_figure_missing`);
+  no usable picture the figure is a required decision (`source_figure_missing`). A picture
+  outside a float (centered, in a sentence, a list item or a table cell) is a figure of its own
+  straight after the block that holds it; a table that loses a picture from a cell this way is
+  a required decision (`source_table_picture`). The words and blocks of a float beside its
+  caption and pictures are read in order after them;
 - an error node in running text stays in the text as written; the conversion stops such a
   source (`source.report.stop`), so raw code never reaches a student. Every error counted here
-  adds the required notice `source_error`.
+  adds the required notice `source_error`. A formula LaTeX could not read in a place that has
+  no equation element of its own (a table cell, a caption, a heading) is written as its TeX
+  and makes that item a required decision (`source_formula_unread`).
 
 Every error node (`ltx_ERROR`) is counted once, wherever it is, and each is tied to the element
 that holds it where the reader can (`Reading.marks`, for `source.report`): inline, inside a
 formula, or in a block the reader took whole (a figure, a table, loose text).
+
+Nothing is left out without a word: after the walk, every text and picture in LaTeXML's body
+that no rule read and that is not under an entry of `SKIP` is counted (`Reading.unread_words`,
+`unread_pictures`, the first words in `unread_start`), and a count above 0 is the required
+notice `source_unread`.
 
 Nothing here runs TeX or opens a file outside the project folder.
 """
@@ -38,8 +56,11 @@ from xml.etree.ElementTree import Element as Node
 
 import defusedxml.ElementTree as SafeET
 
+from readablestem.core import inline
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     Check,
+    ColourRun,
     Element,
     EquationFix,
     Fix,
@@ -47,6 +68,7 @@ from readablestem.core.types import (
     Kind,
     Link,
     Notice,
+    Run,
     ScriptRun,
     SourceFigure,
     SourceMark,
@@ -57,9 +79,9 @@ from readablestem.core.types import (
     inline_marker,
 )
 from readablestem.source import figures
+from readablestem.source.intake import CHARS_PER_PAGE
 from readablestem.source.report import clean
 
-CHARS_PER_PAGE = 3000
 MAX_XHTML_BYTES = 60 * 1024 * 1024
 MAX_DEPTH = 80
 Display = Literal["block", "inline"]
@@ -68,10 +90,40 @@ MAX_MATH_CHARS = 200_000
 BOX = (0.0, 0.0, 1.0, 1.0)
 UNKNOWN_FIGURE_REASON = "source_figure_missing"
 SOURCE_ERROR_NOTICE = "source_error"
+SOURCE_UNREAD_NOTICE = "source_unread"
+# A failed check that makes an item a required decision because the reader could not write
+# all of it faithfully: a formula LaTeX could not read, shown as its TeX in a table, heading or
+# caption; a picture taken out of a table cell. A check, not a reason: review shows a table's
+# checks, and hides its reason once its grid is in the document.
+SOURCE_READ_CHECK = "source.read"
+FORMULA_UNREAD = "source_formula_unread"
+TABLE_PICTURE = "source_table_picture"
+UNREAD_START_WORDS = 12
 _SPACE = re.compile("[ \\t\\r\\n\\u00a0]+")
 _LEVEL = re.compile(r"^h([1-6])$")
 # What a step of a frame does not show (`\\pause`, `\\only`, `\\visible`).
 HIDDEN = frozenset({"ltx_covered", "ltx_invisible"})
+# What the reader leaves out on purpose, by tag or class, and why. Every other text and
+# picture in LaTeXML's body is read by a rule or counted as not read (`_count_unread`).
+SKIP: dict[str, str] = {
+    "head": "the page's head: LaTeXML's title and links, not the document",
+    "script": "code in the page, never shown",
+    "style": "styling in the page, never shown",
+    "nav": "LaTeXML's navigation and contents list, made again from the headings",
+    "ltx_page_footer": "LaTeXML's footer: the program's name and the time of the run",
+    "ltx_covered": "a Beamer step that does not show it (\\pause, \\only)",
+    "ltx_invisible": "a Beamer step that does not show it (\\visible)",
+    "ltx_tag": "a number LaTeX made: an item's marker and an equation's number are read from "
+    "it, a heading's and a caption's are left out",
+    "ltx_note_mark": "a footnote's mark: the note is written where the mark is",
+    "ltx_note_type": 'the word LaTeXML writes before a note\'s text ("thanks:")',
+    "earlier step": "a step of a Beamer frame whose every block is also on its last step "
+    "(`_Reader._frame`)",
+}
+_SKIP_TAGS = frozenset(k for k in SKIP if " " not in k and not k.startswith("ltx_"))
+_SKIP_CLASSES = frozenset(k for k in SKIP if k.startswith("ltx_"))
+# Struck text (ulem's `\\sout` and `\\xout`): kept and marked as deleted (`core.types.Run`).
+STRUCK = frozenset({"ltx_ulem_sout", "ltx_ulem_xout"})
 _SECTION_TITLES = {
     "ltx_title_section",
     "ltx_title_subsection",
@@ -99,6 +151,33 @@ def _children(node: Node) -> list[Node]:
     return [c for c in node if isinstance(c.tag, str)]
 
 
+def _skipped(node: Node) -> bool:
+    """Whether `node` is left out on purpose by an entry of `SKIP`."""
+    return _local(node.tag) in _SKIP_TAGS or bool(_classes(node) & _SKIP_CLASSES)
+
+
+def _is_picture(node: Node) -> bool:
+    return _local(node.tag) in ("img", "svg") or "ltx_picture" in _classes(node)
+
+
+def _itertext(node: Node) -> str:
+    return "".join(node.itertext())
+
+
+def needs_decision(fix: Fix, code: str) -> Fix:
+    """`fix` as a required decision with the failed check `SOURCE_READ_CHECK` `code` (once):
+    an accepted item waits for the instructor; a failed one stays failed."""
+    if any(c.name == SOURCE_READ_CHECK and c.code == code for c in fix.checks):
+        return fix
+    return fix.model_copy(
+        update={
+            "status": Status.NEEDS_REVIEW if fix.status is Status.ACCEPTED else fix.status,
+            "review": "required",
+            "checks": [*fix.checks, Check(name=SOURCE_READ_CHECK, passed=False, code=code)],
+        }
+    )
+
+
 @dataclass
 class Reading:
     title: str | None = None
@@ -113,6 +192,17 @@ class Reading:
     error_nodes: int = 0
     marks: list[SourceMark] = field(default_factory=list)
     figures: list[SourceFigure] = field(default_factory=list)
+    # Element id -> the number LaTeX printed before its heading or caption ("1.2 ", "Figure 3: "),
+    # which the element's own text leaves out: what a reference "Section 1.2" names
+    # (`text_pass.source_links`).
+    printed: dict[str, str] = field(default_factory=dict)
+    # Figures (and tables, headings) that show a formula LaTeX could not read as its TeX: their
+    # fix is a required decision (`needs_decision`, also applied to a figure step's fix).
+    unread_formulas: set[str] = field(default_factory=set)
+    # What no rule read and no entry of `SKIP` covers: words, pictures, and the first words.
+    unread_words: int = 0
+    unread_pictures: int = 0
+    unread_start: str = ""
 
 
 class _Reader:
@@ -130,6 +220,28 @@ class _Reader:
         self.errors = 0
         self.marked: dict[int, str | None] = {}  # id of an error node -> its element's id
         self.pending: list[Node] = []  # error nodes met before their element was made
+        # What the rules read, for the count of what they did not (`_count_unread`): nodes whose
+        # text and children's tails were written, nodes taken whole (a picture, a table read
+        # inside a float), steps of a frame left out (`SKIP["earlier step"]`), and the pictures
+        # met in running text that wait for their block's element (`_flush_pictures`).
+        self.read: set[int] = set()
+        self.done: set[int] = set()
+        self.skipped: set[int] = set()
+        self.loose: list[Node] = []
+        self.pictured: set[str] = set()  # figure elements made from a picture
+        # LaTeXML's id of a node -> the element it became (or the first one made inside it), and
+        # the links of the file to such an id (`\ref`, `\eqref`, `\cite`, a contents entry):
+        # element, start, end, the id. They become links once every element exists (`link_refs`).
+        self.ids: dict[str, str] = {}
+        self.refs: list[tuple[Element, int, int, str]] = []
+
+    def _take(self, node: Node) -> str:
+        """The text of `node` and all below it, now read."""
+        self.read.update(id(n) for n in node.iter())
+        return _itertext(node)
+
+    def _plain(self, node: Node) -> str:
+        return self._take(node)
 
     def _mark(self, node: Node, element: Element | None = None) -> None:
         """Tie an error node to `element`, or to the next element made (a heading's text is
@@ -173,14 +285,55 @@ class _Reader:
 
     # ------------------------------------------------------------------ walking
 
+    def _tie(self, node: Node, element: Element, *, below: bool = True) -> None:
+        """The ids on `node` (and, with `below`, every node under it) name `element`; an id
+        already tied to an element made inside `node` keeps it."""
+        for item in node.iter() if below else (node,):
+            if (name := item.get("id")) and name not in self.ids:
+                self.ids[name] = element.id
+
     def walk(self, node: Node, depth: int = 0) -> None:
-        before = self.counter
-        if self._walk(node, depth) and self.counter > before:
+        before, first = self.counter, len(self.out.elements)
+        took = self._walk(node, depth)
+        if len(self.out.elements) > first:
+            # a node is the first element made inside it; a block read whole holds its ids too
+            self._tie(node, self.out.elements[first], below=took)
+        if not took:
+            return
+        if self.counter > before:
             # a block taken whole: an error node in it that no rule placed is in its last element
             holder = self.out.elements[-1]
             for inner in node.iter():
                 if "ltx_ERROR" in _classes(inner):
                     self._mark(inner, holder)
+        # a picture in it that no rule made a figure of follows it as a figure of its own
+        self.loose.extend(self._pictures_in(node))
+        self._flush_pictures()
+
+    def _pictures_in(self, node: Node) -> list[Node]:
+        """The pictures under `node` (outermost ones: an `svg` inside an `ltx_picture` is one
+        picture) that no rule has made a figure of yet, in document order."""
+        found: list[Node] = []
+
+        def visit(item: Node, depth: int) -> None:
+            if depth > MAX_DEPTH or _skipped(item) or id(item) in self.skipped:
+                return
+            if _is_picture(item):
+                if id(item) not in self.done:
+                    found.append(item)
+                return
+            for child in _children(item):
+                visit(child, depth + 1)
+
+        visit(node, 0)
+        return found
+
+    def _flush_pictures(self) -> None:
+        """A figure for each picture met in the block just read, straight after it."""
+        pictures, self.loose = self.loose, []
+        for picture in pictures:
+            if id(picture) not in self.done:
+                self._picture_element(picture, None)
 
     def _walk(self, node: Node, depth: int) -> bool:
         """Read `node`; True when one rule took it whole (not its children one by one)."""
@@ -188,14 +341,25 @@ class _Reader:
             raise ReadError("too deep")
         tag = _local(node.tag)
         classes = _classes(node)
-        if tag in ("head", "script", "style", "nav") or classes & {"ltx_page_footer", "ltx_dates"}:
-            return False
-        if classes & HIDDEN:  # not shown on this step of a frame (beamer)
-            return False
+        if _skipped(node) or id(node) in self.done or id(node) in self.skipped:
+            return False  # left out on purpose (`SKIP`), or already read by its float
         if tag == "p" and any(_local(n.tag) == "foreignObject" for n in node.iter()):
             # beamer draws a title page inside an svg: the blocks in it are the content
+            self.read.add(id(node))
+            self.done.update(id(n) for n in node.iter() if _local(n.tag) == "svg")
             for box in (n for n in node.iter() if _local(n.tag) == "foreignObject"):
                 self._walk_children(box, depth + 1)
+            return True
+        if _is_picture(node):  # a picture on its own, outside any float
+            self._picture_element(node, None)
+            return True
+        if "ltx_dates" in classes:  # \date: a line of its own
+            text = _squash(self._take(node))
+            if text.startswith("(") and text.endswith(")"):
+                text = text[1:-1].strip()  # LaTeXML's brackets, not the source's
+            if text:
+                self._new(Kind.PARAGRAPH, text=text)
+                self.chars += len(text)
             return True
         if tag == "math":  # display maths outside any equation table
             self._display_math([node], None)
@@ -228,17 +392,17 @@ class _Reader:
             self._theorem(node, depth)
             return True
         if "ltx_authors" in classes:
-            text = _squash(self._plain(node))
-            if text:
-                self._new(Kind.PARAGRAPH, text=text)
-                self.chars += len(text)
+            self._authors(node)
             return True
         if tag in ("span", "a", "em", "strong", "b", "i") and not _children_blocks(node):
-            # loose inline text directly inside a container: a paragraph of its own
-            text, _ = self._inline_text(node)
-            if text:
-                self._new(Kind.PARAGRAPH, text=text)
-                self.chars += len(text)
+            # loose inline text directly inside a container: a paragraph of its own, whose
+            # formulas are equations like any paragraph's
+            self._paragraph(node)
+            return True
+        if tag == "div" and (node.text or "").strip() and not _blocks_below(node):
+            # a block holding its text with no `p` (beamer's \framesubtitle): a paragraph,
+            # not children only, which would leave that text unread
+            self._paragraph(node)
             return True
         self._walk_children(node, depth)
         return False
@@ -275,6 +439,7 @@ class _Reader:
         last = len(steps) - 1
         for number, step in enumerate(steps):
             if number != last and _contained(signatures[number], signatures[last]):
+                self.skipped.add(id(step))  # SKIP["earlier step"]
                 continue
             note = f" (step {number + 1} of {len(steps)})" if number != last else ""
             self._slide(step, note, depth)
@@ -292,6 +457,25 @@ class _Reader:
             else:
                 self.walk(child, depth + 1)
 
+    def _authors(self, node: Node) -> None:
+        """The author block: one paragraph for each author, the lines under the name (where
+        they work, an address, an email) after it, and what `\\thanks` says about that author
+        on the same line as " (note: ...)", never in the name (SW18.3). A block with no
+        author in it is read as one paragraph."""
+        creators = [c for c in node.iter() if "ltx_creator" in _classes(c)]
+        self._take(node)
+        for creator in creators or [node]:
+            notes = [
+                _squash(_text_without_tag(n))
+                for n in creator.iter()
+                if "ltx_author_notes" in _classes(n)
+            ]
+            lines = _lines(creator, drop=frozenset({"ltx_author_notes"}))
+            text = ", ".join(lines) + "".join(f" (note: {n})" for n in notes if n)
+            if text:
+                self._new(Kind.PARAGRAPH, text=text)
+                self.chars += len(text)
+
     def _section_heading(self, node: Node, level: int, classes: set[str]) -> None:
         if "ltx_runin" in classes:  # a theorem's "Theorem 1." title: handled with its body
             return
@@ -300,14 +484,21 @@ class _Reader:
         if self.beamer and classes & _SECTION_TITLES:
             level = max(level - 1, 1)  # a deck's sections are its top level; frames sit below
             self.section_level = level
-        text, _ = self._inline_text(node, skip_tags=True)
+        titled = bool(classes & {"ltx_title_document", "ltx_title_titlepage"})
+        notes: list[str] = []  # `\thanks` on the title: a line of its own, not in the title
+        text, _ = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
         if not text:
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
+        if number := _printed_tag(node):
+            self.out.printed[element.id] = number
         self._heading_fix(element, level, text)
         self.chars += len(text)
-        if classes & {"ltx_title_document", "ltx_title_titlepage"} and self.out.title is None:
+        if titled and self.out.title is None:
             self.out.title = text
+        for note in notes:
+            self._new(Kind.PARAGRAPH, text=f"(note: {note})")
+            self.chars += len(note)
 
     def _theorem(self, node: Node, depth: int) -> None:
         title = ""
@@ -319,6 +510,9 @@ class _Reader:
             if _local(child.tag).startswith("h") and "ltx_runin" in _classes(child):
                 continue
             self.walk(child, depth + 1)
+        if self._lead:  # no paragraph took it (a theorem that is only a display formula)
+            self._new(Kind.PARAGRAPH, text=self._lead)
+            self.chars += len(self._lead)
         self._lead = ""
 
     _lead = ""
@@ -329,30 +523,39 @@ class _Reader:
         lead, self._lead = self._lead, ""
         element = self._new(Kind.PARAGRAPH, text="")
         text, spans = self._inline_text(node, owner=element)
+        if not text:  # nothing to write (only a picture, or what this step hides)
+            self.out.elements.remove(element)
+            self.counter -= 1
+            self._lead = lead  # for the next paragraph
+            self._flush_pictures()
+            return
         if lead:
             text = f"{lead} {text}".strip()
             shift = len(lead) + 1
             spans = [(kind, a + shift, b + shift, extra) for kind, a, b, extra in spans]
-        if not _squash(self._plain(node)) and "⟦" not in text:
-            self.out.elements.remove(element)
-            self.counter -= 1
-            return
         element.text = text
         self._apply_spans(element, spans)
         self.chars += len(text)
-
-    def _plain(self, node: Node) -> str:
-        return "".join(node.itertext())
+        self._flush_pictures()
 
     def _inline_text(
-        self, node: Node, *, owner: Element | None = None, skip_tags: bool = False
+        self,
+        node: Node,
+        *,
+        owner: Element | None = None,
+        skip_tags: bool = False,
+        notes: list[str] | None = None,
     ) -> tuple[str, list[tuple[str, int, int, object]]]:
         """The text of `node` with an inline marker where each formula is (formulas become
         equation elements whose parent is `owner`; without an owner their TeX is written in
-        the text), and the spans (links, raised and lowered runs) as (kind, start, end, data)."""
+        the text, and an error node in one is tied to the next element made), and the spans
+        (links, raised and lowered runs, struck text) as (kind, start, end, data). A picture
+        met here is left for the caller's block (`self.loose`, `_flush_pictures`). A note is
+        written where it stands as " (note: ...)", or, with `notes`, handed to the caller."""
         parts: list[str] = []
         spans: list[tuple[str, int, int, object]] = []
         length = [0]
+        self.read.add(id(node))
 
         def emit(text: str) -> None:
             parts.append(text)
@@ -363,28 +566,37 @@ class _Reader:
                 raise ReadError("too deep")
             tag = _local(item.tag)
             classes = _classes(item)
+            if id(item) in self.done:
+                return
             if skip_tags and "ltx_tag" in classes:
                 return
-            if classes & HIDDEN:  # not shown on this step of a frame
+            if classes & HIDDEN or tag in ("script", "style"):  # SKIP
                 return
             if tag == "span" and "ltx_item" in classes:
                 self.deferred.append(item)  # a list item the frame reveals later: its own item
                 return
+            if _is_picture(item):
+                self.loose.append(item)  # a figure of its own after this block
+                return
+            self.read.add(id(item))
             if tag == "math":
+                self._take(item)
                 if owner is not None:
                     eq = self._inline_math(item, owner)
                     emit(inline_marker(eq.id))
                 else:
-                    emit(item.get("alttext") or _squash(self._plain(item)))
-            elif tag in ("script", "style"):
-                pass
+                    emit(item.get("alttext") or _squash(_itertext(item)))
+                    for inner in item.iter():  # the element made next shows it as written
+                        if "ltx_ERROR" in _classes(inner):
+                            self._mark(inner)
             elif tag == "br":
                 emit(" ")
             elif "ltx_ERROR" in classes:
                 self.errors += 1
                 self._mark(item, owner)
-                emit(_squash(self._plain(item)))
+                emit(_squash(self._take(item)))
             elif classes & {"ltx_note"}:
+                self._take(item)
                 note = _squash(
                     "".join(
                         _text_without_tag(c)
@@ -392,7 +604,9 @@ class _Reader:
                         if "ltx_note_content" in _classes(c)
                     )
                 )
-                if note:
+                if note and notes is not None:
+                    notes.append(note)
+                elif note:
                     emit(f" (note: {note})")
             else:
                 start = length[0]
@@ -406,8 +620,14 @@ class _Reader:
                     href = item.get("href") or ""
                     if length[0] > start and href.startswith(("http://", "https://", "mailto:")):
                         spans.append(("uri", start, length[0], href))
+                    elif length[0] > start and len(href) > 1 and href.startswith("#"):
+                        spans.append(("ref", start, length[0], href[1:]))
                 elif tag in ("sup", "sub") and length[0] > start:
                     spans.append((tag, start, length[0], None))
+                if classes & STRUCK and length[0] > start:
+                    spans.append(("deleted", start, length[0], None))
+                if tag == "span" and length[0] > start and (rgb := _style_colour(item)):
+                    spans.append(("colour", start, length[0], rgb))
 
         if node.text:
             emit(_SPACE.sub(" ", node.text))
@@ -426,8 +646,7 @@ class _Reader:
                 shifted.append((kind, a, b, extra))
         return text, shifted
 
-    @staticmethod
-    def _apply_spans(element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
         text = element.text or ""
         for kind, start, end, extra in spans:
             if start >= end or end > len(text):
@@ -439,9 +658,15 @@ class _Reader:
                 continue
             try:
                 if kind == "uri":
-                    element.links.append(Link(kind="uri", start=start, end=end, href=str(extra)))
+                    inline.add(element, Link(kind="uri", start=start, end=end, href=str(extra)))
+                elif kind == "ref":
+                    self.refs.append((element, start, end, str(extra)))
                 elif kind in ("sup", "sub"):
-                    element.script_runs.append(ScriptRun(start=start, end=end, kind=kind))
+                    inline.add(element, ScriptRun(start=start, end=end, kind=kind))
+                elif kind == "deleted":
+                    inline.add(element, Run(start=start, end=end, kind="deleted"))
+                elif kind == "colour":
+                    _add_colour(element, start, end, extra)
             except ValueError:
                 continue
 
@@ -477,27 +702,22 @@ class _Reader:
                         rest.append(sub)
                 for sub in _non_paragraph_nodes(child):
                     rest.append(sub)
-            if not taken:  # an item with no paragraph (a bibliography entry): its own text
+            if not taken:
+                # An item with no paragraph (a bibliography entry, a contents entry): its own
+                # text, without the list nested in it, which is read as items of its own.
                 holder = Node("span")
-                holder.extend(body)
+                holder.extend(c for c in body if not _is_list(c))
                 text, spans = self._inline_text(holder, owner=element, skip_tags=True)
                 texts.append(text)
-            if not taken:
-                rest = [
-                    r
-                    for r in rest
-                    if _local(r.tag) in ("ul", "ol")
-                    or _classes(r) & {"ltx_itemize", "ltx_enumerate"}
-                ]
+                rest = [r for r in rest if _is_list(r)]
             element.text = texts[0] if texts else ""
             self._apply_spans(element, spans)
+            self._tie(item, element)
             self.chars += len(element.text or "")
+            self._flush_pictures()  # a picture in the item follows it
             self._deferred_items(ordered, level)
             for sub in rest:
-                if _local(sub.tag) in ("ul", "ol") or _classes(sub) & {
-                    "ltx_itemize",
-                    "ltx_enumerate",
-                }:
+                if _is_list(sub):
                     self._list(sub, level + 1)
                 else:
                     self.walk(sub, 1)
@@ -507,6 +727,7 @@ class _Reader:
         one before (`\\pause` in an itemize): each is an item of its own, in order."""
         while self.deferred:
             span = self.deferred.pop(0)
+            self.read.add(id(span))
             marker = ""
             body: list[Node] = []
             for child in _children(span):
@@ -524,6 +745,7 @@ class _Reader:
             element.text = text
             self._apply_spans(element, spans)
             self.chars += len(text)
+            self._flush_pictures()
             self._deferred_items(ordered, level)  # items found inside this one
 
     def _description(self, node: Node) -> None:
@@ -536,6 +758,7 @@ class _Reader:
                 body = _squash(self._plain(child))
                 text = f"{term} {body}".strip() if term else body
                 element = self._new(Kind.PARAGRAPH, text=text)
+                self._tie(child, element)
                 if term:
                     element.term_end = len(term)
                 self.chars += len(text)
@@ -545,7 +768,8 @@ class _Reader:
         lines = [
             "".join(line.itertext()) for line in node.iter() if "ltx_listingline" in _classes(line)
         ]
-        text = "\n".join(lines) if lines else "".join(node.itertext())
+        whole = self._take(node)
+        text = "\n".join(lines) if lines else whole
         text = text.strip("\n")
         if text.strip():
             element = self._new(Kind.PARAGRAPH, text=text)
@@ -556,6 +780,7 @@ class _Reader:
 
     def _math_parts(self, math: Node, display: Display) -> tuple[str, str, bool]:
         """(latex, mathml, has_error) of one `<math>`."""
+        self._take(math)
         latex = (math.get("alttext") or "").strip()
         failed = any(_local(n.tag) == "merror" or "ltx_ERROR" in _classes(n) for n in math.iter())
         for node in math.iter():
@@ -568,63 +793,9 @@ class _Reader:
         self, element: Element, latex: str, mathml: str, failed: bool, display: Display
     ) -> None:
         """Set the fix for an equation element from LaTeXML's reading of it."""
-        from readablestem.pipeline.speech import SpeechError, mathml_to_speech
-        from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
-
-        latex = re.sub(r"^\\displaystyle\s*", "", latex).strip()
-        mathml_ok = ""
-        if not failed and mathml:
-            try:
-                mathml_ok = str(sanitize_mathml(mathml))
-            except UnsafeMathML:
-                failed = True
-        if not failed and not mathml_ok:
-            failed = True
-        if failed:
-            self.errors += 1
-            element.text = latex or None  # shown as written where nothing better exists
-            proposal = _own_conversion(latex, display)
-            fix = Fix(
-                element_id=element.id,
-                kind=Kind.EQUATION,
-                status=Status.NEEDS_REVIEW if proposal is not None else Status.FAILED,
-                reason=None if proposal is not None else "invalid_latex",
-                confidence=None,
-                equation=proposal,
-                checks=[Check(name="source.macro", passed=False, code="unknown_command")],
-                review="required",
-            )
-            self.out.fixes[element.id] = fix
-            return
-        speech, speech_check = "", None
-        try:
-            speech = mathml_to_speech(mathml_ok)
-        except SpeechError:
-            speech_check = Check(
-                name="speech.generated", passed=False, severity="warning", code="speech_failed"
-            )
-        checks = [Check(name="source.exact", passed=True)]
-        if speech_check is not None or not speech:
-            checks.append(
-                speech_check
-                or Check(
-                    name="speech.generated", passed=False, severity="warning", code="speech_empty"
-                )
-            )
-        self.out.fixes[element.id] = Fix(
-            element_id=element.id,
-            kind=Kind.EQUATION,
-            status=Status.ACCEPTED,
-            confidence=1.0,
-            equation=EquationFix(
-                latex=latex,
-                mathml=mathml_ok,
-                speech=speech,
-                display=display,
-            ),
-            checks=checks,
-            review="optional" if len(checks) > 1 else "none",
-        )
+        fix, failed = equation_fix(element, latex, mathml, failed, display)
+        self.errors += failed
+        self.out.fixes[element.id] = fix
 
     def _inline_math(self, math: Node, owner: Element) -> Element:
         latex, mathml, failed = self._math_parts(math, "inline")
@@ -652,26 +823,43 @@ class _Reader:
 
     def _equation_table(self, node: Node) -> None:
         rows = [r for r in node.iter() if _local(r.tag) == "tr"]
+        parents = {id(child): item for item in node.iter() for child in item}
         for row in rows:
             maths = [m for m in row.iter() if _local(m.tag) == "math"]
-            if not maths:
+            if not maths or _squash(_text_without_tag(row, maths=False)):
+                # words between the rows (\intertext, with or without a formula in them): a
+                # paragraph between the equations
+                self._paragraph(row)
                 continue
             label = ""
             for cell in row.iter():
                 if "ltx_tag_equation" in _classes(cell):
                     label = _squash(self._plain(cell))
+            before = len(self.out.elements)
             self._display_math(maths, label or None)
+            if len(self.out.elements) > before:  # the row's own number is what `\eqref` names
+                self._tie(row, self.out.elements[before])
+                if (holder := parents.get(id(row))) is not None:
+                    self._tie(holder, self.out.elements[before], below=False)
 
     # ------------------------------------------------------------------ tables
 
-    def _table(self, node: Node, caption: str | None) -> None:
+    def _table(self, node: Node, caption: str | None) -> Element | None:
+        """A grid (one table element), or one list item per row when it is too large; the
+        pictures in its cells follow it as figures (`self.loose`). The table element."""
         grid = _grid(node, caption)
+        pictures = self._pictures_in(node)
+        self.loose.extend(pictures)
         element = self._new(Kind.TABLE, text=None)
         if grid is None:
             self._flatten_table(node, element)
-            return
+            return None
+        self._take(node)  # every cell's text and formulas are in the grid
+        for inner in node.iter():
+            if "ltx_ERROR" in _classes(inner):
+                self._mark(inner, element)
         element.table = grid
-        self.out.fixes[element.id] = Fix(
+        fix = Fix(
             element_id=element.id,
             kind=Kind.TABLE,
             status=Status.ACCEPTED,
@@ -679,7 +867,10 @@ class _Reader:
             table=TableFix(grid=grid),
             checks=[Check(name="source.exact", passed=True)],
         )
+        # a cell whose picture follows the table reads as empty in it
+        self.out.fixes[element.id] = needs_decision(fix, TABLE_PICTURE) if pictures else fix
         self.chars += sum(len(c.text) for c in grid.cells)
+        return element
 
     def _flatten_table(self, node: Node, element: Element) -> None:
         """A table too large for a grid: one list item per row."""
@@ -689,54 +880,118 @@ class _Reader:
             cells = [_squash(self._plain(c)) for c in _children(row)]
             text = " | ".join(c for c in cells if c)
             if text:
-                self._new(Kind.LIST_ITEM, text=text, list_ordered=False, list_level=1)
+                item = self._new(Kind.LIST_ITEM, text=text, list_ordered=False, list_level=1)
                 self.chars += len(text)
+                for inner in row.iter():
+                    if "ltx_ERROR" in _classes(inner):
+                        self._mark(inner, item)
 
     # ------------------------------------------------------------------ figures
 
     def _figure(self, node: Node, depth: int) -> None:
-        classes = _classes(node)
-        caption = ""
-        for cap in node:
-            if _local(cap.tag) == "figcaption" or "ltx_caption" in _classes(cap):
-                caption = _squash(_text_without_tag(cap))
-        if "ltx_table" in classes:
-            for table in node.iter():
-                if _local(table.tag) == "table" and "ltx_tabular" in _classes(table):
-                    self._table(table, caption or None)
-                    return
-        nested = [c for c in node.iter() if c is not node and _is_figure(c)]
+        """A float: its tables (a table float) or pictures, the first with the caption, then
+        everything else in it in order (words beside the picture, a note under the table,
+        subfigures). A float with neither, and no subfigure, is a figure with no picture."""
+        captions = [
+            c for c in _children(node)
+            if _local(c.tag) == "figcaption" or "ltx_caption" in _classes(c)
+        ]  # fmt: skip
+        caption = _squash(_text_without_tag(captions[-1])) if captions else ""
+        for cap in captions:
+            self._take(cap)
+        nested = self._outermost(node, _is_figure)
         inside = {id(n) for sub in nested for n in sub.iter()}
-        below = {id(d) for sub in nested for d in sub.iter() if d is not sub}
-        pictures = [
-            n
-            for n in node.iter()
-            if id(n) not in inside
-            and (_local(n.tag) in ("img", "svg") or "ltx_picture" in _classes(n))
-        ]
-        if not pictures and not nested:
-            pictures = [None]  # type: ignore[list-item]  # a figure with no picture at all
-        first = True
-        for picture in pictures:
-            element = self._new(Kind.FIGURE, caption=caption if first and caption else None)
-            first = False
-            png = self._picture(picture) if picture is not None else None
-            if png is None and picture is not None and (name := self._picture_name(picture)):
+        holders: list[Element] = []
+        if "ltx_table" in _classes(node):
+            tables = self._outermost(
+                node, lambda n: _local(n.tag) == "table" and "ltx_tabular" in _classes(n)
+            )
+            for table in (t for t in tables if id(t) not in inside):
+                element = self._table(table, None if holders else caption or None)
+                self.done.update(id(n) for n in table.iter())
+                if element is not None:
+                    holders.append(element)
+                self._flush_pictures()  # a picture in a cell follows its table
+        for picture in self._pictures_in(node):
+            if id(picture) not in inside:
+                holders.append(self._picture_element(picture, None if holders else caption))
+        previous = self.out.elements[-1] if self.out.elements else None
+        if holders and captions and (number := _printed_tag(captions[-1])):
+            self.out.printed[holders[0].id] = number  # the caption went to the first
+        if (
+            not holders
+            and not nested
+            and caption
+            and all(c in captions for c in _children(node))
+            and previous is not None
+            and previous.id in self.pictured
+            and previous.caption is None
+        ):
+            # `\captionof` after a picture: a float that is only a caption, the picture's own
+            previous.caption = caption
+            holders.append(previous)
+        if not holders and not nested and not _float_words(node, captions):
+            # a float with nothing in it but its caption (a drawing LaTeX could not make): a
+            # figure with no picture. One with words of its own is read as those words.
+            holders.append(self._picture_element(None, caption))
+        if holders:
+            # an error in the caption, or one in the float's text that is not a formula, is
+            # the float's own (`_mark` keeps the first tie)
+            in_formula = {id(n) for m in node.iter() if _local(m.tag) == "math" for n in m.iter()}
+            in_caption = {id(n) for cap in captions for n in cap.iter()}
+            for inner in node.iter():
+                if "ltx_ERROR" not in _classes(inner) or id(inner) in inside:
+                    continue
+                if id(inner) not in in_formula or id(inner) in in_caption:
+                    self._mark(inner, holders[0])
+        for child in _children(node):
+            if child not in captions:
+                self.walk(child, depth + 1)
+        if not holders and caption:
+            # subfigures, or words, with no picture of the float's own: its caption follows
+            self._new(Kind.PARAGRAPH, text=caption)
+            self.chars += len(caption)
+
+    def _outermost(self, node: Node, match) -> list[Node]:
+        """The nodes under `node` (not `node` itself) that `match`, not inside one another."""
+        found: list[Node] = []
+
+        def visit(item: Node, depth: int) -> None:
+            if depth > MAX_DEPTH:
+                raise ReadError("too deep")
+            for child in _children(item):
+                if match(child):
+                    found.append(child)
+                else:
+                    visit(child, depth + 1)
+
+        visit(node, 0)
+        return found
+
+    def _picture_element(self, picture: Node | None, caption: str | None) -> Element:
+        """A figure element for `picture` (None: a float with no picture at all). A picture
+        that cannot be read is a required decision (`UNKNOWN_FIGURE_REASON`) naming its file."""
+        element = self._new(Kind.FIGURE, caption=caption or None)
+        png = None
+        if picture is not None:
+            self.pictured.add(element.id)
+            self.done.update(id(n) for n in picture.iter())
+            png = self._picture(picture)
+            if png is None and (name := self._picture_name(picture)):
                 self.out.figures.append(SourceFigure(element_id=element.id, name=name))
-            if png is None:
-                self.out.fixes[element.id] = Fix(
-                    element_id=element.id,
-                    kind=Kind.FIGURE,
-                    status=Status.FAILED,
-                    reason=UNKNOWN_FIGURE_REASON,
-                    review="required",
-                )
-            else:
-                self.out.images[element.id] = png
-            self.chars += max(len(caption), CHARS_PER_PAGE // 3)
-        for sub in nested:
-            if id(sub) not in below:
-                self._figure(sub, depth + 1)
+        if png is None:
+            self.out.fixes[element.id] = Fix(
+                element_id=element.id,
+                kind=Kind.FIGURE,
+                status=Status.FAILED,
+                reason=UNKNOWN_FIGURE_REASON,
+                review="required",
+                sources=["source_read"],
+            )
+        else:
+            self.out.images[element.id] = png
+        self.chars += max(len(caption or ""), CHARS_PER_PAGE // 3)
+        return element
 
     def _picture_name(self, node: Node) -> str:
         """The file a picture asked for, as written in the source ("" for a drawing)."""
@@ -842,6 +1097,21 @@ def _visible_blocks(node: Node) -> set[str]:
     return found
 
 
+def _float_words(node: Node, captions: list[Node]) -> bool:
+    """Whether a float holds words of its own: text or a formula outside its captions and
+    outside the error nodes LaTeX left for what it could not read."""
+    left_out = {id(n) for c in captions for n in c.iter()}
+    left_out |= {id(n) for e in node.iter() if "ltx_ERROR" in _classes(e) for n in e.iter()}
+    for item in node.iter():
+        if id(item) in left_out or _skipped(item):
+            continue
+        if _local(item.tag) == "math" or (item.text or "").strip():
+            return True
+        if item is not node and (item.tail or "").strip():
+            return True
+    return False
+
+
 def _is_figure(node: Node) -> bool:
     return _local(node.tag) == "figure" or bool(_classes(node) & {"ltx_figure", "ltx_table"})
 
@@ -855,6 +1125,18 @@ def _markers(text: str):
 def _children_blocks(node: Node) -> bool:
     return any(
         _local(c.tag) in ("p", "div", "ul", "ol", "table", "figure", "section") for c in node.iter()
+    )
+
+
+def _blocks_below(node: Node) -> bool:
+    """A block element under `node`, not counting `node` itself."""
+    return any(_children_blocks(c) for c in _children(node))
+
+
+def _is_list(node: Node) -> bool:
+    """A list nested in a list item (itemize, enumerate, a contents list)."""
+    return _local(node.tag) in ("ul", "ol") or bool(
+        _classes(node) & {"ltx_itemize", "ltx_enumerate"}
     )
 
 
@@ -874,17 +1156,83 @@ def _non_paragraph_nodes(node: Node) -> list[Node]:
     return [node]
 
 
-def _text_without_tag(node: Node) -> str:
+_STYLE_COLOUR = re.compile(r"(?:^|;)\s*color\s*:\s*#([0-9a-fA-F]{6})\s*(?:;|$)")
+
+
+def _style_colour(node: Node) -> tuple[int, int, int] | None:
+    """The colour LaTeXML wrote on a span (`style="color:#FF0000;"`, xcolor), as sRGB."""
+    found = _STYLE_COLOUR.search(node.get("style") or "")
+    if found is None:
+        return None
+    hexed = found.group(1)
+    return int(hexed[0:2], 16), int(hexed[2:4], 16), int(hexed[4:6], 16)
+
+
+def _add_colour(element: Element, start: int, end: int, extra: object) -> None:
+    """A colour run for text printed in a colour that is not body text (the PDF path's own
+    rule: `text_pass.is_run_colour`), trimmed of spaces and kept only when it has a letter, a
+    digit or a formula in it."""
+    from readablestem.pipeline.text_pass import is_run_colour
+
+    rgb = extra
+    if not (isinstance(rgb, tuple) and len(rgb) == 3) or not is_run_colour(rgb, None):
+        return
+    text = element.text or ""
+    while start < end and text[start].isspace():
+        start += 1
+    while end > start and text[end - 1].isspace():
+        end -= 1
+    piece = text[start:end]
+    if any(c.isalnum() for c in piece) or any(True for _ in _markers(piece)):
+        inline.add(element, ColourRun(start=start, end=end, rgb=rgb))
+
+
+def _lines(node: Node, drop: frozenset[str] = frozenset()) -> list[str]:
+    """The lines of `node`: its text split where LaTeX broke the line (`\\\\`), each line
+    squashed, empty ones left out; a node with a class in `drop` or in `SKIP` is left out."""
+    lines = [""]
+
+    def visit(item: Node) -> None:
+        if item.text:
+            lines[-1] += item.text
+        for child in _children(item):
+            if _local(child.tag) == "br":
+                lines.append("")
+            elif _classes(child) & (drop | _SKIP_CLASSES):
+                pass
+            elif _local(child.tag) == "math":
+                lines[-1] += child.get("alttext") or ""
+            else:
+                visit(child)
+            if child.tail:
+                lines[-1] += child.tail
+
+    visit(node)
+    return [line for line in (_squash(x) for x in lines) if line]
+
+
+def _printed_tag(node: Node) -> str:
+    """The number LaTeX printed in front of a heading or caption ("1.2 ", "Figure 3: "), with
+    one space after it, "" when there is none."""
+    for child in _children(node):
+        if "ltx_tag" in _classes(child):
+            return _squash(_itertext(child)).rstrip(":.") + " "
+    return ""
+
+
+def _text_without_tag(node: Node, *, maths: bool = True) -> str:
+    """The text of `node` without what `SKIP` leaves out by class; each formula as its TeX
+    (`maths`), or left out."""
     parts: list[str] = []
 
     def visit(item: Node) -> None:
-        if _classes(item) & {"ltx_tag", "ltx_note_mark", *HIDDEN}:
+        if _classes(item) & _SKIP_CLASSES:
             return
         if item.text:
             parts.append(item.text)
         for child in _children(item):
             if _local(child.tag) == "math":
-                parts.append(child.get("alttext") or "")
+                parts.append(child.get("alttext") or "" if maths else "")
             else:
                 visit(child)
             if child.tail:
@@ -944,6 +1292,74 @@ def _serialise_svg(svg: Node) -> bytes:
     return tostring(svg, encoding="utf-8")
 
 
+def equation_fix(
+    element: Element, latex: str, mathml: str, failed: bool, display: Display
+) -> tuple[Fix, bool]:
+    """The fix of an equation a source states exactly, and whether it failed the product's checks
+    (the second value). `latex` is the source's own, `mathml` the converter's, accepted through the
+    sanitiser (`web.mathml`, ADR 0008) and spoken by the usual reading. A formula that failed (or
+    whose MathML the sanitiser refuses) is shown as written (`element.text` is set) and is a
+    required decision, with our own LaTeX conversion as the proposal when that works. Shared by
+    the LaTeX reader and the Word reader (`source.docx_reader`), so a source equation is judged
+    by one set of checks."""
+    from readablestem.pipeline.speech import SPEECH_VERSION, SpeechError, mathml_to_speech
+    from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
+
+    latex = re.sub(r"^\\displaystyle\s*", "", latex).strip()
+    mathml_ok = ""
+    if not failed and mathml:
+        try:
+            mathml_ok = str(sanitize_mathml(mathml, normal=True))
+        except UnsafeMathML:
+            failed = True
+    if not failed and not mathml_ok:
+        failed = True
+    if failed:
+        element.text = latex or None  # shown as written where nothing better exists
+        proposal = _own_conversion(latex, display)
+        fix = Fix(
+            element_id=element.id,
+            kind=Kind.EQUATION,
+            status=Status.NEEDS_REVIEW if proposal is not None else Status.FAILED,
+            reason=None if proposal is not None else "invalid_latex",
+            confidence=None,
+            equation=proposal,
+            checks=[Check(name="source.macro", passed=False, code="unknown_command")],
+            review="required",
+            sources=["source_read"],
+        )
+        return fix, True
+    speech, speech_check = "", None
+    try:
+        speech = mathml_to_speech(mathml_ok)
+    except SpeechError:
+        speech_check = Check(
+            name="speech.generated", passed=False, severity="warning", code="speech_failed"
+        )
+    checks = [Check(name="source.exact", passed=True)]
+    if speech_check is not None or not speech:
+        checks.append(
+            speech_check
+            or Check(name="speech.generated", passed=False, severity="warning", code="speech_empty")
+        )
+    fix = Fix(
+        element_id=element.id,
+        kind=Kind.EQUATION,
+        status=Status.ACCEPTED,
+        confidence=1.0,
+        equation=EquationFix(
+            latex=latex,
+            mathml=mathml_ok,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display=display,
+        ),
+        checks=checks,
+        review="optional" if len(checks) > 1 else "none",
+    )
+    return fix, False
+
+
 def _own_conversion(latex: str, display: Display) -> EquationFix | None:
     """Our own LaTeX conversion of a formula LaTeXML could not read, as the proposal for the
     decision; None when it does not convert."""
@@ -951,6 +1367,7 @@ def _own_conversion(latex: str, display: Display) -> EquationFix | None:
         return None
     try:
         from readablestem.pipeline.equation_step import _speech, read_latex
+        from readablestem.pipeline.speech import SPEECH_VERSION
         from readablestem.pipeline.validate import (
             LatexConversionError,
             check_latex,
@@ -963,7 +1380,13 @@ def _own_conversion(latex: str, display: Display) -> EquationFix | None:
             return None
         mathml = safe_latex_to_mathml(cleaned, display)
         speech, _ = _speech(mathml)
-        return EquationFix(latex=cleaned, mathml=mathml, speech=speech, display=display)
+        return EquationFix(
+            latex=cleaned,
+            mathml=mathml,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display=display,
+        )
     except (LatexConversionError, ValueError, KeyError, RecursionError):
         return None
     except Exception:
@@ -1008,6 +1431,8 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
             if len(maths) == 1 and not _squash(_text_without_math(cell)):
                 latex = (maths[0].get("alttext") or "").strip() or None
                 mathml = _serialise_math(maths[0]) or None
+            elif maths and not any("ltx_ERROR" in _classes(n) for n in cell.iter()):
+                latex, mathml = _mixed_cell(cell)  # words and formulas: the whole cell as maths
             header = None
             if tag == "th":
                 header = "col" if section == "thead" or "ltx_th_column" in _classes(cell) else "row"
@@ -1034,13 +1459,30 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                 cells.append(TableCell(row=r, col=c, text=""))
     if header_rows >= n_rows:
         header_rows = 0
+    header_cols = _header_cols(cells, header_rows, n_cols)
+    marked = bool(header_rows or header_cols or any(c.header for c in cells))
     grid = TableGrid(
-        rows=n_rows, cols=n_cols, cells=cells, header_rows=header_rows, caption=caption,
-        is_data=True, source="local",
+        rows=n_rows, cols=n_cols, cells=cells, header_rows=header_rows, header_cols=header_cols,
+        caption=caption, is_data=True, source="local", header_source="source" if marked else "none",
     )  # fmt: skip
     from readablestem.core.types import grid_problems
 
+    if grid_problems(grid) and header_cols:
+        grid = grid.model_copy(update={"header_cols": 0})
     return grid if not grid_problems(grid) else _lenient(grid)
+
+
+def _header_cols(cells: list[TableCell], header_rows: int, n_cols: int) -> int:
+    """How many leading columns are row headers: those whose every filled cell below the header
+    rows LaTeXML wrote as `th` (a `ltx_th_row` cell). Nothing is guessed from the look of the
+    table, and a table that LaTeXML gave no `th` has none."""
+    count = 0
+    while count < n_cols - 1:
+        column = [c for c in cells if c.col == count and c.row >= header_rows and not c.is_empty]
+        if not column or any(c.header != "row" for c in column):
+            break
+        count += 1
+    return count
 
 
 def _lenient(grid: TableGrid) -> TableGrid | None:
@@ -1052,6 +1494,7 @@ def _lenient(grid: TableGrid) -> TableGrid | None:
         update={
             "header_rows": 0,
             "header_cols": 0,
+            "header_source": "none",
             "cells": [c.model_copy(update={"header": None}) for c in grid.cells],
         }
     )
@@ -1070,6 +1513,70 @@ def _cell_text(cell: Node):
             yield child.tail
 
 
+_LATEX_TEXT = {
+    "\\": "\\textbackslash{}", "{": "\\{", "}": "\\}", "%": "\\%", "$": "\\$", "&": "\\&",
+    "#": "\\#", "_": "\\_", "^": "\\^{}", "~": "\\~{}",
+}  # fmt: skip
+
+
+def _mixed_cell(cell: Node) -> tuple[str | None, str | None]:
+    """A cell of words and formulas as one formula (SW18.3): the cell in LaTeX, the words in
+    `\\text{}`, and the MathML of it, LaTeXML's own for each formula and `<mtext>` for the words,
+    through the sanitiser every source equation goes through. (None, None) when it does not
+    pass: the cell is then its text, as before."""
+    from html import escape
+    from xml.etree.ElementTree import tostring
+
+    parts: list[str | Node] = []  # words, and each formula's node
+
+    def visit(item: Node) -> None:
+        if item.text:
+            parts.append(item.text)
+        for child in _children(item):
+            if _local(child.tag) == "math":
+                parts.append(child)
+            else:
+                visit(child)
+            if child.tail:
+                parts.append(child.tail)
+
+    visit(cell)
+    latex: list[str] = []
+    inner: list[str] = []
+    for index, part in enumerate(parts):
+        if isinstance(part, str):
+            words = _SPACE.sub(" ", part)
+            if index == 0:
+                words = words.lstrip(" ")
+            if index == len(parts) - 1:
+                words = words.rstrip(" ")
+            if words:
+                latex.append("\\text{" + "".join(_LATEX_TEXT.get(c, c) for c in words) + "}")
+                inner.append(f"<mtext>{escape(words.replace(' ', chr(160)), quote=False)}</mtext>")
+            continue
+        _drop_empty_tokens(part)
+        latex.append((part.get("alttext") or "").strip())
+        tail, part.tail = part.tail, None
+        try:
+            inner.extend(tostring(child, encoding="unicode") for child in part)
+        finally:
+            part.tail = tail
+    source = " ".join(piece for piece in latex if piece)
+    markup = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline"><mrow>'
+        + "".join(inner)
+        + "</mrow></math>"
+    )
+    if len(markup) > MAX_MATH_CHARS or not source:
+        return None, None
+    from readablestem.web.mathml import UnsafeMathML, sanitize_mathml
+
+    try:
+        return source, str(sanitize_mathml(markup, normal=True))
+    except UnsafeMathML:
+        return None, None
+
+
 def _text_without_math(cell: Node) -> str:
     parts = [cell.text or ""]
     for child in _children(cell):
@@ -1082,9 +1589,10 @@ def _text_without_math(cell: Node) -> str:
 # ---------------------------------------------------------------------------- entry
 
 
-def graphics_of(xml: bytes) -> dict[str, str]:
-    """The image file each `graphics` element of LaTeXML's XML names, by its id (the same id the
-    XHTML's `img` has). Anything that is not well formed gives an empty map."""
+def graphics_of(xml: bytes, project: Path) -> dict[str, str]:
+    """The image file each `graphics` element of LaTeXML's XML shows, by its id (the same id the
+    XHTML's `img` has), found the way LaTeX finds it (`figures.find`) in `project`. Anything that
+    is not well formed gives an empty map."""
     try:
         root = SafeET.fromstring(xml, forbid_dtd=True, forbid_entities=True)
     except Exception:
@@ -1095,8 +1603,63 @@ def graphics_of(xml: bytes) -> dict[str, str]:
             ident = node.get("{http://www.w3.org/XML/1998/namespace}id") or ""
             name = node.get("graphic") or ""
             if ident and name:
-                found[ident] = name
+                found[ident] = figures.find(project, name, node.get("candidates") or "")
     return found
+
+
+def _count_unread(reader: _Reader, body: Node) -> None:
+    """Count what no rule read and no entry of `SKIP` covers: the words (a formula's as its
+    TeX), the pictures no figure was made of, and the first `UNREAD_START_WORDS` words."""
+    out = reader.out
+    first: list[str] = []
+
+    def words(text: str | None) -> None:
+        found = (text or "").split()
+        out.unread_words += len(found)
+        first.extend(found[: UNREAD_START_WORDS - len(first)])
+
+    def visit(item: Node, depth: int) -> None:
+        if depth > MAX_DEPTH or _skipped(item) or id(item) in reader.skipped:
+            return
+        if id(item) in reader.done:
+            return  # taken whole: a picture made a figure of, a table read in its float
+        if _is_picture(item):
+            out.unread_pictures += 1
+            return
+        mine = id(item) not in reader.read
+        if _local(item.tag) == "math":
+            if mine:
+                words(item.get("alttext") or _itertext(item))
+            return
+        if mine:
+            words(item.text)
+        for child in _children(item):
+            visit(child, depth + 1)
+            if mine:
+                words(child.tail)
+
+    visit(body, 0)
+    out.unread_start = clean(" ".join(first))
+
+
+def link_internal(
+    elements: list[Element],
+    ids: dict[str, str],
+    refs: list[tuple[Element, int, int, str]],
+) -> None:
+    """The links a source file makes to a place in itself (`\\ref`, `\\eqref`, `\\cite`,
+    `\\autoref`, a contents entry; a Word link to a bookmark) as internal links. `refs`: where
+    each one is (element, start, end) and the id it names, which `ids` maps to the element
+    that place became. An id that became no element, a link inside the element it points to
+    and one that overlaps another link make none: the words stay as text."""
+    made = {e.id for e in elements}
+    for element, start, end, name in refs:
+        target = ids.get(name)
+        if target is None or target not in made or target == element.id:
+            continue
+        if any(k.start < end and start < k.end for k in element.links):
+            continue
+        inline.add(element, Link(kind="internal", start=start, end=end, target_id=target))
 
 
 def read(
@@ -1120,23 +1683,48 @@ def read(
     in_formula = {id(n) for m in body.iter() if _local(m.tag) == "math" for n in m.iter()}
     error_nodes = [n for n in body.iter() if "ltx_ERROR" in _classes(n)]
     reader.walk(body)
+    link_internal(reader.out.elements, reader.ids, reader.refs)
     out = reader.out
     out.errors = reader.errors
     out.error_nodes = len(error_nodes)
+    if not out.elements:
+        raise ReadError("no content")
+    # A formula LaTeX could not read is a decision where it is shown: on its own equation
+    # element, or on the table, heading or figure that shows it as written (`FORMULA_UNREAD`).
+    # Anywhere else (a description, the authors) nothing can hold the decision.
+    by_id = {e.id: e for e in out.elements}
+    decided: set[int] = set()
+    for n in error_nodes:
+        element = by_id.get(reader.marked.get(id(n)) or "")
+        if id(n) not in in_formula or element is None:
+            continue
+        if element.kind is Kind.EQUATION:
+            decided.add(id(n))
+        elif element.kind in (Kind.TABLE, Kind.HEADING, Kind.FIGURE):
+            decided.add(id(n))
+            if element.id not in out.unread_formulas:
+                out.unread_formulas.add(element.id)
+                reader.errors += 1
+                if element.id in out.fixes:
+                    out.fixes[element.id] = needs_decision(out.fixes[element.id], FORMULA_UNREAD)
+    out.errors = reader.errors
     out.marks = [
         SourceMark(
-            name=clean(_squash(reader._plain(n))),
+            name=clean(_squash(_itertext(n))),
             element_id=reader.marked.get(id(n)),
             in_formula=id(n) in in_formula,
+            decided=id(n) in decided,
         )
         for n in error_nodes
     ]
-    if not out.elements:
-        raise ReadError("no content")
+    _count_unread(reader, body)
+    if out.unread_words or out.unread_pictures:
+        # required: the instructor sees what is missing before the document is shared
+        out.notices.append(make(SOURCE_UNREAD_NOTICE, count=out.unread_words + out.unread_pictures))
     if reader.errors:
         # required: a formula LaTeX could not read is shown as written and is a decision
-        out.notices.append(Notice(code=SOURCE_ERROR_NOTICE, count=reader.errors, review="required"))
+        out.notices.append(make(SOURCE_ERROR_NOTICE, count=reader.errors))
     return out
 
 
-__all__ = ["ReadError", "Reading", "read"]
+__all__ = ["ReadError", "Reading", "link_internal", "read"]

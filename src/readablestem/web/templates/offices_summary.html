@@ -9,7 +9,7 @@
    web/offices.py, no script, no outside request. It is the short form of
    /for-accessibility-offices and is written from the same settings and the same list of data
    (web/offices.py `data_items`), so the two cannot name different recipients or times. It
-   should fit one printed Letter or A4 page; tests/test_web_offices_print.py prints it. #}
+   should fit one printed Letter or A4 page; tests/test_web_ux2_lane_d_browser.py prints it. #}
 {{ style_tag }}
 </head>
 <body>
@@ -29,7 +29,8 @@
 <h2>What is sent where</h2>
 <p>The instructor uploads a PDF over HTTPS to the app, hosted by Railway in the United States.
   Students do not sign in. The PDF file, its file name and the instructor's email address are
-  never sent to {{ model_names }}.</p>
+  never sent to {{ model_names }}{% if whole_pages_sent %}; pictures of whole pages are, as the
+  table says{% endif %}.</p>
 {{ matrix(data_items, "What is sent where, and for how long") }}
 <p>{{ model_names }} {{ "states" if model_companies|length == 1 else "state" }} that
   {{ "it does" if model_companies|length == 1 else "they do" }} not train on API data by
@@ -49,9 +50,8 @@
 <h2>What it does not certify</h2>
 <ul>
   <li>It does not say that a document meets WCAG, the ADA, Section 508 or any other standard or
-    law. Proposals can be wrong: in a pre-registered test on 26 documents, 0.79 of the
-    equations were exactly right end to end, against 0.77 for a general chatbot, and the tool
-    asked about 46% of its wrong equations.</li>
+    law. Proposals can be wrong: in a pre-registered test on {{ proof_facts.numbers.units }} documents, {{ proof_facts.numbers.ours_exact }} of the
+    equations were exactly right end to end, against {{ proof_facts.numbers.opus_exact }} for a general chatbot.</li>
   <li>Its checks look at structure, not meaning. It has not been tested by listening with NVDA,
     JAWS or VoiceOver. No accessibility conformance report (VPAT) is published yet (one is in
     preparation) and there has been no independent security test.</li>

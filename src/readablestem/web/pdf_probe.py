@@ -20,13 +20,14 @@ Besides counting pages it refuses, before any quota is spent:
   them again, and a 260 KB file can inflate to 256 MB. They are counted before anything
   parses a page, through decoders that stop at the budget; the object streams are counted
   the same way before the page count is read, since reading it loads them.
-- PDFs with nothing to convert (`pipeline.page_type.document_refusal`): every page
+- PDFs with nothing to convert (`pipeline.page_type.probe_pages`): every page
   handwritten ("handwritten", or "handwritten_no_text" without a hidden recognition
   layer), a scanned image ("scanned", or "scanned_ocr" with a hidden OCR layer), or
   blank ("no_content"). Text nobody sees never counts as text. The text of every page
   is read first and the check stops at the first typed page, so only such documents
-  pay for the drawings and the handwriting analysis, which has a time budget
-  (`page_type.INK_BUDGET_S`): a page not analysed in time never refuses the upload.
+  pay for the drawings and the handwriting analysis, which has a budget counted in work
+  (`page_type.PROBE_MAX_ITEMS` path items for the document) and a clock only as a guard
+  (`page_type.PROBE_GUARD_S`): a page not analysed never refuses the upload.
   With `image_pages` after the page limit (`python -m readablestem.web.pdf_probe MAX_PAGES
   image_pages`, `FEATURE_IMAGE_PAGES` on) a document of scanned or handwritten pages is
   accepted: the conversion reads them from an image of the page (ADR 0007).
@@ -53,6 +54,9 @@ The review screen uses the same child, with the same memory cap, for two more th
   page of the part, so the output's page markers can say it. Unused objects of the pages
   left out are dropped, so the part is smaller than the file in proportion. On any failure
   it writes nothing and exits with status 2.
+- `python -m readablestem.web.pdf_probe outline` prints {"ok": true, "starts": [P, ...]}: the
+  0-based pages where the PDF's top-level bookmarks point (chapter starts), for suggesting
+  where to cut a large file in parts.
 - `python -m readablestem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 - `python -m readablestem.web.pdf_probe text PAGE X0,Y0,X1,Y1` prints {"ok": true, "text": "..."}:
@@ -75,6 +79,8 @@ from readablestem.core.images import MAX_UPLOAD_IMAGE_PIXELS
 
 if TYPE_CHECKING:
     import pymupdf
+
+    from readablestem.pipeline.page_type import ImagePageCount
 
 PDF_MAGIC = b"%PDF-"
 PNG_MAGIC = b"\x89PNG\r\n\x1a\n"
@@ -103,7 +109,7 @@ def looks_like_pdf(data: bytes) -> bool:
     return PDF_MAGIC in data[:MAGIC_WINDOW]
 
 
-# What `document_refusal` says of a document whose every page is a scan or handwriting: with
+# What `probe_pages` says of a document whose every page is a scan or handwriting: with
 # `FEATURE_IMAGE_PAGES` on, the conversion reads such pages from an image of the page
 # (ADR 0007), so these are let through. A blank document is still refused.
 IMAGE_PAGE_REFUSALS = frozenset({"scanned", "scanned_ocr", "handwritten", "handwritten_no_text"})
@@ -115,11 +121,15 @@ def probe(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> in
     return inspect(data, max_pages=max_pages, allow_image_pages=allow_image_pages)[0]
 
 
-def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> tuple[int, int]:
-    """`(pages, image_pages)` or raise ProbeRejected. `image_pages` is how many pages are
-    scanned or handwritten (`page_type.image_page_count`), counted only with
-    `allow_image_pages` (the person asked for them to be converted: a document with none
-    is not refused, the request just does not apply); 0 otherwise."""
+def inspect(
+    data: bytes, *, max_pages: int, allow_image_pages: bool = False, count: bool = False
+) -> tuple[int, ImagePageCount]:
+    """`(pages, image_pages)` or raise ProbeRejected. `image_pages` is how many pages the
+    image page pass reads, by kind (`page_type.image_page_count`, "at least" when some page's
+    drawings were not analysed). It is counted with `allow_image_pages` (the person asked for
+    them to be converted: a document of such pages is not refused, and one with none is not
+    refused either, the request just does not apply) and with `count` (the deployment offers
+    to read them: the person is told how many there are); none otherwise."""
     if not data:
         raise ProbeRejected("empty")
     if not looks_like_pdf(data):
@@ -150,22 +160,12 @@ def inspect(data: bytes, *, max_pages: int, allow_image_pages: bool = False) -> 
             raise ProbeRejected("damaged" if doc.is_repaired else "no_pages")
         if pages > max_pages:
             raise ProbeRejected("too_many_pages", pages=pages)
-        _check_pages(doc, allow_image_pages=allow_image_pages)
-        image_pages = _image_pages(doc) if allow_image_pages else 0
+        image_pages = _check_pages(
+            doc, allow_image_pages=allow_image_pages, count=allow_image_pages or count
+        )
     finally:
         doc.close()
     return pages, image_pages
-
-
-def _image_pages(doc: pymupdf.Document) -> int:
-    """The scanned and handwritten pages of an open document; 0 when MuPDF cannot say (the
-    conversion would fail such a page as well, and says so)."""
-    from readablestem.pipeline.page_type import image_page_count
-
-    try:
-        return image_page_count(doc)
-    except Exception:
-        return 0
 
 
 def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
@@ -178,10 +178,14 @@ def _largest_image_pixels(doc: pymupdf.Document, number: int) -> int:
         return 0  # unreadable page objects fail the checks after this one
 
 
-def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> None:
+def _check_pages(
+    doc: pymupdf.Document, *, allow_image_pages: bool = False, count: bool = False
+) -> ImagePageCount:
     """Refuse oversized pages, too much content and documents with nothing to convert
-    (module docstring)."""
-    from readablestem.pipeline.page_type import document_refusal
+    (module docstring); with `count`, the pages the image page pass reads, from the same
+    analysis (`page_type.probe_pages`). A page MuPDF cannot read only costs the count: the
+    document is checked as it would be without it."""
+    from readablestem.pipeline.page_type import ImagePageCount, probe_pages
 
     try:
         for number in range(doc.page_count):
@@ -194,13 +198,20 @@ def _check_pages(doc: pymupdf.Document, *, allow_image_pages: bool = False) -> N
             content_budget.check(doc)
         except content_budget.ContentTooLarge:
             raise ProbeRejected("content_too_large") from None
-        reason = document_refusal(doc)
+        found = ImagePageCount()
+        try:
+            reason, found = probe_pages(doc, count=count)
+        except Exception:
+            if not count:
+                raise
+            reason = probe_pages(doc)[0]
     except ProbeRejected:
         raise
     except Exception:  # a page MuPDF cannot read would fail the conversion as well
         raise ProbeRejected("unreadable") from None
     if reason is not None and not (allow_image_pages and reason in IMAGE_PAGE_REFUSALS):
         raise ProbeRejected(reason)
+    return found
 
 
 def limit_memory(max_bytes: int = MEMORY_LIMIT_BYTES) -> None:
@@ -235,6 +246,13 @@ def _fold(ch: str) -> str:
     return unicodedata.normalize("NFKC", ch).casefold()
 
 
+def turn_page(page: pymupdf.Page) -> int:
+    """`page_type.turn_page`: the page upright, as layout read it (WS14.3)."""
+    from readablestem.pipeline.page_type import turn_page as turn
+
+    return turn(page)
+
+
 def _open(data: bytes) -> pymupdf.Document:
     import pymupdf
 
@@ -254,10 +272,27 @@ def _open(data: bytes) -> pymupdf.Document:
 
 def page_sizes(data: bytes) -> list[tuple[float, float]]:
     """Every page's (width, height) in points, as `page.rect` gives them (after rotation,
-    the frame layout's boxes are in)."""
+    and after the turn of a page saved sideways: the frame layout's boxes are in)."""
     doc = _open(data)
     try:
-        return [(round(p.rect.width, 2), round(p.rect.height, 2)) for p in doc]
+        sizes = []
+        for p in doc:
+            turn_page(p)
+            sizes.append((round(p.rect.width, 2), round(p.rect.height, 2)))
+        return sizes
+    finally:
+        doc.close()
+
+
+def outline_starts(data: bytes) -> list[int]:
+    """The 0-based pages where a top-level outline (bookmark) entry of the PDF points, ascending,
+    without the first page and without repeats: where a chapter starts, for cutting a large
+    file in parts at chapter boundaries. Empty when the file has no outline."""
+    doc = _open(data)
+    try:
+        total = doc.page_count
+        entries = [e for e in doc.get_toc(simple=True) if len(e) >= 3 and e[0] == 1]
+        return sorted({int(e[2]) - 1 for e in entries if 1 < int(e[2]) <= total})
     finally:
         doc.close()
 
@@ -269,7 +304,9 @@ def _outline_glyphs(
     the document only: it is never saved)."""
     import pymupdf
 
-    flags = pymupdf.TEXT_ACCURATE_BBOXES | pymupdf.TEXT_MEDIABOX_CLIP
+    from readablestem.pipeline.page_type import actualtext_flag
+
+    flags = pymupdf.TEXT_ACCURATE_BBOXES | pymupdf.TEXT_MEDIABOX_CLIP | actualtext_flag(page)
     slack = MARK_SLACK_PT
     area = pymupdf.Rect(region.x0 - slack, region.y0 - slack, region.x1 + slack, region.y1 + slack)
     found = []
@@ -299,6 +336,8 @@ def _ink_lines(page: pymupdf.Page) -> list[pymupdf.Rect]:
     other overlap there, and no edge between them would cut neither."""
     import pymupdf
 
+    from readablestem.pipeline.page_type import drawn_size
+
     out = []
     for block in page.get_text("dict", flags=pymupdf.TEXT_MEDIABOX_CLIP).get("blocks", []):
         for line in block.get("lines", []):
@@ -306,8 +345,8 @@ def _ink_lines(page: pymupdf.Page) -> list[pymupdf.Rect]:
             if not spans:
                 continue
             x0, _, x1, _ = line["bbox"]
-            y0 = min(s["origin"][1] - INK_ABOVE * s["size"] for s in spans)
-            y1 = max(s["origin"][1] + INK_BELOW * s["size"] for s in spans)
+            y0 = min(s["origin"][1] - INK_ABOVE * drawn_size(s) for s in spans)
+            y1 = max(s["origin"][1] + INK_BELOW * drawn_size(s) for s in spans)
             out.append(pymupdf.Rect(x0, y0, x1, y1))
     return out
 
@@ -408,6 +447,7 @@ def render(
         if not 0 <= page < doc.page_count:
             raise ProbeRejected("no_such_page")
         current = doc[page]
+        turn_page(current)  # the page as layout read it (a page saved sideways is turned)
         if max(current.rect.width, current.rect.height) > MAX_PAGE_SIDE_PT:
             raise ProbeRejected("page_too_large")
         area = current.rect if clip is None else pymupdf.Rect(clip) & current.rect
@@ -482,17 +522,20 @@ def region_text(data: bytes, *, page: int, clip: tuple[float, float, float, floa
     Raises ProbeRejected."""
     import pymupdf
 
+    from readablestem.pipeline.page_type import actualtext_flag
+
     doc = _open(data)
     try:
         if not 0 <= page < doc.page_count:
             raise ProbeRejected("no_such_page")
         current = doc[page]
+        turn_page(current)  # the page as layout read it (a page saved sideways is turned)
         if max(current.rect.width, current.rect.height) > MAX_PAGE_SIDE_PT:
             raise ProbeRejected("page_too_large")
         area = pymupdf.Rect(clip) & current.rect
         found = []
         for x0, y0, x1, y1, word, block, line, number in current.get_text(
-            "words", flags=pymupdf.TEXT_MEDIABOX_CLIP
+            "words", flags=pymupdf.TEXT_MEDIABOX_CLIP | actualtext_flag(current)
         ):
             if area.x0 <= (x0 + x1) / 2 <= area.x1 and area.y0 <= (y0 + y1) / 2 <= area.y1:
                 found.append((block, line, number, word))
@@ -537,7 +580,7 @@ def main(argv: list[str] | None = None) -> int:
             return RENDER_FAILED
         sys.stdout.buffer.write(part)
         return 0
-    if args and args[0] in {"render", "sizes", "text"}:
+    if args and args[0] in {"render", "sizes", "text", "outline"}:
         data = sys.stdin.buffer.read()
         try:
             if args[0] == "render":
@@ -546,19 +589,30 @@ def main(argv: list[str] | None = None) -> int:
                 said = region_text(data, page=int(args[1]), clip=_rect(args[2]))
                 sys.stdout.write(json.dumps({"ok": True, "text": said}) + "\n")
                 return 0
+            if args[0] == "outline":
+                sys.stdout.write(json.dumps({"ok": True, "starts": outline_starts(data)}) + "\n")
+                return 0
             sizes = page_sizes(data)
         except Exception:  # ProbeRejected, bad arguments, anything MuPDF raises
             return RENDER_FAILED
         sys.stdout.write(json.dumps({"ok": True, "sizes": sizes}) + "\n")
         return 0
     max_pages = int(args[0]) if args else 1
-    images = len(args) > 1 and args[1] == "image_pages"
+    images = "image_pages" in args[1:]  # accept them; and count them
+    counted = images or "count" in args[1:]  # count them only
     data = sys.stdin.buffer.read()
     try:
-        pages, image_pages = inspect(data, max_pages=max_pages, allow_image_pages=images)
+        pages, image_pages = inspect(
+            data, max_pages=max_pages, allow_image_pages=images, count=counted
+        )
         answer: dict[str, object] = {"ok": True, "pages": pages}
-        if images:
-            answer["image_pages"] = image_pages
+        if counted:
+            answer["image_pages"] = {
+                "scanned": image_pages.scanned,
+                "handwritten": image_pages.handwritten,
+                "unread": image_pages.unread,
+                "unanalysed": image_pages.unanalysed,
+            }
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
         if exc.pages is not None:

@@ -19,7 +19,9 @@ from fixtures.web.support import (
     token,
     upload,
 )
-from readablestem.web import outcome
+from readablestem.config import Settings
+from readablestem.web import outcome, states
+from readablestem.web.dates import format_when
 from readablestem.web.db import Job, session_scope
 
 
@@ -89,32 +91,15 @@ def test_a_saved_default_starts_the_keep_box_ticked_and_the_line_says_seven_days
 # --------------------------------------------------------------------------- job page: done
 
 
-def test_someone_it_was_shared_with_sees_only_the_groups_that_are_theirs(web):
-    job_id = finish(web)
-    token_ = token(web.browser, f"/jobs/{job_id}/share")
-    web.browser.post(
-        f"/jobs/{job_id}/share",
-        data={"csrf_token": token_, "email": BOB, "role": "view"},
-    )
-    bob = web.client()
-    login(bob, BOB)
-    page = bob.get(f"/jobs/{job_id}").text
-    nav = page.split('aria-label="On this page"', 1)[1].split("</nav>", 1)[0]
-    assert "Review and download" in nav and "Record" in nav
-    assert "For students" not in nav and "Settings and sharing" not in nav
-    assert "Delete" not in nav and 'id="delete-heading"' not in page
-
-
 def test_retention_is_explained_once_with_the_real_deletion_time_and_who_moves_it(web):
     job_id = finish(web)
     page = web.browser.get(f"/jobs/{job_id}").text
     assert page.count('id="retention-line"') == 1
     line = flat(page.split('id="retention-line"', 1)[1].split("</div>", 1)[0])
-    assert "Deleted automatically on" in line and "24 hours after you last work on it" in line
-    assert "Your decisions, edits and downloads restart that time" in line
-    assert "sharing does not" in line
-    # it sits in the Delete group, where the share page's "Keep it longer" link goes
-    assert page.index('id="delete-heading"') < page.index('id="retention-line"')
+    assert format_when(web.job(job_id).retain_until) in line and "24 hours" in line
+    assert "restart that time" in line and "sharing does not" in line
+    # it sits under the status box, before the review and download group
+    assert page.index('id="retention-line"') < page.index('id="review-and-download"')
     assert "after upload" not in line
 
 
@@ -145,11 +130,14 @@ def test_a_stopped_scan_job_is_feature_aware_and_the_message_is_not_repeated():
     asked = outcome.failed_message("handwritten", image_pages_offered=True)
     assert asked and "cannot convert" not in asked
     assert "such pages are read only when you ask" in asked and outcome.OPT_IN_ROUTE in asked
-    # the job outcome carries it, for the status box
-    stopped = outcome.job_outcome(status="failed", error_code="scanned", image_pages_offered=True)
-    assert stopped and stopped.label == "Stopped" and "checked" in stopped.message
-    other = outcome.job_outcome(status="failed", error_code="no_content", image_pages_offered=True)
-    assert other and other.message == outcome.FAILED_MESSAGES["no_content"]
+    # the job's state carries it, for the status box
+    offered = states.Context(settings=Settings(_env_file=None, feature_image_pages=True))  # type: ignore[call-arg]
+    scanned = states.Facts(id="j", status="failed", error_code="scanned")
+    stopped = states.state_of(scanned, context=offered)
+    assert stopped.key == "stopped_file" and "checked" in stopped.message
+    empty = states.Facts(id="j", status="failed", error_code="no_content")
+    other = states.state_of(empty, context=offered)
+    assert other.message == outcome.FAILED_MESSAGES["no_content"]
 
 
 # --------------------------------------------------------------------------- deleted, expired

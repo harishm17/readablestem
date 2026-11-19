@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% from "components/notices.html" import notice_box %}
 {# The Symbols screen (routes/inventory.py, web/inventory.py): every letter and symbol read in
    the handwritten equations, grouped with the ones that look alike, one form per symbol that
    changes it everywhere. A plain form: it works without JavaScript, and the places a symbol
@@ -13,12 +15,12 @@
 {% include "_stale_notice.html" %}
 {% if notice %}
 <div class="decision-notice symbols-notice">
-  <div class="notice" role="status" tabindex="-1" autofocus><p>{{ notice }}</p></div>
+  {{ notice_box("success", body=notice, attrs={"tabindex": "-1", "autofocus": true}) }}
   {% if undo %}
-  <form method="post" action="/jobs/{{ job.id }}/undo" class="undo-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="symbols"><input type="hidden" name="version" value="{{ result_version }}">
+  {% call form("review.undo", "/jobs/" ~ job.id ~ "/undo", {"class": "undo-form"}) %}
+    <input type="hidden" name="view" value="symbols"><input type="hidden" name="version" value="{{ result_version }}">
     <button type="submit" class="link-button" data-role="undo">Undo<span class="visually-hidden"> the change to the symbols</span></button>
-  </form>
+  {% endcall %}
   {% endif %}
 </div>
 {% endif %}
@@ -29,7 +31,7 @@
 <ul class="places">
   {% for p in row.places %}
   <li class="place">
-    {% if p.crop %}<img class="place-crop" loading="lazy" src="/jobs/{{ job.id }}/crops/{{ p.element_id }}.png" alt="{{ p.label }}, page {{ p.page }}, as it is written in the PDF">{% endif %}
+    {% if p.crop %}<img class="place-crop" loading="lazy" src="/jobs/{{ job.id }}/crops/{{ p.element_id }}.png"{% if p.crop_size %} width="{{ p.crop_size[0] }}" height="{{ p.crop_size[1] }}"{% endif %} alt="{{ p.label }}, page {{ p.page }}, as it is written in the PDF">{% endif %}
     <div class="place-text">
       <p class="place-where"><a href="/jobs/{{ job.id }}/review?item={{ p.element_id }}">{{ p.label }}<span class="visually-hidden">, on the review screen</span></a>, page {{ p.page }}{% if p.which %}, {{ p.which }}{% endif %}</p>
       <p class="place-latex"><span class="visually-hidden">In the LaTeX: </span><code class="latex">{{ p.before }}<mark class="said-diff">{{ row.key }}</mark>{{ p.after }}</code></p>
@@ -72,14 +74,14 @@
 {% for family in inv.families %}
 <section class="symbol-family" aria-labelledby="family-{{ loop.index }}">
   {% if family.members %}
-  <h2 id="family-{{ loop.index }}">Looks alike: <span aria-hidden="true" class="family-glyphs">{% for m in family.members %}{{ m.glyph }}{% if not loop.last %} {% endif %}{% endfor %}</span><span class="visually-hidden">{% for m in family.members %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span></h2>
+  <h2 id="family-{{ loop.index }}" class="card-title">Looks alike: <span aria-hidden="true" class="family-glyphs">{% for m in family.members %}{{ m.glyph }}{% if not loop.last %} {% endif %}{% endfor %}</span><span class="visually-hidden">{% for m in family.members %}{{ m.name }}{% if not loop.last %}, {% endif %}{% endfor %}</span></h2>
   {% else %}
-  <h2 id="family-{{ loop.index }}">{{ family.name }}</h2>
+  <h2 id="family-{{ loop.index }}" class="card-title">{{ family.name }}</h2>
   {% endif %}
   {% for row in family.rows %}
   {% set rid = row.element_id %}
-  <form method="post" action="/jobs/{{ job.id }}/symbols" class="symbol-form" data-name="{{ row.name }}" data-total="{{ row.times }}" data-changeable="{{ row.changeable }}">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="symbol" value="{{ row.key }}">
+  {% call form("review.symbols", "/jobs/" ~ job.id ~ "/symbols", {"class": "symbol-form", "data-name": row.name, "data-total": row.times, "data-changeable": row.changeable}) %}
+    <input type="hidden" name="version" value="{{ result_version }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="symbol" value="{{ row.key }}">
     <h3 id="{{ rid }}-title"><span class="symbol-glyph" aria-hidden="true">{{ row.glyph }}</span> {{ row.name[0]|upper }}{{ row.name[1:] }}</h3>
     <p class="symbol-count">Read {{ row.times }} {{ "time" if row.times == 1 else "times" }}, in {{ row.equations }} {{ "equation" if row.equations == 1 else "equations" }}.{% if row.changeable < row.times %} {{ row.times - row.changeable }} in decided equations stay.{% endif %}</p>
     {% if family.members and row.changeable %}
@@ -107,7 +109,7 @@
       {{ places_list(row, False) }}
     </details>
     {% endif %}
-  </form>
+  {% endcall %}
   {% endfor %}
 </section>
 {% endfor %}

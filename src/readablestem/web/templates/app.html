@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}{{ documents.page_title }}{% endblock %}
 {% block content %}
@@ -24,21 +25,44 @@
   <p class="hint">This list updates by itself. <a href="/app">Refresh the list</a></p>
   {% endif %}
   {% if ready_documents >= 2 %}{# one ready document is downloaded from its own page #}
-  <p><a id="download-all" href="/app/download">Download all {{ ready_documents }} ready documents (zip)</a></p>
+  <p><a id="download-all" href="/app/download">Download {% if zip_rest %}{{ zip_limit("html") }} of {{ ready_documents }}{% else %}all {{ ready_documents }}{% endif %} ready documents (zip)</a></p>
+  {% if zip_rest or zip_held_back %}
+  <p class="hint">One zip holds at most {{ zip_limit("html") }} documents{% if zip_rest %}: the newest first{% endif %}.
+    {% if zip_held_back %}{{ zip_held_back }} {{ "document with decisions" if zip_held_back == 1 else "documents with decisions" }} still to make {{ "is" if zip_held_back == 1 else "are" }} not in it (listed under Needs you above).{% endif %}</p>
+  {% endif %}
+  {% if zip_rest %}
+  <details id="zip-rest">
+    <summary>The other {{ zip_rest|length }} ready {{ "document" if zip_rest|length == 1 else "documents" }}, not in the zip</summary>
+    <ul>
+      {% for row in zip_rest %}<li><a href="/jobs/{{ row.id }}">{{ row.name }}</a>: download it from its page</li>{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
   {% set download_all_url = "/app/download" %}{% include "_download_all_formats.html" %}
   {% endif %}
 </section>
 {% endif %}
 
 {# Documents other people shared with this address (web/shares.py): a plain list of links. #}
-{% if shared_documents|default([]) %}
+{% if shared_documents|default([]) or shared_courses|default([]) %}
 <section aria-labelledby="shared-heading">
   <h2 id="shared-heading">Shared with you</h2>
+  {% if shared_documents %}
   <ul>
     {% for item in shared_documents %}
     <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: {% if item.owner %}shared by {{ item.owner }}{% else %}shared with you{% endif %}, you can {{ "review" if item.role == "Review" else "view" }} it.</li>
     {% endfor %}
   </ul>
+  {% endif %}
+  {# Documents reached through a course the owner gave access to (FEATURE_COURSE_GRANTS), under its name. #}
+  {% for group in shared_courses|default([]) %}
+  <h3>Course: {{ group.name }}{% if group.owner %}, shared by {{ group.owner }}{% endif %}</h3>
+  <ul>
+    {% for item in group["items"] %}
+    <li><a href="/jobs/{{ item.id }}">{{ item.title }}</a>: you can {{ "review" if item.role == "Review" else "view" }} it.</li>
+    {% endfor %}
+  </ul>
+  {% endfor %}
 </section>
 {% endif %}
 
@@ -66,10 +90,9 @@
   {% if sample_job %}
   <p><a class="button-secondary" href="/jobs/{{ sample_job }}">Open your sample document</a></p>
   {% else %}
-  <form method="post" action="/sample" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("upload.sample", "/sample", {"class": "inline-form"}) %}
     <button type="submit" class="button">Open the sample document</button>
-  </form>
+  {% endcall %}
   {% endif %}
 </section>
 {% endif %}

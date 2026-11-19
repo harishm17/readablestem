@@ -224,6 +224,8 @@ PAGES = [
     ("privacy", "/privacy", None, DESKTOP, False),
     ("terms", "/terms", None, DESKTOP, False),
     ("known limits", "/limits", None, DESKTOP, False),
+    ("pricing", "/pricing", None, DESKTOP, False),
+    ("security", "/security", None, DESKTOP, False),
     ("service status", "/status", None, DESKTOP, False),
     ("posting in your course", "/help/posting", None, DESKTOP, False),
     ("guides", "/guides", None, DESKTOP, False),
@@ -322,7 +324,9 @@ def test_upload_by_keyboard_lands_on_the_job_and_a_wrong_file_is_explained(site,
     tab_to(page, "Upload and convert")
     page.keyboard.press("Enter")
     state = focus_summary(page)
-    assert state["id"] == "pdf" and page.url == f"{site.base}/jobs", state
+    # The page is the one POST /jobs answers; the upload form puts its request token in the
+    # action's query string (web/forms.py), so the query is not part of what is compared.
+    assert state["id"] == "pdf" and page.url.split("?", 1)[0] == f"{site.base}/jobs", state
     assert page.get_attribute("#pdf", "aria-invalid") == "true"
     # Now a real one: the chooser by keyboard, the button by keyboard, the job page after it.
     tab_to(page, "^Files?$", shift=True)
@@ -529,6 +533,85 @@ def test_the_review_screens_second_skip_link_goes_to_the_decision(site, docs, br
     page.keyboard.press("Enter")
     assert focus_summary(page)["id"] == "decision-title"
     assert GROUP  # the heading group is decision 3 of this document
+    context.close()
+
+
+@pytest.fixture
+def course(site, browser) -> Iterator[str]:
+    """A converted course PDF whose first decision is a page card (pages kept as images)."""
+    import copy
+    from pathlib import Path
+
+    from readablestem.config import Settings
+    from readablestem.models import OFFLINE_DEFAULTS
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline.run import convert_pdf
+
+    pdf = (Path(__file__).parent / "fixtures" / "handwriting" / "mixed_course.pdf").read_bytes()
+    output = convert_pdf(
+        pdf,
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        client=FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS)),
+    )
+    yield convert(site, browser, ALICE, output, pdf=pdf)
+    site.converter.output = review_output()
+
+
+def to_the_decision(page, site, job_id: str) -> None:
+    """The review screen, then its second skip link: focus is on the decision's heading."""
+    page.goto(f"{site.base}/jobs/{job_id}/review")
+    start_of_page(page)
+    page.keyboard.press("Tab")
+    page.keyboard.press("Tab")
+    page.keyboard.press("Enter")
+    assert focus_summary(page)["id"] == "decision-title"
+
+
+def test_accept_is_near_the_heading_and_a_does_not_press_accept_anyway(site, browser, fresh):
+    """Decision 1 is an equation whose proposal changes the meaning: its Accept is "Accept
+    anyway". The key moves focus to it and says why; nothing is saved. Reaching it by Tab takes
+    at most three stops from the heading (the site's own skip link lands there)."""
+    context = new_context(browser)
+    page = context.new_page()
+    setup_sign_in(page, site.base, ALICE)
+    to_the_decision(page, site, fresh)
+    url = page.url
+    page.keyboard.press("a")
+    wait_focus(page)
+    assert focus_state(page)["name"] == "Accept anyway equation 1"
+    page.wait_for_function(
+        "() => document.querySelector('#decision-notice').textContent.includes('against a check')"
+    )
+    assert page.url == url
+    page.reload()  # still waiting: nothing was saved
+    assert "Decision 1 of 3" in page.locator("#decision-title").inner_text()
+    to_the_decision(page, site, fresh)
+    for _stop in range(3):
+        page.keyboard.press("Tab")
+        if re.match("Accept", focus_state(page)["name"]):
+            break
+    else:
+        raise AssertionError(f"Accept is more than 3 Tab stops away: {focus_state(page)}")
+    context.close()
+
+
+def test_a_saves_nothing_on_a_page_card_and_says_the_choice_needs_a_press(site, browser, course):
+    """A page card's choice keeps or replaces a whole page: no single key acts on it."""
+    context = new_context(browser)
+    page = context.new_page()
+    setup_sign_in(page, site.base, ALICE)
+    to_the_decision(page, site, course)
+    keep = page.get_by_role("button", name=re.compile("^Keep the page images?, marked"))
+    assert keep.count() == 1
+    url = page.url
+    page.keyboard.press("a")
+    page.wait_for_function(
+        "() => document.querySelector('#decision-notice').textContent.includes('whole page')"
+    )
+    assert page.url == url
+    assert focus_summary(page)["id"] == "decision-title"
+    page.reload()  # still waiting
+    assert keep.count() == 1
     context.close()
 
 

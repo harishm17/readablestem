@@ -1,15 +1,15 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
 {# One course (routes/courses.py), in three parts that are kept apart: its notation (the
    symbols, the starter set when there are none, what its documents suggest, adding one), its
    documents (and adding ones already converted), and the course's settings (rename, delete). #}
 {% set field_errors = field_errors|default({}) %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}{{ course.name }}{% endblock %}
-{% macro error_line(name) %}{% set err = field_errors.get(name) %}{% if err %}<p class="error-message" id="{{ name }}-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}{% endmacro %}
-{% macro described(name, hint=True) %}{% set err = field_errors.get(name) %} aria-describedby="{% if hint %}{{ name }}-hint{% endif %}{% if hint and err %} {% endif %}{% if err %}{{ name }}-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}{% endmacro %}
 {% block content %}
 <h1>{{ course.name }}</h1>
 {% include "_error_summary.html" %}
-<p class="lede">The symbols this course writes in a special way.</p>
+<p class="lede">The symbols this course writes in a special way. {{ notation_words.course }}</p>
 
 <section aria-labelledby="entries-heading" id="course-notation">
   <h2 id="entries-heading">Notation</h2>
@@ -44,8 +44,7 @@
   {% endif %}
 
   {% if starter %}
-  <form method="post" action="/courses/{{ course.id }}/starter" class="starter-form" aria-labelledby="starter-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.starter", "/courses/" ~ course.id ~ "/starter", {"class": "starter-form", "aria-labelledby": "starter-heading"}) %}
     <h3 id="starter-heading">Start from common symbols</h3>
     <p class="hint" id="starter-hint">Check the ones your course uses. Edit any row.</p>
     <ul class="starter-list" aria-describedby="starter-hint">
@@ -67,35 +66,26 @@
       {% endfor %}
     </ul>
     <button type="submit" class="button">Add the checked symbols</button>
-  </form>
+  {% endcall %}
   {% endif %}
 
   {% include "_notation_suggestions.html" %}
 
   <h3 id="add-heading">Add a symbol</h3>
-  <form method="post" action="/courses/{{ course.id }}/entries" novalidate aria-labelledby="add-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <div class="field{% if field_errors.get('symbol') %} field-error{% endif %}">
-      <label for="symbol">Symbol</label>
-      <p class="hint" id="symbol-hint">For example “bold d” or “\mathbf{d}”.</p>
-      {{ error_line("symbol") }}
-      <input type="text" id="symbol" name="symbol" maxlength="64" autocomplete="off" spellcheck="false" value="{{ values.get('symbol', '') }}"{{ described("symbol") }}>
-    </div>
-    <div class="field{% if field_errors.get('meaning') %} field-error{% endif %}">
-      <label for="meaning">What it means</label>
-      {{ error_line("meaning") }}
-      <select id="meaning" name="meaning"{{ described("meaning", hint=False) if field_errors.get("meaning") else "" }}>
+  {% call form("course.add_entry", "/courses/" ~ course.id ~ "/entries", {"novalidate": true, "aria-labelledby": "add-heading"}) %}
+    {% call(aria) field("symbol", "Symbol", error=field_errors.get("symbol"), hint="For example “bold d” or “\mathbf{d}”.") %}
+      <input type="text" id="symbol" name="symbol" maxlength="64" autocomplete="off" spellcheck="false" value="{{ values.get('symbol', '') }}"{{ aria }}>
+    {% endcall %}
+    {% call(aria) field("meaning", "What it means", error=field_errors.get("meaning")) %}
+      <select id="meaning" name="meaning"{{ aria }}>
         {% for value, label in meanings.items() %}<option value="{{ value }}"{% if values.get("meaning") == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
       </select>
-    </div>
-    <div class="field{% if field_errors.get('note') %} field-error{% endif %}">
-      <label for="note">Note (optional)</label>
-      <p class="hint" id="note-hint">For you only.</p>
-      {{ error_line("note") }}
-      <input type="text" id="note" name="note" maxlength="200" autocomplete="off" value="{{ values.get('note', '') }}"{{ described("note") }}>
-    </div>
+    {% endcall %}
+    {% call(aria) field("note", "Note (optional)", error=field_errors.get("note"), hint="For you only.") %}
+      <input type="text" id="note" name="note" maxlength="200" autocomplete="off" value="{{ values.get('note', '') }}"{{ aria }}>
+    {% endcall %}
     <button type="submit" class="button">Add symbol</button>
-  </form>
+  {% endcall %}
 </section>
 
 <section aria-labelledby="course-documents-heading" id="course-documents">
@@ -113,9 +103,9 @@
   {% if attachable %}
   <details class="attach-documents" id="attach-documents">
     <summary>Add converted documents ({{ attachable|length }})</summary>
+    {% if people and people.rows %}<p><strong>People with access to this course can open a document as soon as you add it.</strong></p>{% endif %}
     <p>Lists the document here and shows this notation on its review screen. It is not converted again: to read the PDF with this notation, upload it again for this course.</p>
-    <form method="post" action="/courses/{{ course.id }}/documents">
-      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% call form("course.attach", "/courses/" ~ course.id ~ "/documents") %}
       <fieldset class="field">
         <legend>Documents in no course</legend>
         <ul class="plain-list">
@@ -128,29 +118,27 @@
         </ul>
       </fieldset>
       <button type="submit" class="button-secondary">Add the checked documents</button>
-    </form>
+    {% endcall %}
   </details>
   {% endif %}
 </section>
 
+{% if people %}{% include "_course_people.html" %}{% endif %}
+
 <section aria-labelledby="settings-heading" class="course-settings">
   <h2 id="settings-heading">Rename or delete</h2>
-  <form method="post" action="/courses/{{ course.id }}/rename" novalidate aria-label="Rename the course">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <div class="field{% if field_errors.get('rename') %} field-error{% endif %}">
-      <label for="rename">Course name</label>
-      {{ error_line("rename") }}
-      <input type="text" id="rename" name="name" maxlength="200" autocomplete="off" value="{{ rename_value }}"{{ described("rename", hint=False) if field_errors.get("rename") else "" }}>
-    </div>
+  {% call form("course.rename", "/courses/" ~ course.id ~ "/rename", {"novalidate": true, "aria-label": "Rename the course"}) %}
+    {% call(aria) field("rename", "Course name", error=field_errors.get("rename")) %}
+      <input type="text" id="rename" name="name" maxlength="200" autocomplete="off" value="{{ rename_value }}"{{ aria }}>
+    {% endcall %}
     <button type="submit" class="button-secondary">Rename</button>
-  </form>
+  {% endcall %}
   <h3 id="delete-heading">Delete</h3>
   <p>Documents keep their results.</p>
   {# Posts without confirm=yes: the next page asks before anything is deleted. #}
-  <form method="post" action="/courses/{{ course.id }}/delete" aria-labelledby="delete-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.delete", "/courses/" ~ course.id ~ "/delete", {"aria-labelledby": "delete-heading"}) %}
     <button type="submit" class="button-danger-outline">Delete course</button>
-  </form>
+  {% endcall %}
 </section>
 <p><a href="/courses">All your courses</a></p>
 {% endblock %}

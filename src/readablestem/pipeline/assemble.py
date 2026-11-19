@@ -12,10 +12,13 @@ What the output looks like and why is in docs/output.md. In short:
 - Anything not converted (ABSTAINED, FAILED, REJECTED, or MathML the sanitiser refused)
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
-- A short note for students after `<main>` ("About this version", a `<footer>`): what
-  the file is, that some parts have not been checked by the instructor yet or the date
-  the instructor made the last decision (`checked_on`), and to tell the instructor about
-  anything hard to read. No counts: those are for the instructor, on the job page. An
+- A short note for students at the end of `<main>` ("About this version", a labeled
+  `<section>`; inside `<main>` so every reader of the page, pandoc among them, gets it from
+  the same markup): what the file is, the statement of what was reviewed and converted
+  (`pipeline.checked`: who reviewed how many of the parts the tool flagged and on which day,
+  how many parts are pictures, which pages were left out), and to tell the instructor about
+  anything hard to read. When nobody reviewed it, or a part is a picture or left out, the
+  same statement opens `<main>` too, with a link to each place (`_checked_notice`). An
   optional `notice` at the top (e.g. "offline test run": placeholders, not conversions).
 
 Security: all document and model text is
@@ -36,12 +39,14 @@ before.
 from __future__ import annotations
 
 import base64
+import math
 import re
-from collections.abc import Callable, Collection, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import UTC, date, datetime
 from itertools import pairwise
 from typing import Literal
+from urllib.parse import quote
 from xml.etree.ElementTree import Element as XmlElement
 from xml.etree.ElementTree import ParseError
 
@@ -50,6 +55,7 @@ from defusedxml import DefusedXmlException
 
 from readablestem import __version__
 from readablestem.config import get_settings
+from readablestem.core import inline
 from readablestem.core.types import (
     HEADING_REPEATS_ABOVE,
     IMAGE_PAGE_OMISSION_REASON,
@@ -65,12 +71,16 @@ from readablestem.core.types import (
 from readablestem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from readablestem.pipeline import (
     assemble_tables,
+    checked,
+    checked_words,
+    decoration,
     equation_scale,
     figure_details,
     figure_images,
     inline_text,
     navigation,
     output_chars,
+    student_sheet,
     table_html,
     table_math,
 )
@@ -80,12 +90,11 @@ from readablestem.pipeline.safe_html import MATHML_NS as MATHML_NS
 from readablestem.pipeline.safe_html import MATHML_UNWRAP as MATHML_UNWRAP
 from readablestem.pipeline.safe_html import MAX_MATHML_DEPTH as MAX_MATHML_DEPTH
 from readablestem.pipeline.safe_html import MAX_MATHML_NODES as MAX_MATHML_NODES
-from readablestem.pipeline.safe_html import Display, sanitize_mathml
+from readablestem.pipeline.safe_html import Display, alttext_from_speech, sanitize_mathml
 from readablestem.pipeline.safe_html import escape_text as _escape
 from readablestem.pipeline.safe_html import split_tag as _split_tag
 
-# Class on every element whose text this module wrote (notes, labels, the about section);
-# the table serialiser marks a maths header's reading with it too.
+# Class on every element whose text this module wrote (notes, labels, the about section).
 AUTHORED_CLASS = table_html.AUTHORED_CLASS
 
 # The version of the student file's making: raise it with any change to the sheet, the
@@ -93,7 +102,16 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # (`RENDER_META`), and the web app makes a stored page again from its stored result when
 # the page has none or an older one (`web.routes.jobs.current_html`), so a fix reaches
 # documents converted before it, not only new ones and ones somebody edits again.
-RENDER_VERSION = 3
+# 4: the statement of what was reviewed and converted (SW7). 5: the note "About this version"
+# inside `<main>` (WS22.1); 5 on its own branch too: one H1, the title not said twice (SW6c), and
+# empty alt text only for decoration with evidence (WS6.4). 6: both together. 7: nothing is cut
+# on paper, long descriptions print open, every code block that can scroll is a tab stop, the
+# maths font stack (SW45, WS21.2, WS21.4) and the words of a part kept as a picture (WS21.9).
+# 8: authored notices carry an audience (SW16 part 4): the student file has no sentence
+# written to the person who checks it ("Check it against the original.", "not checked",
+# "Needs a description.", "Check it before students use it."), and the image-page note and the
+# equation alt text are said to a student; a draft is made in the checker's words.
+RENDER_VERSION = 8
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -108,114 +126,215 @@ def render_version(html: str) -> int:
     return int(match.group(1)) if match else 0
 
 
+@dataclass(frozen=True)
+class Stamp:
+    """Which version of a document a file is (WS20.1): the id the web app shows, the first six
+    characters of the job id and the count of changes that reached its output ("b9487b-12"),
+    and the day of the last one. The assembler takes it as a parameter and reads no clock; a
+    caller with no job (the CLI) passes none and the file says nothing of a version."""
+
+    version_id: str
+    day: date
+
+    @classmethod
+    def of(cls, job_id: str, version: int, changed: datetime) -> Stamp:
+        """The stamp of job `job_id` at output version `version`, last changed at `changed`
+        (the day is the UTC day)."""
+        when = changed.astimezone(UTC) if changed.tzinfo else changed
+        return cls(f"{job_id[:6]}-{version}", when.date())
+
+    @property
+    def date_text(self) -> str:
+        """The day written out in full, with no time ("November 10, 2026")."""
+        return f"{self.day:%B} {self.day.day}, {self.day.year}"
+
+    @property
+    def line(self) -> str:
+        return f"Version {self.version_id}, {self.date_text}"
+
+
+VERSION_META = "readablestem-version"
+MODIFIED_META = "dcterms.modified"
+
+
+# --------------------------------------------------------------------------- audiences
+#
+# Who an authored notice is written to. The student file (what a student gets, and every file
+# made from it: Word, EPUB, the Canvas zip, the cartridge, the Listen transcript and speech)
+# holds only `STUDENT` words: what is missing and whom to ask. A sentence written to the person
+# who checks the file ("Check it against the original.") is a `CHECKER` word: it is written
+# only into the draft and the owner's preview of one (`render_html(audience=CHECKER)`), and
+# never into a stored page. Every authored notice is built through `say`, so a notice has one
+# place that says who hears it.
+STUDENT = "student"
+CHECKER = "checker"
+
+
+@dataclass(frozen=True)
+class Words:
+    """An authored notice in the words of each audience: the student's, and, where the
+    checker is told something more or something else, the checker's."""
+
+    student: str
+    checker: str | None = None
+
+
+def say(words: Words, audience: str = STUDENT, **values: object) -> str:
+    """`words` for `audience` (the checker's when it has them, else the student's), with
+    `values` put in its `{placeholders}`."""
+    text = words.checker if audience == CHECKER and words.checker is not None else words.student
+    return text.format(**values) if values else text
+
+
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 # The alt text of an equation kept as an image, when its region has text in the PDF: that
 # text, said to be what the PDF holds and not checked ("v = d / t, read from the PDF
 # text; not checked"). Never a guess: it is the text layer or nothing, and nothing falls
 # back to the equation's number ("Equation (2.4), not converted") or the fixed words.
-EQUATION_TEXT_ALT_SUFFIX = ", read from the PDF text; not checked"
+# A student hears where the words are from ("as written in the PDF"); the checker is told
+# they were not compared with the page ("; not checked").
+EQUATION_TEXT_ALT_SUFFIX = ", as written in the PDF"
+EQUATION_TEXT_ALT_CHECK_SUFFIX = ", read from the PDF text; not checked"
 # ... and when the region has fractions, roots, exponents or several lines, whose order and
 # size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad):
-EQUATION_FLAT_ALT_SUFFIX = (
+EQUATION_FLAT_ALT_SUFFIX = ", as written in the PDF, where fractions and exponents may run together"
+EQUATION_FLAT_ALT_CHECK_SUFFIX = (
     ", read from the PDF text, where fractions and exponents may run together; not checked"
 )
-EQUATION_TEXT_ALT_SUFFIXES = (EQUATION_TEXT_ALT_SUFFIX, EQUATION_FLAT_ALT_SUFFIX)
+EQUATION_TEXT_ALT_WORDS = Words(EQUATION_TEXT_ALT_SUFFIX, EQUATION_TEXT_ALT_CHECK_SUFFIX)
+EQUATION_FLAT_ALT_WORDS = Words(EQUATION_FLAT_ALT_SUFFIX, EQUATION_FLAT_ALT_CHECK_SUFFIX)
+# Every suffix a page can carry (the student's and the checker's): what marks the tool's own
+# words in an alt text (`_FIXED_ALT_IMG`) and what the evaluations strip to get the PDF's text.
+EQUATION_TEXT_ALT_SUFFIXES = (
+    EQUATION_TEXT_ALT_SUFFIX,
+    EQUATION_FLAT_ALT_SUFFIX,
+    EQUATION_TEXT_ALT_CHECK_SUFFIX,
+    EQUATION_FLAT_ALT_CHECK_SUFFIX,
+)
 # Layout's reasons that say the text layer of an equation is not in reading order.
 _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
-FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
+# A figure with no description, never empty alt text: only decoration with evidence has that
+# (`pipeline.decoration`, WS6.4).
+FIGURE_NOT_DESCRIBED_ALT = "Figure not described"
+# The class of what is written as decoration; the page checks allow empty alt text only
+# inside it (`html_checks`, "html.img_alt_content").
+DECORATIVE_CLASS = "decorative"
 # The student note (`_about_section`). It speaks to students: what this file is and who
-# to tell about problems. Final for the beta: it does not name screen readers, and
-# "checked" appears only once an instructor has made a decision. The
-# feature review's challenge (10.3, row 4) warns that "checked" can read as a
-# certificate; its alternative, "N parts were decided by your instructor", was not taken.
+# to tell about problems. What was reviewed and converted is the statement of
+# `pipeline.checked_words` (SW7): a person "reviewed", never "checked", which can read as
+# a certificate.
 ABOUT_TITLE = "About this version"
-ABOUT_WORDING = (
-    "This is a web version of a PDF from your course, made with ReadableSTEM, a tool that "
-    "assists with accessibility."
-)
-# The first sentence for a document made from a LaTeX source (`DocumentResult.origin`).
-ABOUT_WORDING_SOURCE = (
-    "This is a web version of a LaTeX document from your course, made with ReadableSTEM, "
-    "a tool that assists with accessibility."
-)
-ABOUT_WORDING_BEAMER = (
-    "This is a web version of a slide deck from your course, made with ReadableSTEM, "
-    "a tool that assists with accessibility."
-)
-MATHS_NOTE = "Its equations are written so that screen readers can read them aloud."
-NOT_CHECKED_YET = (
-    "Some parts were made by the tool and have not been checked by your instructor yet."
-)
-CHECKED = "Your instructor checked the parts the tool was unsure about"
-FLAGGED_NOTE = (
-    "Some parts could not be converted. They are shown as pictures of the original, "
-    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
-    "instructor for a version you can read."
-)
-# The same for a LaTeX source, whose parts are shown as written, never as pictures.
-FLAGGED_NOTE_SOURCE = (
-    "Some parts could not be converted. They are shown as they were written in LaTeX, "
-    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
-    "instructor for a version you can read."
-)
+# The first sentence names what the file is made from (`checked_words.source_noun`, the one
+# noun every sentence about the job's source uses) and what the file itself is (`ABOUT_MEDIA`;
+# each export sets its own, `with_medium`).
+ABOUT_MEDIA = {
+    "web": "a web",
+    "EPUB": "an EPUB",
+    "Word": "a Word",
+    "Canvas": "a Canvas",
+    "Common Cartridge": "a Common Cartridge",
+}
+
+
+def about_opening(origin: str = "pdf", medium: str = "web") -> str:
+    """ "This is a web version of a PDF from your course, made with ReadableSTEM, ..." for the
+    source `origin` names (`DocumentResult.origin`) and the file's `medium` (`ABOUT_MEDIA`)."""
+    noun = checked_words.source_noun(origin)
+    return (
+        f"This is {ABOUT_MEDIA[medium]} version of a {noun} from your course, made with "
+        "ReadableSTEM, a tool that assists with accessibility."
+    )
+
+
+ABOUT_WORDING = about_opening()
+
+
+def with_medium(html: str, medium: str) -> str:
+    """The finished page with the note's first sentence saying what this file is ("an EPUB
+    version"), for the exports made from the page, which read the page and not the result. The
+    page itself says "web version"; a page with no such note is returned as it is."""
+    at = html.find(f'id="{ABOUT_ID}"')
+    if at < 0:
+        return html
+    kinds = "|".join(re.escape(m) for m in ABOUT_MEDIA.values())
+    note = re.sub(
+        f"This is (?:{kinds}) version of a ",
+        f"This is {ABOUT_MEDIA[medium]} version of a ",
+        html[at:],
+        count=1,
+    )
+    return html[:at] + note
+
+
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.
 DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'
 DRAFT_CLASS = "draft-mark"
 # The flag notes speak to students, as the about section does (UX review MF7): what is
-# missing, and whom to ask. Never reviewer wording ("review", "publishing").
-EQUATION_NOTE = (
-    "This equation is shown as an image of the original, so screen readers cannot read "
-    "it. Ask your instructor for a version you can read."
-)
+# missing, and whom to ask. Never reviewer wording ("review", "publishing"). A box says only
+# what this part is (F-114); why a screen reader cannot read a picture, and what to do about
+# it, is said once, in the notice at the top (`_checked_notice`, `NOT_CONVERTED_WHY`).
+EQUATION_NOTE = "Shown as an image of the original."
 # The same for a formula of a LaTeX source, shown as it was written (no picture).
-EQUATION_WRITTEN_NOTE = (
-    "This equation is shown as it was written in LaTeX, so screen readers may not read it "
-    "well. Ask your instructor for a version you can read."
+EQUATION_WRITTEN_NOTE = "Shown as it was written in LaTeX."
+FIGURE_NOTE = "This figure has no text description yet."
+# Said once, in the notice at the top, when any part is not converted: the explanation that
+# each box used to repeat. What to do ("ask your instructor for a version you can read") is
+# in the statement of the same notice.
+NOT_CONVERTED_WHY = Words(
+    "A screen reader cannot read what a picture shows, so it says only that each of these "
+    "parts is there. Each one is marked where it stands, with what it is."
 )
-FIGURE_NOTE = (
-    "This figure has no text description yet. Ask your instructor for a description of it."
+NOT_CONVERTED_WHY_WRITTEN = Words(
+    "A screen reader may not read these parts well. Each one is marked where it stands, with "
+    "what it is."
 )
-# Pages and handwriting kept as images (pipeline.page_type: there is no handwriting or
-# scan conversion): their alt text ("{page}" is the page number) and the note students
-# see, by the fix's reason. Rendered from the stored reason, so a stored result renders
-# the same. These words are the beta wording (handwriting design, section 3.3).
+# Pages and pictures kept as images (pipeline.page_type: there is no handwriting or scan
+# conversion): by the fix's reason, ONE table of the picture's alt text ("{page}" is the page
+# number), the label of its note and the short reason students see at the box. Rendered from the
+# stored reason, so a stored result renders the same. A reason that names what the picture is (a
+# handwritten page, a scanned page) is a page-level finding; `handwriting_on_page` is also what a
+# box of vector lines got named before the reader had pen evidence (WS6.10, WS3.5), so it says
+# only that the part is a picture and never names handwriting (WS21.9): its label says all, and
+# its reason is empty. A drawing has no reason of its own yet (P1 and P3 record it); it is
+# added to this table then.
 KEPT_IMAGE_LABEL = "Not converted."
+KEPT_PICTURE_LABEL = "Shown as a picture, not converted to text."
 KEPT_IMAGE_WORDS = {
     "handwritten_page": (
         "Page {page}: handwritten notes, not converted to text.",
-        "This page is a picture of handwritten notes, so a screen reader cannot read it. "
-        "Ask your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        "A page of handwritten notes.",
     ),
     "scanned_page": (
         "Page {page}: a scanned page, not converted to text.",
-        "This page is a picture of a scanned page, so a screen reader cannot read it. Ask "
-        "your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        "A scanned page.",
     ),
     "unread_page": (
         "Page {page}: not converted to text.",
-        "This page is shown as a picture, so a screen reader cannot read it. Ask your "
-        "instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        "A page shown as a picture.",
     ),
     "page_read_failed": (
         "Page {page}: this page could not be read.",
-        "This page could not be read, so it is shown as a picture and a screen reader cannot "
-        "read it. Ask your instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        "This page could not be read.",
     ),
     "handwriting_on_page": (
-        "Handwriting on page {page}, not converted to text.",
-        "This is a picture of handwriting on the page, so a screen reader cannot read it. "
-        "Ask your instructor for a text version.",
+        "Part of page {page}, shown as a picture, not converted to text.",
+        KEPT_PICTURE_LABEL,
+        "",
     ),
     # A block of a page converted from an image that the instructor chose to keep as the
     # picture (`_kept_prose`): not a page, and not a whole-page reason either.
     "image_page_text": (
         "Text on page {page}, not converted to text.",
-        "This is a picture of text on the page, so a screen reader cannot read it. Ask your "
-        "instructor for a text version.",
+        KEPT_IMAGE_LABEL,
+        "Text on the page, shown as a picture.",
     ),
 }
 # A page kept as a picture because something painted on it was read into nothing (an
@@ -226,28 +345,23 @@ UNREAD_PARTS_CLASS = "unread-parts-note"
 UNREAD_PARTS_NOTE = "Parts of this page could not be read and are missing from the text below."
 UNREAD_PARTS_LINK = "The page is shown as a picture after it."
 # Writing on a page converted from an image that the reading left out (`image_page_omission`).
-OMITTED_NOTE = (
-    "This part of the page was not converted to text, so a screen reader cannot read it. Ask "
-    "your instructor for a text version."
-)
+OMITTED_NOTE = "Writing on the page that is not in the text."
 # A page converted from an image of it (ADR 0007): the note at its start and the toggle that
 # shows the original. The notice is the author's wording; it assists, it does not say the
 # conversion is right.
-IMAGE_PAGE_NOTICE = "Converted from an image of the page."
-IMAGE_PAGE_CHECK = "Check it against the original."
-IMAGE_PAGE_SHOW = "Show the original page {page}"
-IMAGE_PAGE_ORIGINAL_ALT = "Original of page {page}, shown for checking the converted text."
-IMAGE_PAGE_CSS = """\
-.image-page-note { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem;
-  margin: 1.5em 0; }
-.image-page-note p { margin: 0 0 0.5em; }
-.image-page-note details { margin: 0; }
-.image-page-note summary { cursor: pointer; font-weight: 700; padding: 0.25em 0; }
-.image-page-note img { display: block; margin: 0.5em auto 0; }
-@media screen and (prefers-color-scheme: dark) {
-  .image-page-note { border-color: #ffa066; }
-}
-"""
+# A student is told the page was read from a picture and that small errors are possible; the
+# checker is told to check it, with the label that goes with it.
+IMAGE_PAGE_NOTE = Words(
+    "This page was read from a picture of the original, so small errors are possible.",
+    "Check it against the original.",
+)
+IMAGE_PAGE_LABEL = Words("Note:", "Converted from an image of the page.")
+IMAGE_PAGE_SHOW = Words("Show the original page {page}")
+IMAGE_PAGE_ORIGINAL_ALT = Words(
+    "Original of page {page}.", "Original of page {page}, shown for checking the converted text."
+)
+# The label of a figure's note: to the student what is missing, to the checker what to do.
+FIGURE_LABEL = Words("No description.", "Needs a description.")
 # The about section names the pages kept whole as images.
 KEPT_PAGE_REASONS = frozenset(
     {"handwritten_page", "scanned_page", "unread_page", "page_read_failed"}
@@ -263,6 +377,14 @@ _BACKLINK_RE = re.compile(_BACKLINK_SLOT + "([^\x00]*)" + _BACKLINK_SLOT)
 
 ABOUT_ID = "about-conversion"
 ABOUT_TITLE_ID = "about-conversion-title"
+# The statement at the top of the page (`_checked_notice`), and the sentence of the note at
+# the end that names the pages left out, which it links to.
+NOTICE_ID = "checked-notice"
+NOTICE_TITLE_ID = "checked-notice-title"
+LEFT_OUT_ID = "about-left-out"
+# The statement in the head, for the files made from the page (`_summary_meta`).
+SUMMARY_META = "readablestem-summary"
+SUFFICIENT_META = "readablestem-access-sufficient"
 
 
 # BCP 47-ish: "en", "en-US", "zh-Hant-TW". Anything else falls back to "en".
@@ -385,16 +507,83 @@ def strip_section_number(text: str) -> str:
     return stripped or text.strip()
 
 
+# Where a document's title came from, in the order they are tried (SW14).
+TITLE_YOURS, TITLE_PDF, TITLE_HEADING, TITLE_FILE, TITLE_STOCK = (
+    "yours",
+    "pdf",
+    "heading",
+    "file",
+    "stock",
+)
+# A file extension: a dot and up to five letters or digits at the end of the name.
+_EXTENSION = re.compile(r"\.[A-Za-z0-9]{1,5}\Z")
+_NAME_SEPARATORS = re.compile(r"[_\-\s]+")
+
+
+@dataclass(frozen=True)
+class DocumentTitle:
+    """The title of a document and where it came from (`TITLE_*`)."""
+
+    text: str
+    source: str
+
+
+def file_title(filename: str) -> str:
+    """A file name as a title: no extension, `_` and `-` read as spaces ("week_3-notes.pdf"
+    is "week 3 notes"). "" when nothing is left."""
+    return _NAME_SEPARATORS.sub(" ", _EXTENSION.sub("", filename.strip())).strip()
+
+
+def looks_like_file_name(text: str) -> bool:
+    """A "title" that is a file name written out: no spaces, and an underscore or a mix of
+    letters and digits ("MIT6_0001F16_Welcome", "lec03"). A single plain word is a title."""
+    return (
+        bool(text)
+        and not any(ch.isspace() for ch in text)
+        and ("_" in text or (any(ch.isdigit() for ch in text) and any(ch.isalpha() for ch in text)))
+    )
+
+
+def _usable_title(candidate: str | None) -> str:
+    """The candidate as a title, or "" when it is empty, the stock title or only names a part
+    of a document ("Contents")."""
+    if not candidate or not candidate.strip():
+        return ""
+    text = strip_section_number(_clean_title(candidate))
+    if text == DEFAULT_TITLE or text.casefold().rstrip(".:") in GENERIC_TITLES:
+        return ""
+    return text
+
+
+def document_title(
+    override: str | None,
+    raw: str | None,
+    headings: Sequence[str] = (),
+    filename: str = "",
+) -> DocumentTitle:
+    """The one title of a document and its source (SW14), the same everywhere the document
+    is named (the student `<title>`, the Word and EPUB title, the Canvas and Cartridge names,
+    the list, the download name): the title the instructor typed; the document's own title
+    (without its section number) when it is not generic and not a file name written out; the
+    first heading that is not generic; the file name without its extension and separators;
+    `DEFAULT_TITLE` only when there is nothing else."""
+    if override and override.strip():
+        return DocumentTitle(_clean_title(override), TITLE_YOURS)
+    own = _usable_title(raw)
+    if own and not looks_like_file_name(own):
+        return DocumentTitle(own, TITLE_PDF)
+    for heading in headings:
+        if text := _usable_title(heading):
+            return DocumentTitle(text, TITLE_HEADING)
+    if name := file_title(filename):
+        return DocumentTitle(name, TITLE_FILE)
+    return DocumentTitle(own or DEFAULT_TITLE, TITLE_PDF if own else TITLE_STOCK)
+
+
 def suggested_title(raw: str | None, headings: Sequence[str] = ()) -> str:
-    """The title students hear when the instructor has not chosen one: the PDF's title (or
-    the first top-level heading, as layout reads it) without its section number; when that
-    is missing or only names a part ("Contents"), the first heading that does not.
-    `DEFAULT_TITLE` when there is none."""
-    for candidate in (raw or "", *headings):
-        text = strip_section_number(_clean_title(candidate)) if candidate.strip() else ""
-        if text and text != DEFAULT_TITLE and text.casefold().rstrip(".:") not in GENERIC_TITLES:
-            return text
-    return DEFAULT_TITLE
+    """The title students hear when the instructor has not chosen one and the file has no
+    name to fall back on (`document_title`)."""
+    return document_title(None, raw, headings).text
 
 
 def _is_png(data: bytes | None) -> bool:
@@ -432,7 +621,7 @@ def equation_number(label: str | None) -> str | None:
     return number or None
 
 
-def equation_alt(element: Element) -> str:
+def equation_alt(element: Element, audience: str = STUDENT) -> str:
     """The alt text of an equation that is shown as an image (not converted).
 
     Text the PDF holds for the equation's region (`Element.text`), marked as read from the
@@ -443,7 +632,8 @@ def equation_alt(element: Element) -> str:
     a character that is not text (a symbol font's glyph with no letter, `output_chars`), or
     is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
     exponents or several lines in the region, the marker says the text may run them
-    together (EQUATION_FLAT_ALT_SUFFIX).
+    together (EQUATION_FLAT_ALT_SUFFIX). The checker's marker says the words were not
+    compared with the page; the student's says only where they are from (`audience`).
     """
     number = equation_number(element.equation_label)
     named = f"Equation ({number})" if number else "Equation"
@@ -452,7 +642,8 @@ def equation_alt(element: Element) -> str:
     if text and len(text) <= EQUATION_ALT_MAX_CHARS and usable:
         lead = f"{named}: " if number else ""
         flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
-        return f"{lead}{text}{EQUATION_FLAT_ALT_SUFFIX if flat else EQUATION_TEXT_ALT_SUFFIX}"
+        suffix = say(EQUATION_FLAT_ALT_WORDS if flat else EQUATION_TEXT_ALT_WORDS, audience)
+        return f"{lead}{text}{suffix}"
     return f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
 
 
@@ -481,18 +672,6 @@ def _equation_label(label: str | None) -> str:
 WIDE_EQUATION_EM = 11.0
 
 
-# Longest speech written as alttext. A reading cut short would mislead more than none, so a
-# longer one is left out and the screen reader reads the MathML itself.
-MAX_ALTTEXT_CHARS = 300
-
-
-def alttext_from_speech(speech: str | None) -> str | None:
-    """The stored speech as an `alttext` value (one line of text), or None when there is
-    none or it is too long to be a useful label."""
-    text = " ".join((speech or "").split())
-    return text if text and len(text) <= MAX_ALTTEXT_CHARS else None
-
-
 def _scroller_attrs(mathml: str, label: str | None) -> str:
     """Attributes that make a wide equation's box a named tab stop ("" if not wide).
 
@@ -507,6 +686,23 @@ def _scroller_attrs(mathml: str, label: str | None) -> str:
         return ""
     name = f"Equation {' '.join(label.split())}" if label and label.strip() else "Equation"
     return f' tabindex="0" role="group" aria-label="{_escape(name)}"'
+
+
+# An equation estimated at least this wide (em of the maths font) may not fit a sheet: at
+# Letter and 150% the text column is about 22 em of it. On paper it is scaled to fit the
+# column down to 70% of its size; wider than that it keeps 70% and the page prints a note
+# (`student_sheet.PRINT`, SW45 rule 6). The estimate is not calibrated (A23); it errs wide.
+PRINT_FIT_EM = 14.0
+
+
+def print_width_bucket(mathml: str) -> int | None:
+    """The estimated width of an equation, rounded up to a step (4 em, then 16 em), when it
+    may not fit a sheet; None when it does. Few steps, so the stylesheet gets few rules."""
+    width = min(estimate_width_em(mathml), 512.0)
+    if width < PRINT_FIT_EM:
+        return None
+    step = 4 if width <= 48 else 16
+    return math.ceil(width / step) * step
 
 
 def _fix_attrs(fix: Fix | None, reason: str | None) -> str:
@@ -694,22 +890,96 @@ def outline_before(elements: list[Element], fixes: list[Fix], element_id: str) -
     return outline
 
 
-def title_shift(elements: list[Element], fixes: list[Fix]) -> int:
-    """How many levels `render_html` moves every heading down (T3-13): 1 when the
-    repaired outline has two or more top-level headings (a slide deck has one per slide),
-    so the document's title can be the one `<h1>` and the slide titles are `<h2>`; else 0.
-    Read from the same headings, in the same order, as the renderer writes them."""
+def title_key(text: str) -> str:
+    """A title as the one-H1 rule compares it (SW6c): the way `suggested_title` cleans a
+    title, then case folded, with punctuation and blanks collapsed, so "1 Kinematics",
+    "KINEMATICS" and "Kinematics." are one title. "" for no words."""
+    if not text.strip():
+        return ""
+    cleaned = strip_section_number(" ".join(INLINE_MARKER_RE.sub(" ", text).split()))
+    return " ".join(re.findall(r"\w+", cleaned.casefold()))
+
+
+def same_title(a: str, b: str) -> bool:
+    """Two titles that a student would hear as the same words (`title_key`)."""
+    key = title_key(a)
+    return bool(key) and key == title_key(b)
+
+
+@dataclass(frozen=True)
+class TitlePlan:
+    """How `render_html` writes the document's one `<h1>` (SW6c). `text` is the H1's text and
+    the page's `<title>`. `heading_id` is the heading written as the H1, or None when the
+    title is added above the headings. Every other heading is written `shift` levels below
+    the outline repair's level (`Outline`), except the ones in `unshifted`: the H1 heading
+    and the headings of its own section, which already sit under it. Stored levels never
+    change; this is only what is written."""
+
+    text: str
+    heading_id: str | None
+    shift: int
+    unshifted: frozenset[str] = frozenset()
+    source: str = TITLE_STOCK  # where `text` came from (`document_title`)
+
+    def level(self, element_id: str, written: int) -> int:
+        """The `<hN>` of a heading the outline repair writes at `written`."""
+        offset = 0 if element_id in self.unshifted else self.shift
+        return max(1, min(6, written + offset))
+
+
+def title_plan(
+    elements: list[Element],
+    fixes: list[Fix],
+    *,
+    title: str | None,
+    title_set: bool = False,
+    filename: str = "",
+) -> TitlePlan:
+    """The one-H1 rule (SW6c), read from the same headings, in the same order, as the
+    renderer writes them (the first fix for an id wins).
+
+    The title is the instructor's (`title_set`, used as typed) or `document_title` of the
+    PDF's, the headings and the file name (`filename`). When it is the same title
+    (`same_title`) as the first top-level heading, that
+    heading is the H1 and nothing is added. When it is not and the outline has exactly one
+    top-level heading, that heading is the H1, unless the instructor chose the title: a
+    chosen title is never replaced. Otherwise (no top-level heading, several, or a chosen
+    title) the title is added as the H1 and the headings move down under it, so the
+    shallowest one is an `<h2>`."""
     first: dict[str, Fix] = {}
     for fix in fixes:
         first.setdefault(fix.element_id, fix)
     outline = Outline()
-    tops = 0
+    written: list[tuple[str, int, str]] = []  # (element id, level written, text)
     for element in sorted(elements, key=lambda e: e.order):
         if element.kind is Kind.HEADING:
-            level, _ = heading_parts(element, first.get(element.id))
+            level, text = heading_parts(element, first.get(element.id))
             if level is not None:
-                tops += outline.write(level) == 1
-    return 1 if tops >= 2 else 0
+                written.append((element.id, outline.write(level), text))
+    tops = [entry for entry in written if entry[1] == 1]
+    chosen = (
+        DocumentTitle(_clean_title(title), TITLE_YOURS)
+        if title_set
+        else document_title(None, title, [t for *_, t in written], filename)
+    )
+    if tops and (same_title(chosen.text, tops[0][2]) or (len(tops) == 1 and not title_set)):
+        h1 = tops[0]
+        section = {h1[0]}
+        for element_id, level, _ in written[written.index(h1) + 1 :]:
+            if level == 1:
+                break
+            section.add(element_id)
+        return TitlePlan(
+            text=_clean_title(h1[2]),
+            heading_id=h1[0],
+            shift=1 if len(tops) > 1 else 0,
+            unshifted=frozenset(section),
+            source=(
+                chosen.source if same_title(chosen.text, h1[2]) or title_set else TITLE_HEADING
+            ),
+        )
+    shift = 2 - min((level for _, level, _ in written), default=2)
+    return TitlePlan(text=chosen.text, heading_id=None, shift=shift, source=chosen.source)
 
 
 # --------------------------------------------------------------------------- renderer
@@ -720,7 +990,9 @@ class _Renderer:
     fixes: dict[str, Fix]
     crops: dict[str, bytes]
     equations: dict[str, Element]
-    used_ids: set[str] = field(default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID})
+    used_ids: set[str] = field(
+        default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID, NOTICE_ID, NOTICE_TITLE_ID, LEFT_OUT_ID}
+    )
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
     outline: Outline = field(default_factory=Outline)
@@ -728,9 +1000,8 @@ class _Renderer:
     styles: dict[str, str] = field(default_factory=dict)
     # Write the stored speech as each <math>'s alttext (Settings.mathml_alttext).
     math_alttext: bool = False
-    # Levels added to every heading written (T3-13): 1 when the document has several
-    # top-level headings (slides), so its title can be the one h1 above them.
-    demote: int = 0
+    # Where each heading is written under the document's one H1 (SW6c, `title_plan`).
+    titles: TitlePlan = field(default_factory=lambda: TitlePlan(DEFAULT_TITLE, None, 0))
     # The scale an unconverted equation's picture is shown at (T3-15).
     scale_of: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
     # Navigation (`pipeline.navigation`): the headings as written (for the contents list),
@@ -738,6 +1009,7 @@ class _Renderer:
     # document has two pages or more), the page the last marker or block was on, and the
     # footnotes: their element ids, and the id of the mark that links to each.
     toc: list[navigation.TocEntry] = field(default_factory=list)
+    h1_id: str | None = None  # the id of the `<h1>` a heading is (the skip link's target)
     page_labels: Mapping[int, str] = field(default_factory=dict)
     # Page of the PDF each of the document's pages is, when it is not its own number (a part of
     # a longer file: 0-based local page to 0-based page of the source).
@@ -752,6 +1024,11 @@ class _Renderer:
     # Pages kept as a picture for unread content whose text is written too: page -> the
     # picture's element id, until the note that opens the page's text is written.
     unread_parts: dict[int, str] = field(default_factory=dict)
+    # Whom the authored notices speak to (`STUDENT`, or `CHECKER` for a draft's page).
+    audience: str = STUDENT
+    # The instructor's contact line, when the owner gave one: each note about something not
+    # converted then links to it (`instructor_link`).
+    contact: str | None = None
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -823,19 +1100,46 @@ class _Renderer:
             if not self.pdf_pages or page in self.pdf_pages  # a page that is not in the file
         )
 
-    def mark_for(self, page: int) -> str:
-        """The marker for `page`, which becomes the last page written."""
-        self.last_page = page
+    def page_words(self, page: int) -> tuple[str, int]:
+        """What the student's page marker says for `page` ("Page 5", "PDF page 5"), and its
+        position in the PDF."""
         position = self.pdf_pages.get(page, page) + 1
         printed = self.page_labels.get(page)
         if printed:
-            said = f"Page {printed}"
-        elif self.page_labels:  # others have printed labels: never let this one read as one
-            said = f"PDF page {position}"
-        else:
-            said = f"Page {position}"
-        self.add_style("pagebreak", navigation.PAGEBREAK_CSS)
+            return f"Page {printed}", position
+        if self.page_labels:  # others have printed labels: never let this one read as one
+            return f"PDF page {position}", position
+        return f"Page {position}", position
+
+    def mark_for(self, page: int) -> str:
+        """The marker for `page`, which becomes the last page written."""
+        self.last_page = page
+        said, position = self.page_words(page)
+        self.add_style("pagebreak", student_sheet.PAGE_MARKER)
         return navigation.pagebreak(said, self.claim_id(f"pagebreak-{position}"), AUTHORED_CLASS)
+
+    def instructor_link(self, element: Element, reason: str) -> str:
+        """A link that writes to the instructor about one thing not converted, or "" when the
+        owner gave no contact line (the note then says only "Ask your instructor"). The subject
+        names the document and the thing by kind and page ("Equation on page 3"); nothing of
+        its content is in the link, and the message body is empty (`contact_link`)."""
+        if element.kind is Kind.EQUATION:
+            noun = "equation"
+        elif element.kind is Kind.TABLE:
+            noun = "table"
+        elif reason in KEPT_PAGE_REASONS:
+            noun = "page"
+        elif reason in KEPT_IMAGE_WORDS or reason == "image_page_omitted":
+            noun = "picture"
+        else:
+            noun = "figure"
+        where = self.page_words(element.page)[0] if self.mark_pages else ""
+        if noun == "page":
+            what = where or "This page"
+        else:
+            what = f"{noun.capitalize()} on {where.lower()}" if where else noun.capitalize()
+        text = "{verb} your instructor about this " + noun
+        return contact_link(self.contact, self.titles.text, what, text) or ""
 
     def link_attrs(self, link: Link) -> str:
         """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
@@ -961,7 +1265,7 @@ class _Renderer:
         document but is not known until it is written, so the link is a placeholder that
         `fill_backlinks` replaces once the whole body is written (and drops when no mark
         was written for this note)."""
-        self.add_style("footnote", navigation.FOOTNOTE_CSS)
+        self.add_style("footnote", student_sheet.FOOTNOTE)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
         return (
             f'<div role="doc-footnote"{attrs}><p>{self.rich(text, element)}'
@@ -977,19 +1281,22 @@ class _Renderer:
 
     def code_block(self, element: Element, text: str) -> str:
         """Program code as `<pre><code>`: its lines and indentation as printed, no
-        highlighting. A long line scrolls inside the block (WCAG 1.4.10), and a block with
-        a line wider than a phone screen is a tab stop, so a keyboard user can scroll it
-        (axe `scrollable-region-focusable`), named "Program code" for the focus."""
-        self.add_style("code", CODE_CSS)
+        highlighting; the maths in an algorithm's step stays maths. A long line scrolls
+        inside the block (WCAG 1.4.10), and a block with a line wider than a phone screen
+        is a tab stop, so a keyboard user can scroll it (axe `scrollable-region-focusable`),
+        named "Program code" for the focus."""
+        self.add_style("code", student_sheet.CODE)
         wide = max((len(line) for line in text.split("\n")), default=0) > CODE_WIDE_CHARS
         stop = ' tabindex="0" role="group" aria-label="Program code"' if wide else ""
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
-        return f"<pre{attrs}{stop}><code>{_escape(text.strip(chr(10)))}</code></pre>"
+        body = text.strip(chr(10))
+        shown = self.rich(body) if INLINE_MARKER_RE.search(body) else _escape(body)  # algorithms
+        return f"<pre{attrs}{stop}><code>{shown}</code></pre>"
 
     def definitions(self, entries: list[Element]) -> str:
         """Glossary entries (`Element.term_end`) as one definition list: the term in a
         `<dt>`, its definition in the `<dd>` after it."""
-        self.add_style("definitions", DEFINITIONS_CSS)
+        self.add_style("definitions", student_sheet.DEFINITIONS)
         out = []
         for entry in entries:
             text = entry.text or ""
@@ -1076,11 +1383,14 @@ class _Renderer:
                 attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
-        level = min(6, self.outline.write(level) + self.demote)
+        level = self.titles.level(element.id, self.outline.write(level))
         # Every heading has an id, so the contents list can link to it: the pipeline's own
         # (`p3-e7`, the same on every render of a result), else the next free `heading-N`.
         anchor = self.claim_id(element.id) or self.fresh_id("heading")
         attrs = f' id="{_escape(anchor)}"' + inline_text.passage_attrs(element)
+        if level == 1:  # the skip link jumps here, and focus moves with it (not a tab stop)
+            attrs += ' tabindex="-1"'
+            self.h1_id = anchor
         plain = " ".join(INLINE_MARKER_RE.sub("[equation]", text).split())
         if plain:
             self.toc.append(navigation.TocEntry(level, anchor, plain))
@@ -1108,14 +1418,26 @@ class _Renderer:
             return None, "mathml_rejected"
         return mathml, ""
 
+    def print_fit(self, mathml: str) -> str:
+        """The classes that fit an equation to the sheet on paper (" pw pw-24") and the rules
+        of its width step, or "" when it fits any sheet (SW45 rule 6)."""
+        bucket = print_width_bucket(mathml)
+        if bucket is None:
+            return ""
+        self.add_style(f"print-fit-{bucket:03d}", student_sheet.print_fit(bucket))
+        return f" pw pw-{bucket}"
+
     def block_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "block", with_id=False)
         label = _equation_label(element.equation_label)
         if mathml is not None:
-            css = "equation equation-labelled" if label else "equation"
+            css = ("equation equation-labelled" if label else "equation") + self.print_fit(mathml)
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
-        original = self.original(element, self.image_alt(element, equation_alt(element))) + label
+        original = (
+            self.original(element, self.image_alt(element, equation_alt(element, self.audience)))
+            + label
+        )
         note = EQUATION_NOTE if self.has_picture(element) else EQUATION_WRITTEN_NOTE
         return self.flag_block(element, reason, original, "Not converted.", note)
 
@@ -1136,13 +1458,14 @@ class _Renderer:
             # (only those, since a scroll box sits on the text's baseline differently).
             scroller = _scroller_attrs(mathml, None)
             if scroller:
-                return f'<span class="equation-scroll"{scroller}>{mathml}</span>'
+                fit = self.print_fit(mathml)
+                return f'<span class="equation-scroll{fit}"{scroller}>{mathml}</span>'
             return mathml
         self.flagged.add(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
-            alt = _escape(self.image_alt(element, equation_alt(element)))
+            alt = _escape(self.image_alt(element, equation_alt(element, self.audience)))
             size = self.picture_size(element, self.crops.get(element.id))
             image = f'<img src="{src}" alt="{alt}"{size}>'
             label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
@@ -1193,57 +1516,68 @@ class _Renderer:
             )  # fmt: skip
         if fix is not None and fix.status in NOT_CONVERTED and fix.reason in KEPT_IMAGE_WORDS:
             # A page (or handwriting) kept as an image: what it is, never "a figure".
-            alt, note = KEPT_IMAGE_WORDS[fix.reason]
+            alt, label, note = KEPT_IMAGE_WORDS[fix.reason]
             alt = self.image_alt(element, alt.format(page=element.page + 1))
             figure = f"<figure>{picture(alt)}</figure>"
-            return self.flag_block(element, fix.reason, figure, KEPT_IMAGE_LABEL, note)
+            return self.flag_block(element, fix.reason, figure, label, note)
         if fix is None:
             reason = "no_fix"
         elif fix.status in NOT_CONVERTED:
             reason = fix.reason or ""
         elif proposal is None or not (proposal.decorative or proposal.alt.strip()):
             reason = "no_output"
+        elif proposal.decorative and not decoration.is_decoration(element, fix):
+            reason = decoration.UNPROVEN  # only the model's word: not described, never silent
         else:
             alt = "" if proposal.decorative else proposal.alt.strip()
             if _is_png(self.crops.get(element.id)):
                 image = picture(alt)
             else:  # no crop to show: the description itself is the content
                 image = f"<p>{_escape(alt)}</p>" if alt else ""
+            ids = self.id_attr(element.id)
             if not alt and not caption:  # decorative: no empty "figure" for screen readers
-                return f'<div class="decorative"{self.id_attr(element.id)}>{image}</div>'
-            html = f"<figure{self.id_attr(element.id)}>{image}{caption}</figure>"
+                return f'<div class="{DECORATIVE_CLASS}"{ids}>{image}</div>'
+            marked = f' class="{DECORATIVE_CLASS}"' if not alt else ""
+            html = f"<figure{marked}{ids}>{image}{caption}</figure>"
             if not figure_details.has_details(proposal):
                 return html
             # The long description and data table follow the figure, folded (W3C WAI
             # complex images: a short alt plus a long description next to the image).
-            self.add_style("figure_description", figure_details.DETAILS_CSS)
+            self.add_style("figure_description", student_sheet.FIGURE_DESCRIPTION)
             table_id = assemble_tables.id_prefix(element.id) + "-data"
             if figure_details.data_table_shown(proposal):
                 if self.claim_id(f"{table_id}-caption") is None:
                     table_id = None  # an id already used (a layout bug): no table
                 else:
-                    self.add_style("table", assemble_tables.TABLE_CSS)
+                    self.add_style("table", student_sheet.TABLE)
             details = figure_details.render_details(
-                proposal, element.caption, table_id=table_id, authored_class=AUTHORED_CLASS
+                proposal,
+                element.caption,
+                table_id=table_id,
+                authored_class=AUTHORED_CLASS,
+                math_alttext=self.math_alttext,
             )
             return html + details
         figure = f"<figure>{picture(FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
-        return self.flag_block(element, reason, figure, "Needs a description.", FIGURE_NOTE)
+        label = say(FIGURE_LABEL, self.audience)
+        return self.flag_block(element, reason, figure, label, FIGURE_NOTE)
 
     def image_page_note(self, element: Element) -> str:
         """The start of a page converted from an image (ADR 0007): the notice, and the
         original page in a `<details>` the reader opens (no script; the summary is the
         control and says which page). Without the picture, the notice alone."""
-        self.add_style("image_page", IMAGE_PAGE_CSS)
+        self.add_style("image_page", student_sheet.IMAGE_PAGE)
         page = element.page + 1
-        notice = f'<p><span class="flag-label">{IMAGE_PAGE_NOTICE}</span> {IMAGE_PAGE_CHECK}</p>'
+        label = say(IMAGE_PAGE_LABEL, self.audience)
+        body = say(IMAGE_PAGE_NOTE, self.audience)
+        notice = f'<p><span class="flag-label">{label}</span> {body}</p>'
         png = self.crops.get(element.id)
-        alt = IMAGE_PAGE_ORIGINAL_ALT.format(page=page)
+        alt = say(IMAGE_PAGE_ORIGINAL_ALT, self.audience, page=page)
         image = figure_images.img_html(png, alt, _size_attrs(element), "photo")
         if image is None:
             shown = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
         else:
-            summary = IMAGE_PAGE_SHOW.format(page=page)
+            summary = say(IMAGE_PAGE_SHOW, self.audience, page=page)
             shown = (
                 f'<details class="{AUTHORED_CLASS}"><summary>{summary}</summary>{image}</details>'
             )
@@ -1282,10 +1616,12 @@ class _Renderer:
         self.flagged.add(element.id)
         fix = self.fixes.get(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(fix, reason)
+        link = self.instructor_link(element, reason)
+        said = "".join(f" {part}" for part in (note, link) if part)
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'
-            f'<span class="flag-label">{label}</span> {note}</p></div>'
+            f'<span class="flag-label">{label}</span>{said}</p></div>'
         )
 
 
@@ -1308,6 +1644,17 @@ def _placed_equations(
     return found & equation_ids
 
 
+def _after_title(parts: Iterable[str], contents: str) -> list[str]:
+    """The body's parts with the contents list right after the one that holds the `<h1>`
+    (first on the page when the title is not in a part): the title comes first, so on a phone
+    it is on the first screen and the skip link has its target before the list (F-116)."""
+    out = list(parts)
+    if contents:
+        at = next((i + 1 for i, part in enumerate(out) if "<h1" in part), 0)
+        out.insert(at, contents)
+    return out
+
+
 def _notice(text: str | None) -> str | None:
     """A note at the top of `<main>`, outlined and labelled (not colour alone)."""
     if not text or not text.strip():
@@ -1316,24 +1663,6 @@ def _notice(text: str | None) -> str | None:
         f'<p class="notice {AUTHORED_CLASS}" role="note">'
         f'<span class="flag-label">Note:</span> {_escape(" ".join(text.split()))}</p>'
     )
-
-
-def long_date(day: date) -> str:
-    """The date as "October 9, 2026" (US order, as the rest of the site)."""
-    return f"{day:%B} {day.day}, {day.year}"
-
-
-def _review_line(fixes: list[Fix], checked_on: date | None) -> str:
-    """Whether the instructor has checked what the tool asked about. Nothing when the
-    tool asked nothing and nobody changed anything; "not checked yet" while a decision
-    is open; once every decision is made, "checked", with the date when it is known."""
-    asked = any(f.review == "required" or f.decided_by_reviewer for f in fixes)
-    if not asked:
-        return ""
-    if any(f.pending for f in fixes):
-        return f"<p>{NOT_CHECKED_YET}</p>\n"
-    when = f" on {long_date(checked_on)}" if checked_on is not None else ""
-    return f"<p>{CHECKED}{when}.</p>\n"
 
 
 def kept_pages_note(kept_pages: list[int]) -> str:
@@ -1366,56 +1695,90 @@ def image_pages_note(pages: list[int]) -> str:
     )
 
 
-def omitted_pages_note(omitted_pages: list[int]) -> str:
-    """ "Page 1 of the original PDF was left out of this file." (1-based), or "" when no
-    page was left out. The instructor chose it (a blank page, a cover: T3-16), so the
-    note says the page is not here and does not say why."""
-    numbers = [str(p + 1) for p in sorted(set(omitted_pages))]
-    if not numbers:
-        return ""
-    if len(numbers) == 1:
-        return f"Page {numbers[0]} of the original PDF was left out of this file."
-    listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
-    return f"Pages {listed} of the original PDF were left out of this file."
-
-
 def _about_section(
-    fixes: list[Fix],
-    flagged: int,
+    summary: checked.CheckedSummary,
     source_note: str | None,
-    checked_on: date | None = None,
     kept_pages: list[int] | None = None,
     contact: str | None = None,
-    omitted_pages: list[int] | None = None,
     image_pages: list[int] | None = None,
-    origin: str = "pdf",
+    title: str = "",
+    stamp: Stamp | None = None,
 ) -> str:
-    """The note for students at the end of the file (MF7 of the UX review): what this
-    is, whether the instructor has checked it, which pages are only pictures, who to tell
-    about problems. It is written for the people who read the file, so it has no counts
-    and no review vocabulary ("needs review", "rejected"): the instructor's numbers are
-    on the job page. `kept_pages`: 0-based pages kept whole as an image."""
-    maths = any(f.kind is Kind.EQUATION and f.status not in NOT_CONVERTED for f in fixes)
-    opening = {"latex": ABOUT_WORDING_SOURCE, "beamer": ABOUT_WORDING_BEAMER}.get(
-        origin, ABOUT_WORDING
-    )
-    what = f"{opening} {MATHS_NOTE}" if maths else opening
-    flagged_words = FLAGGED_NOTE if origin == "pdf" else FLAGGED_NOTE_SOURCE
-    flagged_note = f"<p>{flagged_words}</p>\n" if flagged else ""
+    """The note for students at the end of `<main>` (MF7 of the UX review): what this
+    is, the statement of what was reviewed and converted (`checked_words.statement`), which
+    pages are only pictures, who to tell about problems. It speaks to the people who read
+    the file, with no review vocabulary ("needs review", "rejected"). `kept_pages`: 0-based
+    pages kept whole as an image. The sentence about pages left out carries an id, so the
+    notice at the top can link to it."""
+    opening = about_opening(summary.origin)
+    maths = checked_words.maths_sentence(summary)
+    lines = [f"<p>{opening} {maths}</p>" if maths else f"<p>{opening}</p>"]
+    left_out = checked_words.left_out_sentence(summary)
+    for sentence in checked_words.statement(summary):
+        where = f' id="{LEFT_OUT_ID}"' if sentence == left_out else ""
+        lines.append(f"<p{where}>{_escape(sentence)}</p>")
     if pages_line := kept_pages_note(kept_pages or []):
-        flagged_note += f"<p>{pages_line}</p>\n"
+        lines.append(f"<p>{pages_line}</p>")
     if converted := image_pages_note(image_pages or []):
-        flagged_note += f"<p>{converted}</p>\n"
-    if left_out := omitted_pages_note(omitted_pages or []):
-        flagged_note += f"<p>{left_out}</p>\n"
-    source = f"<p>{_escape(source_note)}</p>\n" if source_note and source_note.strip() else ""
+        lines.append(f"<p>{converted}</p>")
+    lines.append(f"<p>{_contact_sentence(contact, title)}</p>")
+    if source_note and source_note.strip():
+        lines.append(f"<p>{_escape(source_note)}</p>")
+    if stamp is not None:
+        lines.append(f'<p class="about-version">{_escape(stamp.line)}</p>')
     return (
-        f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
+        f'<section id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
         f'<p id="{ABOUT_TITLE_ID}" class="about-title">{ABOUT_TITLE}</p>\n'
-        f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
-        f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
+        + "\n".join(lines)
+        + "\n</section>"
     )
+
+
+def _checked_notice(
+    summary: checked.CheckedSummary, places: Collection[str], audience: str = STUDENT
+) -> str:
+    """The statement again, first in `<main>`, when nobody reviewed the page or a part is a
+    picture or left out (SW7), so the note at the end is not the only notice. A region named
+    by its own title (not the note's, so a list of landmarks tells the two apart), with no
+    live role, so it is read once, where it stands. Its links go to the note at the end, to
+    each picture (numbered, up to `NOTICE_MAX_LINKS`) and to the pages left out. `places` are
+    the ids the page holds, so no link points nowhere."""
+    if not summary.needs_notice:
+        return ""
+    words = checked_words
+    links = [f'<li><a href="#{ABOUT_ID}">{words.NOTICE_ABOUT_LINK}</a></li>']
+    shown = [p for p in summary.converted.pictures if p.element_id in places]
+    for number, picture in enumerate(shown[: words.NOTICE_MAX_LINKS], 1):
+        name = _escape(words.picture_link(number, picture.kind, picture.page))
+        links.append(f'<li><a href="#{_escape(picture.element_id)}">{name}</a></li>')
+    if len(shown) > words.NOTICE_MAX_LINKS:
+        rest = words.more_pictures(len(shown) - words.NOTICE_MAX_LINKS)
+        links.append(f"<li>{_escape(rest)}</li>")
+    if summary.left_out:
+        links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.NOTICE_LEFT_OUT_LINK}</a></li>')
+    why = ""
+    if summary.pictures:  # the explanation each not-converted box used to repeat (F-114)
+        said = NOT_CONVERTED_WHY if summary.origin == "pdf" else NOT_CONVERTED_WHY_WRITTEN
+        why = f"<p>{_escape(say(said, audience))}</p>\n"
+    return (
+        f'<section id="{NOTICE_ID}" class="notice checked-notice {AUTHORED_CLASS}" '
+        f'aria-labelledby="{NOTICE_TITLE_ID}" tabindex="-1">\n'
+        f'<p id="{NOTICE_TITLE_ID}" class="flag-label">{words.NOTICE_TITLE}</p>\n'
+        f"<p>{_escape(' '.join(words.statement(summary)))}</p>\n"
+        f"{why}<ul>{''.join(links)}</ul>\n</section>"
+    )
+
+
+def _summary_meta(summary: checked.CheckedSummary, audience: str = STUDENT) -> list[str]:
+    """The statement in the page's head, for the files made from the page (the EPUB's
+    accessibility summary and `accessModeSufficient`, the Canvas README's first lines),
+    which read the page and not the result."""
+    text = _escape(checked_words.export_summary(summary, audience == CHECKER))
+    lines = [f'<meta name="{SUMMARY_META}" content="{text}">']
+    if summary.text_sufficient:
+        lines.append(f'<meta name="{SUFFICIENT_META}" content="textual">')
+    return lines
 
 
 def draft_banner(open_decisions: int) -> str:
@@ -1448,99 +1811,59 @@ def mark_draft(html: str, open_decisions: int) -> str:
     return banner + html
 
 
-def _contact_sentence(contact: str | None) -> str:
-    """The "tell your instructor" sentence, with the instructor's own contact line (T1-17)
-    when there is one: an email address (a mailto link) or a web address (a link), both
-    shown as typed. `web.titles.clean_contact` has checked it; anything else is left out
-    here too."""
+MAX_SUBJECT_TITLE = 100  # characters of the document's title in a message's subject
+
+
+def _contact_href(contact: str | None) -> tuple[str, str] | None:
+    """The instructor's contact line as ("email", address) or ("web", address), or None when
+    there is none or it is neither (`web.titles.clean_contact` has checked what is stored;
+    anything else is left out here too)."""
     line = (contact or "").strip()
     if not line or len(line) > 320 or re.search(r"[\s<>\"']", line):
-        return CONTACT
+        return None
     if re.fullmatch(r"[^@/:]+@[^@/:]+\.[^@/:.]+", line):
-        href = "mailto:" + line
-    elif re.fullmatch(r"https?://[^/\s]+\.[^/\s]+\S*", line):
-        href = line
+        return "email", line
+    if re.fullmatch(r"https?://[^/\s]+\.[^/\s]+\S*", line):
+        return "web", line
+    return None
+
+
+def contact_link(contact: str | None, title: str, what: str, text: str) -> str | None:
+    """A link to the instructor's contact line, or None when there is none. For an email
+    address it is a `mailto:` with the subject "<title>: <what>" and an empty body: `what`
+    names the thing by kind and page ("Equation on page 3"), never by its content. For a web
+    address it goes there. `text` is the link text, with `{verb}` for "Email" or "Contact"."""
+    found = _contact_href(contact)
+    if found is None:
+        return None
+    kind, address = found
+    if kind == "email":
+        name = " ".join(title.split())
+        if len(name) > MAX_SUBJECT_TITLE:
+            name = name[: MAX_SUBJECT_TITLE - 3].rstrip() + "..."
+        subject = quote(f"{name}: {what}" if name else what, safe="")
+        href = f"mailto:{address}?subject={subject}"
     else:
+        href = address
+    words = text.format(verb="Email" if kind == "email" else "Contact")
+    return f'<a href="{_escape(href)}">{_escape(words)}</a>'
+
+
+def _contact_sentence(contact: str | None, title: str = "") -> str:
+    """The "tell your instructor" sentence. With the instructor's own contact line (T1-17) it
+    carries a link that writes to them about this document (`contact_link`), and the address
+    as typed beside it, for a reader whose mail program is not set up or who prints the page."""
+    words = "{verb} your instructor about this document"
+    link = contact_link(contact, title, "a problem with this document", words)
+    if link is None:
         return CONTACT
-    link = f'<a href="{_escape(href)}">{_escape(line)}</a>'
-    return f"{CONTACT.removesuffix('.')}: {link}."
+    return f"{CONTACT.removesuffix('.')}: {link} ({_escape((contact or '').strip())})."
 
 
-# Added to a document's stylesheet only when it has a code block / a definition list
-# (`_Renderer.add_style`), so documents without them are written as before.
-CODE_WIDE_CHARS = 36  # characters in a line that may not fit a 320 px screen at 0.9 rem
-CODE_CSS = """\
-pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px solid #c8c8c8;
-  border-radius: 4px; overflow-x: auto; }
-pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  white-space: pre; }
-@media screen and (prefers-color-scheme: dark) {
-  pre { background: #1f1f1f; border-color: #767676; }
-}
-"""
-DEFINITIONS_CSS = """\
-dl { margin: 0 0 1em; }
-dt { margin-top: 0.75em; }
-dd { margin: 0.1em 0 0 1.5em; }
-"""
-
-STYLE = """\
-:root { color-scheme: light dark; }
-body { margin: 0; background: #ffffff; color: #1b1b1b;
-  font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
-main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
-h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
-p { margin: 0 0 1em; }
-img { max-width: 100%; height: auto; }
-.equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
-  overflow-x: auto; overflow-y: hidden; }
-.equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
-  overflow-x: auto; overflow-y: hidden; }
-.equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
-.equation-labelled > math { flex: 1 0 auto; }
-.equation-label { flex: none; margin-left: auto; }
-math { font-size: 1.1em; }
-math[display="block"] { margin: 0 auto; }
-math[intent] mi { text-transform: none; }
-ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
-li > ul, li > ol { margin: 0.25em 0 0; }
-.printed-markers { list-style: none; }
-.printed-markers > li { text-indent: -1.75em; padding-left: 1.75em; }
-.printed-markers > li > * { text-indent: 0; }
-.list-marker { display: inline-block; min-width: 1.5em; text-indent: 0; }
-.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
-  clip-path: inset(50%); white-space: nowrap; }
-figure { margin: 1.5em 0; }
-figure img { display: block; }
-figcaption { margin-top: 0.5em; }
-.flagged { border: 3px dashed #8a3c00; border-radius: 4px; padding: 0.75rem; margin: 1.5em 0; }
-.notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
-.flagged figure { margin: 0; }
-.flagged > img { display: block; margin: 0 auto; }
-.flagged-inline { border: 2px dashed #8a3c00; padding: 0 0.2em; }
-.flagged-inline img { vertical-align: middle; }
-.flag-note { margin: 0.75em 0 0; }
-.flag-label { font-weight: 700; }
-.original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
-  border-top: 2px solid #1b1b1b; }
-@media (min-width: 44rem) { .about { margin: 0 auto; } }
-.about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
-:focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
-.skip-link { display: inline-block; margin: 0.5rem; padding: 0.5em 1em; background: #ffffff;
-  color: #0b57d0; }
-.skip-link:not(:focus) { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-  overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-@media print { .flagged { break-inside: avoid; } .skip-link { display: none; } }
-@media screen and (prefers-color-scheme: dark) {
-  body { background: #121212; color: #ececec; }
-  .flagged, .notice, .flagged-inline { border-color: #ffa066; }
-  .about { border-top-color: #ececec; }
-  :focus-visible { outline-color: #8ab4f8; }
-  .skip-link { background: #121212; color: #8ab4f8; }
-  img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
-}
-"""
+# A line longer than this is a tab stop. Measured in Chromium at 320 px: a block first scrolls
+# at 30 characters, and at 25 with WCAG 1.4.12 text spacing, so 24 leaves no scrolling block
+# without one (it was 36, F-448).
+CODE_WIDE_CHARS = 24
 
 
 # The tool's own words (notes, labels, the student note) are English. In a document in
@@ -1573,7 +1896,7 @@ _FIXED_ALT_IMG = re.compile(
             # A kept page's alt names its page: any number in its place.
             *(
                 re.escape(alt).replace(re.escape("{page}"), r"\d+")
-                for alt, _ in KEPT_IMAGE_WORDS.values()
+                for alt, *_ in KEPT_IMAGE_WORDS.values()
             ),
         ]
     )
@@ -1645,7 +1968,7 @@ def _kept_prose(ordered: list[Element], fixes: dict[str, Fix]) -> list[Element]:
             fix = fixes[element.id]
             fixes[element.id] = fix.model_copy(update={"reason": "image_page_text"})
             element = element.model_copy(
-                update={"kind": Kind.FIGURE, "text": None, "links": [], "list_marker": None}
+                update={"kind": Kind.FIGURE, "text": None, "list_marker": None, **inline.cleared()}
             )
         elif element.parent_id in kept:
             continue
@@ -1671,8 +1994,19 @@ def render_html(
     pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
     origin: str = "pdf",
+    pages: int | None = None,
+    unread: tuple[int, int] = (0, 0),
+    cut_off_pages: list[int] | None = None,
+    filename: str = "",
+    audience: str = STUDENT,
+    stamp: Stamp | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
+
+    `audience`: whom the authored notices speak to. `STUDENT` (the default) is the student
+    file, the only one that is stored and that every export is made from. `CHECKER` is the
+    draft's page, made fresh for the person who checks it and never stored: it adds what a
+    student must not be told ("Check it against the original.").
 
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
@@ -1684,11 +2018,13 @@ def render_html(
     answers are placeholders). `checked_on` is the day the instructor made the last
     review decision: the student note gives it once no decision is open (the review
     screen passes it when it re-renders the file; the pipeline never does).
-    `title_set`: `title` is the one the instructor chose (T1-7): used as typed, and written
-    as the top-level heading too when the body has none. Otherwise the title is
-    `suggested_title` of the PDF's. `contact`: the instructor's contact line for the note
-    after `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
-    `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
+    `title_set`: `title` is the one the instructor chose (T1-7), used as typed. Otherwise the
+    title is `document_title` of the PDF's, the headings and `filename` (SW14). The page has
+    exactly one `<h1>` and its
+    `<title>` is the H1's text (`title_plan`, SW6c). `contact`: the instructor's contact
+    line for the note at the end of `<main>` (T1-17). `math_alttext`: write each equation's
+    stored speech as the `alttext` of its <math> (None: `Settings.mathml_alttext`, off by
+    default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
     here, and the student note says so. `page_labels`: the printed label of each 0-based page
     that has one (`DocumentResult.page_labels`), for the page markers. A page without one says its
@@ -1697,7 +2033,15 @@ def render_html(
     its page in the PDF it was cut from (a part of a longer file). `footnote_ids`: the element
     ids of footnotes (`Notice` code "footnote"), whose marks and notes are linked both ways.
     `origin`: "pdf" or, for a document made from a LaTeX source, "latex" or "beamer"
-    (`DocumentResult.origin`): the student note's first sentence says so.
+    (`DocumentResult.origin`): the student note's first sentence says so. `pages`: how many
+    pages the document has, when known, so the note can say "7 of 8" pages were left out.
+    `unread`: the words and pictures a LaTeX source's reader did not read
+    (`checked.unread_of`), which the student note says are not in the file. `cut_off_pages`: the
+    0-based empty last pages of a PDF that looks cut off (`checked.cut_off_of`), which the note
+    says are not in the file either.
+    `stamp`: which version of the document this file is (`Stamp`), written as the last line of
+    the student note and in the head. The caller supplies it (no clock or database is read here);
+    without one the file says nothing of a version.
     """
     ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     first_fix: dict[str, Fix] = {}
@@ -1709,19 +2053,21 @@ def render_html(
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
 
-    shift = title_shift(ordered, fixes)
+    titles = title_plan(ordered, fixes, title=title, title_set=title_set, filename=filename)
     renderer = _Renderer(
         fixes=first_fix,
         crops=crops,
         equations=equations,
         math_alttext=math_alttext,
-        demote=shift,
+        titles=titles,
         scale_of=equation_scale.scaler(ordered),
         page_labels=page_labels or {},
         pdf_pages=pdf_pages or {},
         mark_pages=len({p for e in ordered for p in (e.page, e.last_page or e.page)}) >= 2,
         footnote_ids=set(footnote_ids),
         origin=origin,
+        audience=audience,
+        contact=contact,
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations)) | (
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
@@ -1735,41 +2081,55 @@ def render_html(
         and fix.reason in KEPT_PAGE_REASONS
         and fix.status in NOT_CONVERTED
     ]
+    # The statement of what was reviewed and converted, from the same parts the web app reads
+    # from the stored result (`checked.of_result`), so the page and the job page agree.
+    summary = checked.summarize(
+        elements=elements,
+        fixes=fixes,
+        left_out_pages=omitted_pages or (),
+        pages=pages,
+        reviewed_on=checked_on,
+        origin=origin,
+        unread=unread,
+        cut_off_pages=cut_off_pages or (),
+    )
     about = _about_section(
-        list(first_fix.values()),
-        len(renderer.flagged),
+        summary,
         source_note,
-        checked_on,
         kept_pages,
         contact,
-        omitted_pages,
         [e.page for e in ordered if IMAGE_PAGE_ORIGINAL_REASON in e.reasons],
-        origin,
+        title=titles.text,
+        stamp=stamp,
     )
-    heading_texts = [
-        text
-        for e in ordered
-        if e.kind is Kind.HEADING
-        for level, text in [heading_parts(e, first_fix.get(e.id))]
-        if level is not None
-    ]
-    page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
-    if (title_set or shift) and not any("<h1" in part for part in body):
-        body = [f"<h1>{_escape(page_title)}</h1>", *body]
+    top = _checked_notice(summary, renderer.used_ids, audience)
+    # Exactly one H1 (SW6c): the title, added above the headings, or the heading that is it.
+    page_title = titles.text
+    if titles.heading_id is None:
+        title_h1 = f'<h1 id="{navigation.MAIN_ID}" tabindex="-1">{_escape(page_title)}</h1>'
+        body = [title_h1, *body]
+        renderer.h1_id = navigation.MAIN_ID
     # The PDF's own contents page is the contents list; a second one would be one too many.
     printed_contents = any(navigation.PRINTED_CONTENTS_REASON in e.reasons for e in ordered)
     contents = ""
     if len(renderer.toc) >= navigation.MIN_TOC_HEADINGS and not printed_contents:
-        renderer.add_style("contents", navigation.TOC_CSS)
+        renderer.add_style("contents", student_sheet.CONTENTS)
         english = _clean_lang(lang).split("-", 1)[0].lower() == "en"
         contents = _authored_in_english(
             navigation.contents_nav(
-                renderer.toc, AUTHORED_CLASS, None if english else _clean_lang(lang)
+                # The title stands right above the list: it is not an entry of it.
+                [entry for entry in renderer.toc if entry.id != renderer.h1_id],
+                AUTHORED_CLASS,
+                None if english else _clean_lang(lang),
             ),
             lang,
         )
+    # The skip link lands on the first thing a reader must not miss: the notice that says
+    # parts are pictures or nobody reviewed the page, when there is one, else the title. A
+    # link that jumped past that notice would hide it from the readers it is written for.
+    skip_target = NOTICE_ID if top else (renderer.h1_id or navigation.MAIN_ID)
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
-    style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
+    style = student_sheet.screen(renderer.styles)
     page = "\n".join(
         [
             "<!doctype html>",
@@ -1779,18 +2139,26 @@ def render_html(
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
             f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
+            *(
+                [
+                    f'<meta name="{VERSION_META}" content="{_escape(stamp.version_id)}">',
+                    f'<meta name="{MODIFIED_META}" content="{stamp.day.isoformat()}">',
+                ]
+                if stamp is not None
+                else []
+            ),
+            *_summary_meta(summary, audience),
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",
             "<body>",
-            _authored_in_english(navigation.skip_link(AUTHORED_CLASS), lang),
-            *([contents] if contents else []),
-            f'<span id="{navigation.MAIN_ID}" tabindex="-1"></span>',
+            _authored_in_english(navigation.skip_link(AUTHORED_CLASS, skip_target), lang),
             "<main>",
             *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
-            *(_authored_in_english(part, lang) for part in body),
-            "</main>",
+            *([_authored_in_english(top, lang)] if top else []),
+            *_after_title((_authored_in_english(part, lang) for part in body), contents),
             _authored_in_english(about, lang),
+            "</main>",
             "</body>",
             "</html>",
             "",

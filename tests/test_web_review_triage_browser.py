@@ -93,7 +93,7 @@ def walk_group_states(page, site, job: str, check) -> None:
     check("refused level")
     page.goto(url)
     page.get_by_role("button", name=re.compile("^Make all 3 bold text")).click()
-    page.wait_for_url(f"{url}#item-p2-e2")
+    page.wait_for_url(f"{url}?at=item-p2-e2#item-p2-e2")
     check("after make bold text")
     page.goto(f"{site.base}/jobs/{job}")
     check("job page")
@@ -144,7 +144,7 @@ def test_group_decisions_work_without_javascript(site, browser, job):
     card = page.locator(f"#group-card-{GROUP}")
     assert "appears 3 times" in card.inner_text()
     card.get_by_role("button", name=re.compile("^Apply to all 3")).click()
-    assert page.url == f"{url}#item-p2-e2"  # the next decision: the equation
+    assert page.url == f"{url}?at=item-p2-e2#item-p2-e2"  # the next decision: the equation
     assert "Kept 3 headings as they are." in page.locator("#review-progress").inner_text()
     assert page.locator(f"#group-card-{GROUP}").count() == 0
     heading = page.locator("#needs-decision-title").inner_text()

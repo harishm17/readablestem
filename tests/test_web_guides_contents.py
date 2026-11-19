@@ -14,7 +14,9 @@ from readablestem.web import offices, seo
 
 LONG_PAGES = (
     seo.ADA_GUIDE,
+    "/help/review",
     "/help/posting",
+    "/help/latex",
     offices.PAGE_PATH,
 )
 

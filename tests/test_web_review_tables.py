@@ -152,7 +152,7 @@ def edits(env) -> list[ReviewEdit]:
 
 def test_accept_moves_on_and_the_document_has_the_table(tables):
     page = follow(tables, post(tables, "p1-e1", action="accept"))
-    assert "Decision 2 of 3" in panel(page)
+    assert "Decision 1 of 3" in panel(page)
     assert "Table 1: Accepted. 2 decisions left." in page
     fix = fix_of(tables, "p1-e1")
     assert (fix.status, fix.reviewed) == (Status.ACCEPTED, True)
@@ -177,7 +177,7 @@ def test_the_first_row_made_a_header_and_back(tables):
         "passed the required checks and was saved." in page
     )
     edited = grid(tables, "p1-e1")
-    assert edited.header_rows == 1
+    assert (edited.header_rows, edited.header_source) == (1, "reviewer")
     assert {c.header for c in edited.cells if c.row == 0} == {"col"}
     assert {c.header for c in edited.cells if c.row > 0} == {None}
     body = panel(page)
@@ -195,7 +195,7 @@ def test_the_first_row_made_a_header_and_back(tables):
     # Neither: back to the proposal's grid, which has no header cell at all, so the
     # decision is open again (a required check fails).
     page = follow(tables, post(tables, "p1-e1", action="edit", change="headers"))
-    assert grid(tables, "p1-e1") == table_1_proposal()
+    assert grid(tables, "p1-e1") == table_1_proposal().model_copy(update={"header_source": "none"})
     fix = fix_of(tables, "p1-e1")
     assert (fix.status, fix.reviewed) == (Status.NEEDS_REVIEW, False)
     assert "a required check still fails, so the table still waits for your decision" in page
@@ -216,7 +216,7 @@ def test_a_cell_changed_is_checked_escaped_and_shown_again(tables):
     assert fix_of(tables, "p1-e1").status is Status.NEEDS_REVIEW
     cell = next(c for c in grid(tables, "p1-e1").cells if (c.row, c.col) == (1, 1))
     assert cell.text == "<b>12</b> & up"
-    assert "<td>&lt;b&gt;12&lt;/b&gt; &amp; up</td>" in panel(page)
+    assert "&lt;b&gt;12&lt;/b&gt; &amp; up</td>" in panel(page)  # marked: it differs
     assert "&lt;b&gt;12&lt;/b&gt; &amp; up" in with_file(tables).html
     assert "<b>12</b>" not in with_file(tables).html
     # The same text again changes nothing.
@@ -225,6 +225,21 @@ def test_a_cell_changed_is_checked_escaped_and_shown_again(tables):
     )
     assert again.status_code == 422
     assert "This is the text the cell has already." in again.text
+    # The card names the cell that differs with both values (the table has no headers yet).
+    shown = text_of(section(panel(page), 'class="difference-list"', "</ul>"))
+    assert shown.count("Row 2, column 2") == 1 and shown.count("PDF text") == 1
+    assert "rebuilt table <b>12</b> & up" in shown and "PDF text 10" in shown
+    # With headers it names them. A cell that differs only in spacing ("1 0" for "10") is not
+    # listed beside the one that really differs; with nothing else wrong, nothing is listed.
+    post(tables, "p1-e1", action="edit", change="headers", header_row="on", header_col="on")
+    post(tables, "p1-e1", action="edit", change="cell", row="1", col="1", cell="1 0")
+    post(tables, "p1-e1", action="edit", change="cell", row="2", col="1", cell="7")
+    page = panel(screen(tables, "?item=p1-e1"))
+    shown = text_of(section(page, 'class="difference-list"', "</ul>"))
+    assert "Row 3 (Ball), column 2 (Distance (m))" in shown and "Row 2" not in shown
+    assert "rebuilt table 7" in shown and "PDF text 6" in shown
+    post(tables, "p1-e1", action="edit", change="cell", row="2", col="1", cell="6")
+    assert "Cells that differ" not in screen(tables, "?item=p1-e1")
 
 
 def test_a_maths_cell_goes_through_the_latex_checks(tables):
@@ -437,7 +452,11 @@ def test_the_grid_read_from_the_pdf_is_only_used_when_it_has_no_problem():
     result = result_with(plain([["x"], ["y"]]), local=good)
     apply_review(result, "p1-e0", "edit", {"change": "use_local"})
     fix = result.fix_for("p1-e0")
-    assert fix is not None and fix.table is not None and fix.table.grid == good
+    assert (
+        fix is not None
+        and fix.table is not None
+        and fix.table.grid == good.model_copy(update={"header_source": "layout"})
+    )
     assert fix.table.grid is not good  # a copy: the element's grid stays as layout made it
 
 
@@ -576,3 +595,25 @@ def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
     assert back.status_code == 303
     fix = stored(as_text).fix_for("p2-e1")
     assert fix is not None and fix.table is not None and fix.table.grid.is_data
+
+
+def test_a_list_card_names_the_grid_action_once(tmp_path):
+    """A table written as text with a grid to use instead: the button says what it does and
+    the line under it says what students get, without saying the button's words again."""
+    output = table_output()
+    for fix in output.result.fixes:
+        if fix.element_id == "p1-e1":
+            assert fix.table is not None
+            fix.table.grid.is_data = False
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, table_pdf()))
+        env.run_worker()
+        html = client.get(f"/jobs/{env.job_id}/review/list").text
+        card = html[html.index('id="item-p1-e1"') :]
+        card = card[: card.index('id="item-', 20)]
+        assert len(re.findall("use the grid read from the PDF", card, re.I)) == 1

@@ -1,0 +1,282 @@
+{% extends "base.html" %}
+{% from "_help_pages.html" import help_row %}
+{% block body_class %}mode-read{% endblock %}
+{% block title %}Reviewing a converted document{% endblock %}
+{% block description %}How to review a converted document: what each button does, the keyboard shortcuts, accepting many at once, the page tools, and when the document is ready to post.{% endblock %}
+{% block content %}
+{# WS25.4. Every sentence here describes the review screen (routes/split.py, templates/
+   review_split.html, _review_shared.html, _table_card.html, _page_tools.html, static/app.js)
+   and the strings in routes/review.py, web/bulk_accept.py and web/queue.py. Buttons are named
+   as the screen names them. When a screen's words change, change them here. No claim about a
+   standard, about accuracy or about a named screen reader. #}
+<h1>Reviewing a converted document</h1>
+<p class="lede">The tool converts what it can and asks you about what it is not sure of. The
+  review screen shows each question beside the page of the original it comes from. You
+  answer each one, and then the document is ready to post.</p>
+
+<h2 id="glance">At a glance</h2>
+<ul>
+  <li><strong>Open it:</strong> on a finished document, choose <strong>Review</strong>.</li>
+  <li><strong>Each decision:</strong> compare the proposal with the original page, then choose
+    Accept, change it, or keep the original.</li>
+  <li><strong>Many at once:</strong> “Accept many equations” and “Accept many figures” take
+    the ones that passed every check, after you look at them.</li>
+  <li><strong>Mistakes:</strong> after each decision, <strong>Undo</strong> takes it back.</li>
+  <li><strong>Done:</strong> the screen says “All decisions made.” The checks look at the
+    structure of the file, not at whether it says what you meant, so read the student version
+    and listen to it before you share.</li>
+</ul>
+
+{% from "_contents.html" import contents %}
+{{ contents([
+  ("screen", "What the screen shows"),
+  ("kinds", "The kinds of decision"),
+  ("same", "Choices that work the same way everywhere"),
+  ("keys", "Keyboard shortcuts"),
+  ("many", "Accept many at once"),
+  ("tools", "Change a page"),
+  ("optional", "Optional checks"),
+  ("undecided", "Decisions you leave open"),
+  ("ready", "When the document is ready to post")
+]) }}
+
+<h2 id="screen">What the screen shows</h2>
+<p>The page title is “Review” and the file name. Under it, one line says where you are:
+  “3 decisions to make.”, “2 of 3 decisions left.”, or “All decisions made.” A numbered row
+  (or, with many decisions, a bar) shows “1 of 3 decided”; each number is a link to that
+  decision.</p>
+<ul>
+  <li><strong>The decision.</strong> It is headed “Decision 2 of 3” with a label, “Needs your
+    decision” or “Decided”, and a sentence about why the tool asked. Choices are
+    buttons. Links take you to the previous and the next decision.</li>
+  <li><strong>The page.</strong> It is headed “Page 4 of 12” and shows the original page as an
+    image with a mark on each item. A mark is a link to its item. The key above the page says
+    what the marks mean: “Needs your decision”, “Same decision, other page”, “Optional check”
+    and “Accepted”. “Show accepted” and “Hide accepted” turn the accepted marks on and off.
+    “Previous page” and “Next page” move through the pages, and a list of pages says which
+    have decisions to make.</li>
+  <li><strong>On a phone</strong> the decision comes first and the page below it. A bar at the
+    bottom of the window, with “Decision” and “Page 4”, goes to either one.</li>
+  <li><strong>Links above the decision:</strong> “List view” (every item in one list, with a
+    filter), “Accept many equations” and “Accept many figures” when they are offered, and
+    “Results”, which goes back to the document's page.</li>
+</ul>
+<p>A skip link, “Skip to the decision”, goes straight to the decision. After a decision, the
+  screen shows what it did (for example “Accepted.”) with an <strong>Undo</strong> button, and
+  the next decision still waiting comes up. “More about this item” (on a group of items, “More about this decision”) opens the
+  details: the tool's confidence, the checks that failed, and “Report this item”.</p>
+<p>If you have text typed into a box that you have not saved, it is kept in this browser tab
+  and put back when that decision is shown again. It is not sent to the server until you
+  save, and it is gone when you close the tab or sign out in it. If the same document is open
+  in two tabs and the other one changed the item you are saving, that save is refused and
+  nothing is saved; the page says so and offers “Reload this page”. A change the other tab
+  made to a different item does not stop your save.</p>
+
+<h2 id="kinds">The kinds of decision</h2>
+<p>Each decision names its kind and a number, such as “Equation 3” or “Table 2”. The
+  buttons below are the ones the screen shows for that kind.</p>
+
+<details open>
+<summary>Equations</summary>
+<p>The screen shows the original equation as an image and the proposal at the same size
+  beside it, with how the proposal reads aloud and what a screen reader would get from
+  the PDF's own text. A table headed “What differs” lists symbols that differ between the
+  PDF's text and the proposal, and says whether each “Changes the meaning”.</p>
+<ul>
+  <li><strong>Accept</strong> keeps the proposal as it is. When the proposal changes the meaning
+    from the PDF's text, the button says <strong>Accept anyway</strong>. That keeps the
+    differing meaning.</li>
+  <li>When the checks point to one repair, a first button offers it. It saves the change and
+    checks again.</li>
+  <li><strong>Read again</strong> reads the picture once more and replaces the proposal.
+    <strong>Not an equation</strong> gives it back to the page as text, as the PDF has it.
+    Each appears only when it can be used.</li>
+  <li><strong>Edit the LaTeX</strong> opens a box. <strong>Save edit</strong> checks your LaTeX
+    against the PDF and saves it. If your LaTeX differs from the PDF in a way that changes the
+    meaning, the save is refused, and then <strong>Use my edit anyway</strong> appears.</li>
+  <li><strong>Keep as image</strong> shows students a picture of the original. Screen readers
+    read the PDF's text, as written in the PDF. For a LaTeX source with no picture to keep, the
+    button is <strong>Leave as written</strong>: students see the LaTeX as it was written,
+    marked “Not converted”.</li>
+  <li>Sometimes another reading of the same picture differs in a few symbols. Then a section
+    named “A second reading differs” offers one button for each reading, such as “Use ...”.
+    Nothing is chosen for you.</li>
+</ul>
+</details>
+
+<details>
+<summary>Figures</summary>
+<p>The screen shows the figure and its caption, and the proposed alt text in a box. The
+  hint under the box says how long alt text may be.</p>
+<ul>
+  <li><strong>Accept</strong> keeps the proposed alt text.</li>
+  <li><strong>Save and accept</strong> saves what you wrote in the box and accepts it in one
+    step. After a figure is decided, the button is <strong>Save changes</strong>.
+    <strong>Save, decide later</strong> saves your text and leaves the figure waiting.</li>
+  <li><strong>Decorative: adds nothing, so no alt text</strong> is a box to check, for a
+    figure that adds nothing.</li>
+  <li>A longer description, and a data table read from a chart, appear when long
+    descriptions are on. You can remove the data table (“Remove the data table (keep the
+    descriptions)”) or add an optional one (“Add the data table”).</li>
+  <li><strong>Keep without a description</strong> is under “If you cannot describe this
+    figure”. You check “I understand: screen reader users get no description.” first. The
+    figure then stays, marked “Needs a description”.</li>
+</ul>
+</details>
+
+<details>
+<summary>Tables</summary>
+<ul>
+  <li><strong>Accept</strong> keeps the table. If no cell is a header, there is no Accept: you
+    choose <strong>Use the first row as headers</strong>, <strong>Use the first column as
+    headers</strong>, <strong>Use the first row and column as headers</strong> or <strong>This
+    grid is not a table</strong>. Screen readers read each header with its cells.</li>
+  <li><strong>Use the grid read from the PDF</strong> gives students the grid as a table,
+    as read from the PDF. Compare it with the image first.</li>
+  <li><strong>This grid is not a table</strong> writes its words in order, without rows and
+    columns.</li>
+  <li><strong>Change the table</strong> opens a list of cells. Pick one and choose
+    <strong>Change this cell</strong>, then <strong>Save cell</strong>.
+    <strong>Read this cell with the model</strong> reads one cell again and checks what it
+    reads like a typed edit.</li>
+  <li><strong>Keep as image</strong> shows students a picture marked “not converted”.
+    Screen readers get no table.</li>
+  <li>When two or more tables wait with nothing found wrong, a button
+    <strong>Accept all N clean tables</strong> (with the number) accepts them in one step.
+    Undo takes them all back.</li>
+</ul>
+</details>
+
+<details>
+<summary>Headings</summary>
+<ul>
+  <li><strong>Accept</strong> keeps the heading as proposed.</li>
+  <li><strong>Make bold text</strong> (or <strong>Make plain text</strong>) keeps the words
+    but takes the line out of the outline.</li>
+  <li>A level box (“Level 1” to “Level 6”) and <strong>Save edit</strong> change the level.
+    The screen says which levels fit.</li>
+  <li>When the same words repeat on many pages, such as a running header, they become one
+    decision. It says how many times they appear and suggests an answer. <strong>Keep as
+    headings</strong> and <strong>Make bold text</strong> decide all of them.
+    <strong>Choose another level</strong> sets one level for all, and <strong>Decide them
+    one by one</strong> shows each with its own two buttons.</li>
+</ul>
+</details>
+
+<details>
+<summary>Paragraphs, scanned text and notes</summary>
+<ul>
+  <li>For a paragraph or list item the tool asks about, including text read from an image of
+    a scanned or handwritten page, the screen shows the words beside the page. The buttons are
+    <strong>Looks right</strong> and a button that keeps the original, named for what it does
+    (for text read from an image, “Keep as image”). <strong>Change the words</strong> opens the
+    page tools (below).</li>
+  <li>A note titled “Worth checking” says that something in a paragraph may need a look, such as
+    a link or a line. Nothing holds up the document: change the words if you agree, or leave
+    it.</li>
+</ul>
+</details>
+
+<h2 id="same">Choices that work the same way everywhere</h2>
+<ul>
+  <li><strong>Accept</strong> keeps the proposal as proposed. The line under it says so.</li>
+  <li>The button that keeps the original is named for what it does for that kind of item,
+    such as “Keep as image” or “Make bold text”, and the line under it says what students get.</li>
+  <li><strong>Save edit</strong> saves a change you typed. The screen says “Your edit passed the
+    required checks and was saved.” Once you change a field, Save edit becomes the main button.
+    If you press Accept with a changed field, nothing is accepted and the screen says “Choose
+    Save edit to use your change, or undo it to accept the proposal.”</li>
+  <li><strong>Hear this</strong> plays the proposal aloud with your browser's own voice. It
+    appears only when your browser has one. It is not a screen reader.</li>
+  <li><strong>Undo</strong> takes back the last decision. It is offered on the screen that the
+    decision made, and it covers a whole “accept many” step in one press.</li>
+</ul>
+
+<h2 id="keys">Keyboard shortcuts</h2>
+<p>Under the decision, a group named “Keyboard shortcuts” has a box, “Use keyboard
+  shortcuts”. It appears when JavaScript is running. The shortcuts are on until you turn them
+  off, and the choice is remembered in your browser.</p>
+<dl class="keys">
+  <div><dt><kbd>N</kbd></dt><dd>next decision</dd></div>
+  <div><dt><kbd>P</kbd></dt><dd>previous decision</dd></div>
+  <div><dt><kbd>A</kbd></dt><dd>accept</dd></div>
+  <div><dt><kbd>E</kbd></dt><dd>edit (go to the field)</dd></div>
+</dl>
+<p>A key does nothing while you type in a box or hold Ctrl, Alt, Shift or Command. If a key has
+  nothing to act on, the status line says so. A never presses “Accept anyway”, and it never
+  presses a choice that decides a whole page. Those need Tab and a press. Everything also works
+  without the shortcuts.</p>
+
+<h2 id="many">Accept many at once</h2>
+<p>Two kinds can be accepted in a group: equations and figures. The links “Accept many
+  equations (N)” and “Accept many figures (N)” appear when at least two are waiting with every
+  check passed. For equations, that also means the second automated check found nothing. For
+  figures, it means the alt text was generated and is not marked decorative.</p>
+<p>The link opens a list of those items, 20 to a page, each with the original and the
+  proposal. The button on the list (“Accept these N equations” or “Accept these N alt
+  texts”) accepts the ones listed on that page and nothing on the other pages. “Cancel” goes
+  back. Anything that failed a check or was flagged stays for you. Undo reverses the whole step.</p>
+
+<h2 id="tools">Change a page</h2>
+<p>Under the optional checks, a disclosure named “Change page 4” (with the current page number)
+  has three tools. On the document's page, the link <strong>Fix something on a page</strong>
+  opens the same tools for page 1 even when no decision is waiting. After a change here, the
+  screen offers <strong>Undo this change</strong>.</p>
+<ul>
+  <li><strong>Change the words, or make a line a heading.</strong> Choose a paragraph, a list
+    item or a heading on the page, change its words, and choose <strong>Save the words</strong>.
+    <strong>Make it a heading</strong> turns a line into a heading at the level you pick. An
+    equation, a figure or a table is changed in its own decision, not here. A link on words you
+    change is taken off.</li>
+  <li><strong>Add something the tool missed.</strong> Say whether it is “A picture or diagram”
+    or “An equation on its own line”, and give its place on the page: either as numbers from
+    0 to 100 for the left, top, right and bottom edges, or by choosing the line it starts after
+    and the line it ends before. <strong>Show the part I described</strong>
+    shows it cut out before anything is added. Then <strong>Add the picture</strong> (with its
+    alt text) or <strong>Read it as an equation</strong>. The tool reads the equation and you
+    check it as a decision. <strong>Change the region</strong> goes back to the numbers.</li>
+  <li><strong>Leave this page out.</strong> For a blank page or a cover. The page is left out
+    of the student file and of the review, and the file says that it is not there. Nothing is
+    deleted: <strong>Put page N back</strong> restores it. The last page left in a file stays.</li>
+</ul>
+
+<h2 id="optional">Optional checks</h2>
+<p>“Optional checks (N)” lists items the tool accepted for you, each with a small note.
+  Nothing needs doing unless you disagree: choose one to open it and change it. “Your
+  decisions (N)” lists what you decided.</p>
+
+<h2 id="undecided">Decisions you leave open</h2>
+<p>A decision you leave open is not decided for you. The document stays a draft until every
+  decision is made. When only lower-risk decisions are left (a reading that passed every check
+  with lower confidence, or a heading that repeats), the screen says so, and says again that
+  the document stays a draft.</p>
+<ul>
+  <li>On the document's page the status says how many decisions need you before you give it to
+    students, and the main button is <strong>Review</strong>.</li>
+  <li>If you try to download it anyway, a page asks first: “Download a draft of ...?” It says
+    what students would get: for each undecided part, the tool's suggestion as it is, and parts
+    kept as images marked “Not converted”. You can <strong>Review N decisions first</strong>
+    or <strong>Download the draft anyway</strong>.</li>
+  <li>A draft's file name ends in “-draft”, and the file opens with the line “Draft: 2
+    decisions are still open. Not for students.”</li>
+  <li>A person you shared the document with to view only is never given the draft. They are
+    told that the owner is still checking.</li>
+</ul>
+
+<h2 id="ready">When the document is ready to post</h2>
+<ul>
+  <li>The review line says “All decisions made.” and the decision area shows the finish line
+    with a state, for example “Ready to share”, “Ready” or “Partly converted”, and a sentence
+    on what was reviewed. The same state is on the document's page.</li>
+  <li>“Ready to share” means no decision is open, and the page says “Every part the tool found
+    was converted.” “Ready” and “Partly converted” say what remains, such as parts kept as pictures, pages left
+    out, or parts of a LaTeX source it could not read. The page says what it is.</li>
+  <li>When the document can be shared, the screen offers <strong>Download the HTML
+    file</strong>, <strong>Preview the student version</strong> and <strong>Listen as a
+    student</strong>. Read the student version through once and listen to it. The checks look at the structure of
+    the file, not at whether each part says what you meant.</li>
+  <li>Then see <a href="/help/posting">posting the file in your course</a>.</li>
+</ul>
+
+{{ help_row("review") }}
+{% endblock %}

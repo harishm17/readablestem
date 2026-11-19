@@ -17,6 +17,7 @@ import time
 import pytest
 
 from fixtures.web.support import ALICE, WebEnv, as_current, make_pdf
+from readablestem.core.types import Status
 from readablestem.web.db import Job, session_scope
 
 pytestmark = pytest.mark.browser
@@ -79,6 +80,12 @@ def sign_in(page, base: str) -> None:
 
 
 def finished_job(site, page) -> str:
+    # Nothing left to decide: a draft's page is made again from the result when it leaves, so
+    # the stored page a test puts in place is served only for a document that is ready.
+    for fix in site.converter.output.result.fixes:
+        if fix.pending:
+            fix.status = Status.REJECTED if fix.status is Status.ABSTAINED else Status.ACCEPTED
+            fix.reviewed = True
     page.goto(f"{site.base}/app")
     page.locator("#pdf").set_input_files(
         files=[{"name": "notes.pdf", "mimeType": "application/pdf", "buffer": make_pdf(1)}]
@@ -96,7 +103,9 @@ def test_a_hostile_document_runs_nothing_and_sees_no_cookie(site, browser):
     sign_in(page, site.base)
     job_id = finished_job(site, page)
     with session_scope(site.ctx.factory) as session:
-        session.get(Job, job_id).html = as_current(HOSTILE_DOCUMENT)
+        job = session.get(Job, job_id)
+        # served as stored: a finished job's page is otherwise made again on first use
+        job.html, job.html_stale = as_current(HOSTILE_DOCUMENT), False
     page.goto(f"{site.base}/jobs/{job_id}/view")
     assert page.locator("h1").inner_text() == "Hostile"
     page.locator("h1").click()

@@ -31,7 +31,7 @@ from readablestem.models import make_vision_client
 from readablestem.ops.aggregate import aggregate_finished
 from readablestem.pipeline.html_checks import static_checks
 from readablestem.web.app import create_app
-from readablestem.web.db import Blob, ErrorAggregate, Job, session_scope
+from readablestem.web.db import LARGE_COLUMNS, Blob, ErrorAggregate, Job, session_scope
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "worked_example.pdf"
 
@@ -46,7 +46,7 @@ class Site:
 
     def job(self, job_id: str) -> Job:
         with session_scope(self.ctx.factory) as session:
-            job = session.get(Job, job_id)
+            job = session.get(Job, job_id, options=LARGE_COLUMNS)
             assert job is not None
             return job
 
@@ -92,7 +92,7 @@ def without(html: str, *parts: str) -> str:
 
 
 def about(html: str) -> str:
-    match = re.search(r'<footer id="about-conversion".*?</footer>', html, flags=re.S)
+    match = re.search(r'<section id="about-conversion".*?</section>', html, flags=re.S)
     assert match
     return match.group(0)
 
@@ -143,9 +143,9 @@ def test_a_review_decision_reruns_the_checks_on_the_real_output(site):
     assert result.html_checks and all(c.passed for c in result.html_checks)
     assert result.fix_for("p1-e3").reviewed  # type: ignore[union-attr]
     note = about(job.html or "")
-    assert "accepted" not in note and "reviewer" not in note  # no counts for students
+    assert "accepted" not in note and "reviewer" not in note  # no review screen words
     page = site.browser.get(f"/jobs/{site.job_id}").text
-    assert f"All {len(result.html_checks)} checks passed" in page
+    assert f"All {len(result.html_checks)} structure checks passed" in page
 
 
 @pytest.mark.browser

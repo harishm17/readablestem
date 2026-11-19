@@ -51,9 +51,12 @@ Decisions, not fixes, are what a reviewer makes: repeated headings that share a
 as headings, gives them all one level, or makes them all bold text, in one transaction.
 
 Every review write counts itself on the job (`bump_result_version`, `jobs.result_version`),
-and every decision form carries the number its page was drawn at: a form from a page that
-is out of date (a tab left open while the document was changed in another one) is refused
-(`is_stale`) instead of silently overwriting the newer decision.
+and every decision form carries the number its page was drawn at. A write that acts on one
+item (or on the members of a group) is refused only when a write since then touched one of
+those (`routes.review.refuse_stale`, read from the `ReviewEdit` rows that record each write's
+number); a write that depends on the whole document (Undo, a page edit that moves other
+elements) is refused when anything changed (`is_stale`). Either way, the write is made on the
+newest stored result, never on the copy the page was drawn from.
 
 Validators, speech and the HTML assembler are looked up on their modules at call time,
 so tests (and other work packages' stubs) can be swapped in with monkeypatch.
@@ -64,9 +67,9 @@ from __future__ import annotations
 import logging
 import re
 from collections import Counter
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import date
 from typing import TYPE_CHECKING, Any
 
 from readablestem.core import triage
@@ -87,11 +90,14 @@ from readablestem.core.types import (
     TableGrid,
     grid_problems,
 )
+from readablestem.pipeline.notices import TEXT_DECISION_KINDS, TEXT_NOTICE_OF
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.web import reading_chips
 from readablestem.web.edit_check import MEANING_CODES
 from readablestem.web.messages import explain_check
 
 if TYPE_CHECKING:
+    from readablestem.pipeline.assemble import Stamp
     from readablestem.web.db import Job
     from readablestem.web.page_edits import StructureChange
 
@@ -116,6 +122,12 @@ ADD_DATA_TABLE = "add_data_table"
 # "Describe it in words" on an item kept as an image (T3-16): the text becomes the image's
 # alt text after the same checks as any alt text (`describe_in_words`).
 DESCRIBE = "describe"
+# "Read again" and "Not an equation" on an equation card (WS8.5, WS4.5): structural writes of
+# the decision route (`routes.edits.read_again`, `not_an_equation`), undone as one entry.
+REREAD = "reread"
+NOT_EQUATION = "not_equation"
+# The `ReviewEdit.action` of those two writes: Undo of one lands on the item, not on the page tools.
+ITEM_WRITES = frozenset({"read_again", NOT_EQUATION})
 MAX_LATEX_CHARS = 5000
 TEXT_EDIT_ELSEWHERE = (
     "Change the words of this text with “Change the words” on the page, then Accept it; "
@@ -131,12 +143,16 @@ GROUP_SLUGS = {
     Kind.FIGURE: "figures",
     Kind.TABLE: "tables",
     Kind.HEADING: "headings",
-    # Text read from an image of a scanned or handwritten page (ADR 0007): paragraphs and
-    # list items, the only prose that has a fix. Accept it, or keep it as the picture;
-    # its words are changed in the split view (`web.page_edits.edit_text`).
+    # Text with a decision of its own: read from an image of a scanned or handwritten page
+    # (ADR 0007), or a paragraph or list item layout doubts (`pipeline.notices.text_decisions`).
+    # Accept it; a scanned page's text can also be kept as the picture. Its words are
+    # changed in the split view (`web.page_edits.edit_text`).
     Kind.PARAGRAPH: "text",
+    Kind.LIST_ITEM: "list-items",
 }
 GROUP_KINDS = tuple(GROUP_SLUGS)
+# The kinds whose proposal is the element's own text.
+TEXT_FIX_KINDS = TEXT_DECISION_KINDS
 # Waiting for a decision: a proposal to check, or nothing usable (the reviewer can write
 # one, or reject to confirm the original stays).
 PENDING = PENDING_STATUSES
@@ -167,12 +183,15 @@ class ReviewInvalid(Exception):
 
 
 class ReviewStale(Exception):
-    """The form was drawn before the job's last review write (another tab or window):
-    nothing is applied (`is_stale`)."""
+    """The form was drawn before a review write that matters to it (another tab, window or
+    person): nothing is applied (`is_stale`, `routes.review.refuse_stale`)."""
 
-    def __init__(self, job_id: str) -> None:
+    def __init__(self, job_id: str, changed: Sequence[str] = ()) -> None:
         super().__init__("review form out of date")
         self.job_id = job_id  # the owned job row's id, as on `ReviewInvalid`
+        # The elements the write acts on that changed after the page was drawn, when that is
+        # what refused it (empty: the document changed in a way that touches every item).
+        self.changed = list(changed)
 
 
 # --------------------------------------------------------------------------- versions
@@ -244,8 +263,9 @@ class FixGroup:
 
     @property
     def units(self) -> list[list[Fix]]:
-        """The decisions waiting: one per fix, one per group of repeated headings."""
-        return triage.units(self.pending)
+        """The decisions waiting: one per fix, one per group of repeated headings, the
+        higher risk bands first (`triage.risk_rank`), each band in page order."""
+        return sorted(triage.units(self.pending), key=lambda unit: triage.risk_rank(unit[0]))
 
 
 # --------------------------------------------------------------------------- order
@@ -298,8 +318,8 @@ def kept_images_apart(groups: list[FixGroup]) -> list[FixGroup]:
 
 
 def group_fixes(result: DocumentResult) -> list[FixGroup]:
-    """Non-empty groups in priority order (equations, figures, headings). Paragraph and
-    list fixes, if a future step makes any, are not reviewable here."""
+    """Non-empty groups in priority order (equations, figures, tables, headings, text, list
+    items)."""
     position = _positions(result)
     groups = []
     for kind in GROUP_KINDS:
@@ -341,7 +361,7 @@ def item_labels(result: DocumentResult) -> dict[str, str]:
     print when every table has a "Table N" caption and no two share one: a table the
     detector missed would otherwise shift every number, and the card titled "Table 3"
     would show the caption "Table 4"."""
-    from readablestem.web.views import KIND_LABELS
+    from readablestem.web.messages import KIND_LABELS
 
     numbers = item_numbers(result)
     labels: dict[str, str] = _kept_image_labels(result)
@@ -407,8 +427,15 @@ def next_to_review(result: DocumentResult, element_id: str) -> str | None:
         for unit in g.units
         if unit[0].element_id != element_id
     ]
-    here = position.get(element_id)
-    later = [e for e in heads if here is not None and position[e] > here]
+
+    def place(eid: str) -> tuple[int, int, int, int] | None:
+        """Where an element stands in the walk: its kind section, its risk band, then
+        its page and reading order."""
+        at, member = position.get(eid), result.fix_for(eid)
+        return None if at is None or member is None else (at[0], triage.risk_rank(member), *at[1:])
+
+    here = place(element_id)
+    later = [e for e in heads if here is not None and (place(e) or here) > here]
     remaining = later or heads
     return remaining[0] if remaining else None
 
@@ -430,8 +457,8 @@ def group_anchor(group_key: str) -> str:
 
 
 def has_proposal(fix: Fix) -> bool:
-    # A paragraph's proposal is its text, which lives on its element (ADR 0007).
-    return fix.kind is Kind.PARAGRAPH or any(
+    # A paragraph's or list item's proposal is its text, which lives on its element (ADR 0007).
+    return fix.kind in TEXT_FIX_KINDS or any(
         p is not None for p in (fix.equation, fix.figure, fix.heading, fix.table)
     )
 
@@ -576,6 +603,8 @@ def apply_review(
         message = "This proposal failed a required check, so it cannot be accepted as it is. "
         message += "Edit it, or reject it to keep the original."
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    if action == "accept" and headers_required(fix):
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), NO_HEADERS_TO_ACCEPT)])
     if action == "accept" and fix.heading is not None:
         _refuse_moved_level(result, element_id, fix.heading.level, then="then Save edit")
     if action == "accept":
@@ -603,6 +632,11 @@ def apply_review(
         fix.described = None  # converted now: a description of the image is not used
     # A reviewer's Accept is not the pipeline's automatic one; an open table is undecided.
     fix.reviewed = status not in PENDING
+    if fix.reviewed and status is not Status.REJECTED and fix.figure and fix.figure.decorative:
+        # A person decided it is decoration: the evidence for its empty alt text (WS6.4).
+        from readablestem.pipeline import decoration
+
+        fix.figure = fix.figure.model_copy(update={"decoration": decoration.PERSON})
     _recount(result)
     after = snapshot(fix)
     if overridden:
@@ -757,7 +791,7 @@ def _edit(
         return _edit_figure(fix, element, form)
     if fix.kind is Kind.HEADING:
         return _edit_heading(result, fix, element, form)
-    if fix.kind is Kind.PARAGRAPH:
+    if fix.kind in TEXT_FIX_KINDS:
         raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), TEXT_EDIT_ELSEWHERE)])
     raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), "This cannot be edited.")])
 
@@ -811,7 +845,11 @@ def _edit_equation(
         refused.override = True
         raise refused
     fix.equation = EquationFix(
-        latex=checked.latex, mathml=checked.mathml, speech=checked.speech, display=checked.display
+        latex=checked.latex,
+        mathml=checked.mathml,
+        speech=checked.speech,
+        speech_version=SPEECH_VERSION,
+        display=checked.display,
     )
     fix.checks = checked.checks
     return [c for c in fix.checks if not c.passed]
@@ -1291,6 +1329,8 @@ def reject_keeps(origin: str, fix: Fix, element: Element | None) -> str:
     kind. A source has no page pictures until its witness gives them (plan WS18.4)."""
     if fix.kind not in KEPT_AS_PICTURE:
         return ""
+    if fix.reason in TEXT_NOTICE_OF:
+        return "nothing"  # a doubt about the words of a text layer: no picture is made of it
     if origin == "pdf":
         return "picture"
     return "written" if element is not None and (element.text or "").strip() else "nothing"
@@ -1350,6 +1390,24 @@ NO_TABLE_TO_ACCEPT = (
     "There is no rebuilt table to accept. Use the grid read from the PDF, if there is one, "
     "or keep the image."
 )
+NO_HEADERS_TO_ACCEPT = (
+    "No cell of this table is a header, so it cannot be accepted as it is. Choose the first "
+    "row, the first column or both as headers, or say that the grid is not a table."
+)
+
+
+def headers_required(fix: Fix) -> bool:
+    """A data table of at least two rows in which no cell is a header (WS5.2): it is never
+    accepted as it is, whatever else the checks found. A person chooses the header row, the
+    header column or both, or says the grid is not a table."""
+    grid = fix.table.grid if fix.table is not None else None
+    return (
+        grid is not None
+        and grid.is_data
+        and grid.rows >= 2
+        and any(c.code == "no_headers" for c in fix.failed_checks)
+    )
+
 
 # What each `core.types.grid_problems` code means, for the table card and for an edit
 # that is refused. Positions and fixed words only.
@@ -1478,7 +1536,9 @@ def edit_table(
         if grid is None:
             message = "There is no grid read from the PDF that could be used for this table."
             raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
-        fix.table = TableFix(grid=grid.model_copy(deep=True))
+        found = any(c.header for c in grid.cells)
+        source = "layout" if found else "none"
+        fix.table = TableFix(grid=grid.model_copy(deep=True, update={"header_source": source}))
         fix.checks = table_checks(fix.table.grid, element)
         failed = [c for c in fix.checks if not c.passed]
         return failed, USE_LOCAL_NOTE
@@ -1610,6 +1670,8 @@ def _edit_headers(
         raise ReviewInvalid([FieldError(fid, message)], values)
     edited = with_header_col(with_header_row(grid, row), col)
     _refuse_new_problems(grid, edited, fid, "The headers were", values)
+    chosen = any(c.header for c in edited.cells)  # a person unticking both leaves no header
+    edited = edited.model_copy(update={"header_source": "reviewer" if chosen else "none"})
     fix.table = TableFix(grid=edited)
     fix.checks = table_checks(edited, element)
     first_row = "The first row is a header" if row else "The first row is not a header"
@@ -1704,6 +1766,14 @@ def is_image_page_item(element: Element | None) -> bool:
     return element is not None and IMAGE_PAGE_REASON in element.reasons
 
 
+def asked_in_a_high_band(fix: Fix) -> bool:
+    """The decision was asked in band 1, 2 or 3 (`triage.risk_rank`: nothing usable was made,
+    what a student reads may be wrong, or the order of a page): a person decides it, whatever
+    its checks say now. The band is fixed when the decision is asked, so a reading made again
+    that passes every check still has the band of the failure that led to it."""
+    return triage.risk_rank(fix) <= triage.STOP_AFTER_BAND
+
+
 def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
     """A table that waits for a decision although nothing was found wrong with it (the model
     was not sure enough of it to accept it): a data table with a proposal, no failed check
@@ -1714,8 +1784,8 @@ def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
 
     if fix.kind is not Kind.TABLE or fix.status is not Status.NEEDS_REVIEW:
         return False
-    if is_image_page_item(element):
-        return False  # read from a picture of a page: every one is its own decision
+    if is_image_page_item(element) or asked_in_a_high_band(fix):
+        return False  # read from a picture of a page, or a decision of bands 1 to 3
     table = fix.table
     return (
         table is not None
@@ -1815,19 +1885,36 @@ def rerender_html(
     title_override: str | None = None,
     contact: str | None = None,
     math_alttext: bool | None = None,
+    filename: str = "",
+    audience: str = "student",
+    stamp: Stamp | None = None,
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
+    `audience` "checker" makes a draft's page in the checker's words (`assemble.CHECKER`);
+    it is never stored.
 
     The static checks of the new HTML replace `result.html_checks`, so the job page lists
     the checks of the file the user downloads, not of the one before the review.
-    `checked_on` is the day of the last decision for the student note ("checked by your
-    instructor on ..." once no decision is open); by default today (UTC), since a
-    re-render follows a decision. The assembler ignores it while a decision is open.
+    `checked_on` is the day of the last decision for the student note ("Your instructor
+    reviewed ... on ..."); None writes no date, because a day nobody recorded is not one
+    to claim (decisions carried from an earlier conversion have none).
     `math_alttext` is the app's `Settings.mathml_alttext`, the setting the first render used
     (T2-24): the file made again must read like the first one (None: the process settings).
     """
-    from readablestem.pipeline import assemble, html_checks
+    from readablestem.pipeline import assemble, checked, decoration, html_checks
+    from readablestem.pipeline.speech import refresh_readings
 
+    # A reading made by older speech rules is made again from its MathML, so the file says
+    # what the review screen and Listen say (`speech.reading_for`).
+    refresh_readings(result)
+    # Empty alt text only for decoration with evidence (WS6.4), also for a result stored
+    # before the rule: a figure its page writes as "Figure not described" waits for its
+    # decision. A person's decision is never changed; a settled result is left as it is.
+    first: dict[str, Fix] = {}
+    for fix in result.fixes:
+        first.setdefault(fix.element_id, fix)
+    if decoration.settle(result.elements, first, crops, kept=assemble.KEPT_IMAGE_WORDS):
+        _recount(result)
     # The instructor's choices are passed only when there are any, so a file made without
     # them is made exactly as before.
     chosen: dict[str, Any] = {}
@@ -1837,14 +1924,20 @@ def rerender_html(
         chosen |= {"contact": contact}
     html = assemble.render_html(
         origin=result.origin,
+        unread=checked.unread_of(result),
+        cut_off_pages=checked.cut_off_of(result),
         title=title_override or result.title,
+        filename=filename,
+        audience=audience,
+        stamp=stamp,
         **chosen,
         lang=result.lang,
         elements=result.elements,
         fixes=result.fixes,
         crops=crops,
         source_note=None,
-        checked_on=checked_on or datetime.now(UTC).date(),
+        checked_on=checked_on,
+        pages=result.stats.pages or None,
         math_alttext=math_alttext,
         page_labels=result.page_labels,
         pdf_pages=dict(enumerate(result.source_pages)),
@@ -1864,9 +1957,14 @@ def rerender_job_html(
     *,
     checked_on: date | None = None,
     math_alttext: bool | None = None,
+    audience: str = "student",
 ) -> str:
     """`rerender_html` with the job's own choices for the student file: the title the
-    instructor set and the contact line (T1-7, T1-17), and the app's MathML setting."""
+    instructor set and the contact line (T1-7, T1-17), the app's MathML setting, and the
+    job's version id and date (`output.stamp_of`, WS20.1): the file says which version of the
+    document it is, whoever asks for it and whenever."""
+    from readablestem.web import output
+
     return rerender_html(
         result,
         crops,
@@ -1874,4 +1972,7 @@ def rerender_job_html(
         title_override=job.title_override,
         contact=job.contact_line,
         math_alttext=math_alttext,
+        filename=job.filename,
+        audience=audience,
+        stamp=output.stamp_of(job),
     )

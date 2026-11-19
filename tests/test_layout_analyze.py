@@ -8,6 +8,8 @@ errors) and asserts the exact elements that come out.
 from __future__ import annotations
 
 import logging
+import unicodedata
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -18,8 +20,10 @@ from readablestem.pipeline.layout import (
     REASON_NUMBERED,
     LayoutError,
     analyze,
+    crop,
     heading_levels,
 )
+from readablestem.pipeline.output_chars import GAP
 
 BODY = 11.0
 PITCH = 15.0  # baseline-to-baseline distance used for body text in these pages
@@ -201,6 +205,35 @@ def test_inline_maths_becomes_child_equations_with_markers_in_the_paragraph():
         assert px0 <= x0 < x1 <= px1 and py0 <= y0 < y1 <= py1
 
 
+def test_a_greek_sentence_is_prose_and_a_lone_greek_letter_is_still_maths():
+    greek = analyze(
+        html_page("<p>Δυνάμεις είναι η επιστήμη της κίνησης των σωμάτων και των δυνάμεων.</p>")
+    ).elements
+    assert [e.kind for e in greek] == [Kind.PARAGRAPH]  # one paragraph, no equation
+    assert "είναι η επιστήμη" in greek[0].text
+    english = analyze(html_page("<p>The angle \u03b8 is small and the force is large today.</p>"))
+    assert [e.text for e in english.elements if e.kind == Kind.EQUATION] == ["\u03b8"]
+    # Two Greek letters alone in an English line are two symbols, not a word.
+    pair = analyze(
+        html_page("<p>The change \u0394\u03b8 is small and the force is large today.</p>")
+    )
+    assert [e.text for e in pair.elements if e.kind == Kind.EQUATION] == ["\u0394\u03b8"]
+
+
+def test_lines_of_chinese_japanese_and_thai_join_without_a_space():
+    def fill(page):
+        page.insert_htmlbox(
+            pymupdf.Rect(72, 72, 190, 300),
+            "<p>植物は光合成によって酸素が放出されることを学びました。看起来很好。同学们都很开心。</p>",
+        )
+
+    data = one_page(fill)
+    assert len(pymupdf.open(stream=data)[0].get_text().splitlines()) > 2  # it wrapped
+    paragraph = analyze(data).elements[0]
+    assert " " not in paragraph.text
+    assert "酸素が放出" in paragraph.text and "看起来" in paragraph.text
+
+
 def test_code_option_dashes_and_markup_are_not_maths():
     def fill(page):
         page.insert_text((72, 100), "x = 5", fontsize=BODY, fontname="cour")  # code listing
@@ -379,6 +412,50 @@ def test_running_headers_footers_and_page_numbers_are_dropped():
     assert [e.id for e in layout.elements[:3]] == ["p1-e0", "p1-e1", "p2-e0"]
 
 
+TOPICS = ["motion", "force", "energy", "momentum", "gravity", "waves", "heat", "light"]
+
+
+def book_pages(count: int) -> bytes:
+    """Running heads as a book sets them: the left page's holds its number and the chapter,
+    the right page's the section and its number, and the chapter changes part way through.
+    Every page also has a body line close under the head, a number in the footer, the
+    headings "Solution" and "Example" in the same place, and at its foot a note in small type
+    whose words change (a footnote, a slide's source line): at one height on every page like
+    a running foot, but part of the page."""
+    doc = pymupdf.open()
+    for number in range(1, count + 1):
+        page = doc.new_page(width=612, height=792)
+        chapter = 1 if number <= count // 2 else 2
+        if number % 2:
+            page.insert_text((72, 62), f"{number}   Chapter {chapter} Motion", fontsize=8)
+        else:
+            page.insert_text((330, 62), f"{chapter}.{number} Section {number} title", fontsize=8)
+        write(page, 72, 82, [f"This page opens with {TOPICS[number - 1]}, under its head."])
+        page.insert_text((72, 300), "Solution", fontsize=12, fontname="hebo")
+        write(page, 72, 320, [f"Worked answer {number}."])
+        page.insert_text((72, 400), "Example", fontsize=12, fontname="hebo")
+        write(page, 72, 420, [f"Worked example {number}."])
+        page.insert_text((72, 735), f"Source: lecture notes on {TOPICS[number - 1]}.", fontsize=8)
+        page.insert_text((300, 760), str(number), fontsize=8)
+    return doc.tobytes()
+
+
+def test_alternating_running_heads_whose_text_changes_are_dropped_and_repeated_headings_stay():
+    layout = analyze(book_pages(8))
+    assert texts(layout.elements) == [
+        line
+        for number in range(1, 9)
+        for line in (
+            f"This page opens with {TOPICS[number - 1]}, under its head.",
+            "Solution",
+            f"Worked answer {number}.",
+            "Example",
+            f"Worked example {number}.",
+            f"Source: lecture notes on {TOPICS[number - 1]}.",
+        )
+    ]
+
+
 def test_margin_repetition_is_judged_on_neighbouring_pages_when_one_page_is_analysed():
     layout = analyze(running_pages(4), pages=[2])
     assert texts(layout.elements) == [
@@ -398,6 +475,40 @@ def test_a_single_page_keeps_unrepeated_margin_text_but_drops_the_page_number():
         "Draft handout for discussion",
         "The only body paragraph on this page.",
     ]
+
+
+@pytest.mark.parametrize("turn", [90, 270])
+def test_a_page_saved_sideways_with_no_rotate_is_read_as_the_page_it_shows(turn):
+    # A landscape page printed to PDF: every line runs up (or down) the page and /Rotate is 0.
+    # It is turned before it is read, so the title is the heading above its paragraph and a
+    # crop shows it upright; a short label set sideways on an upright page turns nothing.
+    title = "Results of the second experiment"
+    body = [
+        "The measured values agree with the model within the error of the instrument.",
+        "Each run was repeated three times and the mean of the three is reported.",
+    ]
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    for i, (size, line) in enumerate([(20, title), (12, body[0]), (12, body[1])]):
+        at = (90 + 26 * i, 760) if turn == 90 else (500 - 26 * i, 80)
+        page.insert_text(at, line, fontsize=size, rotate=turn)
+    pdf = doc.tobytes()
+
+    out = analyze(pdf)
+    assert [(e.kind, e.text) for e in out.elements] == [
+        (Kind.HEADING, title),
+        (Kind.PARAGRAPH, " ".join(body)),
+    ]
+    assert out.page_sizes == [(842.0, 595.0)]
+    assert crop(pdf, out.elements[0]).startswith(b"\x89PNG")
+    shown = pymupdf.Pixmap(crop(pdf, out.elements[0]))
+    assert shown.width > 5 * shown.height  # a one-line title, upright
+
+    upright = pymupdf.open()
+    plain = upright.new_page(width=595, height=842)
+    write(plain, 72, 100, ["An upright page whose body text runs along its lines, as usual."] * 3)
+    plain.insert_text((30, 600), "Axis label", fontsize=9, rotate=90)
+    assert analyze(upright.tobytes()).page_sizes == [(595.0, 842.0)]
 
 
 # ---------------------------------------------------------------- document properties
@@ -491,3 +602,91 @@ def test_analysis_logs_nothing_about_the_document(caplog):
     analyze(one_page(lambda p: write(p, 72, 100, ["Confidential student feedback here."])))
     assert not [r for r in caplog.records if r.name.startswith("readablestem")]
     assert "Confidential" not in caplog.text
+
+
+# ---------------------------------------------------------------- font codes
+
+
+def font_page(font: str, rows: list[str], differences: str = "") -> bytes:
+    """A one-page PDF whose rows are set in a font named `font` that has no font program
+    and no ToUnicode map, so the text layer gives the codes as they are. `rows` are PDF
+    string literals; `differences` names glyphs for codes (`1 /uniF0A7`) as Word does."""
+    stream = "BT /F1 11 Tf 15 TL 72 700 Td\n" + "".join(f"({row}) Tj T*\n" for row in rows) + "ET"
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R"
+        " /Resources << /Font << /F1 5 0 R >> >> >>",
+        f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
+        f"<< /Type /Font /Subtype /Type1 /BaseFont /{font} /Encoding << /BaseEncoding"
+        f" /WinAnsiEncoding /Differences [{differences}] >> >>",
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+    return out
+
+
+@pytest.mark.parametrize(
+    ("font", "rows", "differences", "expected"),
+    [
+        # Word's Wingdings bullets, as the private-use code or as the Latin-1 letter
+        ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF0A7", ["▪"]),
+        ("Wingdings-Regular", ["\\374 first point", "\\374 second point"], "", ["✓"]),
+        ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF0D8", ["➢"]),
+        ("Wingdings", ["\\001 first point", "\\001 second point"], "1 /uniF076", ["❖"]),
+        # the same private-use code in Symbol is a club, not a bullet
+        ("SymbolMT", ["\\001 first point", "\\001 second point"], "1 /uniF0A7", []),
+        # unreadable glyphs of an icon font that start several lines are bullets
+        ("IconsRegular", ["\\001 first point", "\\001 second point"], "1 /uniE001", ["•"]),
+    ],
+)
+def test_bullets_of_symbol_fonts_are_list_items_by_font_name(font, rows, differences, expected):
+    elements = analyze(font_page(font, rows, differences)).elements
+    assert [e.list_marker for e in elements if e.kind == Kind.LIST_ITEM] == expected * 2
+    assert not any("" in (e.text or "") or "" in (e.text or "") for e in elements)
+
+
+@pytest.mark.parametrize(
+    ("font", "row", "differences", "word"),
+    [
+        ("SymbolMT", "The ligand (h5-C5H5) binds iron.", "", "η5"),
+        ("Symbol", "The angle \\001 is small.", "1 /uniF071", "θ"),
+        ("MT-Extra", "The length \\001 is small.", "1 /uniF06C", "\u2113"),
+        ("AdvP4C4E74", "The sum a\\376b\\274c is small.", "", "a+b=c"),
+        ("Wingdings", "The step \\001 follows it.", "1 /uniF0E0", "→"),  # maths, so an equation
+        ("CMR10", "The e\\013ects are small.", "11 /uni000B", "effects"),
+        # MathTime Pro 2 draws its parentheses at the codes of "." and "/"
+        ("MT2MIT", "The value p.n/ is small.", "", "p(n)"),
+    ],
+)
+def test_codes_are_read_as_what_their_font_draws(font, row, differences, word):
+    rows = ["Plain text on the first line.", row, "Plain text on the last line."]
+    text = " ".join(e.text or "" for e in analyze(font_page(font, rows, differences)).elements)
+    assert word in text
+
+
+def test_tex_extension_font_glyphs_are_read_by_the_names_the_font_gives_them():
+    # calculus_notes.pdf (TeX, CMEX10): a display sum, an integral and the built-up brace of a
+    # cases. The font has no table to Unicode, so the text layer gives U+FFFD for the signs and
+    # private-use codes for the brace's pieces; the file names every glyph.
+    data = Path(__file__).parent.joinpath("fixtures/layout/latex/calculus_notes.pdf").read_bytes()
+    text = " ".join(e.text or "" for e in analyze(data).elements)
+    assert "\u2211" in text and "\u222b" in text and "\u23a7 \u23a8" in text
+    assert not [c for c in text if c == "\ufffd" or unicodedata.category(c) == "Co"]
+
+
+def test_a_stroke_the_font_draws_over_an_l_reads_as_the_l_with_a_stroke():
+    # 2505.03022.pdf (TeX, CMR10): an author's name is set with \l, which prints the glyph
+    # `suppress` over a plain l. The stroke has no character of its own, so the name came out
+    # with a gap mark in front of the l.
+    data = Path(__file__).parent.parent.joinpath("data/real-tables/2505.03022.pdf").read_bytes()
+    text = " ".join(e.text or "" for e in analyze(data, pages=[0]).elements)
+    assert "D\u0142otko" in text
+    assert GAP not in text

@@ -472,7 +472,7 @@ def any_check_enabled(settings: Settings) -> bool:
 
 def claude_check_enabled(settings: Settings) -> bool:
     """The second check on Claude (`models.claude_verifier`, T2-20) is used only with the
-    Anthropic provider, and unless CLAUDE_SECOND_CHECK=off."""
+    Anthropic provider, and when CLAUDE_SECOND_CHECK is not off (it is off by default)."""
     return settings.model_provider == "anthropic" and settings.claude_second_check != "off"
 
 

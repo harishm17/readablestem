@@ -8,11 +8,15 @@ the running app: anonymous visitors, a second user (IDOR) and a non-admin.
 
 from __future__ import annotations
 
+import re
+from pathlib import Path
+
 import pytest
 from sqlalchemy import func, select
 
 from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, csrf_from, job_id_from, login, upload
 from fixtures.web.support import make_pdf as pdf
+from readablestem import web as web_package
 from readablestem.web.db import (
     Course,
     CourseNotation,
@@ -37,9 +41,14 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/privacy"): PUBLIC,
     ("GET", "/terms"): PUBLIC,
     ("GET", "/limits"): PUBLIC,
+    ("GET", "/pricing"): PUBLIC,
+    ("GET", "/security"): PUBLIC,
     ("GET", "/for-accessibility-offices"): PUBLIC,
     ("GET", "/for-accessibility-offices/summary"): PUBLIC,
+    ("GET", "/help"): PUBLIC,
+    ("GET", "/help/review"): PUBLIC,
     ("GET", "/help/posting"): PUBLIC,
+    ("GET", "/help/latex"): PUBLIC,
     ("GET", "/guides"): PUBLIC,
     ("GET", "/guides/ada-title-ii-stem-course-materials"): PUBLIC,
     ("GET", "/guides/readablestem-mathpix-latexml"): PUBLIC,
@@ -53,10 +62,16 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/llms.txt"): PUBLIC,
     ("GET", "/18149cf3a15bfa791042a3df7fdc0388.txt"): PUBLIC,  # IndexNow key
     ("GET", "/favicon.ico"): PUBLIC,
+    ("GET", "/apple-touch-icon.png"): PUBLIC,
+    ("GET", "/site.webmanifest"): PUBLIC,
     ("GET", "/showcase"): PUBLIC,
     ("GET", "/showcase/{rel:path}"): PUBLIC,
     ("GET", "/login"): PUBLIC,
     ("POST", "/login"): PUBLIC,
+    # WS27.2: the one address that shows a document without a sign-in. The token is the
+    # credential; it shows the published student version and nothing else, sets no cookie, and
+    # is 404 unless FEATURE_CLASS_LINK is on (tests/test_job_shares.py).
+    ("GET", "/s/{token}"): PUBLIC,
     ("POST", "/login/microsoft"): PUBLIC,
     (
         "POST",
@@ -71,6 +86,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/logout"): PUBLIC,
     ("POST", "/internal/cron/aggregate-and-purge"): CRON,
     ("GET", "/admin"): ADMIN_ONLY,
+    ("GET", "/admin/reports"): ADMIN_ONLY,  # SW25: problem reports; ids, codes and typed text
+    ("POST", "/admin/reports/{report_id}/close"): ADMIN_ONLY,
     ("GET", "/admin/health"): ADMIN_ONLY,  # stale task names, storage, sandbox probe
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
@@ -82,6 +99,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/account/delete"): USER,
     ("POST", "/account/delete"): USER,  # CSRF; erases the caller's own account only
     ("POST", "/account/keep-default"): USER,  # CSRF; the caller's own setting only
+    ("POST", "/account/name"): USER,  # CSRF; the caller's own name only
+    ("GET", "/account/export"): USER,  # the caller's own documents, records, courses, settings
     ("GET", "/app"): USER,
     ("GET", "/app/documents"): USER,
     ("GET", "/app/download"): USER,  # T3-4: a zip of the person's own ready documents
@@ -96,12 +115,15 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/courses/{course_id}/entries"): USER,
     ("GET", "/courses/{course_id}/entries/{entry_id}"): USER,
     ("POST", "/courses/{course_id}/entries/{entry_id}"): USER,
+    ("GET", "/courses/{course_id}/entries/{entry_id}/delete"): USER,  # the question first
     ("POST", "/courses/{course_id}/entries/{entry_id}/delete"): USER,
     ("POST", "/courses/{course_id}/remember"): USER,
     ("POST", "/courses/{course_id}/suggestions"): USER,  # T3-12: CSRF, owner of course (and job)
     ("POST", "/courses/{course_id}/starter"): USER,  # CSRF, owner of the course; adds ticked rows
     ("POST", "/courses/{course_id}/documents"): USER,  # CSRF, owner of course and of each document
     ("POST", "/courses/{course_id}/rename"): USER,
+    ("POST", "/courses/{course_id}/people"): USER,  # CSRF, owner of the course; 404 while off
+    ("POST", "/courses/{course_id}/people/{grant_id}/remove"): USER,  # CSRF, owner, asks first
     ("GET", "/jobs/{job_id}"): USER,
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): USER,
     ("GET", "/jobs/{job_id}/delete"): USER,
@@ -112,13 +134,17 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/download.docx"): USER,  # W3: the same file as Word
     ("GET", "/jobs/{job_id}/download.epub"): USER,  # W3: the same file as an EPUB
     ("GET", "/jobs/{job_id}/combine"): USER,  # T3-3: the finished parts of a source, joined
+    ("GET", "/jobs/{job_id}/combine/parts"): USER,  # the parts of a source and what each needs
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("POST", "/jobs/{job_id}/draft"): USER,  # SW21: the draft page's confirm
+    ("GET", "/jobs/{job_id}/report"): USER,  # SW25: review right; the problem-report form
+    ("POST", "/jobs/{job_id}/report"): USER,  # CSRF, review right, 5 per 10 minutes per person
     ("GET", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/contact"): USER,  # T1-17: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/keep"): USER,  # T1-8: CSRF, owner only, per-person kept cap
     ("POST", "/jobs/{job_id}/language"): USER,
+    ("POST", "/jobs/{job_id}/cut-off"): USER,  # WS14.5: CSRF, owner only; "continue"
     ("GET", "/jobs/{job_id}/pages/{number}.png"): USER,
     # T3-16: leave a page out of review and of the student file, and put it back. CSRF,
     # owner only, review version checked; not rate limited (like a decision).
@@ -149,6 +175,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/review/{element_id}/check"): USER,
     ("GET", "/jobs/{job_id}/status"): USER,
     ("POST", "/jobs/{job_id}/retry"): USER,  # T3-1: CSRF, owner only, rate limited, tries capped
+    ("POST", "/jobs/{job_id}/cancel"): USER,  # WS11.3a: CSRF, owner only, rate limited
     ("POST", "/jobs/{job_id}/title"): USER,
     # H11: the Symbols screen; the POST is a review write (CSRF, owner only, version-checked)
     ("GET", "/jobs/{job_id}/symbols"): USER,
@@ -163,6 +190,15 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/share"): USER,
     ("POST", "/jobs/{job_id}/share"): USER,  # CSRF, owner only
     ("POST", "/jobs/{job_id}/share/{share_id}/revoke"): USER,  # CSRF, owner only
+    # WS27.2: the class link. Owner only and CSRF-checked, and 404 for everyone while
+    # FEATURE_CLASS_LINK is off: make one (the answer shows its address once), pause, resume,
+    # remove it, and update the published copy.
+    ("POST", "/jobs/{job_id}/share/link"): USER,
+    ("POST", "/jobs/{job_id}/share/link/pause"): USER,
+    ("POST", "/jobs/{job_id}/share/link/resume"): USER,
+    ("GET", "/jobs/{job_id}/share/link/remove"): USER,  # the question before removing it
+    ("POST", "/jobs/{job_id}/share/link/remove"): USER,
+    ("POST", "/jobs/{job_id}/share/link/update"): USER,
     # T3-3: a large file kept while its owner chooses the pages; owner only like a job
     ("GET", "/uploads/{upload_id}"): USER,
     ("GET", "/uploads/{upload_id}/preview"): USER,  # owner only: the parts list for typed pages
@@ -190,6 +226,7 @@ def site(tmp_path):
     env = WebEnv(
         tmp_path,
         feature_notation_memory=True,
+        feature_course_grants=True,
         email_login_enabled=True,
         email_sender="outbox",
         max_large_upload_mb=5,
@@ -247,6 +284,8 @@ def site(tmp_path):
             "course_id": course_id,
             "entry_id": entry_id,
             "share_id": "1" * 32,
+            "grant_id": "1" * 32,
+            "report_id": "1",
             "element_id": "p1-e3",
             "slug": "equations",
             "number": "1",
@@ -280,6 +319,22 @@ def test_every_route_is_classified(site):
     assert actual == set(ROUTES), "classify new routes in ROUTES (and docs/security.md)"
 
 
+def test_every_signed_in_page_marks_one_place_in_the_nav(site):
+    """The nav names where you are: once on every page of a section (a document's pages mark
+    "My documents"), never twice."""
+    sections = ("/app", "/jobs/", "/uploads/", "/courses", "/account", "/admin")
+    for (method, template), who in ROUTES.items():
+        if method != "GET" or who not in {USER, ADMIN_ONLY}:
+            continue
+        path = fill(site, template)
+        response = (site.admin if who == ADMIN_ONLY else site.alice).get(path)
+        nav = re.search(r'<nav aria-label="Main">.*?</nav>', response.text, re.S)
+        if response.status_code != 200 or nav is None:
+            continue  # a redirect, a file, or a page with its own frame
+        marks = nav.group(0).count('aria-current="page"')
+        assert marks == (1 if path.startswith(sections) else 0), (path, marks)
+
+
 def anonymous_response(env, method: str, path: str):
     if method == "GET":
         return env.anon.get(path)
@@ -292,7 +347,13 @@ def test_signed_out_visitors_get_nothing_from_user_and_admin_routes(site):
         if who not in {USER, ADMIN_ONLY}:
             continue
         response = anonymous_response(site, method, fill(site, template))
-        assert response.status_code in {303, 401, 403}, (method, template, response.status_code)
+        # The live LaTeX check answers a signed-out session with an empty 204 (F-088).
+        quiet = response.status_code == 204 and response.text == ""
+        assert quiet or response.status_code in {303, 401, 403}, (
+            method,
+            template,
+            response.status_code,
+        )
         assert "SECRET" not in response.text, (method, template)
     assert counts(site) == before
 
@@ -385,3 +446,99 @@ def test_an_admin_is_not_an_owner(site):
         response = send(site.admin, method, real, token)
         assert response.status_code in {400, 404}, (method, template, response.status_code)
         assert "SECRET" not in response.text, (method, template)
+
+
+# --------------------------------------------------------------------------- partial audiences
+
+TEMPLATES = Path(web_package.__file__).parent / "templates"
+EVERYONE = frozenset({"owner", "reviewer", "reader"})
+# The pages that include partials, and who is ever given each (`views.audience_of`). A reader
+# never gets `job.html`; the review templates are for a Review right or more.
+AUDIENCE_ROOTS = {
+    "job.html": frozenset({"owner", "reviewer"}),
+    "job_reader.html": frozenset({"reader"}),
+    "listen.html": EVERYONE,
+    "_job_status.html": EVERYONE,  # the job page's poll answers, rendered by their own routes
+    "_job_progress.html": EVERYONE,
+    **{path.name: frozenset({"owner", "reviewer"}) for path in TEMPLATES.glob("review*.html")},
+}
+_TAG = re.compile(r"\{%-?\s*(if|elif|else|endif|include|from)\b(.*?)-?%\}", re.S)
+
+
+def _narrowed(condition: str, reach: frozenset[str]) -> frozenset[str] | None:
+    """The audiences an `if` keeps, when it says who is reading (None: it does not)."""
+    if " or " in f" {condition} ":
+        return None
+    kept = reach
+    known = False
+    if "not job.is_owner" in condition:
+        kept, known = kept & {"reviewer", "reader"}, True
+    elif "job.is_owner" in condition or re.search(r"\bowns\b", condition):
+        kept, known = kept & {"owner"}, True
+    if "not job.can_review" in condition:
+        kept, known = kept & {"reader"}, True
+    elif "job.can_review" in condition:
+        kept, known = kept & {"owner", "reviewer"}, True
+    if match := re.search(r'job\.audience (==|!=) "(\w+)"', condition):
+        same = frozenset({match.group(2)})
+        kept, known = (kept & same if match.group(1) == "==" else kept - same), True
+    return frozenset(kept) if known else None
+
+
+def _reached(name: str, reach: frozenset[str], found: dict[str, set[str]]) -> None:
+    """Add to `found` every partial that `name` includes, and the audiences that reach it:
+    those of the page, narrowed by the `if` around the include when that says who it is for."""
+    # Each open `if`: the audiences before it, whether it was a plain who-is-reading test,
+    # and the audiences it kept.
+    stack: list[tuple[frozenset[str], bool, frozenset[str]]] = []
+    here = reach
+    for tag in _TAG.finditer((TEMPLATES / name).read_text(encoding="utf-8")):
+        word, rest = tag.group(1), tag.group(2)
+        if word == "if":
+            kept = _narrowed(rest, here)
+            here_in = here if kept is None else kept
+            stack.append((here, kept is not None and " and " not in rest, here_in))
+            here = here_in
+        elif word == "elif" and stack:
+            before = stack[-1][0]
+            kept = _narrowed(rest, before)
+            here = before if kept is None else kept
+            stack[-1] = (before, False, here)
+        elif word == "else" and stack:
+            before, plain, kept = stack[-1]
+            here = before - kept if plain else before
+        elif word == "endif" and stack:
+            here = stack.pop()[0]
+        elif word in ("include", "from") and (target := re.match(r"\s*[\"']([^\"']+)[\"']", rest)):
+            partial = target.group(1)
+            if partial.startswith("components/"):  # building blocks that say nothing to anyone
+                continue
+            if not here <= found.get(partial, set()):
+                found.setdefault(partial, set()).update(here)
+                _reached(partial, here, found)
+
+
+def partial_audiences() -> dict[str, set[str]]:
+    """Every partial that the pages above include or import macros from, directly or through
+    another, with the audiences that are ever given it."""
+    found: dict[str, set[str]] = {}
+    for name, reach in AUDIENCE_ROOTS.items():
+        if name.startswith("_"):  # a partial that a route renders on its own
+            found.setdefault(name, set()).update(reach)
+        _reached(name, reach, found)
+    return found
+
+
+def test_a_partial_is_reached_only_by_the_audiences_it_names():
+    """SW16: each partial starts with `{# Audiences: owner, reviewer #}`, and the include
+    tree of the job page, the reader page, Listen and the review pages never gives it to
+    anyone it does not name. A partial written for the owner is not included, unguarded, in a
+    page that a reviewer or a reader gets."""
+    faults = []
+    for partial, reached in sorted(partial_audiences().items()):
+        first = (TEMPLATES / partial).read_text(encoding="utf-8").splitlines()[0]
+        named = re.fullmatch(r"\{#\s*Audiences:\s*([a-z, ]+?)\s*#\}", first)
+        said = set(re.split(r",\s*", named.group(1))) if named else set()
+        if not said <= EVERYONE or not reached <= said:
+            faults.append(f"{partial}: reached by {sorted(reached)}, names {sorted(said) or '-'}")
+    assert not faults, "\n".join(faults)

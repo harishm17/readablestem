@@ -17,6 +17,7 @@ Content: a snapshot holds the document's own text (it is deleted with the job, l
 
 from __future__ import annotations
 
+import math
 import re
 import unicodedata
 from collections import Counter
@@ -25,6 +26,8 @@ from dataclasses import dataclass, field
 from difflib import SequenceMatcher
 from typing import Any
 
+from readablestem.core import inline, triage
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     PENDING_STATUSES,
@@ -237,7 +240,7 @@ def omit_page(result: DocumentResult, page: int, *, pages: int) -> StructureChan
     result.elements = [e for e in result.elements if e.id not in ids]
     result.fixes = [f for f in result.fixes if f.element_id not in ids]
     result.notices = [n for n in result.notices if n.page != page]
-    result.notices.append(Notice(code=PAGE_OMITTED, page=page, review="none"))
+    result.notices.append(make(PAGE_OMITTED, page=page))
     _recount(result)
     after = capture(result, pages=True)
     return StructureChange(
@@ -289,6 +292,11 @@ TEXT_KINDS = (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING)
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]")
 _TOKEN = re.compile(r"\[equation (\d+)\]")
 NOTHING_CHANGED = "Nothing changed: this is the text it already has."
+MARK_LEFT_OUT = "Keep the mark {token} in the text, or remove the equation as well."
+MARK_REPEATED = (
+    "“{token}” is there twice. Keep it once, where the equation belongs: "
+    "the equation itself is changed in its own decision."
+)
 NOT_TEXT = "That is not a paragraph, a list item or a heading."
 CODE_NOTE = "program code"
 
@@ -303,11 +311,13 @@ def equation_tokens(
     """The inline equations of an element's text, named as the review names them: marker
     id -> "[equation 3]" and back. A reviewer types the name; the marker (which no one
     could type) is put back when the text is saved."""
-    numbers = item_numbers(result)
     to_token: dict[str, str] = {}
     from_token: dict[str, str] = {}
+    numbers: dict[str, int] | None = None  # the whole document's numbering: only when needed
     for match in INLINE_MARKER_RE.finditer(element.text or ""):
         marker_id = match.group(1)
+        if numbers is None:
+            numbers = item_numbers(result)
         number = numbers.get(marker_id)
         token = f"[equation {number}]" if number else f"[equation {marker_id}]"
         to_token[marker_id] = token
@@ -361,28 +371,35 @@ def _moved(mapping: list[int | None], start: int, end: int) -> tuple[int, int] |
     return first, last + 1
 
 
-def remap_spans(old: str, new: str, element: Element) -> tuple[dict[str, Any], int]:
-    """The element's links, colour runs, script runs and glossary term, moved to where their
-    words are in the new text. A span whose words were changed is dropped (it would point
-    at other words). Returns (fields to update, how many links were dropped)."""
+def remap_spans(old: str, new: str, element: Element) -> tuple[dict[str, Any], Counter[str]]:
+    """The element's spans (links, colour, raised and lowered runs, struck text:
+    `core.inline`) and glossary term, moved to where their words are in the new text. A
+    span whose words were changed is dropped (it would cover other words). Returns (fields
+    to update, how many spans were dropped, by kind: "link", "deleted", ...)."""
     mapping = _char_map(old, new)
-    update: dict[str, Any] = {}
-    dropped = 0
-    for name in ("links", "colour_runs", "script_runs"):
-        kept = []
-        for span in getattr(element, name):
-            moved = _moved(mapping, span.start, span.end)
-            if moved is None:
-                dropped += 1 if name == "links" else 0
-                continue
-            kept.append(span.model_copy(update={"start": moved[0], "end": moved[1]}))
-        update[name] = kept
+    update, dropped = inline.moved(element, lambda start, end: _moved(mapping, start, end))
     if element.term_end is not None:
         # The glossary term stays a term only while its own words are unchanged; then the
         # definition may change freely.
         end = element.term_end
         update["term_end"] = end if new[:end] == old[:end] else None
     return update, dropped
+
+
+def _taken_off(dropped: Counter[str]) -> str:
+    """The sentence that says what an edit took off (" 1 link was taken off because its
+    words changed."): links and struck-text marks, which a reader would miss. A colour or a
+    raised run is only the look of the words that changed, and is not counted."""
+    named = [
+        (dropped["link"], "link", "links"),
+        (dropped["deleted"], "struck-text mark", "struck-text marks"),
+    ]
+    parts = [f"{n} {one if n == 1 else many}" for n, one, many in named if n]
+    if not parts:
+        return ""
+    total = sum(n for n, _, _ in named)
+    were, their = ("was", "its") if total == 1 else ("were", "their")
+    return f" {' and '.join(parts)} {were} taken off because {their} words changed."
 
 
 def text_element(result: DocumentResult, element_id: str) -> Element:
@@ -427,11 +444,8 @@ def edit_text(result: DocumentResult, element_id: str, typed: str) -> StructureC
     for marker_id in from_token.values():
         if left.get(marker_id, 0) != 1:
             token = equation_tokens(result, element)[0][marker_id]
-            many = "twice" if left.get(marker_id, 0) > 1 else "not at all"
-            message = (
-                f"“{token}” is there {many}. Keep it once, where the equation belongs: "
-                "the equation itself is changed in its own decision."
-            )
+            template = MARK_REPEATED if left.get(marker_id, 0) > 1 else MARK_LEFT_OUT
+            message = template.format(token=token)
             raise ReviewInvalid([FieldError(fid, message)], values)
     old = element.text or ""
     before = capture(
@@ -444,12 +458,7 @@ def edit_text(result: DocumentResult, element_id: str, typed: str) -> StructureC
     if heading and fix is not None and fix.heading is not None:
         fix.heading = HeadingFix(level=fix.heading.level, text=stored)
     _recount(result)
-    note = ""
-    if dropped:
-        note = (
-            f" {dropped} link{' was' if dropped == 1 else 's were'} taken off because "
-            f"{'its' if dropped == 1 else 'their'} words changed."
-        )
+    note = _taken_off(dropped)
     return StructureChange(
         element_id=element_id,
         action="edit_text",
@@ -552,6 +561,27 @@ def next_added_id(result: DocumentResult, page: int) -> str:
         if e.id.startswith(prefix) and e.id.removeprefix(prefix).isdecimal()
     ]
     return f"{prefix}{max(used) + 1 if used else 1}"
+
+
+def region_between(
+    size: tuple[float, float],
+    content: tuple[float, float],
+    after: tuple[float, float, float, float] | None,
+    before: tuple[float, float, float, float] | None,
+) -> dict[str, str]:
+    """The four edges, as the form's fields give them (percent of the page), of the part of
+    a page that starts below the line `after` (None: at the top of the page) and ends above
+    the line `before` (None: at the bottom), as wide as the page's content (`content`: its
+    left and right edge). Each edge is rounded outward, so the region never takes in more of
+    the lines around it than the number would. `region_box` then checks it like any other."""
+    width, height = size
+    edges = {
+        "left": math.floor(10000 * content[0] / width) / 100,
+        "top": math.ceil(10000 * (after[3] if after else 0.0) / height) / 100,
+        "right": math.ceil(10000 * content[1] / width) / 100,
+        "bottom": math.floor(10000 * (before[1] if before else height) / height) / 100,
+    }
+    return {name: f"{min(max(value, 0.0), 100.0):g}" for name, value in edges.items()}
 
 
 def region_box(
@@ -738,6 +768,7 @@ def add_equation(
         asked = read.model_copy(update={"status": Status.NEEDS_REVIEW})
     asked.review = "required"
     asked.reviewed = False
+    triage.stamp([asked])
     result.fixes.append(asked)
     _recount(result)
     return StructureChange(
@@ -748,4 +779,157 @@ def add_equation(
         message="The equation was added. Check what the tool read from it.",
         crops={element_id: png},
         shows=element_id,
+    )
+
+
+# --------------------------------------------------------------------------- an equation's card
+
+NOT_AN_EQUATION_NO_TEXT = (
+    "The PDF has no text for this, so there is nothing to give back to the text. Keep it as "
+    "a picture with your description, or type the LaTeX."
+)
+NOT_AN_EQUATION_IN_TABLE = (
+    "This equation is a cell of a table. Change the cell in the table, or keep the table "
+    "as an image."
+)
+NOT_AN_EQUATION_WHERE = "The text this belongs to is not there any more."
+
+
+READ_AGAIN = "The tool read it again. Check what it read."
+# The same picture, the same question: the record answered and the model was not asked.
+READ_BEFORE = (
+    "The tool has already read this picture a second time, and this is the reading it gave. "
+    "It was not asked again and nothing was counted. If the reading is wrong, edit the LaTeX "
+    "or keep the equation as an image."
+)
+
+
+def read_again(
+    result: DocumentResult, element: Element, read: Fix, *, fresh: bool = True
+) -> StructureChange:
+    """Replace the proposal of an equation that waits with `read`, a new reading of the same
+    picture (`web.reread`, made with no lock held), on the same item. The item keeps its id,
+    its place and its crop; whatever the step made, the reviewer decides it (as for an
+    equation added by hand: the tool read it a second time because a person asked, so
+    its answer is checked), and Undo puts the earlier reading back, as a whole.
+    `element` is the element as the read left it (a number printed beside the formula, read
+    out of its LaTeX, is kept). `fresh` False: the reading is the one the model gave the last
+    time this picture was asked about (`web.reread`), and the notice says so instead of saying
+    the picture was read again. Raises LookupError for an item that is not a waiting equation."""
+    fix = result.fix_for(element.id)
+    if fix is None or fix.kind is not Kind.EQUATION or not fix.pending:
+        raise LookupError(element.id)
+    before = capture(result, elements=[element.id], fixes=[element.id], page=element.page)
+    asked = read.model_copy(update={"element_id": element.id})
+    if asked.status not in PENDING_STATUSES:
+        asked.status = Status.NEEDS_REVIEW
+    asked.review = "required"
+    asked.reviewed = False
+    asked.group_key = fix.group_key
+    asked.band = fix.band  # the same place in the review order
+    triage.stamp([asked])
+    result.fixes[next(n for n, f in enumerate(result.fixes) if f is fix)] = asked
+    for index, current in enumerate(result.elements):
+        if current.id == element.id and element.equation_label != current.equation_label:
+            result.elements[index] = current.model_copy(
+                update={"equation_label": element.equation_label}
+            )
+    _recount(result)
+    return StructureChange(
+        element_id=element.id,
+        action="read_again",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=[element.id], fixes=[element.id])},
+        message=READ_AGAIN if fresh else READ_BEFORE,
+        shows=element.id,
+        page=element.page,
+    )
+
+
+# What an element keeps when it stops being an equation: where it is, how it is drawn and its
+# words. Everything the equation step and the equation checks put on it goes.
+_EQUATION_ONLY = {
+    "score": None,
+    "reasons": [],
+    "display": None,
+    "parent_id": None,
+    "equation_label": None,
+    "regular_letters": None,
+    "glyphs": None,
+    "page_latex": None,
+    "page_status": None,
+    "witness_latex": None,
+    "witness_status": None,
+    "alternatives": None,
+}
+
+
+def not_an_equation(result: DocumentResult, element_id: str) -> StructureChange:
+    """ "Not an equation": the glyphs the PDF has under the box go back to the text as words. A
+    display equation becomes a paragraph where it stands (its printed number, if it has one, is
+    written after it); one inside a line is put back into the paragraph it was cut from, in
+    the place of its mark. The equation's fix goes (nobody has to decide it), the item keeps its
+    id and its crop, and Undo puts back the element, the paragraph and the fix as they were.
+    Refused, with nothing changed, for an item that does not wait, one with no text from the
+    PDF, a table's cell or text that is not there any more. Raises ReviewInvalid and
+    LookupError."""
+    element = text_element(result, element_id)
+    fix = result.fix_for(element_id)
+    fid = field_id("actions", element_id)
+    if fix is None or fix.kind is not Kind.EQUATION or not fix.pending:
+        raise LookupError(element_id)
+    glyphs = clean_text(element.text or "", preformatted=False)
+    if not glyphs:
+        raise ReviewInvalid([FieldError(fid, NOT_AN_EQUATION_NO_TEXT)])
+    from readablestem.pipeline import table_math
+
+    if table_math.tie_of(result.elements, element_id) is not None:
+        raise ReviewInvalid([FieldError(fid, NOT_AN_EQUATION_IN_TABLE)])
+    parent = (
+        next((e for e in result.elements if e.id == element.parent_id), None)
+        if element.display == "inline"
+        else None
+    )
+    inline = element.display == "inline"
+    marker = inline_marker(element_id)
+    if inline and (
+        parent is None
+        or parent.kind not in {Kind.PARAGRAPH, Kind.LIST_ITEM}
+        or (parent.text or "").count(marker) != 1
+    ):
+        raise ReviewInvalid([FieldError(fid, NOT_AN_EQUATION_WHERE)])
+    touched = [element_id, parent.id] if parent is not None else [element_id]
+    before = capture(
+        result,
+        elements=touched,
+        fixes=[element_id],
+        orders=inline,
+        pages=True,
+        page=element.page,
+    )
+    if inline and parent is not None:
+        old = parent.text or ""
+        new = old.replace(marker, glyphs)
+        update, _ = remap_spans(old, new, parent)
+        for index, current in enumerate(result.elements):
+            if current.id == parent.id:
+                result.elements[index] = current.model_copy(update={"text": new, **update})
+        result.elements = [e for e in result.elements if e.id != element_id]
+    else:
+        words = f"{glyphs} {clean_text(element.equation_label or '', preformatted=False)}".strip()
+        for index, current in enumerate(result.elements):
+            if current.id == element_id:
+                result.elements[index] = current.model_copy(
+                    update={"kind": Kind.PARAGRAPH, "text": words, **_EQUATION_ONLY}
+                )
+    result.fixes = [f for f in result.fixes if f.element_id != element_id]
+    result.notices = [n for n in result.notices if n.element_id != element_id]
+    _recount(result)
+    return StructureChange(
+        element_id=element_id,
+        action="not_equation",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=touched, fixes=[element_id])},
+        message="It is now text, as the PDF has it.",
+        page=element.page,
     )

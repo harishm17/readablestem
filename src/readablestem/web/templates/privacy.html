@@ -30,12 +30,20 @@
 <h2>What is stored, and for how long</h2>
 <details>
 <summary>What is stored, and the exact clocks</summary>
-<p>For each upload we store: the PDF{% if office_on %} (for a Word or PowerPoint file, the PDF
-  made from it; the Word or PowerPoint file itself is not kept){% endif %}{% if latex_source %}
-  (for LaTeX source, the .tex file or the zip that was uploaded, and the names of the files,
-  packages and commands LaTeX reported a problem with){% endif %} and its file name, images cut from it (equations and
-  figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
-  converted HTML, and your review decisions.</p>
+<p>For each upload we store the file as you uploaded it: the PDF{% if latex_source %}, the LaTeX .tex file or the
+  zip of the LaTeX project{% endif %}{% if word_source %}, the Word .docx file{% endif %}.{% if office_on %}
+  {% if word_source %}A PowerPoint file, or a Word file that is not read from the file itself, is{% else %}A Word or
+  PowerPoint file is{% endif %} turned into a PDF first, and we store that PDF:
+  the Word or PowerPoint file itself is not kept.{% endif %}{% if latex_source %} For LaTeX source we also store the names of the files, packages and
+  commands LaTeX reported a problem with.{% endif %} We also store its file name, images cut from it (equations and
+  figures), the conversion result (proposed LaTeX, MathML, alt text, headings and the names of
+  any files attached inside the PDF), the
+  converted HTML, a count of the changes made to it and the time of the last one (they make the
+  version id its file shows), and your review decisions.</p>
+<p>The review record of a document lists what the tool did, who made each review decision and when,
+  and what was not checked. It is made when you ask for it from what is stored with the
+  document, so it is deleted with the document, and the decisions a person made go when their
+  account is deleted. Print it or save the CSV to keep a copy.</p>
 <ul>
   {# What the code does (T1-8): the
      24-hour and 7-day clocks restart on every review decision, language, title or contact
@@ -57,15 +65,23 @@
     tool. Both boxes
     are unchecked unless you check them; “Keep for 7 days” can be made the default for new
     uploads in <a href="/account">Account</a>.</li>
-  <li>Only your own work restarts these times; a person you share with does not keep it longer.</li>
+  <li>Only your own work restarts these times: a review decision, a download, or a change of the
+    document's language, title or contact. A person you share with does not keep it longer.</li>
   <li>You can delete a document and everything made from it at any time with
-    "Delete now". It is removed from the database straight away.</li>
-  <li>A PDF that is too large to convert at once is kept, as uploaded, while you choose which
+    "Delete now". It asks you to confirm, then removes it from the database straight away.</li>
+  <li>A file that is too large to convert at once (a PDF{% if office_on %}, or for a Word or PowerPoint file the PDF made from it{% endif %}) is kept, as stored, while you choose which
     pages to convert. It is deleted <strong>{{ retention_hours }} hours</strong> after you
     uploaded it, when you discard it, or once every page has been sent to be converted.
     Nothing is sent to an AI service until you choose the pages. The sample document is
     a recorded conversion of a published textbook section, not your file: it is deleted on the
     same schedule as your own documents.</li>
+  {# The one submit rule (web/forms.py, `request_tokens`): deleted at sign-out, with the
+     account, and by the hourly purge after SESSION_MAX_AGE_S (7 days). #}
+  <li>When you press a button that saves, adds or starts something, we keep a random token,
+    which form it was and the outcome of the request (the page it led to and its notice), so
+    that a second press gets the same answer instead of doing it twice. It holds no document
+    content. It is deleted when you sign out, with your account, and at the latest after
+    7 days; the token of an account deletion is kept without the account for those 7 days.</li>
   {# The Railway `backup` service (.railway/railway.ts) dumps the database daily and keeps the
      last 6 dumps (docs/deploy-railway.md, "Backups"). Keep this sentence true: if the
      schedule or the kept time changes, change the sentence. #}
@@ -76,26 +92,28 @@
   {% if notation_on %}
   <li>Your courses and their notation (course names, symbols, what they mean, your notes,
     and the letters you chose to remember for a course during a review) are kept until
-    you delete them or your account; they are not deleted with your documents.</li>
+    you delete them or your account; they are not deleted with your documents. A document
+    converted in a course keeps the list of symbols it was read with, and their meanings,
+    until the document is deleted, also when you delete the course first.</li>
   {% endif %}
 </ul>
 </details>
 
 <h2 id="who-else-sees">Who else sees your documents</h2>
 <ul>
+  {# What each company receives is the list of what is sent (web/recipients.py
+     `sent_material`): one item per kind of material the settings send, with what is kept
+     from the answer. A setting that sends something new adds its item here, and a
+     production start is refused until it shows (ops/launch.py). #}
   {% for r in recipients %}
-  {% if "model" in r.purposes %}
-  <li><strong>{{ r.name }}.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
-    and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
-    nearby text, are sent to {{ r.name }}'s API{% if r.name == "Anthropic" %} (the Claude models){% endif %}.{% if notation_on %} For a document you upload
-    for one of your courses, that course's notation (its symbols and what they mean) is
-    sent with the equations.{% endif %}{% if image_pages_on %} If you check “Convert scanned or
-    handwritten pages”, a picture of each scanned or handwritten page is sent as well.{% endif %}{% if "handwriting" in r.purposes %}
-    A close-up picture of a handwritten expression can also be sent, to be read a second time.{% endif %}
-    {{ retention(r.name) }}</li>
-  {% elif "handwriting" in r.purposes %}
-  <li><strong>{{ r.name }}.</strong> A close-up picture of a handwritten expression can be sent
-    to {{ r.name }}'s API, to be read a second time. No other text goes with it.
+  {% if r.gets_documents %}
+  <li><strong>{{ r.name }}.</strong> Sent to {{ r.name }}'s API{% if r.name == "Anthropic" %}
+    (the Claude models){% endif %}:
+    <ul>
+      {% for m in sent_material if r.name in m.to %}
+      <li>{{ m.what }} {{ m.stored }}</li>
+      {% endfor %}
+    </ul>
     {{ retention(r.name) }}</li>
   {% elif "hosting" in r.purposes %}
   <li><strong>{{ r.name }}</strong> hosts the app and its database (Railway Postgres), in its
@@ -120,8 +138,8 @@
 {# SIGNUP_MODE=open. Keep in step with web/auth.py, web/routes/account.py and the checks of
    ops/launch.py (this page must say that the first sign-in makes an account, and how to
    delete it). #}
-<p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
-  account){% endif %}. We receive your email address, your name, and whether the address
+<p>You sign in with {{ sign_in_words or "Google" }}{% if microsoft_on %} (Microsoft is for school or work
+  accounts){% endif %}. We receive your email address, your name, and whether the address
   is verified. <strong>The first time you sign in, we make an account for you.</strong> It
   stores your email address, your name, the time of your last sign-in, and the id your
   sign-in provider gives your account{% if microsoft_on %} (for Microsoft, also your
@@ -147,8 +165,8 @@
   An account that an administrator has blocked is kept, with its address, so that the block
   holds; write to us to have it deleted.</p>
 {% else %}
-<p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
-  account){% endif %}. We receive your email address, your name, and whether the address
+<p>You sign in with {{ sign_in_words or "Google" }}{% if microsoft_on %} (Microsoft is for school or work
+  accounts){% endif %}. We receive your email address, your name, and whether the address
   is verified. For people on the beta list we store the email address, name, the time of
   the last sign-in, and the id your sign-in provider gives your account{% if microsoft_on %}
   (for Microsoft, also your organization's directory id){% endif %}, so we know it is you
@@ -163,6 +181,10 @@
   There are no analytics, advertising or third-party tracking cookies. While you type a
   review decision, the text is kept in your browser tab until you save it, close the tab or
   sign out; it is never sent to the server before you save.</p>
+<p>The Listen page remembers where you stopped and your speed, voice and other player settings
+  in your browser's local storage, for the last 20 documents you listened to. It keeps a
+  document's id and the ids of places in it, never its text, and it is not sent to the server.
+  It stays until you clear this site's data in your browser.</p>
 {# web/analytics.py and static/analytics.js: PostHog through this site's /m/ path, a random
    visitor id in localStorage (no cookie), no autocapture or session replay, the visitor's
    address not forwarded. Only when ANALYTICS_ENABLED; the offices page says the same. #}
@@ -194,10 +216,27 @@
   you signed in, uploaded, made a review decision or downloaded, and your answers to the
   two optional questions after a download. Each note is a random id, a time, a category
   and at most a number; to notice the same file uploaded twice, it keeps a scrambled
-  fingerprint from which the file cannot be rebuilt ("Delete now" removes it). No
-  cookies or scripts are used for this. These notes are deleted after {{ event_days }}
+  fingerprint from which the file cannot be rebuilt ("Delete now" removes it). For each
+  review decision, notes also record, in fixed categories and never in words from your
+  document: what kind of item it was (for example an equation or a heading), the reason the
+  tool asked about it or that it did not ask, what you did (kept, edited, replaced, rejected,
+  removed or added), whether the item was read from a page or from LaTeX source, whether the
+  tool showed it to you or you found it, whether the decision covered one item or several,
+  how it was saved, and the tool's version. Totals of these notes are read only when they
+  come from at least {{ outcome_min_accounts }} accounts and {{ outcome_min_documents }}
+  documents and no one account gives more than {{ (outcome_max_share * 100)|round|int }}% of
+  them or of their pages. No cookies or scripts are used for this. These notes are deleted after {{ event_days }}
   days, or with your account.</p>
 {% endif %}
+{# Problem reports (web/reports.py, ops/retention.py): the two numbers are `reports.CLOSED_DAYS`
+   and `reports.MAX_DAYS`, checked by ops/launch.py `privacy_claim_problems`. #}
+<p>If you send a problem report from "Report this item" or from a document that stopped
+  converting, we store it with your account, with the ids it names (the document, the item, what kind of item it is and
+  its page number, the code that stopped a conversion, and the converter's version) and
+  whatever you type, never text or pictures from your document. The people who run
+  ReadableSTEM read it, and no one else does. A report is kept until it is closed and for
+  {{ report_closed_days }} days after that, is deleted {{ report_max_days }} days after you
+  send it at the latest, and is deleted with your account.</p>
 </details>
 
 <h2>How it is protected</h2>
@@ -208,12 +247,18 @@
 <ul>
   <li>The site is served over HTTPS only.</li>
   <li>Only you can open your documents, and the people you name. You can give a named
-    person the right to view or to review one document; they must sign in with the exact email
-    address you entered, and you can remove it at any time. Everyone else on the beta, and the
+    person the right to view or to review one document{% if course_grants_on %}, or every document
+    in one of your courses, including the ones you add later{% endif %}; they must sign in with the
+    exact email address you entered, and you can remove it at any time.{% if notation_on %} A person
+    you share a document with to review{% if course_grants_on %}, or give a course to review,{% endif %}
+    also sees the name of its course and the symbols it was read with.{% if course_grants_on %} A person
+    you give a course to, to view or to review, sees the course's name.{% endif %}{% endif %} Everyone else on the beta, and the
     people who run it, are told "not found" for an address that is yours.</li>
   <li>The converted document is shown in a sandbox that stops it running scripts.</li>
-  <li>An uploaded PDF is first opened in a separate short-lived process with its own time
-    and memory limits, and is kept only in the database, never as a file on the server's disk.</li>
+  <li>An uploaded file is first opened in a separate short-lived process with its own time
+    and memory limits, and is kept in the database. Some steps write a temporary copy of derived content to a
+    private folder, which is removed when the step ends: the Word export, a LaTeX build,
+    {% if word_source %}reading a Word file, {% endif %}and Word and PowerPoint conversion.</li>
   <li>Sign-in, uploads and daily page counts have limits that stop automated misuse.</li>
   {% if office_on %}
   {# T3-30. What the code does: a Word or PowerPoint file is
@@ -221,7 +266,9 @@
      written to a private temporary folder, turned into a PDF by LibreOffice running on the
      server with no network access of its own, and the folder is removed at once. Nothing is
      sent to a new company; LibreOffice runs inside the same service. #}
-  <li>A Word or PowerPoint file is checked in a separate process, then turned into a PDF on
+  <li>A Word or PowerPoint file is checked in a separate process. {% if word_source %}A Word file that can be read from the file
+    itself is then read on the server, in the sandbox LaTeX source uses, and kept as uploaded. Any other
+    Word or PowerPoint file is{% else %}It is then{% endif %} turned into a PDF on
     the server itself (nothing is sent to another company for this). While that takes
     place, for a few seconds, it is written to a private temporary folder that is removed
     straight afterwards. Files with macros or with content linked from elsewhere are
@@ -231,15 +278,23 @@
 </details>
 
 <h2>Where it is processed</h2>
-<p>The app and its database run on Railway, in its United States region. Images and nearby
-  text of equations and figures are sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in
-  the United States for processing, as described above. If you are outside the United
-  States, your documents are therefore transferred there.</p>
+<p>The app and its database run on Railway, in its United States region. What is listed
+  under “Who else sees your documents” is sent to {{ recipients|selectattr("gets_documents")|map(attribute="name")|join(" and ") }} in
+  the United States for processing. If you are outside the United States, your documents are
+  therefore transferred there.</p>
 
 <h2>Changes to this notice</h2>
 <p>If this notice changes in a way that affects what is stored or who receives it, we will
   say so on this page, with the date, before the change takes effect{% if not signup_open %}, and email the people
   on the beta list{% endif %}.</p>
+{# One line per kind of material sent, with the day it was first stated here
+   (web/recipients.py `Material.stated`). #}
+<p>When each kind of material sent to a model was first named on this page:</p>
+<ul>
+  {% for m in sent_material %}
+  <li>{{ m.label }}: {{ m.stated_text or "not yet dated" }}.</li>
+  {% endfor %}
+</ul>
 
 <h2>Requests, takedowns and rights</h2>
 <p>You can delete your account and everything in it yourself, any time you are signed in

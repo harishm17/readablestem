@@ -19,6 +19,7 @@ import pytest
 
 from readablestem.core.types import Kind, TableCell, TableGrid, grid_problems
 from readablestem.pipeline import layout, table_model, tables
+from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.layout import LayoutError, analyze, release
 from readablestem.pipeline.tables import Proposal, Slot
 
@@ -131,6 +132,58 @@ def test_a_ruled_numeric_table_is_kept():
     assert judgement.verdict == tables.TABLE
     assert tables.REASON_RULED in judgement.reasons
     assert judgement.columns == 3 and judgement.column_rules == 4
+
+
+def test_a_table_drawn_with_filled_border_boxes_is_a_table_and_a_chart_stays_a_figure():
+    # Word draws cell borders as thin filled rectangles, and a Word page paints them as one
+    # drawing: it was read as the bars of a chart (SW37).
+    def bordered(page):
+        shape = page.new_shape()
+        for r in range(5):
+            shape.draw_rect(pymupdf.Rect(100, 150 + 22 * r - 0.5, 340, 150 + 22 * r + 0.5))
+        for c in range(4):
+            shape.draw_rect(pymupdf.Rect(100 + 80 * c - 0.5, 150, 100 + 80 * c + 0.5, 238))
+        for r in range(5):  # and a small square at every crossing, which is not a bar
+            for c in range(4):
+                shape.draw_rect(
+                    pymupdf.Rect(
+                        100 + 80 * c - 0.25,
+                        150 + 22 * r - 0.25,
+                        100 + 80 * c + 0.25,
+                        150 + 22 * r + 0.25,
+                    )
+                )
+        shape.finish(fill=(0, 0, 0), color=None)
+        shape.commit()
+        for r in range(4):
+            for c in range(3):
+                write(page, 106 + 80 * c, 165 + 22 * r, f"R{r}C{c} {r * 3 + c}")
+
+    def chart(page):
+        write(page, 72, 100, "Rainfall by month, in millimetres.")
+        for k, height in enumerate((40, 90, 65, 120)):
+            page.draw_rect(
+                pymupdf.Rect(120 + 50 * k, 400 - height, 150 + 50 * k, 400), fill=(0.2, 0.3, 0.8)
+            )
+        page.draw_line((110, 400), (330, 400), width=0.8)
+        page.draw_line((110, 270), (110, 400), width=0.8)
+
+    def scatter(page):
+        # Square markers of the same size, none on a rule: still a plot.
+        write(page, 72, 100, "Rainfall by month, in millimetres.")
+        page.draw_line((110, 400), (330, 400), width=0.8)
+        page.draw_line((110, 270), (110, 400), width=0.8)
+        for k in range(14):
+            x, y = 130 + 14 * k, 380 - 7 * ((k * 5) % 9)
+            page.draw_rect(pymupdf.Rect(x, y, x + 0.5, y + 0.5), fill=(0, 0, 0), color=None)
+
+    def kinds(fill):
+        return [e.kind for e in analyze(pdf(fill)).elements]
+
+    assert kinds(bordered).count(Kind.TABLE) == 1
+    assert Kind.FIGURE not in kinds(bordered)
+    assert Kind.FIGURE in kinds(chart) and Kind.TABLE not in kinds(chart)
+    assert Kind.TABLE not in kinds(scatter)
 
 
 def test_an_unruled_aligned_grid_is_kept_on_text_alone():
@@ -365,11 +418,13 @@ def captioned_page(page: pymupdf.Page) -> None:
     write(page, 72, 450, "Then work out the period of each trial.")
 
 
-def test_raised_glyphs_stay_exponents_in_the_cells():
+def test_raised_glyphs_stay_exponents_in_the_cells_and_the_caption():
     # Text layers flatten scripts: 10^5 would read "105" and 10^-18 "10-18". The grid read
-    # from the PDF keeps them raised.
+    # from the PDF keeps them raised, and so does the caption ("CP^3" is not "CP3").
     def fill(page):
-        write(page, 100, 140, "Table 1. Orders of magnitude")
+        caption = "Table 1. Orders of magnitude for CP"
+        write(page, 100, 140, caption)
+        write(page, 100 + pymupdf.get_text_length(caption, fontsize=BODY) + 0.5, 136, "3", size=7.0)
         grid_table(
             page, [["Quantity", "Value", "Unit"], ["Pressure", "", "Pa"], ["Quark", "", "m"]]
         )
@@ -383,6 +438,12 @@ def test_raised_glyphs_stay_exponents_in_the_cells():
     texts = {(c.row, c.col): c.text for c in table.table.cells}
     assert (texts[(1, 1)], texts[(2, 1)]) == ("1.01\u00d710\u2075", "10\u207b\u00b9\u2078")
     assert texts[(1, 2)] == "Pa"
+    assert table.caption == "Table 1. Orders of magnitude for CP\u00b3"
+    pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 60, 20), False)
+    html = render_html(
+        title="T", lang="en", elements=[table], fixes=[], crops={table.id: pixmap.tobytes("png")}
+    )
+    assert "CP\u00b3</figcaption>" in html
 
 
 def test_a_table_at_the_top_of_the_next_page_with_the_same_columns_is_marked_continued():

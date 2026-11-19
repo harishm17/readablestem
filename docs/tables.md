@@ -44,6 +44,21 @@ the layout time on lecture notes and problem sets (`scripts/bench_runtime.py con
 the test). `layout.TABLE_PREFILTER`
 turns it off (for that comparison).
 
+What a tighter test can and cannot do (measured 2026-11-17 on a 100-page math document:
+the test passed 81 pages, the detector found tables on 8). Counting a rule only when it is
+long does not bring the count down, and no length of rule is safe to count by. `judge` asks
+a row rule only for half the width of its box and a box can hold two short cells, so it has
+no minimum length to borrow; the one absolute number is a column rule's (2.2 lines), which
+cuts 81 passes to 80. A guessed limit (four times the text size, a quarter of the narrowest
+rule of any table the repository keeps) cuts it to 79 and leaves the same tables on every
+repository PDF, but it is not a bound `judge` states. The reason is that 69 of the 73 pages
+passed with no table pass on aligned gaps alone (three lines with a gap at one x position):
+on the document's pages the lines that share a gap are the two text columns of a page (30
+pages), the space round a relation sign in a display equation or an equation number (13 and
+12), and a list marker over its text (12). `judge` drops those only for boxes it makes
+itself (`_text_block_dropped`), not for a box the detector proposes, so the test cannot
+leave them out and still promise that it only skips pages `find` would return nothing on.
+
 Three more rules keep a page of pen strokes from costing minutes. They change what the
 detector would have found only on such pages (in the fixtures, the development set, the
 table sets and the 332 research PDFs of handwriting, no output changed; the largest page
@@ -59,7 +74,8 @@ the largest that got through the detector at all):
   beyond that from `DETECTOR_EXCESS_S` (60 s) for the whole document, and when it is used
   up the document's remaining pages get no proposals (one content-free warning). A
   document within the budget reads exactly as it would without one; one over it depends
-  on the machine's speed from there on, as the ink analysis does (`INK_BUDGET_S`).
+  on the machine's speed from there on (plan WS5.14; the ink analysis's budget is counted
+  in work since WS14.9).
 
 The detector's time depends on what is drawn on the page, not on its tables, and is
 nearly all inside PyMuPDF: a lecture slide with 202 pen-stroke paths (11,000 curve items)
@@ -110,7 +126,9 @@ rules above.
    the captions are attached); columns of justified text, whose padding is narrower than a
    cell gap, come from the strips no word crosses (`_word_gutters`); a numbered equation or
    reaction at the top or bottom of a box is cut off it (`_without_captions`); and a box made
-   here is dropped as a chart (curves, scatter dots, bars, small lettering), page text (two
+   here is dropped as a chart (curves, scatter dots, bars, small lettering; a filled square no
+   bigger than a rule's thickness that lies on a drawn rule is the corner of the rules, which
+   Word fills at every crossing, and is not counted: 12 of them made a ruled table a "chart"), page text (two
    prose columns, or one gutter in the middle of the page), references, numbered or bulleted
    lines, algorithm lines, equations (lines of relations, equation numbers), authors and
    addresses, a block of bare numbers (a matrix) or running text in a box (`_text_block_dropped`).
@@ -174,9 +192,13 @@ rules above.
    two columns of single words (`is_word_grid`), is not claimed and keeps the paragraph
    path (equations and headings in it are found as usual). Everything else is a data
    table.
-7. **Caption.** A `"Table N ..."` line just above or below the table (within 36 pt, the
-   same reach as figure captions; "Table 2 shows that ..." is not a caption) and its
-   continuation lines become `Element.caption` and `TableGrid.caption`. A caption is
+7. **Caption.** A `"Table N ..."` line just above or below the table and its continuation
+   lines become `Element.caption` and `TableGrid.caption`. N is Arabic or Roman ("Table IV");
+   "Table 2 shows that ..." is not a caption. The gap, 36 pt (the reach of figure captions), is
+   measured from the caption block's nearest edge: over the table, from the block's last line
+   (a caption of up to eight lines), not from its first; under it, from its first line. Where
+   two tables are stacked, a caption goes to the nearer table. The pattern is
+   `core/captions.py`, shared with the HTML check below and with figure captions. A caption is
    never invented.
 8. **Continued tables.** A table split across pages stays two tables. The second gets the
    reason `"continued from previous page"` when it has the same columns (left edges within
@@ -319,6 +341,12 @@ local` (docs/eval.md, "Tables").
   documents"). Still missed: lists of relations (`X_n ~ f(n)  if ... -> 1`, 2 of 25 on the real-document
   development set), an unruled table of bare numbers with no caption (a matrix looks the same), and
   label-value pairs joined by leader lines.
+- **Tables found and refused on the olmOCR-Bench pages** (`docs/eval-parsing-benchmark.md`,
+  development half, 2026-11-18): after the corner-square fix, 6 of 79 pages with a failed
+  table check still have a box refused as `no_grid` (and 5 more with a `figure` verdict) (an unruled table whose number columns do
+  not line up, a monospace print-out, a striped table with no rules, a two-line table, a
+  ruled key-value box left as a layout grid) with no cause on more than 2 pages; none was
+  built, because no rule separated them from prose.
 - **A sparse table** with text in one column is kept when it has three rules and a header
   that names two columns (see "How a page's tables are found"). One with only a top and a
   bottom rule, a header-less one, or one whose only filled column lines up with no header
@@ -479,6 +507,31 @@ mark an identifying first column as row headers. Both are valid; the rules are:
 - **Caption:** the "Table N" caption layout found beside the table (`Element.caption`),
   never the model's: a caption is never invented. No caption, no `<caption>`.
 
+### Where the header meaning came from (`TableGrid.header_source`, WS5.2)
+
+A first row is never made a header only because it is first. Each table says where its
+header rows and columns came from, and a table with no evidence for one is a choice for a
+person:
+
+| `header_source` | Set by | Meaning |
+|---|---|---|
+| `model` | `table_step` (the header policy) | the model marked the header cells; the policy kept them |
+| `layout` | `table_step.layout_headers`, "Use this grid instead" | the reader of the PDF found the header rows itself (a ruled line under the row, a gap, a header the table reader marked: `TableGrid.header_rows` of the grid read from the PDF) |
+| `source` | `source/ltx_reader`, `source/docx_reader` | the Word or LaTeX file marks them (a `thead` or `th`, a header row Word repeats, or the table style's first-row flag, which also has the warning check) |
+| `reviewer` | the card's header choice, "Save headers" | a person chose them; Undo puts the earlier grid back whole |
+| `none` | all of the above | no header cell and no evidence for one |
+
+A grid read from the PDF with no header row found (`none`) has no header cell, so
+`table.headers` `no_headers` fails and the table is required: the card offers **Use the first
+row as headers**, **Use the first column as headers**, **Use the first row and column as
+headers** and **This grid is not a table**, and no accept (accepting a table with no headers
+was the fault: F-091). The first three are the same `headers` edit "Change the table" makes.
+The field is left out of the stored JSON when it is None, so a result stored before it
+existed loads and is written exactly as before. Word and LaTeX tables with no header mark
+are still accepted (`none`, no decision asked): the repository's own files have 3 of 31
+unmarked, a real LaTeX project more, and turning each into a decision is a review load that
+is a person's call (WS5.2 report).
+
 ### Checks
 
 All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
@@ -547,10 +600,10 @@ First matching rule wins:
 | # | Condition | Status | `reason` | Tier |
 |---|---|---|---|---|
 | 1 | rebuilding off | FAILED | `table_not_rebuilt` | required (image kept) |
-| 2a | the answer kept says it is not a data table, but the grid read from the PDF is a grid of numbers (`numeric_grid`: half its cells below the first row hold a digit) | NEEDS_REVIEW, the local grid with first-row headers | (check `table.kind` `numbers_not_a_table`) | required |
+| 2a | the answer kept says it is not a data table, but the grid read from the PDF is a grid of numbers (`numeric_grid`: half its cells below the first row hold a digit) | NEEDS_REVIEW, the local grid with the header rows layout found | (check `table.kind` `numbers_not_a_table`) | required |
 | 2 | the answer kept says it is not a data table | ACCEPTED, the grid read from the PDF (`is_data` False) written as its text in reading order | (check `table.kind` `written_as_text`) | optional |
 | 2b | ... and there is no grid read from the PDF to write (none, no text, flattened math) | ABSTAINED | `not_data_table` | required (image kept) |
-| 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with first-row headers | (check `local_grid`) | required |
+| 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with the header rows layout found | (check `local_grid`) | required |
 | 3b | no usable answer, no local grid | FAILED | `model_<outcome>` or `invalid_table` | required (image kept) |
 | 4 | every check passed | ACCEPTED | | none |
 | 5 | only notes failed (`whitespace_differs`, `style_cosmetic`, `row_headers_dropped`, `written_as_text`) | ACCEPTED | | optional |
@@ -586,8 +639,8 @@ is never lost. Table CSS is added only to documents with a rebuilt table.
 otherwise): `html.table_headers` (a data table has a `<th>`), `html.table_header_scope`
 (every `<th>` has `scope`, or an id in a table that uses `headers`),
 `html.table_header_text` (no empty `<th>`), `html.table_caption` (a warning: a "Table N
-..." paragraph right beside a table without `<caption>`, by layout's caption pattern, so
-"Table 2 shows that ..." is not one) and `html.table_layout` (no `role="presentation"`
+..." paragraph right beside a table without `<caption>`, by the shared caption pattern
+(`core/captions.py`, Roman numerals included), so "Table 2 shows that ..." is not one) and `html.table_layout` (no `role="presentation"`
 table: the output never uses tables for layout). axe-core covers `th-has-data-cells`,
 `td-headers-attr` and `scope-attr-valid`; the browser suite runs it on tables of every
 shape the step writes.
@@ -1118,7 +1171,7 @@ pin, which passes on both.
 
 | Residual | Cause | Fix | Dev effect |
 |---|---|---|---|
-| bar charts with fewer than 12 bars taken for tables | the bars of one series are one drawing of many `re` items, so they counted as one fill, and the count needed 12 | `layout._Path.rects` keeps the rectangles of a filled drawing; `tables._bars`: at least four filled rectangles on one line, side by side, of three or more different lengths, mostly with no text on them, is a chart (rules drawn as thin filled boxes are not bars) | the two bar charts of `data/real-tables-heldout` (false tables) gone: precision 0.951 to 1.000 |
+| bar charts with fewer than 12 bars taken for tables | the bars of one series are one drawing of many `re` items, so they counted as one fill, and the count needed 12 | `layout._Path.rects` keeps the rectangles of a filled drawing; `tables._bars`: at least four filled rectangles on one line, side by side, of three or more different lengths, mostly with no text on them, is a chart (rules drawn as thin filled boxes are not bars; a drawing of thin filled boxes only, the way Word draws cell borders, is paper rules too, `layout._page_paths`, and the table finder reads each thin box of a filled shape as a rule and the other boxes as fills, `tables._PageView.build`) | the two bar charts of `data/real-tables-heldout` (false tables) gone: precision 0.951 to 1.000 |
 | lists of relations (`X ~ f(n)   if ...`) left as text | lines of symbols in aligned columns look like displayed equations | `tables._conditions`: three or more lines whose last cell opens with "if", "when", "where"..., not built from bracket glyph pieces (`cases` is math), are a list of definitions | the two lists of `data/real-tables`: recall 0.920 to 1.000 (25 of 25) |
 | a ruled table split by far-apart rules (groups of rows) found as its first part | `_stack` only follows rules within three lines; the detector stops there | `_joined_frames`: the whole stack is the table when the detector's box in it is the stack's width and covers two spans, no paragraph runs across it, no caption is inside, and no other detector table is in it | partial find of 2302.07336 Table I found whole |
 | two rules and ragged number columns under a "Table N" line | the span between two rules is not "ruled" for the arbitration | the detector's box with a top and a bottom rule, three lines in aligned columns and a caption is a table | 1 table found (2503.16294) |

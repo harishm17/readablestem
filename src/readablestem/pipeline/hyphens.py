@@ -27,6 +27,15 @@ dictionary: when the same two pieces are written with a hyphen inside a line els
 ("antiderivative"), a break in the middle of it is soft hyphenation and the hyphen goes,
 even for two pieces that are words with a join the list lacks. A single letter before the
 hyphen (rule 1) is never overruled by the second.
+
+None of that applies when the line broke inside one token, a number or an address, where
+there is no word to tell and a space would split it (`joins_inside_token`):
+
+- a digit, a hyphen and a digit: "(2012-08-" / "17)" is one date, "5-" / "7 m" one range;
+- a line that ends in "/", ".", "_", "-" or "=" inside an address ("project/" /
+  "memspectrum/", "www.example." / "org"): the next line goes on from it;
+- a non-breaking hyphen (U+2011) and its look-alikes after a letter or digit: they mark a
+  compound that must not break, so what follows is its second half ("easy-" / "to-use").
 """
 
 from __future__ import annotations
@@ -39,6 +48,11 @@ from importlib import resources
 from itertools import pairwise
 
 HYPHENS = "-\u2010"
+# Hyphens that never break a word: the non-breaking hyphen (Word's Ctrl+Shift+hyphen), the small
+# hyphen-minus and the fullwidth one. A break after one is a compound split over two lines,
+# so the hyphen stays and no space follows. Not here: the en dash, the figure dash and the
+# minus sign, which are punctuation or an operator when a line ends with them.
+FIXED_HYPHENS = "\u2011\ufe63\uff0d"
 MIN_PIECE = 2  # the word list holds words of two letters or more
 
 
@@ -116,3 +130,65 @@ def keeps_hyphen(
     if (stem + head).lower() in vocabulary:
         return False
     return stem.lower() in vocabulary and head.lower() in vocabulary
+
+
+_SCHEME = re.compile(r"[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+_ADDRESS_END = "/._-="
+_OPENERS = "([{<\"'\u201c\u2018"
+
+
+def _address(token: str) -> bool:
+    """A web address, an e-mail address or a path: it starts with a scheme or "www.", or
+    holds "/" or "@". A lone slash ("a / b") is not one. "km/" / "s" and "and/" / "or" count
+    as paths, and joining them is what a reader does."""
+    body = token.lstrip(_OPENERS)
+    if len(body) < 2 or not any(c.isalnum() for c in body[:-1]):
+        return False
+    return bool(
+        _SCHEME.match(body) or body.lower().startswith("www.") or "/" in body or "@" in body
+    )
+
+
+def _host_unfinished(token: str) -> bool:
+    """Does the address in `token` (it ends with a full stop) lack its top-level domain?
+
+    A full stop ends a sentence as often as it ends a line inside an address, so it joins
+    only a host that is still short of "com" or "org": "www.example." has a name and no
+    suffix, "www.example.org." does not need one. Once there is a path the stop is too
+    ambiguous to read, and the next line keeps its space."""
+    body = token.lstrip(_OPENERS)
+    scheme = _SCHEME.match(body)
+    rest = body[scheme.end() :] if scheme else body
+    if "/" in rest:
+        return False
+    if "@" in rest:
+        rest = rest.rsplit("@", 1)[1]
+    labels = rest.rstrip(".").split(".")
+    if "@" not in body and labels[0].lower() == "www":
+        labels = labels[1:]
+    return len([label for label in labels if label]) <= 1
+
+
+def joins_inside_token(before: str, after: str) -> bool:
+    """Did the line break fall inside one token, so that `after` goes on from `before`
+    with no space and the hyphen, if there is one, stays (module docstring)?
+
+    `before` ends the earlier line and `after` starts the next, neither with spaces at the
+    break. The caller has handled a soft hyphen. Whether the break fell inside an address is
+    read from the last word of `before` alone: the link annotations of the page, which would
+    settle the ambiguous cases, are not available to this function yet."""
+    if len(before) < 2 or not after or before[-1].isspace() or after[0].isspace():
+        return False
+    last, previous = before[-1], before[-2]
+    if last in HYPHENS + FIXED_HYPHENS and previous.isdecimal() and after[0].isdecimal():
+        return True
+    if last in FIXED_HYPHENS and previous.isalnum():
+        return True
+    if last not in _ADDRESS_END and last not in HYPHENS + FIXED_HYPHENS:
+        return False
+    token = before.rsplit(None, 1)[-1]
+    if not _address(token):
+        return False
+    if last != ".":
+        return True
+    return _host_unfinished(token) and after[0].islower()  # the host's suffix: "com", "org"

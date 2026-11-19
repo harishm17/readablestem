@@ -38,8 +38,8 @@ Design notes:
   "pg-..." and `group_size`), so a 20-page handwritten file asks once. The pages are
   listed on `DocumentResult.image_only_pages`, and every page's type on
   `DocumentResult.page_types` (content-free). The web app reports them to the user.
-- With `FEATURE_IMAGE_PAGES` (ADR 0007), the kept pages that are scanned or handwritten
-  (`image_page.READ_REASONS`) are read from a picture of the page first, one vision call each
+- With `FEATURE_IMAGE_PAGES` (ADR 0007), the kept pages whose content is a picture or ink
+  (`page_type.image_kind`) are read from a picture of the page first, one vision call each
   (`_image_pages_pass`). A page that is read leaves the kept pages: its blocks become
   elements, the fixes decided without a model are put in place before any step runs, the
   display equations are read from the crops of their boxes by the equation step (with the
@@ -140,9 +140,11 @@ from readablestem.models.pricing import UnknownModelError
 from readablestem.observability.tracing import NoopTracer, Tracer
 from readablestem.pipeline import (
     assemble,
+    decoration,
     equation_scale,
     equation_step,
     figure_step,
+    font_codes,
     heading_step,
     html_checks,
     image_page,
@@ -155,6 +157,7 @@ from readablestem.pipeline import (
     page_math_reconcile,
     page_type,
     page_witness,
+    say_once,
     shadow,
     step_facts,
     table_math,
@@ -233,7 +236,48 @@ log = logging.getLogger(__name__)
 # (`DocumentResult.source_report`, `source.report`), and a source that loses content outside a
 # formula stops with a code that names the cause. PDFs are unchanged. Results from 0.5.9 load
 # unchanged and are not judged again.
-PIPELINE_VERSION = "0.5.10"
+# 0.5.11 (2026-11-11): the text and figure boxes of a PDF page change. Codes of symbol and TeX
+# fonts are read as what the font draws (`font_codes`, behind FONT_CODE_TABLES, on): TeX's
+# ligatures and accents at control codes, Symbol's Greek, Wingdings bullets. A vector chart's
+# figure takes its outer labels (axis values, category names, a rotated or centered axis title),
+# so its crop grows to them; a small drawing on a typed page is handwriting only with pen
+# evidence in its strokes (a skeletal structure's bonds now go to the figure step). A LaTeX
+# source's outcome changes too (`source.support`, the same unreleased wave): a source in a class
+# read as an article converts instead of stopping on that class, one in a refused class or
+# package stops in the conversion child with its code and name, and a package stop records
+# whether the package is the instructor's own. The LaTeX reader leaves nothing out unsaid
+# (`source.ltx_reader`): a picture outside a float is a figure after its block, a float's other
+# words are read, `\intertext` and `\date` are paragraphs, a formula LaTeX could not read in a
+# table, heading or caption makes that item a required decision, and what no rule reads is
+# counted (`SourceReport.unread_words`, `unread_pictures`) and said (`source_unread`). The stop
+# rule names a missing bibliography and a special character in the text, so source jobs gain
+# figures and decisions. A date, an address or a compound broken at a line end keeps its token
+# whole (`hyphens.joins_inside_token`): no space inside "(2012-08-17)" or "project/memspectrum/".
+# A figure is written with empty alt text only as decoration with evidence
+# (`decoration.settle`, WS6.4, the same wave): one the model calls decorative with no repeat,
+# rule shape or person behind it is a required decision, and one whose reading failed is
+# decoration when the evidence says so, so the review load moves. A glyph the file's own table
+# does not decode is read by the name its font gives it (`glyph_names`, the same wave), and a
+# row of numbers inside a maths row's box joins that equation, so the text of equations and of
+# the paragraphs around them changes on TeX pages. Results from 0.5.10 load
+# unchanged; their page is made again (`assemble.RENDER_VERSION` 6).
+# 0.5.12 (2026-11-19): the rest of the wave that 0.5.11 began, raised once more because reports
+# and records were made at 0.5.11 before it (CHANGELOG.md has each change). What a PDF's result
+# holds moves: words in bold, italic, a fixed-pitch face or under a highlight, struck text,
+# blanks and checkboxes are runs (`Element.runs`, CONTENT_RUNS on), and so is a kept line end
+# ("break": a poem, an address); a name in small capitals is text in its own case; a formula's
+# ActualText is chosen by page; an equation number at the far edge stays with its equation; a
+# slide deck is found by its pages and a file may hold several; "Abstract" alone on its line is
+# a heading, an algorithm's steps are one code block, a glossary, index or bibliography entry is
+# a block of its own, footnotes the file names are notes; a long table caption is attached and
+# a table with no header cell is a required choice (`header_source`); links come from typed
+# addresses, numbered references and a LaTeX or Word file's own references; the document's
+# language is settled once. Results from 0.5.10 and 0.5.11 load unchanged and their page is
+# made again (`assemble.RENDER_VERSION` 8). An older release refuses a result that holds a
+# value its closed lists do not have (a link of kind "typed", a new notice code, the origin
+# "docx"), so a deploy of this version is not rolled back past it once a document has been
+# converted (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.12"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -791,11 +835,20 @@ def _text_pass(
     options: ConversionOptions,
     tracer: Tracer,
 ) -> text_pass.TextPassResult:
-    """Links, cross-references, language and (with FEATURE_COLOUR) colour runs on the
-    elements, before any step (`text_pass.apply`; it never raises)."""
-    with _span(tracer, "text", elements=len(elements), colour=options.colour) as span:
+    """Links, cross-references, language, (with FEATURE_COLOUR) colour runs and (with
+    CONTENT_RUNS; counted either way) struck runs on the elements, before any step
+    (`text_pass.apply`; it never raises)."""
+    with _span(
+        tracer, "text", elements=len(elements), colour=options.colour, runs=options.content_runs
+    ) as span:
         text = text_pass.apply(
-            pdf_bytes, elements, pages=pages, layout_lang=layout_lang, colour=options.colour
+            pdf_bytes,
+            elements,
+            pages=pages,
+            layout_lang=layout_lang,
+            colour=options.colour,
+            runs=options.content_runs,
+            chosen_lang=options.language,
         )
         _annotate(span, lang_source=text.lang_source, **text.counts())
     return text
@@ -1577,6 +1630,8 @@ def _page_math_pass(
             grouping: dict[str, Any] = (
                 {"display_grouping": True} if settings.layout_display_grouping else {}
             )
+            if settings.region_tree == "on":
+                grouping["region_tree"] = True
             try:
                 doc = layout.analyze(
                     pdf_bytes,
@@ -1701,7 +1756,8 @@ def _witness_image(pdf_bytes: bytes, number: int) -> bytes:
 
 def _image_pages_pass(
     pdf_bytes: bytes,
-    kept: dict[int, str],
+    pages: list[int],
+    typed: Mapping[int, list[Element]],
     boxes: dict[int, BBox],
     vector: dict[int, image_page_vector.VectorPage],
     *,
@@ -1713,14 +1769,13 @@ def _image_pages_pass(
     measured: list[CallFact],
     step_cache: StepCache | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
-    """Read the kept scanned and handwritten pages from a picture of each (ADR 0007).
+    """Read the kept pages `pages` (`image_page.kept_reads`) from a picture of each (ADR 0007).
 
     Returns what was built for the pages that were read, and the summary (None when there
     was no page to read). A page not in the first result stays a kept page. Fails safe: a
     page whose answer cannot be used, a spend cap that stops the pass or an exception while
     building leaves that page as it was. `ConfigError` and `UnknownModelError` propagate like
     they do from every step."""
-    pages = image_page.kept_reads(kept)
     if not pages:
         return {}, None
     # (An answer kept by an earlier run is given back in front of the recording client: it
@@ -1764,6 +1819,7 @@ def _image_pages_pass(
                     accept_agreed=settings.image_pages_accept_agreed,
                     maths_required=settings.image_pages_maths_always_required,
                     page_ink=read.vector if settings.image_pages_vector_checks else None,
+                    typed=typed.get(number, ()),
                 )
             except Exception as exc:  # the page stays an image: a bad answer is not worth more
                 log.warning("image page build failed: %s", type(exc).__name__)
@@ -1804,6 +1860,7 @@ def _convert(
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
+    font_codes.configure(settings.font_code_tables)
     # What this conversion measures of itself (`pipeline.step_facts`): each stage's wall
     # time, and every request to a model with its page.
     watch = step_facts.Stopwatch()
@@ -1812,9 +1869,10 @@ def _convert(
     # the conversion and can change nothing of it.
     shadowed = shadow.Shadow()
     # Pages a layout run typed without their ink, and handwritten pages whose strokes were
-    # not read, because the time for the ink analysis ran out (`page_type.InkBudget`).
-    ink_late: set[int] = set()
-    strokes_late: list[NotFinished] = []
+    # not read, each with its cause: a count of work ran out, or the clock guard fired
+    # (`page_type.InkBudget`).
+    ink_late: dict[int, str] = {}
+    strokes_late: dict[int, str] = {}
     # The page-level passes ask through the job's kept answers when it has any.
     page_client: VisionClient = (
         client if step_cache is None else _PageAnswers(client, step_cache, settings)
@@ -1833,13 +1891,15 @@ def _convert(
             extra: dict[str, Any] = {} if collector is None else {"page_math": collector}
             if settings.layout_display_grouping:
                 extra["display_grouping"] = True
+            if settings.region_tree == "on":
+                extra["region_tree"] = True
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,
                 max_pages=settings.max_pages_per_job,
                 **extra,
             )
-            ink_late.update(page_type.out_of_time(getattr(doc, "page_types", None) or {}))
+            ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
@@ -1857,7 +1917,7 @@ def _convert(
                     measured=measured,
                 )
                 # (the pass lays the plan over a second layout run, which types the pages again)
-                ink_late.update(page_type.out_of_time(getattr(doc, "page_types", None) or {}))
+                ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
             if collector is not None and options.page_witness:
                 watch.stage("page_witness")
                 witnessed, witness_summary = _page_witness_pass(
@@ -1884,37 +1944,26 @@ def _convert(
             vector_pages: dict[int, image_page_vector.VectorPage] = {}
             if options.image_pages:
                 watch.stage("image_pages")
-                # (a picture under a text layer that does not cover it is kept as an
-                # unread page and read as a scan: `page_type.reads_image`)
-                to_read = {
-                    n: page_type.SCANNED_PAGE
-                    if reason == page_type.UNREAD_PAGE
-                    and (kind := (getattr(doc, "page_types", None) or {}).get(n)) is not None
-                    and page_type.reads_image(kind)
-                    else reason
-                    for n, reason in kept.items()
-                }
+                # Every kept page whose content is a picture or ink (`page_type.image_kind`:
+                # a scan, handwriting, a picture under a text layer that does not cover it, an
+                # unread page of vector ink), asked to be read.
+                page_types = getattr(doc, "page_types", None) or {}
+                to_read = image_page.kept_reads(kept, page_types)
+                # What layout read from them, a title over notes: the read keeps what it
+                # leaves out (`image_page.build`).
+                typed: dict[int, list[Element]] = {}
+                for e in elements:
+                    if e.page in to_read:
+                        typed.setdefault(e.page, []).append(e)
                 if settings.image_pages_vector_crops or settings.image_pages_vector_checks:
-                    page_kinds = {
-                        n: r.kind for n, r in (getattr(doc, "page_types", None) or {}).items()
-                    }
-                    ink_time = page_type.InkBudget()
+                    page_kinds = {n: r.kind for n, r in page_types.items()}
                     vector_pages = image_page_vector.analyse(
-                        pdf_bytes, to_read, page_kinds, budget=ink_time
+                        pdf_bytes, to_read, page_kinds, stopped=strokes_late
                     )
-                    if ink_time.ran_out:
-                        written = [
-                            n for n in to_read if page_kinds.get(n) in page_type.HANDWRITTEN_KINDS
-                        ]
-                        strokes_late = step_facts.stopped(
-                            step_facts.INK_STROKES,
-                            "time_limit",
-                            done=len(vector_pages),
-                            of=len(written),
-                        )
                 image_built, image_summary = _image_pages_pass(
                     pdf_bytes,
                     to_read,
+                    typed,
                     boxes,
                     vector_pages,
                     client=client,
@@ -2029,6 +2078,12 @@ def _convert(
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         elements, run.fixes = table_math.settle(elements, run.fixes)
+        # No empty alt text on content (WS6.4): decoration only with evidence, after every step.
+        decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)
+        # A paragraph or list item layout doubts (`option_labels`, `rtl_text`) gets its decision.
+        for fix in notice_rules.text_decisions(elements, run.fixes):
+            run.fixes[fix.element_id] = fix
+        triage.stamp(run.fixes.values())  # the risk band each decision was asked at
         ordered = _ordered_fixes(elements, run.fixes)
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
@@ -2036,6 +2091,10 @@ def _convert(
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
+        # A PDF repaired when it was opened whose last pages are empty looks cut off: the
+        # student note says so, and so does the job page until the owner answers.
+        repaired = pdf_facts.repair_notices(pdf_bytes, getattr(doc, "page_types", None) or {})
+        cut_off = notice_rules.cut_off_pages(repaired)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
             _send(stage_progress, "assemble")
             html = assemble.render_html(
@@ -2049,6 +2108,7 @@ def _convert(
                 math_alttext=settings.mathml_alttext,
                 page_labels=labels,
                 footnote_ids=footnotes,
+                cut_off_pages=cut_off,
             )
             _send(stage_progress, "checks")
             watch.stage("checks")
@@ -2058,8 +2118,18 @@ def _convert(
                 "image_page",
                 [r.page for r in image_summary.per_page if r.outcome == "budget_exceeded"],
             )
-        stops += strokes_late + step_facts.pages_capped(
-            step_facts.PAGE_TYPE, sorted(ink_late), "time_limit"
+        stops += step_facts.ink_stopped(step_facts.PAGE_TYPE, ink_late)
+        stops += step_facts.ink_stopped(step_facts.INK_STROKES, strokes_late)
+        # The say-once measure, in shadow (SW60): a page whose words an element does not say
+        # is noted, with its share, in the conversion's own record and nowhere a person sees.
+        # A page kept whole as a picture, or read from one, has its own decision.
+        shadowed.over_line(
+            say_once.NOTICE_CODE,
+            lambda: say_once.over_line(
+                say_once.measure(
+                    getattr(doc, "sources", None) or {}, elements, skip={*kept, *image_built}
+                )
+            ),
         )
         facts = step_facts.gathered(
             measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
@@ -2124,12 +2194,14 @@ def _convert(
     notices: list[Notice] = [
         *text.notices,
         *doc.notices,
+        *repaired,
         *image_page.notices(image_built),
         *reading_notices,
     ]
-    derived = notice_rules.from_fixes(
-        elements, ordered, long_descriptions=options.long_descriptions
-    )
+    derived = [
+        *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),
+        *notice_rules.from_reasons(elements, ordered),
+    ]
     notices = notice_rules.ordered(notice_rules.merge(derived, notices), elements)
     result = DocumentResult(
         pipeline_version=PIPELINE_VERSION,

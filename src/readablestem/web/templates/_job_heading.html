@@ -1,0 +1,9 @@
+{# Audiences: owner, reviewer, reader #}
+{# The heading of the job page: the document's title and its file name (not for a reader: the
+   name of the owner's file is theirs). The title changes when the job finishes (the file name
+   until then), so the finished answer sends this out of band. #}
+<div id="job-heading"{% if oob|default(false) %} hx-swap-oob="true"{% endif %}>
+  <h1>{{ job.title }}</h1>
+  {% if job.title != job.filename and job.audience != "reader" %}<p class="doc-file">File: {{ job.filename }}</p>{% endif %}
+  {% if job.version_line %}<p class="doc-file" id="job-version">{{ job.version_line }}</p>{% endif %}
+</div>

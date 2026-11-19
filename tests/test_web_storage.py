@@ -143,10 +143,24 @@ def test_an_upload_over_the_cap_is_refused_and_says_how_much_is_used(web):
     assert response.status_code == 413
     text = flat(response.text)
     assert "You are storing 3 MB of the 3 MB you can keep" in text
-    assert "third.pdf would go over it" in text
+    assert "would go over it" in text
     assert "Delete documents you no longer need" in text and "Nothing was uploaded" in text
     with session_scope(web.ctx.factory) as session:
         assert len(list(session.scalars(select(Job)))) == 2  # nothing stored, no pages taken
+
+
+def test_an_upload_that_cannot_fit_is_refused_before_a_byte_of_it_is_read(web, monkeypatch):
+    store(web, ALICE, int(2.9 * MB))
+
+    def unread(*args, **kwargs):
+        raise AssertionError("the body of the upload was read")
+
+    monkeypatch.setattr("readablestem.web.routes.jobs.read_upload_form", unread)
+    response = post(web.alice, padded(0.5))  # the body says it carries more than the room left
+    assert response.status_code == 413
+    assert "You are storing 3 MB of the 3 MB you can keep" in flat(response.text)
+    monkeypatch.undo()
+    assert post(web.alice, make_pdf(1)).status_code == 303  # a file that fits is still taken
 
 
 def test_deleting_a_document_frees_the_room(web):
@@ -261,6 +275,16 @@ def test_the_storage_shows_to_the_admin_and_goes_stale_while_full(web):
     assert detail["stale"] == ["storage"]
     assert detail["storage"]["full"] is True and detail["storage"]["stored_mb"] == 5
     assert "storage" in admin.get("/admin").text
+    # The daily canaries' results are on the admin page too, and only there.
+    from readablestem.ops import canary
+
+    canary.count_status(web.ctx.factory, utcnow().date(), "claude:drift")
+    assert admin.get("/admin/health").json()["canaries"] == {
+        "decisions": None,
+        "claude": {"day": utcnow().date().isoformat(), "status": "drift"},
+    }
+    assert "Claude second check: drift on" in admin.get("/admin").text
+    assert "canar" not in web.alice.get("/healthz/ops").text
 
 
 # --------------------------------------------------------------------------- the parts page

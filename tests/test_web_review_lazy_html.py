@@ -8,7 +8,6 @@ import pytest
 
 from fixtures.web.support import fetch
 from readablestem.core.types import DocumentResult
-from readablestem.pipeline.assemble import CHECKED
 from readablestem.web.db import Job, session_scope
 from test_web_pipeline import Site, csrf_from, paragraph, review, site  # noqa: F401
 
@@ -53,7 +52,7 @@ def test_the_student_note_is_dated_by_the_last_decision_not_by_the_render(site):
         for edit in session.query(ReviewEdit).filter_by(job_id=site.job_id):
             edit.created_at = edit.created_at.replace(year=2026, month=1, day=2)
     served = fetch(site.browser, f"/jobs/{site.job_id}/download").text
-    assert f"{CHECKED} on January 2, 2026." in served, served[-600:]
+    assert "the tool flagged, on January 2, 2026." in served, served[-600:]
 
 
 def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
@@ -110,9 +109,9 @@ def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
     stored checks become those of the new page."""
     import re
 
-    from readablestem.pipeline import assemble, html_checks
-    from readablestem.web import output
+    from readablestem.pipeline import assemble, checked_words, html_checks
 
+    site.browser.get(f"/jobs/{site.job_id}")  # the first view makes the stored page
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
         assert job is not None and not job.html_stale
@@ -122,18 +121,23 @@ def test_a_page_made_by_an_older_renderer_is_made_again_once(site):
     first = site.browser.get(f"/jobs/{site.job_id}/view").text
     assert assemble.render_version(first) == assemble.RENDER_VERSION
     stored = site.job(site.job_id)
-    # The view of a draft carries the draft banner as it leaves; the stored page never does.
+    # The view of a draft carries the draft banner as it leaves, and is made fresh in the
+    # checker's words (`audience="checker"`); the stored page has neither.
     assert assemble.DRAFT_STATE_META not in (stored.html or "")
-    assert first == output.marked(stored.html or "", output.export_state(stored))
+    assert assemble.DRAFT_STATE_META in first
+    assert checked_words.CHECK_BEFORE_USE in first
+    assert checked_words.CHECK_BEFORE_USE not in (stored.html or "")
     checks = DocumentResult.model_validate(stored.result_json).html_checks
     assert checks == html_checks.static_checks(stored.html or "")
 
-    # A page at the current version is served as it is stored: no second render.
+    # A page at the current version is not made again for the stored file (a draft is made fresh
+    # each time it leaves, and never stored).
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
         assert job is not None
         job.html = (stored.html or "").replace("</main>", "<p>Stored as it was.</p></main>")
-    assert "Stored as it was." in site.browser.get(f"/jobs/{site.job_id}/view").text
+    assert site.browser.get(f"/jobs/{site.job_id}/view").status_code == 200
+    assert "Stored as it was." in (site.job(site.job_id).html or "")
 
 
 def test_an_older_page_that_cannot_be_made_again_is_served_as_it_is_stored(site, monkeypatch):
@@ -146,6 +150,7 @@ def test_an_older_page_that_cannot_be_made_again_is_served_as_it_is_stored(site,
     def fails(*args, **kwargs):
         raise ValueError("the new renderer cannot read this stored result")
 
+    site.browser.get(f"/jobs/{site.job_id}")  # the first view makes the stored page
     with session_scope(site.ctx.factory) as session:
         job = session.get(Job, site.job_id)
         assert job is not None and not job.html_stale

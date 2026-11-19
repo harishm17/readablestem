@@ -52,3 +52,6 @@ handwriting-private/
 
 # Local re-score of the interim held-out report (make proof-interim); the committed one is registered
 proof/interim/rebuilt-here.md
+
+# Written by `readablestem ops image-facts --write` (the image build); never committed.
+src/readablestem/source/tex_distribution_names.txt

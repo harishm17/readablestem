@@ -1,15 +1,39 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-11-02",
-  "pipeline_version": "0.5.1",
+  "date": "2026-11-19",
+  "pipeline_version": "0.5.12",
+  "profile": {
+    "name": "development settings",
+    "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
+    "confirmed": false,
+    "differs": [
+      "CHEAP_MODEL",
+      "DECISIONS_EQUATION_SHADOW",
+      "DECISIONS_FIGURE_VERIFY",
+      "EQUATION_GLYPH_CHECKS",
+      "EQUATION_GLYPH_RECONCILE",
+      "EQUATION_LINE_CONTEXT",
+      "FEATURE_IMAGE_PAGES",
+      "FEATURE_LATEX_SOURCE",
+      "FEATURE_LONG_DESCRIPTIONS",
+      "FEATURE_NOTATION_MEMORY",
+      "FEATURE_TABLES",
+      "FLAG_POLICY",
+      "MAIN_MODEL",
+      "MODEL_PROVIDER"
+    ],
+    "counted_off": [
+      "OFFICE_INPUT_ENABLED"
+    ]
+  },
   "prompt_versions": {},
   "models": {
-    "main": "claude-opus-5-5",
-    "cheap": "claude-haiku-5-5"
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
   },
   "models_used": [],
-  "client": "anthropic",
+  "client": "fake",
   "dataset": {
     "gold_dir": "data/gold",
     "manifest_sha256": "b74e1fa4a67bd67ff37c048e992fdf518308ad0e063ed4522129aa43a82981de",
@@ -138,6 +162,15 @@
       "required_by_reason": {
         "heading.repeated_label": 8,
         "heading.weak_evidence": 8
+      },
+      "required_by_band": {
+        "5": 4
+      },
+      "required_by_source": {
+        "pipeline": 4
+      },
+      "required_by_class": {
+        "doubt": 4
       },
       "optional_by_reason": {
         "heading.weak_evidence": 20

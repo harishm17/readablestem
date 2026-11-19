@@ -43,7 +43,7 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.web.db import ReviewEdit, session_scope
+from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 from readablestem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
 
 
@@ -87,7 +87,7 @@ class FakePipeline:
             )
         ]
 
-    def mathml_to_speech(self, mathml: str) -> str:
+    def mathml_to_speech(self, mathml: str, *, readings=None) -> str:
         return "spoken form"
 
     def render_html(
@@ -284,8 +284,11 @@ def rich_output() -> ConversionOutput:
 def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 303
-    # Next fix still waiting after equation 2 is the abstained equation 3.
-    assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#item-p1-e5"
+    # The abstained equation 3 (band 1) is listed before equation 2 (band 2), so the next fix
+    # still waiting after equation 2 is the figure.
+    assert (
+        response.headers["location"] == f"/jobs/{web.job_id}/review/list?at=item-p1-e4#item-p1-e4"
+    )
     after = result(web)
     fix = after.fix_for("p1-e3")
     assert fix is not None and fix.status.value == "accepted"
@@ -302,9 +305,9 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     # The reviewer's decisions come before what was accepted for them.
     assert cards(page) == ["p1-e5", "p1-e4", "p1-e3", "p1-e2", "p1-e0"]
     # The notice sits where the redirect lands, linked back to the fix that changed.
-    landing = card(page, "p1-e5")
+    landing = card(page, "p1-e4")
     assert '<a href="#item-p1-e3">Equation 2 on page 1</a>: Accepted.' in landing
-    assert landing.index("Accepted.") < landing.index('<article id="fix-p1-e5"')
+    assert landing.index("Accepted.") < landing.index('<article id="fix-p1-e4"')
     # The changed fix is decided now: the folded list of decided fixes opens to show it.
     changed = card(page, "p1-e3")
     assert '<details class="done-item" open>' in changed
@@ -375,6 +378,29 @@ def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
     assert response.status_code == 422
     assert "failed a required check" in response.text
     assert post(web, "p1-e4", action="edit", alt="A rising line").status_code == 303
+
+
+def test_a_stored_crop_is_drawn_at_the_size_of_its_box_in_the_pdf(web):
+    """A crop is drawn from its element's box in the page, with one scale for every crop and
+    the proportions of its file, so the page keeps room for it before it loads."""
+    header = (
+        b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR" + (400).to_bytes(4, "big") + (100).to_bytes(4, "big")
+    )
+    with session_scope(web.ctx.factory) as session:
+        blob = session.scalars(
+            select(Blob).where(Blob.job_id == web.job_id, Blob.element_id == "p1-e3")
+        ).one()
+        blob.content = header + blob.content[len(header) :]
+        job = session.get(Job, web.job_id)
+        assert job is not None and job.result_json is not None
+        data = DocumentResult.model_validate(job.result_json)
+        for element in data.elements:
+            if element.id == "p1-e3":
+                element.bbox = (50.0, 100.0, 146.0, 124.0)  # 96 pt wide, with 2 pt padding a side
+        job.result_json = data.model_dump(mode="json", exclude={"html"})
+    tag = re.search(r"<img[^>]*crops/p1-e3\.png[^>]*>", review_page(web))
+    assert tag is not None
+    assert 'width="150"' in tag[0] and 'height="38"' in tag[0]  # (96 + 4) pt at 1.5 px; 4 to 1
 
 
 def test_unknown_action_or_element(web):
@@ -605,13 +631,13 @@ def heading_doc(*spec: int | None) -> DocumentResult:
 
 def written_levels(data: DocumentResult) -> dict[str, int]:
     """element_id -> N of the <hN> the real assembler writes for it, without the move down
-    that gives a file with several top-level headings one title (T3-13, `title_shift`): the
-    review screen speaks of the outline repair's levels."""
+    under the one H1 (SW6c, `title_plan`): the review screen speaks of the outline repair's
+    levels."""
     from unittest.mock import patch
 
-    from readablestem.pipeline.assemble import render_html
+    from readablestem.pipeline.assemble import TitlePlan, render_html
 
-    with patch("readablestem.pipeline.assemble.title_shift", return_value=0):
+    with patch("readablestem.pipeline.assemble.title_plan", return_value=TitlePlan("t", None, 0)):
         html = render_html(title="t", lang="en", elements=data.elements, fixes=data.fixes, crops={})
     return {eid: int(n) for n, eid in re.findall(r'<h([1-6]) id="(p1-e\d+)"', html)}
 
@@ -729,3 +755,118 @@ def test_every_review_write_records_a_content_free_outcome(tmp_path):
             held = getattr(event, column.name)
             if isinstance(held, str):
                 assert not any(w.lower() in held.lower() for w in words), (column.name, held)
+
+
+# --------------------------------------------------------------------------- no proposal
+
+
+def _give_text(env, element_id: str, text: str) -> None:
+    """The PDF's own glyphs for an element (the fake document has none for its equations)."""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    with session_scope(env.ctx.factory) as session:
+        job = session.get(Job, env.job_id)
+        assert job is not None
+        data = DocumentResult.model_validate(job.result_json)
+        for element in data.elements:
+            if element.id == element_id:
+                element.text = text
+        job.result_json = data.model_dump(mode="json")
+        flag_modified(job, "result_json")
+
+
+def standing(env) -> dict:
+    """What the reviewer's writes stand for (the outcome events, net of Undo)."""
+    from readablestem.web import events
+    from readablestem.web.db import Event
+
+    key = (Event.kind, Event.outcome, Event.write_mode)
+    with session_scope(env.ctx.factory) as session:
+        sums = session.execute(
+            select(*key, func.sum(Event.value))
+            .where(Event.name == events.DECISION_OUTCOME)
+            .group_by(*key)
+        ).all()
+    return {(k, o, w): n for k, o, w, n in sums if n}
+
+
+def _undo(env):
+    version = str(env.job(env.job_id).result_version or 0)
+    page = f"/jobs/{env.job_id}/review"
+    data = {"csrf_token": token(env.browser, page), "version": version, "view": "list"}
+    return env.browser.post(f"/jobs/{env.job_id}/undo", data=data)
+
+
+def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(web):
+    """An abstained equation's card offers Read again, a picture with the reviewer's
+    description and Not an equation. Each stores its own decision, the rendered output says
+    the same, and Undo puts the stored result back as it was."""
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.web import page_edits
+
+    _give_text(web, "p1-e5", "x = 1")
+    clients: list[FakeVisionClient] = []
+
+    def model(settings, budget) -> FakeVisionClient:
+        clients.append(
+            FakeVisionClient(
+                budget=budget,
+                defaults={
+                    "equation": {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
+                },
+            )
+        )
+        return clients[-1]
+
+    web.ctx.client_factory = model
+
+    def held() -> dict:
+        """What the review decides: the elements and their fixes, as stored."""
+        stored = result(web).model_dump(mode="json")
+        return {k: stored[k] for k in ("elements", "fixes", "notices")}
+
+    settled(web)
+    before = held()
+    mine = card(review_page(web), "p1-e5")
+    assert 'value="reread"' in mine and 'value="not_equation"' in mine
+    assert "Keep as a picture with my description" in mine
+
+    # Read again: a proposal where there was none, on the same item, still waiting.
+    assert post(web, "p1-e5", action="reread").status_code == 303
+    read = result(web).fix_for("p1-e5")
+    assert read is not None and read.pending and read.equation is not None
+    assert read.equation.latex == "x^2 + 1"
+    assert held()["elements"] == before["elements"]
+    assert _undo(web).status_code == 303
+    assert held() == before
+    # Asked for again, the record answers: no second call, and the page does not say the
+    # picture was read anew.
+    assert post(web, "p1-e5", action="reread").status_code == 303
+    assert sum(len(c.requests) for c in clients) == 1
+    said = unescape(review_page(web))
+    assert page_edits.READ_BEFORE in said and page_edits.READ_AGAIN not in said
+    assert _undo(web).status_code == 303
+    assert held() == before
+
+    # A picture with the reviewer's description.
+    assert (
+        post(web, "p1-e5", action="describe", description="A fraction one over two").status_code
+        == 303
+    )
+    kept = result(web).fix_for("p1-e5")
+    assert kept is not None and kept.status is Status.REJECTED and kept.described
+    assert "p1-e5:rejected" in fetch(web.browser, f"/jobs/{web.job_id}/download").text
+    assert _undo(web).status_code == 303
+    assert held() == before
+
+    # Not an equation: the glyphs go back to the text as a paragraph, with no fix left.
+    assert post(web, "p1-e5", action="not_equation").status_code == 303
+    after = result(web)
+    assert after.fix_for("p1-e5") is None
+    assert "p1-e5:" not in fetch(web.browser, f"/jobs/{web.job_id}/download").text
+    element = next(e for e in after.elements if e.id == "p1-e5")
+    assert element.kind is Kind.PARAGRAPH and element.text == "x = 1"
+    assert standing(web) == {("equation", "removed", "structure"): 1}  # recorded, no words
+    assert _undo(web).status_code == 303
+    assert held() == before
+    assert standing(web) == {}  # net of Undo

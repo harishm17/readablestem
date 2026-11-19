@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{# Confirm removing the class link of a document (routes/sharing.py, web/links.py). #}
+{% block title %}Remove the class link?{% endblock %}
+{% block body_class %}page-confirm{% endblock %}
+{% block content %}
+<h1>Remove the class link for “{{ doc_title }}”?</h1>
+<p>{% if label %}The link labeled “{{ label }}”{% else %}The link{% endif %}, opened {{ opened }} {{ "time" if opened == 1 else "times" }}, stops working at once for everyone who has it. Its published copy is deleted.</p>
+<p>The address cannot be got back. A new link has a new address, and you would have to send it to your class again.</p>
+<div class="confirm-actions">
+  {% call form("link.remove", "/jobs/" ~ job_id ~ "/share/link/remove", {"class": "inline-form"}) %}
+    <button type="submit" class="button-danger">Remove the link</button>
+  {% endcall %}
+  <a class="button-secondary" href="/jobs/{{ job_id }}/share">No, keep it</a>
+</div>
+{% endblock %}

@@ -33,7 +33,7 @@ from collections.abc import Callable, Iterable
 from readablestem.core.types import Element, Kind
 
 CSS_PX_PER_PT = 96 / 72  # a PDF point is 1/72 in; a CSS pixel is 1/96 in
-OUTPUT_TEXT_PX = 18.0  # the file's text: `assemble.STYLE` sets the body at 1.125rem
+OUTPUT_TEXT_PX = 18.0  # the file's text: `student_sheet.CORE` sets the body at 1.125rem
 SHARP = 3  # image pixels per CSS pixel of the displayed picture
 MIN_SCALE = 0.5
 MAX_SCALE = 2.0

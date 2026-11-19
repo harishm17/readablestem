@@ -118,3 +118,21 @@ def test_layout_lists_a_code_block_and_a_footnote_as_notices_with_no_decision():
     # Plain text paragraphs, a footnote-sized line without a raised mark: nothing.
     plain = analyze(code_and_footnote_pdf(code_font="helv"))
     assert all(n.code != "code_block" for n in plain.notices)
+
+
+def test_a_line_is_made_only_for_a_code_in_the_table_and_every_row_has_words():
+    import pytest
+
+    from readablestem.core import page_checks
+    from readablestem.core.types import NOTICE_CODES
+    from readablestem.web.messages import HANDLED_MESSAGES, NOTICE_MESSAGES
+
+    with pytest.raises(ValueError):
+        page_checks.make("not_a_check_line")
+    with pytest.raises(ValueError):  # a line for the whole document has no page
+        page_checks.make("lang_assumed", page=0)
+    assert page_checks.make("scanned_page", page=2).review == "required"
+    # a row without a sentence would render an empty line, and a code without a row has no tier
+    assert set(page_checks.TABLE) == set(NOTICE_CODES)
+    assert all(NOTICE_MESSAGES.get(code) for code in page_checks.TABLE)
+    assert set(HANDLED_MESSAGES) >= page_checks.HANDLED_CODES

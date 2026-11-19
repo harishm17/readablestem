@@ -18,6 +18,7 @@ from defusedxml import ElementTree as SafeET
 from markupsafe import Markup
 
 from readablestem.core.mathml_intent import intent_allowed
+from readablestem.pipeline.mathml_shape import normal_form
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
@@ -94,12 +95,14 @@ def _write(node: Element, out: list[str], depth: int, flag: frozenset[str] = fro
     out.append(f"</{tag}>")
 
 
-def sanitize_mathml(mathml: str, *, flag: Collection[str] = ()) -> Markup:
+def sanitize_mathml(mathml: str, *, flag: Collection[str] = (), normal: bool = False) -> Markup:
     """Allowlisted, re-serialised MathML, safe to place in a page. Raises UnsafeMathML.
 
     Tokens holding one of the `flag` characters (compared as NFKC, case-folded: a bold
     "𝛚" and a plain "ω" alike) get `class="flagged"`, so the review screen can outline
-    the symbol a check is about."""
+    the symbol a check is about. `normal` writes the tree in the normal form first
+    (`pipeline.mathml_shape`), for MathML that a source brings and that is then stored and
+    spoken."""
     if not mathml or len(mathml) > MAX_INPUT_CHARS:
         raise UnsafeMathML("empty or too long")
     try:
@@ -109,6 +112,8 @@ def sanitize_mathml(mathml: str, *, flag: Collection[str] = ()) -> Markup:
     if _local(root.tag) != "math":
         raise UnsafeMathML("root is not <math>")
     out: list[str] = []
+    if normal:
+        normal_form(root)
     _write(root, out, 0, frozenset(_fold(c) for c in flag))
     return Markup("".join(out))  # every piece above was escaped or is a fixed literal
 

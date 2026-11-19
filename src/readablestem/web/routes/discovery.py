@@ -3,15 +3,17 @@ key, the favicon) and the showcase: the static reviewer demo under /showcase/ (w
 
 from __future__ import annotations
 
+import functools
 import html
+import json
 import re
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, PlainTextResponse, Response
 
-from readablestem.web import seo
-from readablestem.web.assets import STATIC_DIR, cached_html, static_url
+from readablestem.web import seo, signin_words
+from readablestem.web.assets import STATIC_DIR, cached_html, fixed_file, static_url
 from readablestem.web.deps import get_ctx
 from readablestem.web.security import VIEW_CSP
 
@@ -39,7 +41,15 @@ def sitemap(request: Request) -> Response:
 
 @router.get("/llms.txt")
 def llms(request: Request) -> Response:
-    body = seo.llms_txt(_site(request), showcase=bool(seo.showcase_pages()))
+    ctx = get_ctx(request)
+    words = signin_words.sign_in_words(
+        google=ctx.sign_in_client("google") is not None,
+        microsoft=ctx.sign_in_client("microsoft") is not None,
+        email_link=False,  # the link signs in an account that exists; it makes none
+    )
+    body = seo.llms_txt(
+        _site(request), showcase=bool(seo.showcase_pages()), sign_in=words or "Google"
+    )
     return PlainTextResponse(body, headers={"Cache-Control": CRAWL_CACHE})
 
 
@@ -49,9 +59,45 @@ def indexnow_key() -> Response:
 
 
 @router.get("/favicon.ico")
-def favicon() -> Response:
-    return FileResponse(
-        STATIC_DIR / "favicon.ico", headers={"Cache-Control": "public, max-age=86400"}
+def favicon(request: Request) -> Response:
+    return fixed_file(request, STATIC_DIR / "favicon.ico", cache_control="public, max-age=86400")
+
+
+@router.get("/apple-touch-icon.png")
+def apple_touch_icon(request: Request) -> Response:
+    """iOS and some browsers ask for the home-screen icon at the root whatever the page links."""
+    return fixed_file(
+        request, STATIC_DIR / "apple-touch-icon.png", cache_control="public, max-age=86400"
+    )
+
+
+# The page background in light and dark mode: `--bg` in static/tokens.css (the manifest has one
+# color for each, so it takes the light one; `base.html` gives the browser both).
+THEME_LIGHT = "#ffffff"
+THEME_DARK = "#0f1115"
+
+
+@router.get("/site.webmanifest")
+def web_manifest() -> Response:
+    """The web app manifest: the name and icons a browser or phone offers when a person adds the
+    site to the home screen. It opens as a normal page (`display` is not `standalone`)."""
+    manifest = {
+        "name": "ReadableSTEM",
+        "short_name": "ReadableSTEM",
+        "start_url": "/",
+        "scope": "/",
+        "display": "minimal-ui",
+        "theme_color": THEME_LIGHT,
+        "background_color": THEME_LIGHT,
+        "icons": [
+            {"src": static_url("icon-192.png"), "sizes": "192x192", "type": "image/png"},
+            {"src": static_url("icon-512.png"), "sizes": "512x512", "type": "image/png"},
+        ],
+    }
+    return Response(
+        json.dumps(manifest),
+        media_type="application/manifest+json",
+        headers={"Cache-Control": "public, max-age=86400"},
     )
 
 
@@ -63,15 +109,18 @@ SHOWCASE_CANONICAL = {"examples/physics-2-3/converted.html": "/demo"}
 
 @router.get("/showcase")
 def showcase_root() -> Response:
+    """The folder's address. Where the showcase was not built (the folder is absent) there is
+    nothing to redirect to: a clean 404, not a redirect to one."""
+    if not seo.showcase_pages():
+        raise HTTPException(status_code=404)
     return Response(status_code=301, headers={"Location": seo.SHOWCASE_PREFIX})
 
 
 @router.get("/showcase/{rel:path}")
 def showcase(request: Request, rel: str) -> Response:
-    path = _showcase_file(seo.SHOWCASE_DIR, rel)
+    path, name = _showcase_file(seo.SHOWCASE_DIR, rel)
     if path.suffix != ".html":
         return FileResponse(path, headers={"Cache-Control": CRAWL_CACHE})
-    name = path.relative_to(seo.SHOWCASE_DIR.resolve()).as_posix()
     page = _with_head_tags(path.read_text(encoding="utf-8"), _site(request), name)
     headers = {}
     if path.name in seo.SHOWCASE_NOINDEX:
@@ -80,22 +129,40 @@ def showcase(request: Request, rel: str) -> Response:
     return cached_html(request, page, max_age=CRAWL_MAX_AGE, headers=headers)
 
 
-def _showcase_file(root: Path, rel: str) -> Path:
-    """The built file for a showcase address; a folder means its index.html. 404 for
-    anything outside the build, hidden files, or when there is no build."""
+@functools.cache
+def _showcase_files(root: Path) -> dict[str, tuple[Path, str]]:
+    """Every file of the build that may be served, by the address it answers to under
+    `/showcase/` (a folder's address, with or without its slash, is its index.html):
+    (the file, its name inside the build). Listed from the build itself, once: a request
+    only picks one of these, it never builds a path. Left out: hidden files, 404.html and
+    anything that resolves outside the build (a symlink)."""
     root = root.resolve()
-    path = (root / rel).resolve()
-    if path.is_dir():
-        path = path / "index.html"
-    parts = Path(rel).parts
-    if (
-        not path.is_relative_to(root)
-        or not path.is_file()
-        or any(part.startswith(".") for part in parts)
-        or path.name == "404.html"
-    ):
+    served: dict[str, tuple[Path, str]] = {}
+    for found in sorted(root.rglob("*")) if root.is_dir() else []:
+        path = found.resolve()
+        relative = found.relative_to(root)
+        if (
+            not path.is_file()
+            or not path.is_relative_to(root)
+            or any(part.startswith(".") for part in relative.parts)
+            or found.name == "404.html"
+        ):
+            continue
+        entry = (path, relative.as_posix())
+        served[relative.as_posix()] = entry
+        if found.name == "index.html":
+            folder = relative.parent.as_posix().removeprefix(".")
+            served[folder] = served[folder + "/" if folder else ""] = entry
+    return served
+
+
+def _showcase_file(root: Path, rel: str) -> tuple[Path, str]:
+    """The built file for a showcase address, and its name in the build. 404 for anything
+    that is not one of the build's files (`_showcase_files`), or when there is no build."""
+    entry = _showcase_files(root).get(rel)
+    if entry is None:
         raise HTTPException(status_code=404)
-    return path
+    return entry
 
 
 def _with_head_tags(page: str, site: str, name: str) -> str:
@@ -129,6 +196,6 @@ def _with_head_tags(page: str, site: str, name: str) -> str:
     if Path(name).name in seo.SHOWCASE_NOINDEX:
         tags.append('<meta name="robots" content="noindex, follow">')
     else:
-        data = seo.structured_data(site, path, title, description, seo.SHOWCASE_UPDATED)
+        data = seo.structured_data(site, path, title, description, seo.showcase_updated())
         tags.append(str(seo.json_ld_tag(data)))
     return re.sub(r"<head[^>]*>", lambda m: m.group(0) + "\n" + "\n".join(tags), page, count=1)

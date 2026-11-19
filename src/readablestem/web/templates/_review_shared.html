@@ -1,3 +1,4 @@
+{# Audiences: owner, reviewer #}
 {# Markup the review screen (review_split.html) and the list view (review.html) share: the
    hidden fields of a decision form, an error line, how an equation is read aloud, the LaTeX
    field, a figure's alt-text fields and its fallback, and the "keep the original" fallback of
@@ -6,18 +7,18 @@
    `alt_guideline`. Every control is a form field or a button, so it all works without
    JavaScript. #}
 {% from "_hear.html" import hear_button %}
+{% from "components/forms.html" import submit_button with context %}
+{% from "components/fields.html" import field, field_classes, field_error, field_aria %}
 
-{# Every decision form: the CSRF token, the view to come back to, and the review version the
-   page was drawn at (a form from an out-of-date tab is refused, not applied). `flt` is the
+{# Every decision form (the `form` macro writes the CSRF and request tokens): the view to
+   come back to, and the review version the page was drawn at (a form from an out-of-date tab is refused, not applied). `flt` is the
    list view's decision filter, kept through the decision. #}
 {% macro hidden_fields(view="split", flt="") -%}
-<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ result_version }}">{% if flt %}<input type="hidden" name="flt" value="{{ flt }}">{% endif %}
+<input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ result_version }}">{% if flt %}<input type="hidden" name="flt" value="{{ flt }}">{% endif %}
 {%- endmacro %}
 
-{% macro error_line(item, prefix) %}
-{% set err = item.errors.get(prefix) %}
-{% if err %}<p class="error-message" id="{{ prefix }}-error-{{ item.element_id }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-{% endmacro %}
+{# A decision form's error line: `prefix` is the field's name in `item.errors`. #}
+{% macro error_line(item, prefix) %}{{ field_error(prefix ~ "-error-" ~ item.element_id, item.errors.get(prefix)) }}{% endmacro %}
 
 {# A reading with the symbols that differ from the other one marked (web.speech_diff). The
    line after the two readings says what the marks are, in words. #}
@@ -30,8 +31,8 @@
    the differing words marked, when the checks found a difference; the list view has none. #}
 {% macro speech_lines(item, spoken=None) %}
 {% if item.speech|speakable %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{% if spoken %}{{ said(spoken.said) }}{% else %}{{ item.speech|speakable }}{% endif %}”</p>{% endif %}
-{% if item.text_layer %}
-<p class="speech"><span class="speech-label">From your PDF a screen reader gets:</span> “<span class="text-layer">{{ item.text_layer }}</span>”{% if spoken %}, roughly “{{ said(spoken.pdf_said) }}”{% endif %}</p>
+{% if from_source|default(false) %}{% elif item.text_layer %}
+<p class="speech"><span class="speech-label">From your {{ source|default("PDF") }} a screen reader gets:</span> “<span class="text-layer">{{ item.text_layer }}</span>”{% if spoken %}, roughly “{{ said(spoken.pdf_said) }}”{% endif %}</p>
 {% if spoken %}<p class="hint said-key">Marked words differ.</p>{% endif %}
 {% else %}
 <p class="speech"><span class="speech-label">From your PDF a screen reader gets</span> nothing here: the PDF has no text for this equation.</p>
@@ -42,21 +43,41 @@
 {# The LaTeX of an equation. With `live` (the review screen), htmx checks it as it is typed (a
    pause of 0.6 s first) and shows the result below; the server-side checks on Save edit are
    the same. #}
-{% macro latex_field(item, live=False, rows=2) %}
+{% macro latex_field(item, live=False, rows=6) %}
 {% set eid = item.element_id %}
 {% set err = item.errors.get("latex") %}
-<div class="field{% if err %} field-error{% endif %}">
+<div class="{{ field_classes(err) }}">
   <label for="latex-{{ eid }}">LaTeX for {{ item.label|lower }}</label>
-  <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Checked against the PDF when you save.{% else %}Type the LaTeX, then save.{% endif %}</p>
+  <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}{% if from_source|default(false) %}Checked when you save.{% else %}Checked against the PDF when you save.{% endif %}{% else %}Type the LaTeX, then save.{% endif %}</p>
   {{ error_line(item, "latex") }}
   <textarea id="latex-{{ eid }}" name="latex" rows="{{ rows }}" spellcheck="false" autocapitalize="off" data-edit-field
             {% if live %}hx-post="/jobs/{{ job.id }}/review/{{ eid }}/check" hx-trigger="input changed delay:600ms" hx-target="#live-check-{{ eid }}" hx-swap="innerHTML" hx-sync="this:replace"
-            {% endif %}aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %}{% if live %} live-status-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
+            {% endif %}{{ field_aria("latex-error-" ~ eid, err, "latex-hint-" ~ eid ~ (" live-status-" ~ eid if live else "")) }}>{{ item.values.get("latex", "") }}</textarea>
   {% if live %}
   <p class="live-status" id="live-status-{{ eid }}" role="status"></p>
   <div class="live-check" id="live-check-{{ eid }}"></div>
   {% endif %}
 </div>
+{% endmacro %}
+
+{# The two choices of an equation that waits and has its own picture and text (WS8.5, WS4.5):
+   read the picture again, or give its glyphs back to the text. Each posts the decision form
+   as its own action (`form_id`: the form they belong to when they sit outside it); the line
+   under them (`own_notes`) says what each does. #}
+{% macro own_choices(item, form_id="") %}
+{% set eid = item.element_id %}
+{% if item.can_read_again %}
+{{ submit_button("Read again", "reading", "action", "reread", "button-secondary", {"form": form_id or none, "data-role": "reread", "aria-describedby": "reread-note-" ~ eid}) }}
+{% endif %}
+{% if item.can_not_equation %}
+{{ submit_button("Not an equation", "saving", "action", "not_equation", "button-secondary", {"form": form_id or none, "data-role": "not-equation", "data-tone": "quiet", "aria-describedby": "not-equation-note-" ~ eid}) }}
+{% endif %}
+{% endmacro %}
+
+{% macro own_notes(item) %}
+{% set eid = item.element_id %}
+{% if item.can_read_again %}<p class="hint decide-note" id="reread-note-{{ eid }}">Read again reads the picture once more and replaces the proposal.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>{% endif %}
+{% if item.can_not_equation %}<p class="hint decide-note" id="not-equation-note-{{ eid }}">Not an equation gives it back to the page as text, as the {{ source|default("PDF") }} has it.</p>{% endif %}
 {% endmacro %}
 
 {# Keep the original of an equation (or any kind that only has the plain fallback): its own
@@ -76,17 +97,17 @@
 {% macro alt_fields(item) %}
 {% set eid = item.element_id %}
 {% set err = item.errors.get("alt") %}
-<div class="field{% if err %} field-error{% endif %}">
+<div class="{{ field_classes(err) }}">
   <label for="alt-{{ eid }}">Alt text for {{ item.label|lower }}</label>
   <p class="hint" id="alt-hint-{{ eid }}">{{ item.alt_guidance }} {{ alt_guideline }} characters at most{% if item.values.get("alt") %} (this has {{ item.alt_chars }}){% endif %}.</p>
   {{ error_line(item, "alt") }}
   <textarea id="alt-{{ eid }}" name="alt" rows="3" maxlength="1000" class="prose-input" data-edit-field
-            aria-describedby="alt-hint-{{ eid }}{% if err %} alt-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("alt", "") }}</textarea>
+            {{ field_aria("alt-error-" ~ eid, err, "alt-hint-" ~ eid) }}>{{ item.values.get("alt", "") }}</textarea>
 </div>
 {% set err = item.errors.get("decorative") %}
-<div class="field checkbox-field{% if err %} field-error{% endif %}">
+<div class="{{ field_classes(err, "checkbox-field") }}">
   {{ error_line(item, "decorative") }}
-  <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on" data-edit-field{% if item.values.get("decorative") %} checked{% endif %}{% if err %} aria-describedby="decorative-error-{{ eid }}" aria-invalid="true"{% endif %}>
+  <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on" data-edit-field{% if item.values.get("decorative") %} checked{% endif %}{{ field_aria("decorative-error-" ~ eid, err) }}>
   <label for="decorative-{{ eid }}">Decorative: adds nothing, so no alt text</label>
 </div>
 {% endmacro %}
@@ -95,18 +116,18 @@
    (one step), or save the text and decide later. Which is the main button follows what is
    changed (app.js); the line under them says what each does, so it is the same on every
    screen. #}
-{% macro figure_choices(item) %}
+{% macro figure_choices(item, form_id=None) %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
 {{ error_line(item, "actions") }}
 {% if item.status == "edited" %}<p class="saved-state" id="saved-{{ eid }}">Saved and accepted.</p>{% endif %}
 <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
   {% if item.can_accept %}
-  <button type="submit" name="action" value="accept" class="button" data-role="accept">Accept<span class="visually-hidden"> {{ name }}</span></button>
+  <button type="submit"{% if form_id %} form="{{ form_id }}"{% endif %} name="action" value="accept" class="button" data-role="accept">Accept<span class="visually-hidden"> {{ name }}</span></button>
   {% endif %}
-  <button type="submit" name="action" value="edit" class="{{ 'button-secondary' if item.can_accept else 'button' }}" data-role="save">{{ "Save and accept" if item.pending else "Save changes" }}<span class="visually-hidden"> ({{ name }})</span></button>
+  <button type="submit"{% if form_id %} form="{{ form_id }}"{% endif %} name="action" value="edit" class="{{ 'button-secondary' if item.can_accept else 'button' }}" data-role="save">{{ "Save and accept" if item.pending else "Save changes" }}<span class="visually-hidden"> ({{ name }})</span></button>
   {% if item.pending %}
-  <button type="submit" name="action" value="save" class="button-secondary" data-tone="quiet" data-role="save-later">Save, decide later<span class="visually-hidden"> ({{ name }})</span></button>
+  <button type="submit"{% if form_id %} form="{{ form_id }}"{% endif %} name="action" value="save" class="button-secondary" data-tone="quiet" data-role="save-later">Save, decide later<span class="visually-hidden"> ({{ name }})</span></button>
   {% endif %}
 </div>
 
@@ -118,11 +139,11 @@
 {% macro figure_fallback(item) %}
 {% set eid = item.element_id %}
 {% set err = item.errors.get("acknowledge") %}
-<fieldset class="fallback fallback-figure{% if err %} field-error{% endif %}">
+<fieldset class="{{ field_classes(err, base="fallback fallback-figure") }}">
   <legend>If you cannot describe this figure</legend>
   {{ error_line(item, "acknowledge") }}
   <div class="checkbox-field">
-    <input type="checkbox" id="acknowledge-{{ eid }}" name="acknowledge" value="on"{% if err %} aria-describedby="acknowledge-error-{{ eid }}" aria-invalid="true"{% endif %}>
+    <input type="checkbox" id="acknowledge-{{ eid }}" name="acknowledge" value="on"{{ field_aria("acknowledge-error-" ~ eid, err) }}>
     <label for="acknowledge-{{ eid }}">I understand: screen reader users get no description.<span class="visually-hidden"> ({{ item.label|lower }})</span></label>
   </div>
   <button type="submit" name="action" value="reject" class="button-secondary" data-tone="quiet" data-role="reject" data-needs-tick="acknowledge-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ item.label|lower }})</span></button>

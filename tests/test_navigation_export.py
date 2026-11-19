@@ -59,9 +59,11 @@ def link_targets_exist(markup: str) -> None:
 
 def test_the_file_in_the_zip_keeps_all_of_it_and_adds_no_tab_stop(export):
     page = export.index_html
-    assert 'href="#main-content"' in page and 'id="main-content"' in page
-    # the one tabindex is the skip link's target, which is not a scroll box
-    assert re.findall(r'tabindex="[^"]*"', page) == ['tabindex="-1"']
+    # the skip link lands on the notice the page opens with; it and the h1 take focus from a
+    # link and are not tab stops
+    assert re.search(r'class="skip-link[^>]*href="#checked-notice"', page)
+    assert re.findall(r'<h1 [^>]*tabindex="-1"', page) == ['<h1 id="p1-e0" tabindex="-1"']
+    assert re.findall(r'tabindex="[^"]*"', page) == ['tabindex="-1"'] * 2
     assert export.notes.scroll_boxes == 0
     link_targets_exist(page)
     assert re.findall(r'aria-label="(P[^"]+)"', page) == ["PDF page 1", "Page 12", "Page 13"]
@@ -96,7 +98,8 @@ def test_the_headings_go_down_a_level_in_the_page_but_the_contents_list_does_not
     page = export.page_html or ""
     assert '<h2 id="p1-e0">Motion</h2>' in page
     nav = re.search(r"<nav.*?</nav>", page, re.S)
-    assert nav and nav.group(0).count("<ul") == 2  # nested as in the source
+    # the title's own entry is left out, so its two sections are one flat list
+    assert nav and nav.group(0).count("<ul") == 1 and "Motion" not in nav.group(0)
 
 
 def strip_like_a_strict_purifier(markup: str) -> str:
@@ -124,5 +127,6 @@ def test_the_zip_and_the_cartridge_carry_it(export):
     assert cc.check_cartridge(data) == []
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
         page = archive.read(f"web_resources/{FOLDER}/index.html").decode()
-    assert page == export.index_html
+    # the same page, its note saying what this file is
+    assert page == cc.with_medium(export.index_html, "Common Cartridge")
     link_targets_exist(page)

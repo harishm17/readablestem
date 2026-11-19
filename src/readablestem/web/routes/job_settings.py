@@ -23,7 +23,7 @@ from sqlalchemy.orm import Session
 from readablestem.config import Settings
 from readablestem.core.types import DocumentResult
 from readablestem.web import job_page as page_rules
-from readablestem.web import retention, titles
+from readablestem.web import links, output, retention, titles
 from readablestem.web.db import Job, session_scope, utcnow
 from readablestem.web.deps import (
     CurrentUser,
@@ -33,7 +33,9 @@ from readablestem.web.deps import (
     get_ctx,
     render,
     require_csrf,
+    say_new_time,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.review import rerender_job_html
 from readablestem.web.routes.jobs import (
@@ -59,9 +61,9 @@ def _job_page_with_errors(
     request: Request, job_id: str, user: CurrentUser, field: str, message: str, typed: str
 ) -> Response:
     """The job page again, status 400, with `message` under `field` and `typed` kept."""
-    job, outcome = load_job_status(request, job_id, user)
-    context: dict[str, Any] = status_context(job, outcome) | {"auto_reload": False}
-    context["course"] = _job_course(request, job_id, user)
+    job = load_job_status(request, job_id, user)
+    context: dict[str, Any] = status_context(request, job) | {"auto_reload": False}
+    context["course"] = _job_course(request, job_id, user, job)
     context["after_download"] = after_download_state(request, job_id, user)
     context["auto_reload_s"] = AUTO_RELOAD_S
     context["errors"] = [{"field_id": field, "message": message}]
@@ -70,9 +72,12 @@ def _job_page_with_errors(
     return render(request, "job.html", context, status_code=400)
 
 
-def _remake_html(session: Session, job: Job, settings: Settings) -> DocumentResult:
-    """Make the HTML file again with the job's own choices (the caller holds the job)."""
+def _remake_html(session: Session, job: Job, settings: Settings, cause: str) -> DocumentResult:
+    """Make the HTML file again with the job's own choices (the caller holds the job). `cause`
+    is `output.TITLE` or `output.CONTACT`: the change is counted first, so the file is made
+    with its new version id."""
     result = DocumentResult.model_validate(job.result_json or {})
+    output.output_changed(job, cause)
     job.html = rerender_job_html(
         job,
         result,
@@ -90,6 +95,7 @@ def _remake_html(session: Session, job: Job, settings: Settings) -> DocumentResu
 
 
 @router.post("/jobs/{job_id}/title", dependencies=[Depends(require_csrf)])
+@submit_once("job.title")
 def set_title(
     request: Request, job_id: str, user: UserDep, title: Annotated[str, Form()] = ""
 ) -> Response:
@@ -105,19 +111,22 @@ def set_title(
         owned_id = job.id  # redirects are built from the owned row, not the request
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
-        chosen = typed if typed and typed != page_rules.suggested_title(result) else None
+        chosen = (
+            typed if typed and typed != page_rules.suggested_title(result, job.filename) else None
+        )
         if chosen == job.title_override:
             flash(request, "The title is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.title_override = chosen
-        _remake_html(session, job, ctx.settings)
-        retention.restart_clock(job, ctx.settings)
-        now_title = chosen or page_rules.suggested_title(result)
+        _remake_html(session, job, ctx.settings, output.TITLE)
+        say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
+        now_title = chosen or page_rules.suggested_title(result, job.filename)
     log_event(logger, "title_set", job_id=job_id, own=chosen is not None)
     flash(
         request,
         f"The title students hear is now “{now_title}”. The HTML file was made again with it.",
         undo=False,
+        kind="success",
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
@@ -126,6 +135,7 @@ def set_title(
 
 
 @router.post("/jobs/{job_id}/contact", dependencies=[Depends(require_csrf)])
+@submit_once("job.contact")
 def set_contact(
     request: Request, job_id: str, user: UserDep, contact: Annotated[str, Form()] = ""
 ) -> Response:
@@ -143,15 +153,15 @@ def set_contact(
             flash(request, "The contact line is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
         job.contact_line = line or None
-        _remake_html(session, job, ctx.settings)
-        retention.restart_clock(job, ctx.settings)
+        _remake_html(session, job, ctx.settings, output.CONTACT)
+        say_new_time(request, retention.restart_clock_and_say(job, ctx.settings))
     log_event(logger, "contact_set", job_id=job_id, has_contact=bool(line))
     message = (
         "The contact line was added to the student file. The HTML file was made again."
         if line
         else "The contact line was removed from the student file."
     )
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind="success")
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
@@ -159,6 +169,7 @@ def set_contact(
 
 
 @router.post("/jobs/{job_id}/keep", dependencies=[Depends(require_csrf)])
+@submit_once("job.keep")
 def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
     """ "Keep for 7 days": seven days from now, only the owner sees it. Refused (429, nothing
     changed) when keeping this document would put the person over the number of documents
@@ -176,18 +187,16 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
                     "This document was not kept longer",
                     f"You are keeping {others + 1} documents, and the most allowed is "
                     f"{MAX_LIVE_JOBS_PER_USER}. Delete one you no longer need, then choose "
-                    "Keep for 7 days again. Nothing was changed.",
+                    f"{retention.keep_label()} again. Nothing was changed.",
                     context={"job_id": job_id},
                 )
         changed = retention.keep_seven_more_days(job)
+        if changed:
+            links.extend(session, job, get_ctx(request).settings)  # a link's window is now a week's
+        until = job.retain_until
     if changed:
         log_event(logger, "kept_longer", job_id=job_id)
-        flash(
-            request,
-            "This document will be kept for 7 days from now. Only you and the people you share "
-            "it with can see it.",
-            undo=False,
-        )
+        flash(request, retention.keep_done(until), undo=False, kind="success")
     else:
-        flash(request, "This document is already kept for longer than 7 days.", undo=False)
+        flash(request, retention.keep_already(), undo=False)
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

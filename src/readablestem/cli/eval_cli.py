@@ -16,6 +16,7 @@ import argparse
 import datetime as dt
 import json
 import math
+import subprocess
 import sys
 from collections.abc import Generator
 from contextlib import contextmanager
@@ -211,6 +212,11 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
     if not args.fake and args.max_usd is None:
         return "--max-usd is required for real model calls (or pass --fake)"
     cap = args.max_usd if args.max_usd is not None else math.inf
+    if not args.fake:
+        from readablestem.ops.limits import run_cap_problem
+
+        if problem := run_cap_problem(settings, cap, settings.model_concurrency):
+            return f"--max-usd: {problem}"
     budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
     if getattr(args, "batch", False):
         from readablestem.models.anthropic_batch import BatchRunner, PendingPool
@@ -225,7 +231,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
         # Checks the key before any work, not on the first call. The OpenAI client carries
         # the second automated check on the same budget, as in the app
         # (DECISIONS_FIGURE_VERIFY, DECISIONS_EQUATION_SHADOW turn it off); the Claude
-        # client carries the Claude check (CLAUDE_SECOND_CHECK, shadow by default).
+        # client carries the Claude check (CLAUDE_SECOND_CHECK, off by default).
         client = make_live_client(settings, budget)
     except ConfigError as exc:
         return str(exc)
@@ -929,6 +935,8 @@ def _measured(
             made = [[measure.Converted.from_dict(row) for row in run] for run in kept["runs"]]
         except (ValueError, KeyError, TypeError) as exc:
             return _error(f"cannot read {args.records_from}: {exc}")
+        if not made:
+            return _error(f"{args.records_from}: no run in it")
         known = {upload.name for upload in measure.every_upload()}
         unknown = sorted({done.upload for run in made for done in run} - known)
         if unknown:
@@ -1042,8 +1050,9 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     """`eval burden`: decisions a page asks of a reviewer, by page kind, by what is decided
     and by why it was asked, from a replay of the corpus under the production profile, and
     the bar against an earlier record (`eval.burden`). Spends nothing. Exit code 0: the bar
-    is met or none was asked; 1: a page kind asks for more than before; 2: the two records
-    cannot be compared."""
+    is met or none was asked; 1: a page kind asks for more than before (with `--same`: an
+    upload asks for other decisions than the record has); 2: the two records cannot be
+    compared."""
     from readablestem.eval import burden, measure
 
     before = None
@@ -1059,7 +1068,11 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     metrics = burden.report(run)
     record = measure.record(run, settings, metrics)
     _write_record(args.out, record)
-    verdict = None if before is None else burden.judge(record, before, allowance=args.allowance)
+    verdict = (
+        None
+        if before is None
+        else burden.judge(record, before, allowance=args.allowance, same=args.same)
+    )
     print(burden.render(record, verdict))
     if not metrics["uploads"]["measured"]:
         return _error("no upload could be measured")
@@ -1125,6 +1138,39 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     return run, registry
 
 
+def _cmd_parsing_bench(args: argparse.Namespace) -> int:
+    """`eval parsing-bench`: the reader on the categories of olmOCR-Bench that need no model,
+    scored by the benchmark's own checker (`eval.olmocr_bench`). Spends nothing. The
+    benchmark is fetched outside the repository (`--fetch`) and a run keeps one file per page
+    there; `--run-dir` resumes or repeats a run from them."""
+    from readablestem.eval import olmocr_bench
+
+    folder = args.folder or olmocr_bench.default_folder()
+    if args.fetch:
+        olmocr_bench.fetch(folder, said=lambda line: print(line, file=sys.stderr, flush=True))
+    if not (folder / "bench_data").is_dir():
+        return _error(f"no benchmark at {folder}: run with --fetch")
+    run_dir = args.run_dir or olmocr_bench.new_run_dir(folder)
+
+    def said(line: str) -> None:
+        print(line, file=sys.stderr, flush=True)
+
+    try:
+        record = olmocr_bench.run(
+            folder,
+            run_dir,
+            at_once=args.at_once,
+            only=args.only,
+            limit=args.limit,
+            said=said,
+        )
+    except (OSError, ValueError, subprocess.CalledProcessError) as exc:
+        return _error(f"parsing-bench: {exc}")
+    _write_record(args.out, record)
+    print(olmocr_bench.render(record))
+    return 0
+
+
 def _cmd_order(args: argparse.Namespace) -> int:
     """`eval order`: whether each gold page of the corpus is read in order, and what else
     is wrong on a page that is, in the page a student is given and in what the pipeline
@@ -1187,6 +1233,33 @@ def _cmd_outputs(args: argparse.Namespace) -> int:
     _write_record(args.out, record)
     print(outputs.render(record))
     if not metrics["whole"]["uploads"] and not metrics["answers_missing"]["uploads"]:
+        return _error("no upload could be measured")
+    return 0
+
+
+def _cmd_say_once(args: argparse.Namespace) -> int:
+    """`eval say-once`: the share of each page's words that no element says, and that are
+    said twice, over the corpus, read by layout with no model (`eval.say_once_report`).
+    Spends nothing and gates nothing. Exit code 0: measured; 2: nothing could be measured."""
+    from readablestem.eval import corpus, measure, say_once_report
+
+    settings = measure.replay_settings(corpus.ANSWERS)
+    uploads = measure.every_upload()
+    if args.only:
+        unknown = sorted(set(args.only) - {upload.entry for upload in uploads})
+        if unknown:
+            return _error(f"not in the corpus: {', '.join(unknown)}")
+        uploads = [upload for upload in uploads if upload.entry in args.only]
+
+    def said(done: Any) -> None:
+        print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
+
+    run = say_once_report.run(uploads, at_once=args.at_once, said=said)
+    metrics = say_once_report.report(run)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(say_once_report.render(record))
+    if not metrics["uploads"]["measured"]:
         return _error("no upload could be measured")
     return 0
 
@@ -2064,6 +2137,13 @@ def register(
         default=0.0,
         help="how many more decisions a page a page kind may ask for than before (0)",
     )
+    burden.add_argument(
+        "--same",
+        action="store_true",
+        help="with --against: every upload measured now must ask for exactly the decisions "
+        "the record has, fewer or more (CI's eval gate); an upload this machine cannot "
+        "replay is not compared",
+    )
     burden.set_defaults(func=_cmd_burden)
 
     ledger = group.add_parser(
@@ -2120,6 +2200,24 @@ def register(
     )
     order.set_defaults(func=_cmd_order)
 
+    parsing = group.add_parser(
+        "parsing-bench",
+        help="the reader on the olmOCR-Bench categories that need no model, scored by the "
+        "benchmark's own checker (spends nothing)",
+    )
+    parsing.add_argument("--fetch", action="store_true", help="fetch the benchmark first")
+    parsing.add_argument("--folder", type=Path, help="the fetched benchmark (outside the repo)")
+    parsing.add_argument(
+        "--run-dir", type=Path, help="a run's folder: pages already converted there are kept"
+    )
+    parsing.add_argument(
+        "--at-once", type=_positive_int, default=2, help="conversions at once (3 at most)"
+    )
+    parsing.add_argument("--only", action="append", help="one category (repeat); default: all")
+    parsing.add_argument("--limit", type=_positive_int, help="the first N PDFs of each category")
+    parsing.add_argument("--out", type=Path, help="write the run record as JSON")
+    parsing.set_defaults(func=_cmd_parsing_bench)
+
     outputs = group.add_parser(
         "outputs",
         help="the files a student is given, built from a replay of the corpus, read and "
@@ -2127,6 +2225,20 @@ def register(
     )
     _add_measure_args(outputs, at_once=4)
     outputs.set_defaults(func=_cmd_outputs)
+
+    say_once = group.add_parser(
+        "say-once",
+        help="the share of each page's words that no element says and that are said twice, "
+        "over the corpus, read with no model (spends nothing, gates nothing)",
+    )
+    say_once.add_argument(
+        "--only", action="append", metavar="ID", help="a corpus file to measure (repeatable)"
+    )
+    say_once.add_argument(
+        "--at-once", type=_positive_int, default=2, help="files read at the same time (default 2)"
+    )
+    say_once.add_argument("--out", type=Path, help="write the report as JSON")
+    say_once.set_defaults(func=_cmd_say_once)
 
     page_audit = group.add_parser(
         "page-audit",

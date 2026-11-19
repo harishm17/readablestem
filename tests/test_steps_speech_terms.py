@@ -37,7 +37,7 @@ def say(latex: str) -> str:
         ),
         (
             r"A = \begin{pmatrix} 1 & 0 \\ 0 & 1 \end{pmatrix}",
-            "capital A equals the 2 by 2 matrix; row 1: 1, 0; row 2: 0, 1; end matrix",
+            "cap A equals the 2 by 2 matrix; row 1: 1, 0; row 2: 0, 1; end matrix",
         ),
         (
             r"\begin{vmatrix} a & b \\ c & d \end{vmatrix} = -2",
@@ -92,7 +92,7 @@ def test_cases_read_as_a_piecewise_definition(latex, expected):
         (r"{}^{0}_{+1}e", "positron, mass number 0, atomic number plus 1"),
         (r"{}^{4}_{2}\alpha", "alpha particle, mass number 4, atomic number 2"),
         # not an element or a particle: the scripts before the symbol, as written
-        (r"{}^{a}_{b}X", "superscript a subscript b capital X"),
+        (r"{}^{a}_{b}X", "superscript a subscript b cap X"),
     ],
 )
 def test_nuclide_notation_reads_as_the_element(latex, expected):
@@ -121,7 +121,7 @@ def test_nuclide_notation_reads_as_the_element(latex, expected):
         (r"2 m", "2 m"),
         (r"2x", "2 x"),
         (r"2\mathrm{d}x", "2 d x"),
-        (r"5\,\mathrm{J/kg\ K}", "5 joules per kilogram capital K"),
+        (r"5\,\mathrm{J/kg\ K}", "5 joules per kilogram K"),
         (r"3\ \text{apples}", "3 apples"),
     ],
 )

@@ -40,9 +40,10 @@ TIMING = "timing: it is written in a field of seconds and decides nothing"
 CACHE = "cache: when a kept object is forgotten; a forgotten one is made again the same"
 SAYS_SO = "limit: it stops the step, which writes a 'not finished' fact"
 ENDS_JOB = "limit: it ends the conversion with a failure code, so no document differs"
-# The two that decide what a page contains today. Each has an item of the plan that ends it,
-# and the corpus test below lists the files they change without saying so.
-INK = "budget in seconds, with a 'not finished' fact; to become a count of work (plan WS14.9)"
+# The ink analysis is bounded per page by counts of work (plan WS14.9); its clock is only a
+# guard against a hang, far above any honest page, and a page it stops writes a fact.
+INK = "hang guard: per page, 40 times the slowest corpus page; it writes a 'not finished' fact"
+# The one that decides what a page contains today, with the item of the plan that ends it.
 TABLE_SEARCH = "budget in seconds, to become thread CPU time with a fact (plan WS5.14)"
 
 # Every place the conversion reads a clock: (file, the function or class it is in) and what
@@ -52,13 +53,13 @@ CLOCKS = {
     ("pipeline/run.py", "_run_step"): TIMING,
     ("pipeline/run.py", "_convert"): TIMING,
     ("pipeline/step_facts.py", "Stopwatch"): TIMING,
-    ("pipeline/layout.py", "_DocumentCache"): CACHE,
+    ("pipeline/layout/access.py", "_DocumentCache"): CACHE,
     ("pipeline/figure_images.py", "student_image"): CACHE,
     ("pipeline/image_page_reconcile.py", "reconcile"): SAYS_SO,
-    ("pipeline/layout.py", "_image_infos"): ENDS_JOB,
-    ("pipeline/layout.py", "_image_xrefs"): ENDS_JOB,
-    ("pipeline/layout.py", "_plain_image"): ENDS_JOB,
-    ("pipeline/layout.py", "_charge"): ENDS_JOB,
+    ("pipeline/layout/figures.py", "_image_infos"): ENDS_JOB,
+    ("pipeline/layout/figures.py", "_image_xrefs"): ENDS_JOB,
+    ("pipeline/layout/figures.py", "_plain_image"): ENDS_JOB,
+    ("pipeline/layout/figures.py", "_charge"): ENDS_JOB,
     ("pipeline/page_type.py", "InkBudget"): INK,
     ("pipeline/tables.py", "propose"): TABLE_SEARCH,
     ("pipeline/tables.py", "find_continued"): TABLE_SEARCH,
@@ -175,12 +176,13 @@ def test_a_report_of_a_replay_names_the_step_a_clock_stopped(tmp_path, capsys) -
     assert f"{ENTRY} page_type page 4 (time_limit)" in capsys.readouterr().out
 
 
-def test_a_page_typed_without_its_ink_because_the_time_ran_out_says_so(
+def test_a_page_typed_without_its_ink_because_the_guard_fired_says_so(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    # On the corpus this happened to one handwritten upload at a quarter of the speed: its
-    # fourth page was no longer told to be handwriting, and nothing said why.
-    monkeypatch.setattr(page_type, "INK_BUDGET_S", 0.0)
+    # Before the budget was counted in work this happened to one handwritten upload of the
+    # corpus at a quarter of the speed: its fourth page was no longer told to be handwriting,
+    # and nothing said why. Now only the clock guard of a hang can stop a page.
+    monkeypatch.setattr(page_type, "INK_GUARD_S", 0.0)
     written = Path(__file__).parent / "fixtures" / "handwriting" / "ink_no_layer.pdf"
 
     output = run.convert_pdf(

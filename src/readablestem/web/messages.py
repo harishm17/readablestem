@@ -20,7 +20,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from readablestem.core.types import Check, DocumentResult, Notice
+from readablestem.core.types import Check, DocumentResult, Kind, Notice
 from readablestem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
@@ -32,6 +32,19 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
         "unknown_command",
     ): "The LaTeX source uses a command this tool does not know, so this equation could "
     "not be read from it: correct the LaTeX or reject it.",
+    # LaTeX source (readablestem.source.ltx_reader): what a table, heading or figure shows
+    # that LaTeX could not read, or a picture that left its table cell
+    (
+        "source.read",
+        "source_formula_unread",
+    ): "A formula here uses a command LaTeX does not know, so it is shown as LaTeX code: "
+    "correct it, or accept it as it is.",
+    (
+        "source.read",
+        "source_table_picture",
+    ): "A cell of this table holds a picture, which follows the table as a figure of its own "
+    "and leaves the cell empty: say in the cell what the picture is, or accept the table as "
+    "it is.",
     # LaTeX (pipeline.validate.check_latex)
     ("latex.not_empty", "empty"): "The transcription is empty: type the LaTeX for this "
     "equation, or reject it to keep the image.",
@@ -81,6 +94,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("mathml.depth", "too_deep"): "The MathML is nested too deeply to be a real equation.",
     ("mathml.structure", "bad_arity"): "A fraction, root, subscript or similar has the wrong "
     "number of parts, often because an argument is missing.",
+    ("mathml.structure", "empty_argument"): "A fraction, root or script has nothing in it, "
+    "often because a part of the equation was left out.",
     ("mathml.converted", "unconverted_command"): "Part of the LaTeX was copied through as text "
     "instead of becoming math, often because of an unsupported command.",
     # Equations (pipeline.equation_step)
@@ -130,6 +145,17 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",
+    # The reading was not compared with the PDF's own text, and why (`equation_step.not_compared`).
+    ("equation.not_compared", "no_characters"): "The PDF holds no text for this equation, so "
+    "the reading was not checked against it: compare it with the picture symbol by symbol.",
+    ("equation.not_compared", "unmapped_characters"): "The PDF's font does not say which "
+    "characters these are, so the reading was not checked against the PDF's text: compare it "
+    "with the picture symbol by symbol.",
+    ("equation.not_compared", "no_usable_characters"): "The PDF's text for this equation holds "
+    "only signs and punctuation, so the reading was not checked against it: compare it with "
+    "the picture symbol by symbol.",
+    ("equation.not_compared", "bold_letter"): "This bold letter was written from the PDF's own "
+    "text and no reading of the picture was made, so there was nothing to compare.",
     # A page converted from an image (pipeline.image_page, ADR 0007)
     ("image_page.no_text_layer", "image_page"): "This was read from an image of the page, so "
     "nothing in the PDF can confirm it: compare it with the original page.",
@@ -223,6 +249,13 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "description), so check before hiding it from screen readers.",
     ("figure.second_check", "second_check_mismatch"): "A second automated check found a "
     "possible mismatch between the alt text and the image; worth a look.",
+    # Decoration with evidence only (pipeline.decoration, WS6.4)
+    ("figure.decoration", "decoration_unproven"): "Only the model says this figure is "
+    "decoration: it is not repeated on the pages and is not a rule, so students hear "
+    '"Figure not described" until you decide. Describe it, or accept that it is decoration.',
+    ("figure.decoration", "decoration_by_rule"): "The figure could not be read, and it is "
+    "decoration by its shape or because it repeats on the pages, so screen readers skip it; "
+    "worth a look.",
     # Tables (pipeline.table_step)
     ("table.grid", "grid_invalid"): "The rebuilt table's cells overlap, leave gaps or reach "
     "outside the table, so check its rows and columns against the image.",
@@ -267,16 +300,21 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "check those letters.",
     ("table.math_style", "style_cosmetic"): "A letter's style in a math cell differs from "
     "the PDF only where it does not change the meaning, so this was accepted as it is.",
+    ("table.cell_reading", "differs_from_table_reading"): "This formula is also a cell of a "
+    "table, and the table's own reading of that cell is different, so compare both with the "
+    "image and keep the one that is right.",
     ("table.row_headers", "row_headers_dropped"): "A column of row labels comes after data "
     "cells and could not be used as one, so the table has no row headers: check that each "
     "value can still be found by its row.",
+    # The grid has the header rows the PDF's layout shows, or none (`table_step.layout_headers`):
+    # the sentence names no header, and `no_headers` asks for the choice when there is none.
     ("table.source", "local_grid"): "No model could read this table, so this is the grid "
-    "built from the PDF's own text with the first row as headers: check it against the image.",
+    "built from the PDF's own text: check it against the image.",
     ("table.kind", "written_as_text"): "The model judged that this is not a table of data, so "
     "students get its text in reading order; if it is one, use the grid read from the PDF.",
     ("table.kind", "numbers_not_a_table"): "The model judged that this is not a table of data, "
-    "but its cells hold numbers, so this is the grid built from the PDF's own text with the "
-    "first row as headers: check it against the image.",
+    "but its cells hold numbers, so this is the grid built from the PDF's own text: check it "
+    "against the image.",
     # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)
     ("figure.data_values", "values_from_image"): "A data table was read from the chart "
     "image, so its values may be off; it is added only if you choose to after checking them.",
@@ -313,6 +351,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "level 1 straight to level 3).",
     ("html.heading_text", "empty_heading"): "A heading in the document is empty.",
     ("html.img_alt", "img_missing_alt"): "An image in the document has no alt attribute.",
+    ("html.img_alt_content", "empty_alt_content"): "An image in the document has empty alt "
+    "text but is not marked as decoration, so screen readers skip something that may carry "
+    "content.",
     ("html.unique_ids", "duplicate_id"): "Two elements in the document share an id, which can "
     "break links and confuse screen readers.",
     ("html.list_structure", "list_structure"): "A list in the document is malformed (an empty "
@@ -386,6 +427,14 @@ REASON_MESSAGES: dict[str, str] = {
     "model_skipped": "No model was asked about this item.",
     # Heading step
     "heading.empty_text": "This heading has no text, so it cannot be used as a heading.",
+    # A paragraph or list item layout doubts (`pipeline.notices.text_decisions`): the proposal
+    # is its own text, as the PDF gives it.
+    "text.rtl_order": "This text is written right to left (Arabic or Hebrew). The PDF may store "
+    "its words in a different order from the one they are read in, so check them against the "
+    "original: if they read right, choose Looks right; if not, change the words.",
+    "text.option_labels": "Answer options (A, B, C and so on) run together in one paragraph or "
+    "list item, so a screen reader reads them as one block. If each option can still be told "
+    "from the next, choose Looks right; if not, change the words so that each one is set apart.",
     # Table step (pipeline.table_step)
     "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
     "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
@@ -449,27 +498,59 @@ NOTICE_MESSAGES: dict[str, str] = {
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "
     "guessed from the page ({count} characters) was not used.",
+    "drawings_not_analysed": "The drawings on this page were not analyzed, so handwriting on "
+    "it may be missing: compare the page with the original.",
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",
+    "file_cut_off": "This file looks cut off: its last pages are empty, so the rest is not in "
+    "the converted file. Upload a fresh copy, or continue with the pages before them.",
+    "file_repaired": "This PDF was damaged, and the tool had to repair it to open it. Check "
+    "the converted file against the original: a page that is empty in the PDF may have "
+    "lost its content.",
     "code_block": "Program code is kept as a code block with its line breaks and "
     "indentation, without highlighting.",
     "footnote": "A footnote is kept where it falls in the text; its mark in the text links "
     "to it where the mark could be found.",
     "colour_reference": "The text refers to a color (for example, shown in red), so add "
     "a cue that does not depend on seeing the color.",
+    "colour_used": "Passages printed in color: {count}. The converted file does not keep "
+    "color. If a color carries a meaning here (for example, answers in red), say that "
+    "meaning in words.",
     "colour_only": "A figure tells things apart by color alone, so add labels or patterns "
     "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
     "could not be kept and is written on the line, so check it reads right.",
+    "struck_text": "Text struck through on the page is kept, shown struck through and read "
+    "out as deleted: if students no longer need it, take it out with the page tools.",
+    "form_fields": "This PDF is a fillable form. Its fields are written out as text (a blank, a "
+    "box with its state, or the value filled in), and the converted file cannot be filled in: "
+    "keep the PDF for students who need to fill it in.",
+    "annotations_read": "This tool cannot tell which comments in the PDF were written for "
+    "students. All of them ({count}) are in this file, as paragraphs that start “Note on the "
+    "page:”, so read them before you share it. To leave one out, upload a copy of the PDF "
+    "without that comment, or leave its page out.",
+    "attachments_not_converted": "Files attached to this PDF ({count}) are not converted and "
+    "are not in this file. Give students the original PDF, or the files themselves, if they "
+    "need them.",
+    "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
+    "item, so a screen reader reads them as one block: check that each option can be told from "
+    "the next, and change the words if not.",
+    "rtl_text": "This text is written right to left (Arabic or Hebrew). The PDF may store its "
+    "words in a different order from the one they are read in, so the words may be out of "
+    "order: check it against the original.",
     "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
     "email address.",
     "link_text_unclear": "A link's text does not say where it goes (for example, click "
     "here), so reword it.",
     "lang_detected": "The language of the document was detected from its text, so check it "
     "is right.",
-    "lang_assumed": "The PDF does not say which language it is in and none was detected, "
-    "so English is assumed: check it is right.",
+    "lang_assumed": "The language of this document could not be found: the PDF does not say "
+    "which it is in and the text is too short to tell, so English is assumed. Confirm the "
+    "language before you share it, because a screen reader reads the whole file in its voice.",
+    "lang_mixed": "No one language makes up most of this document, so the one with the most "
+    "text is used for the whole file and passages in other languages are marked. Confirm the "
+    "language before you share it, because a screen reader reads the file in its voice.",
     "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
     "long description yet.",
     "image_page_converted": "A scanned or handwritten page was converted from an image of "
@@ -484,6 +565,63 @@ NOTICE_MESSAGES: dict[str, str] = {
     "file says that it is not there.",
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
+    "source_unread": "This tool could not read part of the source file, so it is not in the file.",
+    # "{count}" is the number of problems, pictures or pages.
+    "source_unplaced": "LaTeX reported {count} problems that could not be matched to a place in "
+    "the converted file, so nothing there says where they are: read the file against your "
+    "source before you share it.",
+    "source_figure_missing": "The source names {count} pictures that are not in the upload or "
+    "that this tool cannot read, so each figure shows no picture: add them and upload again, or "
+    "describe each figure yourself.",
+    # One sentence for a LaTeX and a Word source: nothing compiles or prints either in a job yet.
+    "source_not_compared": "This file was converted from the source itself and was not compared "
+    "with its printed pages: read the converted file against your own copy before you share it.",
+    "page_turned": "This page was saved sideways in the PDF, so it was turned upright to be read.",
+    # Word and PowerPoint uploads (`web.office_census`); "{count}" is the number counted.
+    "office_tracked_changes": "Tracked changes (insertions and deletions) that nobody "
+    "accepted or rejected in this Word file: {count}. The PDF this was read from may show "
+    "words that were deleted and not yet the final text. Accept or reject them in Word, then "
+    "upload the file again, before you give this to students.",
+    "office_speaker_notes": "Slides with speaker notes: {count}. The notes are not in this "
+    "file: only the slides were read.",
+    "office_hidden_slides": "Hidden slides: {count}. They are not in this file.",
+    "office_comments": "Comments in the original file: {count}. They are not in this file.",
+    # A Word file read from the file itself (`source.docx_reader`); "{count}" as above.
+    "word_hidden_text": "Hidden text in the Word file: {count} runs of words. They are left "
+    "out of this file, as Word leaves them out of the page.",
+    "word_text_boxes": "Text boxes in the Word file: {count}. Check that their words are in "
+    "this file where they belong.",
+    "word_headers_footers": "Running headers and footers in the Word file: {count}. They are "
+    "not in this file.",
+    "word_objects": "Diagrams, charts or embedded objects in the Word file: {count}. They "
+    "are not in this file, so describe them or add them again as pictures.",
+    "word_rtl_text": "Right-to-left paragraphs in the Word file: {count}. Their words are in "
+    "reading order, but this file shows them left to right.",
+    "word_tracked_changes": "Tracked changes (insertions and deletions) that nobody accepted "
+    "or rejected in this Word file: {count}. This file has the text as if all were accepted. "
+    "Accept or reject them in Word, then upload the file again, before you give this to "
+    "students.",
+}
+
+# What the job page says of what it found and converted (`core.page_checks.HANDLED_CODES`):
+# the thing named singular and plural, then what was done with it, for any count.
+HANDLED_MESSAGES: dict[str, tuple[str, str, str]] = {
+    "footnote": (
+        "footnote",
+        "footnotes",
+        "kept where they fall in the text; a mark in the text links to its footnote where the "
+        "mark could be found.",
+    ),
+    "code_block": (
+        "block of program code",
+        "blocks of program code",
+        "kept as code, with line breaks and indentation, without highlighting.",
+    ),
+    "page_turned": (
+        "page",
+        "pages",
+        "saved sideways in the PDF and turned upright to be read.",
+    ),
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
@@ -506,6 +644,50 @@ TABLE_CHECK_PARTS = {
 }
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
 UNKNOWN_NOTICE_MESSAGE = "Something in this file may need a look."
+
+# What each kind of decision is called, for the review screen's headings and for the role a
+# screen reader says in Listen (`web.listen`): one table, so the two never say it two ways.
+KIND_LABELS = {
+    Kind.EQUATION: "Equation",
+    Kind.FIGURE: "Figure",
+    Kind.TABLE: "Table",
+    Kind.HEADING: "Heading",
+    Kind.PARAGRAPH: "Paragraph",
+    Kind.LIST_ITEM: "List item",
+}
+
+# The other roles Listen names, in plain words: not the ARIA terms ("Complementary
+# landmark", "Content information landmark") a person who has never met them would not know.
+LISTEN_LABELS = {
+    "main": "Main content",
+    "navigation": "Navigation",
+    "complementary": "Side notes",
+    "contentinfo": "Footer",
+    "banner": "Header",
+    "region": "Section",
+    "search": "Search",
+    "list": "List",
+    "page-title": "Page title",
+    "page-language": "Page language",
+    "language-change": "Language change",
+    "caption": "Caption",
+    "image": "Image",
+    "image-not-converted": "Image, not converted",
+    "not-converted": "Not converted",
+    "note": "Note",
+    "term": "Term",
+    "definition": "Definition",
+    "code": "Code",
+    "quote": "Quote",
+    "end-quote": "End quote",
+    "page-break": "Page break",
+    "section-closed": "Collapsed section",
+    "expandable": "Expandable section",
+    "row": "Row",
+    "section": "Section",
+    "long-description": "Long description",
+    "skip-link": "Skip link",
+}
 
 SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth checking"}
 # Failed checks of a fix accepted with optional notes (`Fix.review == "optional"`): they
@@ -560,12 +742,18 @@ def source_item_notes(result: DocumentResult) -> dict[str, str]:
             names = commands.setdefault(mark.element_id, [])
             if mark.name not in names:
                 names.append(mark.name)
+    kinds = {e.id: e.kind.value for e in result.elements}
+    holders = {"table": "this table", "heading": "this heading", "figure": "this caption"}
     for element_id, names in commands.items():
         listed = ", ".join(names[:5])
         verb = "is" if len(names) == 1 else "are"
-        notes[element_id] = (
-            f"This formula uses {listed}, which {verb} not defined. It is shown as it was written."
+        where = holders.get(kinds.get(element_id, ""))
+        subject = f"A formula in {where}" if where else "This formula"
+        sentence = (
+            f"{subject} uses {listed}, which {verb} not defined. It is shown as it was written."
         )
+        before = notes.get(element_id)
+        notes[element_id] = f"{before} {sentence}" if before else sentence
     return notes
 
 

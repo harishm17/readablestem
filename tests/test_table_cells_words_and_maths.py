@@ -64,12 +64,12 @@ def test_the_html_has_the_words_as_text_and_each_formula_as_math():
     assert "mtext" not in td
 
 
-def test_a_header_cell_of_words_and_maths_keeps_a_reading_for_screen_readers():
+def test_a_header_cell_of_words_and_maths_is_named_by_its_reading():
     html = render_table(
         _grid(_cell(r"\text{Mass (GeV/}c^{2}\text{)}", "Mass"), header=True), id_prefix="t"
     )
     th = html.split("<th ")[1]
-    assert "visually-hidden" in th and 'aria-hidden="true"' in th
+    assert 'aria-label="Mass (GeV/ c squared' in th and "aria-hidden" not in th
 
 
 def test_a_cut_that_leaves_unbalanced_brackets_is_not_made():

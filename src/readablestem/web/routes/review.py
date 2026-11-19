@@ -43,7 +43,8 @@ the one just changed.
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
+import struct
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Any
 from urllib.parse import parse_qsl, urlencode
@@ -51,7 +52,7 @@ from urllib.parse import parse_qsl, urlencode
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
@@ -64,7 +65,10 @@ from readablestem.core.types import (
     Kind,
     Status,
 )
-from readablestem.pipeline.layout import REASON_LARGER_FONT
+from readablestem.pipeline import checked_words, table_math
+from readablestem.pipeline.layout import CROP_PAD, REASON_LARGER_FONT
+from readablestem.pipeline.notices import TEXT_NOTICE_OF
+from readablestem.pipeline.speech import refresh_readings
 from readablestem.pipeline.validate import ALT_WARN_CHARS
 from readablestem.web import (
     bulk_accept,
@@ -75,7 +79,9 @@ from readablestem.web import (
     notation,
     notice_places,
     outcomes,
+    output,
     page_edits,
+    queue,
     shares,
 )
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
@@ -91,10 +97,12 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.job_page import word_kind
 from readablestem.web.logsafe import log_event
 from readablestem.web.mathml import try_sanitize_mathml
 from readablestem.web.messages import (
+    KIND_LABELS,
     NOTE_LABEL,
     Explained,
     confidence_label,
@@ -108,11 +116,15 @@ from readablestem.web.review import (
     ADD_DATA_TABLE,
     DESCRIBE,
     GROUP_SLUGS,
+    ITEM_WRITES,
     KEPT_IMAGES_SLUG,
     NOT_CONVERTED,
+    NOT_EQUATION,
+    REREAD,
     SAVE_ONLY,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
+    TEXT_FIX_KINDS,
     UNDO_ACTION,
     USE_LOCAL_NOTE,
     WRITE_KEY,
@@ -133,6 +145,7 @@ from readablestem.web.review import (
     group_anchor,
     group_fixes,
     group_members,
+    has_proposal,
     heading_level_written,
     heading_places,
     is_group_key,
@@ -145,6 +158,7 @@ from readablestem.web.review import (
     kind_for_slug,
     needs_attention,
     next_to_review,
+    page_group_members,
     reject_keeps,
     restorable,
     review_anchor,
@@ -160,7 +174,6 @@ from readablestem.web.routes.jobs import (
 from readablestem.web.shares import REVIEW
 from readablestem.web.table_card import TableCard, table_card
 from readablestem.web.views import (
-    KIND_LABELS,
     JobView,
     decisions_label,
     fix_status_label,
@@ -196,6 +209,9 @@ USE_LOCAL_DONE = (
     "check it against the image."
 )
 EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
+# What the words of a text decision are called on its card: the text layer's, not a picture's.
+TEXT_LAYER_LABEL = "Text as the PDF gives it"
+LOOKS_RIGHT = "Looks right"
 ANYWAY_DONE = "Your edit was saved as you wrote it, although it differs from the PDF."
 
 
@@ -213,9 +229,9 @@ class RejectWords:
 REJECT_WORDS = {
     Kind.EQUATION: RejectWords(
         "Keep as image",
-        "Students see a picture; screen readers read the PDF's text, marked unchecked.",
+        "Students see a picture; screen readers read the PDF's text, as written in the PDF.",
         "Kept as an image of the original. Screen readers will hear the PDF text of the "
-        "equation, marked as not checked.",
+        "equation, said to be as written in the PDF.",
         "Kept as an image by you",
     ),
     # A table's image is kept, marked "not converted" (when there was no proposal, there
@@ -342,6 +358,7 @@ NOUNS = {
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
     Kind.PARAGRAPH: ("piece of text", "pieces of text"),
+    Kind.LIST_ITEM: ("list item", "list items"),
 }
 # The list view's own section for pages and handwriting kept as images
 # (`web.review.kept_images_apart`): figures in the data, not in words.
@@ -371,13 +388,16 @@ class Notice:
     label: str | None = None  # the fix it is about, e.g. "Equation 3 on page 2"
     href: str | None = None  # link to that fix
     element_id: str = ""  # that fix's id (app.js forgets a draft of it kept in this tab)
+    kind: str = "info"  # what it says: "success" (a decision was saved), "warning" or "info"
 
 
 STALE_TITLE = "Your choice was not saved"
-STALE_MESSAGE = (
-    "This document was changed in another tab or window after this page was opened. It is "
-    "shown below as it is now: check it, then choose again."
-)
+STALE_MESSAGE = "This document was changed in another tab or window after this page was opened."
+STALE_ITEM_MESSAGE = "This item was changed in another tab or window after this page was opened."
+STALE_MEMBERS_MESSAGE = "{names} changed in another tab or window after this page was opened."
+# The one next step, last in the box: the page below is drawn from the document as it is now.
+STALE_NEXT = "Look at what has changed, then choose again if you still want to."
+NAMED_AT_MOST = 3
 
 
 @dataclass
@@ -386,7 +406,8 @@ class StaleNotice:
 
     title: str
     message: str
-    now: str  # what the item is now ("Equation 1 is now: accepted by you."), or ""
+    now: str  # what comes after the message: what the item is now ("Equation 1 is now: accepted
+    # by you."), that what was typed is kept, and the next step; the template writes it as is
     href: str  # the page as it is now, by GET (reloading the POST would only re-send it)
     kept: bool = False  # what was typed is back in its field (which is then open)
 
@@ -400,6 +421,7 @@ def stale_notice(
     target: str,
     href: str,
     typed: Mapping[str, str] | None = None,
+    changed: Sequence[str] = (),
 ) -> StaleNotice:
     fix = (
         result.fix_for(target) if not (is_group_key(target) or is_page_group_key(target)) else None
@@ -412,8 +434,17 @@ def stale_notice(
         element = next((e for e in result.elements if e.id == target), None)
         now = f"{label} is now: {status_words(fix, element, result.origin).lower()}."
     kept = any((value or "").strip() for value in (typed or {}).values())
-    message = f"{STALE_MESSAGE} {STALE_KEPT}" if kept else STALE_MESSAGE
-    return StaleNotice(STALE_TITLE, message, now, href, kept)
+    message = STALE_MESSAGE
+    if changed and fix is not None:
+        message = STALE_ITEM_MESSAGE
+    elif changed:
+        labels = item_labels(result)
+        names = [labels.get(c, "An item") for c in changed]
+        more = len(names) - NAMED_AT_MOST
+        listed = ", ".join(names[:NAMED_AT_MOST]) + (f" and {more} more" if more > 0 else "")
+        message = STALE_MEMBERS_MESSAGE.format(names=listed)
+    after = " ".join(part for part in (now, STALE_KEPT if kept else "", STALE_NEXT) if part)
+    return StaleNotice(STALE_TITLE, message, after, href, kept)
 
 
 def _stale_anchor(result: DocumentResult, target: str) -> str:
@@ -452,6 +483,10 @@ class ReviewItem:
     heading_in_document: bool
     can_accept: bool
     values: dict[str, str]
+    # The size in CSS pixels the stored crop is shown at (`crop_shown_size`: from its
+    # element's box, one scale for every crop), so the page keeps room for it before it loads;
+    # None when there is no crop.
+    crop_size: tuple[int, int] | None = None
     optional: bool = False  # accepted automatically with optional notes (`checks`)
     second_check: bool = False  # ... one of them the second automated check's
     errors: dict[str, str] = field(default_factory=dict)  # field prefix -> message
@@ -480,9 +515,16 @@ class ReviewItem:
     # What the item is, in a few words, for lists that name it (UX review MF15): the
     # heading's text or the start of the alt text. Equations show `mathml` instead.
     preview: str = ""
-    # Text read from an image of a scanned or handwritten page (a PARAGRAPH fix): the words
-    # as read, an inline equation shown as "[equation]". Document content, owner only.
+    # The words of a paragraph or list item fix, as read from an image of a scanned or
+    # handwritten page or as the text layer gave them (`pipeline.notices.text_decisions`): an
+    # inline equation shown as "[equation]". Document content, owner only. `read_label` names
+    # them, `read_lang` is the passage's language (written as `lang`, with `dir="auto"`, so
+    # right-to-left words are drawn as they are read).
     read_text: str = ""
+    read_label: str = "Text as read from the image"
+    read_lang: str = ""
+    reason_lead: str = "Not converted"  # "Check this" for a text decision: the words are there
+    accept_label: str = "Accept"  # "Looks right" for a text decision: the words are right
     # What a screen reader gets from the PDF for an equation: its text layer ("" when
     # the PDF has none). Shown only to the job's owner, on the review screens.
     text_layer: str = ""
@@ -503,6 +545,13 @@ class ReviewItem:
     describe_hint: str = ""
     # A figure: what its alt text should say for the kind of figure it is (`ALT_GUIDANCE`).
     alt_guidance: str = ""
+    # An equation that waits (WS8.5, WS4.5): read its picture again, and give its glyphs back
+    # to the text. Not offered where there is no picture, no text from the PDF, or it is a
+    # table's cell (`_item(tied=...)`).
+    can_read_again: bool = False
+    can_not_equation: bool = False
+    # ... and the tool read no equation from it: the card says what it can do instead.
+    no_proposal: bool = False
 
     @property
     def open(self) -> bool:
@@ -542,7 +591,7 @@ class HeadingGroupView:
     keep: int  # how many "Apply to all" would keep at their level
     values: dict[str, str] = field(default_factory=dict)
     error: str | None = None
-    notices: list[str] = field(default_factory=list)
+    notices: list[Notice] = field(default_factory=list)
     members_open: bool = False  # one of them was just decided on its own
     # The advice (`web.heading_groups`, T1-18): the answer to suggest ("bold" or "keep"),
     # the fact that decides it, and up to three copies to look at.
@@ -602,7 +651,7 @@ class PageGroupView:
     reading: str = ""  # when they were tried from an image (the option): why they stayed images
     values: dict[str, str] = field(default_factory=dict)
     error: str | None = None
-    notices: list[str] = field(default_factory=list)
+    notices: list[Notice] = field(default_factory=list)
     members_open: bool = False
     # Every page or piece of handwriting of the group, to describe in words (T3-16).
     describe: list[ReviewItem] = field(default_factory=list)
@@ -830,9 +879,10 @@ class GroupView:
     done: list[ReviewItem]
     needs_review: int
     not_converted: int
-    notices: list[str] = field(default_factory=list)
+    notices: list[Notice] = field(default_factory=list)
     error: str | None = None
     clean: int = 0  # tables waiting with nothing wrong found in them (T3-11)
+    of: int = 0  # decisions in all when `units` is one view of them (0: all are in it)
 
     @property
     def total(self) -> int:
@@ -841,20 +891,56 @@ class GroupView:
 
 # --------------------------------------------------------------------------- view model
 
+# One scale for every crop on the review screens: CSS pixels per PDF point. A 10 pt line of
+# the PDF is then 15 px high, as tall as the page's own text, whatever resolution the crop
+# was cut at (an equation's crop is cut sharper than a figure's) and however big its box is.
+CROP_PX_PER_PT = 1.5
+CROP_MAX_PX = 4000
+
+
+def crop_shown_size(
+    element: Element | None, natural: tuple[int, int] | None
+) -> tuple[int, int] | None:
+    """The (width, height) in CSS pixels a stored crop is shown at: its element's box in the
+    page (`element.bbox`, grown by the padding the crop was cut with) times `CROP_PX_PER_PT`,
+    so crops of one page share one scale. The height follows the file's own proportions
+    (`natural`, its size in pixels), so the picture is never stretched. A crop of a table set
+    sideways was cut turned: its box is turned too. Without a usable box the size is the
+    file's own."""
+    if element is None:
+        return natural
+    x0, y0, x1, y1 = element.bbox
+    width, height = x1 - x0, y1 - y0
+    if width <= 0 or height <= 0:
+        return natural
+    if element.table is not None and element.table.turned in (90, 270):
+        width, height = height, width
+    shown_w = round((width + 2 * CROP_PAD) * CROP_PX_PER_PT)
+    if natural is not None:
+        shown_h = round(shown_w * natural[1] / natural[0])
+    else:
+        shown_h = round((height + 2 * CROP_PAD) * CROP_PX_PER_PT)
+    if not 0 < shown_w <= CROP_MAX_PX or not 0 < shown_h <= CROP_MAX_PX:
+        return natural
+    return (shown_w, shown_h)
+
 
 def _item(
     fix: Fix,
     element: Element | None,
     number: int,
     job_id: str,
-    crop_ids: set[str],
+    crop_ids: CropSizes,
     place: HeadingPlace | None = None,
     label: str | None = None,
     source_note: str = "",
     origin: str = "pdf",
+    tied: frozenset[str] | None = None,
 ) -> ReviewItem:
     """`label`: the item's name (`web.review.item_labels`), else kind and `number`;
-    `source_note`: `messages.source_item_notes` for this item; `origin`: the result's."""
+    `source_note`: `messages.source_item_notes` for this item; `origin`: the result's;
+    `tied`: the equations that are a table's cells (None: not known, so an equation's own
+    actions are not offered)."""
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
@@ -892,6 +978,7 @@ def _item(
         crop_url=f"/jobs/{job_id}/crops/{fix.element_id}.png"
         if fix.element_id in crop_ids
         else None,
+        crop_size=crop_shown_size(element, crop_ids.get(fix.element_id)),
         mathml=try_sanitize_mathml(fix.equation.mathml) if fix.equation else None,
         speech=fix.equation.speech if fix.equation else None,
         alt=fix.figure.alt if fix.figure else None,
@@ -914,6 +1001,10 @@ def _item(
         by_you=fix.decided_by_reviewer,
         preview=_preview(fix, element),
         read_text=_read_text(fix, element),
+        read_label=TEXT_LAYER_LABEL if fix.reason in TEXT_NOTICE_OF else ReviewItem.read_label,
+        read_lang=(element.lang or "") if element is not None else "",
+        accept_label=LOOKS_RIGHT if fix.reason in TEXT_NOTICE_OF else ReviewItem.accept_label,
+        reason_lead="Check this" if fix.reason in TEXT_NOTICE_OF else ReviewItem.reason_lead,
         text_layer=(element.text or "").strip()
         if element is not None and fix.kind is Kind.EQUATION
         else "",
@@ -929,15 +1020,39 @@ def _item(
             if element is not None and fix.kind is Kind.EQUATION
             else "",
             mathml=fix.equation.mathml if fix.equation else None,
+            source=checked_words.source_noun(origin),
         ),
         kept_image=is_kept_image(fix),
         source_note=source_note,
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
         can_describe=describable,
-        describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "") if describable else "",
+        describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "").format(
+            source=checked_words.source_noun(origin)
+        )
+        if describable
+        else "",
         alt_guidance=ALT_GUIDANCE.get(fix.figure.figure_type, ALT_GUIDANCE["other"])
         if fix.figure is not None
         else "",
+        can_read_again=_own_equation(fix, element, origin, tied) and fix.element_id in crop_ids,
+        can_not_equation=_own_equation(fix, element, origin, tied)
+        and bool((element.text or "").strip() if element is not None else ""),
+        no_proposal=fix.kind is Kind.EQUATION and not has_proposal(fix),
+    )
+
+
+def _own_equation(
+    fix: Fix, element: Element | None, origin: str, tied: frozenset[str] | None
+) -> bool:
+    """A waiting equation of a PDF that is not a table's cell: the card can read it again
+    and give it back to the text."""
+    return (
+        fix.kind is Kind.EQUATION
+        and fix.pending
+        and element is not None
+        and origin == "pdf"
+        and tied is not None
+        and fix.element_id not in tied
     )
 
 
@@ -955,7 +1070,7 @@ ALT_GUIDANCE = {
 
 # What a description in words replaces, by the kind of item kept as an image (T3-16).
 DESCRIBE_HINTS = {
-    "equation": "Students using a screen reader hear this instead of the PDF's own text of "
+    "equation": "Students using a screen reader hear this instead of the {source}'s own text of "
     "the equation. Say the equation in words, for example “v equals d over t”.",
     "table": "Students using a screen reader hear this instead of “table not converted”. "
     "Say what the table holds and what it shows.",
@@ -1006,7 +1121,7 @@ PREVIEW_CHARS = 60  # of an alt text, in a list line
 def _read_text(fix: Fix, element: Element | None) -> str:
     """The words of a text fix (ADR 0007) as the card shows them: an inline equation as
     "[equation]", blanks collapsed."""
-    if fix.kind is not Kind.PARAGRAPH or element is None:
+    if fix.kind not in TEXT_FIX_KINDS or element is None:
         return ""
     return " ".join(INLINE_MARKER_RE.sub("[equation]", element.text or "").split())
 
@@ -1017,7 +1132,7 @@ def _preview(fix: Fix, element: Element | None) -> str:
     if fix.kind is Kind.HEADING:
         text = fix.heading.text if fix.heading is not None else (element.text if element else "")
         return " ".join((text or "").split())
-    if fix.kind is Kind.PARAGRAPH:
+    if fix.kind in TEXT_FIX_KINDS:
         words = _read_text(fix, element)
         if len(words) <= PREVIEW_CHARS:
             return words
@@ -1119,30 +1234,56 @@ def _group(
     )
 
 
-def _load(
-    request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, set[str]]:
-    view, result, crop_ids, _ = _load_versioned(request, job_id, user)
-    return view, result, crop_ids
+def _load_result(request: Request, job_id: str, user: CurrentUser) -> DocumentResult:
+    """The job's result, for a route that needs the document and nothing else (a picture of
+    one item, the live check of a typed equation). Not `_load_versioned`: the job's summary
+    and the crop sizes are the screen's, and cost far more than what these routes use."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        refresh_readings(result)  # "Read aloud roughly as" says what the rules in force say
+    return result
 
 
-def _load_versioned(
-    request: Request, job_id: str, user: CurrentUser
-) -> tuple[JobView, DocumentResult, set[str], int]:
-    """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
+def _load_versioned(request: Request, job_id: str, user: CurrentUser) -> Loaded:
+    """`_load`, and the job's review version: what the page's forms carry (stale guard).
+    The crops are the elements that have a stored crop, each with its size in pixels."""
     with session_scope(get_ctx(request).factory) as session:
         job = job_access(session, job_id, user, REVIEW)
         require_done(job)
         role = shares.role_of(session, job, user) or REVIEW
-        view = job_view(session, job, with_summary=True, role=role)
+        # No summary: the review screens count from the result they just read, and only the
+        # job page shows the counts `job_view(with_summary=True)` makes (a second pass over it).
+        view = job_view(session, job, role=role)
         result = DocumentResult.model_validate(job.result_json or {})
-        crop_ids = set(
-            session.scalars(
-                select(Blob.element_id).where(Blob.job_id == job.id, Blob.kind == "crop")
-            ).all()
-        )
+        refresh_readings(result)  # "Read aloud roughly as" says what the rules in force say
+        crops = _crop_sizes(session, job.id)
         version = job.result_version or 0
-    return view, result, {c for c in crop_ids if c}, version
+    return view, result, crops, version
+
+
+# A PNG file holds its width and height as two 4-byte numbers at bytes 16 to 24: the
+# database hands back those 8 bytes, not the crop.
+CropSizes = dict[str, tuple[int, int] | None]
+
+# What `_load_versioned` reads: the job's view, its result, its crops and its review version.
+Loaded = tuple[JobView, DocumentResult, CropSizes, int]
+
+
+def _crop_sizes(session: Session, job_id: str) -> CropSizes:
+    rows = session.execute(
+        select(Blob.element_id, func.substr(Blob.content, 17, 8)).where(
+            Blob.job_id == job_id, Blob.kind == "crop"
+        )
+    ).all()
+    sizes: CropSizes = {}
+    for element_id, header in rows:
+        if not element_id:
+            continue
+        width, height = struct.unpack(">II", bytes(header)) if len(header or b"") == 8 else (0, 0)
+        sizes[element_id] = (width, height) if width and height else None
+    return sizes
 
 
 def _place_flashes(
@@ -1160,32 +1301,34 @@ def _place_flashes(
     top: list[Notice] = []
     for entry in flashes:
         message = str(entry.get("message", ""))
+        kind = str(entry.get("kind", "info"))
         target = entry.get("element_id")
         target = target if isinstance(target, str) else ""
         if target.startswith(GROUP_FLASH):
             group = groups.get(target.removeprefix(GROUP_FLASH))
             if group is not None:
-                group.notices.append(message)
-            top.append(Notice(message))
+                group.notices.append(Notice(message, kind=kind))
+            top.append(Notice(message, kind=kind))
             continue
         if target.startswith(HEADING_GROUP_FLASH):
             card = cards.get(target.removeprefix(HEADING_GROUP_FLASH))
             if card is not None:
-                card.notices.append(message)
-            top.append(Notice(message))
+                card.notices.append(Notice(message, kind=kind))
+            top.append(Notice(message, kind=kind))
             continue
         changed = items.get(target)
         if changed is None:
-            top.append(Notice(message))
+            top.append(Notice(message, kind=kind))
             continue
         changed.changed.append(message)
         where = f" on page {changed.page}" if changed.page else ""  # 0: element missing
-        notice = Notice(message, changed.label + where, f"#item-{target}", target)
+        notice = Notice(message, changed.label + where, f"#item-{target}", target, kind)
         landing = next_to_review(result, changed.element_id)
         landing_fix = result.fix_for(landing) if landing else None
         if landing_fix is not None and landing_fix.group_key in cards:
             card = cards[landing_fix.group_key]
-            card.notices.append(f"{notice.label}: {message}" if notice.label else message)
+            text = f"{notice.label}: {message}" if notice.label else message
+            card.notices.append(Notice(text, kind=kind))
             changed_fix = result.fix_for(target)
             if changed_fix is not None and changed_fix.group_key == card.key:
                 card.members_open = True  # deciding them one by one: keep them in view
@@ -1287,6 +1430,218 @@ def filter_decisions(deciding: list[GroupView], kind: str, page: str, pages: int
     )
 
 
+# --------------------------------------------------------------------------- parts of the list
+
+# A view of the list holds about this many cards (a heading group counts as its copies: they
+# are cards inside it), so the largest document in the tests stays under 300 KB and 5,000
+# DOM nodes a view (PF2). A line of the notes or of the page links is small: it counts a fifth.
+PART_CARDS = 25
+ROW_WEIGHT = 0.2
+
+
+@dataclass
+class ListEntry:
+    """One thing the list shows, in the order it shows them: decisions (by kind), optional
+    checks, notes, the reviewer's decisions, what was accepted for them, the page links."""
+
+    section: str  # "decisions", "optional", "notes", "decided", "accepted", "pages"
+    payload: Any  # a UnitView, a ReviewItem, a notice row, or (page number, left out)
+    weight: float = 1.0
+    anchors: tuple[str, ...] = ()  # the ids of what it holds that a link can point to
+    slug: str = ""  # decisions: the kind it is listed under
+    card: bool = True  # counted as an item of the list (a row of notes or links is not)
+
+
+def _unit_entry(slug: str, unit: UnitView) -> ListEntry:
+    if unit.item is not None:
+        return ListEntry("decisions", unit, 1.0, (f"item-{unit.item.element_id}",), slug)
+    card = unit.group or unit.pages
+    assert card is not None
+    members = tuple(f"item-{m.element_id}" for m in card.members)
+    weight = float(max(1, len(card.members)))
+    return ListEntry("decisions", unit, weight, (card.anchor, *members), slug)
+
+
+def list_entries(
+    deciding: list[GroupView],
+    optional: list[ReviewItem],
+    note_rows: list[Any],
+    mine: list[ReviewItem],
+    auto: list[ReviewItem],
+    tool_pages: list[tuple[int, bool]],
+) -> tuple[list[ListEntry], dict[str, int]]:
+    """Everything the list shows as one sequence, and where each section starts in it (the
+    index of its first entry, which an empty section takes from the one after it)."""
+    entries: list[ListEntry] = []
+    starts: dict[str, int] = {"needs-decision": 0}
+    for g in deciding:
+        starts[f"group-{g.slug}"] = len(entries)
+        entries += [_unit_entry(g.slug, u) for u in g.units]
+    starts["optional-checks"] = len(entries)
+    entries += [ListEntry("optional", i, 1.0, (f"item-{i.element_id}",)) for i in optional]
+    entries += [ListEntry("notes", r, ROW_WEIGHT, card=False) for r in note_rows]
+    starts["decided"] = len(entries)
+    entries += [ListEntry("decided", i, 1.0, (f"item-{i.element_id}",)) for i in mine]
+    starts["accepted"] = len(entries)
+    entries += [ListEntry("accepted", i, 1.0, (f"item-{i.element_id}",)) for i in auto]
+    starts["page-changes"] = len(entries)
+    entries += [ListEntry("pages", t, ROW_WEIGHT, card=False) for t in tool_pages]
+    return entries, starts
+
+
+@dataclass
+class ListPart:
+    """One view of the list: a run of entries that fits a page, and how to reach the others.
+    Every link is a plain GET (works without script) that keeps the decision filter."""
+
+    job_id: str
+    number: int  # 1-based
+    count: int
+    entries: list[ListEntry]
+    first: int  # items on the views before this one
+    items: int  # items on this view
+    total: int  # items in the list (under the filter)
+    filter_query: str
+    part_of: dict[str, int]  # anchor -> the view that holds it (1-based)
+    starts: dict[str, int]  # section anchor -> the view that holds its start
+    sections: dict[str, int]  # entries of each section in the whole list
+
+    def url(self, number: int, anchor: str = "list-part") -> str:
+        found = parse_qsl(self.filter_query)
+        query = urlencode([*found, *([("part", str(number))] if number > 1 else [])])
+        return f"/jobs/{self.job_id}/review/list{'?' + query if query else ''}#{anchor}"
+
+    def link(self, anchor: str) -> str:
+        """A link to an item or a section: in this view, or to the view that holds it."""
+        number = self.part_of.get(anchor) or self.starts.get(anchor)
+        if number is None or number == self.number:
+            return f"#{anchor}"
+        query = urlencode([*parse_qsl(self.filter_query), ("at", anchor)])
+        return f"/jobs/{self.job_id}/review/list?{query}#{anchor}"
+
+    @property
+    def previous(self) -> str:
+        return self.url(self.number - 1) if self.number > 1 else ""
+
+    @property
+    def next(self) -> str:
+        return self.url(self.number + 1) if self.number < self.count else ""
+
+    @property
+    def form_query(self) -> str:
+        """The filter and the view a decision form carries back (the hidden `flt`)."""
+        found = parse_qsl(self.filter_query)
+        return urlencode([*found, *([("part", str(self.number))] if self.number > 1 else [])])
+
+    @property
+    def status(self) -> str:
+        """Which items of how many this view shows: the count a reader is told."""
+        n = "item" if self.total == 1 else "items"
+        if not self.items:
+            return f"{self.total} {n} in all."
+        if self.items == self.total:
+            return f"Showing all {self.total} {n}."
+        last = self.first + self.items
+        return (
+            f"Showing items {self.first + 1} to {last} of {self.total}. "
+            f"Part {self.number} of {self.count}."
+        )
+
+    def shown(self, section: str, slug: str = "") -> list[Any]:
+        return [
+            e.payload for e in self.entries if e.section == section and (not slug or e.slug == slug)
+        ]
+
+    def shows(self, anchor: str, *sections: str) -> bool:
+        """Whether this view draws a section (of one or two kinds of entry): it holds some
+        of it, or it is empty and this is the view where it would start."""
+        if any(e.section in sections for e in self.entries):
+            return True
+        return not any(self.sections.get(name) for name in sections) and (
+            self.starts.get(anchor) == self.number
+        )
+
+
+def split_list(
+    job_id: str,
+    entries: list[ListEntry],
+    starts: dict[str, int],
+    filter_query: str,
+    *,
+    part: str = "",
+    at: str = "",
+) -> ListPart:
+    """Cut the sequence into views of `PART_CARDS` cards and pick the one asked for: the
+    one holding `at` (an item or a section), else the `part`, else the first. An item or a
+    section that is not in the list (a filter hides it) is not an error: the first view."""
+    runs: list[list[ListEntry]] = [[]]
+    weight = 0.0
+    for entry in entries:
+        if runs[-1] and weight + entry.weight > PART_CARDS:
+            runs.append([])
+            weight = 0.0
+        runs[-1].append(entry)
+        weight += entry.weight
+    part_of: dict[str, int] = {}
+    for number, run in enumerate(runs, 1):
+        for entry in run:
+            for anchor in entry.anchors:
+                part_of.setdefault(anchor, number)
+
+    def holding(index: int) -> int:
+        seen = 0
+        for number, run in enumerate(runs, 1):
+            seen += len(run)
+            if index < seen:
+                return number
+        return len(runs)
+
+    section_part = {anchor: holding(index) for anchor, index in starts.items()}
+    wanted = part_of.get(at) or section_part.get(at)
+    if wanted is None:
+        number = int(part) if part.isascii() and part.isdigit() else 0
+        wanted = number if 1 <= number <= len(runs) else 1
+    run = runs[wanted - 1]
+    return ListPart(
+        job_id,
+        wanted,
+        len(runs),
+        run,
+        sum(e.card for earlier in runs[: wanted - 1] for e in earlier),
+        sum(e.card for e in run),
+        sum(e.card for e in entries),
+        filter_query,
+        part_of,
+        section_part,
+        {name: sum(e.section == name for e in entries) for name in {e.section for e in entries}},
+    )
+
+
+def _name_deciders(
+    request: Request, job_id: str, user: CurrentUser, items: dict[str, ReviewItem]
+) -> None:
+    """An item someone else decided says so ("Accepted by Sam"), not "by you": the words
+    that name them are those of the record (`shares.names_of`)."""
+    decided = {i.element_id for i in items.values() if i.by_you}
+    if not decided:
+        return
+    with session_scope(get_ctx(request).factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        last: dict[str, str] = {}
+        for edit in session.scalars(
+            select(ReviewEdit)
+            .where(ReviewEdit.job_id == job.id, ReviewEdit.action != UNDO_ACTION)
+            .order_by(ReviewEdit.created_at, ReviewEdit.id)
+        ):
+            last[edit.element_id] = edit.user_id
+        others = {u for e, u in last.items() if e in decided and u != user.id}
+        names = shares.names_of(session, job, user, others) if others else {}
+    for element_id, person in last.items():
+        if element_id in decided and person in names:
+            item = items[element_id]
+            item.status_label = item.status_label.replace(" by you", f" by {names[person]}")
+
+
 def _page(
     request: Request,
     job_id: str,
@@ -1294,9 +1649,12 @@ def _page(
     *,
     invalid: tuple[str, ReviewInvalid] | None = None,
     stale: str | None = None,
+    stale_changed: Sequence[str] = (),
     status_code: int = 200,
     kind: str = "",
     page: str = "",
+    part: str = "",
+    at: str = "",
 ) -> Response:
     view, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
@@ -1305,6 +1663,7 @@ def _page(
     fix_groups = kept_images_apart(group_fixes(result))
     places = heading_places(result)
     notes = source_item_notes(result)
+    tied = table_math.tied_ids(result.elements)
     items = {
         f.element_id: _item(
             f,
@@ -1316,10 +1675,12 @@ def _page(
             labels.get(f.element_id),
             source_note=notes.get(f.element_id, ""),
             origin=result.origin,
+            tied=tied,
         )
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)
     }
+    _name_deciders(request, job_id, user, items)
     groups = {g.slug: _group(result, g, items, elements, places) for g in fix_groups}
     cards: dict[str, HeadingGroupView | PageGroupView] = {
         unit.group.key: unit.group
@@ -1354,40 +1715,78 @@ def _page(
     count = page_edits.page_count(result, view.page_count)
     deciding = [g for g in groups.values() if g.units or g.error or g.notices]
     filtered = filter_decisions(deciding, kind, page, count)
+    mine = [item for item in done if item.by_you]
+    auto = [item for item in done if not item.by_you]
+    tool_pages = (
+        [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)]
+        if result.origin == "pdf"
+        else []
+    )
+    entries, starts = list_entries(filtered.groups, optional, note_rows, mine, auto, tool_pages)
+    # A refused or out-of-date form comes back on the view that holds its item.
+    where = at
+    if not where and invalid:
+        card = cards.get(invalid[0])
+        where = card.anchor if card is not None else f"item-{invalid[0]}"
+        if invalid[0] in groups:
+            where = f"group-{invalid[0]}"
+    parts = split_list(view.id, entries, starts, filtered.query, part=part, at=where)
+    shown_groups = []
+    for g in filtered.groups:
+        units = [u for u in parts.shown("decisions", g.slug) if u in g.units]
+        if units or (not g.units and parts.number == 1):
+            shown_groups.append(replace(g, units=units, of=len(g.units)))
     context: dict[str, Any] = {
         "note_rows": note_rows,
         # Accept many at once (web.bulk_accept), and the filter of the decision list.
         "bulk_offers": bulk_accept.offers(result),
         "symbols_offer": inventory.handwritten_count(result),
         "decision_filter": filtered,
+        "parts": parts,
         "filter_kinds": [(g.slug, g.title, len(g.units)) for g in deciding if g.units],
         "page_count": count,
         # T3-5, T3-16: the page tools are on the review screen; one link to each page's.
-        "tool_pages": [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)],
+        "tool_pages": parts.shown("pages"),
+        "tool_pages_all": len(tool_pages),
         # A LaTeX source has no page pictures, so no review screen and no page tools (the
         # screen redirects here, `routes.split`): no link that leads back to this page.
         "has_pages": result.origin == "pdf",
+        # What the document was made from, for the words about it (`checked_words.source_noun`).
+        "source": checked_words.source_noun(result.origin),
+        "from_source": result.origin != "pdf",
         "job": view,
         "groups": list(groups.values()),
-        "deciding": filtered.groups,
+        "deciding": shown_groups,
+        "deciding_all": filtered.groups,
         "optional": optional,
-        "optional_open": any(item.open for item in optional),
+        "optional_shown": parts.shown("optional"),
+        "optional_open": any(item.open for item in parts.shown("optional")),
         "second_checks": sum(item.second_check for item in optional),
-        "done": done,
-        "done_open": any(item.open for item in done),
+        "mine": mine,
+        "mine_shown": parts.shown("decided"),
+        "mine_open": any(item.open for item in parts.shown("decided")),
+        "auto": auto,
+        "auto_shown": parts.shown("accepted"),
+        "auto_open": any(item.open for item in parts.shown("accepted")),
+        "notes_shown": parts.shown("notes"),
         "errors": [{"field_id": e.field_id, "message": e.message} for e in errors],
         "flash": [],  # placed by _place_flashes instead of at the top of <main>
         "notices": top,
         "remaining": sum(len(g.units) for g in fix_groups),
+        "stopping_line": queue.stopping_words(result.fixes),
         "remaining_by_kind": [decisions_label(g.units, g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
         "result_version": version,
         "undo": bool(top) and undo_offer(request, view.id, user, version),
         "stale": None
         if stale is None
-        else stale_notice(result, numbers, stale, list_url(view.id, _stale_anchor(result, stale))),
-        # No `active` nav item: this page is not "My documents" itself, so the link
-        # must not be announced as the current page (aria-current="page").
+        else stale_notice(
+            result,
+            numbers,
+            stale,
+            list_url(view.id, _stale_anchor(result, stale)),
+            changed=stale_changed,
+        ),
     }
     return render(request, "review.html", context, status_code=status_code)
 
@@ -1397,8 +1796,15 @@ def _page(
 LIST_VIEW = "list"
 
 
+# Anchors that every view of the list has: a link to one needs no view named.
+_EVERY_VIEW = {"review-progress"}
+
+
 def list_url(job_id: str, anchor: str) -> str:
-    return f"/jobs/{job_id}/review/list#{anchor}"
+    """The list at this anchor: `at` names it, and the list shows the view that holds it."""
+    if anchor in _EVERY_VIEW:
+        return f"/jobs/{job_id}/review/list#{anchor}"
+    return f"/jobs/{job_id}/review/list?{urlencode({'at': anchor})}#{anchor}"
 
 
 # The Symbols screen's address for each view it can come back to; nothing typed goes in.
@@ -1417,9 +1823,15 @@ def symbols_url(job_id: str, view: str) -> str:
 
 @router.get("/jobs/{job_id}/review/list")
 def review_list(
-    request: Request, job_id: str, user: UserDep, kind: str = "", page: str = ""
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    kind: str = "",
+    page: str = "",
+    part: str = "",
+    at: str = "",
 ) -> Response:
-    response = _page(request, job_id, user, kind=kind, page=page)
+    response = _page(request, job_id, user, kind=kind, page=page, part=part, at=at)
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "list")
     return response
@@ -1471,28 +1883,156 @@ def _stale_page(
     view: str,
     target: str,
     values: dict[str, str] | None = None,
+    changed: Sequence[str] = (),
 ) -> Response:
     """A write from an out-of-date page: nothing applied; the view the form was on, as it
     is now, says so (409). What the reviewer typed stays in the field, so choosing again
-    is one click."""
+    is one click. `changed`: the items that changed since the page was drawn, when that is
+    why it was refused (`refuse_stale`); the notice names them."""
     log_event(logger, "review_stale", job_id=job_id)
     kept = ReviewInvalid([], values)
     if view == LIST_VIEW:
-        return _page(request, job_id, user, invalid=(target, kept), stale=target, status_code=409)
+        return _page(
+            request,
+            job_id,
+            user,
+            invalid=(target, kept),
+            stale=target,
+            stale_changed=changed,
+            status_code=409,
+        )
     from readablestem.web.routes.split import split_page
 
     return split_page(
-        request, job_id, user, item=target, invalid=(target, kept), stale=True, status_code=409
+        request,
+        job_id,
+        user,
+        item=target,
+        invalid=(target, kept),
+        stale=True,
+        stale_changed=changed,
+        status_code=409,
     )
 
 
-def _refuse_stale(job: Job, version: str) -> None:
-    """Raise ReviewStale when the form was drawn before the job's last review write."""
-    if is_stale(job.result_version, version):
+ALREADY_SAVED = "Already saved: this item has that decision. Nothing was saved twice."
+
+
+def _already_saved(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    element_id: str,
+    action: str,
+    form: dict[str, str],
+    anyway: bool,
+    keep_open: bool,
+) -> tuple[str, str, DocumentResult] | None:
+    """A decision refused as made from an out-of-date page, which the item has already: the
+    decision would change nothing, and the item's last decision is this reviewer's, with
+    the same action. Then (the owned job's id, the element's id, the review as it is);
+    otherwise None, and the refusal stands. Nothing is written."""
+    ctx = get_ctx(request)
+    try:
+        with (
+            session_scope(ctx.factory) as session,
+            notation.in_force(ctx.factory, ctx.settings, job_id),
+        ):
+            job = job_access(session, job_id, user, REVIEW)
+            require_done(job)
+            result = DocumentResult.model_validate(job.result_json or {})
+            decided = element_ref(result, element_id)
+            trial = result.model_copy(deep=True)
+            change = apply_review(
+                trial,
+                decided,
+                action,
+                form,
+                anyway=anyway,
+                witness=ctx.settings.feature_page_witness,
+                keep_open=keep_open,
+            )
+            if any(c.before != c.after for c in change.every):
+                return None
+            last = session.scalar(
+                select(ReviewEdit)
+                .where(ReviewEdit.job_id == job.id, ReviewEdit.element_id == decided)
+                .order_by(ReviewEdit.created_at.desc(), ReviewEdit.id.desc())
+                .limit(1)
+            )
+            if last is None or last.user_id != user.id or last.action != change.action:
+                return None
+            return job.id, decided, result
+    except (LookupError, ReviewInvalid, PageError):
+        return None
+
+
+# What a write of one of these actions changed is the element it names (and what it was written
+# through to, which has its own row): a decision, an edit of an item, and the three writes of
+# one item's words, level or reading. Every other action (a page left out or put back, a
+# region added, "Not an equation", an Undo) moves or renumbers other elements.
+ITEM_ACTIONS = frozenset(
+    {*STATUS_FOR_ACTION, ADD_DATA_TABLE, DESCRIBE, "read_again", "edit_text", "make_heading"}
+)
+
+
+def written_with(result: DocumentResult, element_id: str) -> list[str]:
+    """The element and what an edit of it is written through to: a table's cells' equations,
+    or the table an equation is a cell of (`web.review._written_through`)."""
+    from readablestem.pipeline import table_math
+
+    ids = [element_id]
+    element = next((e for e in result.elements if e.id == element_id), None)
+    if element is not None and element.kind is Kind.TABLE and element.table is not None:
+        ids += [c.equation_id for c in element.table.cells if c.equation_id]
+    elif (tie := table_math.tie_of(result.elements, element_id)) is not None:
+        ids.append(tie[0].id)
+    return ids
+
+
+def refuse_stale(
+    session: Session, job: Job, sent: str, acts_on: Collection[str] | None = None
+) -> None:
+    """Raise ReviewStale when the form was drawn before a write that matters to it. Called with
+    the job row locked, so what it reads is the newest stored result.
+
+    `acts_on` None: the write depends on the whole document (Undo, a page edit that moves other
+    elements): any write since the page was drawn refuses it (`is_stale`). Otherwise `acts_on`
+    holds the elements the write changes (an item and what it is written through to, a
+    group's members, the items of a many-item action): the writes since the page was drawn are
+    read from the `ReviewEdit` rows that record each write's number (`WRITE_KEY`), and the
+    form is refused only when one of them changed an element in `acts_on`, which `ReviewStale`
+    then names. It is refused too when a write since left no such row (the tool's own, a setting
+    change) or was one of the other actions (`ITEM_ACTIONS`): those cannot be told apart."""
+    if not is_stale(job.result_version, sent):
+        return
+    current = job.result_version or 0
+    seen = int(sent) if sent.strip().isdecimal() else -1
+    if acts_on is None or not 0 <= seen < current:
         raise ReviewStale(job.id)
+    rows = session.execute(
+        select(ReviewEdit.element_id, ReviewEdit.action, ReviewEdit.after).where(
+            ReviewEdit.job_id == job.id
+        )
+    ).all()
+    since = [
+        (element_id, action, after[WRITE_KEY])
+        for element_id, action, after in rows
+        if isinstance(after, dict)
+        and isinstance(after.get(WRITE_KEY), int)
+        and after[WRITE_KEY] > seen
+    ]
+    if not set(range(seen + 1, current + 1)) <= {written for _, _, written in since}:
+        raise ReviewStale(job.id)
+    if any(action not in ITEM_ACTIONS for _, action, _ in since):
+        raise ReviewStale(job.id)
+    changed = [e for e in dict.fromkeys(element_id for element_id, _, _ in since) if e in acts_on]
+    if changed:
+        raise ReviewStale(job.id, changed)
 
 
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
+@submit_once("review.decide")
 def review_action(
     request: Request,
     job_id: str,
@@ -1555,6 +2095,14 @@ def review_action(
         return keep_filter(
             _page_group_action(request, job_id, element_id, user, action, view, version), flt
         )
+    if action in {REREAD, NOT_EQUATION}:
+        # "Read again" and "Not an equation" on an equation card: writes of the item, not
+        # decisions on its fix (`routes.edits`).
+        from readablestem.web.routes import edits as item_edits
+
+        if action == REREAD:
+            return item_edits.read_again(request, job_id, element_id, user, version, view, flt)
+        return item_edits.not_an_equation(request, job_id, element_id, user, version, view, flt)
     sent = {
         "latex": latex,
         "alt": alt,
@@ -1588,9 +2136,9 @@ def review_action(
             job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
-            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
             element_id = element_ref(result, element_id)
+            refuse_stale(session, job, version, written_with(result, element_id))
             change_made = apply_review(
                 result,
                 element_id,
@@ -1600,16 +2148,26 @@ def review_action(
                 witness=ctx.settings.feature_page_witness,
                 keep_open=keep_open,
             )
-            job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+            output.output_changed(job, output.DECISION)  # the file is made again when asked for
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
-            restart_owner_clock(job, user, get_ctx(request).settings)
+            restart_owner_clock(job, user, get_ctx(request).settings, request)
             _decision_events(request, session, user, job, result, "single", change_made.every)
             session.add_all(_review_edit(job.id, user, c, written) for c in change_made.every)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, element_id, _typed(form))
+    except ReviewStale as stale:
+        same = _already_saved(request, job_id, user, element_id, action, form, anyway, keep_open)
+        if same is None:
+            return _stale_page(request, job_id, user, view, element_id, _typed(form), stale.changed)
+        # The item already has this decision, by this reviewer (often a second click
+        # whose page was drawn before the first one saved): nothing to save twice, and
+        # the answer the first click got (SW43, "identical repeat").
+        owned_id, decided, now = same
+        flash(request, ALREADY_SAVED, element_id=decided, undo=False)
+        if view != LIST_VIEW:
+            return _split_redirect(owned_id, now, decided)
+        return keep_filter(RedirectResponse(_landing(owned_id, now, decided), status_code=303), flt)
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
         known = action in STATUS_FOR_ACTION or action in {ADD_DATA_TABLE, DESCRIBE}
@@ -1630,7 +2188,7 @@ def review_action(
     element = next((e for e in result.elements if e.id == element_id), None)
     message = done_message(change_made, element, result.origin)
     message += _moved_message(change_made.moved, item_numbers(result))
-    flash(request, message, element_id=element_id)
+    flash(request, message, element_id=element_id, kind="success")
     if view != LIST_VIEW:
         if (
             (table and action == "edit")
@@ -1670,8 +2228,9 @@ def list_query(raw: str) -> str:
     query = {}
     if found.get("kind") in slugs:
         query["kind"] = found["kind"]
-    if found.get("page", "").isascii() and found.get("page", "").isdigit():
-        query["page"] = found["page"]
+    for name in ("page", "part"):
+        if found.get(name, "").isascii() and found.get(name, "").isdigit():
+            query[name] = found[name]
     return urlencode(query)
 
 
@@ -1679,9 +2238,16 @@ def keep_filter(response: Response, flt: str) -> Response:
     """A redirect back to the list view keeps the decision filter the form was drawn with."""
     query = list_query(flt) if flt else ""
     location = response.headers.get("location", "")
-    marker = "/review/list#"
-    if query and response.status_code == 303 and marker in location:
-        response.headers["location"] = location.replace(marker, f"/review/list?{query}#", 1)
+    if not query or response.status_code != 303:
+        return response
+    if "/review/list?" in location:  # it names the view that holds its item (`at`)
+        response.headers["location"] = location.replace(
+            "/review/list?", f"/review/list?{query}&", 1
+        )
+    elif "/review/list#" in location:
+        response.headers["location"] = location.replace(
+            "/review/list#", f"/review/list?{query}#", 1
+        )
     return response
 
 
@@ -1714,20 +2280,21 @@ def _group_action(
             job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
-            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
+            members = [m.element_id for m in group_members(result, group_key)]
+            refuse_stale(session, job, version, members)
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
-                job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+                output.output_changed(job, output.DECISION)  # the file is made again when asked for
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
-                restart_owner_clock(job, user, get_ctx(request).settings)
+                restart_owner_clock(job, user, get_ctx(request).settings, request)
                 _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, group_key)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, group_key, changed=exc.changed)
     except ReviewInvalid as exc:
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
         log_event(logger, "review_invalid", job_id=job_id, action=f"group_{logged_action}")
@@ -1742,7 +2309,7 @@ def _group_action(
         left=len(outcome.left),
     )
     message = _group_message(action, level, outcome, every=every)
-    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
+    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key, kind="success")
     if view != LIST_VIEW:
         if outcome.left:
             # Headings left waiting (the output would move their level) keep the group
@@ -1785,20 +2352,21 @@ def _page_group_action(
             job = job_access(session, job_id, user, REVIEW, lock=True)
             owned_id = job.id  # redirects are built from the owned row, not the request
             require_done(job)
-            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
+            members = [m.element_id for m in page_group_members(result, group_key)]
+            refuse_stale(session, job, version, members)
             outcome = apply_page_group(result, group_key)
             if outcome.changes:  # nothing left to decide: no write, no re-render
-                job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+                output.output_changed(job, output.DECISION)  # the file is made again when asked for
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
-                restart_owner_clock(job, user, get_ctx(request).settings)
+                restart_owner_clock(job, user, get_ctx(request).settings, request)
                 _decision_events(request, session, user, job, result, "group", outcome.changes)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, group_key)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, group_key, changed=exc.changed)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="page_group_unknown")
         return _invalid_page(request, job_id, user, view, group_key, exc)
@@ -1810,7 +2378,12 @@ def _page_group_action(
         message = f"Kept {n} as {'an image' if n == 1 else 'images'}, marked “Not converted”."
     else:
         message = "Nothing changed: none of these were waiting for a decision."
-    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
+    flash(
+        request,
+        message,
+        element_id=HEADING_GROUP_FLASH + group_key,
+        kind="success" if n else "info",
+    )
     if view != LIST_VIEW:
         return _split_redirect(owned_id, result, group_key)
     landing = next_to_review(result, outcome.changes[-1].fix.element_id) if n else None
@@ -1972,9 +2545,11 @@ def undo_offer(request: Request, job_id: str, user: CurrentUser, version: int) -
 
 UNDO_PENDING = "Undone. {it} waiting for your decision again."
 UNDO_BACK = "Undone. {it} back as {was}."
+UNDO_ITEM = "Undone. It is back as it was."
 
 
 @router.post("/jobs/{job_id}/undo", dependencies=[Depends(require_csrf)])
+@submit_once("review.undo")
 def undo(
     request: Request,
     job_id: str,
@@ -1996,7 +2571,7 @@ def undo(
             require_done(job)
             if not version.strip():
                 raise ReviewStale(owned_id)
-            _refuse_stale(job, version)
+            refuse_stale(session, job, version)
             edits = last_write(session, job.id, job.result_version or 0)
             if not can_undo(edits, user.id):
                 raise _NothingToUndo(owned_id)
@@ -2008,10 +2583,10 @@ def undo(
             for change in changes:
                 if isinstance(change, StructureChange) and change.removed:
                     drop_crops(session, job.id, change.removed)
-            job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+            output.output_changed(job, output.DECISION)  # the file is made again when asked for
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
-            restart_owner_clock(job, user, get_ctx(request).settings)
+            restart_owner_clock(job, user, get_ctx(request).settings, request)
             # What the undone write recorded, taken back (`web.outcomes`).
             outcomes.record_undo(
                 session,
@@ -2024,7 +2599,11 @@ def undo(
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
-        flash(request, "Nothing was undone: this document changed after this page was opened.")
+        flash(
+            request,
+            "Nothing was undone: this document changed after this page was opened.",
+            kind="warning",
+        )
         return _back(exc.job_id, view)
     except _NothingToUndo as exc:
         flash(request, "There is nothing to undo here.")
@@ -2033,9 +2612,18 @@ def undo(
     from readablestem.web.routes.split import review_url
 
     structural = [c for c in changes if isinstance(c, StructureChange)]
+    if len(edits) == 1 and edits[0].action in ITEM_WRITES:
+        # Read again or "Not an equation": back on the item, where the choice was.
+        target = edits[0].element_id
+        flash(request, UNDO_ITEM, element_id=target, undo=False, kind="success")
+        if view == LIST_VIEW:
+            where = list_url(owned_id, review_anchor(result, target))
+            return keep_filter(RedirectResponse(where, status_code=303), flt)
+        where = review_url(owned_id, item=target, anchor="decision-title")
+        return RedirectResponse(where, status_code=303)
     if structural:
         # An edit to the text, a page or something added: back on the page it was on.
-        flash(request, "Undone. The document is as it was before.", element_id=None)
+        flash(request, "Undone. The document is as it was before.", element_id=None, kind="success")
         page = structural[0].page
         where = review_url(
             owned_id,
@@ -2051,7 +2639,7 @@ def undo(
     words = {"it": "They are" if many else "It is", "was": "they were" if many else "it was"}
     message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
     if view == SYMBOLS_VIEW:  # the Symbols screen: back on it, no Undo under an Undo
-        flash(request, message, element_id=SYMBOLS_FLASH, undo=False)
+        flash(request, message, element_id=SYMBOLS_FLASH, undo=False, kind="success")
         return RedirectResponse(symbols_url(owned_id, "split"), status_code=303)
     keys = {f.group_key for f in fixes}
     if len(fixes) == 1:
@@ -2062,7 +2650,7 @@ def undo(
     else:  # a bulk accept
         slug = GROUP_SLUGS.get(fixes[0].kind, "")
         target, flashed = slug, GROUP_FLASH + slug
-    flash(request, message, element_id=flashed)
+    flash(request, message, element_id=flashed, kind="success")
     if view == LIST_VIEW:
         where = RedirectResponse(list_url(owned_id, _stale_anchor(result, target)), status_code=303)
         return keep_filter(where, flt)

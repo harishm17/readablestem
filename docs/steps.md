@@ -154,8 +154,25 @@ model wrote alt text anyway, the warning check `figure.decorative_consistency` f
 with code `decorative_conflict`. The fix then goes to review whatever the confidence,
 and a tiny figure escalates to the main model first.
 
+The model's word is not enough for empty alt text (WS6.4). After every step,
+`decoration.settle` keeps a decorative answer only with evidence: the picture repeats on
+the pages, it is a rule by its shape, or a person decided (docs/output.md "Decoration").
+Without evidence, an ACCEPTED decorative figure becomes NEEDS_REVIEW with review
+`required` and the warning check `figure.decoration` (`decoration_unproven`). A figure
+whose reading failed or abstained becomes ACCEPTED decoration (review `optional`, code
+`decoration_by_rule`) when the evidence says it is one, and stays a decision otherwise.
+
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
+
+From a LaTeX source (`source/ltx_reader.py`) every picture the reader meets is a figure for
+this step, outside a float too: a picture centered on its own, in a sentence, in a list item or
+in a table cell is a figure straight after the block that holds it, so a source job spends on
+those descriptions where it spent nothing before (the upload's reservation already counted every
+`\includegraphics`). A picture inside a sentence follows the sentence; its place inside the text
+waits for Element v2 (WS16). A figure whose caption shows a formula LaTeX could not read keeps
+this step's status and also becomes a required decision (`source.read` /
+`source_formula_unread`, docs/web.md "LaTeX source").
 
 ### Long descriptions, data tables and color (FEATURE_LONG_DESCRIPTIONS)
 
@@ -790,7 +807,7 @@ send the fix to review.
 | `latex.allowed_commands` | `unknown_command` | error | any control word or symbol not in the allowlist |
 | `latex.allowed_commands` | `unsupported_ce` | error | a `\ce{...}` the chemistry subset could not write out (`pipeline/chem.py`); it is the only unknown command |
 | `latex.allowed_environments` | `unknown_environment` | error | an environment other than `array matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix cases aligned align align* gathered split` |
-| `latex.command_arguments` | `bad_argument` | error | `\hspace` without a braced, non-negative dimension (`x \hspace y` would become `<mspace width="y">` and lose the `y`) |
+| `latex.command_arguments` | `bad_argument` | error | `\hspace` without a braced, non-negative dimension (`x \hspace y` would become `<mspace width="y">` and lose the `y`); `\not` before anything but `=`, `<`, `>` or a relation or arrow command (`\not a` would become a stray slash) |
 | `latex.plain_text_arguments` | `markup_in_text` | error | `<`, `>` or `&` in the argument of `\text \textrm \textbf \textit \textsf \texttt \textnormal \textup \mbox` (latex2mathml copies that argument into its XML unescaped, so it would become markup) |
 
 The allowlist (`validate.ALLOWED_COMMANDS`) covers Greek letters, binary operators,
@@ -800,7 +817,13 @@ delimiters, accents (`\vec \hat \bar \dot \ddot \tilde \overline \underline
 \textrm \textbf \operatorname ...`) and structures (`\frac \dfrac \tfrac \sqrt \binom
 ...`). A test converts every allowed command with latex2mathml and fails if any of them
 comes through unconverted, so the allowlist cannot drift from what the converter
-supports. `\not` and `\arg` are left out for that reason.
+supports. `\arg` is left out for that reason. A negated relation is allowed in either
+spelling: `\not` before a relation or arrow (`\not\in`, `\not=`, `\not\equiv`) and the `\n...` commands
+(`\nleq`, `\nless`, `\ngeq`, `\nsubseteq`, `\ncong`, `\nsim`, `\nparallel`, `\nrightarrow`, ...). The tree
+shape joins the two into the one negated sign (`mathml_shape.shape_general`): the Unicode character
+where there is one (`≠ ∉ ≰ ⊄`), the relation and U+0338 otherwise.
+`\textbf` of one letter is baked to a bold letter before the conversion (`\textbf{F}` is "bold
+cap F", not the text "F").
 
 Before checking, the equation step removes wrappers the prompt forbids but models still
 add: `$...$`, `$$...$$`, `\[...\]`, `\(...\)`, `equation` environments, `\displaystyle`,
@@ -830,11 +853,13 @@ applies it to the chatbot arms' recorded LaTeX. See [chemistry.md](chemistry.md)
 4. Converts with latex2mathml.
 5. Parses the result with defusedxml, sets `display`, and unescapes `\%`, `\_`, `\#`,
    `\$` in `<mtext>` (latex2mathml leaves the backslash in text mode).
-   Then, on the tree, the repairs a reader needs: bold letters (`bake_bold_variants`), a charge
+   Then, on the tree, the repairs a reader needs: a charge
    or a count on its element symbol, arrows as operators, and the screen-reader shape
    (`mathml_shape.shape_general`: the degree sign, overline and underline, labeled arrows;
    `chem_mathml.shape_chemistry`: one `mi` per element symbol, states, nuclides, and
-   `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape").
+   `intent` on `<math>` for a formula or reaction on its own; docs/chemistry.md, "MathML shape"),
+   then `mathml_shape.normal_form` as the last step: bold letters, function names, plain digits,
+   the prime, the aligned-rows mark (docs/mathml-alttext.md).
 6. Re-serialises with `serialize_mathml`, which writes one MathML `xmlns` on the root and
    refuses (`UnsafeMathMLError`, message = the code) any tree that fails the allowlist
    rules of `check_mathml`: an unknown element or attribute, markup inside a token, a
@@ -857,6 +882,7 @@ Inputs so deeply nested that the converter recurses too far fail the same way.
 | `mathml.token_content` | `markup_in_token` | an element inside `mi`, `mn`, `mo`, `mtext` or `ms` (other than `malignmark`); browsers parse children of `<mtext>` as HTML |
 | `mathml.depth` | `too_deep` | nesting deeper than 64 (measured without recursion) |
 | `mathml.structure` | `bad_arity` | `mfrac`, `mroot`, `msub`, `msup`, `munder`, `mover` without 2 children, or `msubsup`, `munderover` without 3 (latex2mathml turns `\frac{a}` into a one-child `mfrac`) |
+| `mathml.structure` | `empty_argument` | a fraction, root or script with an empty part (`\frac{}{2}`, `\sqrt{}`, `x^{}`, an empty base): the part of the equation that was read is missing, and a reading of the rest would say a different equation |
 | `mathml.converted` | `unconverted_command` | LaTeX left in a token (`<mi>\foo</mi>`, `<mtext>\textbf{x</mtext>`, `<mtext>a\,b</mtext>`: a backslash followed by a command name or any non-alphanumeric character), any `merror`, or a stray alignment `&` in an `mi` |
 
 All are error-level. All 30 gold MathML equations pass.
@@ -908,19 +934,24 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 
 | Construct | Reading |
 |---|---|
-| Simple fraction (each side one or two plain tokens) | "a over b", "capital delta bold d over capital delta t" |
+| Simple fraction (each side one or two plain tokens) | "a over b", "cap delta bold d over cap delta t"; "a over b end fraction" when a plain token follows it, and the long form after a plain token, so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}` are not said alike |
 | Other fractions | "the fraction ... over ... end fraction" |
 | `linethickness=0` fraction | "n choose k" |
 | Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power" |
 | Primes, degrees | "y double prime", "30 degrees" |
-| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub" |
+| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a short subscript a plain token (or a script on one) follows is closed, "x sub i end sub y" against `x_{iy}` "x sub i y" |
+| Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "cap A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
+| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides" and a pair of bars the absolute value |
+| A centered dot or a cross | between vectors (bold letters, arrows, nabla, the test of `signs.py`) "dot" and "cross"; between numbers and scalars "times" |
+| A negated relation | "is not an element of", "is neither less than nor equal to", "not equal to", "is not a subset of", ...; a relation with no word of its own "with stroke" |
+| Distribution and sets | `\sim` after a variable before a distribution "is distributed as"; `\setminus` "set minus"; `\mathit{diff}` is the word "diff" (a plain `diff` is still d, i, f, f) |
 | Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
 | Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
 | Roots | "the square root of x", "... end root" when compound, "the cube root of", "the root of index n of" |
 | Large operators | "the sum from i equals 1 to n of", "the integral from 0 to 1 of", "the product over k of" |
 | Limits | "the limit as x approaches 0 of" (an arrow under `lim` reads "approaches") |
 | Operators and relations | equals, minus, plus or minus, times, divided by, less than or equal to, approximately equals, proportional to, right arrow, ... |
-| Letters | "x", "capital F"; Greek "delta", "capital delta"; bold "bold d"; double-struck "double-struck capital R" |
+| Letters | "x", "cap F" (a capital is "cap", never "capital"); Greek "delta", "cap delta"; bold "bold d"; double-struck "double-struck cap R"; the letters of an upright name (`\mathrm{Var}`) add no "cap" ("V a r") |
 | Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde" |
 | Functions | "sine", "cosine", "natural log", ... |
 | Tables | "row 1: ...; row 2: ..." when there are several rows; cells of an aligned equation read as one line, matrix cells are comma-separated |
@@ -930,6 +961,39 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Units | upright letters or text right after a number: "5 m/s" reads "5 meters per second", "9.8 m/s^2" "9.8 meters per second squared", "3 kg·m/s" "3 kilogram meters per second", "2.9 m/s" "2.9 meters per second", "25 °C" "25 degrees Celsius"; singular after 1. Italic letters (a variable `m`), ambiguous divisions (`J/kg K`) and unknown symbols read as before (`speech_units.py`) |
 | Text | verbatim, except words that are a single math symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
+
+Two prints that differ are not said alike, and two spellings of one print are: an operator the
+converter leaves as an identifier (`\vert`, `\Vert`, `\pm`, `\langle`, `\geqslant`) reads as the operator,
+and a transposed run of letters (`\boldsymbol{BB}^T`) as one print with `BB^T`. Left alike on
+purpose: `ab_2` and `{ab}_2` (the same print), round and square matrix brackets, `\cdot`, `\times` and
+`*` between scalars, `\simeq` and `\approx`, `\implies` and `\Rightarrow`, `5^\circ` and `5\degree`,
+`\mathrm{diff}` and a plain `diff` (upright letters are read one by one: units).
+
+**Stored readings.** What keeps its old words and what takes the new ones, for a document converted
+before a change to these rules:
+
+- The reading stored with an equation (`EquationFix.speech`) is made in the equation step and
+  carries the version of the speech rules that made it (`EquationFix.speech_version`, the code's
+  `speech.SPEECH_VERSION`, 2 since "cap" and the pauses in a formula; 0 where none was stored).
+  A stored reading made by older rules and not written by a person is made again from its MathML,
+  without a model, where it is read: `speech.refresh_readings` on the result in
+  `web.review.rerender_html` (the page, the EPUB's `describedMath` and the Word fallback text),
+  `routes.review._load_versioned` (every review screen), `job_page._examples` and
+  `listen.stored_speeches` (Listen). All of them show the same string, and the stored result is
+  brought up to date the next time it is saved. A reading a person wrote has a negative version
+  and is never replaced (no path writes one today: an edited equation is read again at once,
+  `web/edit_check.py`, and stamped with the current version). Raise `SPEECH_VERSION` whenever a
+  rule changes what an existing MathML reads as; the spoken string is never part of a model
+  request, so a remade reading costs nothing.
+- Where no reading is stored (a LaTeX one is not used) the Listen transcript, `speech_diff` and the
+  decision cards speak the MathML with the speech of the day: the new words, whenever a page is opened.
+- A table header's name (the `aria-label` `table_html` writes) is spoken from the stored cell MathML each time the
+  page is made, so a stored document takes the new words when its page is made again (a
+  `RENDER_VERSION` bump, or an edit that renders the HTML) and keeps the old in the file it
+  already holds.
+- `PIPELINE_VERSION` is not bumped here: this change alters what a conversion stores (a negated
+  relation is accepted, an equation with an empty part is refused, one-letter `\textbf` keeps its
+  bold, every reading changes words), so a bump is owed at merge.
 
 Sentence punctuation at the very end of the equation is not read. Unreadable input
 raises `SpeechError` with a content-free message. In the equation step a speech failure
@@ -958,10 +1022,10 @@ full description is in [tables.md](tables.md). In short:
   not a data table -> the grid read from the PDF written as its text in reading order,
   ACCEPTED with the note `written_as_text` (optional; ABSTAINED `not_data_table`,
   required, when there is no such grid to write); not a data table but a grid of numbers
-  (half the cells below the first row hold a digit) -> the local grid with first-row
-  headers, NEEDS_REVIEW (`numbers_not_a_table`: written as text, the values would lose
+  (half the cells below the first row hold a digit) -> the local grid with the header
+  rows layout found, NEEDS_REVIEW (`numbers_not_a_table`: written as text, the values would lose
   their columns); no usable answer -> the local grid with
-  first-row headers, NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
+  the header rows layout found (none: no header cell, a choice), NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
   FAILED `table_not_rebuilt`. No model confidence: `Fix.confidence` is None.
 - Header policy: header rows from the top; row headers only for columns of non-empty,
   non-numeric, distinct labels the model marked (leading ones, or a second label column
@@ -1049,6 +1113,55 @@ output limit): over `PAGE_AUDIT_MAX_USD_PER_PAGE` (default $0.10) the page is
 a cent) because the worst case of one request is $0.05 to $0.09: the output limit, which
 thinking can fill, dominates it. Every request goes through the run's spend guard; when
 the guard refuses, the run stops and the pages left are `cap_reached`.
+
+## Say once (`pipeline/say_once.py`; runs in shadow only)
+
+Another check of the whole page, with no model and no second read of the file. Layout
+already holds what a page says (`Layout.sources`, one `PageSource` a page: the words of the
+rows it set out to read, each with the box of its glyphs, written while the rows are
+prepared, after the margin filter) and the conversion holds what each element says
+(`Element.text` and `bbox`). `say_once.measure` counts, for each page, the words that **no
+element says**, the words said **twice**, and what layout **left out by its own rule**.
+
+| Code | A word that is |
+|---|---|
+| `no_owner` | in no equation, table or figure box and said by no paragraph, heading, list item, caption or equation label |
+| `two_places` | inside the boxes of two elements that are not parent and child |
+| `place_and_text` | inside an equation, table or figure box and also said by a text element |
+| `said_twice` | said by the elements one time more than the page has it |
+| `not_on_page` | said by an element and not on the page's text layer (counted, no fault: a reading may spell a thing another way) |
+
+An equation, a table and a figure own the glyphs under their box (a child inside its parent,
+a formula in a caption or a cell, is the same owner). A paragraph, heading or list item owns
+words: the page's words that no box holds are matched one for one with the words of those
+elements, after the same folding on both sides (Unicode compatibility form, so ligatures and
+superscript digits; case folded; marks dropped; cut into runs of letters and digits; a word
+broken at a row end is looked for whole first). A paragraph that goes on over a page break
+shares its words between its pages (`Element.last_page`).
+
+Left out by layout's own rule, counted by name and never a fault: `furniture` (the running
+heads, feet, page numbers and watermarks `_MarginFilter` drops), `hidden` (text nobody can
+see, `page_type`), `contents` (the leaders and page numbers of a contents line) and
+`teacher_tag` (OpenStax's "[BL]", "[OL]" level tags). Each is recorded where layout applies
+the rule, so there is no second copy of the rule here. A page kept whole as its picture is
+not measured: it has its own decision.
+
+**It does not see wrong reading order**: the words are matched as a bag, so a block read in
+the wrong place, or a column read in the wrong order, counts as said. `eval order` is the
+measure of order. It does not see a word said in the wrong place, a formula read wrongly or
+a picture's content either.
+
+**In shadow (SW60).** At the end of a conversion `shadowed.over_line("page_missing", ...)`
+(`Shadow.over_line`) gives each measured page one content-free `ShadowFact`: its page, its
+share of words in no element, and `differs` when the page has at least `MIN_WORDS` (40)
+words and at least `LINE` (15%) of them are in no element, `same` otherwise. It is the
+shadow mechanism and not a `Notice` because a notice is listed on the job page and needs
+text for it; this is shown to nobody, changes no counter a person sees, and is counted by
+`shadow.agreement` and logged by the worker (`job_shadow`, step `page_missing`). The step's
+name is the code WS15.9's page-check writer will give the same finding; that writer is not
+built. A step that raises is one `failed` fact for the document; nothing else changes. The
+figures the line was chosen on, and the `eval say-once` command that gives them again, are
+in [eval-say-once.md](eval-say-once.md).
 
 ## Running a new step in shadow (`pipeline/shadow.py`)
 
@@ -1270,7 +1383,7 @@ confidence or reasoning, only the proposal (alt text and caption, or LaTeX) fenc
 | Flagged when | min(ok, 1 - factual_error) < `DECISIONS_FIGURE_FLAG_BELOW` (0.5): either answer is bad | `meaning_changing` >= `DECISIONS_EQUATION_FLAG_AT` (0.2) |
 | Asked about | an ACCEPTED, non-decorative figure with alt text | the final proposal of an ACCEPTED equation (`CLAUDE_CHECK_SCOPE=accepted`, default; `all` adds those already waiting for review) |
 
-**`CLAUDE_SECOND_CHECK`** (default **`shadow`**): `off` asks nothing. `shadow` asks, records
+**`CLAUDE_SECOND_CHECK`** (default **`off`**): `off` asks nothing. `shadow` asks, records
 a `Verification` with mode `shadow` and its `flagged` verdict, and changes nothing: no
 check, no note, no status, no review tier, no escalation. `enforce` (off by default) is for
 figures only: a flag adds the same optional `figure.second_check` note as the Decisions
@@ -1312,7 +1425,7 @@ API with recorded answers; Claude is not deterministic, so this one asks the che
 fixed synthetic cases (the figure and equation cases of `canary_requests.json`) whose
 answer is known by construction (`SHOULD_FLAG`) and counts the cases it gets wrong. More
 than `CLAUDE_CANARY_MAX_MISSES` (1) is drift: one ERROR line `claude_canary_drift`. At most
-once a day, only in the HTTP cron route (production's `ops cron` does not run it; claim row
+once a day, in `ops cron` and in the HTTP cron route (`ops.canary.run_daily`; claim row
 `canary/claude:run`, counts `claude:<status>`), fail-open, off with `CLAUDE_CANARY=false`, never with `ENV=test`, `FAKE_MODELS`, another
 provider or `CLAUDE_SECOND_CHECK=off`. By hand: `readablestem ops claude-canary --max-usd 0.25`
 (exit 0, 1 drift, 2 could not run). First live run: 12 of 12 right, $0.0166.

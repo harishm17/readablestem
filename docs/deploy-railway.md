@@ -118,11 +118,11 @@ Rules that keep the plan honest:
    second place deleted documents live, so it would need a short lifetime (an R2 lifecycle rule
    of 3 days) and a sentence on the privacy page.
 3. **Cron: the Railway cron service (option A).** The HTTP route (`POST
-   /internal/cron/aggregate-and-purge`) also runs the daily canaries (the Claude canary, about
-   $0.04 a run; the OpenAI Decisions canary, which is off under Anthropic); `ops cron` does not,
-   so **no canary runs in production**. To get the Claude canary, run `readablestem ops
-   claude-canary --max-usd 0.25` on a schedule you control (option B below, or a GitHub workflow
-   with a repository secret).
+   /internal/cron/aggregate-and-purge`) and `ops cron` both run the two daily canaries, each at most
+   once per UTC day (the Claude canary, about $0.04 a run; the OpenAI Decisions canary, which is
+   off under Anthropic). In production the Claude canary does nothing until
+   `CLAUDE_SECOND_CHECK` is turned on (it is `off` in code), so no canary spends anything by
+   default. Their status goes in the cron heartbeat's note and on `/admin` ("Daily checks").
 4. **LibreOffice in the image (Word and PowerPoint uploads).** Off by default. To turn it on:
    variable `INSTALL_LIBREOFFICE=true` on the web service and a memory allowance of 2 GB (below).
    Check `readablestem ops launch-check` first.
@@ -160,11 +160,14 @@ production if a required one is missing, and logs the reason):
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the GitHub uptime checks (below). |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | Defaults 24 hours after the last activity, and 30 days for a document whose owner also lets the developer look at the results; "Keep for 7 days" is a per-upload choice with a fixed length (`web/retention.py`). Neither is named in `railway.ts`, so production uses the defaults. | Leave unset. If you set them, the cron service needs the same values (reference the web service's). |
-| `CLAUDE_SECOND_CHECK` | The Claude second check: `shadow` (the code default) asks a second model about each equation and figure and only records its answer; `enforce` acts on it; `off` skips it. Declared on `web` in `railway.ts`. | Production's value is in the production profile. It was set to `off` on 2026-11-09: on the first real-model walkthrough (4 OCW documents) the shadow check changed no output and cost about 16% of the spend. Turn it back on only for a measured run. |
-| `CLAUDE_CANARY` | Daily drift check of the Claude second check. Only the HTTP cron route runs it, so with the cron service it never runs and this variable does nothing. | Leave unset. |
+| `CLAUDE_SECOND_CHECK` | The Claude second check: `off` (the code default since WS10.5) skips it; `shadow` asks a second model about each equation and figure and only records its answer; `enforce` acts on it. Declared on `web` in `railway.ts`. | Production's value is in the production profile. It was set to `off` on 2026-11-09: on the first real-model walkthrough (4 OCW documents) the shadow check changed no output and cost about 16% of the spend. Turn it back on only for a measured run. |
+| `CLAUDE_CANARY` | Daily drift check of the Claude second check. The cron service (`ops cron`) and the HTTP cron route run it, at most once per UTC day, and only while `CLAUDE_SECOND_CHECK` is not `off`. | Leave unset. |
 | `INSTALL_LIBREOFFICE` | Build argument, see decision 4. | Unset. |
 | `FEATURE_LATEX_SOURCE` | Takes `.tex` files and zips of a LaTeX project (docs/web.md, "LaTeX source"; ADR 0008). Declared on `web` in `railway.ts`. | Production's value is in the production profile (it was turned on 2026-11-04 13:53 UTC, once the start-up sandbox probe passed on Railway, see "LaTeXML" below). Turn it on only after the image has LaTeXML (`INSTALL_LATEXML`) and `railway ssh -s web -- readablestem ops sandbox-probe --require-latexml` prints PASS. |
 | `FEATURE_BATCH_ZIP` | Takes a `.zip` of PDFs and LaTeX project folders as a batch of documents (docs/web.md, "Zip of documents and the batch page"). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until real course sources (zips of projects) have been tried. Zips of LaTeX projects also need `FEATURE_LATEX_SOURCE` (on). |
+| `FEATURE_WORD_SOURCE` | Reads a `.docx` from the file itself (pandoc in the sandbox, `source/docx_reader.py`) instead of from a LibreOffice PDF; needs pandoc, a passing sandbox probe, and takes only files the reader's gate accepts, the rest go the PDF route (docs/web.md, "Word files read from the file"). Not declared on `web` in `railway.ts` yet. | Production's value is in the production profile; off until real Word files have been read both ways. |
+| `FEATURE_CLASS_LINK` | The class link: an owner's link that opens the published student version without a sign-in (docs/web.md, "The class link"). Declared on `web` in `railway.ts`. | Off, and stays off until the list in "Before `FEATURE_CLASS_LINK` is turned on" below is done. |
+| `FEATURE_COURSE_GRANTS` | Course grants: an owner gives a person every document of a course (docs/web.md, "Course grants"). Needs `FEATURE_NOTATION_MEMORY`. Declared on `web` in `railway.ts`. | Off, and stays off until the list in "Before `FEATURE_COURSE_GRANTS` is turned on" below is done. |
 | `FEATURE_BEAMER_SOURCE` | Takes Beamer decks within LaTeX source (needs `FEATURE_LATEX_SOURCE`; docs/web.md). Declared on `web` in `railway.ts`. | Production's value is in the production profile; keep it off until a few real decks have been converted and read. |
 | `INSTALL_LATEXML` | Build argument: adds LaTeXML, TeX Live's base and ImageMagick (about 270 MB; see "LaTeXML" below). Needed for LaTeX source uploads, which also need the sandbox to pass `readablestem ops sandbox-probe` on this image. Declared on `web` in `.railway/railway.ts` so that `railway config apply` keeps it. | Leave as it is: the probe passes on Railway with it. |
 | `INSTALL_MATH_READER` | Build argument: adds the local handwriting reader's model files (0.6 GB; `docs/math-readers.md`, "The local reader"). Only `IMAGE_PAGES_SECOND_READER=local` makes the pipeline call it, and both it and `MATH_READER_LOCAL_ENABLED` are off by default (production's values: the production profile). With it, allow 2 GB of memory. | Unset. |
@@ -185,6 +188,15 @@ it is logged once per process when `X-Forwarded-For` has more than `TRUSTED_PROX
 entries, which means a proxy is missing from the setting (or a client forged the header). It
 carries counts, no addresses. `readablestem ops launch-check` cannot see the live header; it
 only flags `TRUSTED_PROXY_HOPS=0`.
+
+Every request line in the log also carries `forwarded_parts`, the number of entries the
+`X-Forwarded-For` header held when it reached the app (a count, never an address; 0 with no
+header). To settle how Railway treats the header, send one public GET to a page that is not a
+health route (those log at debug level) with a made-up two-entry header and read the count on its
+line: 3 means Railway appends the address it saw, so the limiter keys on the real address
+(`TRUSTED_PROXY_HOPS=1` is right); 1 means it replaces the header; 2 means it passes the header
+through, and `TRUSTED_PROXY_HOPS` must change before anything else. **Not yet read in production**:
+write the date and the count here when it is.
 
 `CRON_TOKEN` must be at least 32 characters (production refuses to start otherwise). To rotate
 `SESSION_SECRET` without signing people out, use `SESSION_SECRET_PREVIOUS`
@@ -211,6 +223,11 @@ profile's hash to an admin (the public `/healthz/ops` gives the status word only
 writes the image facts (`readablestem ops image-facts --write`, Dockerfile), which changes that
 hash with what the image carries.
 
+`FONT_CODE_TABLES` is new: on by default in code, with no value set in Railway (the profile says
+so). Set it to `false` on `web`, and in the profile, to go back to the old private-use bullet rules
+without a deploy; element text changes on documents with symbol fonts, so their stored step answers
+are asked again.
+
 Limits in production (each equals the code default in `config.py`, except the per-user page quota and the daily
 spend cap, which are set on `web`): 100 pages and 50 MB per upload (`MAX_PAGES_PER_JOB`, `MAX_UPLOAD_MB`); a file of up
 to 500 pages and 100 MB is kept for choosing pages (`MAX_SOURCE_PAGES`, `MAX_LARGE_UPLOAD_MB`);
@@ -218,6 +235,75 @@ open tier 150 pages a day; invited 300 pages a day (`PER_USER_DAILY_PAGE_QUOTA`)
 of 250 MB per open-tier person, 300 MB per invited person and 2000 MB for everybody
 (`STORAGE_*_MB`; these cap what is stored at a time, not what is uploaded per day); a spend cap of
 $6 per job and $10 a day for the site, of which open-tier accounts may use $4.
+
+## Before `FEATURE_COURSE_GRANTS` is turned on
+
+Course grants (WS27.1, docs/web.md "Course grants") let an owner give a person every document of a
+course. They are off in code and in the production profile, and with the switch off the public
+pages are accurate. Do not set it to `true` on `web` (it needs `FEATURE_NOTATION_MEMORY` too)
+until the sentences below are changed or made conditional; the code does not do that for them,
+except the one in `privacy.html`, which already follows the switch (`course_grants_on`).
+
+1. **These sentences are false or incomplete once it is on** (`src/readablestem/web/templates/`):
+   - `security.html:122-125`: "A document belongs to the person who uploaded it ... The owner can
+     share a document with named people": a course can be shared too, and the people reach
+     documents added later.
+   - `offices.html:80-82`: "A document can be shared with named colleagues, who must sign in with
+     the exact email address entered": same.
+   - `account.html:24` ("People you share a document with see this beside your address") and
+     `account.html:51` ("A read started by someone a document is shared with counts here"): both
+     should also name a course's people.
+   - `help_review.html:262`: "A person you shared the document with to view only is never given
+     the draft": true for a course grant too; add "or a course".
+   - `privacy.html`: the access sentence is already conditional on `course_grants_on`.
+   - Unchanged and still true: `_retention_table.html:9` and `privacy.html:58`, `67-68` (a document
+     is deleted on its schedule whoever can open it).
+2. **Tell the owners what a grant is.** A grant covers documents added later; taking a document out
+   of the course ends it; nothing is emailed; the grantee must sign in with Google, Microsoft or an
+   emailed link to that exact address. The People section says this; the help pages do not yet.
+3. **Know what it does not do.** No teams, departments or offices, no hand-over of a course, no
+   usage totals. A grant is a person's address, not a role in an organization. The grantee's reads
+   count against the owner's allowance.
+
+## Before `FEATURE_CLASS_LINK` is turned on
+
+The class link (WS27.2, docs/web.md "The class link") is the one way a document's content reaches
+someone who is not signed in: `GET /s/{token}`. It is off in code and in the production profile.
+Do not set it to `true` on `web` until all of this is true; none of it is done by the code, and the
+public pages were deliberately not changed with the feature, so with the switch off they stay
+accurate.
+
+1. **The service owner supplies terms for publishing.** The terms say nothing today about an
+   instructor putting a converted document where a class can open it without signing in: whose
+   material may be published, that the instructor answers for the rights to it, what the service
+   may do about a link (pause or remove it), and that a link's address is a secret that anyone
+   holding it can use. This is the service owner's text, not an engineering one.
+2. **A takedown contact that is watched.** `terms.html:88` and `privacy.html:292-296` send
+   takedown requests to `CONTACT_EMAIL`, or to "the contact address of this service" when it is
+   unset. Public pages now carry owners' material, so `CONTACT_EMAIL` must be set, read daily, and
+   someone must know how to remove a link by hand (delete the `job_links` row or set `revoked_at`;
+   the published copy then goes with the next hourly purge).
+3. **These sentences must change** (they are true only while there is no link; `src/readablestem/web/templates/`):
+   - `privacy.html:246-251`: "Only you can open your documents, and the people you name." With a
+     link, anyone holding the address can open the published student version, without signing in.
+   - `privacy.html:56`: "Nobody else looks at it." (the 7-day choice) is no longer the whole
+     truth for a document with a link.
+   - `privacy.html:48-54` and `privacy.html:65-66`: the deletion times ("deleted automatically 24
+     hours after you last worked on it", "a person you share with does not keep it longer") need
+     the exception that a document with a class link is kept until the link's last day (at most 180
+     days) and then for its usual time again; and `_upload_limits.html:38-40`, the limits page's
+     "How long it is kept", says the same thing and needs the same exception.
+   - `privacy.html:127-128`: "No one else. We do not use your uploads to train models, sell them or
+     share them beyond the services named here." needs to say that the owner may publish a copy and
+     that the page sets no cookie and keeps no record of who opened it, only a count.
+   - `terms.html:14` ("Check the output before you share it") and `terms.html:53-55` ("process
+     material you are not allowed to share") should name publishing by link next to sharing.
+4. **Know what the link does not do** (so the pages above can say it): its address is in the URL, so
+   a browser history, a proxy or a log that records URLs holds it (the app's own logs record the
+   route template, not the address, and uvicorn's access log is off); `open_count` counts fetches,
+   including a chat app's link preview; the page has no way to show who opened it.
+
+Then set `FEATURE_CLASS_LINK=true` on `web` and in the production profile.
 
 ## Microsoft sign-in on Railway
 
@@ -458,7 +544,7 @@ has its own address-space cap of 768 MB (a 117 MB, 500-page PDF was probed in 8 
 (docs/web.md, "The conversion runs in a child process"; it loads the table models itself, so
 `PRELOAD_TABLE_MODELS` no longer preloads them in the web process): while a job converts expect the
 web process plus a child of about 0.3-0.5 GB resident. Recommendation:
-**allow 2 GB, expect 0.4 to 0.9 GB resident, and do not set a limit below 1 GB** (an upload is held in memory about three times over while it is read, so one of 100 MB adds about 300 MB, and `MAX_CONCURRENT_UPLOADS=3` of them 900 MB: 1 GB was enough for 20 MB uploads); with
+**allow 2 GB, expect 0.4 to 0.9 GB resident, and do not set a limit below 1 GB** (an upload is held once while it is read and twice more by the database driver when it is stored, measured with SQLite: so one of 100 MB adds about 300 MB, and `MAX_CONCURRENT_UPLOADS=3` of them 900 MB: 1 GB was enough for 20 MB uploads); with
 `INSTALL_LIBREOFFICE=true` allow 2 GB (LibreOffice adds about 300 MB while a Word or PowerPoint file
 converts); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
 about 1.1 GB resident (measured, 74 crops), so allow 2 GB there too. Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing
@@ -586,6 +672,63 @@ same order, so **read the real before and after sizes from the first Railway bui
 pandoc 3.7; the web service lets two run at once and caps each at 2 GB of heap, so allow for about 0.5 GB
 more while two Word files are made. Check the build log for the pandoc version line.
 
+## The worker as its own service
+
+By default (`WORKER_MODE=inline`) the worker is a thread of `web`: a conversion and a request
+share one process. With `WORKER_MODE=service` a second Railway service, `worker`, runs
+`readablestem worker` (the same image; no web server) and `web` starts no worker. Measured on the
+development box with replayed 10-page documents (no model calls), four readers loading one
+review page while four conversions ran: the web process held 289 MB before and 364 MB after
+inline, and 220 MB before and 257 MB after in `service` mode; the review page's median went from
+291 to 312 ms inline (95th percentile 334 to 380) and from 252 to 273 ms (284 to 320) with the
+worker apart. The conversion itself was already a child process, so the gain is the web
+process's memory and the worker's share of its CPU, not a faster page.
+
+**Not in `railway.ts` yet.** Adding the service to the file would make the next `railway config
+apply` create and start a second service whatever `WORKER_MODE` says, so it is written here, as
+the step an operator takes, and not there. Two claimers are safe (a job is claimed by one
+conditional update, docs/web.md "Worker"), so the order is: add the service, check it, then
+switch `web`.
+
+1. Add this to `.railway/railway.ts` (next to `cron`), and `worker` to the `resources` list:
+
+   ```ts
+   // Conversions, apart from the web process (WORKER_MODE=service on web). Same image; no
+   // domain, no health check. SIGTERM to SIGKILL: the worker stops claiming and ends its
+   // running jobs' leases within 20 s (web/worker_service.py DRAIN_S), so 30 here.
+   const worker = service("worker", {
+     build: { buildEnvironment: "V3", builder: "RAILPACK" },
+     start: "readablestem worker",
+     replicas: { iad: 1 },
+     deploy: {
+       drainingSeconds: 30,
+       limitOverride: { containers: { memoryBytes: 2 * 1024 ** 3 } }, // one slot; +1 GB a slot
+     },
+     env: preserved(...appVariables, ...profileVariables, "WORKER_SLOTS"),
+   });
+   ```
+
+   Its variables are references to `web`'s (`${{web.NAME}}`), as `cron`'s are; `WORKER_MODE` and
+   the settings of `webOnlyVariables` that conversions read (the feature switches, the
+   `MAX_USD_*` caps, `CONTENT_RUNS`, `EQUATION_*`, `IMAGE_PAGES_*`, `PAGE_WITNESS_MODEL`, ...) must
+   reach it too, so reference every name of `webOnlyVariables` except `PORT` and `MS_*`. No
+   pre-deploy command (two services migrating at once would race). Run `railway config plan`,
+   review, `railway config apply`, then `railway up --service worker`.
+2. With `web` still inline, the new service starts claiming jobs beside it. Look at its logs for
+   `worker_service_started`, and at `/readyz` after step 3.
+3. Set `WORKER_MODE=service` on `web` (`railway variable set WORKER_MODE=service --service
+   web`) and redeploy it. `/readyz` should say `"worker": "ok"` within a minute, and a test
+   upload should convert.
+
+**Rolling back is one setting:** `WORKER_MODE=inline` on `web`, then redeploy `web`; it runs its
+own worker thread again. Scale `worker` to zero or remove it afterwards so that it does not keep
+claiming (two claimers are safe, only needlessly costly).
+
+**Cost.** A second service: its memory is billed by use, about 0.3 GB resident while idle
+(about $3 a month at $10 per GB-month) and more while a conversion runs, which `web` no longer
+holds. `WORKER_SLOTS` above 1 runs that many conversions at once in the one service and needs 1 GB
+more memory for each.
+
 ## Ship a new version
 
 Production is deployed from a checkout; none of its services is connected to GitHub (`source` is empty
@@ -608,7 +751,9 @@ and choose **Rollback** (Railway keeps images for 72 hours after removal; **conf
 This switches the code only. The database is not rolled back and the pre-deploy migration does not run
 backwards: an older version starts against a newer schema (it logs `schema_ahead` and carries on), which
 works while migrations are additive. A release whose migration removed or renamed something needs a
-forward fix or a backup restore (deploy.md "Roll back" explains this and the 0.4.0 stored-results limit).
+forward fix or a backup restore (deploy.md "Roll back" explains this and the stored-results limits at
+0.4.0 and 0.5.12). A rollback below 0.5.12 is safe only until the first document is converted by the new
+release: after that the older code answers 500 for each such document, so fix forward.
 Then fix on a branch and ship forward.
 
 ## Logs and monitoring

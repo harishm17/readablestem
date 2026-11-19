@@ -74,16 +74,18 @@ def test_the_matrix_the_company_table_and_the_summary_are_written_from_one_list(
     # full-page images and the course notation the summary used to leave out.
     joined = " ".join(labels)
     assert "tables" in joined and "scanned or handwritten page" in joined
-    assert "course's notation" in joined and "close-up of a handwritten expression" in joined
+    assert "course's notation" in joined
+    assert "close-up picture of a handwritten expression" in joined
     with env.running() as client:
         page = client.get(offices.PAGE_PATH).text
         summary = client.get(offices.SUMMARY_PATH).text
+        security = client.get("/security").text
     page_text, summary_text = text_of(page), text_of(summary)
     for label in labels:
         assert label in page_text, label
         assert label in summary_text, label
-    # Every company's cell on the page lists what the same list says it receives.
-    table = page.split('class="recipients-table"', 1)[1].split("</table>", 1)[0]
+    # Every company's cell on the security page lists what the same list says it receives.
+    table = security.split('class="recipients-table"', 1)[1].split("</table>", 1)[0]
     for r in recipients(env.settings):
         if "hosting" in r.purposes:
             continue
@@ -145,7 +147,7 @@ def test_every_page_that_lists_inputs_says_the_same_about_latex_source(tmp_path)
         seo.COMPARE_GUIDE: "a zip of a LaTeX project",
         seo.ADA_GUIDE: "You can upload a PDF or LaTeX file",
         offices.PAGE_PATH: "a zip of a LaTeX project",
-        "/privacy": "for LaTeX source, the .tex file",
+        "/privacy": "the LaTeX .tex file",
     }
     with on.running() as client_on, off.running() as client_off:
         for path, phrase in paths.items():
@@ -188,10 +190,10 @@ def test_the_chart_is_one_shared_component_with_the_numbers_in_a_real_table(tmp_
     # The bars are for the eye; the same numbers are a table a screen reader always reads.
     assert '<div class="chart" aria-hidden="true">' in chart
     hidden = chart.split('<div class="visually-hidden">', 1)[1].split("</table>", 1)[0]
-    assert "<caption>" in hidden and hidden.count('<th scope="row">') == 6
-    assert "0.840" in hidden and "$0.068" in hidden and "never asks" in hidden
+    assert "<caption>" in hidden and hidden.count('<th scope="row">') == 3
+    assert "0.840" in hidden and "$0.068" in hidden
     # Every bar has its system's name and number beside it, and no style attribute (the CSP).
-    assert chart.count('class="chart-name"') == chart.count('class="chart-value"') == 18
+    assert chart.count('class="chart-name"') == chart.count('class="chart-value"') == 9
     assert " style=" not in chart
     assert "ReadableSTEM and the Opus chatbot are" in " ".join(text_of(chart).split())
     assert "level" in text_of(chart) and "beat" not in text_of(chart).lower()

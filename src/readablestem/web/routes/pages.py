@@ -12,22 +12,21 @@ from functools import cache
 from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import JSONResponse, Response
 from sqlalchemy import func, select
 from starlette.background import BackgroundTask
 
 from readablestem.pipeline import export_docx
-from readablestem.web import analytics, office_convert, offices, proof_facts, seo
-from readablestem.web.assets import cached_html, static_url
+from readablestem.web import analytics, office_convert, offices, outcome, proof_facts, seo
+from readablestem.web.assets import cached_html, fixed_file, static_url
 from readablestem.web.database import ping
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
-from readablestem.web.deps import get_ctx, render
+from readablestem.web.deps import SESSION_FLASH, current_user, get_ctx, render
 from readablestem.web.health import ops_freshness, readiness
-from readablestem.web.provider_health import HEALTH
 from readablestem.web.quota import next_day_start
 from readablestem.web.recipients import privacy_context
 from readablestem.web.sample import DEMO_DIR
-from readablestem.web.security import VIEW_CSP
+from readablestem.web.security import CARRIES_SECRET, VIEW_CSP
 from readablestem.web.speech_diff import read_text_layer
 
 router = APIRouter()
@@ -71,25 +70,46 @@ def _features(request: Request) -> dict[str, object]:
         "word_export": export_docx.available(),  # Word downloads need pandoc on the server
         # .tex and project zips: off by default, and only once the sandbox probe has passed
         "latex_source": settings.feature_latex_source and ctx.sandbox.allows_source(),
+        # A .docx read from the file itself and kept as uploaded (FEATURE_WORD_SOURCE)
+        "word_source": ctx.word_source_on,
     }
+
+
+def public_page(request: Request, template: str, context: dict[str, object]) -> Response:
+    """A public page that is the same for every signed-out visitor: an `ETag` and
+    `Cache-Control: no-cache`, so a repeat visit is a 304 with no body (`cached_html`).
+
+    Not cached, and `no-store` like every other page: a signed-in visitor's page (their
+    menu, the sign-out form), a page that shows a notice once (a flash or a queued usage
+    event are the visitor's own), and any page that carries the CSRF token."""
+    session = request.session
+    own = (
+        current_user(request) is not None
+        or session.get(SESSION_FLASH)
+        or session.get(analytics.SESSION_KEY)
+    )
+    page = render(request, template, context)
+    if own or getattr(request.state, CARRIES_SECRET, False):
+        return page
+    return cached_html(request, bytes(page.body).decode("utf-8"), max_age=0, revalidate=True)
 
 
 @router.get("/")
 def landing(request: Request) -> Response:
-    return render(
+    return public_page(
         request,
         "landing.html",
-        {"active": "home", "hero": _hero(), "proof_facts": proof_facts.load()} | _features(request),
+        {"hero": _hero(), "proof_facts": proof_facts.load()} | _features(request),
     )
 
 
 @router.get("/demo/source.pdf")
-def demo_source() -> Response:
+def demo_source(request: Request) -> Response:
     """Page 3 of the demo's source PDF, which the landing page links (OpenStax, CC BY 4.0)."""
     if not DEMO_PDF.is_file():
         raise HTTPException(status_code=404)
-    return FileResponse(
-        DEMO_PDF, media_type="application/pdf", headers={"Cache-Control": "public, max-age=3600"}
+    return fixed_file(
+        request, DEMO_PDF, cache_control="public, max-age=3600", media_type="application/pdf"
     )
 
 
@@ -118,7 +138,7 @@ def demo(request: Request) -> Response:
             headers={"Content-Security-Policy": VIEW_CSP},
             background=noted,
         )
-    return render(request, "demo_pending.html", {"active": "demo"})
+    return render(request, "demo_pending.html")
 
 
 # The demo is the same bytes for everyone until a deploy (688 KB): kept an hour, then the
@@ -185,13 +205,14 @@ def privacy(request: Request) -> Response:
     ctx = get_ctx(request)
     context = privacy_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
-    return render(request, "privacy.html", context)
+    context["word_source"] = _features(request)["word_source"]
+    return public_page(request, "privacy.html", context)
 
 
 @router.get("/terms")
 def terms(request: Request) -> Response:
     ms_on = get_ctx(request).settings.ms_sign_in_enabled
-    return render(request, "terms.html", {"active": "terms", "microsoft_on": ms_on})
+    return render(request, "terms.html", {"microsoft_on": ms_on})
 
 
 @router.get(offices.PAGE_PATH)
@@ -213,6 +234,7 @@ def for_accessibility_offices_summary(request: Request) -> Response:
     ctx = get_ctx(request)
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
+    context["proof_facts"] = proof_facts.load()
     context["as_of"] = utcnow().date().isoformat()
     context["style_tag"] = offices.summary_style_tag()
     return render(
@@ -228,37 +250,77 @@ def for_accessibility_offices_summary(request: Request) -> Response:
 
 @router.get("/limits")
 def limits(request: Request) -> Response:
+    return public_page(request, "limits.html", limits_context(request))
+
+
+def limits_context(request: Request) -> dict[str, object]:
+    """What /limits and /pricing both state about uploads, from the settings the upload
+    routes enforce."""
     settings = get_ctx(request).settings
-    context = {
-        "active": "limits",
+    return {
         # A bigger file is kept so its pages can be chosen and converted in parts (T3-3).
         "in_parts": settings.upload_limit_mb > settings.max_upload_mb
         or settings.source_page_limit > settings.max_pages_per_job,
-        "upload_limit_mb": settings.upload_limit_mb,
-        "source_pages": settings.source_page_limit,
         # The daily page limit of invited people; the open tier's is in every page's context.
         "invited_page_quota": settings.per_user_daily_page_quota,
         "proof_facts": proof_facts.load(),
         # What one person may keep stored at once (`web.storage`), by tier.
         "storage_mb": settings.storage_per_user_mb,
         "open_storage_mb": settings.storage_open_tier_mb,
+        # What reading scanned and handwritten pages costs: the upload form's words.
+        "image_pages_cost": outcome.image_pages_cost(settings),
     } | _features(request)
-    return render(request, "limits.html", context)
+
+
+@router.get("/pricing")
+def pricing(request: Request) -> Response:
+    """The beta is free, with the limits `/limits` lists; no prices are set (WS25.1). Public."""
+    return render(request, "pricing.html", limits_context(request))
+
+
+@router.get("/security")
+def security_page(request: Request) -> Response:
+    """What is stored, who receives it, how long, how it is protected, what was and was not
+    tested, how to report a problem (WS25.3). Written from the same settings as the offices
+    page and the privacy notice (web.offices), and from docs/security.md."""
+    ctx = get_ctx(request)
+    context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["latex_source"] = _features(request)["latex_source"]
+    return render(request, "security.html", context)
+
+
+@router.get("/help")
+def help_index(request: Request) -> Response:
+    """The help pages and what each answers (WS25.4). Public, like each of them."""
+    return render(request, "help_index.html")
+
+
+@router.get("/help/review")
+def review_help(request: Request) -> Response:
+    """How to review a converted document: what each decision, button and shortcut does and
+    when a document is ready to post (WS25.4). Public, so a colleague can read it first."""
+    return render(request, "help_review.html")
+
+
+@router.get("/help/latex")
+def latex_help(request: Request) -> Response:
+    """What a LaTeX file or zip may hold and what each message about one means (WS25.4).
+    Public. It reads the same limits and lists the upload checks use."""
+    return render(request, "help_latex.html", _features(request))
 
 
 @router.get("/help/posting")
 def posting_help(request: Request) -> Response:
     """How to put the file in front of students (UX review MF11): upload it and link it,
     never paste it into an LMS page. Public, so an accessibility office can read it."""
-    return render(request, "help_posting.html", {"active": "posting"} | _features(request))
+    return render(request, "help_posting.html", _features(request))
 
 
-def _guide_context(path: str, active: str) -> dict[str, object]:
+def _guide_context(path: str) -> dict[str, object]:
     """The dates a guide shows. They come from seo.PUBLIC_PAGES, which also feeds the
     sitemap and the Article in the page's structured data, so the three cannot differ."""
     page = next(page for page in seo.PUBLIC_PAGES if page.path == path)
     return {
-        "active": active,
         "updated": page.updated,
         "updated_text": _long_date(page.updated),
         "published": page.published or page.updated,
@@ -279,7 +341,7 @@ def guides_index(request: Request) -> Response:
         guides.append(
             {"guide": guide, "updated": page.updated, "updated_text": _long_date(page.updated)}
         )
-    return render(request, "guides.html", {"active": "guides", "guides": guides})
+    return render(request, "guides.html", {"guides": guides})
 
 
 @router.get(seo.ADA_GUIDE)
@@ -287,7 +349,7 @@ def guide_ada_title_ii(request: Request) -> Response:
     """What the Justice Department's web rule asks of STEM course materials, with sources
     and the dates as checked on the day it was written. Public, like /help/posting."""
     path = seo.ADA_GUIDE
-    context = _guide_context(path, "guide-ada") | _features(request)
+    context = _guide_context(path) | _features(request)
     return render(request, "guide_ada_title_ii.html", context)
 
 
@@ -295,11 +357,7 @@ def guide_ada_title_ii(request: Request) -> Response:
 def guide_compare(request: Request) -> Response:
     """ReadableSTEM beside Mathpix, Aelira, chatbots and LaTeXML, each fact with source and date."""
     path = seo.COMPARE_GUIDE
-    context = (
-        _guide_context(path, "guide-compare")
-        | _features(request)
-        | {"proof_facts": proof_facts.load()}
-    )
+    context = _guide_context(path) | _features(request) | {"proof_facts": proof_facts.load()}
     return render(request, "guide_compare.html", context)
 
 
@@ -312,8 +370,8 @@ def status(request: Request) -> Response:
     """
     ctx = get_ctx(request)
     database_ok = ping(ctx.engine)
+    provider = ctx.provider_health()
     context: dict[str, object] = {
-        "active": "status",
         "database_ok": database_ok,
         "conversions_open": None,
         "waiting": None,
@@ -322,11 +380,11 @@ def status(request: Request) -> Response:
         # When these facts were read: the page does not update itself.
         "checked_at": utcnow(),
         # The AI service, as this server's own recent requests saw it (web.provider_health).
-        "provider_down_since": HEALTH.down_since(),
+        "provider_down_since": provider.down_since(),
         # Optional: the page reloads itself every minute while this is on (`?refresh=1`).
         "refresh": request.query_params.get("refresh") == "1",
     }
-    requests_seen, requests_failed, last_request = HEALTH.observed()
+    requests_seen, requests_failed, last_request = provider.observed()
     context |= {
         "provider_requests": requests_seen,
         "provider_failed": requests_failed,

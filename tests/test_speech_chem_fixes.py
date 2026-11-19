@@ -34,13 +34,13 @@ def say_mathml(inner: str) -> str:
         (r"\text{Cu}^{2+}(\text{aq})/\text{Cu}(\text{s})", "C u 2 plus aqueous, slash C u solid"),
         (
             r"E^\circ(\mathrm{Cu^{2+}/Cu}) = 0.34\ \text{V}",
-            "capital E degrees open parenthesis C u 2 plus slash C u close parenthesis "
+            "cap E degrees open parenthesis C u 2 plus slash C u close parenthesis "
             "equals 0.34 volts",
         ),
         (
             r"E^\circ_{\text{cell}} = E^\circ(\text{Cu}^{2+}/\text{Cu}) - E^\circ(\text{Zn}^{2+}/\text{Zn})",
-            "capital E sub cell degrees equals capital E degrees open parenthesis C u 2 plus "
-            "slash C u close parenthesis minus capital E degrees open parenthesis Z n 2 plus "
+            "cap E sub cell degrees equals cap E degrees open parenthesis C u 2 plus "
+            "slash C u close parenthesis minus cap E degrees open parenthesis Z n 2 plus "
             "slash Z n close parenthesis",
         ),
     ],
@@ -53,9 +53,7 @@ def test_openstax_couple_shape() -> None:
     # OpenStax: one mtext per symbol, the charge on an msup.
     inner = "<mi>E</mi><mo>(</mo><msup><mtext>Cu</mtext><mrow><mn>2</mn><mo>+</mo></mrow></msup>"
     inner += "<mo>/</mo><mtext>Cu</mtext><mo>)</mo>"
-    assert say_mathml(inner) == (
-        "capital E open parenthesis C u 2 plus slash C u close parenthesis"
-    )
+    assert say_mathml(inner) == ("cap E open parenthesis C u 2 plus slash C u close parenthesis")
 
 
 @pytest.mark.parametrize(
@@ -69,7 +67,7 @@ def test_openstax_couple_shape() -> None:
         ),
         (r"\text{mol/L}", "mol/L"),
         # italic letters are variables, not species: no evidence of a couple
-        (r"Cu^{2+}/Cu", "capital C u to the power 2 plus divided by capital C u"),
+        (r"Cu^{2+}/Cu", "cap C u to the power 2 plus divided by cap C u"),
     ],
 )
 def test_division_still_reads_as_division(latex: str, speech: str) -> None:
@@ -140,7 +138,7 @@ def test_label_cell_stays_apart_from_the_reaction() -> None:
 def test_arrow_cell_outside_chemistry_reads_as_before() -> None:
     assert say(r"\begin{array}{ccc} x & \to & y \end{array}") == "x right arrow y"
     assert say(r"\begin{array}{ccc} A & \rightleftharpoons & B \end{array}") == (
-        "capital A, equilibrium arrow, capital B"
+        "cap A, equilibrium arrow, cap B"
     )
 
 
@@ -179,8 +177,8 @@ def test_excited_nuclide(latex: str, speech: str) -> None:
 
 
 def test_a_star_outside_a_nuclide_reads_as_before() -> None:
-    # `O*` on its own could be a set or an operator, so it is not guessed to be excited
-    assert say(r"\text{O}^*") == "O to the power times"
+    # `O*` on its own could be a set or an operator, so it is not guessed to be excited (said "star")
+    assert say(r"\text{O}^*") == "O star"
 
 
 # ------------------------------------------------------------------------ units
@@ -190,13 +188,13 @@ def test_unit_after_a_decimal_in_a_chemistry_row() -> None:
     # V is vanadium to the element check: both volts must still read as volts
     assert say(r"0.000\ \text{V} - 0.0592\ \text{V}") == "0.000 volts minus 0.0592 volts"
     assert say(r"E = 0.000\ \text{V} - 0.0592\ \text{V} \log 10") == (
-        "capital E equals 0.000 volts minus 0.0592 volts log 10"
+        "cap E equals 0.000 volts minus 0.0592 volts log 10"
     )
 
 
 def test_whole_number_before_an_element_symbol_stays_a_coefficient() -> None:
     assert say(r"2\ \text{K} + 2\ \text{H}_2\text{O} \to 2\ \text{KOH} + \text{H}_2") == (
-        "2 K plus 2 H 2 O reacts to form 2 K O H plus H 2"
+        "2, K plus 2, H 2 O reacts to form 2, K O H plus H 2"
     )
     assert say(r"0.5\ \text{H}_2 + 0.5\ \text{Cl}_2 \to \text{HCl}") == (
         "0.5 H 2 plus 0.5 C l 2 reacts to form H C l"

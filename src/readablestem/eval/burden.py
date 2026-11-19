@@ -154,21 +154,51 @@ class Verdict:
     judged: bool  # False: the two cannot be compared, and `why` says so
     why: str = ""
     more: list[str] = field(default_factory=list)  # one line per figure over the allowance
+    same: bool = False  # the bar was "the same decisions", and `more` says where they differ
 
     @property
     def met(self) -> bool:
         return self.judged and not self.more
 
 
-def judge(now: dict[str, Any], before: dict[str, Any], *, allowance: float = ALLOWANCE) -> Verdict:
+def judge(
+    now: dict[str, Any],
+    before: dict[str, Any],
+    *,
+    allowance: float = ALLOWANCE,
+    same: bool = False,
+) -> Verdict:
     """The bar, on two burden records: the whole set and each page kind with enough pages
     ask for no more decisions a page than in `before`, by more than `allowance`. Only two
-    records of the same documents are compared."""
+    records of the same documents are compared.
+
+    `same`: the bar of a record that is kept up to date with the code. Every upload measured
+    now asks for as many decisions on as many pages as it did in `before`, fewer or more:
+    a rule that stops asking about something wrong is as much a change as one that asks more.
+    An upload that was not measured now (this machine cannot replay it) is not compared, so a
+    machine with fewer recordings than the one that made `before` can still hold the bar."""
+    one, other = now["metrics"], before["metrics"]
+    if same:
+        # The set's hash names the uploads measured, so a machine with fewer recordings has
+        # another one; the uploads themselves are what is compared.
+        if not one["documents"]:
+            return Verdict(False, "no upload was measured, so none could be compared")
+        kept = {row["upload"]: row for row in other["documents"]}
+        differ = []
+        for row in one["documents"]:
+            was = kept.get(row["upload"])
+            if was is None:
+                differ.append(f"{row['upload']}: measured now, not in the record")
+            elif (row["pages"], row["decisions"]) != (was["pages"], was["decisions"]):
+                differ.append(
+                    f"{row['upload']}: {row['decisions']} decisions on {row['pages']} pages, "
+                    f"{was['decisions']} on {was['pages']} in the record"
+                )
+        return Verdict(True, more=differ, same=True)
     here = (now.get("split") or {}).get("set_sha256")
     there = (before.get("split") or {}).get("set_sha256")
     if not here or here != there:
         return Verdict(False, "the two records are not of the same documents")
-    one, other = now["metrics"], before["metrics"]
     if one["uploads"]["measured"] != other["uploads"]["measured"]:
         return Verdict(
             False,
@@ -264,6 +294,8 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         lines.append("")
         if not verdict.judged:
             lines.append(f"The bar was not judged: {verdict.why}.")
+        elif verdict.met and verdict.same:
+            lines.append("The bar is met: every upload asks for the decisions the record has.")
         elif verdict.met:
             lines.append("The bar is met: no page kind asks for more decisions than before.")
         else:

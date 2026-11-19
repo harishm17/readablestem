@@ -21,7 +21,10 @@ PUBLIC_PAGES = (
     "/privacy",
     "/terms",
     "/limits",
+    "/help",
+    "/help/review",
     "/help/posting",
+    "/help/latex",
     "/guides",
     "/guides/ada-title-ii-stem-course-materials",
     "/guides/readablestem-mathpix-latexml",
@@ -95,7 +98,7 @@ def test_deleting_does_not_promise_more_than_it_does(tmp_path, which):
     what the model provider already received is under its own retention."""
     env = WebEnv(tmp_path / "a", signup_mode="open", model_provider="anthropic")
     text = account_pages(env, ALICE)[which]
-    assert "Not reached by deleting:" in text
+    assert "Not reached by deleting" in text
     assert "Backups keep a copy for about a week." in text
     assert "already sent to Anthropic stay under its own retention" in text
     assert "delete API inputs and outputs within 30 days, longer for material" in text

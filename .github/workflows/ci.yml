@@ -606,43 +606,89 @@ jobs:
           docker run --rm readablestem:latexml identify -list policy | grep -B1 'pattern: PDF' | grep -q 'rights: None'
           docker images readablestem --format '{{.Tag}} {{.Size}}'
 
+  # The eval gate holds the code to numbers the code itself made (docs/eval.md, "The gate
+  # measures the code as it is"). Two checks, both at no cost and with no model:
+  #
+  # 1. The reports of the tasks that call no model (headings, tables-local) must have been
+  #    made by this pipeline version (`--require-current`) and must not have regressed
+  #    against their baselines. Equations, figures and document cost money to re-make: their
+  #    reports are historical records here and `eval-live.yml` re-measures them weekly.
+  # 2. When the change touches the pipeline, the burden replay (`eval burden`) converts the
+  #    corpus's public files from the recorded answers, as the worker does, and every upload
+  #    must ask for exactly the decisions `data/eval/burden-corpus.json` has. A difference
+  #    fails unless the record is re-made in the same PR (`eval burden --out`, on a machine
+  #    that has the kept-out answers). The files whose answers are kept out of the repository
+  #    are not replayed here, and are compared where they are.
   eval-gate:
-    name: eval gate (when a baseline exists)
+    name: eval gate (reports made by this code, replay of the committed record)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
+    env:
+      EVENT: ${{ github.event_name }}
+      BASE_SHA: ${{ github.event.pull_request.base.sha }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Look for committed baselines (data/eval/baseline-<task>.json)
-        id: files
-        run: |
-          if ls data/eval/baseline-*.json >/dev/null 2>&1; then
-            echo "present=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::no eval baseline committed yet; gate skipped"
-          fi
-      - if: steps.files.outputs.present == 'true'
-        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
         with:
           python-version: "3.12"
           enable-cache: true
-      - if: steps.files.outputs.present == 'true'
-        name: Install (locked)
-        run: uv sync --locked
-      - if: steps.files.outputs.present == 'true'
-        name: Fail if any task's latest eval regressed against its baseline
+      - name: Install (locked)
+        run: uv sync --locked --all-extras
+      - name: Fail if a no-model report was not made by this code, or regressed
         run: |
           set -euo pipefail
-          for baseline in data/eval/baseline-*.json; do
-            task="${baseline#data/eval/baseline-}"; task="${task%.json}"
-            current="data/eval/latest-${task}.json"
-            if [ ! -f "$current" ]; then
-              echo "::error::$baseline has no matching $current"; exit 1
-            fi
-            uv run readablestem eval gate --require-current --current "$current" --baseline "$baseline"
+          for task in headings tables-local; do
+            uv run readablestem eval gate --require-current \
+              --current "data/eval/latest-${task}.json" --baseline "data/eval/baseline-${task}.json"
           done
+      # A pull request replays only when it changes what the replay reads: the package
+      # (the web app aside), the corpus's recorded answers, the record or the lockfile.
+      # main, the nightly run and a manual run always replay.
+      - name: Does this change touch what the replay reads?
+        id: replay
+        run: |
+          set -euo pipefail
+          run=true
+          if [ "$EVENT" = "pull_request" ]; then
+            git fetch --no-tags --depth=1 origin "$BASE_SHA"
+            if git diff --name-only "$BASE_SHA" HEAD \
+                | grep -E -v '^src/readablestem/web/' \
+                | grep -E -q '^(src/readablestem/|tests/workflows/corpus/|data/eval/burden-corpus\.json|pyproject\.toml|uv\.lock|\.github/workflows/ci\.yml)'; then
+              run=true
+            else
+              run=false
+            fi
+          fi
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      - if: steps.replay.outputs.run == 'true'
+        name: Cache the table-structure model
+        id: table-model-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/readablestem/models
+          key: table-model-slanet-plus-d57a942af6a2f57d6a4a0372573c696a2379bf5857c45e2ac69993f3b334514b
+      - if: steps.replay.outputs.run == 'true' && steps.table-model-cache.outputs.cache-hit != 'true'
+        name: Fetch the table-structure model (checksum-verified)
+        run: |
+          for attempt in 1 2 3 4; do
+            make table-model && exit 0
+            echo "fetch attempt $attempt failed; retrying"; sleep $((attempt * 15))
+          done
+          exit 1
+      - if: steps.replay.outputs.run == 'true'
+        name: Cache the corpus's public files
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .cache/corpus
+          key: corpus-${{ hashFiles('tests/workflows/corpus/corpus.json') }}
+      - if: steps.replay.outputs.run == 'true'
+        name: Fetch the corpus's public files (each checked against its hash)
+        run: uv run python -m readablestem.eval.corpus check --fetch
+      - if: steps.replay.outputs.run == 'true'
+        name: Fail if the corpus asks for other decisions than the committed record
+        run: uv run readablestem eval burden --against data/eval/burden-corpus.json --same
 
   secret-scan:
     name: gitleaks

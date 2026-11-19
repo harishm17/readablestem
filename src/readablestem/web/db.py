@@ -17,7 +17,7 @@ a time), content-free by construction: no column can hold text from a document.
 from __future__ import annotations
 
 import uuid
-from collections.abc import Generator
+from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from datetime import UTC, date, datetime
 from enum import StrEnum
@@ -25,6 +25,7 @@ from enum import StrEnum
 from sqlalchemy import (
     JSON,
     Boolean,
+    CheckConstraint,
     Date,
     DateTime,
     Float,
@@ -47,6 +48,7 @@ from sqlalchemy.orm import (
     mapped_column,
     relationship,
     sessionmaker,
+    undefer,
 )
 
 
@@ -120,10 +122,19 @@ class Job(Base):
     # and commands that stopped it, for its owner's page. Names from the document, so never
     # logged or counted, cleared when the job is tried again, deleted with the job.
     error_detail: Mapped[dict | None] = mapped_column(JSON)
+    # What the job has spent and what its calls in flight hold (`web.worker`): `cost_usd` is
+    # both, since the caps count both, and `held_usd` the part of it not yet settled. What a
+    # page may show as spent is `settled_usd`; what is held is not spent.
     cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    held_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
     model_calls: Mapped[int] = mapped_column(Integer, default=0)
-    result_json: Mapped[dict | None] = mapped_column(JSON)  # DocumentResult without html
-    html: Mapped[str | None] = mapped_column(Text)
+    # The two large columns (a long document's result is megabytes of JSON, its page as much
+    # HTML) are deferred: reading the row does not load them, the first use of one does (one
+    # more query, inside the session). A route that polls or lists a job reads the summary
+    # columns below instead. Read them before the session closes, or load them with the row
+    # (`sqlalchemy.orm.undefer`): a detached row cannot fetch them.
+    result_json: Mapped[dict | None] = mapped_column(JSON, deferred=True)  # without html
+    html: Mapped[str | None] = mapped_column(Text, deferred=True)
     aggregated: Mapped[bool] = mapped_column(Boolean, default=False)  # counted in aggregates
     # The course whose notation the conversion used; a deleted course leaves the job.
     # Named, so the migration can drop it again (SQLite rebuilds the table to do so).
@@ -136,6 +147,15 @@ class Job(Base):
     # Bumped by every review write, so a review screen open in an older tab can tell its
     # copy is stale. The server default keeps rows inserted by an older release valid.
     result_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # The identity of the document's output (`web.output.output_changed`): how many changes
+    # have reached it, from 1, and when the last one did. Together with the first six
+    # characters of the job id they are the version id and date the student file, the job
+    # page and the page's head say (`pipeline.assemble.Stamp`). Counted only where something a
+    # reader would see changes; a write that leaves the output alone (a share, keeping the
+    # document longer) does not count. NULL time: a row from before the column was filled by
+    # the migration; one from an older release that inserts a job reads as its finish time.
+    output_version: Mapped[int] = mapped_column(Integer, default=1, server_default="1")
+    output_changed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # How long the job is kept (`web.retention`): "day" (the default hours), "week" (7
     # days, only its owner sees it) or "dev" (30 days, the developer may look; always
     # with `opt_in_retention`). The clock restarts on activity for "day" and "week".
@@ -149,6 +169,10 @@ class Job(Base):
     # The upload form's "Exam or quiz" box: the figure step describes what is shown and
     # never the result (`ConversionOptions.exam_mode`, read by `web.notation.conversion_options`).
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # The upload form's "Language of the document": a tag from the control's list
+    # (`pipeline.language.LANGUAGE_NAMES`), NULL for "Detect it". It is the document's language,
+    # stated (`ConversionOptions.language`, read by `web.notation.conversion_options`).
+    language: Mapped[str | None] = mapped_column(String(16))
     # The upload form's "Convert scanned or handwritten pages": the pages `page_type` calls
     # scanned or handwritten are read from an image of the page (ADR 0007) and the job's spend
     # cap allows for it (`web.worker.job_caps`). Without it they are kept as images.
@@ -169,6 +193,18 @@ class Job(Base):
     # list fills in on first sight (`web.documents`). Document-derived: deleted with the job.
     open_decisions: Mapped[int | None] = mapped_column(Integer)
     result_title: Mapped[str | None] = mapped_column(Text)
+    # What a finished job's state reads of its result when it has no decision open and no
+    # outcome code (`web.states.finished_facts`): so the list, the batch page and the counts
+    # name the state without loading the result. Set with the two above when no decision is
+    # open; NULL while one is, on a row from before the column and for a result this version
+    # cannot read, which `states.load` fills on first sight. Counts and sentences only, never
+    # the document's words.
+    state_facts: Mapped[dict | None] = mapped_column(JSON)
+    # The render version written in `html`'s head (`pipeline.assemble.render_version`), set
+    # whenever `html` is assigned (`_keep_html_version`), so "is the page made by an older
+    # renderer" and "has a page been made" are answered without loading it. NULL: no page,
+    # or a row from before the column, which `has_html` fills in on first sight.
+    html_version: Mapped[int | None] = mapped_column(Integer)
     # A review write changes `result_json` at once and the HTML file only when somebody
     # asks for it (download, view, the job page), so a run of review clicks costs one
     # render, not one each (`web.routes.jobs.current_html`). True: `html` and the checks in
@@ -186,6 +222,20 @@ class Job(Base):
     # one began (a job interrupted `MAX_ATTEMPTS` times since then is failed, as before).
     retries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     attempts_at_retry: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # A Word or PowerPoint upload (T3-30): the census its preflight counted (what the PDF route
+    # did with the file; `web.office_convert.Census.to_json`, counts only). NULL for a PDF.
+    office_json: Mapped[dict | None] = mapped_column(JSON)
+    # When the owner asked for this document to stop (`POST /jobs/{id}/cancel`). A queued job is
+    # stopped by the request itself; a running one is stopped by the worker at its next beat,
+    # which ends it with the error code `canceled` (`web.worker.Worker._beat`).
+    cancel_requested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # A finished document converted again because the converter's version moved on (WS10.15,
+    # `web.retry`): the `PIPELINE_VERSION` it was last offered and started for (at most once per
+    # version), and what the job had spent when that run began. The new run's spend caps count
+    # from that spend, so a document that used most of its cap the first time can be read again.
+    rerun_version: Mapped[str | None] = mapped_column(String(32))
+    cap_base_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
+    cap_base_calls: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -195,13 +245,50 @@ class Job(Base):
         back_populates="job", cascade="all, delete-orphan", passive_deletes=True
     )
 
+    @property
+    def settled_usd(self) -> float:
+        """What the job has spent: its calls that came back, not what its calls in flight
+        hold. It never falls while a job runs, and it is the job's cost when the job ends.
+        `held_usd` is the rest of `cost_usd`."""
+        return max(0.0, float(self.cost_usd or 0.0) - float(self.held_usd or 0.0))
+
+    @property
+    def has_html(self) -> bool:
+        """A page has been made. Answered from `html_version`; a row from before that column
+        is read once and its version stored (the set event)."""
+        if self.html_version is not None:
+            return True
+        if self.html is None:
+            return False
+        self.html = self.html
+        return True
+
 
 @event.listens_for(Job.result_json, "set")
 def _keep_list_facts(target: Job, value: object, _old: object, _initiator: object) -> None:
-    """Whenever a result is stored, store the two facts the list reads next to it."""
-    from readablestem.web import documents
+    """Whenever a result is stored, store the facts the list reads next to it."""
+    from readablestem.web import documents, states
 
-    target.open_decisions, target.result_title = documents.list_facts(value)
+    target.open_decisions, target.result_title = documents.list_facts(
+        value, getattr(target, "filename", None) or ""
+    )
+    # Only a result with nothing open has its state read from them; a review click on a
+    # document still being decided does not pay for them, and the click that closes the last
+    # decision does.
+    target.state_facts = None if target.open_decisions else states.finished_facts(value)
+
+
+@event.listens_for(Job.html, "set")
+def _keep_html_version(target: Job, value: object, _old: object, _initiator: object) -> None:
+    """Whenever the page is stored, store its render version next to it."""
+    from readablestem.pipeline.assemble import render_version
+
+    target.html_version = render_version(value) if isinstance(value, str) else None
+
+
+# The stored upload of a Word file read from the file itself, a LaTeX file or a project zip has a
+# media type that starts with this; its page count is an estimate (`source.intake`).
+SOURCE_MEDIA_PREFIX = "application/x-readablestem-"
 
 
 class Blob(Base):
@@ -211,7 +298,7 @@ class Blob(Base):
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
-    kind: Mapped[str] = mapped_column(String(16))  # "upload" | "crop"
+    kind: Mapped[str] = mapped_column(String(16))  # "upload" | "crop" | "export" | "carry"
     element_id: Mapped[str | None] = mapped_column(String(64))
     media_type: Mapped[str] = mapped_column(String(64))
     content: Mapped[bytes] = mapped_column(LargeBinary)
@@ -267,6 +354,9 @@ class JobCall(Base):
     attempt: Mapped[int] = mapped_column(Integer)
     is_fallback: Mapped[bool] = mapped_column(Boolean)
     outcome: Mapped[str] = mapped_column(String(32))
+    # The part of `cost_usd` charged at the reservation, no usage having come back: a hold,
+    # not a cost, so it is totaled apart from settled spend. 0: all of it is measured.
+    billed_unseen_usd: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
 
 class JobStage(Base):
@@ -334,6 +424,30 @@ class JobShare(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
+class JobLink(Base):
+    """A link that lets whoever holds it read one document's published student version
+    (`web.links`, WS27.2). Only a SHA-256 of the token is stored, as for `LoginLink`, so a
+    copy of the database opens nothing. A link is not a role and has no person: the page it
+    opens sets no cookie, so the only state is how many times it was opened and when first.
+    Content-free; deleted with the document, and 30 days after it closes or is removed."""
+
+    __tablename__ = "job_links"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    kind: Mapped[str] = mapped_column(String(8), default="class", server_default="class")
+    # What the owner calls it ("PHYS 201, fall"); shown to the owner only.
+    label: Mapped[str] = mapped_column(String(80), default="", server_default="")
+    opens_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    closes_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    paused_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    first_opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    open_count: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class SpendDay(Base):
     """Global model spend per UTC day. Updated with conditional UPDATEs (see web.spend).
 
@@ -392,8 +506,9 @@ class DeletedAccount(Base):
 
 class QuotaDay(Base):
     """Pages a user has submitted per UTC day, and the model reads from review they have
-    started (`rereads`, counted for open-tier accounts only: `web.quota`), and what their
-    jobs cost that day (`spent_usd`, added by the spend guard when a model call settles).
+    started (`rereads`, counted for every account, limited for open-tier ones: `web.quota`),
+    and what their jobs cost that day (`spent_usd`, added by the spend guard when a model call
+    settles).
     Deleted with the user; `spend_days` stays the global total."""
 
     __tablename__ = "quota_days"
@@ -467,8 +582,16 @@ class PendingUpload(Base):
         ForeignKey("courses.id", ondelete="SET NULL", name="fk_pending_uploads_course_id_courses")
     )
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    language: Mapped[str | None] = mapped_column(String(16))  # as `Job.language`
     image_pages: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     retention_mode: Mapped[str] = mapped_column(String(8), default="day", server_default="day")
+    # The census of a Word or PowerPoint file made into this PDF (`Job.office_json`), handed to
+    # every part cut from it.
+    office_json: Mapped[dict | None] = mapped_column(JSON)
+    # The scanned and handwritten pages the probe counted (`page_type.ImagePageCount` as a
+    # dict) when the box was not checked: the chooser says them (`routes.jobs.scans_note`), and
+    # for a file within the limits with most pages of that kind it asks what to do with them.
+    scans_json: Mapped[dict | None] = mapped_column(JSON)
     # The 0-based pages already sent to be converted, so the rest can be chosen later.
     done_pages: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
@@ -544,6 +667,28 @@ class CourseNotation(Base):
     )
 
 
+class CourseGrant(Base):
+    """One person's right to read the documents of one course (`web.shares`, WS27.1, behind
+    `FEATURE_COURSE_GRANTS`): the address they must sign in with, lower-cased, and what they may
+    do ("view" or "review", never more). The course's owner is the only one who can add, change
+    or remove a row. A document is covered because its `course_id` is this course, so one added
+    later is covered at once and one moved out or whose course is deleted is not. Goes with the
+    course (ON DELETE CASCADE, and `notation.delete_course`) and with the person it names
+    (`ops.retention.erase_user`)."""
+
+    __tablename__ = "course_grants"
+    __table_args__ = (
+        UniqueConstraint("course_id", "email", name="uq_course_grant_person"),
+        CheckConstraint("role IN ('view', 'review')", name="ck_course_grants_role"),
+    )
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    course_id: Mapped[str] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"), index=True)
+    email: Mapped[str] = mapped_column(String(320), index=True)
+    role: Mapped[str] = mapped_column(String(8))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
 class Event(Base):
     """A content-free usage event: who (pseudonymous user id), what (`name`, a code),
     a category `code` and a number `value`, when. `job_ref` is a job id but not a
@@ -576,6 +721,37 @@ class Event(Base):
 
     # What `events.outcome_cells` groups by.
     __table_args__ = (Index("ix_events_name_reason_release", "name", "reason", "release"),)
+
+
+class Report(Base):
+    """A problem report to the operator (`web.reports`): where the problem is and what the
+    person typed, nothing from the document. Only `kind` "tool" is written so far; the column
+    stays so a later kind needs no migration. `job_ref` is a job id but not a foreign key, so
+    the report outlives the document (like `events.job_ref`). `item_ref`, `item_kind`, `page`
+    and `code` are content-free ids and codes. `text` is what the sender typed (at most
+    `reports.MAX_TEXT` characters), plain and shown escaped. Deleted with the sender's account,
+    `reports.CLOSED_DAYS` after it is closed and `reports.MAX_DAYS` after it was made
+    (`ops.retention`)."""
+
+    __tablename__ = "reports"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    kind: Mapped[str] = mapped_column(String(16), default="tool", server_default="tool")
+    from_user_id: Mapped[str] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    job_ref: Mapped[str | None] = mapped_column(String(32))
+    item_ref: Mapped[str | None] = mapped_column(String(64))
+    item_kind: Mapped[str | None] = mapped_column(String(16))
+    page: Mapped[int | None] = mapped_column(Integer)
+    code: Mapped[str | None] = mapped_column(String(64))
+    pipeline_version: Mapped[str | None] = mapped_column(String(40))
+    text: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(String(8), default="open", server_default="open")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+    closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
 class AuthIdentity(Base):
@@ -636,6 +812,34 @@ class LoginLink(Base):
     used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
 
+class RequestToken(Base):
+    """One submitted form, so a repeat of it is answered with what the first one got
+    (`web.forms`, the one submit rule). `token` is the random value the form was drawn
+    with; `route` the form's key in `web.forms.FORMS`; `outcome` the answer: the status,
+    the redirect target and the one-time notices (content-free, like every notice), NULL
+    while the request that wrote the row is still finishing. No document content.
+
+    Deleted when the person's session ends (sign-out, blocked, removed), with the account,
+    and by the hourly purge once older than a session can live. The one row without a user
+    is the account deletion's own: it stays until that browser's session would have lapsed,
+    so a second click on "Delete my account" lands on the "deleted" notice."""
+
+    __tablename__ = "request_tokens"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    token: Mapped[str] = mapped_column(String(64))
+    route: Mapped[str] = mapped_column(String(64))
+    outcome: Mapped[dict | None] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+    __table_args__ = (UniqueConstraint("user_id", "token", name="uq_request_token_user_token"),)
+
+
 # --------------------------------------------------------------------------- engine
 
 
@@ -666,8 +870,19 @@ def make_engine(database_url: str) -> Engine:
     return create_engine(database_url, pool_pre_ping=True, pool_size=5, max_overflow=5)
 
 
-def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:
-    return sessionmaker(engine, expire_on_commit=False)
+# `session.info` key under which a session factory says whether course grants count right now
+# (`web.shares.role_of`). A factory that says nothing, like the worker's and the commands', has
+# no grants in force: the rule fails closed.
+COURSE_GRANTS_KEY = "course_grants_in_force"
+
+
+def make_sessionmaker(
+    engine: Engine, *, course_grants: Callable[[], bool] | None = None
+) -> sessionmaker[Session]:
+    """The session factory. `course_grants` is asked on each access check whether a person's
+    course grants count (the app passes its `FEATURE_COURSE_GRANTS` setting, read live)."""
+    info = {} if course_grants is None else {COURSE_GRANTS_KEY: course_grants}
+    return sessionmaker(engine, expire_on_commit=False, info=info)
 
 
 def create_all(engine: Engine) -> None:
@@ -686,3 +901,8 @@ def session_scope(factory: sessionmaker[Session]) -> Generator[Session]:
         raise
     finally:
         session.close()
+
+
+# For a query that reads the large columns of every row it returns, or a row handed out of its
+# session: `session.get(Job, id, options=LARGE_COLUMNS)`, `select(Job).options(*LARGE_COLUMNS)`.
+LARGE_COLUMNS = (undefer(Job.result_json), undefer(Job.html))

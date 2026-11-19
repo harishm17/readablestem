@@ -14,7 +14,8 @@ from html import unescape
 import pytest
 
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
-from readablestem.core.types import Check, PageStats, Status
+from readablestem.core.types import Check, Notice, PageStats, Status
+from readablestem.web import states
 from readablestem.web.db import Job, session_scope
 from readablestem.web.outcome import FAILED_MESSAGES
 from readablestem.web.views import job_error_message
@@ -64,6 +65,9 @@ def convert(web, **update) -> str:
 # --------------------------------------------------------------------------- outcomes
 
 
+NEEDS = states.TABLE["needs_decisions"].label
+
+
 def stop_part_way(web) -> None:
     """The fake result as a daily-cap stop leaves it: the abstained equation was never
     converted because the budget ran out."""
@@ -77,7 +81,8 @@ def test_a_job_stopped_early_says_so_in_the_title_status_and_results(web):
     job_id = convert(web, stopped_by="budget_daily")
     assert web.job(job_id).error_code == "budget_daily"
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Stopped early: SECRET-HEADING Kinematics | ReadableSTEM"
+    # Decisions are still open, so that is the state; the stop is its gap note (F-033).
+    assert title(html) == f"{NEEDS}: SECRET-HEADING Kinematics | ReadableSTEM"
     text = page_text(html)
     assert "1 of 4 equations and figures were not converted" in text
     assert "The accessible HTML is ready" not in text
@@ -86,16 +91,22 @@ def test_a_job_stopped_early_says_so_in_the_title_status_and_results(web):
     assert 'id="partial-note"' in html
 
 
+def test_a_budget_stop_that_left_nothing_unconverted_has_no_gap_note(web):
+    """F-319: a job stored with a budget stop but nothing left out says no "0 of N"."""
+    job_id = convert(web, stopped_by="budget_daily")
+    assert web.job(job_id).error_code == "budget_daily"
+    html = web.browser.get(f"/jobs/{job_id}").text
+    assert "0 of" not in page_text(html)
+    assert 'id="partial-note"' not in html
+
+
 def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     pages = [PageStats(page=p, elements=1, fixes=1, cost_usd=0, latency_ms=0) for p in (0, 1)]
     result = web.converter.output.result
     result.stats.per_page = pages
     job_id = convert(web, image_only_pages=[1])
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert (
-        title(html)
-        == "Finished, with pages not converted: SECRET-HEADING Kinematics | ReadableSTEM"
-    )
+    assert title(html) == f"{NEEDS}: SECRET-HEADING Kinematics | ReadableSTEM"
     assert "Page 2 is a scanned image, so it was not converted." in page_text(html)
     assert 'id="partial-note"' in html
 
@@ -116,14 +127,16 @@ def test_every_failure_code_with_its_own_message_has_it_on_the_failed_section():
 
 
 def test_the_job_page_shows_no_model_cost(web):
-    """T1-11: what a conversion cost is for the admin page, not for an instructor."""
+    """T1-11, then WS10.9: the model's cost is for the admin page. The owner's page says one
+    thing about money, once the job is done: what the document has cost in all (`$0.50` here)."""
     job_id = convert(web)
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
         job.cost_usd = 0.5  # an earlier attempt was interrupted after spending
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert "Model cost" not in html and "$0.5" not in html and "$0.012" not in html
+    assert "Model cost" not in html and "$0.012" not in html
+    assert html.count("$0.50") == 1 and 'id="settled-cost"' in html
 
 
 def test_failed_checks_of_the_html_file_are_listed(web):
@@ -134,9 +147,11 @@ def test_failed_checks_of_the_html_file_are_listed(web):
               code="math_missing_display"),
     ]  # fmt: skip
     job_id = convert(web, html_checks=checks)
+    with session_scope(web.ctx.factory) as session:  # the checks as stored, not of a new render
+        session.get(Job, job_id).html_stale = False  # type: ignore[union-attr]
     results = section(web.browser.get(f"/jobs/{job_id}").text, "results-heading")
     text = page_text(results)
-    assert "2 of 3 checks did not pass" in text
+    assert "2 of 3 structure checks did not pass" in text
     assert "Must be fixed: The headings skip a level" in text
     assert "heading_skip" not in text and "html.heading_order" not in text  # no codes (T1-11)
     assert "Worth checking: An equation does not say" in text
@@ -160,3 +175,21 @@ def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
 
 
 # --------------------------------------------------------------------------- queue
+
+
+def test_footnotes_and_code_are_counted_as_handled_and_only_what_was_left_out_is_not_handled(web):
+    """F-043: a footnote or a block of code the file holds is converted, so it is not listed
+    as not handled; a file with something recorded as left out lists that, and only that."""
+    kept = [
+        Notice(code="footnote", page=0, count=2, review="none"),
+        Notice(code="code_block", page=0, review="none"),
+    ]
+    html = web.browser.get(f"/jobs/{convert(web, notices=kept)}").text
+    assert "not-handled-heading" not in html
+    handled = page_text(section(html, "handled-heading"))
+    assert "2 footnotes" in handled and "1 block of program code" in handled
+
+    left_out = [*kept, Notice(code="form_fields", count=1, review="none")]
+    html = web.browser.get(f"/jobs/{convert(web, notices=left_out)}").text
+    assert "fillable form" in page_text(section(html, "not-handled-heading"))
+    assert "footnote" not in page_text(section(html, "not-handled-heading"))

@@ -220,7 +220,7 @@ def _microsoft_sign_in(
         elif not user.is_allowed:
             return SignIn(refused=no_access, email=user.email)
         user.last_login_at = utcnow()
-        if name:
+        if name and not user.name:  # a name the person chose stays
             user.name = name[:200]
         return SignIn(user_id=user.id, session_version=user.session_version, created=created)
 

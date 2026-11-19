@@ -191,9 +191,38 @@ def test_two_workers_claim_every_job_exactly_once(factory, tmp_path):
     assert sorted(claimed) == sorted(ids)
 
 
-def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_path):
+def test_two_worker_loops_convert_every_job_exactly_once(factory, tmp_path):
+    """The worker as its own service (`WORKER_MODE=service`, WS9.4): two workers whose loops
+    run at once on one database convert each of 30 jobs once, on their first attempt."""
+    ids = queue_jobs(factory, 30)
+    converter = FakeConverter()
+    settings = make_settings(tmp_path, database_url="postgresql+psycopg://unused")
+    workers = [
+        Worker(settings, factory, converter=converter, client_factory=fake_client_factory)
+        for _ in range(2)
+    ]
+    turn = iter(workers)
+    lock = threading.Lock()
+
+    def loop() -> None:
+        with lock:
+            worker = next(turn)
+        while worker.run_once() is not None:
+            pass
+
+    run_threads(2, loop)
+    assert len(converter.calls) == len(ids)
+    with db.session_scope(factory) as session:
+        rows = session.execute(select(db.Job.status, db.Job.attempts)).all()
+    assert sorted(rows) == [("done", 1)] * len(ids)
+
+
+def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_path, monkeypatch):
     """Every reservation adds its hold to the job's row in one conditional UPDATE, so 20
     step threads (or a dead attempt plus a retry) cannot pass the job's cap together."""
+    # No call settles here, so a refused one would wait its whole two minutes before it asks
+    # again (`JobBudget.reserve`): 20 threads of them ran past the Postgres job's 15 minutes.
+    monkeypatch.setattr("readablestem.core.budget.SETTLE_WAIT_S", 0.0)
     [job_id] = queue_jobs(factory, 1)
     worker = make_worker(factory, tmp_path)
     worker.guard = DbSpendGuard(factory, 100.0)
@@ -488,3 +517,48 @@ def test_settlements_and_releases_racing_for_the_same_holds_release_each_once(fa
     assert snapshot.spent_usd == pytest.approx(0.05 * 40)
     with db.session_scope(factory) as session:
         assert session.scalar(select(func.count()).select_from(db.SpendHold)) == 0
+
+
+def test_the_class_link_purge_and_cascade_on_postgres(factory):
+    """WS27.2: the purge's published-copy step (an EXISTS over `job_links`), a document kept past
+    its link's last day on its own clock, and the job-to-link cascade run on Postgres, not only
+    on SQLite."""
+    from datetime import UTC, datetime
+
+    from readablestem.ops.retention import purge_expired
+    from readablestem.web import links
+
+    now = datetime(2026, 11, 18, 12, 0, tzinfo=UTC)
+    closes = now - timedelta(minutes=30)
+    user_id = add_user(factory)
+    with db.session_scope(factory) as session:
+        job = db.Job(
+            user_id=user_id,
+            filename="a.pdf",
+            page_count=1,
+            status=db.JobStatus.DONE,
+            retain_until=closes + timedelta(hours=24),  # the last day plus the document's window
+            created_at=now - timedelta(days=3),
+        )
+        session.add(job)
+        session.flush()
+        job_id = job.id
+        session.add(
+            db.JobLink(job_id=job_id, token_hash="p" * 64, closes_at=closes, created_at=now)
+        )
+        session.add(
+            db.Blob(
+                job_id=job_id,
+                kind=links.PUBLISHED,
+                element_id="v1",
+                media_type="text/html",
+                content=b"<p>x</p>",
+            )
+        )
+    assert purge_expired(factory, now).jobs_deleted == 0  # still kept, its copy is freed
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.Blob)) == 0
+    with db.session_scope(factory) as session:
+        session.delete(session.get(db.Job, job_id))  # the foreign key cascades the link row
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.JobLink)) == 0

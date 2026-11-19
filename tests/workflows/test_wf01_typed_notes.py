@@ -51,7 +51,6 @@ def test_the_document_page_says_what_the_conversion_cost(
     assert f"${cost:.2f}" in harness.words(document_page)
 
 
-@harness.finding("F-043")
 def test_not_handled_lists_nothing_the_student_file_holds(
     document_page: lxml.html.HtmlElement,
 ) -> None:
@@ -77,6 +76,7 @@ def test_no_print_stamp_is_in_the_text(student: lxml.html.HtmlElement) -> None:
     assert "“mcs” —" not in harness.words(student.xpath("//main")[0])
 
 
+@harness.waits_for("w_notes_6042_ch2")
 @harness.finding("F-226")
 def test_no_character_is_left_unreadable(student: lxml.html.HtmlElement) -> None:
     text = harness.words(student.xpath("//main")[0])
@@ -84,6 +84,7 @@ def test_no_character_is_left_unreadable(student: lxml.html.HtmlElement) -> None
     assert lost == []
 
 
+@harness.waits_for("w_notes_6042_ch2")
 @harness.finding("F-226")
 def test_an_equation_in_a_sentence_is_not_read_as_stray_letters(
     student: lxml.html.HtmlElement,
@@ -102,10 +103,11 @@ def test_every_equation_has_words_for_a_screen_reader(student: lxml.html.HtmlEle
 
 def test_the_student_file_says_it_has_not_been_checked(student: lxml.html.HtmlElement) -> None:
     # No decision has been made, so the file may not tell a student that anyone checked it.
-    about = harness.words(student.xpath("//footer")[0])
-    assert "not been checked by your instructor" in about
+    (about,) = student.xpath('//main//section[@id="about-conversion"]')
+    assert "has not been reviewed by a person" in harness.words(about)
 
 
+@harness.waits_for("w_notes_6042_ch2")
 def test_listen_speaks_what_is_raised_and_lowered(site: harness.ReplaySite, notes: str) -> None:
     spoken = harness.words(site.page(f"/jobs/{notes}/listen").xpath("//main")[0])
     assert "m sub 0" in spoken

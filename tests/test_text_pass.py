@@ -7,10 +7,12 @@ tests/test_text_latex.py runs the same pass on a real LaTeX document.
 from __future__ import annotations
 
 import logging
+import re
 
 import pytest
 
 from readablestem.core.types import (
+    INLINE_MARKER_RE,
     DocumentResult,
     DocumentStats,
     Element,
@@ -18,7 +20,7 @@ from readablestem.core.types import (
     Notice,
     inline_marker,
 )
-from readablestem.pipeline import language, text_pass
+from readablestem.pipeline import language, layout, text_pass
 from readablestem.pipeline.layout import Glyph
 from readablestem.pipeline.text_pass import (
     PdfLink,
@@ -69,6 +71,24 @@ def codes(result) -> list[tuple[str, str | None, int]]:
 
 
 # --------------------------------------------------------------------------- alignment
+
+
+def test_a_bold_capital_that_is_not_in_the_text_does_not_embolden_the_next_small_letter():
+    """A bold vector of an inline formula ("A", a marker in the text) stood before "and": with
+    letters compared without case its glyph took the place of the "a", which then read as one
+    bold letter. A name in small capitals (printed capitals, lower-case in the text) is still
+    placed, so its weight is still read."""
+    from dataclasses import replace
+
+    first, second = inline_marker("p1-e1"), inline_marker("p1-e2")
+    text = f"Letting {first} and {second} be the two sides, as Smith said."
+    printed = "Letting A and B be the two sides, as SMITH said."
+    bold = {printed.index("A and"), *range(printed.index("SMITH"), printed.index("SMITH") + 5)}
+    offsets = [i for i, c in enumerate(printed) if not c.isspace()]
+    glyphs = [replace(g, bold=i in bold) for i, g in zip(offsets, line(printed), strict=True)]
+    result = annotate([el("p1-e0", text=text)], pdf_with(glyphs), runs=True)
+    (paragraph,) = result.elements
+    assert [text[r.start : r.end] for r in paragraph.runs if r.kind == "strong"] == ["Smith"]
 
 
 # --------------------------------------------------------------------------- web links
@@ -224,6 +244,14 @@ FIGURES = [
     el("e4", Kind.EQUATION, display="block", equation_label="(4) (5)"),
     el("e6", Kind.EQUATION, display="block", equation_label="2.4"),
     el("i1", Kind.EQUATION, display="inline", equation_label="(9)"),
+    el("s32", Kind.HEADING, text="3.2 Rates of change"),
+    el("c4", Kind.HEADING, text="Chapter 4: Waves"),
+    el("apa", Kind.HEADING, text="Appendix A  Units"),
+    el("apb2", Kind.HEADING, text="B.2 Tables of constants"),
+    el("th21", Kind.PARAGRAPH, text="Theorem 2.1 (Rolle). Let f be continuous."),
+    el("d3", Kind.PARAGRAPH, text="Definition 3. A group is a set."),
+    el("s5a", Kind.HEADING, text="5 Methods"),
+    el("s5b", Kind.HEADING, text="5. Results"),
 ]
 
 
@@ -250,6 +278,11 @@ def refs(text: str, *, taken=(), elements=FIGURES) -> list[tuple[str, str | None
         ("Substituting (3) into (4), we get", [("(3)", "e3"), ("(4)", "e4")]),
         ("From (3), the speed is", [("(3)", "e3")]),
         ("using (3) and (4)", [("(3)", "e3"), ("(4)", "e4")]),
+        ("as Section 3.2 shows", [("Section 3.2", "s32")]),
+        ("see Chapter 4 and § 3.2", [("Chapter 4", "c4"), ("\u00a7 3.2", "s32")]),
+        ("By Theorem 2.1 and Definition 3, the", [("Theorem 2.1", "th21"), ("Definition 3", "d3")]),
+        ("see Appendix A and Appendix B.2.", [("Appendix A", "apa"), ("Appendix B.2", "apb2")]),
+        ("Appendices A and B.2 hold them", [("Appendices A", "apa"), ("B.2", "apb2")]),
     ],
 )
 def test_references_link_to_the_one_target_with_that_number(text, expected):
@@ -274,6 +307,12 @@ def test_references_link_to_the_one_target_with_that_number(text, expected):
         "This agrees with earlier measurements (3) and with the textbook value (4).",
         "Answer question (3) on the data sheet before you leave.",
         "When the cart stops, Repeat (3)",  # the one link the real lab manuals made
+        "Section 7 is not in this document.",  # no heading starts with 7
+        "Section 5 covers both.",  # two headings start with 5: nothing is guessed
+        "Chapter 9 and Lemma 2 are not here.",
+        "Appendix Z is not here.",
+        "In an appendix a reader may look.",  # "a" in lower case is a word, not an appendix letter
+        "For example 3 of them fail.",  # "example" in lower case is not a reference
     ],
 )
 def test_no_link_without_one_target(text):
@@ -288,9 +327,69 @@ def test_an_ambiguous_number_gets_no_link():
     assert refs("See Figure 2.", elements=twice) == []
 
 
+def test_a_reference_inside_its_own_target_is_not_linked():
+    own = FIGURES[-4]
+    assert own.id == "th21"
+    links = crossrefs(own.text or "", targets_for(*FIGURES), element_id=own.id)
+    assert links == []
+
+
 def test_an_unattached_caption_does_not_link_to_itself():
     assert refs("Figure 2.3: Velocity against time.") == []
     assert refs("Figure 2.3 shows the velocity.") == [("Figure 2.3", "f1")]
+
+
+# --------------------------------------------------------------------------- typed addresses
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        (
+            "See https://example.org/notes.pdf. It is long.",
+            [("https://example.org/notes.pdf", "https://example.org/notes.pdf")],
+        ),
+        (
+            "(see www.example.org/a_(b)), then",
+            [("www.example.org/a_(b)", "https://www.example.org/a_(b)")],
+        ),
+        (
+            "Write to jo.smith@example.edu, or call.",
+            [("jo.smith@example.edu", "mailto:jo.smith@example.edu")],
+        ),
+        ("Visit http://localhost:8000 or www. now", []),  # no host worth a link
+        ("The result a@b is not an address.", []),
+        # Broken at a line end the text keeps: only what the text holds together is linked.
+        ("Use https://example.org/a\nbc", [("https://example.org/a", "https://example.org/a")]),
+    ],
+)
+def test_an_address_typed_in_the_text_becomes_a_link(text, expected):
+    result = annotate([el("p1-e0", text=text)], pdf_with(line(text)))
+    assert links_of(result, "p1-e0") == [("typed", shown, href) for shown, href in expected]
+
+
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        # The line cut the address: its first part alone would be a link to another page.
+        ("Hand in at https://example.org/courses/12/view?", "id=5678 by noon.", []),
+        ("Hand in at https://example.org/courses/12/sub", "missions/new today.", []),
+        # The whole address is on the second line.
+        ("Hand in your work", "at https://example.org/a today.", ["https://example.org/a"]),
+    ],
+)
+def test_an_address_that_the_line_end_cuts_gets_no_link(first, second, expected):
+    text = f"{first} {second}"
+    glyphs = [*line(first), *line(second, y=114.0)]
+    result = annotate([el("p1-e0", text=text, bbox=(72, 98, 572, 126))], pdf_with(glyphs))
+    assert [shown for _, shown, _ in links_of(result, "p1-e0")] == expected
+
+
+def test_an_address_the_file_already_links_gets_no_second_link():
+    text = "Syllabus at https://example.org/s here."
+    link = PdfLink(0, rect_of(text, "https://example.org/s"), "uri", uri="https://example.org/s")
+    result = annotate([el("p1-e0", text=text)], pdf_with(line(text), link))
+    assert links_of(result, "p1-e0") == [("uri", "https://example.org/s", "https://example.org/s")]
 
 
 # --------------------------------------------------------------------------- colour
@@ -331,6 +430,14 @@ def test_a_coloured_phrase_becomes_a_run_and_the_body_text_does_not():
     result = annotate([el("p1-e0", text=text)], PdfText(glyphs={0: glyphs}), colour=True)
     (run,) = result.elements[0].colour_runs
     assert text[run.start : run.end] == "terms in red as vectors" and run.rgb == RED
+    # Small capitals: the page prints capitals where layout reads the lower-case letters.
+    text = "Read the Lotka and Volterra terms as vectors, the rest as scalars."
+    glyphs = coloured(
+        text.replace("Lotka and Volterra", "LOTKA AND VOLTERRA"), "LOTKA AND VOLTERRA"
+    )
+    result = annotate([el("p1-e0", text=text)], PdfText(glyphs={0: glyphs}), colour=True)
+    (run,) = result.elements[0].colour_runs
+    assert text[run.start : run.end] == "Lotka and Volterra"
 
 
 def test_colour_runs_need_the_flag():
@@ -338,6 +445,9 @@ def test_colour_runs_need_the_flag():
     result = annotate([el("p1-e0", text=text)], PdfText(glyphs={0: coloured(text, "terms")}))
     assert result.elements[0].colour_runs == []
     assert not any(n.code == "colour_reference" for n in result.notices)
+    assert [(n.code, n.count) for n in result.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]
 
 
 def test_linked_text_is_left_out_of_a_run():
@@ -374,10 +484,13 @@ ENGLISH = (
 FRENCH = "La vitesse moyenne est le quotient du déplacement par la durée du trajet."
 
 
-def test_the_pdfs_language_comes_first():
+def test_the_pdfs_language_is_kept_when_the_text_agrees_and_decides_when_it_cannot():
     result = annotate([el("p1-e0", text=ENGLISH)], PdfText(lang="en-GB"))
     assert (result.lang, result.lang_source, result.notices) == ("en-GB", "pdf", [])
+    # English text outranks a layout language of "de"; a short text takes it.
     result = annotate([el("p1-e0", text=ENGLISH)], PdfText(), layout_lang="de")
+    assert (result.lang, result.lang_source) == ("en", "detected")
+    result = annotate([el("p1-e0", text="Speeds are below.")], PdfText(), layout_lang="de")
     assert (result.lang, result.lang_source) == ("de", "pdf")
 
 
@@ -389,9 +502,10 @@ def test_without_lang_the_language_is_detected_and_flagged():
 
 def test_a_passage_in_another_language_is_marked():
     elements = [el("p1-e0", text=ENGLISH), el("p1-e1", text=FRENCH, order=1),
-                el("p1-e2", Kind.HEADING, text=FRENCH, order=2)]  # fmt: skip
+                el("p1-e2", Kind.HEADING, text=FRENCH, order=2),
+                el("p1-e3", text=ENGLISH, order=3), el("p1-e4", text=ENGLISH, order=4)]  # fmt: skip
     result = annotate(elements, PdfText(lang="en"))
-    assert [e.lang for e in result.elements] == [None, "fr", None]  # not on headings
+    assert [e.lang for e in result.elements] == [None, "fr", None, None, None]  # not on headings
 
 
 # --------------------------------------------------------------------------- language change
@@ -425,6 +539,351 @@ def test_a_language_name_or_tag_is_accepted_and_anything_else_refused():
             set_document_language(stored(), bad)
 
 
+# --------------------------------------------------------------------------- bold, italic, code
+
+
+def set_line(page, y: float, pieces: list[tuple[str, str]], x: float = 72.0) -> None:
+    """One line of `(text, font)` pieces side by side; fonts are PyMuPDF's base-14 codes
+    (helv regular, hebo bold, heit italic, hebi both, cour fixed-pitch, tiit Times italic)."""
+    import pymupdf
+
+    for words, font in pieces:
+        page.insert_text((x, y), words, fontsize=12, fontname=font)
+        x += pymupdf.get_text_length(words, fontname=font, fontsize=12)
+
+
+def styled_page(*, italic: bool = True) -> bytes:
+    """A handout: bold, italic, bold-and-italic and fixed-pitch words in running text, a bold
+    phrase inside a web link, a paragraph set wholly in italic and italic variables."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    em = "heit" if italic else "helv"
+    both = "hebi" if italic else "hebo"
+    first = [("Please ", "helv"), ("do not open", "hebo"), (" the exam until told, read ", "helv")]
+    first += [("Moby Dick", em), (" soon, then ", "helv"), ("both at once", both), (".", "helv")]
+    set_line(page, 100, first)
+    second = [("Call ", "helv"), ("len(L)", "cour"), (" on the list, then follow the ", "helv")]
+    second += [("course link", "hebo"), (" for details of the exam today.", "helv")]
+    set_line(page, 130, second)
+    link = page.search_for("course link", clip=pymupdf.Rect(0, 115, 612, 135))[0]
+    page.insert_link({"kind": pymupdf.LINK_URI, "from": link, "uri": "https://example.org/x"})
+    set_line(page, 160, [("This whole paragraph is set in italic from first word to last.", em)])
+    third = [("Let ", "helv"), ("x", "tiit"), (" and ", "helv"), ("y", "tiit")]
+    third += [(" be reals with ", "helv"), ("x", "tiit"), (" + ", "helv"), ("y", "tiit")]
+    set_line(page, 190, [*third, (" = 3 given.", "helv")])
+    # Highlighted by an annotation and by a rectangle behind the words; a padded shaded box
+    # around a whole line is not a highlight; a red phrase.
+    set_line(page, 220, [("Marked with the pen: pay attention to this phrase today.", "helv")])
+    page.add_highlight_annot(page.search_for("pay attention to this phrase")[0])
+    set_line(page, 250, [("A second mark with a band behind these exact words here.", "helv")])
+    band = page.search_for("band behind these exact words")[0]
+    page.draw_rect(band, color=None, fill=(1, 0.9, 0.1), overlay=False)
+    page.draw_rect(pymupdf.Rect(62, 296, 560, 326), color=None, fill=(0.8, 0.9, 1), overlay=False)
+    set_line(page, 316, [("Boxed sentence with a shaded callout around the whole line.", "helv")])
+    set_line(page, 380, [("Shaded cells one two three stand in a row today.", "helv")])
+    for word in ("one", "two", "three"):
+        cell = page.search_for(word, clip=pymupdf.Rect(0, 360, 612, 390))[0]
+        page.draw_rect(cell, color=None, fill=(1, 0.9, 0.1), overlay=False)
+    x = 72.0
+    for words, rgb in (("The answers are ", (0, 0, 0)), ("printed in red", (1, 0, 0))):
+        page.insert_text((x, 350), words, fontsize=12, fontname="helv", color=rgb)
+        x += pymupdf.get_text_length(words, fontname="helv", fontsize=12)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def styled(
+    pdf: bytes, *, colour: bool = False
+) -> tuple[dict[str, list[tuple[str, str]]], text_pass.TextPassResult]:
+    """The runs (bold, italic, code, highlight) of each paragraph of `pdf` that has any, by its
+    first word, as (kind, words), and the pass's result."""
+    elements = layout.analyze(pdf).elements
+    result = text_pass.apply(pdf, elements, pages=[0], runs=True, colour=colour)
+    return {
+        (e.text or "").split()[0]: [(r.kind, (e.text or "")[r.start : r.end]) for r in e.runs]
+        for e in result.elements
+        if e.kind is Kind.PARAGRAPH and e.runs
+    }, result
+
+
+def test_bold_italic_and_code_words_are_runs_and_a_block_set_in_one_style_is_not():
+    # F-510: "Do not open the exam" reached the student as plain words.
+    found, _ = styled(styled_page())
+    assert found["Please"] == [
+        ("strong", "do not open"),
+        ("emphasis", "Moby Dick"),
+        ("strong", "both at once"),
+        ("emphasis", "both at once"),
+    ]
+    assert found["Call"] == [("code", "len(L)"), ("strong", "course link")]
+    # The paragraph set wholly in italic is italic as a block, and one italic letter beside
+    # an inline equation is a variable: neither is emphasis.
+    assert set(found) == {"Please", "Call", "Marked", "A"}
+
+
+def test_a_pdf_with_no_italic_face_has_no_italic_runs():
+    found, _ = styled(styled_page(italic=False))
+    assert {kind for runs in found.values() for kind, _ in runs} == {"strong", "code", "highlight"}
+
+
+def test_highlights_by_annotation_and_rectangle_are_runs_and_a_shaded_box_is_not():
+    found, result = styled(styled_page())
+    assert found["Marked"] == [("highlight", "pay attention to this phrase")]
+    assert found["A"] == [("highlight", "band behind these exact words")]
+    assert "Boxed" not in found and "Shaded" not in found  # a box, and a row of shaded cells
+    assert result.counts()["highlight_runs"] == 2
+
+
+def test_colour_that_is_not_kept_is_counted_and_said_once():
+    found, result = styled(styled_page())
+    assert [(n.code, n.count) for n in result.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]
+    assert not any(e.colour_runs for e in result.elements) and "The" not in found
+    _, with_colour = styled(styled_page(), colour=True)
+    assert not any(n.code == "colour_used" for n in with_colour.notices)
+    red = [e for e in with_colour.elements if e.colour_runs]
+    assert [(e.text or "")[r.start : r.end] for e in red for r in e.colour_runs] == [
+        "printed in red"
+    ]
+    assert with_colour.counts()["colour_runs"] == result.counts()["colour_runs"] == 1
+
+
+# --------------------------------------------------------------------------- struck text
+
+
+def struck_page() -> bytes:
+    """A syllabus page: a date struck through by a drawn line, a word struck by a StrikeOut
+    annotation, an underlined word, a rule under a blank to fill in, the corner of a plot and
+    a line the page paints over."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    lines = {
+        100: "The midterm is on October 3 October 10 in room 2-190.",
+        160: "Lab 3 is cancelled and moved to Friday.",
+        220: "You must not bring a phone to the exam.",
+        280: "Name:",
+        340: "The answer is x = 12 and not 13 today.",
+        430: "The room is hidden behind a rule that never shows.",
+    }
+    for y, words in lines.items():
+        page.insert_text((72, y), words, fontsize=12)
+
+    def under(y: float, part: str) -> pymupdf.Rect:
+        return page.search_for(part, clip=pymupdf.Rect(0, y - 14, 612, y + 4))[0]
+
+    date = under(100, "October 3")
+    page.draw_line((date.x0, 100 - 3.6), (date.x1, 100 - 3.6), width=0.6)  # through it
+    page.add_strikeout_annot(under(160, "cancelled"))
+    word = under(220, "not")
+    page.draw_line((word.x0, 220 + 1.5), (word.x1, 220 + 1.5), width=0.6)  # under it
+    name = under(280, "Name:")
+    page.draw_line((name.x1 + 6, 280 + 1), (name.x1 + 150, 280 + 1), width=0.6)  # a blank
+    # A plot's corner: a tick label, the axis, and inside it the line sample of the legend.
+    page.insert_text((72, 400), "1.0", fontsize=12)
+    tick = under(400, "1.0")
+    page.draw_line((tick.x1 + 3, 380), (tick.x1 + 3, 520), width=0.6)
+    page.draw_line((tick.x1 + 9, 400 + 1.5), (tick.x1 + 27, 400 + 1.5), width=0.6)
+    equation = under(340, "x = 12")
+    page.draw_line((equation.x0, 340 - 3.6), (equation.x1, 340 - 3.6), width=0.6)  # an equation
+    # A line through "hidden" that the page paints over: in the drawings, not on the page.
+    hidden = under(430, "hidden")
+    bar = pymupdf.Rect(hidden.x0, 430 - 4.2, hidden.x1, 430 - 3.0)
+    page.draw_line((hidden.x0, 430 - 3.6), (hidden.x1, 430 - 3.6), width=0.6)
+    page.draw_rect(bar, color=None, fill=(1, 1, 1))
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
+    # F-509: a cancelled date was read as live text, so a student heard both dates.
+    pdf = struck_page()
+    elements = layout.analyze(pdf).elements
+    result = text_pass.apply(pdf, elements, pages=[0], runs=True)
+    struck = [
+        (e.text or "")[r.start : r.end]
+        for e in result.elements
+        for r in e.runs
+        if r.kind == "deleted"
+    ]
+    # The third is the struck equation "x = 12" in a sentence: a run that is its marker alone.
+    assert struck[:2] == ["October 3", "cancelled"] and len(struck) == 3
+    assert INLINE_MARKER_RE.fullmatch(struck[2])
+    # The rule under the gap after "Name:" is a blank, and the underlined word is not one;
+    # nor is the legend's line sample, which the axis parts from the tick label beside it.
+    assert [r.kind for e in result.elements for r in e.runs if r.kind != "deleted"] == ["blank"]
+    assert "October 3 October 10" in " ".join(e.text or "" for e in result.elements)  # kept
+    notices = [n for n in result.notices if n.code == "struck_text"]
+    assert sum(n.count for n in notices) == 3
+    assert all(n.review == "optional" and n.page == 0 for n in notices)
+    # CONTENT_RUNS off (the shadow rollout): found and counted, not written.
+    shadow = text_pass.apply(pdf, elements, pages=[0])
+    assert shadow.counts()["deleted_runs"] == 3 and shadow.counts()["deleted_runs_written"] == 0
+    assert not any(r.kind == "deleted" for e in shadow.elements for r in e.runs)
+    assert not any(n.code == "struck_text" for n in shadow.notices)
+
+
+def reviewed_page() -> bytes:
+    """A lab sheet a reviewer marked up: a date struck out with a caret that gives the new one,
+    a quiz time replaced (the caret says so), a sticky note with its popup and a reply, a
+    highlight with a comment and one without, a file attached to the page and one to the PDF."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    lines = {
+        100: "The report is due May 1 at noon in the lab office.",
+        160: "Measure 25 mL of the buffer into the beaker.",
+        220: "The quiz is on June 1 in room 5.",
+        280: "Dispose of the waste in the labelled container only.",
+        340: "Questions about safety go to the lab manager.",
+    }
+    for y, words in lines.items():
+        page.insert_text((72, y), words, fontsize=12)
+
+    def at(y: float, part: str) -> pymupdf.Rect:
+        return page.search_for(part, clip=pymupdf.Rect(0, y - 14, 612, y + 4))[0]
+
+    page.add_strikeout_annot(date := at(100, "May 1"))
+    page.add_caret_annot(date.br).set_info(content="May 8")
+    page.add_strikeout_annot(quiz := at(220, "June 1"))
+    again = page.add_caret_annot(quiz.br)
+    again.set_info(content="June 2")
+    doc.xref_set_key(again.xref, "IT", "/Replace")
+    sticky = page.add_text_annot((500, 160), "Correction: use 30 mL, not 25 mL.")
+    sticky.set_popup(pymupdf.Rect(400, 170, 560, 240))
+    reply = page.add_text_annot((500, 340), "Agreed.")
+    doc.xref_set_key(reply.xref, "IRT", f"{sticky.xref} 0 R")
+    page.add_highlight_annot(at(280, "Dispose of the waste")).set_info(content="Important")
+    page.add_highlight_annot(at(340, "Questions about safety"))  # no comment: adds nothing
+    for annot in page.annots():
+        annot.update()
+    page.add_file_annot((540, 400), b"Data sheet.", "datasheet.txt")
+    doc.embfile_add("rubric.txt", b"Rubric.")
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_a_reviewers_comments_are_notes_after_the_text_they_mark_and_attached_files_are_named():
+    # F-541: a sticky note, a comment on a highlight and a caret's new date were lost, so a
+    # student heard the stale text alone.
+    pdf = reviewed_page()
+    layout_result = layout.analyze(pdf)
+    result = text_pass.apply(pdf, layout_result.elements, pages=[0], runs=True)
+    texts = [e.text or "" for e in result.elements]
+    note = "Note on the page: "
+    assert [t for t in texts if t.startswith(note)] == [
+        note + "May 8",
+        note + "Correction: use 30 mL, not 25 mL.",
+        note + "Agreed.",  # its parent's reply, though it stands lower on the page
+        note + "replace with June 2",
+        note + "Important",
+    ]
+    # Each follows the text it marks; the struck date is still marked, beside its new one.
+    assert texts.index(note + "May 8") == 1 + next(i for i, t in enumerate(texts) if "May 1" in t)
+    assert texts.index(note + "Important") == 1 + next(
+        i for i, t in enumerate(texts) if t.startswith("Dispose")
+    )
+    struck = [(e.text or "")[r.start : r.end] for e in result.elements for r in e.runs]
+    assert [s for s in struck if s != ""][:2] == ["May 1", "June 1"]
+    (read,) = [n for n in result.notices if n.code == "annotations_read"]
+    assert read.count == 5 and read.review == "required" and read.page is None
+    (attached,) = [n for n in result.notices if n.code == "attachments_not_converted"]
+    assert attached.count == 2 and sorted(attached.names) == ["datasheet.txt", "rubric.txt"]
+    # The ids stay what layout gave them: only the notes are new, one past the highest.
+    assert {e.id for e in layout_result.elements} <= {e.id for e in result.elements}
+    assert [e.order for e in result.elements] == list(range(len(result.elements)))
+
+
+def test_blanks_boxes_and_form_fields_are_tokens_said_in_words():
+    # SW36 and SW39: a drawn blank, typed underscores and printed boxes, and the fields of an
+    # AcroForm, are runs that the writer says ("blank", "Checkbox, checked:"); the form gets
+    # one notice, and what a field draws is no stray paragraph.
+    import pymupdf
+
+    from readablestem.pipeline.inline_text import render_inline_text
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    font = pymupdf.Font(fontfile="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    page.insert_font(fontname="dj", fontbuffer=font.buffer)
+    page.insert_text((72, 100), "Date: ____ and \u2611 yes \u2610 no", fontsize=12, fontname="dj")
+    page.insert_text((72, 160), "Course:", fontsize=12)
+    page.insert_text((72, 220), "Agree to the terms", fontsize=12)
+    page.insert_text((72, 280), "Term:", fontsize=12)
+    page.insert_text((72, 340), "Email:", fontsize=12)
+    for kind, name, rect, value in (
+        (pymupdf.PDF_WIDGET_TYPE_TEXT, "course", (140, 145, 300, 165), "ENVS 101"),
+        (pymupdf.PDF_WIDGET_TYPE_CHECKBOX, "agree", (200, 208, 212, 220), True),
+        (pymupdf.PDF_WIDGET_TYPE_COMBOBOX, "term", (140, 265, 240, 285), "Spring"),
+        (pymupdf.PDF_WIDGET_TYPE_TEXT, "email", (140, 325, 300, 345), None),
+    ):
+        widget = pymupdf.Widget()
+        widget.field_type, widget.field_name, widget.rect = kind, name, pymupdf.Rect(*rect)
+        widget.border_color = (0, 0, 0)
+        if value is not None:
+            widget.field_value = value
+        if kind == pymupdf.PDF_WIDGET_TYPE_COMBOBOX:
+            widget.choice_values = ["Fall", "Spring"]
+        page.add_widget(widget)
+    pdf = doc.tobytes()
+    doc.close()
+    elements = layout.analyze(pdf).elements
+    result = text_pass.apply(pdf, elements, pages=[0])
+    texts = [e.text for e in result.elements]
+    assert texts == [
+        "Date: ____ and \u2611 yes \u2610 no",
+        "Course: ENVS 101",
+        "Agree to the terms \u2611",
+        "Term: Spring",
+        "Email: _____",
+    ]
+    html = [render_inline_text(e.text, element=e, equation=lambda _: "") for e in result.elements]
+    said = [re.sub(r"<[^>]+>", "", h) for h in html]
+    assert said[0].count("blank") == 1 and "Checkbox, checked: " in said[0]
+    assert "Checkbox, not checked: " in said[0]
+    assert 'aria-hidden="true">____<' in html[0]  # what the page printed is kept, not read
+    assert "blank, filled in: ENVS 101" in said[1] and "blank, filled in: Spring" in said[3]
+    assert "Checkbox, checked: " in said[2] and said[4] == "Email: blank_____"
+    form = [n for n in result.notices if n.code == "form_fields"]
+    assert [(n.count, n.page, n.element_id) for n in form] == [(4, None, None)]
+    assert result.counts()["blanks"] == 4 and result.counts()["checkboxes"] == 3
+
+
+def test_a_column_of_check_boxes_is_a_checklist_and_not_a_table():
+    # A form's check boxes beside their labels are aligned in two columns: they were read as
+    # a table of boxes and labels.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    labels = (
+        "Extended time on exams",
+        "Note-taking support",
+        "Course materials in an accessible format",
+        "Other (describe below)",
+    )
+    for i, label in enumerate(labels):
+        top = 292 + 24 * i
+        page.insert_text((84, top + 11), label)
+        widget = pymupdf.Widget()
+        widget.field_type, widget.field_name = pymupdf.PDF_WIDGET_TYPE_CHECKBOX, f"box{i}"
+        widget.rect, widget.border_color = pymupdf.Rect(60, top, 74, top + 14), (0, 0, 0)
+        page.add_widget(widget)
+    pdf = doc.tobytes()
+    doc.close()
+    elements = layout.analyze(pdf).elements
+    assert {e.kind.value for e in elements} == {"paragraph"}
+    assert " ".join(e.text for e in elements) == " ".join(f"\u2610 {label}" for label in labels)
+
+
 # --------------------------------------------------------------------------- the pass as a whole
 
 
@@ -449,7 +908,7 @@ def test_a_failing_pass_leaves_the_elements_as_they_were(monkeypatch):
     # With no language from the PDF either, English is assumed and the job page asks.
     result = text_pass.apply(b"not a pdf", elements, pages=[0])
     assert (result.lang, result.lang_source) == ("en", "default")
-    assert result.notices == [Notice(code="lang_assumed")]
+    assert result.notices == [Notice(code="lang_assumed", review="required")]
 
 
 def test_a_language_detector_that_cannot_load_leaves_links_and_references(monkeypatch, caplog):
@@ -470,7 +929,7 @@ def test_a_language_detector_that_cannot_load_leaves_links_and_references(monkey
     assert (result.lang, result.lang_source, result.notices) == (
         "en",
         "default",
-        [Notice(code="lang_assumed")],
+        [Notice(code="lang_assumed", review="required")],
     )
     assert "language detection failed: OSError" in caplog.text
 

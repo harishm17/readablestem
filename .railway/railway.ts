@@ -130,7 +130,9 @@ const appVariables = [
 ];
 
 // Settings only the web service holds (the image-page switch and the per-page and per-job
-// spend caps added 2026-10-22; the worker thread runs inside web). MS_* are the Microsoft
+// spend caps added 2026-10-22; the worker thread runs inside web unless WORKER_MODE=service,
+// docs/deploy-railway.md "The worker as its own service", where the `worker` service is described
+// and deliberately not defined here: applying it would start a second service). MS_* are the Microsoft
 // sign-in settings (docs/deploy-railway.md, "Microsoft sign-in on Railway"): declared before
 // they have values so a later `railway variable set` is not deleted by the next apply; the
 // app treats an unset variable as "Microsoft sign-in off", and a half-set group refuses to
@@ -140,15 +142,20 @@ const appVariables = [
 // behaviour setting named here is in src/readablestem/ops/production.profile.toml, not here.
 const webOnlyVariables = [
   "CLAUDE_SECOND_CHECK",
+  "CONTENT_RUNS",
   "EQUATION_GLYPH_CHECKS",
   "EQUATION_GLYPH_RECONCILE",
   "EQUATION_LINE_CONTEXT",
   "FEATURE_BATCH_ZIP",
   "FEATURE_BEAMER_SOURCE",
+  "FEATURE_CLASS_LINK",
+  "FEATURE_COURSE_GRANTS",
   "FEATURE_IMAGE_PAGES",
   "FEATURE_LATEX_SOURCE",
   "FEATURE_PAGE_WITNESS",
+  "FEATURE_WORD_SOURCE",
   "FLAG_POLICY",
+  "FONT_CODE_TABLES",
   "INSTALL_LATEXML",
   "IMAGE_PAGES_SECOND_READER",
   "IMAGE_PAGES_VECTOR_CHECKS",
@@ -158,6 +165,7 @@ const webOnlyVariables = [
   "STORAGE_GLOBAL_MAX_MB",
   "STORAGE_OPEN_TIER_MB",
   "STORAGE_PER_USER_MB",
+  "WORKER_MODE",
   "MAX_USD_PER_JOB",
   "MAX_USD_PER_PAGE",
   "MS_ALLOWED_TENANTS",
@@ -218,11 +226,13 @@ const profileVariables = [
   "OFFICE_INPUT_ENABLED",
   "PAGE_AUDIT_MAX_OUTPUT_TOKENS",
   "PAGE_AUDIT_MODEL",
+  "PAGE_IMAGE_CACHE_MB",
   "PAGE_MATH_AGREEMENT_LIFT",
   "PAGE_MATH_MAX_OUTPUT_TOKENS",
   "PAGE_MATH_MODEL",
   "PAGE_MATH_UNCONFIRMED_FACTOR",
   "PAGE_WITNESS_MAX_OUTPUT_TOKENS",
+  "REGION_TREE",
 ];
 
 export default defineRailway(() => {

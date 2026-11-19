@@ -13,15 +13,30 @@ import stat
 import sys
 from pathlib import Path
 
+import pytest
+
 from fixtures import office
 from fixtures.web.support import ALICE, WebEnv, csrf_from, login, make_pdf
 from readablestem.web import offices
 
+# The vendor line is built from what the settings send (web/recipients.py `sent_material`);
+# its three forms, each pinned: only the cut-outs; tables and scanned pages on (production's
+# sentence since D-008); and whole pages that hold math on as well.
+CUTOUTS_LINE = (
+    "Pictures of the equations and figures in your file, with a little nearby text, go to "
+    "Anthropic's Claude models to propose readings. They are not used to train models."
+)
 ANTHROPIC_LINE = (
     "Pictures of the equations, figures and tables in your file, with a little nearby text, go to "
     "Anthropic's Claude models to propose readings, and so do whole pages you ask to have read "
     "as scans. They are not used to train models."
 )
+MATH_PAGES_LINE = (
+    "Pictures of the equations, figures and tables in your file, with a little nearby text, go to "
+    "Anthropic's Claude models to propose readings, and so do pictures of whole pages that hold "
+    "math and whole pages you ask to have read as scans. They are not used to train models."
+)
+TABLES_AND_SCANS = {"feature_tables": True, "feature_image_pages": True}
 OPENAI_LINE = (
     "Pictures of the equations, figures and tables in your file, with a little nearby text, go to "
     "OpenAI's models to propose readings, and so do whole pages you ask to have read as "
@@ -69,22 +84,32 @@ def upload(env: WebEnv, name: str, data: bytes, content_type: str):
 # ------------------------------------------------------------------ the vendor line
 
 
+@pytest.mark.parametrize(
+    "sending,line",
+    [
+        ({}, CUTOUTS_LINE),
+        (TABLES_AND_SCANS, ANTHROPIC_LINE),
+        ({**TABLES_AND_SCANS, "feature_page_witness": True}, MATH_PAGES_LINE),
+    ],
+    ids=["cut-outs", "tables and scans", "math pages"],
+)
 def test_the_vendor_line_names_anthropic_beside_the_upload_button_and_on_the_landing_page(
-    tmp_path,
+    tmp_path, sending, line
 ):
-    env = WebEnv(tmp_path, model_provider="anthropic")
+    env = WebEnv(tmp_path, model_provider="anthropic", **sending)
     with env.running() as client:
         signed_in(env, client)
         app = client.get("/app").text
         landing = client.get("/").text
-    form = app.split('<form method="post" action="/jobs"', 1)[1].split("</form>", 1)[0]
+    # The upload form's action carries its request token (SW43): "/jobs?request_token=...".
+    form = app.split('<form method="post" action="/jobs?', 1)[1].split("</form>", 1)[0]
     after_button = form.split("Upload and convert", 1)[1]
-    assert ANTHROPIC_LINE in text_of(after_button)
-    assert ANTHROPIC_LINE in text_of(landing)
+    assert line in text_of(after_button)
+    assert line in text_of(landing)
 
 
 def test_the_vendor_line_follows_the_provider(tmp_path):
-    env = WebEnv(tmp_path, model_provider="openai")
+    env = WebEnv(tmp_path, model_provider="openai", **TABLES_AND_SCANS)
     with env.running() as client:
         signed_in(env, client)
         app = text_of(client.get("/app").text)

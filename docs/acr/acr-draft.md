@@ -37,7 +37,7 @@ file.
 | **Reflow and text spacing** at 320 CSS px and with the WCAG 1.4.12 override, 400% zoom viewport sizes, landscape and portrait. | 1.4.4, 1.4.10, 1.4.12, 1.3.4. | Browsers other than Chromium. |
 | **Stylesheet checks** (`tests/test_web_focus_style.py`, `tests/test_web_review_split.py`): color pairs and the focus ring. | 1.4.3, 1.4.11, 2.4.7 colors. | Colors the stylesheet does not declare (images). |
 | **Code inspection** of the templates (`src/readablestem/web/templates/`), `app.css` and `app.js`. | Structure that is true by construction. | Behavior. |
-| **Screen reader session** (VoiceOver in Safari, [../screen-reader-test.md](../screen-reader-test.md)). | | **Not done yet.** Rows that depend on it say so. |
+| **Screen reader session** (VoiceOver in Safari, [../device-checks.md](../device-checks.md), D3 and D4). | | **Not done yet.** Rows that depend on it say so. |
 
 ## 3. Terms
 
@@ -68,7 +68,7 @@ of the sheet that feeds it (R1 to R17).
 | 1.4.2 Audio Control | Not Applicable | No audio. |
 | 2.1.1 Keyboard | Supports | `tests/test_web_keyboard_browser.py`: every control on every page in scope is reached by Tab, and the main flows are done with keys only (Enter, Space, arrow keys on a choice, Tab, Shift+Tab, typing). The one step a script cannot do from the keyboard is choosing a file in the operating system's dialog; the walk opens the chooser with Space or Enter on the file field. Nothing needs a pointer: the page-tools region is chosen with number fields, and marks on the page image are links. Chromium only. |
 | 2.1.2 No Keyboard Trap | Supports | The walk presses Tab until focus leaves the page or comes round, and Shift+Tab back through the same stops, on every page in scope; a deliberately trapped test page is reported as a failure (`test_the_walker_reports_a_missing_focus_ring_a_trap_and_a_missing_skip_link`). No dialog or widget traps focus (there are no modal dialogs). |
-| 2.1.4 Character Key Shortcuts | Supports | The review screen's single-key shortcuts (N, P, A, E) are off until the person turns them on, can be turned off, and never act while typing (`test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing`). |
+| 2.1.4 Character Key Shortcuts | Supports | The review screen's single-key shortcuts (N, P, A, E) are on by default with their keys listed beside the switch, can be turned off (the choice is remembered), never act while typing or with a modifier held, and never press "Accept anyway" or a choice for a whole page (`test_keyboard_shortcuts_are_on_by_default_listed_in_view_and_never_fire_while_typing`, `test_accept_is_near_the_heading_and_a_does_not_press_accept_anyway`). |
 | 2.2.1 Timing Adjustable | Supports | The only time limit is the sign-in session, 7 days (`SESSION_MAX_AGE_S`, `web/app.py`): longer than 20 hours. Text typed when a session ends is kept (`test_typed_text_survives_the_session_ending`, `tests/test_web_review_ux_browser.py`). |
 | 2.2.2 Pause, Stop, Hide | Partially Supports | The job page's status box (every 3 s) and My documents (every 5 s, only while a document is converting) update by themselves with no control to pause them. The updates do not move focus (`test_the_documents_list_and_the_job_status_refresh_without_taking_focus_away`; `test_the_steps_update_without_touching_the_live_region`, `tests/test_web_job_page_browser.py`), and each page says the list can be refreshed by hand. Whether the progress counts as essential has not been decided. Nothing blinks or moves otherwise. |
 | 2.3.1 Three Flashes or Below Threshold | Supports | No animation or flashing content: `app.css` declares no `@keyframes`, and under `prefers-reduced-motion` all transitions are off (`test_forced_colors_and_reduced_motion_keep_the_controls_visible_and_still`, `tests/test_web_scale_browser.py`). |
@@ -108,7 +108,7 @@ of the sheet that feeds it (R1 to R17).
 | 2.4.5 Multiple Ways | Supports | Site navigation and the footer's links (`base.html`), the guides index, and `sitemap.xml` (`web/routes/discovery.py`); app pages are steps in a process. |
 | 2.4.6 Headings and Labels | Not yet evaluated | VoiceOver (R2, R12). Tested: axe's heading and label rules pass (no empty headings, one `h1`). Whether they describe their topic needs a person. |
 | 2.4.7 Focus Visible | Supports | A 3 px ring with a halo on `:focus-visible` (`app.css`); the walk finds a ring on every Tab stop of every page in scope (including marks on the page image, the page region and disclosures). |
-| 2.4.11 Focus Not Obscured (Minimum) | Supports | The walk finds, for every Tab stop, the focused control in the window and not covered by another element (there is no sticky header over the content); the review screen keeps the selected mark and the decision heading in view (`test_stacked_the_selected_mark_is_inside_the_page_region`). |
+| 2.4.11 Focus Not Obscured (Minimum) | Supports | The walk finds, for every Tab stop, the focused control in the window and not covered by another element (there is no sticky header over the content); the review screen keeps the selected mark and the decision heading in view (`test_the_selected_mark_is_inside_the_page_region_and_the_window_stays_at_the_top`). |
 | 2.5.7 Dragging Movements | Supports | Nothing needs dragging; an area of a page is chosen with number fields (`_page_tools.html`; `app.js` has no drag handler). |
 | 2.5.8 Target Size (Minimum) | Supports | Controls are 44 x 44 CSS px on the Symbols screen and the choice cards, marks on the page image at least 24 x 24 (`test_every_mark_is_a_link_of_at_least_24_css_px`, `test_undo_is_a_44_px_target_and_the_marks_are_24_px_or_more`, `test_every_control_is_a_44px_target_and_nothing_scrolls_sideways`); axe's target-size rule is in the tag set. Links inside a sentence are exempt. |
 | 3.1.2 Language of Parts | Not yet evaluated | VoiceOver (R13). The interface is English; text from a document in another language is shown without a `lang` on the review screen. Not reviewed. |
@@ -132,7 +132,7 @@ of the sheet that feeds it (R1 to R17).
 
 ## 8. What is still needed before this can be published
 
-1. A VoiceOver session in Safari ([../screen-reader-test.md](../screen-reader-test.md)), by the
+1. A VoiceOver session in Safari ([../device-checks.md](../device-checks.md), D3 and D4), by the
    owner. It feeds the rows marked VoiceOver: 1.1.1, 1.3.1, 1.3.2, 2.4.1, 2.4.2, 2.4.4, 2.4.6, 3.1.2, 3.3.1, 4.1.2,
    4.1.3.
 2. A look by a person at the rows marked "Not reviewed": 1.3.3, 1.4.13, 3.2.4, 3.3.7, and a

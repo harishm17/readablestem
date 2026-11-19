@@ -1,0 +1,78 @@
+{# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
+{% from "components/notices.html" import notice_box %}
+{% if class_link %}
+{# The class link (web/links.py, routes/sharing.py): off unless FEATURE_CLASS_LINK. The address
+   is in the page only in the answer to making the link; after that nothing here holds it. #}
+{% set cl = class_link %}
+<section aria-labelledby="class-link-heading">
+  <h2 id="class-link-heading">Class link</h2>
+  <p class="hint">One link for a whole class. Anyone who has it can read the published student version of this document without signing in. They cannot see or do anything else. It stops working on the last day you choose.</p>
+  {% if cl.address %}
+  {{ notice_box("success", body="The link is made. Copy it now: it is not shown again. If you lose it, make a new link, and the old one stops working.", attrs={"tabindex": "-1", "autofocus": true}) }}
+  <label for="class-link-address">Class link</label>
+  <div class="copy-row">
+    <textarea id="class-link-address" readonly rows="3" spellcheck="false">{{ cl.address }}</textarea>
+    <button type="button" class="button-secondary" data-copy-target="class-link-address" data-copy-state="class-link-copy-state" hidden>Copy link</button>
+  </div>
+  <p class="hint" id="class-link-copy-state" role="status"></p>
+  {% endif %}
+
+  {% if cl.link %}
+  <dl class="share-facts">
+    <dt>Status</dt><dd>{{ cl.link.state }}</dd>
+    {% if cl.link.label %}<dt>Label</dt><dd>{{ cl.link.label }}</dd>{% endif %}
+    {% if cl.link.opens_at %}<dt>Opens</dt><dd>{{ cl.link.opens_at|utc }}</dd>{% endif %}
+    <dt>Last day</dt><dd>{{ cl.link.closes_at|utc }}</dd>
+    <dt>Opened</dt><dd>{{ cl.link.open_count }} {{ "time" if cl.link.open_count == 1 else "times" }}{% if cl.link.first_opened_at %}, first on {{ cl.link.first_opened_at|utc }}{% endif %}</dd>
+    {% if cl.published %}<dt>Published copy</dt><dd>Version {{ cl.published }}</dd>{% endif %}
+  </dl>
+  {% if cl.link.kept %}
+  {% if not cl.address %}<p class="hint">The address was shown once, when the link was made. If you lost it, make a new link.</p>{% endif %}
+  <p class="hint">This document is kept until {{ retain_until|utc }}. A link keeps its document to the link's last day and {{ cl.after }}.</p>
+  {% if cl.out_of_date %}
+  <p id="class-link-stale">The published copy is version {{ cl.published }}. Your document is now version {{ cl.current }}.{% if not cl.ready %} Finish checking it to publish the new version.{% endif %}</p>
+  {% endif %}
+  <div class="share-actions">
+    {% if cl.can_update %}
+    {% call form("link.update", "/jobs/" ~ job_id ~ "/share/link/update", {"class": "inline-form"}) %}
+      <button type="submit" class="button-secondary">Update the published copy</button>
+    {% endcall %}
+    {% endif %}
+    {% if cl.link.paused %}
+    {% call form("link.resume", "/jobs/" ~ job_id ~ "/share/link/resume", {"class": "inline-form"}) %}
+      <button type="submit" class="button-secondary">Resume the link</button>
+    {% endcall %}
+    {% else %}
+    {% call form("link.pause", "/jobs/" ~ job_id ~ "/share/link/pause", {"class": "inline-form"}) %}
+      <button type="submit" class="button-secondary">Pause the link</button>
+    {% endcall %}
+    {% endif %}
+    <a class="button-danger-outline" href="/jobs/{{ job_id }}/share/link/remove">Remove the link</a>
+  </div>
+  {% endif %}
+  {% endif %}
+
+  {% if cl.ready %}
+  <h3 id="class-link-make-heading">{% if cl.link and cl.link.kept %}Make a new link{% else %}Make a link{% endif %}</h3>
+  {% if cl.link and cl.link.kept %}<p class="hint">The link above stops working when you make a new one.</p>{% endif %}
+  {% call form("link.make", "/jobs/" ~ job_id ~ "/share/link", {"novalidate": true}) %}
+    <div class="field">
+      <label for="link-label">Label (only you see it)</label>
+      <input type="text" id="link-label" name="label" maxlength="80" autocomplete="off" value="{{ cl.typed.label|default('') }}">
+    </div>
+    {% call(aria) field("link-closes", "Last day", error=cl.errors.get("link-closes"), hint="The link works until the end of this day (UTC). It can work for at most " ~ cl.max_days ~ " days, so the latest day is " ~ cl.latest ~ ".") %}
+      <input type="date" id="link-closes" name="closes" required min="{{ cl.today }}" max="{{ cl.latest }}" value="{{ cl.typed.closes|default('') }}"{{ aria }}>
+    {% endcall %}
+    {% call(aria) field("link-opens", "First day (optional)", error=cl.errors.get("link-opens"), hint="Leave empty to open it now.") %}
+      <input type="date" id="link-opens" name="opens" min="{{ cl.today }}" max="{{ cl.latest }}" value="{{ cl.typed.opens|default('') }}"{{ aria }}>
+    {% endcall %}
+    <button type="submit" class="button">{% if cl.link and cl.link.kept %}Make a new link{% else %}Make the link{% endif %}</button>
+  {% endcall %}
+  {% else %}
+  <p class="hint" id="class-link-not-ready">A class link can be made once this document is ready, with nothing left to check.</p>
+  {% endif %}
+</section>
+{% endif %}
+

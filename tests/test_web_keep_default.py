@@ -12,6 +12,7 @@ import re
 import pytest
 
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login, make_pdf, upload
+from readablestem.web.dates import format_when
 from readablestem.web.db import User, session_scope
 from readablestem.web.routes.account import KEEP_ON
 
@@ -48,7 +49,7 @@ def save(env, on: bool):
 
 def test_turning_it_on_ticks_the_box_and_is_remembered(web):
     response = save(web, on=True)
-    assert response.status_code == 303 and response.headers["location"] == "/account#account-keep"
+    assert response.status_code == 303 and response.headers["location"] == "/account"
     assert stored(web) is True
     assert KEEP_ON in web.browser.get("/account").text  # the notice, once
     app = web.browser.get("/app").text
@@ -67,10 +68,11 @@ def test_the_job_page_says_when_it_is_deleted_and_offers_a_week(web):
     page = web.browser.get(f"/jobs/{job_id}").text
     line = page.split('id="retention-line"', 1)[1].split("</div>", 1)[0]
     flat = " ".join(re.sub(r"<[^>]+>", " ", line).split())
-    assert "Deleted automatically on" in flat and "24 hours after you last work on it" in flat
+    assert format_when(web.job(job_id).retain_until) in flat  # the time, and why
+    assert "24 hours" in flat
     assert f'action="/jobs/{job_id}/keep"' in line and "Keep for 7 days" in flat
     # Keeping it: the line then says 7 days and the button goes (it was just extended).
     web.browser.post(f"/jobs/{job_id}/keep", data={"csrf_token": csrf_from(page)})
     page = web.browser.get(f"/jobs/{job_id}").text
     line = page.split('id="retention-line"', 1)[1].split("</div>", 1)[0]
-    assert "7 days after you last work on it" in line and "/keep" not in line
+    assert format_when(web.job(job_id).retain_until) in line and "/keep" not in line

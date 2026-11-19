@@ -57,11 +57,17 @@ value and where that value came from. This page does not repeat those values.
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `EMAIL_LOGIN_ENABLED`, `EMAIL_SENDER`, `EMAIL_LINK_MINUTES` | Sign in by an emailed one-time link (T3-10). **Off, and no email provider is wired in.** `EMAIL_SENDER` names a registered sender (`web/email_senders.py`); the settings check refuses `EMAIL_LOGIN_ENABLED=true` without one in any environment, and in production refuses a sender that is for development only, which today means always. See "Sign-in, sessions and CSRF" |
+| `FEATURE_WORD_SOURCE` | Off by default. Reads a `.docx` from the file itself with pandoc in the sandbox, in place of a LibreOffice PDF; the PDF route stays the fallback for what the reader does not take. See "Word files read from the file" |
+| `FEATURE_COURSE_GRANTS` | Off by default; needs `FEATURE_NOTATION_MEMORY`. Course grants (WS27.1, `web/shares.py`, `routes/courses.py`): the owner of a course gives a person, by the address they sign in with, the right to `view` or `review` every document in it, now and later. Off, the People section is not there, `/courses/{id}/people...` answer 404, and a `course_grants` row that exists gives no right. See "Course grants" below and docs/deploy-railway.md, "Before `FEATURE_COURSE_GRANTS` is turned on" |
+| `FEATURE_CLASS_LINK` | Off by default. The class link (WS27.2, `web/links.py`, `routes/class_link.py`): the owner of a ready document makes one link that opens the published student version at `/s/{token}` without a sign-in, until a last day at most 180 days away. Off, there is no section on the share page and `/s/...` answers 404. See "The class link" below and docs/deploy-railway.md, "Before `FEATURE_CLASS_LINK` is turned on" |
 | `OFFICE_INPUT_ENABLED`, `SOFFICE_PATH`, `OFFICE_TIMEOUT_S` | Word and PowerPoint uploads (T3-30). On by default but taken only where LibreOffice is installed (`SOFFICE_PATH`, else `soffice` on `PATH`); `OFFICE_TIMEOUT_S` (90) is how long LibreOffice may take for one file. See "Uploads and limits" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default in code; which are on in production is in the production profile |
+| `CONTENT_RUNS` | Struck text (WS16.1, F-509) stored and written as a `deleted` run (docs/output.md "Struck, bold and other marked text"). On by default since 2026-11-18; off is the old shadow rollout, where struck runs are found and counted in the trace but not written |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEATURE_PAGE_WITNESS`, `PAGE_WITNESS_MODEL`, `PAGE_WITNESS_MAX_OUTPUT_TOKENS`, `PAGE_WITNESS_TIMEOUT_S`, `ANTHROPIC_EFFORT_PAGE_WITNESS` | The page witness (docs/steps.md): one call per math page to `claude-opus-5-5` reads every formula; disagreements and formulas only it found are required decisions. Off by default; first dev measurement in docs/eval-equation-round5.md |
 | `EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING` | Equation reading flags (docs/steps.md, docs/layout.md, docs/eval-flag-policy.md), all off by default in code; production's values are in the production profile. Turning `LAYOUT_DISPLAY_GROUPING` on needs a `PIPELINE_VERSION` bump |
+| `REGION_TREE` | Reading order from a tree of regions instead of one gutter (docs/layout.md "The region tree"), `off` or `on`, `off` by default in code and in the production profile. Turning it on changes the order of some pages, so it needs a `PIPELINE_VERSION` bump |
+| `FONT_CODE_TABLES` | The codes of symbol and TeX fonts read as what the font draws, by font name (`pipeline/font_codes.py`, docs/layout.md "Font code tables"). **On by default in code**; set `false` on `web` to turn it off without a deploy. It changes element text on documents with these fonts, so stored step answers for them are asked again. Production's value is in the production profile |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
 | `ANALYTICS_ENABLED` | Product analytics (see "Product analytics"): PostHog loaded and sent through this app's own `/m/` proxy, page views plus a few named funnel events. **Off by default**: the privacy notice's "Cookies" section says there are no analytics. Production refuses to start with it on until the notice (`web/templates/privacy.html`) names PostHog and no longer says "no analytics" (`ops.launch.analytics_notice_problem`; `launch-check` lists the same). The notice has no version number, so the check reads its text |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
@@ -83,14 +89,15 @@ value and where that value came from. This page does not repeat those values.
 | `MAX_USD_PER_JOB` ($6.00), `MAX_MODEL_CALLS_PER_JOB` (1200) | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (code defaults $0.30 and 80; with `MODEL_PROVIDER=anthropic`, as in production, the dollar default is $1.00), so one dense page cannot use a long document's allowance |
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_VECTOR_CROPS` (default off, unmeasured: on a handwritten page whose ink is vector, the pictures of expressions are drawn from the pen strokes) and `IMAGE_PAGES_VECTOR_CHECKS` (default on: a letter in the other case, a power lost, added or moved, and ink no block accounts for are flagged by comparing the reading with the strokes, docs/layout.md), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on), `IMAGE_PAGES_SECOND_READER` (`off`, `local`, `claude`, `openai`; default `off`), `IMAGE_PAGES_SECOND_READER_TIME_S` (120) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds math (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected); the second reader (`docs/math-readers.md`, "Using a reader in the pipeline") reads the crop of each handwritten display equation and compares it with the page's reading, so the review card can offer the differences as choices (it must also be enabled with its `MATH_READER_*_ENABLED`). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
-| `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary that only the HTTP cron route runs (docs/steps.md, docs/operations.md). All on by default in code; the Decisions ones do nothing with `MODEL_PROVIDER=anthropic` |
+| `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary that the HTTP cron route and `readablestem ops cron` both run (docs/steps.md, docs/operations.md). All on by default in code; the Decisions ones do nothing with `MODEL_PROVIDER=anthropic` |
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai` is the default in code; production's provider is in the production profile) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organization-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `MODEL_ANSWERS_FILE`, `MODEL_ANSWERS_OFFLINE`, `MODEL_ANSWERS_REKEY`, `MODEL_ANSWERS_LIVE_USD` | Dev and test only: the real client sits behind a JSON-lines file of recorded answers (`eval/answers.py`, the format `eval pipeline --answers` uses). `MODEL_ANSWERS_REKEY=true` reads a file recorded before 2026-11-11 through its older keys and writes each row found that way again under the new one (docs/eval.md, "Recorded answers"). A recorded request is answered from the file at no cost; any other is asked and appended, so a walkthrough or browser test pays for each answer once. With `MODEL_ANSWERS_OFFLINE=true` a missing answer is refused instead of asked, so a replay spends nothing. `MODEL_ANSWERS_LIVE_USD` is the most one process may pay for answers the file lacks: once that is spent a missing answer is refused in the same way, and replayed answers do not count. A replay also needs no room under `DAILY_SPEND_CAP_USD`: uploads and the worker are not held back by the headroom a live call needs (`web.spend.conversion_headroom_usd`), so a copy of the server with a $0.01 cap still converts. Conversions and review-screen re-reads are both recorded. With the Claude second check on (`CLAUDE_SECOND_CHECK`), its answers go into the same file (step `check`) and replay from it, offline as well; a verdict the file lacks comes back as an unanswered check, with no call. Ignored with `FAKE_MODELS`; refused in production. Keep the file outside the repository |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
-| `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
+| `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval (an upload or a new part wakes the worker at once, so this is only the wait between looks at an idle queue) |
+| `WORKER_MODE`, `WORKER_SLOTS` | `inline` (the default): the web process starts the worker thread, as above. `service`: the web process starts none and only `readablestem worker` converts, `WORKER_SLOTS` jobs at once (default 1; the web process's own thread is always one). The web process then reads the worker's liveness, the AI service's health and the sandbox probe from `ops_heartbeat` rows. docs/deploy-railway.md, "The worker as its own service" |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer "Source code" link (the AGPL source offer; the license sentence is on /terms, ADR 0003 addendum); contact on the 403, privacy and terms pages |
 
 ## Routes
@@ -109,12 +116,18 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/demo/listen` | anyone | "Listen as a student" for the stored demo: the transcript of what a screen reader roughly says, with the player ("Listen as a student", below); `noindex`, read-only |
 | GET `/guides` | anyone | The list of the guides below it, each with an audience line, its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer. The comparison guide ("Choosing a tool for STEM course files") opens with a short decision list by file and need, then the table; its Inputs cell and the landing, limits, ADA, offices and privacy pages name LaTeX source only when `latex_source` is on |
 | GET `/privacy`, `/terms` | anyone | Each opens with a short summary (privacy: a retention table, `_retention_table.html`, the default and every exception, from the settings; terms: "In short"). The beta wording, describing the real behavior (hourly purge, the `backup` service's daily database dumps kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
-| GET `/for-accessibility-offices` | anyone | The page for an accessibility or procurement office (`web/offices.py`, `offices.html`): data flow (an SVG with a described list as its text equivalent), the companies that receive data (one row per entry of `web/recipients.py`, the list `/privacy` uses, so tracing and analytics appear only when on), a table by kind of data (what is sent where and for how long) at the top and a table by company, both written from `offices.data_items`, retention from the settings (`_retention_table.html`), no training and the `store` setting (OpenAI path only), student records (FERPA), what the tool does not do, an eight-step pilot checklist. It makes no conformance claim (`tests/test_web_offices.py`). Linked from every footer, in the sitemap and `llms.txt` |
+| GET `/for-accessibility-offices` | anyone | The page for an accessibility or procurement office (`web/offices.py`, `offices.html`): data flow (an SVG with a described list as its text equivalent), a table by kind of data (what is sent where and for how long) at the top, written from `offices.data_items`, a pointer to the table by company on `/security#by-company` (one row per entry of `web/recipients.py`, the list `/privacy` uses, so tracing and analytics appear only when on), retention from the settings (`_retention_table.html`), no training and the `store` setting (OpenAI path only), student records (FERPA), what the tool does not do, an eight-step pilot checklist. It makes no conformance claim (`tests/test_web_offices.py`). Linked from every footer, in the sitemap and `llms.txt` |
 | GET `/for-accessibility-offices/summary` | anyone | The same facts on one printable page, a self-contained HTML file sent as a download (`offices_summary.html`, inline style, no script, `VIEW_CSP`); not indexed. Its table of data is the page's (`offices.data_items`), the pilot is an ordered list, and it prints on one Letter or A4 page (`tests/test_web_ux2_lane_d_browser.py`) |
 | GET `/limits` | anyone | Known limits: what you can upload first (file types, size, daily limits, storage, how long it is kept), then what it handles and does not do, how much review it needs, and the measured accuracy (including tables, links, color, language and file types, as this server is set up) |
+| GET `/help` | anyone | The help pages and what each one answers (WS25.4, F-384): how to review, posting, when a LaTeX upload fails, and the known limits page (linked, not repeated). The list is `templates/_help_pages.html`, which every help page ends with as a row of links; a "Help" link is in the footers (not the sign-in pages' one-task footer) |
+| GET `/help/review` | anyone | "Reviewing a converted document": the kinds of item, what each button does in the screen's own words, the keyboard shortcuts and their switch, accepting many at once, the page tools, what happens to a decision left open, and how to tell a document is ready to post. Linked from the review screen and the list view |
+| GET `/help/latex` | anyone | "When a LaTeX upload fails": what a `.tex` file or zip may hold, each upload and stop message and what to change, and the classes and packages that are not read. Reads the limits and the refused lists the upload checks use; with LaTeX source off it says so. Linked from the LaTeX line of the upload form, from a refused LaTeX upload and from a stopped LaTeX job |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labeled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
+| GET `/pricing` | anyone | Free during the beta, the limits that apply (`_upload_limits.html`, shared with `/limits`), no prices, and that pricing for offices is not set |
+| GET `/security` | anyone | What is stored and who receives it (the data matrix, then the same data by company, `recipients-table`), how long it is kept, sign-in and who can see a document, how uploaded files are handled, what has and has not been tested, that no data agreement is offered, how to report a problem. Everything depends on the settings (`offices.offices_context`) |
+| GET `/favicon.ico`, `/apple-touch-icon.png`, `/site.webmanifest` | anyone | The icons browsers and phones ask for at the root (the files in `static/`, served by `fixed_file`) and the web app manifest (name, start URL `/`, `display: minimal-ui`, the 192 and 512 px icons, theme and background color from `--bg` in `tokens.css`; `base.html` links it and gives the light and dark `theme-color`). Every icon, and the social card, is drawn from `static/icon.svg` by `scripts/brand_icons.py` (`favicon.ico` at 16, 32 and 48 px, the 192 and 512 px icons, the 180 px touch icon on the page background, and `social-card.png` in Source Sans 3); `base.html` links the SVG first and the `.ico` as the fallback; the SVG icon is served from `/static/`, so the static-file rules apply to it |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer). It says when it was checked (a local-time `<time>`), links to itself as "Check again", and says that the AI service line is the last 10 minutes of this server's own requests: with none it reads "No recent requests; availability untested", with some "Recent requests were answered" and their number and last time (`provider_health.observed`). `?refresh=1` reloads the page every minute (a `<meta http-equiv="refresh">`, off unless asked for, with a link to stop it) |
-| GET `/login` | anyone | Sign-in page; when sign-up is open, the consent ("signing in makes an account", terms and privacy notice) is plain text under the buttons. Sign-in pages use the short footer (`footer_mode = "minimal"` in `base.html`) |
+| GET `/login` | anyone | Sign-in page; when sign-up is open, the consent ("signing in makes an account", terms and privacy notice) is plain text under the buttons. Sign-in pages use the short footer (`footer_mode = "minimal"`, read by `base.html` and `_footer.html`) |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; with open sign-up a new verified address gets an account (303 to `/app`); 403 page if not allowlisted (allowlist mode), blocked (open mode) or email not verified; 503 "Sign-ups are full for today" when the day's new accounts are used up; 429 when one address has made too many accounts |
 | POST `/login/email`, GET and POST `/login/email/confirm` | anyone | The emailed sign-in link (404 unless `EMAIL_LOGIN_ENABLED`): the form answers with the same page for every address; the link opens a page with a button, and only the button's POST (CSRF-checked) uses the link up. See "Sign-in, sessions and CSRF" |
@@ -138,8 +151,9 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/uploads/{id}` | owner | Convert the chosen parts: each is cut out, checked, counted against the quota and queued as a document of its own; rate limited like an upload. 400 for pages that cannot be used, 413 for a part over the size limit, 429 for the quota or the caps |
 | POST `/uploads/{id}/delete` | owner | "Discard this file": only a POST with `confirm=yes` deletes it, any other POST shows the confirmation page |
 | GET `/jobs/{id}` | view | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
-| GET `/jobs/{id}/status?v=` | view | Status fragment for htmx polling (204 while unchanged); changes per step |
-| GET `/jobs/{id}/progress?v=` | view | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
+| GET `/jobs/{id}/status?v=` | view | Status fragment for htmx polling (204 while unchanged); changes per step. When the job has finished it answers with the status box plus the heading and `#job-body` out of band, so the open page becomes the finished page without a reload. Opened directly (no `HX-Request` header) it redirects (303) to the job page: a fragment is never a page (`web/poll.py`) |
+| GET `/jobs/{id}/progress?v=` | view | The list of steps with their counts, polled on its own outside the live region (204 while unchanged); the same redirect when opened directly. A step with counts draws a `<progress>` element with its text beside it |
+| POST `/jobs/{id}/cancel` | owner | "Cancel" on a waiting or converting document (WS11.3a). A queued job stops at once (`canceled`) and its pages come back when they were counted today; a running one is asked to stop and the worker ends it at its next reservation or beat with nothing returned. The upload is kept; "Convert it" (the retry route) starts it again without using a try |
 | GET `/jobs/{id}/draft?format=&course=` | review | Asked before a draft leaves (SW21, `web/output.py`): what students would get, the banner the file will open with, "Review N decisions first" or "Download the draft anyway" for the file type asked for (`html`, `canvas`, `cartridge`, `docx`, `epub`); with none open, 303 to the finish line; 403 for a person who can only view |
 | POST `/jobs/{id}/draft` | review | "Download the draft anyway": makes the confirm token (signed with the session's secret, for this job and its current `result_version`, 10 minutes) and 303s to the download with it. Every single download of a draft without a valid token 303s to the GET above, so a typed or bookmarked address cannot skip the question; with the token the file's name ends in `-draft`, its head carries `<meta name="readablestem-state" content="draft">` and its body opens with "Draft: N decisions are still open. Not for students." (in the Word, EPUB, Canvas and Cartridge files too). A person who can only view gets a 403 from every download of a draft; the student preview (`/view`) of a draft carries the same banner |
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
@@ -147,10 +161,11 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/keep` | owner | "Keep for 7 days": the deletion time becomes seven days from now; 429 and nothing changed when it would put the person over the 40 kept documents |
 | POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | view | The HTML as an attachment |
-| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); 409 with fewer than two such parts, 404 for another person's or an expired document |
+| GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); with fewer than two such parts it answers 200 with the combine page below instead of a file; 404 for another person's or an expired document |
+| GET `/jobs/{id}/combine/parts` | owner | The combine page (`templates/combine.html`, `views.combine_view`): always 200 for a part of a file converted in parts. A row per part the person keeps, in page order, with its state as the list words it (`web/states.py`), the open decisions and a Review link to the first open one (the review screen's own queue), then "Combine the N ready parts (leaves out M)" with the Word and EPUB links, or what is still needed when fewer than two are ready. Linked from every part's page (`_job_parts.html`); 404 for another person's, expired or non-part document |
 | GET `/jobs/{id}/download/canvas` | view | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/download/cartridge` | view | The same page as an IMS Common Cartridge 1.3 package, `.imscc` (`pipeline/export_cartridge.py`, docs/output.md "The Common Cartridge export"). Same errors and recording as the Canvas zip; a plain link on the job page |
-| GET `/jobs/{id}/download.docx` | view | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link in the Word route of "Where will you post it?" on the finish line, shown only when pandoc is installed |
+| GET `/jobs/{id}/download.docx` | view | The document as a Word file with native equations (`pipeline/export_docx.py`, docs/output.md "The Word export"). The same rules as `/download`: another user's or an expired job is 404, one that is not done 409, the file is made again first when a review write left it out of date, the deletion clock restarts, and it is recorded as a download (code `open` when decisions were still open) with the file type `docx`. The file is built once per version of the document and kept (`web/export_store.py`, a `blobs` row of kind `export`, deleted with the job): a repeat download is answered from it and still restarts the clock and is recorded. 503 when pandoc is not installed or two Word files are already being made; 409 with a plain page when the file cannot be made (the HTML stays available). A plain link in the Word route of "Where will you post it?" on the finish line, shown only when pandoc is installed |
 | GET `/jobs/{id}/download.epub` | view | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link in the EPUB route of "Where will you post it?" |
 | GET `/jobs/{id}/share` | owner | Who can open this document (G1, "Sharing a document" below): the people and their right, the form to add one, the document's address to copy. 404 for a sample or an unfinished document |
 | POST `/jobs/{id}/share` | owner | Give a person (`email`, in full) the right `role` (`view` or `review`), or change theirs; 422 with the reason beside the field for an address that is not one, your own, a right that does not exist, or an eleventh person. CSRF-checked, nothing is sent |
@@ -158,20 +173,20 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
-| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
-| GET `/jobs/{id}/review/list?kind=&page=` | review | "All items as a list": every fix, grouped by kind; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below) |
-| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
-| POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item that list shows, as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
+| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `mode=page` (with `page=`) is "Fix something on a page" (WS19.6): the page's tools are the first panel under the heading "Page N", no decision is shown above them, and the optional checks of that page follow; `add`, `left`, `top`, `right`, `bottom` describe a region to add |
+| GET `/jobs/{id}/review/list?kind=&page=&part=&at=` | review | "All items as a list": every fix, grouped by kind, 25 cards a view; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below); `part` (1-based) picks the view and `at` (an item, heading group or section id) picks the view that holds it |
+| GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, one page of it (`?page=`, 20 items) and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
+| POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item of the page the list shows (`ids`; with none, every candidate), as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
 | GET `/jobs/{id}/symbols?view=` | review | The Symbols screen of a document with handwritten equations: every symbol read in them, grouped with the ones that look alike, with counts and places ("Symbols in handwritten equations" below) |
 | POST `/jobs/{id}/symbols` | review | Write one symbol as another of its family in every handwritten equation still waiting, except the places the form checked; one write (CSRF, review `version` checked: 409 and nothing changed when the document changed since the page was drawn; 422 when no symbol, or one outside the family, is chosen); one Undo takes it back |
-| GET `/jobs/{id}/review/marks.css` | review | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
-| GET `/jobs/{id}/pages/{n}.png` | review | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
+| GET `/jobs/{id}/review/marks.css?page=N` | review | Where each mark and its frame go on page `N` (1-based; 404 when there is no such page), and the compare sizes of the equations on it (element ids and numbers only). `Cache-Control: private, no-cache` with an `ETag` made from what the page's marks are made of (see "Marks stylesheet" below): a repeat request that names it gets a 304 with no body, after the same access checks as the screen. With `v=<tag>`, the screen's own link, `private, max-age=31536000, immutable` while the tag is the page's current one |
+| GET `/jobs/{id}/pages/{n}.png` | review | Page `n` (1-based) of the upload, rendered at 144 dpi and kept only in the web process's memory (`PAGE_IMAGE_CACHE_MB`, default 32; emptied with the job), `no-store` for the browser; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | review | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
-| POST `/jobs/{id}/review/{element_id}` | review | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers`, `use_local` or `not_a_table`; `action=add_data_table` adds a chart's data table read from the image; `action=describe` with `description` gives an item kept as an image its alt text, T3-16); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
+| POST `/jobs/{id}/review/{element_id}` | review | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers`, `use_local` or `not_a_table`; `action=add_data_table` adds a chart's data table read from the image; `action=describe` with `description` gives an item kept as an image its alt text, T3-16; `action=reread` reads a waiting equation's own picture again on the main model and replaces its proposal (WS8.5; rate limited as `reread`, one write that Undo puts back whole, an empty read leaves the day's count as it was and says so); `action=not_equation` gives a waiting equation's glyphs back to the text, a paragraph where it stands or the words back in their line (WS4.5; refused for a table's cell or an equation with no text from the PDF, recorded as `removed`, Undo puts the element, paragraph and fix back, and a revised file gets the same choice for the same picture and words, `carry_edits`)); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
 | POST `/jobs/{id}/review/{element_id}/check` | review | The checks Save edit would run, on the LaTeX being typed (htmx, after a 0.6 s pause): an HTML fragment, nothing stored; 204 when signed out |
 | POST `/jobs/{id}/undo` | review | Undo the job's last review write, from the page that write drew (its `version` must be the job's); a structural edit below is put back too |
 | POST `/jobs/{id}/edit/{element_id}` | review | Change what the tool did not propose (T3-5): `action=text` changes the words of a paragraph, list item or heading (`text`), `action=heading` makes a paragraph a heading (`level`). Review `version` checked; 422 with the error beside the field |
-| GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | review | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered now in the render child, never stored; 404 for a region that is not one |
+| GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | review | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered in the render child, kept in the same memory cache, never stored on disk; 404 for a region that is not one |
 | POST `/jobs/{id}/pages/{n}/add` | review | Add a picture the tool did not find (`kind=picture`, `alt`) or mark a region as an equation (`kind=equation`: the equation step reads it, the answer is a required decision), the region as `left`, `top`, `right`, `bottom`. Rate limited (`edit_region`, and `reread` for an equation), one read at a time per person, under the job's and the day's spend caps |
 | POST `/jobs/{id}/pages/{n}/omit`, `/restore` | review | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
 | POST `/jobs/{id}/tables/accept-clean` | review | Accept every table that waits with nothing wrong found in it (T3-11), one write |
@@ -183,14 +198,16 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation (an editable starter set of common bold vectors and matrices while it has none), its documents, rename and delete as separate sections; add a symbol |
 | POST `/courses/{id}/starter` | owner | Add the checked starter rows as edited (`notation.add_starter`); nothing is added unchecked |
 | POST `/courses/{id}/documents` | owner of the course and of each document | Put finished documents that are in no course into this course (`notation.attach_documents`): listed under it, their review screen and edit checks use its notation; they are not converted again (to read the PDF with the notation, upload it again for the course) |
-| GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
+| GET, POST `/courses/{id}/entries/{entry}`; GET, POST `.../delete` | owner | Edit or remove one symbol. "Remove" is a link to the GET question, which names the symbol, its meaning and note and says what is lost; its button posts. A repeated POST answers as the first did (`course.remove_entry`) |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
-| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
+| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | view | The review record (T3-6, "The review record" below): a page to print and a CSV; anyone who may open the document (a person's address is shown to the owner only, and the CSV names who decided in the owner's file only), finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the checked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
-| GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
-| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (adding makes them `invited`; removing blocks them) |
-| POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
+| POST `/courses/{id}/people` | owner of the course; setting on | Give a person (`email`, in full) the right `role` (`view` or `review`) on every document of the course, or change theirs (the share page's validation and words; at most 10 people per course); 422 with the reason beside the field. CSRF-checked, one-submit form `people.add`. 404 with `FEATURE_COURSE_GRANTS` off |
+| POST `/courses/{id}/people/{grant_id}/remove` | owner of the course; setting on | Without `confirm=yes` the answer is the question "Remove <address> from <course>?" (so no address is in a URL); with it, remove the grant, effective on the person's next request. CSRF-checked, one-submit form `people.remove` |
+| GET `/admin` | admins | Sign-up numbers (accounts today against the limit, accounts by tier, blocked), the allowlist with each person's tier, blocked accounts, today's spend against the cap and the open pool, the queue (how many stored documents are in each state, in the table's labels, F-213), aggregate counts, usage counts per day and per pseudonymous person |
+| POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone (the Remove button's POST answers with a question that names the address and says what is lost, and removes only with `confirm=yes`, so no address is in a URL; adding makes them `invited`; removing blocks them). Every admin POST says what happened: "Nothing changed: ..." with the reason for an empty or unknown address or a repeat, never a success when no row changed (`routes/admin.py`, the words of `routes/sharing.SHARE_OUTCOME`'s shape) |
+| POST `/admin/users/block`, `/admin/users/unblock` | admins | Block an account (the Block button and the "Block by email" form post, the answer is a question naming the address, and only `confirm=yes` blocks; signed out everywhere, jobs stopped, sign-ins refused in either mode, no new row) or lift the block (the tier is kept). Not oneself |
 | POST `/admin/linked-emails`, `/admin/linked-emails/remove` | admins | Let an allowed instructor also sign in with another Google address, or take that away (T3-10; "Sign-in, sessions and CSRF") |
 | POST `/internal/cron/aggregate-and-purge` | a scheduler (Cloud Scheduler on the Cloud Run path; production runs the `cron` service instead and does not call it) | `X-Cron-Token` header; aggregates, then purges, then runs the daily canaries |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
@@ -213,6 +230,16 @@ case (check the address and the signed-in account, ask the sender; it may also h
 deleted), so a revoked share, an expired document and an id that never existed read the
 same. It is a 404 either way. The
 `/courses/*` routes do the same for courses.
+
+**The page frame.** `base.html` draws the header and, through `_footer.html`, the footer. The
+footer partial holds the one list of footer links (each target has one label) and three
+arrangements: the full one for public pages, a compact one for signed-in pages and a short one
+for the sign-in pages. The mark `aria-current="page"` in the main navigation and the footer
+comes from the path alone: `deps.current_section` maps it to a section (`deps.SECTIONS`, the
+longest matching prefix), so a document's pages (`/jobs/...`, `/uploads/...`, review, share,
+Listen, record, draft) mark "My documents", `/courses...` Courses, `/account...` Account,
+`/admin...` Admin, and a path in no section marks nothing. A route does not pass `active`; a new
+page is added to `SECTIONS` when it belongs to a section the frame names.
 
 ## Sign-in, sessions and CSRF
 
@@ -324,6 +351,70 @@ same. It is a 404 either way. The
   constant time with the session's. `tests/test_web_auth.py` lists every POST route and
   checks each refuses a forged token, so a new route cannot skip the check unnoticed.
 
+## Forms: the one submit rule (`web/forms.py`, `templates/components/forms.html`, SW43)
+
+A form that saves, adds, starts or deletes something is answered once, however often it is
+sent: a double click, a tap on a slow phone, Back and send again, a retry by the browser.
+
+- **The form.** `form(key, action, attrs)` (`components/forms.html`, imported `with context`)
+  draws a POST form of the registry's form `key` (`web.forms.FORMS`: one row per route, with
+  its kind, its busy label and what a repeat did before the rule). It writes the CSRF token
+  and a **request token**, `secrets.token_urlsafe(24)`, minted for that drawing of the form.
+  The upload reads its body itself, so its token also rides in the action's query string
+  (`token_in_action`). `submit_button(label, busy)` draws a button with its own busy label
+  (SW10's button macro takes it over).
+- **The handler.** `@submit_once("key")`, under the route's decorator. The first request
+  with a token runs the handler; the table row `request_tokens` (user, token, form key) is
+  inserted in the first commit that writes, so it shares the action's transaction (an action
+  that fails writes neither). When the handler has answered, the row keeps the outcome: the
+  status, the redirect target and the one-time notices. An answer of 400 or more, or an
+  error, removes the row, so the form can be sent again; a request that writes nothing keeps
+  no row.
+- **A repeat.** The same token from the same person again: the stored outcome is answered
+  (its notices shown again) and nothing runs (`request_replayed` is logged with the form key
+  only). A repeat that arrives while the first request is still running waits for it (in the
+  process, a lock per token; across processes, the unique key on `(user_id, token)`) and gets
+  the same answer; after 5 minutes it gets a 409 "Still saving" page that says nothing was
+  done twice. A token is looked up for its own user only, so another person's token replays
+  nothing: their request runs as their own.
+- **Another token, same thing.** A second form drawn before the first click saved carries a
+  new token. Where the thing is already as asked, the answer is the first click's, not an
+  error: a review decision the item already has, made by the same reviewer, is "Already
+  saved" (no write, no new version); Add course for a name the person already has opens that
+  course; Add a symbol with the same meaning and note says the course already has it; removing
+  a share that is gone, or Try again on a document that is waiting or converting, answers as
+  the first click did; linking an address already linked to the same instructor says so.
+- **Without a token** (the forms below that cannot carry one, and any request without the
+  field, such as a script) the handler runs as it did before the rule.
+- **Which forms.** Every POST form of a signed-in person is drawn by the macro and has a row
+  in `FORMS`, except "Download the draft anyway" (`job_draft.html`): its answer is a file
+  download, so the page does not change and a form blocked after one click would stay
+  blocked. The delete forms of a document, an upload and a course are drawn twice, as the
+  people forms are: the button asks (the answer is the question; nothing is written, so no
+  row is kept; its own busy label says "Opening…") and the question's button deletes. The
+  sign-in and sign-out forms (`signin.*`, `signout`) are in `FORMS` with `token=False`: the
+  token is looked up with a signed-in user's id and these arrive without one, so the macro
+  draws them with the busy label and the page's block on a second submit and no request
+  token, and the server runs as before (the identity provider, the one-time sign-in link or
+  the session answers a repeat). The live check of a typed value on the review screen
+  (`hx-post` to `/jobs/{id}/review/{item}/check`) is not a form that changes anything and has
+  no row.
+- **Not CSRF.** The request token is not a CSRF token and replaces none: every route still
+  checks `csrf_token` first (`require_csrf`; the upload checks it after the replay, which
+  runs nothing).
+- **In the browser** (`static/app.js`, "The one submit rule"): the pressed button gets
+  `aria-busy="true"` and `aria-disabled="true"` (not `disabled`, which would drop it from
+  the focus order and from the request), its busy label ("Saving…", from
+  `web.forms.BUSY_LABELS`), and a polite live region says the same; a second click or Enter
+  sends nothing. It is ready again when the page comes back from the browser's page cache
+  and after an htmx request of the form itself. `controls.css` has the pressed and busy
+  looks, also in forced colors, and moves nothing when reduced motion is asked for.
+- **How long.** The rows go when the session ends (sign-out, a block or removal, an unlinked
+  address), with the account (`erase_user`) and, at the latest, 7 days after they were made
+  (`SESSION_MAX_AGE_S`, the hourly purge: `tokens_deleted`). Account deletion's own row is
+  kept without a user, tied to the browser by a session marker, so a second click on Delete
+  my account gets the Deleted page instead of an error; the purge removes it after 7 days.
+
 ## Sign-up modes and access tiers (`web/access.py`, `web/auth.py`, `web/routes/account.py`)
 
 `SIGNUP_MODE` decides what happens to a verified sign-in that has no account.
@@ -364,9 +455,11 @@ What the open tier changes, and where:
   today".
 - **Model reads from review.** `OPEN_TIER_DAILY_REREADS` a UTC day, counted in
   `quota_days.rereads` by one conditional UPDATE (`quota.try_consume_reread`) before the
-  read starts and not given back, like pages. Every model read from review (a region marked
-  as an equation, a table cell read as math) goes through `reread.read_equation`, so one
-  place counts them; adding a picture costs no model call and is not counted. Invited
+  read starts, like pages, and given back (`quota.give_back_reread`) when the read comes back
+  with nothing or is refused after it was counted (pages are not given back). Every model read
+  from review (a region marked as an equation, a table cell read as math, "Read again" on an
+  equation) goes through `reread.read_equation`, so one place counts them; adding a picture
+  costs no model call and is not counted. Invited
   accounts have no allowance beyond the rate limits.
 - **Spend.** Their documents' reservations also draw on the open pool
   (`OPEN_TIER_DAILY_SPEND_CAP_USD`, "Spend cap" below). When it is spent, new uploads of open-tier
@@ -408,7 +501,7 @@ pseudonym (`quota_days.spent_usd`), and a "Blocked accounts" table with Unblock.
 `auth.set_blocked(blocked=True)`: `set_allowed(allowed=False)`, so sessions end, queued and
 running jobs fail with `access_removed`, and admin rights are lost (not given back by
 unblocking). An admin cannot block themselves. With thousands of accounts the page lists the
-newest 300 of each table, and a "Block by email" form (the same `POST /admin/users/block`) reaches
+newest 300 of each table, and a "Block by email" form (the same `POST /admin/users/block`, which asks first) reaches
 any account, listed or not.
 
 Pages and `ops launch-check`: the public pages that carry invitation wording render it only
@@ -424,7 +517,12 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031 on the OpenAI pair and about $0.11 on `claude-opus-5-5` at 2026-10 prices:
    a display equation on the main model), a friendly 503 page ("Conversions are paused
    for today"). A smaller threshold admitted uploads that could convert nothing;
-1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
+1a. the wait a refusal states (`quota.retry_after`, `Wait`): every refusal that tells a person to come back builds its
+   sentence ("Try again at midnight UTC", "in about 5 minutes") and its `Retry-After` header from the same number
+   (`Wait.words`, `Wait.header`). The daily ones (the page quota, the daily spend cap, sign-ups full) are the seconds to the
+   next midnight UTC, the time `quota.next_day_start` resets at; the rate limiter's are its own wait; the fixed pauses (storage
+   full, busy) are named constants. Refusals that give no time carry a plain `Retry-After` only.
+1b. stored bytes (`web/storage.py`): while the service holds `STORAGE_GLOBAL_MAX_MB` of uploads a plain 503 page ("Uploads are paused while storage catches up", `Retry-After` an hour) is answered before the body is read; and per file, in the job's transaction with the person's row locked, an upload that would take the person over `STORAGE_PER_USER_MB` (`STORAGE_OPEN_TIER_MB` for open-tier accounts) is refused with 413 and says how much they store and to delete documents (`storage_user`); a body whose Content-Length is already more than they may still store (less 64 KB for the form's fields) is refused the same way before any of it is read (`routes.jobs._storage_refusal`, which cannot name the file); a large file kept for its pages and the parts cut from it are held to the same cap, and the parts page keeps the file when a part is refused;
 2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
    user (`uploads.UploadGate`). Each upload costs about three times its size in memory
    while it is read, copied and probed, so this keeps uploads to at most about 900 MB (three
@@ -462,8 +560,8 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    hidden text is not used, that nothing was taken from the daily pages, and to upload a
    typed version: never "run OCR", which makes exactly these files) and one whose every
    page is blank (`no_content`). A page the probe cannot be sure of (a full-page picture
-   with a short title and no hidden layer, which may be a slide; ink not analyzed within
-   the 10 s budget) never refuses the upload: the conversion keeps it as an image with
+   with a short title and no hidden layer, which may be a slide; ink beyond the
+   probe's allowance of path items) never refuses the upload: the conversion keeps it as an image with
    a decision (docs/layout.md "Hidden text and page types"). The child caps its own address space at 768 MB. The conversion
    runs in a child process of its own too; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
@@ -471,7 +569,13 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
    upload page again, naming the file, its pages and the pages left today). The quota is
    the person's tier's (`PER_USER_DAILY_PAGE_QUOTA` for invited people,
    `OPEN_TIER_DAILY_PAGE_QUOTA` for open-tier accounts, whose message says "the N pages a new
-   account can convert today"). Before all of this, an upload is refused (503) while the
+   account can convert today"). A file that is only scans or handwriting is refused here
+   without counting a page; when the probe could not tell inside its allowance, the file
+   becomes a job and the conversion's first step fails it with the same words, and its pages
+   come back the same day, in the transaction that marks the job failed (`quota.give_back_pages`,
+   `worker.Worker._finish_failed`). It still counts for the per-person upload rule
+   (`upload_user`) and no "Try again" is offered, so it cannot be repeated without bound. Every
+   other failed job keeps its pages. Before all of this, an upload is refused (503) while the
    day's spend cap is used up or, for an open-tier account, while its pool is.
 
 Validation errors re-show the upload page with an error summary linked to the file input.
@@ -493,17 +597,53 @@ every converted equation and table needs your check)", beside the exam box. It i
 choice for that upload (`Job.image_pages`, and `PendingUpload.image_pages` for a large file, applied
 to each of its parts that has such pages); the flag only offers it.
 
-- **The probe.** Only when the box is checked is the probe told so (`pdf_probe MAX_PAGES
-  image_pages`): it then lets a PDF of scans or handwriting through and counts the pages
-  `page_type` calls scanned or handwritten (`page_type.image_page_count`, the same classifier layout
-  uses; typed pages are told from their text alone, so only a page that is not clearly typed pays
-  for the ink analysis; a page whose text covers little of it (under 12 %) pays for it too, as a
-  watermark or a page number can lie over vector handwriting). The count is an estimate: a page
-  whose picture is the template's background is counted by the probe and found typed by layout.
-  A file with none is not refused and not changed: the request does not
-  apply, and the job is made as if the box were not checked. Without the box a PDF of only scans
-  or handwriting is refused as before, and the message (`upload_error_message`) says to upload it
-  again with the box checked when the server offers it.
+- **The probe.** With the flag on, every upload is counted (`pdf_probe MAX_PAGES count`, or
+  `image_pages` when the box is checked, which also lets a PDF of scans or handwriting through):
+  `page_type.probe_pages` makes one pass over the pages for the refusal and the count, by kind
+  (`page_type.ImagePageCount`: scanned, handwritten, unread pages of ink or drawings, and
+  `unanalysed` pages whose ink the guard did not analyze, which makes the count "at least").
+  The ink analysis is bounded by work, not by a clock: the whole document has an allowance of
+  50,000 path items (`page_type.PROBE_MAX_ITEMS`, spent through `InkBudget.take`; a page of dense
+  handwriting has about 35,000), and a clock of 20 s (`PROBE_GUARD_S`) only guards against a hang,
+  so the same file gets the same answer on a slow machine and a fast one. Notes of many dense
+  pages made the request take 4 to 8 s with an allowance of 1,000,000; with 50,000 they take
+  1.3 to 4.3 s (20 pages of 6 MB, 100 pages of 30 MB, measured 2026-11-18), as long as the text
+  pass and the drawings of the pages analyzed take. Once the allowance is spent the drawings of
+  the pages after it are not read (`page_type._probe_ink`): reading them cost more than the
+  analysis. A page past the allowance is not refused; with less than a line of text it still
+  counts as an unread page of ink, so the count and the choice for a file of mostly handwriting
+  stay, while the split between handwritten and unread and the refusal of a document that is only
+  handwriting wait for the conversion (`worker.result_outcome`, same words, and the pages come
+  back: `worker.Worker._finish_failed`, docs below, "page quota"). The text pass, about 14 ms a
+  page of a dense file, is the rest of the time.
+  The kinds are those of `page_type.image_kind`, the one predicate that also picks the pages the
+  image page pass reads (`image_page.kept_reads`), so the count and the reading agree. Typed pages
+  are told from their text alone, so only a page that is not clearly typed pays for the ink
+  analysis (a page whose text covers little of it, under 12 %, pays too, as a watermark or a page
+  number can lie over vector handwriting); the text pass over typed pages of a long file costs
+  about 26 ms a page. The count is an estimate: a page whose picture is the template's background
+  is counted by the probe and found typed by layout. A file with none is not refused and not
+  changed: the request does not apply, and the job is made as if the box were not checked. Without
+  the box a PDF of only scans or handwriting is refused as before, and the message
+  (`upload_error_message`) says to upload it again with the box checked when the server offers it.
+- **Said at upload.** A file with such pages and the box not checked is queued with them kept as
+  pictures, and the answer says how many pages are scans or handwriting, that they stay pictures
+  marked "Not converted" unless asked for, and what reading them would cost
+  (`outcome.image_pages_offer`: pages times `IMAGE_PAGES_USD_PER_PAGE`, at most
+  `IMAGE_PAGES_MAX_USD_PER_JOB`, `Settings.image_pages_estimate`, the same figure the job's cap
+  uses). The cost is worded once, by `outcome.image_pages_cost`, as "up to" (both settings are
+  spend limits, not prices: a job that reaches the per-job one stops reading and keeps the rest as
+  pictures), and the same sentence is in the checkbox's hint (`aria-describedby`), the refusal of
+  a PDF of only scans, the stopped job's message, the offer above and `/limits`. With the count
+  of such pages in the file it is the estimate for the file; without it, the per-page and
+  per-document limits. A file whose count is "at least" gets the limits, not an estimate. A single file's answer is a notice on its job page; a batch's is a line under the
+  document's row (`Placed.scans`, kept with the answer in `upload_result`). The finished job's
+  "pages kept as pictures" note says the same from the stored page records
+  (`outcome.image_pages_in`, the same count function) to its owner, with "Upload it again with the
+  box checked", which opens the upload form for a revised version with the box checked
+  (`/app?revises=<id>&image_pages=on`). Until a re-read of a finished document exists, that is the
+  way to ask. A large file kept for choosing its pages says nothing at upload; each part's job
+  page does when it is done.
 - **Quota.** Pages count against the daily quota as for any document (`intake.store_job`),
   open-tier accounts included.
 - **Spend.** A job that asked has the dollar cap `max(MAX_USD_PER_JOB limited by MAX_USD_PER_PAGE,
@@ -548,21 +688,72 @@ counted are the PDF's. A page count from LibreOffice can differ from Word's. Mea
 the development box: a one-page Word file converts in under a second; with the model, a
 one-page file with a Word equation took 5.5 s and $0.014 on Claude.
 
+**The census (WS18.13).** The child's preflight returns what it counted in the file, as
+`office_convert.Census` (counts only, no text), in the header line it sends back; the upload route
+stores it on the job (`jobs.office_json`; `pending_uploads.office_json` for a large file kept for
+its parts, which hands it to each part) and the CLI uses it too. It counts with an expat target
+that builds no tree, on the parts the preflight already read, under the same size limits and
+defusedxml parser; a part that is not well formed gives partial counts. What it holds, and what
+each count is for: `tracked_insertions` and `tracked_deletions` (Word: `w:ins` and `w:del`, outside
+`mc:Fallback`) make the *required* notice `office_tracked_changes` (count = both), so a Word file
+with open changes is "Ready", never "Ready to share", with the sentence "Tracked changes ... Accept
+or reject them in Word, then upload the file again"; `speaker_notes` (slides whose notes hold text),
+`hidden_slides` and `comments` make *optional* notices (`office_speaker_notes`,
+`office_hidden_slides`, `office_comments`, "Worth checking"), because the PDF export leaves each
+of them out; `typed_equations` (OMML equations, Word and PowerPoint) is the job page's "How this
+file was read" sentence (they are read as pictures of the PDF page, like any equation in a PDF);
+`units` (slides, or the pages Word states) is built for a later charge and nothing reads it yet.
+Counted and left out because no sentence needs them (rule 12): hidden runs, fields, text boxes,
+headers and footers, footnotes, tables, pictures. The notices are added to the result when the
+worker stores it (`web/office_census.py`), so "Try again" does not list them twice.
+
 Not done: Word fields are not evaluated (an `INCLUDETEXT` field did not read the local file
 it names, tested); no PowerPoint conversion could be run on the development box (Impress is
 not installed there), so that path is covered by the file checks and a stand-in only.
 `readablestem convert FILE.docx` takes Word and PowerPoint files too.
 
-A third box, off by default: "Exam or quiz: describe figures without giving answers"
+A third box, off by default and always in view under the file field (it changes what students
+get, so it is not folded into a group): "Exam or quiz: describe figures without giving answers"
 (`exam`). It is stored as `jobs.exam_mode` and the worker passes it to the conversion as
 `ConversionOptions.exam_mode` (`web/notation.conversion_options`, which also carries the
-course notation; with neither, the run uses the settings' flags as before). Figure
-descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
+course notation; with neither, the run uses the settings' flags as before). The options are in
+force for every step of the run (`pipeline/options.py`), so each step that describes content can
+read the fact. Figure descriptions say what is shown and never the result
+(`pipeline/figure_step.py`); the page-image reader's figure descriptions do not read it yet (the
+prompt `image_page.md` has no exam wording, and a changed prompt is a changed request).
+
+The choice is said where the document is handled, in one set of words (`web/exam.py`, the Jinja
+global `exam_words`): the job page ("Exam or quiz: figure descriptions do not give answers." or
+"Not an exam or quiz: figures are described normally.", with "Change the exam or quiz choice" for
+the owner of a finished document, which opens the revised-upload form with the box ready), a mark
+on the row of the documents list and of an upload's batch page, the review header, the review
+record and its CSV, and the job page a reviewer opens from a share. The student's page, files and
+Listen text never say it. Changing the choice is a revised upload (the file again, decisions
+carried over); a change in place that re-describes only the description steps is not built.
+
+The box is never checked for the person, but the page can suggest it from a name
+(`web/exam.py` `word_in`, `NAME_WORDS`: exam, quiz and midterm, in the plural too, as whole
+words in any case; a digit, `_`, `-`, `.` or a camel-case join breaks a word, so "Midterm2" and
+"quiz-03" count and "Examples" does not). "Final" and "test" are left out on purpose:
+`..._FINAL.pdf` is a final draft and "test" is a draft label; "final exam" is caught by "exam".
+Homework, worksheets and problem sets are not read as exams. With JavaScript, when the box is not
+checked and a chosen file's name holds one of the words, `static/app.js` writes one line into the
+polite region `#exam-hint` under the box ("A file name says “midterm”. Check the box above if
+students will be tested with it."); it goes when the box is checked or the files change, and it
+never checks the box or moves focus. The words and the sentence reach the script as data
+attributes of the box. The server cannot see a file name before the upload, so without
+JavaScript nothing changes there. After the conversion, the job page of a finished document that
+was not converted as an exam, and whose title or file name holds one of the words, adds one line
+(`_job_exam.html`, `#job-exam-hint`) with the word and, for the owner, the same "Change the exam
+or quiz choice" link. It is computed from the title and file name when the page is rendered and
+stored nowhere; it blocks nothing and changes no count, and no prompt reads it. The student's
+page and files never say it.
 
 **The form's shape** (`_upload_form.html`, ux2-lane-a): the file field with its facts, then two
-groups that are one line each until opened, then "Upload and convert". "How to convert it" (course,
-exam or quiz, scanned and handwritten pages when offered) and "How long to keep it" each say what
-is set now ("No course · Figures described normally · Scanned pages kept as pictures"; "Deleted 24
+groups that are one line each until opened, then "Upload and convert". The "Language of the document" select ("Detect it" by default; stored as `Job.language` and `PendingUpload.language`, and handed to the converter as `ConversionOptions.language`, which is not part of a step's key) and the exam box sit between the
+file field and the groups. "How to convert it" (course and scanned and handwritten pages, each when
+offered) and "How long to keep it" each say what
+is set now ("No course · Scanned pages kept as pictures"; "Deleted 24
 hours after you last work on it."); static/app.js rewrites that line as boxes change, and a group opens by itself when it
 holds a choice that is not its default. The scan box says first what it is for: needed for a PDF
 that is all scans or handwriting (refused without it), while a mixed PDF keeps its scanned pages
@@ -604,6 +795,79 @@ person's daily page limit once no page is left ("You have converted all 150 page
 today. Uploads open again at ..."); before that, the hint under the file field says how
 many pages are left and when the count starts again.
 
+### Word files read from the file (`FEATURE_WORD_SOURCE`, WS18.14 and WS18.15)
+
+Off by default. With the switch on, a `.docx` upload is not turned into a PDF: its own structure
+is read (`source/docx_reader.py`) and goes through the source path that LaTeX uses (the envelope
+kind `docx`, `source.convert`, origin `docx`). The route (`routes/jobs._place_word`) runs the
+Word gate in a child process (`uploads.check_word_isolated`, `office_convert --check`), and falls
+back to the PDF route above for anything it does not take: a revision, a file the gate refuses
+(the PDF route has its own gate and says why), a file over the pages one job takes (only the PDF
+route splits a long file into parts), a file that is not a Word document, and a server with no
+pandoc or no passing sandbox probe (the same condition as LaTeX source).
+
+- **Gate** (`source/docx_package.check`): the Office preflight (`office_convert.preflight`) and
+  more: a member name with `..`, an absolute path, a backslash or a drive letter, a name twice,
+  a folder with a size, an unpacked part over 80 MB (20 MB for the small parts), a ratio over 400
+  above 4 MB, and an XML nesting over 300 deep. Refusals use the Office codes (`office_unsafe`,
+  `office_unsupported`). A file in Strict Open XML (the `purl.oclc.org` namespace, which pandoc
+  cannot read, 3.1 and 3.7 alike) is `office_unsupported` here, so the route leaves it to the
+  PDF route.
+- **Working copy** (`docx_package.prepare`): pandoc is not given the upload. It is given a new
+  package of the parts it needs (document, footnotes, endnotes, styles, numbering), with the
+  relationships filtered to styles, numbering, notes, hyperlinks and pictures; each picture
+  replaced by a 1x1 PNG of the same name (the reader takes the real picture from the upload
+  later); no embeddings, macros, headers, footers, comments, settings or themes. External
+  targets (`TargetMode="External"` pictures, templates, OLE) are never copied, so nothing is
+  fetched. Hidden runs and paragraphs are taken out here, a simple field (`w:fldSimple`: page
+  number, reference, merge field) is written as its runs (pandoc drops its result), a carriage
+  return is written as a line break (pandoc reads it as nothing), and each table's style id is
+  replaced by a mark that carries whether the author marked a header row (pandoc 3.1, the
+  Dockerfile's pin, does not give the style id back; the reader then goes by the file's own list
+  of marks when it lines up with the tables of the tree).
+- **pandoc step** (`source/pandoc.py`): one sandboxed run (`--sandbox`, no network, the working
+  copy read-only, output to the JSON tree, a heap cap), under the lock LaTeXML uses
+  (`source.convert.GATE_NAME`), with limits of its own (pandoc needs 2 GB of address space and
+  six tasks, which LaTeXML's limits do not give it).
+- **What the reader takes from the file** (`docx_reader.read`): headings, lists with levels and
+  start numbers, tables with spans and a header row only when the author marked one (an unmarked
+  first row is a proposal with a check), pictures with the author's alt text (accepted without
+  a model; a picture without text goes to the figure step), footnotes (in the text, as a note),
+  links, super- and subscripts, the title style, captions, and every equation typed in Word
+  (`m:oMath`): pandoc writes LaTeX, which goes through `read_latex`, `check_latex` and
+  `safe_latex_to_mathml` and then to the same fix a LaTeX equation gets. One that cannot be
+  converted is counted and stays what the PDF route would have made of it (a figure for the
+  model step).
+- **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
+  copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
+  `w:lang`, the document language is the most common one; headers and footers (dropped) are
+  counted (`word_headers_footers`, optional); a default table style (read as a header row by
+  pandoc) is told from a marked header row; SmartArt, charts and embedded objects (silent) are
+  counted as the required notice `word_objects`; the Title style, which pandoc moves to its
+  metadata (with Subtitle, Author, Date and Abstract), is the title and a level 1 heading, the
+  others paragraphs before the body; a title in the document properties is not read.
+  Right-to-left paragraphs are read in logical order and counted (`word_rtl_text`, optional): no
+  direction is kept. A table of contents is left out and made again from the headings. Comments
+  are dropped (the census notice says so). Text in text boxes is read only when pandoc finds it
+  in the flow (a drawing box with its fallback once; a lone old-style box is not) and is
+  otherwise counted by the coverage rule: every word of the file is in pandoc's tree or counted as
+  `source_unread` (a required notice) so nothing is left out without a number. Tracked changes
+  are read as accepted, and say so (`word_tracked_changes`, required).
+- **What is stored.** The file as uploaded, wrapped in the envelope (`source/envelope.py`, kind
+  `docx`, media type `application/x-readablestem-docx`), as the job's `upload` row of `blobs`: the
+  same row, counted in the person's stored bytes and deleted with the document (`delete_jobs`,
+  the expiry purge and the deletion of the account) as the PDF of any other job. No PDF is made, so
+  no second copy exists. A Word file the reader does not take goes the PDF route above, where the
+  Word file is not kept and the PDF is. The privacy notice, "Delete this document" and the upload
+  form say which, from `AppContext.word_source_on` (the flag, pandoc and a passing sandbox).
+- **What it changes** (the switch on, against off): no LibreOffice conversion and no PDF are
+  made for a `.docx` the reader takes; the document has no page images and its original is its
+  own text (as a LaTeX source); the pages counted are one per 3,000 characters of the file's text
+  or one per picture, whichever is larger (a PDF's real pages differ); typed equations cost no
+  model call and are not read from a picture; the job page says the file was read from the
+  Word file itself. A file the reader cannot take, or that fails to read, is not tried again as
+  a PDF.
+
 ### LaTeX source (`FEATURE_LATEX_SOURCE`, ADR 0008)
 
 With the switch on, the upload form also takes a `.tex` file or a `.zip` of a LaTeX project (the
@@ -626,16 +890,85 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
 - **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
   per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
   `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their
-  switch (`source.intake.BEAMER_ENABLED`) is on.
+  switch (`FEATURE_BEAMER_SOURCE`) is on.
+- **Classes and packages** (`source/support.py`, `SUPPORT`). Each class and package is on one of
+  three lists. `bound`: LaTeXML 0.8.8 ships a binding for it (43 classes, 356 packages; a test
+  where LaTeXML is installed compares the lists with `LaTeXML/Package/`, so an upgrade fails it
+  until they are copied again). `plain`: read without a binding; for a class, its commands
+  carry layout, so it is read as an article (`scrartcl`, `scrreprt`, `scrbook`, `memoir`,
+  `extarticle`, each kept only while a small document of it converts with no error); for a
+  package, its binding loads nothing with the TeX tree hidden and the document is read without
+  it (`babel`: a command of it that the document uses stops the job). `refused`: refused at
+  upload by name, before anything is queued or counted (`source.intake.check_support`, run
+  again in the conversion child): the `exam` class (`source_unsupported_class`; read without
+  its rules, its solutions and correct-answer marks would reach students) and the `csquotes`
+  package (`source_unsupported_package`; loading it alone gives 24 errors here). The answer
+  says to compile the version students should see and upload the PDF. The main file's literal
+  `\documentclass` and the `.tex` files' literal `\usepackage` lines are read, comments
+  removed, names compared in lower case. A class on no list goes on to LaTeXML, which falls
+  back to its "OmniBus" guess, and the report stops the job if errors follow (below). Which
+  other bindings only load a package's own TeX and so fail here is found by the package sweep
+  (WS18.0), which moves each to `plain` or `refused`.
+- **TeX package names** (`source/tex_distribution_names.txt`). The image build
+  (`readablestem ops image-facts --write`) writes the names of TeX Live's packages and of the
+  files they install, from texdoc's data that `texlive-base` brings, and records their number
+  as the image fact `tex_names`. When the job stops because a package's commands are not
+  read, a package on that list is "a package this tool cannot read yet: upload the PDF", and
+  one not on it is the instructor's own: "this tool does not read package files from the
+  upload: copy the definitions you use into the source". Without the file (the repository, an
+  image built without LaTeXML) the sentence says both.
 - **The job.** The upload is stored as an envelope (`source/envelope.py`, media type
   `application/x-readablestem-tex` or `-zip`); the worker hands it to the converter like a PDF and
   `pipeline.run.convert_pdf` passes it to `source.convert`, in the same conversion child
   (`web/isolated_convert.py`). The child checks everything again, unpacks into a private temporary
   folder, runs LaTeXML in the sandbox (`core/sandbox.py`, `source/latexml.py`; docs/security.md,
   "Running uploaded TeX"), and `source/ltx_reader.py` turns its XHTML into elements: headings,
-  paragraphs, lists, tables, exact equations (LaTeXML's MathML through the sanitiser, accepted),
-  and figures with the project's own picture through the ordinary figure step. A formula
-  LaTeXML could not read, and a figure with no picture, are required decisions.
+  paragraphs, lists (a list nested in an item, a contents entry's sub-entries included, is read
+  as items of its own one level down; the item keeps only its own words), tables, exact
+  equations (LaTeXML's MathML through the sanitiser, accepted), and figures with the project's own picture through the ordinary figure step. A formula
+  LaTeXML could not read, and a figure with no picture, are required decisions. **Which picture
+  a name means** (WS18.2) is decided as LaTeX does it, not by the suffix as written: the reader
+  takes the first entry of LaTeXML's `candidates` for the graphic that is inside the project and
+  of a kind it reads (`.pdf .png .jpg .jpeg .gif`); with none, the written name with those
+  suffixes in that order, as written and in capitals (pdfTeX's order); `\includegraphics{fig1}`
+  finds `fig1.png`. `.eps` and `.svg` stay unread (a figure with no picture, as before), and what
+  the picture is is decided from its bytes (`figures.figure_png`), not its name.
+- **Nothing left out unsaid** (SW42.4). A picture outside a float (centered, in a sentence, in a
+  list item, in a table cell) is a figure of its own straight after the block that holds it; a
+  picture in a cell makes its table a required decision (`source.read` / `source_table_picture`),
+  since the cell reads as empty. A float reads its tables or pictures, the first with the
+  caption, then everything else in it in order (the words beside a picture, a note under a
+  table, subfigures); a `\captionof` caption goes to the picture just before it. `\intertext`
+  is a paragraph between the equations, `\date` is a line of its own, and a block that holds its
+  words with no paragraph inside (a Beamer `\framesubtitle`) is a paragraph. A formula LaTeX could
+  not read that a table, a heading or a caption shows as LaTeX code makes that item a required
+  decision (`source.read` / `source_formula_unread`). After the walk the reader counts what no
+  rule read and no entry of its skip list (`ltx_reader.SKIP`, each entry with its reason)
+  covers: `SourceReport.unread_words`, `unread_pictures` and the first 12 words. Either above 0
+  adds the required notice `source_unread`, whose line on the job page gives the counts and the
+  first words, and the finished job has the gap note "Parts not read" (`states.gaps_of`), so
+  it is "Partly converted" and never "Ready to share".
+  Three more lines go through `core.page_checks` (`convert._source_lines`): `source_unplaced`
+  (required: LaTeX reported errors the reader could not tie to a place, counted; the job is held
+  at "Ready" with its sentence), `source_figure_missing` (required: pictures the source names
+  that are not in the upload or cannot be read, counted) and `source_not_compared` (worth
+  checking): no compile witness runs for a job (`source.tex_compile` is called by none) and
+  nothing prints a Word source, so the text was not compared with its printed pages, and the job
+  page says so, in one sentence for both kinds, instead of "Every part the tool found was
+  converted". A job stored before this has no such line and reads as before.
+- **Front matter and table heads** (SW18.3, WS18.10). The title is a heading with no `\thanks`
+  in it; the `\thanks` of the title is a line of its own after it ("(note: ...)"). Each author
+  is one line: the name, then the lines under it (where they work, an address, an email) after
+  commas, and the author's own `\thanks` as " (note: ...)" on that line, never in the name. A
+  cell of words and formulas is the whole cell as math (`TableCell.latex`, the words in
+  `\text{}`; `mathml`: LaTeXML's MathML for each formula and `<mtext>` for the words, through the
+  sanitiser); a cell that does not pass is its text. The reader fills the fields of today's
+  content model that the PDF path fills and it did not: `TableGrid.header_cols` (the leading
+  columns LaTeXML wrote as `th`; nothing is guessed from the look of a table) and
+  `Element.colour_runs` (a color `xcolor` set on words, by the PDF path's own rule
+  `text_pass.is_run_colour`). Runs for emphasis, line breaks, notes, roles, the language of a
+  span and the quotation and `babel` definitions need Element v2 (WS16.2) and WS18.2 and are not
+  read yet.
 - **Beamer** (`FEATURE_BEAMER_SOURCE`, off by default, needs `FEATURE_LATEX_SOURCE`): a deck is
   read through LaTeXML's `beamer.cls` binding, which writes one `ltx_slide` per overlay step. A
   frame is a heading (its title) and its content: sections are the top level, frames sit one level
@@ -670,20 +1003,30 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   as image" (`web.review.reject_keeps`): the student file shows its LaTeX, marked "Not
   converted", never "The original image is not available."; an item with no picture and no
   text (a source table) offers no such choice, and a posted one is refused.
-  `DocumentResult.origin` is `latex`; the student note says "a LaTeX document".
+  `DocumentResult.origin` is `latex`; the student note says "a LaTeX source" (`checked_words.source_noun`,
+  the one function for the noun: the job page, the review list, the record and the stop advice use
+  it). "Upload a revised version" is not offered on a source job (`_job_body.html`, `_job_exam.html`),
+  and `/app?revises=` and a `revises` upload for one are refused with `revise_source` (WS18.8).
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
-  room for the conversion's tasks: "The server is busy ... Try again") or `timeout` and the message "Upload
+  room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time limit: a macro that
+  calls itself, a very large file; not offered "Try again") or `timeout` and the message "Upload
   the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
   itself is refused at once.
 - **Lost content stops the job.** LaTeXML exits 0 when it drops content; what it said is in its
   log (`out/latexml.out`, `out/post.out`), which `source.report.parse` reads into
   `DocumentResult.source_report` with the error nodes the reader found (`SourceReport`). A loss
   outside a formula stops the job (`source.report.stop`): `source_missing_file` (an `\input` or
-  `\include` that is not in the upload), `source_syntax_error` (an unclosed brace or environment,
-  with its file and line), `source_unsupported_class` / `source_unsupported_package` (no binding,
-  and the document used what it defines; a `.sty` in the upload is not read either) or
-  `source_undefined`. The job page names the files and commands from `Job.error_detail` (at most
+  `\include` that is not in the upload, or a `\bibliography` whose `.bib` is not: the one error of
+  `latexmlpost` that stops a job), `source_syntax_error` (an unclosed brace or environment,
+  with its file and line; or a `^`, `_`, `&` or `#` in running text, named with what to write
+  instead), `source_unsupported_class` / `source_unsupported_package` (no binding,
+  and the document used what it defines; a `.sty` in the upload is not read either; a class read
+  as an article is never named as the cause; a package with no binding whose command is the
+  log's first error is the cause even when a syntax error follows, as an mhchem charge does) or
+  `source_undefined`. A command in a formula is left to the decision of the item that shows it
+  only when that item holds one (`SourceMark.decided`); one in a description or the authors
+  stops the job. The job page names the files and commands from `Job.error_detail` (at most
   20, nullable JSON, migration `3c9a4e7d1b62`): document content, so never logged, cleared on
   "Try again" and deleted with the job. A command LaTeX did not know inside a formula, and a
   picture that is missing or of a kind not read, is a required decision on the review list with a
@@ -772,8 +1115,9 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
 
 **The batch page** (`GET /app/batch/{id}`, `batch.html`, `_batch_rows.html`): the answer to an upload of
 several files or a zip of documents (a zip of documents is answered by it even when it held one). One row per
-document in the order sent, with its status as it is now (`documents.DocumentRow`: "Waiting", "Converting: 2 of 5 pages done",
-"3 decisions to make" with a Review link, "Ready to download" with a Download link, "Stopped", "Deleted"), then
+document in the order sent, with its state as it is now (`documents.DocumentRow`, from "Job states" below: "Waiting",
+"Converting: 2 of 5 pages done", "Needs your decisions: 3 decisions to make" with a Review link, "Ready to share" with a
+Download link, a stop with "Try again" while a try is left, "Deleted on Nov 11, 2026"), then
 the large files waiting for their pages and the files not uploaded. `#batch-summary` is a **polite live
 region** (`role="status"`) with the counts in one sentence ("5 documents: 2 ready to download, 1 needs your
 decisions, 1 converting, 1 waiting. 1 file was not uploaded."); no names. While a document is waiting or
@@ -797,15 +1141,23 @@ A PDF over `MAX_PAGES_PER_JOB` pages or `MAX_UPLOAD_MB`, and within `MAX_SOURCE_
 with it), nothing is converted or counted, and the person is sent to `/uploads/{id}`:
 
 - **The page** says how many pages and MB the file is, what one part can hold and the pages
-  left today (once), and suggests parts: as few as fit and of nearly equal size (59 pages:
-  `1-30` and `31-59`; `ranges.suggest_parts`). The parts are a list with a page count each and
-  one summary line ("3 parts, 12 pages."); with script, two page fields and "Add part" append a
+  left today (once), and suggests parts (`ranges.suggest_parts(total, limit, taken, left=,
+  chapters=)`): as few as fit and of nearly equal size (59 pages: `1-30` and `31-59`); the first
+  part is sized to the pages left today, so one is never suggested that today's pages cannot
+  start (60 left, 240 pages, 100 a part: `1-60`, `61-150`, `151-240`); and where the PDF has
+  top-level bookmarks (`pdf_probe outline`, read in the child process like every other look at
+  the file; none or a failure means even cuts) a part ends before the latest chapter start that
+  leaves it at least half the limit. The parts are a list, one label each ("Part 2: pages 5 to 8
+  (4 pages)"), and the summary is whole sentences from one count (`ranges.schedule`): "Part 1
+  (pages 1 to 60) starts now. Parts 2 and 3 can start after <time>, when your pages reset."
+  The page does not start the later parts: the file stays and they are sent again after the reset.
+  With script, two page fields and "Add part" append a
   line to the text box and "Remove" takes one out (`static/parts.js`). The box is the form's one
   field and stays under "Type the pages instead" (open without script and when something needs
   fixing): one part per line (or after a semicolon), ranges with a hyphen, ranges joined with
   commas in one part, pages numbered from 1 as in a PDF viewer. What cannot be used is said in
   words naming the part and the page ("Part 2: page 70 is not in this file, which has 59
-  pages", `ranges.parse_parts`); the preview (`ranges.preview`, `GET /uploads/{id}/preview`,
+  pages"; one typed part has no name: "Page 70 is not ..."; `ranges.parse_parts`); the preview (`ranges.preview`, `GET /uploads/{id}/preview`,
   refreshed by htmx as the box changes and drawn again after an error) marks the part that is
   wrong and still counts the others. Pages already sent are left out and cannot be sent twice.
 - **Cutting.** Each part is cut out in the probe's child process (`pdf_probe extract`,
@@ -825,10 +1177,26 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
   page names what was started and why it stopped.
 - **Each part is a document** named "chapter2 (pages 31-59).pdf", with `jobs.part_group` (the
   pending upload's id) and `jobs.part_label`; its page says which pages it holds and links
-  its sibling parts in page order. Parts are separate documents; the "Combine parts" link on
+  its sibling parts in page order, with a "Combine the parts" link to the combine page. Parts are separate documents; "Combine parts" on
   the results page of a part (when two or more finished parts are kept) joins the ones the
   person still keeps into one HTML file (`web/combine.py`, docs/output.md "Combining the parts
-  of a long source").
+  of a long source"). The combine page says once when a part's language is assumed or mixed
+  and unconfirmed, or the parts share no majority language (`CombineView.language`); each part
+  keeps its own language in the file.
+- **Scanned and handwritten pages (WS7.8).** With the offer on and the box not checked, the
+  upload probe's count (`page_type.ImagePageCount`) is kept on the row (`pending_uploads.scans_json`)
+  and the page says it in the words of every other place (`routes.jobs.scans_note`). A file
+  within the limits of which more than half the pages are such pages (`ImagePageCount.mostly`) is
+  kept the same way even though it is small: its page asks whether to keep those pages as
+  pictures or read them, nothing is converted or counted before the answer, and the answer
+  (`POST /uploads/{id}` with `whole=1` and `images=pictures|read`) makes one document with the
+  file's own name and no parts. When no room for a waiting file is left, it is converted at once
+  as for any file.
+- **Two sizes, each named once.** "One document" is up to `MAX_PAGES_PER_JOB` pages and `MAX_UPLOAD_MB` and is
+  converted as it is; "one file" is up to `MAX_SOURCE_PAGES` pages and `upload_limit_mb` and is kept here so the
+  pages are chosen, each part becoming a document. The words are `uploads.one_document`, `uploads.one_file` and
+  `uploads.zip_limits` (the template globals `one_document`, `one_file`, `project_zip`); no template or refusal types
+  a limit as a number.
 - **Retention.** The pending upload is deleted `RETENTION_HOURS` after it was made, by the
   hourly purge (`ops.retention.purge_pending`), "Discard this file" (asks first), when its last
   page has been sent, and with the person (`erase_user`). Past its time it answers 404 at
@@ -840,7 +1208,9 @@ with it), nothing is converted or counted, and the person is sent to `/uploads/{
 With `FEATURE_NOTATION_MEMORY` on, the course page lists the documents converted for the
 course ("Documents in this course", the same list as My documents, polling
 `/app/documents?course=<id>` while any is converting) and offers "Download all N ready
-documents (zip)". My documents offers the same for everything the person has
+documents (zip)". My documents offers the same for everything the person has (when more are ready
+than one zip holds the link counts what the zip has, "Download 25 of 34 ready documents (zip)", says the
+limit and how many with decisions open are left out, and lists the others (the zip takes the newest first), so each can be downloaded from its own page; the Word link says "the newest 10" likewise)
 (`web/bundle.py`, `web/routes/bundle.py`):
 
 - Only a document that is **ready to share** goes in (finished, no decision open). One with
@@ -870,9 +1240,11 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   one-line "add a person, copy the link, send it yourself", a form (email address; View or
   Review as whole-row choices, each with what it allows; the Share button has when access ends
   beside it), the people with access with "Change ... to" and "Remove ..." (a danger button)
-  per person, the document's address to copy: a selectable field, plus a "Copy link" button
-  that `static/copy-link.js` shows (with a polite confirmation; without script the field is
-  copied by hand). Beside the address the page says when the document is deleted (every share
+  per person, the document's address to copy: a selectable read-only box that wraps, so the
+  whole address shows at any width (the class link's address is the same), plus a "Copy link"
+  button that `static/copy-link.js` shows (with a polite confirmation; without script the box is
+  copied by hand). In forced colors "Remove ..." keeps a thick double edge, so it does not
+  look like the "Change ... to" button. Beside the address the page says when the document is deleted (every share
   ends then) and links to the job page's keep controls. The sign-in wording names only the
   providers this server has (`routes.sharing.sign_in_words`); the exact-address rule is under
   "Help with sharing", and an error summary sits directly above the form. Nothing is emailed; the
@@ -885,13 +1257,37 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   that exact address, and see the document under "Shared with you" on My documents and at its
   address. A person who cannot sign in at all (not on the allowlist, in allowlist mode) cannot
   use a share.
-- **Rights.** `view`: the job page (without the owner's controls: delete, keep, retry, title,
-  contact line, language, revision, parts, sharing and the course), the student preview, the
-  crops, every download (HTML, Canvas, Common Cartridge, Word, EPUB), the review record and its
-  CSV, and the two optional questions. `review`: also the review screen, its list, the page and
+- **Rights.** `view`: the job page (a page of its own, `job_reader.html`, below), the student
+  preview, the crops, every download (HTML, Canvas, Common Cartridge, Word, EPUB), the review
+  record and its CSV, all only once the document can leave without a draft banner (below).
+  `review`: also the review screen, its list, the page and
   region images, bulk accept, the Symbols screen and every decision and edit, with Undo. The
   owner alone: delete, retry, title, contact, language, keep, a revised version, combining parts,
   "Download all", the course notation, and sharing.
+- **Three audiences of the job page** (`views.audience_of(role)`): `owner`, `reviewer` (a
+  `review` share) and `reader` (a `view` share). A reader gets `job_reader.html`: the title,
+  "Shared by Name", what they can do, when it will be deleted, Open, Listen and the download
+  formats (`_job_reader_body.html`, `_job_files.html`), and nothing about posting, Canvas,
+  decisions, checks, the record or the owner's course. State words come from `web/states.py`
+  (`being_checked` is the reader's `needs_decisions`: "The owner is still checking this
+  document.", no number). A reviewer keeps the owner's page without the owner-only blocks and
+  sees the same one total of open decisions (`job_page.open_decisions_line(count, audience)`).
+  A reader never gets a draft: `/view` and `/listen` ask the one export-state function
+  (`output.shown`, as the downloads ask `output.check`), so while a decision is open a reader
+  gets the 403 page there and a draft nowhere. Every partial starts with a comment naming its
+  audiences (`{# Audiences: owner, reviewer #}`); `tests/test_audit_authz.py` parses the
+  includes and fails when a partial is reached by an audience it does not name. Not built: the
+  "Tell the owner about a problem" and "Ask for the Review right" links (SW25) and the
+  version-id line (WS20.1).
+- **The settled cost** (WS10.9): once a job is done, its owner's job page says "Converting
+  this document has cost $x.xx in all." from `Job.cost_usd` (the total across a re-run, whose
+  caps start from `Job.cap_base_usd`), with the `usd` filter of the admin page. Nothing while
+  it runs, and no one it was shared with sees it.
+- **Drafts are made fresh in the checker's words.** The stored page is the student file. A
+  file that leaves as a draft (the owner's or a reviewer's preview, the HTML download, the
+  Canvas, Common Cartridge, Word and EPUB files made from a draft) is made again from the
+  stored result with `audience="checker"` (`routes.jobs.served_html`) and marked as a draft;
+  that page is not stored. See docs/output.md "Audiences of notices".
 - **One check.** Every route loads its job with `job_access(session, job_id, user, need)`,
   with `need` `"view"`, `"review"` or `"owner"` (it replaced `owned_job`). A stranger or someone
   whose share was removed gets the same 404 as for an id that does not exist; a shared person
@@ -899,7 +1295,8 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
   for everyone. The share is read on every request, so removing it works on the next click.
 - **Who did what.** A review edit is stored with the person who made it
   (`ReviewEdit.user_id`, as before), and the review record's "Decided by" column and its CSV
-  name them: name and address for the owner, names only for everyone else. Undo only takes
+  name them (`shares.names_of`): "you" for the reader, a name for anyone else, and the owner's
+  address once at the top of the record. The CSV has the "by" column in the owner's file only. Undo only takes
   back a write the person made themselves. A share applies only to a sign-in that proved the
   address (Google's verified email, Microsoft's `xms_edov`), see docs/security.md.
 - **Limits and cost stay the owner's.** A model re-read a reviewer asks for (marking an
@@ -916,6 +1313,110 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
 - Tests: `tests/test_job_shares.py` (the matrix of every job route against the owner, a viewer, a
   reviewer, a removed person and a stranger; the address rules; removal at once; who is
   recorded; the clock; deletion), `tests/test_audit_authz.py`, `tests/test_web_auth.py`.
+
+### Course grants (`web/shares.py`, `routes/courses.py`, `FEATURE_COURSE_GRANTS`, WS27.1)
+
+An owner gives a person, by the address they sign in with, the right to `view` or `review` every
+document of one course, now and later. Behind `FEATURE_COURSE_GRANTS` (off in code and in the
+production profile; it also needs `FEATURE_NOTATION_MEMORY`, because courses do). Off, there is no
+People section, the two routes answer the same 404 as a wrong address, and a `course_grants` row
+that exists gives **no** right. Before turning it on read docs/deploy-railway.md, "Before
+`FEATURE_COURSE_GRANTS` is turned on". docs/security.md, "Course grants", has the access rule.
+
+- **Table.** `course_grants` (`id`, `course_id` FK to `courses` ON DELETE CASCADE and indexed,
+  `email` the sign-in address in lower case (320, indexed), `role` `view` or `review` (a CHECK),
+  `created_at`; unique on `course_id` and `email`). Migration `d3a8f1c5e692`, after
+  `c5d9e1a3b7f4`; the downgrade drops the table (the grants are lost, the documents are not).
+- **The rule is `shares.role_of` alone.** The highest of: owner; the document's `job_shares` row
+  for the person; a `course_grants` row on `job.course_id` for the person, when the course is the
+  owner's own and grants are in force. The `job_access` signatures did not change: the setting
+  reaches `role_of` through the session (`db.make_sessionmaker(..., course_grants=...)` puts a
+  callable in `session.info`, read per request by `shares.grants_in_force`; a session made
+  without it counts as off). Rank never exceeds `review`; `is_owner` and every owner-only route
+  stay owner-only.
+- **The People section** (`_course_people.html`, on `GET /courses/{id}`, owner only): the people
+  and their right, the add form (the share page's words and validation, `shares._checked_person`),
+  change and remove next to each person, "N of 10 people". Plain forms, no script. Nothing is
+  emailed: the page says to tell the person. Remove is a POST whose answer is the question
+  (`course_person_remove_confirm.html`), as for the Admin page's Block.
+- **The document's share page** lists, read-only, "Through the course <name>" with the people and
+  their right and a link to the course's People section. The review record is unchanged: only
+  the owner sees addresses.
+- **"Shared with you"** also lists the documents reached through a course, grouped under the
+  course's name, each document once; one shared directly as well shows the higher right.
+- **Deletion.** `notation.delete_course` deletes the course's grants; `ops.retention.erase_user`
+  deletes the grants that name the erased address and those on the erased person's courses.
+  Removing a document from a course (or the document expiring) ends the grant's reach to it.
+- **Money.** A grantee's re-read goes through the same `reread.read_equation` as a reviewer's:
+  the owner's allowance, pool, per-job cap and rate limit (`job.user_id`).
+- **Logs.** `course_grant_set`, `course_grant_removed` and `course_grant_refused`: course id,
+  right and a category; never an address. Flash notices carry no address.
+- Tests: `tests/test_job_shares.py` (the course actors in the route matrix, the setting off,
+  covered from the moment a document joins until it leaves, expired before any grant is read, who
+  may give a grant, the limit, what the owner and a grantee see, "Shared with you", erasure),
+  `tests/test_web_courses.py`, `tests/test_web_migrations.py`, `tests/test_web_auth.py` (CSRF).
+
+### The class link (`web/links.py`, `routes/class_link.py`, `FEATURE_CLASS_LINK`, WS27.2)
+
+One link an owner makes for a whole class. Behind `FEATURE_CLASS_LINK` (off): with it off there is
+no section on the share page, `/s/...` answers the same 404 as any wrong address, and the public
+pages are unchanged. Before turning it on read docs/deploy-railway.md, "Before `FEATURE_CLASS_LINK`
+is turned on".
+
+- **What it gives.** `GET /s/{token}` serves the published copy of the student version: the HTML
+  stored as a `Blob` of kind `published` (its `element_id` is the version id of
+  `web.output.version_id`), through the same serving function as `/jobs/{id}/view`
+  (`routes.jobs.student_page`: the same `VIEW_CSP` sandbox). It is not a role and never passes
+  through `job_access`: a token opens this one address and nothing under `/jobs/...`, signed in or
+  not. No app header or footer, no `Set-Cookie` (the route never touches the session),
+  `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer`, `Cache-Control: private,
+  no-store`. A wrong, paused, removed, not-yet-open or closed token gets one identical plain 404
+  page; guesses are limited by address (`class_link_miss`, 20 per 10 minutes, then a 429; every
+  fetch also counts against `class_link`). `open_count` goes up by one per successful GET (a HEAD, which `seo.CrawlerRequestsMiddleware`
+  serves as a GET without the body, is not counted) and
+  `first_opened_at` is set once; nothing identifies a reader.
+- **Who may do what.** Only the owner (not a person the document is shared with, at any rank)
+  makes, pauses, resumes or removes the link, or updates the published copy (`routes/sharing.py`;
+  each asks `job_access` for the owner right and checks CSRF). "Remove the link" opens a
+  question first (`GET /jobs/{id}/share/link/remove`, owner only): it names the document and says
+  the link stops at once, its published copy is deleted and its address cannot be got back; the
+  POST is unchanged. The token is made like a sign-in
+  link's (`web.email_login`): 32 random bytes, and only the SHA-256 is stored (`token_hash`). The
+  address is shown once, in the answer to making the link; later the page shows that a link
+  exists, its label, dates, open count and published version. "Make a new link" removes the old.
+  The answer is the page itself, not a redirect: a redirect could carry the address only in the
+  URL or in the session cookie, which is signed but not encrypted. Making a link follows the
+  one submit rule (`link.make` in `web.forms.FORMS`), so a reload of that answer, which sends the
+  same form with the same request token, is answered with a redirect to the share page (no
+  address) and makes no second link; a link made on purpose is a new form and a new token.
+- **Ready only.** A link is made, and the copy updated, only while `output.export_state(job)` is
+  ready; the copy is the HTML at that moment and an edit afterwards changes nothing a class sees
+  until "Update the published copy".
+- **How long.** `closes_at` is required and at most 180 days after the link is made; `opens_at`
+  is optional (`links.is_live` answers "is this link open"). While a link is kept (not removed, not
+  closed; a paused or not-yet-open one still keeps it) `retain_until` is the latest `closes_at`
+  plus the window the document goes back to (`retention.after_link`: 24 hours for a `day`
+  document, 7 days for `week`, and for `dev` its 30 days from upload or a day after the last day,
+  whichever ends later), and there is no new retention mode. The document therefore runs out on
+  its own clock after the link closes: nothing releases it, it never reads as expired while the
+  link works or in the window after, and the purge needs no rule for links. Removing the link
+  (`retention.clock_after_link`) gives the earlier retention with the clock starting at the
+  removal. A document already kept longer for another reason (7 or 30 days) keeps that time: a
+  link only ever extends it, and removing the link does not shorten it. A new link replaces the
+  old one and the document follows the new last day; "Keep for 7 days" while a link is open makes
+  the week count from the last day too (`links.extend`). The hourly purge deletes the published
+  copy of every document no link keeps (`links.purge_copies`); a closed link's copy is never
+  served after `closes_at` (`links.find`, `is_live`), whether or not that purge has run. A link's
+  row is deleted with its document and 30 days after the link closes or is removed.
+- **Table** `job_links` (migration `b7d2f4a8c613`): `id`, `job_id` (cascade), `token_hash` (unique),
+  `kind` (`class` only), `label`, `opens_at`, `closes_at`, `paused_at`, `revoked_at`,
+  `first_opened_at`, `open_count`, `created_at`. `ops.retention.delete_jobs` deletes the rows and
+  the published `Blob` with the document.
+- **Not built.** `/s/{token}/listen`, Word or EPUB through a link, a link for a named person, and
+  any change to the privacy, terms or limits pages.
+- Tests: `tests/test_job_shares.py` (the link as a kind of visitor, the headers and no cookie,
+  owner-only, the one 404, the 180 days, ready only, publish and update, switch off),
+  `tests/test_ops_retention.py`, `tests/test_web_migrations.py`, `tests/test_audit_authz.py`.
 
 ### The sample document (`web/sample.py`)
 
@@ -940,21 +1441,114 @@ day and is deleted with its day.
   it is deleted by the same clock or by "Delete now", it cannot be named as the earlier version
   of a revised upload, and its page says what it is, where it comes from and its license.
 
+## Job states (`web/states.py`)
+
+One function, `states.state_of(facts)`, says what state a job is in from its stored facts:
+its status, error code, tries, attempts, lease, sample flag and open decisions, and for a
+finished job with an outcome code its stored result. `states.load` does the same for a list
+from the jobs' columns alone. Every surface prints what it returns, and none keeps its own
+words (F-033): the job page's title, status box, next steps and "What you can do", the
+polled fragment's `data-title` and `data-summary` (the tab title and the browser notice),
+My documents (label, badge, group, next step), the batch page, the parts listed on a
+part's page, the review screen's finish line, the record (page and CSV), the retry route's
+offer and the admin queue (F-213).
+
+| Key | Label | When | Group | Next step |
+|---|---|---|---|---|
+| `waiting` | Waiting | queued | Working | none |
+| `waiting_reset` | Waiting until 00:00 UTC | queued, today's budget spent | Working | none |
+| `converting` | Converting | running, its lease current | Working | none |
+| `restarting` | Restarting | running past its lease, or put back after a lost attempt | Working | none |
+| `stopping` | Stopping | running, the owner pressed Cancel (`jobs.cancel_requested_at`) | Working | none |
+| `canceled` | Canceled | failed with the code `canceled` | Needs you | Convert it |
+| `stopped_file` | Stopped: this file cannot be converted as it is | failed by the file (encrypted, unreadable, scanned, no content, ...) | Needs you | Upload it again |
+| `stopped_service` | Stopped: not caused by your file | failed by the service, a try left | Needs you | Try again (N left) |
+| `stopped_no_tries` | Stopped | failed by the service with no try left, or a stop a try cannot help | Needs you | Upload it again as a new document |
+| `stopped_limit` | Stopped: too large for one conversion | the job's own caps, out of memory | Needs you | Upload it again |
+| `stopped_unknown` | Stopped | a missing or unknown code; names the step it stopped in | Needs you | Try again (N left) |
+| `needs_decisions` | Needs your decisions | finished, decisions open | Needs you | Review |
+| `partly_converted` | Partly converted | finished, none open, a gap note | Ready | Convert the missing parts, or Download |
+| `ready` | Ready to share | finished, none open, no gap note, and the summary says ready (below) | Ready | Download, Share |
+| `ready_remains` | Ready | finished, none open, no gap note, but a part is a picture, a page is left out or a structure check failed: the message says which | Ready | Download, Share |
+| `sample` | Sample | the recorded sample | its state's | Open |
+| `deleted` | Deleted on Nov 11, 2026 | past its deletion time (the batch page) | Needs you | Upload it again |
+
+A finished job's gaps (an outage, a budget stop, pages kept as pictures) are notes under
+the state ("Outcome codes on finished jobs", below); a note with nothing in it is not
+shown (F-319). A stopped job says nothing about decisions in its old result (F-314) and is
+not offered "Keep for 7 days": only `needs_decisions`, `partly_converted`, `ready` and
+`ready_remains` have something to keep (F-316). Steps are the owner's; a reviewer gets Review, a viewer none.
+The badge color (`status-*` in app.css) comes from the tone and only repeats the words.
+`tests/test_web_batch.py` walks every key and checks each surface prints its label.
+
+### What was checked (SW7)
+
+Every sentence about what was converted, checked or reviewed is made from one model,
+`pipeline.checked.CheckedSummary`, by one module, `pipeline/checked_words.py`; no template
+writes such a sentence. The summary is computed from the stored result (`checked.of_result`:
+its elements, fixes, pages left out and the page's structure checks) and is never stored. It
+holds what was converted by kind (equations in MathML, figures described or marked as
+decoration, tables rebuilt or written as text, the parts shown as pictures with their kind and
+page, the pages left out), the structure checks (how many ran, which failed), what people did
+per decision (`core.triage.review_load`: open, accepted, accepted with a check failing,
+edited, kept as a picture, marked as decoration, optional notes never opened), what is never
+checked, the day of the last decision and the version.
+
+- The open count is `review_load`'s: `checked.open_required`, which `documents.open_decisions`
+  (the stored `jobs.open_decisions`), `output.open_required` (the draft gate) and the state
+  read, so the three never disagree.
+- The state table reads it: with no gap note and nothing open, `ready` only when nothing is a
+  picture, nothing is left out and no structure check failed; otherwise `ready_remains`,
+  "Ready", whose message says what remains ("2 equations are shown as images that screen
+  readers cannot read. 7 of 8 pages were left out."). With no summary (a caller that passes
+  none) the job is never "Ready to share". The documents list reads the result of every
+  finished job with no decision open to get this label; a job with decisions open needs only
+  its stored count.
+- "Every part the tool found was converted." is the sentence for a whole job, never
+  "Everything was converted": ink the tool did not find is not counted until page facts exist.
+  A LaTeX source whose reader left words or pictures unread (`checked.unread_of`, from
+  `SourceReport.unread_words` and `unread_pictures`, SW42.4) is not whole either: the student
+  note and its opening notice say "14 words of the LaTeX source could not be read and are not
+  in this file", the owner's lines say they "were not read", and the record says "No".
+- The job page's pictures line, notes line, structure-checks line and "What was checked, and
+  what was not", the before/after card's equation row and its "Yes" ("In the converted
+  parts" when a part is a picture or a page is left out), the finish line ("You reviewed 3 of
+  5 flagged parts, the last on October 9. 1 part kept with a check failing. 2 optional notes
+  not opened."), the review screen's finish, the record and its CSV (one row per action), the
+  student note and the notice that opens the student page (docs/output.md), the EPUB's
+  accessibility metadata and the Canvas README's first lines all print `checked_words`.
+- Old jobs: nothing new is stored. A page made before the summary existed is made again when
+  it is next opened (`RENDER_VERSION` 4, `routes.jobs.current_html`), which also rewrites its
+  structure checks; until then a download of an older stored page has the old footer. Its
+  EPUB says "This file does not record what was converted or reviewed" and an
+  `accessibilityHazard` of `unknown`.
+
+Not in the summary yet, because nothing on this branch holds them: the page facts of each
+page (type, unread ink: WS14.1, WS14.7, WS14.11), the language found (P2), page cards
+(WS21.8), where a source-read document's content came from (A11, S4), `format_when` (SW9),
+the record link (SW25) and the audience helper (SW16).
+
+Not in the table yet, because nothing stored says so: the final checks of a conversion,
+and "checking", "paused for an update" and "waiting its turn" (P9). "Convert it in parts" for a job that is too large and "Report
+this" for an unknown stop are not offered: no route does either from a stored job.
+
 ## My documents (`web/documents.py`)
 
-`/app` is a to-do list (UX review BW5): "Needs your decisions" (finished with decisions
-still open, oldest first, with a "Review next" button to the first one's review
-screen), then "Ready to download" (newest first), then "Converting, waiting or stopped".
-A summary line counts them ("2 documents need your decisions (5 decisions in all) · 1
-ready to download · 1 converting"). Each row leads with the file name that was uploaded
+`/app` is a to-do list (UX review BW5, F-414), grouped by the state's tone ("Job states"
+above): "Needs you" (finished with decisions still open, oldest first, with a "Review
+next" button to the first one's review screen; then every stopped document, newest first,
+its reason in its label and "Try again" as its next step while a try is left), then
+"Working" (waiting, converting, restarting), then "Ready" (newest first). A summary line
+counts them ("2 documents need your decisions (5 decisions in all) · 1 stopped · 1
+converting · 1 ready to download"). Each row leads with the file name that was uploaded
 (`DocumentRow.name`; "book.pdf, pages 31-59" for a part), because generated titles repeat
 across a course's files; the document's title sits under it ("Titled “…”") when it says
 something else, with pages and upload time. A title the person chose themselves (T1-7)
 and the recorded sample lead with the title. The row then has the status in words, when
 it is deleted automatically, and one next step (Review or Download) beside a Delete link
 to the confirmation page; "Upload a revised version" is on the document's own page, not
-repeated in every row. A partly converted result says so first ("Stopped early, 2
-decisions to make"). When there are documents the list comes before the upload form, and
+repeated in every row. The status is the state's label ("Needs your decisions: 2
+decisions to make", "Partly converted", "Stopped: not caused by your file"). When there are documents the list comes before the upload form, and
 "Upload another file" beside the heading jumps to it; after a refused upload, and for
 someone with no documents, the form comes first.
 
@@ -964,13 +1558,33 @@ only for finished jobs. While a document is waiting or converting, htmx polls
 of open decisions of a finished job are columns of the job (`jobs.result_title`,
 `jobs.open_decisions`), set whenever `result_json` is assigned (a SQLAlchemy set event in
 `web/db.py`), and a finished job from before them is filled in the first time the list
-sees it. `list_version` (from the jobs' own columns) answers 204 when
+sees it. What the state of a finished job with nothing open and no outcome code reads of its
+result is stored the same way in `jobs.state_facts` (`states.finished_facts`: what its summary
+says, the converter version, and whether it has a gap note or a notice to word), so the list,
+the batch page, the course page and the admin queue count name that state with `states.state_of`
+and load no result; a document whose facts say it has something to word, or that has an outcome
+code, has its result read as before. `list_version` (from the jobs' own columns) answers 204 when
 nothing changed, otherwise the whole list is swapped. Every link in it has a stable id,
 so htmx puts focus back on the same link after a swap; the list is not a live region,
 but the tab title follows it ("My documents (4 of 6 finished)"). Without JavaScript a
 "refresh the list" link does the same. Below 600 px each row is a block of labeled
 lines instead of a table row wider than the screen (the table keeps explicit ARIA roles,
 since some browsers drop a table's semantics when its display changes).
+
+The job page's own polls (`/jobs/{id}/status` and `/jobs/{id}/progress`, every 3 s while a job
+waits or converts) read no stored result either. `jobs.result_json` and `jobs.html` are the two
+large columns (megabytes for a long document) and are deferred on the model (`web/db.py`):
+reading a job loads neither, and the first use of one loads it, inside the session (one more
+query). A detached row cannot load them, so a route reads what it needs before its session
+closes, and a query that needs them for every row it returns, or a row handed out of its
+session, loads them with the row (`db.LARGE_COLUMNS`). Two more columns stand in for them:
+`jobs.html_version` (the render version written in the page's head, set whenever `html` is
+assigned; NULL for no page, or for a row from before the column, which `Job.has_html` fills in
+the first time it looks) answers "is there a page" and "was it made by an older renderer"
+(`routes.jobs.current_html`, `require_done`, `output.export_state`), and `jobs.open_decisions`
+(above) answers the draft gate. Only a finished job's state and summary read its result
+(`states.Facts.of`, `views.job_view`): a job that is waiting, converting or stopped has none to
+read, even a retried one that still holds its earlier result.
 
 Downloads are named after the title plus the start of the job id
 (`problem-set-2-kinematics-3f9a2b.html`), so two versions of a handout never overwrite
@@ -1003,7 +1617,7 @@ so production can count false flags per true flag, corrections nobody was asked 
 checked against a closed list by `events.make`, hold the element kind, the reason code
 that put it in front of the reviewer (or `none`), the outcome (`kept`, `edited`,
 `replaced`, `rejected`, `removed`, `added`), the origin (`page` or `source`), what raised
-it (`pipeline` or `browsing`), `single` or `group`, the write mode (`single`, `group`,
+it (a source of `core.triage.SOURCES`, or `browsing`), `single` or `group`, the write mode (`single`, `group`,
 `structure`) and the release (the output's `pipeline_version`). The value is the signed
 count. `web/outcomes.py` works out the rows from a write (the rules are in its docstring)
 and keeps them in the write's `ReviewEdit`, so Undo writes them again negated and the
@@ -1014,6 +1628,13 @@ id and no page number is stored. `events.outcome_cells(release)` is the one read
 per lane (`events.LANES`) and for all lanes, without admin accounts, and a cell drawing on
 fewer than 5 accounts or 10 documents, or with one account giving more than half its
 decisions or pages, is withheld (with the next smallest lane when it is the only one).
+Flags count in false flags per true flag only when `events.SOURCE_CLASSES` names their source
+a doubt source; a rule source counts on its own line; any other is "not classified".
+`events.SOURCE_CLASSES` and `events.SOURCES` are made from the one table of sources,
+`core.triage.SOURCES` (below), and the source of a row is the first source the flagged fix
+names (`Fix.sources`).
+`readablestem ops accuracy` prints it by release (`events.outcome_releases`), and
+`readablestem ops lookup` shows one account's three figures (docs/operations.md).
 
 `/admin` counts them per UTC day (last 28 days) and per pseudonymous person (`u-` and
 the start of the random user id, never an email). Events are deleted after 400 days by
@@ -1121,8 +1742,22 @@ notation" and docs/layout.md "Bold letters in prose".
   ("No course" first); without any, one line links to `/courses`. The choice must be one
   of the user's courses, checked after the CSRF token and before the PDF is opened;
   otherwise the form comes back with an error and nothing is uploaded or counted. The job
-  stores `course_id`, and the job page says "Course: <name>. This document is read with
-  its notation."
+  stores `course_id`. The choice's hint says, from `recipients.notation_words`, that the
+  course's symbols and meanings go to the model provider (named from `model_vendor`) with
+  each equation of the document, at most `MAX_CONTEXT_ENTRIES` (24) symbols with each, and
+  the notes do not; the course pages carry the same sentence and who else sees the list.
+- **What a document was read with.** The worker keeps the symbols it hands the pipeline
+  with the finished result (`DocumentResult.notation_applied`, each symbol's key and
+  meaning; `notation.applied_record`): a list, empty when the course had no symbols then,
+  and none for a document with no course, a source file, or a result from before it was
+  kept. The job page of a document with a course says "Read with 6 symbols from <course>"
+  and lists them, to the owner and to a person who reviews it (`views.audience_of`), not to
+  a reader and not on the reader page or in the student file; only the owner gets the link to
+  the course. A document with no record says the notation of the course was applied and
+  lists nothing, and is never filled in from the course as it is now. The record is the
+  instructor's own notation: it is content, stored with the result, deleted with the job,
+  and never logged or put in an event. Not built: "Convert again to apply" and the course
+  page's marks on older documents.
 - **Suggestions (T3-12).** Typing `\mathbf{d}` is not needed: the course page ("Symbols
   found in your documents", the course's five latest finished documents) and the finished
   job page ("Symbols found in this document", for a job with a course) list the notation
@@ -1159,7 +1794,9 @@ notation" and docs/layout.md "Bold letters in prose".
   job's, adds the symbol with source "review", and goes back to the same decision with
   "Remembered for <course>: ...".
 
-Course names, symbols and notes are user content: shown only to their owner, logged only
+Course names, symbols and notes are user content: opened only by their owner (a person a
+document is shared with to review sees the course's name, the symbols the document was read
+with and, on the review screen, the ones that apply to an equation, never the notes), logged only
 as ids and counts (`course_created`, `course_renamed`, `course_deleted`,
 `notation_added` with its source, `notation_changed`, `notation_removed`), sent to a
 model only as the fenced course notation block, and erased with the user
@@ -1179,7 +1816,9 @@ upload changes: its pages count against the daily quota like any other conversio
 When the new job has been converted, the worker (`Worker._carry_decisions`, in the same
 transaction that stores the result) reads the earlier version's result and crops, if it is
 still the owner's, finished and not past its deletion time, and carries the decisions over
-(`carry.carry_decisions`):
+(`carry.carry_decisions`). If it is not (the owner deleted it, or the purge did, while the new
+one waited or converted), the worker uses the snapshot the upload took (below). The live row is
+used whenever it is there: it may hold decisions made after the upload.
 
 - An item is **the same item** only if its kind and content fingerprint are equal: for an
   equation, figure or table the SHA-256 of its crop, plus an equation's display mode and a
@@ -1206,8 +1845,26 @@ carry, and usage counts show `review:carried`). The report is `jobs.carried_json
 ids and counts, and the earlier file's name for the owner's page; no text of the document.
 The job page's "Compared with the earlier version" card says how many decisions were carried
 over, how many items changed or are new, and links to the first that needs a decision; the
-review screen marks a decision it carried. If the earlier document was deleted before the new
-one finished, the card says so and every decision is new.
+review screen marks a decision it carried. The card names the earlier file and does not link
+to it, so it stays true when that document is gone. The card says that nothing was copied only
+when no snapshot could be taken (an upload made before snapshots, or an earlier version that
+could not be read) and the earlier document was gone.
+
+**The snapshot at upload (`web/carry_snapshot.py`).** When `POST /jobs` stores a revised
+version, `intake.store_job` writes out what carry-over reads of the earlier version, under the
+check the upload already makes (the person's own, finished, kept, not the sample), and stores
+it with the new job as a `blobs` row of kind `carry` (zlib JSON). It holds the earlier result's
+elements and fixes (pages left out included; no HTML, notices or stats), the SHA-256 of each
+crop in place of the crop (a fingerprint is all carry-over uses of one; only the pictures and
+equations added by hand keep their bytes, because they are copied onto the new file), the
+structural review edits, a digest of how each region carry-over compares looked in the earlier
+PDF (so "this page looks the same" can be answered without that PDF), and the earlier file's
+name. Nothing about the earlier document's deletion time is changed by taking it. If it cannot
+be taken the upload goes through as before. The worker removes it in the same transaction as
+the carry (`carry_snapshot.pop`), whether or not anything carried; every deletion of a job
+(`ops.retention.delete_jobs`: owner delete, purge, account erasure) deletes all its blobs, so
+it goes with the job too. A job that fails keeps it until the job is deleted. It counts in the
+person's stored bytes like any blob.
 
 **Edits that are not decisions (`web/carry_edits.py`).** The review screen also changes what no
 fix covers: the words of a paragraph, a paragraph made a heading, a picture or an equation
@@ -1239,8 +1896,13 @@ made before a page was left out is found.
   is told apart from another blank page by that, not by its number alone.
 
 What was not carried is counted (`edits_dropped`, the card says "N changes you made by hand
-were not carried over, because the part of the page it was made on is not the same any
-more"); what was is a `carried` `ReviewEdit` with the kind in its `after`
+were not made again, because the part of the page it was made on is not the same any
+more") and listed by name and page under it (`edits_not_applied` in `carried_json`, the words
+in `carry.NOT_REAPPLIED_WORDS`: "Page 2: words you changed"). An equation read again and a
+page operation that has no carry (a paragraph made a heading, a picture added, an equation
+marked or given back to the text) are listed there when they are not made again, so nothing a
+person did disappears silently; an equation read again is never made again (the new file has
+the tool's own reading) and one that was undone is not listed. What was carried is a `carried` `ReviewEdit` with the kind in its `after`
 (`carried_edit`), shown on the record. A document **tried again** is the same file, so the
 comparison needs no drawing; a picture added by hand on a page the tool could not read before
 is not added a second time once the tool reads it. Any failure leaves the result as the
@@ -1275,7 +1937,11 @@ now says; its positional id still names it.
 
 For the person's accessibility office. `GET /jobs/{id}/record` is a page made to print
 (site navigation and the buttons are hidden by `@media print`); `GET /jobs/{id}/record.csv`
-has the same facts as one table. Both are made on request from what is stored, are owner
+has the same facts as one table. The count line reads "N decisions made by a person. M changes
+to pages." (`Record.count_line`; the CSV has the two numbers as "Decisions made by a person" and
+"Changes to pages made by a person"): a text edit, a heading, a picture or equation added, a
+page left out or put back and the like are changes to pages, not decisions
+(`record.PAGE_CHANGES`). Both are made on request from what is stored, are owner
 only, and change nothing (no deletion-clock restart, unlike a download). The job page links to
 both under "Record for your accessibility office".
 
@@ -1283,9 +1949,10 @@ It lists, in this order: the document (title, file name, pages, when and by whom
 converted, the tool and pipeline version, the language, when the record was made, a short
 reference); what the tool did (parts found by kind, accepted by the tool with no decision
 from a person, decided by a person, still open, shown as pictures); every review decision
-(`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom
-- the document's owner, the only person who can review it); the decisions still open; the
-parts shown as pictures and why; the automatic checks (how many ran, which did not pass);
+(`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom:
+"you" for the reader, a name for another person, never an address beyond the one "Converted
+by" line the owner sees); the decisions still open; the
+parts shown as pictures and why; the structure checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
 lines for the office to sign. Every kind of change a person can make is a row with who and
 when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a
@@ -1301,6 +1968,12 @@ axe test not run on the document, meaning is not checked, not tried in a course 
 itself is out of scope) plus counts from the result: the equations, figure descriptions,
 headings and tables the tool accepted without a person, the decisions still open, the parts
 that are pictures.
+
+Each item the record names (a decision, a part waiting, a part shown as a picture) is a link
+to that item on the review screen (`/jobs/{id}/review?item=...`, a page's own edit to that
+page's tools) for a reader with the Review right; a reader with only the View right gets the
+words without a link, since the screen refuses them. An item that is no longer in the
+document is named with "no longer in the document" and no link. The CSV keeps the words.
 
 It is a record and not a verdict: the page opens with a statement that it does not say the
 document meets any standard or law, and neither it nor the CSV uses the word "certification"
@@ -1324,8 +1997,8 @@ showcase site has one per example (`site/build.py` writes `examples/<id>/listen.
 the site is built, with the same component and the same script).
 
 - **The transcript** is built on the server from the final HTML in reading order, with no
-  model call: the page title and language, landmarks, headings with their level ("Heading
-  level 2: Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link"
+  model call: the page title and language, the skip link, landmarks, headings with their level
+  ("Heading level 2: Kinematics"), paragraphs, lists ("List, 3 items", then each item), links ("link"
   before the text), figures (alt text, caption, the long description inside its collapsed
   section), tables (caption, size, column headers, then up to 8 rows read with their headers
   and "…N more rows"), pictures kept as images ("Image, not converted"), page breaks and
@@ -1333,6 +2006,19 @@ the site is built, with the same component and the same script).
   as" on the review screen: the stored reading of that equation when the job has one, else the
   file's `alttext`, else `pipeline.speech` on the MathML. A reading that looks like LaTeX is
   never used (`listen.speakable`, the rule the review screen's `speakable` filter applies).
+  **Role words** are plain words from the app's string table, `web/messages.py`, the one the
+  review screen takes its item names from (`KIND_LABELS`: Equation, Figure, Table, Heading,
+  Paragraph, List item; `LISTEN_LABELS`: "Main content", "Navigation", "Side notes", "Footer",
+  "Header", "Section", "Collapsed section", "End quote", ...), never the ARIA names ("Main
+  landmark", "Content information landmark"). A `<br>` is a pause (a comma in the words), and a
+  `<blockquote>` closes with an "End quote" item.
+  **Before the lesson (F-120).** The page title, the page language, the skip link (`a.skip-link`,
+  kind `skip-link`, said "Skip link: Skip to main content") and a landmark with no name that
+  opens the content are marked `Item.before` by `listen._before_the_lesson`, from the items'
+  kinds and never from their words; the player folds them under "Before the lesson (N)" and
+  Play starts at the first item after them (`data-listen-lesson`). A page with nothing before
+  its content has no fold, and a page with no such marker starts at its first heading. The
+  items keep their ids.
 - **Kept per job result version** in memory (`listen.CACHE`, the last 32; the key also holds a
   digest of the HTML). Nothing is stored in the database, logged, or put in a downloaded or
   exported file.
@@ -1341,23 +2027,65 @@ the site is built, with the same component and the same script).
   the lesson (title, language, notices, license) are folded under "Before the lesson", an index
   of headings and equations is a list of links, and a filter (text and kind) narrows the list
   (script). The transcript is plain text, so it works without JavaScript and in a browser that
-  cannot speak; the controls are hidden until `listen.js` finds `speechSynthesis`.
+  cannot speak; the controls are hidden until `listen.js` finds `speechSynthesis`. The page's
+  title is the document's name (`documents.document_title`, the function every page uses),
+  then "Listen" ("Kinematics notes: Listen | ReadableSTEM"), for the owner and a reader alike.
+  **Layout (F-465).** The transcript has the reading width (`--prose-max`) with the role as a
+  small line above the text. In a window 64rem or wider a second column (`.listen-thing`)
+  draws the selected item itself: the equation as MathML (`Item.thing`, from the same parsed
+  MathML the reading is made from), a table's first 40 rows, or a picture when its data is under
+  150,000 characters (a larger picture is left to the student page, so a page never carries its
+  images twice). It is filled by `listen.js` from the `<template data-listen-thing>` in the
+  item's row when the place changes, and it is `aria-hidden`, never takes focus and is not a
+  live region, so a screen reader hears the item once, from the transcript; a narrow window has
+  no second column. Every item also has a link, "Student page", to its place on `/jobs/{id}/view`
+  (`Item.anchor`: the id of the element the item came from, else the nearest element before it
+  that has one, else the top of the page); the demo and the showcase pages have no student page
+  and show no link.
 - **The player** uses the browser's Web Speech API (a static file under `script-src
   'self'`). The transport is Play (which becomes Pause), Previous and Next, and stays in view;
   Play starts at the lesson. Under "More controls": Stop, Play from the beginning, next
-  heading, next equation, Follow along, speed, voice, keys. Why Play is off (no voice, or only
-  online voices) is a line right under it with "Read the transcript" (and "Choose a voice").
+  heading, next equation, Follow along, speed, voice, keys. No voice at all is a line right
+  under Play with "Read the transcript"; a voice off the device is a line there too once Play
+  has asked about it (see Privacy).
   While the filter is on, Previous, Next and playing move through the items shown. The scroll
-  offset is the transport's measured height (`--listen-sticky`), so it holds at enlarged text;
-  the transport sits on the `--z-sticky` layer (`tokens.css`).
+  offset is the transport's measured height (`--listen-sticky`, also the page's
+  `scroll-padding-top`, so a focused link is never under it), so it holds at enlarged text; the
+  transport sits on the `--z-sticky` layer (`tokens.css`). In a window under 32rem tall (a
+  laptop at 200% or 400% zoom) only a compact bar sticks: Play or Pause, Previous, Next and the
+  place, at most a third of the window; the voice line under it scrolls with the page.
   The item being spoken is marked (a bar and a tint, `aria-current`) and scrolled into
   view (instantly under `prefers-reduced-motion`). Keys (`p`, `s` or Esc, `[`, `]`, `h`, `e`)
   work only while focus is inside the page's content, never with a modifier or in a menu. State
   changes go to a polite status line; the item being spoken is not announced again. It never
   moves focus, so it does not fight a screen reader.
-- **Privacy.** A voice with `localService === true` is the default. When the browser lists only
-  online voices, the player says some browsers send the text to their maker and speaks nothing
-  until a voice is chosen; a "Hear this" button asks once and speaks only on the second press.
+- **The place (SW49).** Every transcript item has a stable id from the element it was made
+  from (`Item.ref`, the page's `data-listen-id`: the element's own `id`, else its tag and place
+  under its parent), the same on every load of a result and unique in the page. The script
+  keeps its whole state in one object and reads `data-kinds` and `data-listen-*`, never the
+  words on the page. The place, speed, voice name, Follow along and Keyboard shortcuts are
+  kept in the browser's `localStorage` under the document's id and result version
+  (`readablestem.listen:<job>:<version>`, the demo `demo:demo`; static example pages use their
+  path): ids and settings only, never text of the document. At most 20 documents' places are
+  kept (the oldest dropped), and a new version of a document replaces its older entry. Every
+  read and write is wrapped, so a browser with storage blocked plays with no memory. On a return
+  the Play button says "Resume from item 47 of 520"; Stop keeps the place; "Play from the
+  beginning" is the restart. The place is set by clicking an item, an index link (Headings,
+  Equations, Pages, from the page markers) or Previous and Next, and Play starts from it. An id
+  that is gone after a new version falls back to the nearest earlier item that is still there
+  (the eight before it are kept as ids), then to the start. The place is `aria-current` and a
+  class, never a live announcement, and focus never moves; the status line says only what the
+  person did ("Place set to item 47 of 520"). The "Hear this" buttons share the script and keep
+  no place.
+- **Privacy.** A voice with `localService === true` is the default and speaks at once. Any other
+  voice is one of two classes and Play is never switched off for either: an **online** voice
+  (not local, and named as a network voice, such as Chrome's "Google ..."), and a voice **not
+  known** (not local, no more said: all of Firefox's speech-dispatcher voices on Linux). The
+  first Play with either asks in words and the second press of Play is the answer, kept for the
+  visit; Previous, Next and the other buttons do not answer it. The words for an online voice
+  say some browsers send the text to their maker; the words for one not known say only that the
+  browser does not tell the page whether it runs on the device. A "Hear this" button does the
+  same with its own press. The sentences are in `WORDS` at the top of `static/listen.js`.
 - **Where it is offered.** The job page (beside "Preview the student version", and as the
   "Check how it sounds" step of "Before you share"), the review screen's finish line and list,
   the demo's note, the showcase examples, `/help/posting#listen`. On the review screen (split
@@ -1442,7 +2170,17 @@ conservative. A model call now costs one more INSERT to hold and a SELECT and a 
 
 ## Worker (`web/worker.py`)
 
-A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
+A thread started and stopped with the app's lifespan when `RUN_WORKER=true` and `WORKER_MODE=inline`
+(the defaults). With `WORKER_MODE=service` the same `Worker` runs in `readablestem worker`
+(`web/worker_service.py`): `WORKER_SLOTS` of them in one process, no web server. Several workers
+on one database are safe: a job is claimed by one conditional UPDATE (`WHERE status = 'queued'`,
+after `SELECT ... FOR UPDATE SKIP LOCKED` on Postgres), so a job goes to one of them, and a job
+whose worker died is requeued when its lease runs out, whichever worker notices first. What the
+web process reads from the worker (`web/worker_rows.py`): rows `worker.<slot>` (written every
+10 seconds: the slot's state and how long since its loop last showed life), `provider` (the AI
+service's recent requests, `web/provider_health.py`) and `sandbox` (the probe's result,
+`web/sandbox_status.py`) of `ops_heartbeat`; they hold words, numbers and times, nothing from a
+document.
 
 - **Claiming.** Fewest attempts first, so a retried job goes behind fresh ones; within
   that, people take turns (`web/fair_queue.py`): the owner whose latest job started
@@ -1527,7 +2265,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
-  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analyzed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe normally refuses these first). A result stored before page types: `scanned` when every page was only a picture of a page |
+  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analyzed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe refuses these first when it can tell inside its allowance of path items, and the pages of such a job are given back). A result stored before page types: `scanned` when every page was only a picture of a page |
   | `too_complex` | A page needs more time or memory to read than a conversion has: the layout step's child process (open and render the pages, `layout._probe_pages`) passed its time limit (`PROBE_TIMEOUT_S` + `PROBE_PER_PAGE_S` per page after the first) or its 768 MB address-space cap (`PROBE_MEMORY_BYTES`) |
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no key for the selected provider): every job would fail the same way |
@@ -1550,30 +2288,53 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   write is logged (`progress_write_failed`) and skipped. A requeued job starts again with
   none. Only a converter that takes `stage_progress` gets it.
 - **Outcome codes on finished jobs** (`worker.result_outcome`; status `done`, results
-  available, but incomplete). The job page and the documents list show them instead of
-  "Finished" (`web/outcome.py`), and `ops.aggregate` counts them as `job error:<code>`:
+  available, but incomplete). They are gap notes of the job's state (`states.gaps_of`,
+  words from `web/outcome.py`): the state is "Needs your decisions" while any decision is
+  open, else "Partly converted", never "Ready to share". A note with nothing in it is not
+  shown (F-319: never "0 of N were not converted"). `ops.aggregate` counts them as
+  `job error:<code>`:
 
   | Code | Cause | What the user is told |
   |---|---|---|
-  | `budget_daily` | The daily cap ran out part way | "Stopped early": N of M equations and figures not converted, originals kept; upload again after 00:00 UTC |
-  | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | "Stopped early": split the PDF |
-  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with drawings or writing nothing could be read from), or handwriting on typed pages kept as images | "Finished, with pages not converted" ("Finished, with handwriting not converted" when only handwriting on typed pages was kept): which pages are handwritten, scanned or unread; that the HTML keeps it (or each one) as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
+  | `budget_daily` | The daily cap ran out part way | Note "Stopped early": N of M equations and figures not converted, originals kept; "Convert the missing parts" after 00:00 UTC |
+  | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | Note "Stopped early": split the PDF |
+  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with drawings or writing nothing could be read from), or handwriting on typed pages kept as images | Note "Pages kept as pictures": which pages are handwritten, scanned or unread, or have handwriting on typed text; that the HTML keeps it (or each one) as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
   | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
 
   A finished job with no code whose equations, figures and tables mostly failed with
-  `model_api_error` or `model_timeout` is shown as "Stopped: the AI service did not
-  answer" (`outcome.MODEL_OUTAGE`, read from the stored result on the job page; nothing
-  is stored on the job, and it goes away once enough of them are filled in). "Convert
-  the missing parts" on that page tries it again ("Trying a document again", below).
+  `model_api_error` or `model_timeout` has the note "Service outage" ("The AI service did
+  not answer for N of M ..."; read from the stored result on the job page; nothing is
+  stored on the job, and it goes away once enough of them are filled in). Each of those
+  items is an open decision, so the lists, which read no result, show the job as "Needs
+  your decisions". "Convert the missing parts" on that page tries it again ("Trying a
+  document again", below).
+
+  A finished LaTeX source job with no code whose reader left words or pictures unread
+  (`SourceReport.unread_words`, `unread_pictures`) has the note "Parts not read", with the
+  counts and no words of the source. Converting again reads the same way, so the note offers
+  no retry, and the job can still be shared (`states.FINAL_GAPS`, like pages kept as pictures).
 
 ### Trying a document again (`web/retry.py`, `web/step_cache.py`)
+
+A finished document made at an older `PIPELINE_VERSION` than the code's is offered **"Convert it
+again"** on its job page (owner only; `states.rerun_step`; WS10.15), through the same route and
+form. It is a re-run, not a try after a failure: it uses no try (`jobs.retries` stays), no daily
+pages and none of the page allowance, keeps the decisions made (the worker carries them over as
+for a try), and has a spend cap of its own: `jobs.cap_base_usd` and `jobs.cap_base_calls` record
+what the job had spent when the re-run began, and the caps (`worker.job_caps`, and the equation
+read's budget in `web/reread.py`) count from there, so a document that used most of its cap the
+first time can be read again. `jobs.rerun_version` records the version it was started for, so it
+is offered once for each version. It is never offered where "Try again" or "Convert the missing
+parts" is, nor on a sample. The finished steps of a finished document are not kept (`forget_steps`),
+so the re-run asks the model again for all of it, up to its cap, until raw answers are kept for
+the job's life.
 
 A conversion can stop for reasons that are nobody's fault. The job page offers a button, not
 a dead end:
 
 | The document | The button | Why |
 |---|---|---|
-| Failed with `timeout`, `lease_expired`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` | "Try again" | Stopped by something that is not about the file. The other failure codes (a handwritten or scanned file, `no_content`, a removed account) are not offered a retry: it would stop the same way |
+| Failed with `timeout`, `lease_expired`, `conversion_unavailable`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` ("Stopped: not caused by your file"), or with a code this version does not know ("Stopped", which names the step it stopped in) | "Try again (N left)" | Stopped by something that is not about the file, or not known to be. The file's own stops (a handwritten or scanned file, `no_content`), the limits (`budget_job_*`, `conversion_oom`) and a removed account are not offered a retry: it would stop the same way. With no tries left the state is "Stopped", says how many times it was tried, and offers only "Upload it again as a new document" (F-315) |
 | Finished with `budget_daily`, or converted while the AI service was down | "Convert the missing parts" | Only the parts that were not converted are sent again |
 
 `POST /jobs/{id}/retry` (owner only, CSRF, rate limits `retry` per address and `retry_user`
@@ -1700,23 +2461,13 @@ reflow, htmx, no JavaScript), `tests/test_job_source_facts.py`,
 
 From top to bottom:
 
-1. **The status box**, a polite live region, with a headline that says what is left
-   to do (MF5 of the UX review; `job_page.headline`):
-
-   | State | Label | Sentence |
-   |---|---|---|
-   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go (an estimate). You can leave this page; it keeps its place." |
-   | queued, today's budget spent | Waiting | the `waiting_budget` outcome |
-   | converting | Converting | the step it is on: "Reading the equations and checking each against your PDF's text." |
-   | stopped by a spend cap | Stopped early | the outcome's message (and the open decisions) |
-   | AI service outage | Stopped: the AI service did not answer | "... Nothing is wrong with your PDF ..." |
-   | pages kept as images | Finished, with pages not converted | which pages and why (handwritten, scanned, nothing readable); hidden text not used |
-   | decisions open | Converted | "3 decisions need you before you give it to students." |
-   | no decision open, parts shown as images | Ready | "1 equation is shown as an image that screen readers cannot read." |
-   | nothing left | Ready to share | "Everything was converted." |
-   | failed | Stopped | why (the failure codes above) |
-
-   The tab title follows the label. The estimate while waiting is the pages ahead (in
+1. **The status box**, a polite live region (`#job-status-region`), with the job's state
+   ("Job states", above): its badge and label, its one-line message ("2 documents ahead of
+   yours (1 is yours), about 3 minutes to go (an estimate). You can leave this page; it
+   keeps its place.", the step it is on, "3 decisions need you before you give it to
+   students.", why it stopped) and its gap notes. The state is said there once: the
+   heading over the actions names the task ("Review" or "Download"), not the state again
+   (F-415). The tab title follows the label. The estimate while waiting is the pages ahead (in
    the worker's claim order), what is left of the jobs converting and the job's own
    pages, at the pace of the last 20 finished jobs (start to finish, per page; 10 s a
    page with none to go by: `views.seconds_per_page`); the sentence says it is an
@@ -1742,8 +2493,9 @@ From top to bottom:
    ("For 1 equation and 1 figure, students will get the tool's suggestion as it is. 1
    equation is an image marked "Not converted"."). The polled status links to the first
    decision as soon as the job finishes ("Start the review"), so it is one click from
-   finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
-   decisions on October 9." (or "Nothing in this file needed your decision."), the
+   finished to deciding. With none open, the state's label (BW1, MF9) and the finish line
+   from the summary ("You reviewed 3 of 5 flagged parts, the last on October 9." or "The
+   tool flagged nothing in this file for review, and nobody has reviewed it."), the
    download as the main button, the student version, then **"Where will you post it?"**
    (ux2-lane-a): one flat list of the ways the file leaves the tool, each with its own
    link and the recommended one first. "A course site or any web page (Recommended)" is
@@ -1773,9 +2525,23 @@ From top to bottom:
    is feature-aware (`outcome.failed_message`): with "Convert scanned or handwritten pages"
    offered it says such pages are read only when asked for and gives that route, and does not
    say the tool cannot convert them; without the option it says it cannot.
-4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
-   (notices derived again from the fixes as they are now, plus the stored ones of other
-   codes), one sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
+   **Every line is made in one place.** `core/page_checks.py` is the table of the lines a job can
+   show (code, page or document, tier, what measures it, where it is listed, whether the record
+   lists it as not checked), and `page_checks.make` is the only way a `Notice` is made: it takes
+   the tier from the table and refuses a code that is not in it, so a measured fact cannot be
+   left without a line, a tier or a sentence. `NOTICE_CODES` equals the table, and
+   `notices.section` and `HANDLED_CODES` read it. The sentences stay in `messages.py`.
+   The rows marked `not_checked` (hidden text, attached files, Word parts left out, drawings not
+   analyzed, LaTeX errors with no place, a source not compared with a compiled copy) are also
+   listed by the review record and its CSV under what was not checked
+   (`record.notice_not_checked`).
+4. **Not handled in this file**, **Worth checking** and **Handled in this file**:
+   `pipeline.notices.current(result)` (notices derived again from the fixes as they are now,
+   plus the stored ones of other codes). "Not handled" holds only what the result records as
+   found and not converted; footnotes and code blocks, which are converted, are counted under
+   "Handled in this file" with one line each ("2 footnotes: kept where they fall in the text",
+   `notices.HANDLED_CODES`, `messages.HANDLED_MESSAGES`), and what the file does not contain is
+   not listed (F-043). One sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
    "The whole document:"), "(2 times)" for a count (a message with "{count}" in it, the
    hidden-text notices, says "(1,083 characters)" in the sentence instead), and, when the
    notice has a decision, "Decide it (one of your decisions)" or "You have decided it". A
@@ -1783,13 +2549,21 @@ From top to bottom:
    and the pages kept as images for one reason once, as their group. A kept page is one
    line: its hidden text that was not used is said on it, and only the first page of a
    group has "Decide it"; the others say "It is decided together with page 2."
+   A paragraph or list item flagged `rtl_text` or `option_labels` has a decision of its own
+   (`notices.text_decisions`, reason `text.rtl_order` or `text.option_labels`): its notice is
+   derived from that decision while it waits and is gone once it is made, so the job is
+   "Needs your decisions" and then "Ready to share" like any other. Its review card shows the
+   words as the PDF gives them (`dir="auto"`, the element's `lang`) and "Looks right"; a
+   result stored before has the bare notice and keeps the job at "Ready"
+   (`states._HOLDS`). A decision on the same words carries over to a revised upload
+   (`carry.CARRIED_KINDS`, the words as the fingerprint).
    (`job_page.notice_lists`). The Results list counts "Pages kept as images" and
    "Handwriting kept as images" apart from the figures, the decisions name them ("the
    handwritten pages and the scanned page", never "groups of repeated figures"), and the
    waiting items say why they make fewer decisions ("pages kept as images for the same
    reason are decided together"). The finish line's heading is the status box's label:
-   **Ready to share** only when everything was converted, else "Ready" or "Finished,
-   with pages not converted", as on the review screen.
+   **Ready to share** only when the summary says so ("What was checked" above), else
+   "Ready" with what remains, or "Partly converted", as on the review screen.
 5. **What changed for a screen-reader user** (Beta 1 of the feature review), shown for
    results with `source_facts` (older ones have no card): up to 7 rows "Can a
    screen-reader user ... | In your PDF | In the HTML" (equations with their structure,
@@ -1810,41 +2584,64 @@ From top to bottom:
    gone."), and "In the HTML:" the spoken reading. That text is document content: it is
    rendered for the owner only and never logged. On the committed demo PDF (13 pages,
    one real run) the card has 7 rows and its first example is Equation 2.4: "capital
-   delta d capital delta t period" against "capital delta bold d over capital delta t".
+   delta d capital delta t period" against "cap delta bold d over cap delta t".
 6. **Results**: what was found, and decisions as the one unit everywhere (MF6, T1-3,
    T1-11): "Decisions to make" and "Decisions made" ("Decisions still open" for a person who can only view it), counted as on the review
    screen and in My documents (a group of repeated headings is one decision). A heading
    made bold text is a decision, never "shown as an image" (`job_page.shown_as_image`),
-   so a job whose decisions are done is "Ready to share". Items are not counted, and
+   so it does not keep a job from "Ready to share". Items are not counted, and
    there is no model cost, internal code or confidence here (cost is on `/admin`). One
-   line says how many parts were accepted for you with a note, with a link to them. Then
-   the links per kind to their first decision, and the automatic checks of the file with
+   line says how many parts were accepted by the tool with an optional note nobody has
+   opened (not reviewed), with a link to them. Then
+   the links per kind to their first decision, and the structure checks of the file with
    their plain sentences and a disclosure, "What was checked, and what was not": the
    structure checks ran; the axe test and screen-reader testing did not.
 7. **Language**, one line with a "Change" control folded behind a details element:
    "Language: English (detected; your PDF did not say)" ("from your PDF",
-   "assumed; ...", "you chose it"; a result made before detection existed counts as
+   "assumed; ...", "you chose it" (an assumed or mixed language is a required check: the
+   job's state is "Converted: confirm the language" until this control is used,
+   `web.states`); a result made before detection existed counts as
    "from your PDF" when the PDF has /Lang) and a select of the languages in
    `pipeline.language.LANGUAGE_NAMES` (35) with "Confirm this language" (when it was
    detected or assumed) or "Use this language". The POST (CSRF-checked, owner only,
    finished jobs only, only a listed language or the document's own) goes through the
    text pass's rule (`text_pass.set_document_language`): `lang` and
-   `lang_source="user"`, the `lang_detected` and `lang_assumed` notices dropped, and the
+   `lang_source="user"`, the `lang_detected`, `lang_assumed` and `lang_mixed` notices dropped, and the
    passage languages worked out again against the new language. Then it makes the HTML
    again (`review.rerender_html`, with the day of the last decision for the student
    note) and bumps `jobs.result_version`. The language tag is not logged.
+   **A file that looks cut off** (F-505, `source_facts.repair_notices`): a PDF that MuPDF had to
+   repair when it opened it (a download that did not finish) and whose last pages are empty
+   (page type "blank": no text, picture or drawing) gets one required notice, `file_cut_off`
+   (`page` the first empty page, `count` how many, to the end of the file). The job's state is
+   "Converted: the file looks cut off" and says "This file looks cut off: pages 4 to 6 are empty.
+   Upload a fresh copy, or continue with pages 1 to 3." The owner has two ways on, in the section
+   "The file looks cut off" (`_job_cut_off.html`): "Upload a fresh copy" (the revise path) and
+   "Continue with pages 1 to 3" (`POST /jobs/{id}/cut-off`, CSRF-checked, owner only, finished jobs
+   only: `notices.continue_cut_off` sets the notice's review to "none"; the student file is not
+   made again). The notice is kept after the answer: `checked.cut_off_of` reads the pages from
+   it, so the summary never says "Every part the tool found was converted" (state "Ready", with
+   "Pages 4 to 6 of the PDF are empty ... so the rest is not in this file"), the student note
+   says the pages are not in the file, and the EPUB, Word file, Canvas README, the record and
+   Listen say it from the same summary. A repaired file with content on every page, or with
+   empty pages only in the middle, gets the optional line `file_repaired` ("Worth checking");
+   a file MuPDF did not repair raises nothing, whatever blank pages it has.
 8. **For students** (`web/routes/job_settings.py`, `web/titles.py`): the title students
    hear (T1-7) and a contact line (T1-17). The title field starts with the stored
    `jobs.title_override`, else what the file's `<title>` already is
-   (`assemble.suggested_title`: the PDF's title or first top-level heading without its
+   (`assemble.document_title`, `docs/output.md` "One title": the PDF's title or first heading without its
    section number, "1 Derivatives" to "Derivatives"; "Contents" and similar names of
    parts are skipped for the first heading that is not one). Saving a different title
    stores it and makes the HTML again (`assemble.render_html(title_set=True)`): `<title>`,
    a top-level heading when the body has none, the job page heading and tab, My documents,
    the delete page and the download name. Empty, or the suggestion, clears the choice. The
    contact line is an email or an http(s) address (`titles.clean_contact`); it goes in the
-   student note's "tell your instructor" sentence as a `mailto:` or web link
-   (`assemble._contact_sentence`, which checks it again). Both are CSRF-checked, owner
+   student note's "tell your instructor" sentence and in each note about something not
+   converted (an equation, picture, table, figure or page), as a `mailto:` or web link
+   (`assemble.contact_link`, which checks it again). The `mailto:` subject is the document's
+   title and the item by kind and page ("Equation on page 3"), never its content; the body is
+   empty. The link text says what it does ("Email your instructor about this equation").
+   Nothing is sent or stored by the app. Both are CSRF-checked, owner
    only, finished jobs only; an unusable line shows the job page again, status 400, with
    the error under the field and the typed text kept. Neither is logged.
 9. **Deleting**: "Delete now" at the end of the page, styled as a danger entry point
@@ -1919,7 +2716,9 @@ fields, the equation's speech lines and LaTeX field, the figure's alt fields and
 keep-the-original block) is in `templates/_review_shared.html`; the two layouts keep their own.
 "More about this item" folds the details, the codes and the report link.
 
-**A phone** has a Decision / Page bar fixed at the bottom of the window (plain links; with script it
+**A phone** has a Decision / Page bar, fixed at the bottom of the window when the window is at
+least 32rem tall and a row above the decision in a shorter one (400% zoom on a laptop, a phone on
+its side: F-412) (plain links; with script it
 remembers where you were in each, so going back lands on the same place), "Fit to width" for the page
 image (kept for the tab), and "Enlarge" under each picture of the PDF, which opens it in a dialog (the
 image itself without script).
@@ -1948,7 +2747,10 @@ image itself without script).
   plain "R" there, so for `\mathbb{R}` the screen says "The proposal has a double-struck
   ℝ. The PDF's text cannot show that style, so check it in the image." instead of
   calling the PDF's R plain (unless the R is known to come from a regular text font).
-  The proposal is drawn in Latin Modern Math (served from `static/vendor/fonts`, see
+  "What differs" shows the first five rows and folds the rest under "N more differences"
+  (F-077: a long array listed every number), and the LaTeX box opens tall and grows with
+  its text (`field-sizing: content`, at least 6 lines, at most 60% of the window); the list
+  view's box has the same live check as the split view's. The proposal is drawn in Latin Modern Math (served from `static/vendor/fonts`, see
   its README), the OpenType math font of the family LaTeX PDFs are set in: in the
   browser's default math font a plain omega is as heavy as a bold Computer Modern one.
   Under them, two readings: "Read aloud roughly as: …" (the proposal's speech text) and
@@ -2102,8 +2904,8 @@ image itself without script).
 description" for a figure, "Keep as image" for a table, "Make bold text" or "Make plain text" for a heading, "Keep the
 original" otherwise. A line under the buttons, tied to the button by
 `aria-describedby`, says what that means for students ("Keep as image: Students see a
-picture of the original; screen readers hear the PDF text of the equation, marked as not
-checked."; "Equation not converted" is what they hear only when the PDF has no text there),
+picture of the original; screen readers hear the PDF text of the equation, as written in the
+PDF."; "Equation not converted" is what they hear only when the PDF has no text there),
 and the notice after it and the item's state say the same in other words ("Kept as an image by
 you"). The action posted is still `reject`; stored results, ops counts and the output
 are unchanged.
@@ -2112,10 +2914,10 @@ are unchanged.
 sentence and code. Previous and next decision links close the card. After Accept, Save
 edit or the "Reject" button the form redirects (303) to the next decision still open
 after this one (`queue.next_open`, wrapping round), or to the done state, the finish
-line as the job page says it (`SplitBuilder.ready`, from `job_page.headline` and
-`job_page.Finish`): **Ready to share** ("You made 3 decisions on October 9." or "Nothing
-in this file needed your decision."), or **Ready** with what is shown as an image ("2
-tables are shown as an image that screen readers cannot read."), then **Download the
+line as the job page says it (`SplitBuilder.ready`, from the job's state and
+the summary): **Ready to share** or **Ready** with what remains ("2 tables are shown as
+images that screen readers cannot read."), after the finish line ("You reviewed 3 of 5
+flagged parts, the last on October 9."), then **Download the
 HTML file**, "Preview the student version", a line on reading it through before sharing
 (and the notes, optional), "How to post it in your course" and "Back to the results". A
 job that stopped early shows its outcome instead, with no download button. There the
@@ -2125,6 +2927,37 @@ fragment, which would cancel autofocus) and is described by a status line above 
 "Equation 1: Accepted. 2 decisions left." The page title starts with the position
 ("Decision 2 of 3: Review …"). A refused edit comes back on the same decision (422) with
 the error summary and the field open.
+
+**Tier, sources and the risk order (`core.triage`).** `tier_for(fix)` is the one place a tier
+is decided (required, optional or none): a fix is required when the pipeline asked for a decision
+(`Fix.review`, which a review never changes) or is waiting for a person whatever its stored tier
+says, as in a result stored before tiers existed. Every counter and the review queue call it.
+`SOURCES` is the one table of what can raise a required decision: `pipeline` (the conversion's
+own steps and the reading of a scanned page), `text` (layout doubts a paragraph or list item:
+`text.rtl_order`, `text.option_labels`), `source_read` (a LaTeX or Word source: a picture with no
+file, a formula that could not be read) and `decoration` (a figure called decorative that nothing
+proves is). Each row says whether its flags are doubts or rules and, for a row with one, its
+band. A fix keeps the list of sources that raised it (`Fix.sources`, empty meaning `pipeline`,
+so older results are unchanged); a second source that flags a fix already asked for adds its name
+(`add_source`) and makes no second decision; a name outside the table is refused when the fix is
+built. A row is added by the item that brings its source; a source with no row can raise nothing.
+
+`risk_rank(fix)` puts a required decision in one of five bands, fixed when it is asked
+(`Fix.band`, set by `stamp`: a review changes the checks and the status the band is read from,
+and the numbers of the one-at-a-time view must not move). 1: nothing usable was made for content a
+student cannot get another way (a formula, figure or table kept as it was, a page kept as a
+picture). 2: what a student reads is or may be wrong (a failed check, a text doubt, an unproven
+decoration). 3: order or structure of a page (no source raises it yet). 4: confidence under the
+bar with no failed check. 5: repeated headings and other weak structure. The one-at-a-time view
+(`web.queue`) walks the bands in this order and, inside a band, in page and reading order; the
+list view keeps its sections by kind and orders each section the same way. Once every decision of
+bands 1 to 3 is decided and some of bands 4 and 5 are left, both views say that the higher-risk
+decisions are made, how many lower-risk ones are left and what they are, and that the document
+stays a draft until every decision is made (`triage.stopping_line`, `queue.stopping_words`; it
+never says the document can be shared, because a band 4 reading can be wrong and a document
+with a decision open is a draft). `review_load` also counts required decisions by
+band, by opening source and by class (`required_by_band`, `required_by_source`,
+`required_by_class`).
 
 **Target sizes.** Undo is 44 CSS px high and wide. The marks on the page image are at least 24
 px (WCAG 2.5.8, overlapping no other mark) and are grown to 44 px wherever the page has room
@@ -2195,11 +3028,20 @@ Save edit runs the same function, so the two never disagree.
 **Stale tabs** (MF12). Every review write (a decision, a group decision, Undo)
 counts itself on the job, inside its transaction after the row is locked
 (`web.review.bump_result_version`, `jobs.result_version`), and every review form, in both
-views, carries the number its page was drawn at (`version`). A form drawn before the last
-write (a tab left open while the document was changed in another one) is refused with a
-409, nothing applied: the decision is shown as it is now, with "Your choice was not
-saved. This document was changed in another tab or window after this page was opened. …
-Equation 1 is now: accepted by you." and a **Reload this page** link (by GET; reloading
+views, carries the number its page was drawn at (`version`). What refuses a form depends on
+what it acts on (`routes.review.refuse_stale`). A write on one item (a decision, an edit, an
+item's words, "Read again"), on a group's members or on the items of a many-item action (accept
+many, accept the clean tables, relettering a symbol) is refused only when a write since the
+page was drawn changed one of those items; the writes since are read from the `ReviewEdit`
+rows, which record the number each write made, so no form field or column is added, and the
+write is applied to the newest stored result under the row lock. Two tabs, or two cards decided
+one after the other from one page, therefore both save. A write that depends on the whole
+document is refused when anything changed: Undo, a page left out or put back, a region added
+and "Not an equation". So is any write since that left no row (the tool's own, a setting
+change). A form that sends no version is never refused. A refused form gets a 409, nothing
+applied: the decision is shown as it is now, with "Your choice was not saved. This item was
+changed in another tab or window after this page was opened. … Equation 1 is now: accepted by
+you." (a group or many-item action names the items that changed) and a **Reload this page** link (by GET; reloading
 the POST would only send it again). What was typed stays in the field. The notice takes
 focus, like the error summary. A form without the field (a page from before this release,
 a script) is not refused: the guard is for tabs, not a lock.
@@ -2210,13 +3052,19 @@ A decision posted then used to give "This form has expired" or a bare 401, and s
 always went to My documents. Now:
 
 - a page asked for while signed out is remembered, and signing in goes back to it
-  (`auth.finish_login`), so a deep link to a decision survives sign-in;
+  (`auth.finish_login`), so a deep link to a decision survives sign-in. The pages are the GET
+  routes whose function takes the signed-in or the admin user, collected from the routers
+  when the app is made (`return_to.build_pages`), so a new page is covered with no list to
+  update. A request the browser makes for a page's picture, stylesheet or status poll
+  (`Sec-Fetch-Dest` other than `document`) is not remembered, so signing in never lands on
+  a picture;
 - a decision (or Undo) posted while signed out answers "Please sign in again. Your session
   ended, so this was not saved. … Sign in again to come back to the same decision.", with
   the sign-in buttons on the page; signing in lands on that decision. When the cookie
   itself expired (its CSRF token with it) the page is the same, not "This form has
-  expired". A form whose token is from before the reviewer signed in again (in another
-  tab) says the form has expired and links **Back to the decision**;
+  expired". The same holds for any form, not only a decision: posted with nobody signed in
+  it gets the signed-out page. A form whose token is from before the reviewer signed in again
+  (in another tab) says the form has expired and links **Back to the decision**;
 - with JavaScript, what is typed into a decision's fields is kept as a draft in this
   tab's `sessionStorage`, under the form's address (ids only; plus the form's
   `data-draft-key` where two forms post to one address, as a table's cell form, keyed by
@@ -2232,10 +3080,10 @@ always went to My documents. Now:
   one is not put back and nothing claims protection that is not there.
   Choosing a table cell from the list is navigation, so it keeps no draft.
 
-Only pages of this app are remembered (`/app`, `/admin`, a job's page, review screen,
-list view or HTML, with a query of ids and numbers; one pattern), so it is not an open
-redirect: `//elsewhere.example`, images, stylesheets and anything else are neither
-remembered nor followed. It lives in the signed session cookie, which signing in clears.
+Only pages of this app are remembered (the GET routes that take the signed-in or the admin
+user, with a plain path and a query of ids and numbers), so it is not an open redirect:
+`//elsewhere.example`, `..`, the static files and anything else are neither remembered nor
+followed. It lives in the signed session cookie, which signing in clears.
 The server never sends typed text back on these pages.
 
 **Keyboard** (BW11). "Skip to the decision" is the second Tab stop (after "Skip to main
@@ -2279,12 +3127,42 @@ shown) links that size would overlap, and a click in the overlap would go to the
 item: overlapping links are pushed apart, each by part of the overlap, never so far that
 a link stops covering the middle of its own item (pairs squeezed along one axis are
 tried along the other). The frames stay put. The layout covers every fix of the page,
-shown or not, so no subset a view shows overlaps. A mark's number sits left of its
+shown or not, so no subset a view shows overlaps. Only links that can ever touch are compared,
+in the order all pairs would have been, and the work is bounded (`marks.TRIES_PER_MARK` pairs
+tried for each mark): 200 marks that can be separated take about 12 ms, and a page whose
+elements overlap each other, which cannot be separated whatever is done, stops at the bound
+with those links still overlapping, as it did before after about 2.7 s of rounds. A mark's number sits left of its
 frame, or for an equation in a line of text in the page margin on the same line (its
-"Note" label and check mark too), so it covers no word. The marks keep their own colors in forced-colors mode
+"Note" label and check mark too), so it covers no word. Numbers of neighboring lines are 22 CSS
+px high and the lines 12 pt apart, so numbers that would cover each other move along their line
+to a free place (`marks._space_tags`: in a margin one of the places one number wide that fit in
+it, nearest first; beside a frame further left; where none fits they stay), at the sizes of the
+smallest page, whatever is decided; `marks.overlapping_tags` reports the ones still covering.
+Under the page image the same marks are a text list in reading order (`PageView.listed`), each
+a link to the item its frame opens, with its number, kind and first words. The marks keep their own colors in forced-colors mode
 (`forced-color-adjust: none` on the page frame): the page image stays white whatever the
 theme, and system colors would make them white on white. The page itself never scrolls
 sideways (320 CSS px included).
+
+**Marks stylesheet.** One per page, `marks.css?page=N`, and the screen links the one of the
+page it shows (and, for an equation's card, that equation's page when it is another, where its
+proposal is sized under its crop). The stylesheet is a pure function of the page's inputs:
+the boxes of the fixes and of the notices that get a mark, which of them are inline, how far
+the page's content reaches, the page's size, the font size and box of each equation on it, and
+`marks.PLACEMENT_VERSION` (bump it when `place` or the rules written from its marks change).
+The `ETag` is a hash of exactly those (`PageMarks.etag` in `routes/split.py`), so it is
+computed without placing a mark, and a decision does not change it: a mark's state (open,
+accepted, current) is a class on its link, not geometry. What can change it is what moves or adds a
+mark: an element's box, a page edit, a notice that appears or goes with a decision on text.
+The screen's link carries that tag (`marks.css?page=N&v=<tag>`). When `v` is the page's current
+tag the answer is `private, max-age=31536000, immutable`: the file for that address never
+changes, so the browser keeps it and a decision on the same page asks for nothing (it was a
+request on the way to the first paint, about 60 ms on a quiet server and more under load). A new
+page, or marks that moved, is a new address. Without `v`, or with one from a screen drawn before
+the marks moved, the answer is `private, no-cache`: the browser asks every time, and gets a 304
+when the tag still holds. The stylesheet blocks the first paint on purpose: it is one small file (about 11 KB
+raw, 2.7 KB sent, for a page of 43 marks) and a mark without its rule would show at the top of
+the page image, and `app.js` reads a mark's place to scroll it into view.
 
 **Page images.** Rendered when the browser asks, from the job's own upload, in the
 upload probe's child process (`python -m readablestem.web.pdf_probe render ...`, 768 MB
@@ -2334,7 +3212,19 @@ an image is a decision the screen shows and the job can be done. The card has:
   proposal's grid (`core.types.grid_problems`, `web.review.GRID_PROBLEM_SENTENCES`) that no check already
   reported. Each finding has the one correction that answers it: **Use the first row as headers**, **Use
   the grid read from the PDF**, or **Change the table** (opens the folded place below). The codes stay in
-  "More about this item";
+  "More about this item". A failed check of the words (`table.cell_text`: `text_mismatch`,
+  `cell_mismatch`, `row_mismatch`) or of a math cell (`table.math_symbols`, `table.math_signs`,
+  `table.math_style` when it changes the meaning) also lists **Cells that differ**, in a list under its
+  sentence: each cell by its row and column, with the nearest header in brackets where the table has
+  one ("Row 3 (Ball), column 2 (Distance (m))"), the cell in the rebuilt table and the PDF's text where it
+  stands. The same cells are marked in the table above (`class="cell-differs"`: a dashed frame and a ≠
+  sign, so color carries nothing). The list is worked out when the card is drawn, from the proposal and
+  the grid read from the PDF, by the table step's own comparison (`table_step.text_differences`,
+  `maths_differences`), so a difference in spacing or in a spelling that the check folds is not listed;
+  nothing is stored (a `Check` stays free of cell text). It stops at 8 cells, then says how many more
+  differ. When the two grids cannot be compared cell by cell (another number of rows or columns,
+  merged cells that differ, no PDF text) no list is shown: the check's sentence says why. It is
+  information: it adds no choice, and Accept stores what it stored;
 - **Change the table** (folded; one place for headers, a cell and the grid read from the PDF): "Cell to change", a list of every cell ("Row 4,
   columns 2 to 3: v = d / t") with **Change this cell**, a GET that comes back with that
   cell's form open and its field focused (`?item=<id>&cell=r3c1`); and **Headers**, two
@@ -2366,7 +3256,14 @@ with Accept (the proposal as it is now) or Keep as image. After one the reviewer
 now, with "Go on to decision N" when it was the last change; Accept and Keep as image
 move on as for other kinds. The rules (`web.review`, "tables"):
 
-- *Headers.* Checking a box makes the first row's cells column headers (`header_rows`
+- *Headers.* A data table of two or more rows in which no cell is a header is a choice,
+  whatever else the checks found (`review.headers_required`, `TableCard.needs_headers`, WS5.2;
+  the grid read from the PDF after a failed model answer is the common case, and it carries a
+  second finding). Accept is refused for it on the server too. The decision bar has **Use the first row as
+  headers**, **Use the first column as headers** (not for a one-column table), **Use the first row
+  and column as headers** and **This grid is not a table**, in place of Accept and "Accept without
+  headers". The first three send the same `headers` edit as the two boxes below, and any such edit
+  stores `header_source` "reviewer" ("none" again when it leaves no header cell). Checking a box makes the first row's cells column headers (`header_rows`
   1), or the first column's body cells row headers (`header_cols` 1); unchecking makes
   them data cells again (a full-width section heading stays one). A model may mark the
   first column's cells without the count; the box is then checked. The same boxes as
@@ -2432,8 +3329,9 @@ the PDF in its place), the equation step reads that crop (`POST
 what it read goes through the cell's edit checks as if typed: saved when it passes, else shown
 in the cell's box with what differs from the PDF (and "Use my edit anyway").
 
-With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
-the cell list. In the list view a table card shows its crop, the proposal (or the grid
+With keyboard shortcuts on (they are on by default), A accepts a proposed table (or, when
+only the headers are missing, says there is nothing to accept: the card is a choice of headers, WS5.2) and E
+opens "Change the table" at the cell list. In the list view a table card shows its crop, the proposal (or the grid
 read from the PDF) and Accept, Keep as image, Use the grid read from the PDF;
 headers and cells are changed on the review screen ("open it on the review screen").
 
@@ -2454,14 +3352,25 @@ are not compared (both views).
 **JavaScript** (`static/app.js`, and htmx for the live check) only enhances: it scrolls
 the page region so the selected mark is in its visible box, working inside the region
 only (stacked, the region starts below the window, and a window term used to scroll it
-to its end; side by side it also moves the window when the mark is near the foot of a
-page, never so far that the decision's heading leaves the window), asks once more after
+to its end, against the part of the page region that is in the window; the window is never
+moved on load, because side by side the page pane is sized to the space under the header
+(`--page-top`, measured by `app.js`, read by `.page-area` in `app.css`)), asks once more after
 1.5 s for an image that was refused for a moment and only then says the page image could
 not be shown, makes "Save edit" the main button once a field of the decision is changed,
 keeps a draft of what is typed in this tab (above), and offers keyboard shortcuts: N next
-decision, P previous, A accept, E go to the edit field. They are off until turned on
-("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys with Ctrl, Alt
-or Meta, and never act while focus is in a field.
+decision, P previous, A accept, E go to the edit field. They are on until turned off (the
+keys are listed beside the switch, "Use keyboard shortcuts"; the choice is stored in
+`localStorage` as "on" or "off", nothing stored means on; WCAG 2.1.4). A key does nothing
+with Ctrl, Alt, Meta or Shift held, while an input method is composing, behind an open
+dialog, or while focus is in a text field, text area, select, or editable region. A key with
+nothing to act on says so in the status line (`#decision-notice`, `role="status"`, the one
+the saved notice uses; it is on the page empty when nothing was saved). A never presses
+"Accept anyway" (marked `data-anyway`): it moves focus to
+that button and says why. On a page card (`data-card="page"`) A does nothing and says the
+choice needs a Tab and a press. After N or P, focus goes to the new decision's heading (a
+flag in `sessionStorage`), as it does after a saved decision. On each card the choices come
+first after the heading (equation, heading, text, figure, table, repeated-heading and page
+cards), so Accept is at most three Tab stops from the heading.
 
 **Describe it in words** (T3-16; `web.review.describe_in_words`, `templates/_describe.html`).
 An item shown as an image (an equation or table kept as the original, a page or handwriting
@@ -2516,9 +3425,23 @@ an edit or an error, and when `tools=1`) with, in this order:
   any heading; the element becomes a heading with a fix the reviewer made (`edited`), so
   "Make plain text" and Undo take it back, and later headings are repaired in the outline as
   always (the notice says how many moved).
+- *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
+  the proposal read aloud in its place (the sentence before and after for one on its own line),
+  and both readings, as speech and as LaTeX, where the page witness read it differently; a
+  figure's card gives the sentence that refers to it by number ("Figure 2"), after the caption it
+  already shows. Where the only evidence is the page's picture (a page whose content did not
+  come from a text layer, a page kept as an image, an equation with no text from the PDF and no
+  sentence, a figure with no caption and no reference) the card says "This can only be checked
+  against the page image." (`SplitBuilder.evidence`).
 - *Add something the tool missed.* Step 1 is a plain GET form: a picture or an equation on its
   own line, and the region as four numbers from 0 to 100 (left and right across the page, top
-  and bottom down it). Step 2 shows the region cut out (`pages/{n}/region.png`, the same crop
+  and bottom down it), or by two lines: "Starts after line" and "Ends before line", two selects
+  filled from the page's paragraphs, list items and headings in reading order (each option is
+  the line's first words, with "the top of the page" and "the bottom of the page" as ends; no
+  view of the image, no JavaScript). The server writes the box the lines make into the four
+  numbers (`page_edits.region_between`: below the first line, above the second, as wide as the
+  page's text margins, rounded outward), so step 2 and the add route are the same for both; when
+  lines are chosen they win over the four numbers, which the form says. Step 2 shows the region cut out (`pages/{n}/region.png`, the same crop
   the file will carry, at 200 dpi with 2 pt of page round it) with **Add the picture** (alt text,
   checked like any alt text before anything is cut) or **Read it as an equation**. A picture is
   a new figure element in the reading order (placed after the last element above it in its
@@ -2533,7 +3456,7 @@ an edit or an error, and when `tools=1`) with, in this order:
   into `DocumentResult.omitted` (`OmittedPage`): nothing downstream sees them (the queue, the
   counts, the student file), the file says "Page 1 of the original PDF was left out of this
   file." in its note, links to elements on it are taken off at render, and the job page lists the
-  notice `page_omitted`. A page that was kept whole as an image comes off `image_only_pages` while it is out (a job whose only such pages were left out is no longer "Finished, with pages not converted"). The last page left cannot be left out. **Put page N back** moves it all
+  notice `page_omitted`. A page that was kept whole as an image comes off `image_only_pages` while it is out (a job whose only such pages were left out no longer has the "Pages kept as pictures" note). The last page left cannot be left out. **Put page N back** moves it all
   home; Undo does the same.
 
 Every one of these is a write like a decision: the job row is locked, the stored result changed,
@@ -2563,12 +3486,27 @@ links are one folded disclosure at the top of that section ("Sections, filter an
 at once"; open while a filter is in use; "Review at scale" below). With more than one decision
 in a kind each is a compact row and the first is open.
 
+**Parts.** The list is one sequence (decisions by kind, optional checks and their notes, "Your
+decisions", "Accepted automatically", the page links) cut into views of 25 cards
+(`routes/review.py` `PART_CARDS`; a heading group counts as its copies, a note or page link as a
+fifth). A view is about 130 KB and 4,100 DOM nodes on a document of 300 items (it was 1.3 MB and
+40,000 nodes). The links are plain GETs: `?part=N` and "Previous part", "Next part" and "Skip to the
+next part of the list" (the filter is kept), and `?at=<id>` shows the view that holds an item
+(`item-<id>`), a heading group (`group-card-<key>`) or a section (`optional-checks`, `decided`,
+`accepted`, `group-<kind>`): every redirect after a decision, the notices, the job page and the
+review screen link that way, so a link lands on the item. The line "Showing items 26 to 50 of 305.
+Part 2 of 13." says which items the view shows; the counts in the headings and the sections' summary
+lines stay whole-document counts. The order of the items and of the tab stops inside a view does not
+change. Crop pictures carry their width and height (read from the PNG) and `loading="lazy"`, and sit
+in folded rows, so a picture is asked for only when its row is open and on screen. Every bulk action
+works on the whole document, not on the view (below).
+
 **Order.** Only meaning-level problems ask for a decision, so the page has three sections:
 
-1. **Needs your decision (N)**: equations, then figures, then tables, then headings (a
-   mistake there costs a student most), each with the fixes still waiting (needs review, failed and not
-   converted alike) in page and reading order. N counts decisions: a group of repeated
-   headings is one.
+1. **Needs your decision (N)**: grouped by kind (equations, figures, tables, headings, text),
+   and inside each kind the higher risk band first, then page and reading order (the bands are
+   below). Each holds the fixes still waiting (needs review, failed and not converted alike).
+   N counts decisions: a group of repeated headings is one.
 2. **Optional checks (M)**: fixes accepted automatically with a note (`Fix.review ==
    "optional"`: a bold subscript, a double-struck R the PDF cannot show, a heading with
    weak evidence, a long alt text), folded into a `<details>`. Each item's summary line is
@@ -2645,6 +3583,23 @@ the last decision still works.
   the "Reject" button named for what it does, as on the review screen, each with an
   accessible name that includes the fix ("Keep without a description (figure 2)").
 
+### The output version
+
+`jobs.output_version` (an integer, 1 for the first file) and `jobs.output_changed_at` identify the
+file a job holds (WS20.1; the id the page, the About note and the head print is the first six
+characters of the job id and the count, `b9487b-12`). One function, `web.output.output_changed(job,
+cause)`, is the only code that marks the stored HTML out of date or makes it again for a reason
+a reader would see: it counts the change, sets the time and sets `html_stale`. The causes
+(`output.CAUSES`): `decision` (a review write of an item, a group or a page group, the
+symbol-list and bulk accepts, an undo), `page_edit` (a page edit), `language`, `title`,
+`contact`, `rerun` (the worker finished a job that already had a file) and `converted` (the
+first file of a job or the sample: sets the time, leaves the count at 1). A write that leaves the
+output alone (keeping the document 7 more days, adding or removing a share, a download) does not
+call it. The lazy render of a stale page (`routes.jobs.current_html`, also the one a new release
+causes) writes the stamp from the job and does not count, so the first view of a job, whose file
+the pipeline wrote with no job to name, moves nothing. The counter is separate from
+`result_version`, which stays what the review forms and the draft confirm read.
+
 A decision is one transaction: lock the job row, refuse a form from an out-of-date page
 (the stale-tab guard above), apply the decision (`web/review.py`), clean and check edits
 the way model output is (LaTeX through `web.edit_check`, the equation step's own checks
@@ -2665,7 +3620,12 @@ way: the page carries the render version in its head (`<meta name="readablestem-
 `pipeline.assemble.RENDER_VERSION`, raised with any change to the sheet, the markup, the
 student words or the speech rules), and `current_html` makes a stored page with none or an
 older one again from the stored result, once, so a fix reaches documents converted before
-it. The stored elements and decisions are not touched. A failed check
+it. The stored elements and decisions are not touched, with one exception: a figure stored
+as decoration without evidence (a result from before WS6.4) becomes the required decision
+it would be today (`decoration.settle`, docs/output.md "Decoration"), since its page now
+says "Figure not described". Accepting a decorative figure, or saving one with
+"Decorative" checked, stores the reviewer as its evidence (`FigureFix.decoration` `person`).
+A failed check
 re-shows the page (422) with the reviewer's input as typed and an error summary linked to
 the field; nothing is saved.
 
@@ -2697,7 +3657,7 @@ the field; nothing is saved.
   headings.
 
 After a decision on the list view the browser is redirected (303) to
-`/jobs/{id}/review/list#item-<id>` of the next fix still waiting, after this one in review
+`/jobs/{id}/review/list?at=item-<id>#item-<id>` of the next fix still waiting, after this one in review
 order and wrapping round to the first, or to `#review-progress` when none are left. A one-time notice there links back to the fix
 that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
 The landing item has `tabindex="-1"`, so the next Tab reaches that link.
@@ -2733,9 +3693,31 @@ for the reviewer.
 *Where.* Links (with the count) at the top of "Needs your decision" in the list view and under
 "All items as a list" on the review screen, only while there is something to accept. A link
 opens `GET /jobs/{id}/accept/{equations|figures}`: the count, a sentence saying what is and is
-not included, the whole list (each item's label, page, the original crop beside the proposal as the card shows
-it, and a link to decide it on its own), the **Accept all N equations** button and **Cancel**. Nothing is
-written by looking.
+not included, the list (each item's label, page, the original crop beside the proposal as the card shows
+it, and a link to decide it on its own), the **Accept these N equations** button and **Cancel**. Nothing is
+written by looking. The button is at the top of the list and at the bottom, so it is on screen when the page
+opens (at 1,280 and at 430 px, measured: 372 and 457 px from the top where it was 7,587 and 11,704 px down
+with 31 equations). The list is paged, `bulk_accept.PAGE_SIZE` (20) items a page, with Previous page and Next
+page links under it (`?page=`); a page of 20 is about 5,600 px tall at 1,280 px and 7,600 at 430. The crops load
+lazily and carry their width and height, so the page does not jump.
+
+*What the button accepts.* Exactly the items listed on the page it is on, and the count in the button is the
+number listed: the form carries the review version and the element ids of the page (`ids`), and only those that
+are still candidates are accepted (`accept_all(..., only=ids)`). Nothing on another page is accepted: a person
+who has not seen an item has not been asked about it. After a page the person returns to the list (the first page
+of what is left, with the notice "Accepted 20 equations ... 41 more are listed below. Undo is on the review
+screen."); with nothing left the landing is as before. A form with no `ids` (a script) accepts every candidate,
+as the page did before it was paged; the version check still refuses a document that changed.
+
+*One scale for the crops (F-067).* Every crop on the review screens (the list card, the split card's figure, the
+kept-image card and this list) goes through one macro (`templates/_crop.html`, `crop_image`) that shows it at the
+size its element has in the page, from `element.bbox` and not from the file: 1.5 CSS px a PDF point
+(`routes/review.CROP_PX_PER_PT`, the box grown by the 2 pt the crop was cut with), with the file's proportions for the
+height, so crops of one page share one scale whatever resolution they were cut at, and none is shrunk to fit or
+stretched (a tall figure was drawn 2.56 times too wide for its height by a `max-height` rule). A crop wider than its
+column scrolls inside its own box (`.crop-scroll`): a named group that takes focus (`tabindex="0"`) only while it
+scrolls (`app.js`), a line under it ("Wider than the screen: scroll sideways to see all of it.") and a shadow on its
+right edge while more is out of view; the page never scrolls sideways. Without `app.js` every box is a tab stop.
 
 *The decision.* `POST /jobs/{id}/accept/{kind}` is CSRF-checked and owner-only like every review
 route, and goes through the same path as a clean-tables accept (`routes/edits.write_review`):
@@ -2752,6 +3734,25 @@ count ("Accepted 12 equations whose checks passed. Undo takes them all back in o
 view, **Undo** on the review screen) puts every one back to undecided in one step, from the
 `before` snapshots the write stored (`web.review.undo_last`), as it does for a heading group.
 
+*At least two (F-068).* A kind is offered only when `MIN_OFFERED` (2) items qualify; one item
+is decided on its own card, so the page no longer says "Accept many figures (1)".
+
+*Bands.* Nothing asked in band 1 to 3 (`core.triage.risk_rank`) is accepted in bulk, equations, figures and
+"Accept the clean tables" alike (`review.asked_in_a_high_band`, read by `bulk_accept.is_bulk_candidate` and
+`review.is_clean_table`). A reading made again (`page_edits.read_again`) keeps the band of the failure it replaced
+and can pass every check, so the checks alone did not keep it out. Over the 51 corpus documents that replay at
+$0, the rule offered 19 items (12 equations, 7 figures), every one of band 4, none stamped lower, none in a group,
+and no clean table. A page-level card does not exist on this version (WS21.8): the page kept as an image is a
+group and a kept image, which the rule already leaves out.
+
+*Identical items (WS8.1) are not built.* The plan asked for one decision on open equations and
+figures of one document with a byte-equal crop and an equal proposal. The measure came first
+(rule 12): the tracked fixtures hold no such group, the replayed corpus cannot be converted
+from its recording on this tree (the model answers are not in it), and the recorded real-world
+development runs (dev, dev2, fresh, fresh2, fresh3) repeat an equation or figure picture's
+answer key in 513 of about 417,000 answers (0.12%), an upper bound that also counts
+retries and repeats across documents. Near zero, so nothing was built.
+
 *Filter.* A plain GET form ("Show only some decisions", shown when more than one decision is
 waiting): **Kind** (a select of the kinds that still have decisions, with their counts) and
 **Page** (a number from 1 to the page count). `?kind=figures&page=2` keeps the decisions of
@@ -2765,12 +3766,29 @@ document are ignored (the list is shown whole). Filtering only hides cards; it d
 and the accept-many actions always list everything that qualifies.
 
 *Report this item.* Each card, on both screens, ends with "Report this item"
-(`templates/_report_item.html`, `web/report_item.py`). It opens the footer's feedback path
-(`FEEDBACK_URL` with `job` and `item` added to its query, else a `mailto:` to `CONTACT_EMAIL`
-with the subject, "Job: <id>" and "Item: <id>" and a line asking not to paste text from the
-document). Only the two ids are put in the address: no LaTeX, alt text, heading text or page
-content. With neither setting there is no link. There is no mail provider in production, so
-nothing is sent by the app.
+(`templates/_report_item.html`, `web/report_item.py`). It is a link to the short in-app form
+`/jobs/{id}/report?item=<id>` (below); only the two ids are in the address. The form is also
+where the stopped job's "Tell us about it" line goes (`templates/_job_body.html`); the mail
+address stays printed beside it as text.
+
+*Problem reports to the operator (SW25).* `web/routes/reports.py`, `web/reports.py`, the
+`reports` table (migration `e4b7a1c9d352`).
+
+| Route | Who | What it does |
+|---|---|---|
+| GET `/jobs/{id}/report?item=` | owner, or a person shared with at Review | The form: what is stored, who reads it, how long it is kept, a textarea of at most 1,000 characters (optional), "Send report". Works without script; a failed send is 422 with the error summary and focus on it |
+| POST `/jobs/{id}/report` | the same | Stores one row (CSRF, one-submit rule, `report` limit: 5 per 10 minutes per account), then 303 back to the item or the document with a confirmation and a reference number |
+| GET `/admin/reports` | admins | Open reports first, oldest first, then closed; ids, code, version, sender, the text escaped (never a link) |
+| POST `/admin/reports/{id}/close` | admins | Closes a report |
+
+A row holds the kind (`tool`), the sender (deleted with their account), the job id, the item
+id, the item's kind and page, the stored failure code and pipeline version, the typed text,
+a status and two dates. The kind, page, code and version are read from the stored document on
+the server, never from the form. No picture, no item text, no reply address. Retention
+(`ops.retention`): with the sender's account; 30 days after it is closed
+(`reports.CLOSED_DAYS`); 180 days after it was made whatever its state (`reports.MAX_DAYS`).
+The privacy page states both numbers from the same constants, and `ops.launch` checks the
+rendered text.
 
 *Accessibility.* Every control is a native link, button, select or number field with a visible
 label; the preview list is an ordered list whose equations scroll in a focusable named group; the
@@ -2788,10 +3806,10 @@ worth a look)". The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
 HTML file that did not pass, each as a sentence from `web/messages.py` with its code
-("All 11 checks passed" otherwise). An incomplete or failed job's outcome
-(`web/outcome.py`: "Stopped early", "Finished, with pages not converted", a scanned or
-empty PDF) replaces the plain status in the page title, the status box and the
-status box (once; the section under it, "What you can do", has the retry or the safe ways on), and a finished but incomplete job gets a note at
+("All 11 structure checks passed" otherwise). An incomplete or failed job's state ("Job states":
+a stop with its reason, or a finished job's gap notes, "Stopped early" or "Pages kept as
+pictures") is the page title and the status box (once; the section under it, "What you can
+do", has the retry or the safe ways on), and a finished but incomplete job gets a note at
 the top of its results.
 
 **Messages.** `web/messages.py` maps every `(Check.name, Check.code)` pair and every
@@ -2876,14 +3894,35 @@ X-Frame-Options: DENY
 Cross-Origin-Opener-Policy: same-origin
 Cross-Origin-Resource-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-Cache-Control: no-store            (everything except /static/; page images and
-                                    marks.css: private, no-store)
+Cache-Control: no-store            (everything except /static/; page images:
+                                    private, no-store; marks.css: private, no-cache
+                                    with an ETag)
                                    (/static/: public, max-age=31536000, immutable for
                                     hashed names and vendor/ files, public, max-age=3600
                                     with an ETag otherwise; /demo and /showcase/ pages:
                                     public, max-age=3600 with an ETag and 304s)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
+
+Three public pages (`/`, `/privacy`, `/limits`) are the exception to `no-store` for a visitor
+who is signed out, has no flash message and no queued analytics events: they answer
+`Cache-Control: public, no-cache` with an `ETag` (`cached_html` in `web/assets.py`, called
+from `public_page` in `routes/pages.py`) and a 304 with no body for a matching
+`If-None-Match`. Any other visitor, or a page that printed the CSRF token, gets the normal
+`no-store` render. `/favicon.ico`, `/apple-touch-icon.png` and `/demo/source.pdf` answer 304 from the file's own
+validators (`fixed_file`).
+
+**Compression** (`CompressionMiddleware`, outermost): gzip for text types (HTML, CSS, JS, JSON,
+XML, SVG) between 1 KB and 8 MiB with a known length, when the browser sends
+`Accept-Encoding: gzip`; the answer carries `Vary: Accept-Encoding`, and an `ETag` becomes weak
+(`W/`). Fonts, images, PDFs, downloads, streamed answers and pages that printed the CSRF token
+are left alone (the BREACH rule in [security.md](security.md)). On the landing page: 19,195 to
+5,408 bytes; `app.css` 108,117 to 23,542.
+
+**Image sizes.** A stored crop is drawn with `width` and `height` read from the PNG header
+(`routes/review.py` `_crop_sizes`, `inventory.Place.crop_size`), so the page does not move
+when it loads. Images cut on request (region images, the job card's example) have no known
+size until the render child makes them and are not sized.
 
 `form-action` names Google's and Microsoft's sign-in hosts because the sign-in buttons
 are forms whose answer redirects there, and browsers check `form-action` on that
@@ -2918,9 +3957,9 @@ only pages of a signed-in person stay `no-store`. The math font is sent as
 WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
-enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts,
+enhancements (scrolling the page image to the selected mark, keyboard shortcuts that can be turned off,
 drafts kept in the tab; see "Review screen"). The review screen's per-job geometry comes as
-a stylesheet from our origin (`marks.css`), not as inline styles.
+a stylesheet from our origin (`marks.css`, one per page), not as inline styles.
 
 ## Accessibility of the app itself
 
@@ -2984,7 +4023,7 @@ best-practice rules (target size included) at moderate and above on every state 
 review screen at 1440 and 390 CSS px, checks 320 CSS px reflow with and without text
 spacing, measures every mark (at least 24 x 24 CSS px), completes a whole review with
 JavaScript off, checks that focus lands on the next decision's heading after each
-decision, that shortcuts are opt-in and never fire while typing, and that the marks keep
+decision, that shortcuts are on by default, can be turned off and never fire while typing, that the window stays at the top on load, and that the marks keep
 their colors in forced-colors mode. `test_web_review_ux_browser.py` does the same at
 1280 and 320 CSS px for the states the UX review fixes added (the readings marked, the
 live check, "Use my edit anyway", the notice with Undo, your decisions, a stale write
@@ -3016,6 +4055,9 @@ white text on the numbered discs at least 4.5:1.
   account (email, name, last sign-in), which the person can delete from `/account`. For
   people with an account the sign-in identity (provider, issuer, subject id and, for
   Microsoft, the directory id) is kept with the account and erased with it.
+- Request tokens (`request_tokens`, "Forms: the one submit rule") hold a random token, the
+  form and the outcome of the request (status, redirect target, the one-time notices), no
+  document content; they go at sign-out, with the account, and after 7 days at the latest.
 - Usage events are content-free and pseudonymous (see "Usage events"); the privacy page
   has one line on them (its final wording is Harish's) and admins see them per day and
   per pseudonym only.
@@ -3074,10 +4116,18 @@ test fails when a table with a user id is added without it.
   (nullable; links made before it prove nothing). Additive; the downgrade drops the column.
 - `5d8e1f2a7c39` (the head as of 2026-11-04): `users.keep_week_default`, the Account page's "Keep new
   documents for 7 days by default" (server default false). Additive; the downgrade drops the column.
+- `d3a8f1c5e692` (course grants, after `c5d9e1a3b7f4`): the table `course_grants` (`course_id` FK cascade, the sign-in address in lower case, `role` `view` or `review`; unique per course and address). Additive; the downgrade drops the table.
 - `b7112167eb0d` (job shares): the table `job_shares` (`job_id`, the sign-in address in
   lower case, `role` `view` or `review`; unique per document and address). Additive: nothing else
   changes, and the downgrade drops the table (the shares are lost, the documents are not).
   `a6c2e9f4b713` and `e1a7c3b95d24` above are no longer the head.
+- `8b3d5f0e2a71` (the one submit rule, after `7b1d3e9a4c28`, which is after the released
+  `8b1d5f3a9e04`): the table `request_tokens`
+  (`user_id`, nullable for account deletion's own row; `token`; `route`, the form key;
+  `outcome`, the status, redirect target and notices; `created_at`), unique on
+  `(user_id, token)`. Content-free: a random token, the form and the answer. Additive; the
+  downgrade drops the table. `tests/test_web_jobs_migrations.py` runs it up and down on
+  SQLite and `tests/test_web_postgres.py` on Postgres.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,

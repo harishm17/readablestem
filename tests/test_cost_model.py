@@ -13,9 +13,10 @@ from readablestem.core.types import CallFact, StepFacts
 from readablestem.eval import cost, measure
 from readablestem.eval.measure import Converted
 
-# A file made for the corpus, so its answers are in the repository: two pages, one with a
-# chart and one with a table, read by the figure step and the table step.
-ENTRY = "s15_charts_figures"
+# A file made for the corpus, so its answers are in the repository, and one whose recording
+# holds every answer it asks for (`harness.OWED` does not list it): three pages of an exam in
+# two columns, read by the equation step and the figure step.
+ENTRY = "s18_exam_twocol"
 
 
 # A replay of a corpus file: the workflow job has the table model its answers were made with.
@@ -39,11 +40,11 @@ def test_the_kinds_add_up_to_what_the_replayed_file_cost(tmp_path, capsys):
     assert sum(row["usd"] for row in made["kinds"].values()) == pytest.approx(
         done["usd"], abs=0.005
     )
-    assert sum(row["pages"] for row in made["kinds"].values()) == done["pages"] == 2
+    assert sum(row["pages"] for row in made["kinds"].values()) == done["pages"] == 3
     assert sum(row["usd"] for row in made["steps"].values()) == pytest.approx(
         done["usd"], abs=0.005
     )
-    assert {"figure", "table"} <= set(made["steps"])
+    assert {"equation", "figure"} <= set(made["steps"])
     # A step that is not built is listed with nothing spent and its estimate beside it.
     audit = next(row for row in made["added"] if row["step"] == "page_audit")
     assert (audit["calls"], audit["spent_usd"], audit["estimate_usd"]) == (0, 0.0, [0.0054, 0.01])
@@ -78,3 +79,16 @@ def test_a_page_has_its_own_requests_and_a_share_of_the_documents():
     assert by_kind == pytest.approx({"dense_math": 0.05, "figure": 0.03, "typical": 0.01})
     assert made["kinds"]["figure"]["steps"] == pytest.approx({"figure": 0.02, "outline": 0.01})
     assert made["usd"] == pytest.approx(0.09)
+
+
+@pytest.mark.parametrize(
+    "runs", [[[Converted(ENTRY, pages=2, kinds=["typical"] * 2, missed=2)]], []]
+)
+def test_a_replay_in_which_no_file_was_measured_ends_with_a_message(tmp_path, capsys, runs):
+    # Every file left out for missing answers, or no run at all: a message and exit 2.
+    records = tmp_path / "records.json"
+    records.write_text(json.dumps({"runs": [[done.as_dict() for done in run] for run in runs]}))
+
+    assert main(["eval", "cost", "--from", str(records)]) == 2
+
+    assert "error:" in capsys.readouterr().err

@@ -12,19 +12,21 @@ on it. The pipeline that feeds it is in docs/steps.md.
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="ReadableSTEM 0.1.0">
-<meta name="readablestem-render" content="3">   (assemble.RENDER_VERSION: an older page is made again)
+<meta name="readablestem-render" content="6">   (assemble.RENDER_VERSION: an older page is made again)
+<meta name="readablestem-version" content="b9487b-12">   (the version id, only when the caller gives one)
+<meta name="dcterms.modified" content="2026-11-10">      (the day of the last change, UTC)
 <title>Speed and Velocity</title>
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
 <body>
-<a class="skip-link readablestem" href="#main-content">Skip to main content</a>
-<nav class="toc" aria-label="Contents">...</nav>       (3 or more headings, see "Navigation")
-<span id="main-content" tabindex="-1"></span>
+<a class="skip-link readablestem" href="#main-content">Skip to main content</a>   (to the h1)
 <main>
   <p class="notice readablestem" role="note">...</p>   (only when a notice is given)
+  <h1 id="main-content" tabindex="-1">...</h1>
+  <nav class="toc" aria-label="Contents"><details>...</details></nav>   (3 or more headings, see "Navigation")
   ... the document, in reading order ...
+  <section id="about-conversion" ...>About this version (the note for students)</section>
 </main>
-<footer id="about-conversion" ...>About this version (the note for students)</footer>
 </body>
 </html>
 ```
@@ -35,12 +37,15 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 `external_resource` rule if that ever changes. It must not be pasted into an LMS page
 (see "Posting it in a course").
 
-- `lang` is `DocumentResult.lang`: the PDF's `/Lang`, else the language detected from the
-  text, else `en` (see "Language"). Anything that is not a language tag falls back to
-  `en`, so a crafted PDF cannot inject attributes.
+- `lang` is `DocumentResult.lang`: the language chosen at upload, else the language of the
+  text, else the PDF's `/Lang` when the text is too short to say, else `en` (see
+  "Language"). Anything that is not a language tag falls back to `en`, so a crafted PDF
+  cannot inject attributes.
 - Links (`<a href>`, see "Links and cross-references") load nothing: following one is
   the reader's choice, and opening the file still sends no request.
-- `<title>` is the PDF title or the first level-1 heading, else "Converted document".
+- `<title>` is the text of the page's one `<h1>` (see "One h1"): the first top-level
+  heading when it is the title, or the title itself, else the first heading, else the file
+  name, else "Converted document" (see "One title", `assemble.document_title`).
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
 - If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
@@ -84,7 +89,7 @@ default file is byte for byte as before; the golden tests cover that). The job p
 | `index.html` | The whole document with no `<style>` block. Each rule of the stylesheet is written into `style` attributes (selectors by tag, class, attribute, descendant and child, in cascade order), keeping only properties Canvas keeps. Every `data:` image is `images/image-NN.png` (or `.jpg`; one file per distinct picture). `tabindex` and `headers` stay, because a file is not sanitized. |
 | `images/` | The pictures, as files. |
 | `canvas-page.html` | Only with a course number. The same content as a fragment: no `<html>`, `<head>`, `<title>`, `<main>`, inside `<div lang>`; no `tabindex` and `headers` (Canvas removes them, so the file says what survives); rules for bare `p`, `h1`-`h6`, `ul`, `ol`, `li` left to Canvas's own styles; headings one level down (Canvas shows the page title as the top heading) unless the document has an `h6`; pictures at `/courses/<number>/file_contents/course%20files/<folder>/images/image-NN.png`. Not offered when it would exceed a Page's 500 KB body limit. |
-| `README.txt` | Plain steps for the instructor, with the folder name and course number filled in, and only the "what Canvas still changes" notes that apply to this document. |
+| `README.txt` | First the page's statement of what was converted and reviewed (its `readablestem-summary`), then plain steps for the instructor, with the folder name and course number filled in, and only the "what Canvas still changes" notes that apply to this document. |
 
 The folder name is `<ascii title>-<first 6 characters of the job id>` (`folder_name`). The
 instructor makes that folder in Files, uploads the zip into it and expands it, so the
@@ -111,13 +116,15 @@ equation its MathML, and headings, tables (caption, `th`, `scope`, spans), links
 language and text are as in the source.
 
 The equations carry a math font stack in the Canvas versions (T3-8,
-`export_canvas.MATH_FONT_STACK`): `font-family` on each `<math>`, written as a `style`
+`math_font.MATH_FONT_STACK`, shared with the student file's stylesheet): `font-family` on each `<math>`, written as a `style`
 attribute like every other carried rule. Canvas keeps `font-family` (it is in its list) but
 has no style block and no `@font-face`, so the stack can only name fonts the reader's
 computer has; native MathML in Chrome, Edge, Firefox and Safari needs a font with an
 OpenType MATH table, and the stack lists the families that have one, with the browser's own
-`math` family last. The default student file is unchanged (the golden files cover that), so
-it uses the browser's default math font as before. If Canvas draws the equations with its
+`math` family last. The student file's stylesheet names the same stack on `math` (WS21.4), so
+it helps a device that has one of those fonts and changes nothing on one with none: the file is
+one HTML file and `/view` allows no font file (`web.security.VIEW_CSP`), so the font itself is
+only in the EPUB. If Canvas draws the equations with its
 MathJax instead, the stack is not used; `docs/canvas-sandbox-test.md` has the step that
 shows which happens.
 
@@ -190,12 +197,32 @@ our own would be a second MathML reader to keep right.
 - **Before pandoc.** The same sanitiser as the EPUB (`export_epub._sanitise`): scripts, frames,
   forms, remote pictures (they become their alt text), `javascript:` links and event handlers
   go, so pandoc is given only a document that names nothing outside itself. (Pandoc's own
-  `--sandbox` cannot be used: the distribution build reads its default styles from disk.) Page
-  markers (`role="doc-pagebreak"` and their visible label) are left out; a Word document has
-  its own pages. A figure's long description (`<details class="figure-description">`) becomes
-  its summary line in bold and its paragraphs, after the figure. A figure with no picture is
-  written as paragraphs: pandoc would make it a one-cell table. A WebP picture is written as a
-  PNG. The page's language and title are passed on.
+  `--sandbox` cannot be used: the distribution build reads its default styles from disk.) A
+  figure's long description (`<details class="figure-description">`) becomes its summary line
+  in bold and its paragraphs, after the figure; the Contents `<details>` the same way, so its
+  summary is a bold "Contents" line above the list. `<main>` is unwrapped, so a draft's banner,
+  which stands before it, is in the file; the Contents and the note "About this version" are
+  inside `<main>`. A WebP picture is written as a PNG. The page's language and title are
+  passed on. Every id an in-page link names is put where pandoc writes a Word bookmark:
+  pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
+  picture and drops it on a paragraph, a list, a row or a cell, so there the id moves to an
+  empty `<span>` at the element's start (F-514). A figure's id is a bookmark only from pandoc
+  3.2 on (production runs 3.1.11.1, CI 3.1.3), so the filter wraps the figure in a div that
+  has the id, the same in every version (F-581). A footnote's mark (`doc-noteref`)
+  is renamed so pandoc's reader does not turn it into an empty note.
+- **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
+  (`div.pagebreak`: `role="doc-pagebreak"` and their visible label) and the skip link are left
+  out, and a figure with no picture is written as paragraphs (pandoc would make it a one-cell
+  table). A Word document has its own pages and its own navigation. The same filter tries every
+  equation once, all together in a test file written by the writer that makes the real one: an
+  equation pandoc cannot write as an Office equation (a MathML shape its TeX step refuses
+  leaves raw TeX in the text, as `<mi mathvariant="bold">"</mi>` does, or nothing, as an
+  empty `<math>` does) is written, in the "Not Converted" character style, as its reading and
+  "This equation could not be written as a Word equation; it is complete on the web page."
+  The other equations are unchanged and the file is made (F-502). The filter also writes each
+  footnote as a real Word footnote: the note's words go to its mark, and the page's block and its
+  "Back to the text" link are not written (F-566; a second mark for one note is its text, no
+  link).
 - **The child.** Its own process group, an environment of `PATH`, `LANG` and the like only
   (`core.childenv`: no keys, no database URL), a private temporary directory removed
   afterwards, 90 s of CPU, a file-size cap, 256 open files, a 2 GB heap (`+RTS -M2g`), and 60 s
@@ -208,11 +235,19 @@ our own would be a second MathML reader to keep right.
   - a table whose first row is a header gets `w:tblHeader`, so it repeats on each page and is
     read as a header;
   - pandoc's title paragraph is dropped when the first heading says the same thing (the
-    title stays in the document properties).
+    title stays in the document properties);
+  - an in-page link whose bookmark is not in the file (the target was a page marker, which Word
+    leaves out, or an id the page does not have) is written as its words, not as a link that
+    leads nowhere, and counted (`DocxExport.links_unlinked`, printed by the CLI).
 - **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
   (inside the document by bookmark); tables with their caption; alt text on each picture; the
-  document language and title; equations as `m:oMath`. The export fails
-  (`equations`) rather than hand over a file with fewer equations than the HTML has `<math>`.
+  document language and title; equations as `m:oMath`, or, where one could not be written, its
+  words (above; `DocxExport.not_word` lists their element ids, `readablestem export docx`
+  prints them, the route logs the count). The export fails (`equations`) rather than hand over
+  a file with fewer equations than the HTML has `<math>` and no words in place of the missing
+  ones, or one where an equation Word cannot hold has a reading too long to write (over 400
+  characters: only the sentence would be in the file). A stored document picks this up the next time it is downloaded: the file is made on
+  request from the stored page.
 - **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colors
   of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
   pictures, and any conformance claim: the tool assists, and nobody has checked how the file
@@ -244,8 +279,9 @@ no network, no model.
 
 | File | What it is |
 |---|---|
-| `EPUB/content.xhtml` | The whole document as XHTML, in one content document. Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet stays. The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
-| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); and a `page-list` from `role="doc-pagebreak"` markers when the document has them (hidden in the book, used by reading systems). |
+| `EPUB/content.xhtml` | The document as XHTML (a long one continues in `chapter-NN.xhtml` files, below). Text, headings, lists, tables, ids, links and alt text are not changed. The page's stylesheet goes in as the book's own sheet (below). The one MathML change: `intent` on `<math>` (chemistry, docs/chemistry.md) is dropped, because EPUB 3 validation refuses it (RSC-005). Scripts are not carried. |
+| `EPUB/nav.xhtml` | `toc` from the headings, nested by level (a document with no headings gets one entry for the start); a `page-list` from `role="doc-pagebreak"` markers when the document has them, and `landmarks` (the start of the text at the first heading; the contents file is not in the reading order, so it is not a landmark); both are hidden in the book and used by reading systems. |
+| `EPUB/fonts/latinmodern-math-1.959.woff2` | The math font, in a book that has math, with `GUST-FONT-LICENSE.txt` and `MANIFEST-Latin-Modern-Math.txt` beside it (the license allows an unmodified copy; `THIRD_PARTY_NOTICES.md`). The stylesheet asks for an installed copy first (`pipeline/math_font.py`). |
 | `EPUB/images/image-NN.png` | Each `data:` image as a file (one per distinct picture), `alt` kept on the `<img>`. |
 | `EPUB/package.opf` | Title, language, a UUID made from the document, `dcterms:modified`, accessibility metadata, manifest, spine. |
 
@@ -277,15 +313,21 @@ no network, no model.
   document has headings (a document with none gets a one-entry contents list, because the
   format needs one, and neither feature); `MathML` when there is a `<math>`; `describedMath`
   only when every `<math>` has an `alttext`; `alternativeText` only when every picture has
-  non-empty alt text; `longDescription` only when every `<figure>` has a figure description
+  non-empty alt text or is decoration (inside `class="decorative"`, written only with evidence,
+  see "Decoration"); `longDescription` only when every `<figure>` has a figure description
   (a `<details class="figure-description">` inside it or right after it); `pageNavigation`
   when there is a page list. Also `schema:accessMode` (textual, and visual when there are
-  pictures), `accessibilityHazard` `none` (no script, audio or video is written) and an
-  `accessibilitySummary`. `accessModeSufficient` (`textual`) is left out while the document
-  still has flagged items, because then a person has not yet made it sufficient. A page list
-  also adds `dc:source` ("Source PDF", `source-of` pagination).
+  pictures). The `accessibilitySummary` is the page's statement (`readablestem-summary` in
+  its head: how many equations are MathML, how much a person reviewed, what is a picture or
+  left out; a draft's page adds "Check it before students use it.", the student file does not);
+  a page without it (made before it existed) gets "This file does not record what was
+  converted or reviewed." `accessModeSufficient` is
+  always written: `textual` only when the page says the text alone is enough and no item is
+  flagged, else `textual,visual`. `accessibilityHazard` is `none` (no script, audio or video
+  is written), and `unknown` only when a picture is a GIF or WebP file, which can move. A page
+  list also adds `dc:source` ("Source PDF", `source-of` pagination).
 - **No claim of conformance.** The package has no `dcterms:conformsTo` and the summary says the
-  tool assists and does not certify. The tests run EPUBCheck 5.4 (no errors or warnings) and
+  tool assists with accessibility. The tests run EPUBCheck 5.4 (no errors or warnings) and
   DAISY Ace (no serious or critical violation) on the golden documents, the demo, the LaTeX
   conversions and a synthetic page with page markers, when both are installed
   (`.github/workflows/epub.yml` installs them in CI, Ace from the lockfile in `.github/ace`,
@@ -293,25 +335,36 @@ no network, no model.
   those two programs found nothing on those documents; it does not show a reading system reads
   the file well. The page list is built from `role="doc-pagebreak"` markers; a file
   without them has none.
-- One content document, not one per chapter: ids and links inside the file keep working as they
-  are. A very long document is one long file.
+- **The book's own sheet** (`student_sheet.epub`). The page's colors, font family, base
+  size and column (the rules of `body`, `html` and `:root`, and `max-width`, `margin` and
+  `padding` on `main`) are left to the reading system, so its dark, sepia or large-text theme
+  and its margins apply instead of being fought. No rule keeps a `color` or `background`, and
+  the `prefers-color-scheme` and print blocks are not carried. The components keep their shape
+  (borders, spacing, wrapping). A book with pictures frames each in the text's own color
+  (`outline: currentColor`), so a picture shows on any theme.
+- **Chapters.** A document of at most 100,000 characters of XHTML is one file. A longer one is
+  cut inside `<main>` before a top-level `h1` or `h2` once the file so far is 40,000 characters
+  long (`content.xhtml`, `chapter-02.xhtml`, ...). Each file has its own `<main>`; the skip link
+  is in the first and the footer in the last. A link to a place in another file names that file
+  (`chapter-02.xhtml#p3-e4`), and the contents, page list, landmarks, manifest and spine list
+  every file. A document with no top-level heading to cut at stays one file.
 
 ## How each element is written
 
 | Element | Converted | Not converted (ABSTAINED, FAILED, REJECTED, no fix) |
 |---|---|---|
 | Heading | `<h1>`-`<h6>` from the heading fix (with an `id`, and an entry in the contents list, see "Navigation") | `<p>` with the original text; a bold line a reviewer rejected ("Make them bold text") is `<p><strong>`, bold as in the PDF |
-| Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
+| Paragraph | `<p>`, inline equations placed at their markers; a line end the page keeps (a poem, an address: a `break` run, docs/layout.md "Kept line ends") is `<br>` | (no fix) |
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
-| Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 36 characters is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
+| Program code (T2-16), algorithm steps (WS2.6) | `<pre><code>` with the lines and indentation as printed, no highlighting (an algorithm's inline equations are written as math inside the `<code>`; in the Word file such a block is lines of a paragraph, its indentation no-break spaces); a block with a line over 24 characters (it first scrolls at 30 at 320 px, at 25 with WCAG text spacing) is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
-| Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
-| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
+| Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text."; for `handwriting_on_page`, "Part of page 3, shown as a picture, not converted to text.", the label "Shown as a picture, not converted to text."; its label alone says it, with no further reason), the label "Not converted." and a short reason: "A page of handwritten notes." (the explanation is once, in the notice at the top: see "Flagged items"). When text was read from an `unread_page` too, that text opens with `<p class="notice flag-note unread-parts-note" role="note">`: "Not converted. Parts of this page could not be read and are missing from the text below. The page is shown as a picture after it.", the last sentence a link to the picture (F-451: an equation drawn with lines leaves a hole in its sentence); a hole in that text fails the `html.sentence_holes` check |
 | Page read from an image (`FEATURE_IMAGE_PAGES`, ADR 0007) | at the start of the page, `<div class="image-page-note" role="note">` with the notice and `<details><summary>Show the original page 2</summary><img alt="Original of page 2, shown for checking the converted text."></details>`, then the page's blocks as ordinary elements (see "Pages converted from an image") | a prose block the instructor keeps as the picture: `<div class="flagged" data-reason="image_page_text">`; an equation or table whose reading could not be used: the usual flagged equation or table |
-| Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
+| Decorative figure (with evidence, see "Decoration") | `<div class="decorative"><img alt="">` (a `<figure class="decorative">` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
 A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assembly:
@@ -328,8 +381,7 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
 <div class="flagged" id="p1-e5" data-status="failed" data-reason="budget_job_usd">
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
   <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span>
-  This equation is shown as an image of the original, so screen readers cannot read it.
-  Ask your instructor for a version you can read.</p></div>
+  Shown as an image of the original.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
@@ -343,23 +395,40 @@ document in another language marks it `lang="en"`).
 
 - **Skip link.** The first thing in `<body>`: `<a class="skip-link" href="#main-content">`
   "Skip to main content" (WCAG 2.4.1). It is hidden until focused (`.skip-link:not(:focus)`)
-  and jumps over the contents list to the empty `<span id="main-content" tabindex="-1">` just
-  before `<main>`. The id is on a span, not on `<main>`, because about 60 places (code, tests,
-  the committed demo) read the file by the literal `<main>` tag. `tabindex="-1"` makes the span
-  focusable by following the link, so Firefox and VoiceOver move there (a link to an element
-  that cannot take focus only scrolls), without making it a tab stop. Canvas removes `tabindex`
-  from a pasted page, one more reason the paste version has no skip link. The skip link is the
-  first tab stop of the file, so a test that tabs through a file presses Tab once more.
-- **Contents list.** `<nav class="toc" aria-label="Contents">` after the skip link and before
-  `<main>`: nested `<ul>` of links to the headings, made from the outline as written (after
-  the repair above, and after the move down of "One h1": the title written as the `<h1>`
-  is not an entry), when there are at least 3 headings (`MIN_TOC_HEADINGS`). It is not
+  and jumps to the page's one `<h1>` (F-116), or to the "Before you read" notice above it
+  when the page has one (`href="#checked-notice"`), so that following the link never passes
+  over the statement that parts are pictures or that nobody reviewed the page. The target
+  carries `tabindex="-1"`: that makes it focusable by following the link, so focus moves
+  there with the link (in some browsers a link to an element that cannot take focus only
+  scrolls; not tested with a named screen reader, see `docs/device-checks.md`), without
+  making it a tab stop. A title the assembler
+  adds has the id `main-content`; a heading that is the title keeps its own id, and the link
+  points to it. Canvas removes `tabindex` from a pasted page, one more reason the paste
+  version has no skip link (it drops the id `main-content` too). The skip link is the first
+  tab stop of the file, so a test that tabs through a file presses Tab once more.
+- **Contents list.** `<nav class="toc" aria-label="Contents">` right after the `<h1>`, inside
+  `<main>`: a `<details class="toc-details">` whose summary is "Contents" and whose body is a
+  nested `<ul>` of links to the headings, made from the outline as written (after the
+  repair above), when there are at least 3 headings (`MIN_TOC_HEADINGS`). The title itself is
+  not an entry (it stands right above the list). The title comes
+  first, so on a 390 px screen it is on the first screen and a long list is one closed line
+  below it (it was above the title, 1,245 px of it for 30 entries). The `<details>` is closed
+  in the markup, so every reader that draws no style (Canvas, Word, a transcript) gets the
+  short form too. The page's style shows it open from 40rem of width up and on paper, without a
+  script: where the browser has `::details-content` the list is drawn and the summary is hidden
+  (a control that is not there cannot say "collapsed" over an open list), and the words
+  "Contents" are written by the style. Where it does not (older browsers) the closed line
+  stays, a control that works from the keyboard, and on paper its summary asks to open it
+  first, as a figure description's does. A heading that repeats under the same parent
+  ("Teacher Support" in every section) is one entry that links to the first; the later ones
+  follow it as links named by their number ("Teacher Support 2", visible "2"). The list is not
   written when the PDF has a contents page of its own (an element with the reason
   `contents entry`, `layout.CONTENTS_ENTRY`; a test keeps the two strings equal): a second list
   of contents would be one too many, and that page's entries already link to their headings.
   An equation in a heading is called "[equation]" in the list, as in a title. Every heading has
   an id, so every entry has a target: the heading's pipeline id (`p3-e7`, the same on every
-  render of a result), or `heading-N` for one whose id is missing or repeated.
+  render of a result), or `heading-N` for one whose id is missing or repeated. A heading that
+  is the title is the first entry, with the rest under it.
 - **Page markers.** Between the blocks, at each source page boundary:
   `<div class="pagebreak"><hr role="doc-pagebreak" aria-label="Page 12" id="pagebreak-N">
   <span aria-hidden="true">Page 12</span></div>`. The role is on an `<hr>` because axe accepts
@@ -451,8 +520,31 @@ and each part's equations, figures and tables as in the part.
   id gets `s{part number}-` in front. The same rewrite is applied everywhere an id is named,
   including the equation markers inside text (their length changes, so the offsets of links,
   color runs, raised and lowered runs and a glossary term's end move with them) and the pictures.
+- **Links.** A part cannot link to what is printed in another part: its contents entry for a
+  later chapter, or "Chapter 2" or "Figure 3" naming something in the next part, stay plain
+  words there. After the join `pipeline/combine.join` runs the passes that made those links in
+  the parts once more over all the elements (`layout.elements._contents_links`, then
+  `text_pass.source_links`: contents entries, typed addresses and references by number; an entry
+  with a section number links only to a heading with the same number), so a
+  contents entry and a reference whose target is in the file link to it. A link a part already
+  has is kept and moves with its target's new id. A link the PDF itself made to a page of
+  another part is not restored (the part did not keep it). The combined file has no link to an
+  id that is not on the page.
 - **Title.** The title the instructor chose for the first part, else the source file's name
   without the part tag and extension; the contact line is the first part's that has one.
+- **Language.** The file's `<html lang>` is the language most parts have (by language
+  subtag: "en" and "en-US" are one; an earlier part first on a tie). A part in another
+  language keeps it: its paragraphs, list items and headings are written with their own
+  `lang` unless they have one already (`combine._element`), so a screen reader changes voice
+  at the part. A part whose language was assumed or mixed (`lang_assumed`, `lang_mixed`, not
+  yet confirmed) votes for nothing and is marked with nothing, since its tag is a guess: it
+  is read in the file's language until its owner confirms it on the part's page
+  (`text_pass.set_document_language`), and the next file made follows. The combined file is
+  made on request and stored nowhere, so it has no language control of its own. The combine
+  page asks once for the whole (`web.combine.language_check`, `#combine-language`), however
+  many parts are unconfirmed, and also when the parts disagree and no language is held by
+  more than half of them. Tables, figures and equations carry no `lang` of their own, in a
+  part or in a document.
 - **Not done.** It is not offered as
   a Canvas zip or cartridge (download the parts one by one for those).
 
@@ -466,11 +558,17 @@ first row), `<th scope="row">`, a body split into one `<tbody>` per section with
 `scope="rowgroup"` on a full-width section heading, and `headers`/`id` only when scope
 cannot say which headers apply (a row header after data cells, a column header below the
 header rows, or nested column headers whose spans cross). Cell text and captions are
-escaped; a math cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
-header cell that is only math also gets its reading (`speech.mathml_to_speech`) as
-visually hidden text, with the MathML hidden from assistive technology: browsers name a
-`<th>` from its text, never from MathML, and screen readers announce a cell's headers by
-name (the static rule `html.table_header_text` does not count MathML as header text). A
+escaped. Math in a cell is written the way math in the text is
+(`assemble.converted_mathml`): MathML rebuilt by `sanitize_mathml` (the cell's text when it
+cannot be shown), with the reading as its `alttext` when `MATHML_ALTTEXT` is on. A cell stores
+no reading, so it is made the way `speech.reading_for` makes one for a stored equation with no
+current reading, the same words the text, the review screen and Listen say. A header with
+math in it also gets that reading as its `aria-label`, because browsers name a `<th>` from
+its text, never from MathML, and screen readers announce a cell's headers by name. The
+MathML stays in the header, not hidden from anything, so a braille display gets the math.
+Where no reading can be made the header has no name (the static rule
+`html.table_header_text`, which does not count MathML as header text, then says so); it is
+never named from the cell's LaTeX. A
 broken grid (`core.types.grid_problems`) still renders as a rectangular table.
 
 `pipeline/assemble_tables.py` wraps a rebuilt table in a box that scrolls sideways on a
@@ -505,11 +603,10 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
   be the figure's first or last child, and a long description inside the figcaption
   would become the figure's accessible name, read in full on entering it.
 - The summary names the figure from its caption ("Description of Figure 2.3", "Data for
-  Figure 2.3" when there is only a table); a figure without a number is named by the
-  first eight words of its alt text ("Description of the figure “Line graph of the
-  position of a car…”"), and only one without either is "the figure". So
-  several unnumbered figures' summaries still differ in a screen reader's list of
-  controls. The data table's caption names the figure the same way. It works without
+  Figure 2.3" when there is only a table); a figure without a number is "the figure" ("Description
+  of the figure"). The summary never quotes the alt text, which stands on the picture just above
+  (F-118), so several unnumbered figures share the same summary words; their order tells them
+  apart. The data table's caption names the figure the same way. It works without
   scripts.
 - Each line of the long description is a `<p>`; everything the model wrote is escaped.
 - The data table goes through `table_html.render_table` like a rebuilt table, in a box
@@ -520,8 +617,34 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
   approximate"). A table read from the image that nobody added stays on the fix as an
   optional extra and is not in the file (a figure with only that has no `<details>`).
 - Nothing is written for a decorative figure or a proposal that is not used (rejected,
-  failed, abstained). Its CSS (`DETAILS_CSS`, plus the table CSS with a table) is added
+  failed, abstained). Its CSS (`student_sheet.FIGURE_DESCRIPTION`, plus `TABLE` with a table) is added
   only to documents with one.
+
+## Decoration (WS6.4)
+
+`alt=""` tells a screen reader there is nothing there, so a picture is written with it only
+as decoration with evidence (`pipeline/decoration.py`), never on the figure model's word
+alone. The evidence is one of:
+
+- `repeated`: the same picture (the same crop, pixel for pixel) on at least half of the
+  document's pages, and on two or more: a logo or a banner in the body (layout already drops
+  the ones in the header and footer bands);
+- `shape`: a rule, a band at least 8 times as long as it is thick and at most 16 pt thick;
+- `person`: a reviewer accepted that it is decoration, or checked "Decorative" on the card.
+
+The rule is the same for a figure the model calls decorative and for one whose reading
+failed (`decoration.settle`, after every step in the PDF and LaTeX converters, and again
+before a stored result's page is made again, `review.rerender_html`). With evidence, the
+figure is decoration and the evidence is stored on its record (`FigureFix.decoration`, left
+out of the JSON when absent); a figure whose reading failed becomes decoration with an
+optional note (`figure.decoration`, `decoration_by_rule`). Without evidence, a figure the
+model calls decorative is a required decision (`figure.decoration`, `decoration_unproven`)
+and is written like any figure with no description: flagged, with alt "Figure not
+described", until a person decides. Decoration is written inside `class="decorative"`
+(`assemble.DECORATIVE_CLASS`), and the output check `html.img_alt_content` fails on any
+other empty alt text. The EPUB, Canvas and Word files keep the page's alt text (Word writes
+no description for decoration), and Listen skips decoration and says "Image, not converted:
+Figure not described" for the rest.
 
 ## Figure images in the student file (UX review MF23)
 
@@ -623,6 +746,60 @@ a scroll box sits on the line differently. `tests/test_assemble_wide.py` checks 
 Chromium at 320 px that the page does not scroll sideways, that every gold equation
 that overflows is a tab stop, that arrow keys scroll it, and axe.
 
+## On paper
+
+Nothing scrolls on a sheet, so the print block of the stylesheet (`student_sheet.PRINT`,
+`TABLE` and `CODE` there) makes sure nothing is cut without a mark (SW45 rule 6; the rest of
+the print build waits for WS21.1):
+
+- A table wraps inside the sheet (`overflow-wrap: anywhere` in its cells, no scroll box).
+- Code wraps (`pre-wrap`).
+- An equation of at least `PRINT_FIT_EM` (14 em, estimated) has the classes `pw pw-N`, N its
+  estimated width rounded up to 4 em (16 em above 48), and is scaled to the sheet down to
+  70%: `font-size: max(0.77em, min(1.1em, 100cqw / var(--pw)))`, `main` being the container.
+  An equation still too wide at 70% stays in its box, which clips on paper, and prints "This
+  equation is wider than the paper. It is complete on the web page." The note is generated
+  content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
+  The rules of each width step are added to the stylesheet only when an equation has it.
+- A picture is never wider than the sheet (`max-width: 100%`) on paper, and on screen while the
+  window is wider than 40 em.
+
+### Kept pictures on screen (WS21.3, reduced)
+
+- A kept picture (`.flagged > img`: a crop of an equation, a table, a drawing or a whole page)
+  holds what could not be read as text. In a window narrower than 40 em, which is what zoom to
+  200% or more makes of a desktop window (and a phone), it keeps its printed size and the
+  `.flagged` box scrolls sideways, so the writing in it stays as large as the text around it
+  instead of shrinking with the column. Wider than that, it fits the column as before.
+- An inline kept equation (`.flagged-inline`) is an inline block with its own line height: the
+  line grows to hold the crop instead of the crop overlapping the lines next to it.
+- Left out (triage: reduce): the "Larger" switch, the box's name and focus on every scroll box
+  (browsers that make a scroller focusable by default do; Safari does not), moving an inline
+  crop wider than half the column to its own line, and the dark-mode inversion of crops. The
+  EPUB sheet already frames pictures and does not invert them.
+- A figure's long description prints open (`details.figure-description`); where the browser
+  has no `::details-content`, its summary says "open this description before printing".
+
+The estimate is not calibrated (A23); a table cell with math that is wider than its column
+is not scaled. Canvas has no style block, so none of this is in it; Word and the EPUB
+reader's own pagination do not use these rules.
+
+## Audiences of notices (SW16)
+
+Every notice the tool writes is built through one helper, `assemble.say(Words, audience)`, which
+says who hears it. `STUDENT` words are in the student file and in every file made from it
+(Word, EPUB, the Canvas zip, the cartridge, the Listen transcript and speech): what is missing
+and whom to ask. `CHECKER` words are written to the person who checks the file, and appear only
+in a draft's page (`render_html(audience="checker")`, made again from the stored result when a
+draft leaves, never stored): the image-page note "Converted from an image of the page. Check it
+against the original." (the student's is "This page was read from a picture of the original, so
+small errors are possible."), the alt text of that page's original ("..., shown for checking the
+converted text."), the equation alt suffix "...; not checked" (the student's: "as written in the
+PDF"), the figure label "Needs a description." (the student's: "No description.") and the
+statement's last sentence "Check it before students use it.". `RENDER_VERSION` is 8 for these
+words. A student file with no checker sentence is a rule (`tests/test_assemble_render.py`),
+not a wording.
+
 ## Flagged items
 
 Anything the pipeline could not convert keeps the original crop. Sighted readers lose
@@ -630,9 +807,10 @@ nothing, and screen reader users hear a fixed, honest alt text ("Figure without 
 description") and a note, instead of a guess read aloud as if it were right.
 
 An equation kept as an image (`assemble.equation_alt`) has the text the PDF holds for its
-region as alt text, with a marker that says where it comes from and that nobody has checked
-it: `6.0 m/s, read from the PDF text; not checked`, or `Equation (2.4): v = d / t, read from
-the PDF text; not checked` when it has a number. Where layout saw fractions, roots,
+region as alt text, with a marker that says where it comes from: `6.0 m/s, as written in the
+PDF`, or `Equation (2.4): v = d / t, as written in the PDF` when it has a number. The student
+file says only that; a draft, made for the person who checks it, says `read from the PDF
+text; not checked` (audiences, below). Where layout saw fractions, roots,
 exponents or several lines in the region, the marker adds that the text may run them
 together (`v2 = v20 + 2ad` for v squared = v0 squared + 2ad), because the flat text layer
 loses their order and size; an inline equation's exponents are not always known, so
@@ -653,9 +831,22 @@ and label are unchanged. In a document in another language the alt text is marke
 - If there is no crop, the extracted text (if any) is shown in monospace with "The
   original image is not available."
 - A page (or handwriting) kept as an image is never called a figure: its alt text names
-  the page and what it is, and its note says a screen reader cannot read it and to ask
-  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, by the fix's reason,
-  so a stored result renders the same; the design's draft wording is the beta wording).
+  the page and what it is, and its note says what it is in a few words ("A scanned page.")
+  (`assemble.KEPT_IMAGE_WORDS`, one table of alt text, label and short reason by the fix's
+  reason, so a stored result renders the same). The explanation is not repeated at each box
+  (F-114): the notice at the top says once that a screen reader cannot read a picture, beside
+  the statement that says to ask the instructor for a version one can read
+  (`assemble.NOT_CONVERTED_WHY`, built through `say` so it has an audience). The same holds for
+  an equation, a table, writing left out of a page and a figure with no description: each
+  box has its label and its reason ("Shown as an image of the original."), and the link to
+  write to the instructor when the owner gave a contact line. `handwriting_on_page` is also what a box of vector
+  lines was named before the reader had pen evidence, so it never says "handwriting": the
+  part is "shown as a picture, not converted to text" in its alt text, label and note, and
+  in its link in the statement ("Part 2 not converted: picture, page 1",
+  `checked_words.STUDENT_KIND_WORDS`). The review screen and the job page keep their own
+  words for it. A drawing has no reason of its own yet and joins the table when it has.
+  Alt text is never made at render: it is the instructor's own description, the stored
+  proposal's text, or these fixed words, in that order.
   Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
@@ -669,10 +860,12 @@ read fails, it is a page kept as an image as before ("Flagged items"). What the 
 for such a page:
 
 - **The notice and the original.** The page starts with a bordered note, labeled in words and
-  not by color alone: "**Converted from an image of the page.** Check it against the
-  original.", and under it a `<details>` whose summary reads "Show the original page N". Opened,
+  not by color alone: "**Note:** This page was read from a picture of the original, so small
+  errors are possible." (a draft says "**Converted from an image of the page.** Check it
+  against the original." instead: it is written to the person who checks, `assemble.CHECKER`),
+  and under it a `<details>` whose summary reads "Show the original page N". Opened,
   it shows the page's own picture (a JPEG at the student file's size, `figure_images`) with the
-  alt text "Original of page N, shown for checking the converted text." No script: the control
+  alt text "Original of page N." (a draft: "..., shown for checking the converted text."). No script: the control
   is the browser's own disclosure, so it works with the keyboard (Enter, Space) and a screen
   reader announces it as one. The element is the figure for the whole page
   (`IMAGE_PAGE_ORIGINAL_REASON`); it has no fix, because nothing is decided about it, and the
@@ -758,9 +951,44 @@ items and headings; offsets are into the stored text, markers included.
   file is written). Any other PDF link (ftp, a file, a program, javascript) is not
   written; its text stays, and the job page lists the notice `link_scheme_dropped`.
 - **Links inside the document** ("internal": a PDF link to a place in it; "crossref":
-  "Figure 2.3", "Eq. (3)", "Table 1" in the text) point at `#` + the target element's id.
-  Figures, tables, display equations, headings, paragraphs and list items already carry
-  their ids, so nothing new is written at the target.
+  "Figure 2.3", "Eq. (3)", "Table 1", "Section 3.2", "Chapter 4", "Appendix A",
+  "Theorem 2.1" in the text) point at `#` + the target element's id. Figures, tables, display equations,
+  headings, paragraphs and list items already carry their ids, so nothing new is written
+  at the target. A reference is a link only when exactly one thing in the document has
+  that number: "Section 3.2" needs a heading that starts with 3.2, "Chapter 4" a heading
+  "Chapter 4", "Appendix A" (or "Appendices A and B") a heading that starts "Appendix A", and "Theorem 2.1" (also Lemma, Proposition, Corollary, Definition,
+  Example) a paragraph or heading that starts "Theorem 2.1." or "Theorem 2.1 (name).".
+  No such target, or two, and the words stay plain text; so does a reference inside its
+  own target.
+- **Typed addresses** ("typed": `https://...`, `http://...`, `www....` and `name@host.tld`
+  printed in the text with no link in the PDF) are written as web and email links like
+  the PDF's own, after the same `is_safe_href` check. The full stop or comma that ends a
+  sentence is not part of the address, and an address cut at a line end is whole only
+  where the converted text joins it. They are not counted as links of the PDF on the
+  job page and get no `link_text_unclear` notice, because nobody made them links.
+- **Word and LaTeX documents** get the same typed addresses and references by number, from
+  the same two functions (`text_pass.source_links`, called where `source.convert` finishes
+  the elements; the PDF-only parts of the pass need glyphs and link annotations, and a source
+  has neither). The reader's own links ("uri": a Word hyperlink, LaTeX's `\href` and `\url`)
+  come first and are never overlapped or replaced; nothing is linked inside math (an inline
+  formula is a marker); the job page's count of links kept counts only the file's own.
+  LaTeX prints a heading's or caption's number in a tag the reader leaves out of the text
+  ("1.2 ", "Figure 3: "), so the reader hands it over as `Reading.printed` and the targets
+  are found as if it were there. Word captions and "Theorem 1." paragraphs hold their words
+  already. LaTeX's own references are exact, so they win: LaTeXML has written `\ref`,
+  `\eqref`, `\autoref`, `\cite`, `\pageref` and each `\tableofcontents` entry as a `#id` link,
+  the reader records which element each LaTeXML id became (a heading, a numbered equation, a
+  theorem's paragraph, a figure, a table, a bibliography entry, or the paragraph that holds
+  the id) and each such link is an "internal" link to that element (`ltx_reader.link_internal`;
+  the words are LaTeXML's, usually just the number, and `source_links` widens them to the
+  word before them, as it does a PDF's: "Section 2", "equation (1)"). The guessed link is made
+  only where the file had no reference, and never overlaps one. An id that became no element,
+  a link inside the element it names (a theorem citing itself), and a reference in a place
+  that holds no links (a table cell, a caption, a footnote, a heading) make no link; the words
+  stay text. `\pageref` prints the number of its target (LaTeXML has no pages), so its words
+  say "page 2.1" and the link goes to that target. A Word hyperlink to a bookmark on a heading
+  is the same kind of link (`docx_reader`; pandoc keeps no other bookmark, and the words of a
+  `REF` field are plain text).
 - A link never wraps an inline equation: a wide one is a tab stop of its own, and a tab
   stop cannot sit inside a link (axe `nested-interactive`). A link across an equation is
   written in two pieces around it.
@@ -787,15 +1015,40 @@ found confidently in another language carries its own (`Element.lang`), written 
 ```
 
 A screen reader switches voice for that paragraph (WCAG 3.1.2), and MathCAT speaks math
-in the page's language. Where the document language came from is
-`DocumentResult.lang_source`: "pdf" (`/Lang`), "detected" (from the body text, notice
-`lang_detected`), "default" ("en" because nothing else was found, notice `lang_assumed`)
-or "user". The job page shows the language and lets the instructor change it: the route
-calls `text_pass.set_document_language(result, tag)` (a BCP 47 tag such as "fr" or
-"pt-BR", or an English name such as "French"; ValueError otherwise), which sets the
-language and source "user", drops the two notices and works out the passages again
-against the new language, then re-renders the file with `web.review.rerender_html` and
-stores both, as after a review decision.
+in the page's language. The sources are tried in this order, with no voting between
+them (`text_pass._document_language`):
+
+1. The language chosen on the upload form ("Language of the document"; "Detect it" is the
+   default). It is stated, never assumed: source "user".
+2. The text. Letters are counted by script: kana makes Japanese, Hangul Korean, Hebrew,
+   Greek and Thai their own languages, and Han with no kana is Chinese. Latin, Cyrillic and
+   Arabic text goes to the detector, restricted to the languages written in that script,
+   with the same bar for every language. Source "detected" (notice `lang_detected`, unless
+   the file's own `/Lang` names the same language, then "pdf").
+3. The file's `/Lang`, only when the text could not decide and its script fits the text.
+   Word writes `en-US` into files in other languages, so it is not trusted over the text.
+4. Otherwise `en`, assumed: source "default" and the notice `lang_assumed`.
+
+A passage is found the same way, block by block. When no language holds 60 % of the
+letters the document is mixed: its language is the largest one, and the notice
+`lang_mixed` says so.
+
+A PDF that looks cut off (repaired when opened, its last pages empty) is a required check of
+the same kind, `file_cut_off`, with one difference: the owner's answer ("continue with the
+pages before the empty ones") keeps the notice, so `CheckedSummary.converted.cut_off_pages`
+still names the pages and every statement of what was converted (the student note, the EPUB
+accessibility summary, the Canvas README, the record) says they are not in the file.
+`file_repaired` (optional) is the line for a repaired file with content on every page.
+
+`lang_assumed` and `lang_mixed` are required checks: until the owner confirms the language
+or changes it, the job is not "Ready to share" (the state "Converted: confirm the
+language", `web.states`) and the open item is counted. Where the document language
+came from is `DocumentResult.lang_source`. The job page shows the language and lets the
+instructor change it: the route calls `text_pass.set_document_language(result, tag)` (a
+BCP 47 tag such as "fr" or "pt-BR", or an English name such as "French"; ValueError
+otherwise), which sets the language and source "user", drops the three notices and works
+out the passages again against the new language, then re-renders the file with
+`web.review.rerender_html` and stores both, as after a review decision.
 
 Text the tool itself writes (the notes, "Equation" before an equation number, the about
 section) is English whatever the document's language.
@@ -905,7 +1158,156 @@ text itself keeps the link color.
 Color alone tells a screen reader nothing, so text that refers to color near colored
 text ("shown in red") gets the optional notice `colour_reference`: the instructor may want
 to add a cue that does not depend on seeing it. With the flag off, colored text is
-written in the body color, as in pipeline 0.3.0.
+written in the body color, and the job gets one notice for the whole document, `colour_used`
+("Passages printed in color: 3. The converted file does not keep color. If a color carries
+a meaning here (for example, answers in red), say that meaning in words."): its count
+is the number of colored passages the PDF has, and it holds no text of the document.
+
+## Struck, bold and other marked text
+
+Text whose look changes its meaning is kept as a run of the element's text
+(`Element.runs`, `core/types.Run`), offsets into the stored text like links and color
+runs. Seven kinds exist: `deleted`, text struck through on the page ("The midterm is
+on ~~October 3~~ October 10"), `blank` and `checkbox`, a blank to fill in and a printed
+or form check box (below), `strong`, `emphasis` and `code`, bold, italic and fixed-pitch
+words inside a paragraph or list item (below), and `highlight`, words the page highlights
+(below).
+
+A struck run is kept, never removed, and written as `<del>` with the words said around it:
+
+```html
+<p id="p1-e1">The midterm is on <span class="visually-hidden readablestem">deleted: </span><del>October 3</del><span
+  class="visually-hidden readablestem"> end deleted</span> October 10 in room 2-190.</p>
+```
+
+Most screen readers say nothing for `<del>`, so the meaning would depend on the reader's
+settings; the two hidden phrases ("deleted: " before, "end deleted" after) say it in every
+reader and in Listen. They sit outside `<del>`, so the strike covers only the page's words,
+and they carry the `readablestem` class (the tool's own words, `lang="en"` in a document in
+another language). A document with struck text gets one rule, added only then:
+
+```css
+del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;
+  text-decoration-skip-ink: none; }
+```
+
+A text decoration is drawn in the text's own color, so it stays in forced-colors mode and
+on the dark page. Nesting, outermost first: link, struck, color, style, raised or lowered. A struck
+run is outside color so that a color change inside it never cuts it in two (a cut run would
+be said twice); a link stays outermost so it is never cut. A struck run may cover an inline
+equation (the hidden words go around the math).
+
+What each output holds for the struck date above:
+
+- **HTML and EPUB:** as above (the EPUB sanitizer keeps `del` and the spans).
+- **Canvas page and index, Common Cartridge:** as above, the hidden spans also given
+  Canvas's `screenreader-only` class and its inline hiding style.
+- **Word:** "deleted:" and "end deleted" as ordinary words, and "October 3" struck through
+  (pandoc writes `<del>` as strike; Word has no hidden text that a screen reader reads).
+- **Listen:** "The midterm is on deleted: October 3 end deleted October 10 in room 2-190."
+
+Where runs come from: the text pass marks struck PDF text (docs/layout.md "Struck text"),
+and the LaTeX reader turns `\sout` and `\xout` (ulem) into deleted runs. Each element with
+struck text gets the optional notice `struck_text` ("Worth checking", with its page; it adds
+no required decision): the instructor may want to take out words students no longer need.
+A text edit that changes struck words takes the run off, and the edit's message counts it
+("1 struck-text mark was taken off because its words changed"); the notice goes with the
+last run.
+
+### Bold, italic and fixed-pitch words (F-510)
+
+Words a PDF sets in bold, in italic or in a fixed-pitch face inside a paragraph or list item
+are runs of kind `strong`, `emphasis` and `code`, written as `<strong>`, `<em>` and `<code>`:
+
+```html
+<p id="p1-e0">Please <strong>do not open</strong> the exam until told, and read <em>Moby
+  Dick</em> soon, then <strong><em>both at once</em></strong>.</p>
+```
+
+They add markup and no words, so a screen reader that announces emphasis says it and one that
+does not says the same words as before; the output audit and the say-once check count the
+same words. Nesting, outermost first: link, struck, color, `<mark>`, `<strong>`, `<em>`, `<code>`, raised
+or lowered. The text is cut at every edge of every run and each piece is wrapped in the tags of
+the runs that cover it, so any mix of links, color, struck text, raised text and bold and
+italic nests: a run that crosses a link's edge is two tags, one in the link and one outside. Bold
+and italic may overlap each other and code. An inline equation or a blank is never inside a
+style tag (a run that reaches one is written in two pieces round it). Headings get no style
+runs (a heading is bold as a whole), nor does program code (`<pre>`) or a glossary entry.
+A document with fixed-pitch words gets one rule, added only then (`code`, 0.9 em, a
+fixed-pitch stack). Word keeps bold, italic and a "Verbatim Char" style for code; EPUB, Canvas
+and Listen are written from the same HTML. A text edit moves the runs with the words that did
+not change and takes off those whose words did, without a message (it is only the look of
+the words). Runs come from the text pass (docs/layout.md "Bold, italic and fixed-pitch
+words"); a Word or LaTeX source has none yet. `CONTENT_RUNS` off finds and counts them
+(`strong_runs`, `emphasis_runs`, `code_runs` in the trace) and writes none.
+
+### Highlighted text (SW51c)
+
+Words a Highlight annotation covers, or a colored band printed behind them, are a `highlight`
+run, written as `<mark>`: `<p>Read <mark>chapter 4 before the lab</mark> twice.</p>`. A table's
+header shading, a code block's background and a boxed theorem are not highlights (docs/layout.md
+"Highlighted words"). The `<mark>` rule is added only to a document that has one, in the
+page's own stylesheet:
+
+```css
+mark { background: #fff0a0; color: #1b1b1b; padding: 0 0.1em; border-bottom: 2px solid #7a5c00; }
+@media screen and (prefers-color-scheme: dark) {
+  mark { background: #5c4a00; color: #f5f5f5; border-bottom-color: #ffd34d; }
+}
+@media (forced-colors: active) {
+  mark { background: Mark; color: MarkText; border-bottom-color: CanvasText; }
+}
+```
+
+The text on the band reaches 4.5:1 in both schemes, and the line under the words (3:1 against
+the page) shows where the band does not: paper that prints no backgrounds, and forced colors.
+Nesting, outermost first: link, struck, color, `<mark>`, `<strong>`, `<em>`, `<code>`, raised
+or lowered. Word writes the words with Word's own yellow highlight; EPUB, Canvas and Listen keep `<mark>`
+(the book's stylesheet drops the page's colors, so the reading system draws the band).
+
+### What the reviewers wrote on the page (F-541)
+
+A comment of a PDF's annotation is a paragraph of its own, "Note on the page: Correction: use 30 mL,
+not 25 mL.", after the text it marks, in every output: a paragraph in the HTML (the Canvas page,
+Common Cartridge and EPUB too), a paragraph in Word, a sentence in Listen. A struck date and
+the caret that gives the new one read "October 3 ... deleted ... Note on the page: October 10"; a
+caret the file calls a replacement says "Note on the page: replace with October 10". The notice
+`annotations_read` (required) counts them and keeps a finished job at "Ready" (`web.states`
+`_HOLDS`): a comment may have been written for the instructor alone, and every one is in the
+student file. `attachments_not_converted` (optional) names the files attached to the PDF ("The
+files: “rubric.txt”") on the job page. Neither adds a decision; the note paragraph is an
+ordinary one, whose words an instructor may change. No tool takes one paragraph out: the
+page can be left out, or the PDF uploaded again without the comment.
+
+`CONTENT_RUNS` (on by default since 2026-11-18, and in the production profile) is the
+rollout switch. Off, struck runs are found and counted in the trace (`deleted_runs`,
+`deleted_runs_written: 0`) but not stored or written, and no notice is raised: the output
+is as the release before it wrote them. A result without runs is stored and
+written byte for byte as before (the field is left out of the JSON when empty), and a
+result with runs loads in a release that does not know them, which writes the words plain.
+
+### Blanks, check boxes and form fields
+
+A blank (a drawn rule in a gap of a row, or three or more typed underscores), a printed check
+box (U+2610, U+2611, U+2612) and the fields of a fillable PDF are runs of kind `blank` and
+`checkbox` (docs/layout.md "Rules near a baseline, blanks, boxes and form fields"). The
+characters the page printed stay, hidden from a screen reader, and the tool's own words are
+said in their place, in the same visually hidden span as the struck text's:
+
+```html
+<p>Date: <span class="blank"><span class="visually-hidden readablestem">blank</span><span aria-hidden="true">_____</span></span></p>
+<p>I agree <span class="checkbox"><span class="visually-hidden readablestem">Checkbox, checked: </span><span aria-hidden="true">&#9745;</span></span></p>
+<p>Course: <span class="blank"><span class="visually-hidden readablestem">blank, filled in: </span>ENVS 101</span></p>
+```
+
+A reader hears "Date: blank", "I agree checkbox, checked:" and "Course: blank, filled in: ENVS
+101". The spans carry a class and no style, so the page's stylesheet is the same. Word has
+no hidden text a screen reader reads, so it holds both the words and the printed characters;
+Listen skips the `aria-hidden` characters and says the words; EPUB and Canvas are written from
+the same HTML. A document with a fillable form gets one notice, `form_fields` ("Not handled
+in this file", no page, the number of fields): the converted file cannot be filled in, so the
+instructor keeps the PDF for students who fill it in. There is no switch: what these runs
+mark is in the text, and a result without them is written as before.
 
 ## MathML is rebuilt, never pasted
 
@@ -924,13 +1326,16 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
    other element, is dropped here and refused by `check_mathml` (`unsafe_attribute`).
 3. **Bold letters.** MathML Core (Chromium) draws only `mathvariant="normal"`, so a bold or
    bold-italic token is written as Unicode mathematical bold letters instead
-   (`core.mathchars.bake_bold_variants`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`
+   (`mathml_shape.normal_form`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`
    U+1D6DA, the way `\mathbf{d}` was already U+1D41D, and the attribute (also inherited from
    an `mstyle`) is removed from the tokens that could be written so. The converter does it
    when it makes the MathML (`validate.safe_latex_to_mathml`) and the sanitiser does it
    again for MathML stored before, so every screen reader says "bold omega" and every
    browser draws it bold (`tests/test_math_bold_greek.py`, Chromium). Other variants are
-   left as they were.
+   left as they were. Digits are not styled (`\mathbf{3}` is a plain 3). `normal_form` also
+   joins a spelled function name into one `mi`, writes a prime as `<mo>′</mo>`, drops
+   `mathvariant` from operators and marks the aligned rows of one equation
+   (`data-aligned-rows`, kept by the sanitiser); docs/mathml-alttext.md.
 4. `semantics` and `maction` are replaced by their first child, which is what a browser
    shows anyway; annotations and alternatives are dropped.
 5. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
@@ -965,55 +1370,143 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
-### One h1 (T3-13)
+### One title (SW14)
 
-A file should have one top-level heading. A slide deck has one per slide, so when the
-repaired outline would write two or more `<h1>` the assembler writes the document's title
-as the only `<h1>` (the title students hear, see "One self-contained file": the one the
-instructor typed on the job page, else the PDF's title without its section number) and
-moves every heading one level down, so the slide titles are `<h2>` (capped at `<h6>`). A
-file with at most one `<h1>` is written as before. `assemble.title_shift` decides it from the
-repaired outline, for the renderer and for tests. The move comes after the repair above,
-so the review screen's levels (`would_write`, "In the document: level N") are the levels
-before it: in a slide deck its numbers are one less than the file's. The "About this
+A document has one title, said the same in every place and file: the student page's
+`<title>` and `<h1>`, the Word and EPUB title, the Canvas and Cartridge names, manifest and
+README, the download file name and the names in a zip of documents, the job page, My
+documents and the batch table, feedback, the record, Listen, the share page and the delete
+page. One function makes it, `assemble.document_title(override, raw, headings, filename)`,
+which returns the text and where it came from (`DocumentTitle.source`), in this order:
+
+1. `yours`: the title the instructor typed.
+2. `pdf`: the document's own title, without its section number, when it is not generic
+   ("Contents", "Overview") and not a file name written out (no spaces and an underscore or
+   letters mixed with digits, such as "MIT6_0001F16_Welcome").
+3. `heading`: the first heading that is not generic.
+4. `file`: the file name without its extension, `_` and `-` read as spaces.
+5. `stock`: "Converted document", only when there is nothing else.
+
+`assemble.title_plan` keeps the one-H1 rule (below), so a single top-level heading that
+is not the title still becomes the H1 and the page's `<title>`, and then the title is that
+heading (`heading`). The web layer reads it through `documents.document_title(job)`
+(`jobs.title_override`, the stored `jobs.result_title` and `jobs.filename`; no result is
+loaded) and `titles.effective_title` for a caller with only the columns. `jobs.result_title`
+is what the page writes without the instructor's choice (`documents.list_facts`, set
+whenever a result is stored); a row from before is the PDF's own title until its result is
+stored again, and shows the same words except where the page took a heading or the file name.
+A page is made with the file name (`render_html(filename=)`); the pipeline does not know it,
+so the worker marks a page whose title is the file name out of date and it is made again
+from the stored result on first use. A combined document is titled by the file its parts came
+from (`web.combine.title_of`), not by the first part's heading.
+
+My documents and the batch table lead with the title and put the file name on the line
+under it; when the title is the file name as written there is one line. The job page's title field
+says where the suggestion comes from ("From the title in your PDF.", "From the first
+heading.", "From the file name.", or "No title found: students will hear “Converted
+document”. Type one.").
+
+### One h1 (T3-13, SW6c)
+
+A file has exactly one `<h1>`, and the title is said once (`assemble.title_plan`, one rule
+for the page, the contents list, the EPUB, the Word file and Listen, which all read the
+page). The title is the one the instructor typed on the job page, else the PDF's title as
+`document_title` gives it ("One title" below). Two titles are the same when they match with case folded,
+punctuation and spaces collapsed and the section number removed ("2.3 Kinematics" and
+"KINEMATICS." are one title, `assemble.same_title`).
+
+- The title is the same as the first top-level heading of the repaired outline: that
+  heading is the `<h1>`, not moved, and nothing is added.
+- Otherwise, when the outline has exactly one top-level heading, it is the `<h1>` (a title
+  the instructor typed is never replaced by a heading: it is added as below).
+- Otherwise (no top-level heading, or several and none the title) the title is written as
+  the `<h1>` and the headings move down under it, so the shallowest is an `<h2>` (capped at
+  `<h6>`): a slide deck's slide titles are `<h2>`. When the H1 is a heading of a slide deck
+  (several top-level headings), its own section stays where it is and the rest move down.
+
+`<title>` is always the H1's text. The stored levels never change: the move comes after the
+repair above, so the review screen's levels (`would_write`, "In the document: level N") are
+the levels before it: in a slide deck its numbers are one less than the file's. Word drops
+pandoc's title paragraph when it is the same title as the first heading
+(`export_docx._drop_title_paragraph`, the same comparison), so a title that differs only in
+case is not read twice there either. The "About this
 version" title is a labeled paragraph, not a heading: the `<footer>` is named by it
 (`aria-labelledby`), so a screen reader user reaches it as a landmark, and it is not a
 section of the document's outline.
 
 ## The note for students ("About this version")
 
-The file ends with a short note for the people who read it, in a `<footer>` after
-`</main>` (`id="about-conversion"`, MF7 of the UX review). It has no counts and no
-review words ("needs review", "rejected"): those are for the instructor, on the job page
-(docs/web.md "The job page"). In order:
+The file ends with a short note for the people who read it, a labeled `<section>` at the
+end of `<main>` (`id="about-conversion"`, MF7 of the UX review). It is inside `<main>` so every
+output made from the page gets it from the same markup: pandoc reads only what is inside
+`<main>`. It is a region landmark named "About this version", not a heading, so the outline is
+unchanged. Its sentences are the summary's
+(`pipeline.checked`, docs/web.md "What was checked"), made by `pipeline/checked_words.py`,
+so it says no more than was done. It has no review screen's words ("needs review",
+"rejected"). In order:
 
 - what this is: "This is a web version of a PDF from your course, made with ReadableSTEM, a
-  tool that assists with accessibility.", plus "Its equations are written so that screen
-  readers can read them aloud." when the file has converted equations;
-- whether the instructor has checked it: nothing when the tool asked nothing and nobody
-  changed anything; "Some parts were made by the tool and have not been checked by your
-  instructor yet." while a decision is open (a draft download); "Your instructor checked
-  the parts the tool was unsure about on October 9, 2026." once every decision is made.
-  The date is `render_html(checked_on=...)`: the review screen passes the day of the
-  re-render that follows a decision (`web/review.py rerender_html`, UTC), the language
-  control the day of the last decision; the pipeline never passes one, so a result
-  renders the same from storage;
-- when something is shown as an image of the original: "Some parts could not be
-  converted. They are shown as pictures of the original, marked "Not converted" or
-  "Needs a description": ask your instructor for a version you can read.", and when whole
-  pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
-  scanned pages and were not converted." (`assemble.kept_pages_note`);
+  tool that assists with accessibility." The noun is the source's (`checked_words.source_noun`,
+  the one function every surface that names the file uses): "PDF", "LaTeX source", "LaTeX
+  slide deck", "Word file". The medium is the file's: the EPUB, Word, Canvas and Common
+  Cartridge files say "an EPUB version", "a Word version", "a Canvas version", "a Common
+  Cartridge version" (`assemble.with_medium`, done on the finished page, so the page itself
+  is unchanged). Then how many equations a screen reader can read:
+  "Its equations are written so that screen readers can read them aloud." when all are, "2
+  of its 5 equations are written so that screen readers can read them aloud; the others are
+  pictures." when some are, nothing when none is (the pictures sentence says so);
+- what a person reviewed, in one of three forms: "This version has not been reviewed by a
+  person." until someone makes a decision; "Your instructor reviewed 3 of 5 parts the tool
+  flagged, on October 9, 2026."; and the same with " 1 part was kept as the tool wrote it
+  without a check passing." after an "Accept anyway". An optional note nobody opened is
+  among the flagged parts and never among the reviewed ones. The date is the day of the
+  last decision (`render_html(checked_on=...)`, which the job page's re-render reads from
+  the review log); with no recorded decision (decisions carried from an earlier
+  conversion, the pipeline) there is no date. When the page count is known
+  (`render_html(pages=...)`), the pages-left-out sentence says "(7 of 8)";
+- when something is a picture of the original, how many: "4 parts could not be converted
+  and are shown as pictures of the original, marked "Not converted" or "Needs a
+  description": ask your instructor for a version you can read." (for a LaTeX source,
+  "shown as they were written in LaTeX"); when whole pages are kept as images, which ones
+  (`assemble.kept_pages_note`);
+- when pages were left out, which: "Pages 2, 3 and 4 (3 of 8) of the original PDF were left
+  out of this file.";
 - when pages were read from an image of the page: "Page 2 was converted from an image of the
   page: it starts with a note and the original page to check it against."
   (`assemble.image_pages_note`);
 - "If something is hard to read or looks wrong, tell your instructor.";
-- an optional plain-text `source_note`, such as an OpenStax attribution.
+- an optional plain-text `source_note`, such as an OpenStax attribution;
+- when the caller gives a stamp (`render_html(stamp=assemble.Stamp)`), the last line, "Version
+  b9487b-12, November 10, 2026" (`<p class="about-version">`): which version of the document
+  this file is. See "The version id" below.
 
-The wording is final for the beta: the note does not name screen
-readers, and "checked" appears only once an instructor has made a decision (the feature
-review's challenge, 10.3 row 4, would say "decided by your instructor" instead, since the
-tool only knows that decisions were made). Model cost is not in the HTML: the file is meant for
-students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
+The note says "reviewed" for what a person did and never "checked" (the tool's checks are
+"structure checks", and they are not mentioned to students). Model cost is not in the HTML:
+the file is meant for students.
+
+### The version id
+
+Two copies of one document can be told apart (WS20.1). The id is the first six characters of the
+job id, a hyphen and a count of the changes that have reached the document's output
+(`jobs.output_version`, from 1): `b9487b-12`. The date is the day (UTC) of the last change
+(`jobs.output_changed_at`), written in full with no time. The student file says both in its About
+note and its head (`readablestem-version`, `dcterms.modified`); the Word, EPUB and Canvas files
+carry the note's line because they are made from the same page, and nothing is added to their own
+metadata. The job page shows the same line under the title, to the owner and a reviewer. The
+assembler takes the stamp as a parameter and reads no clock and no database: the web app passes
+`web.output.stamp_of(job)`; the command line has no job, so it gives none and its files say
+nothing of a version rather than invent an id. Which changes count is in docs/web.md "The output
+version".
+
+The same statement opens the page, in `<main>` before the content, when nobody has reviewed
+it or a part is a picture or left out: a `<section id="checked-notice"
+aria-labelledby="checked-notice-title">` (a region named "Before you read", no live role, so
+it is read once in the page's order) with the statement and a list of links: "About this
+version", one per picture ("Part 1 not converted: equation, page 3", numbered so no two
+links have the same name; after ten, the rest are counted) and "Which pages were left out".
+The statement is also in the head, `<meta name="readablestem-summary">` (plus
+`<meta name="readablestem-access-sufficient" content="textual">` when the text alone is
+enough), for the files made from the page. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
 Text the tool writes (notes, labels, the student note) carries `class="readablestem"`. The
 `banned_wording` check reads only that text, so course content that legitimately uses
@@ -1021,8 +1514,28 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 
 ## Styling
 
-About 35 lines of inline CSS:
+About 100 lines of inline CSS, all of it in one module, `pipeline/student_sheet.py`. The sheet
+is a set of named parts: the core every page has (base, headings, equation, lists, hidden
+text, figure, kept picture and notice, about, skip link, then the narrow-screen, print and
+dark blocks), and the parts a page gets only when it uses them (code, definition list,
+table, contents list, page marker, footnote, figure description, stacked scripts, struck
+text, colored text, the print fit of a wide equation, the image-page note). Three builds
+are made from the parts: the screen build is what the page carries; the EPUB build
+(`student_sheet.epub`, below) is the same text cut by the EPUB writer; and what the Canvas
+export may carry into `style` attributes (`student_sheet.CANVAS_PROPERTIES`) is defined
+beside them.
 
+- the type scale, in em of the 1.125rem (18 px) text: h1 2 (36 px), h2 1.5 (27), h3 1.3
+  (23.4), h4 1.15 (20.7); h5 and h6 stay at the text's size, never under it, and are told
+  apart from it and from each other by weight and style (h5 bold, h6 bold italic). Captions,
+  the notes beside a kept picture, footnotes and page markers are one step smaller, 0.9 em
+  (16.2 px), with more room above a caption. No text on the page is under 14 px; the
+  stacked scripts of a nuclide or an ion are 0.8 em (14.4 px). The exceptions are
+  the scripts inside math, which the browser sizes. The scale is the same
+  in the EPUB (sizes are relative there, so it follows the reader's own text size) and in
+  the standalone Canvas page; the Canvas page for pasting leaves heading sizes to Canvas's
+  own theme (rules on bare `h1` to `h6` are not carried into it). The Word file is made by
+  pandoc and takes none of it;
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
   (about 17:1 contrast; for a dark scheme see "Dark colors");
 - images at their printed size (PDF points x 96/72) and never wider than the column; an
@@ -1035,7 +1548,7 @@ About 35 lines of inline CSS:
   item, since `text-indent` is inherited), equation numbers to the right of their
   equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
   readers still read it);
-- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together;
+- a visible `:focus-visible` outline and a print block (below, "On paper");
 - only in documents that have one: a figure's folded description (a bold summary with
   the browser's own marker, no new colors) and table rules.
 
@@ -1071,6 +1584,7 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 | `html.heading_order` | `heading_skip` |
 | `html.heading_text` | `empty_heading` |
 | `html.img_alt` | `img_missing_alt` (`alt=""` is allowed) |
+| `html.img_alt_content` | `empty_alt_content` (`alt=""` outside `class="decorative"`, since 2026-11-11) |
 | `html.unique_ids` | `duplicate_id` |
 | `html.list_structure` | `list_structure` (an `<li>` outside `<ul>`/`<ol>`, or an element other than `<li>` or text directly in one; axe's `list` and `listitem` rules) |
 | `html.math_display` | `math_missing_display` (warning) |
@@ -1274,18 +1788,21 @@ Keep the two in step when a limit changes.
   printed with rules becomes a list of its terms.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
-- A figure's long description and data table are folded: they print only if opened
-  first. A chart's data table read from the image is in the file only when a reviewer
+- A figure's long description and data table are folded on screen. On paper they print open
+  where the browser can draw a folded `<details>` (`::details-content`: Chromium 131 and later);
+  where it cannot, the summary says "open this description before printing" and they print
+  only if opened first (not run in Firefox or Safari yet, WF44). A chart's data table read from the image is in the file only when a reviewer
   added it, and is approximate (its caption says so).
 - A PDF link over an image or a drawing (not over text) is not kept; neither is a link
   in a figure's caption. A link whose rectangle covers only part of a word links that
   part.
 - Link text is kept as printed, also when it says nothing on its own ("click here"):
   only the instructor can reword it (the job page lists it as worth checking).
-- Language detection needs about 20 words of prose; a short handout of mostly math is
-  assumed to be English unless the PDF says otherwise. A passage is marked only when it
-  is a whole paragraph or list item in another language (a quoted phrase inside an
-  English sentence is not).
+- Language detection needs about 100 letters of prose; a short handout of mostly math is
+  assumed to be English unless the PDF says otherwise, and the job then waits for you to
+  confirm the language. You can also choose the language when you upload. A passage is
+  marked only when it is a whole paragraph or list item in another language (a quoted
+  phrase inside an English sentence is not).
 - Color inside figures stays in the image; color in headings is not kept.
 
 

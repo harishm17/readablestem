@@ -35,8 +35,8 @@ from sqlalchemy.orm import Session
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit
 
 EXPIRES = "EXPIRES"
-# The proposal fields of a fix. A paragraph fix has none: its proposal is its element's
-# text (ADR 0007).
+# The proposal fields of a fix. A paragraph or list item fix has none: its proposal is its
+# element's text (ADR 0007; a page read from its picture, a text decision).
 PROPOSAL_KEYS = ("equation", "figure", "table", "heading")
 
 

@@ -19,6 +19,7 @@ page kept as an image: those stay for a person.
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from dataclasses import dataclass
 
 from readablestem.core.types import DocumentResult, Element, Fix, Kind, Status
@@ -28,6 +29,7 @@ from readablestem.web.review import (
     ReviewChange,
     ReviewInvalid,
     apply_review,
+    asked_in_a_high_band,
     can_accept,
     is_image_page_item,
     is_kept_image,
@@ -80,7 +82,8 @@ def is_bulk_candidate(fix: Fix, slug: str, element: Element | None = None) -> bo
     """Whether the bulk action for `slug` accepts this fix: undecided, a usable proposal,
     nothing failed, nothing flagged, and on its own (not in a group). Never an item read from
     an image of a page (`element`): handwritten and scanned maths is always its own decision,
-    whatever its checks say."""
+    whatever its checks say. Never one asked in band 1 to 3 either: a reading made again that
+    passes every check keeps the band of the failure it replaced."""
     spec = BULK_KINDS[slug]
     if fix.kind is not spec.kind or fix.status is not Status.NEEDS_REVIEW:
         return False
@@ -88,7 +91,7 @@ def is_bulk_candidate(fix: Fix, slug: str, element: Element | None = None) -> bo
         c.name == "image_page.maths_always_checked" for c in fix.checks
     ):
         return False
-    if fix.group_key or fix.reason or is_kept_image(fix):
+    if fix.group_key or fix.reason or is_kept_image(fix) or asked_in_a_high_band(fix):
         return False
     if fix.failed_checks or _flagged(fix) or not can_accept(fix):
         return False
@@ -118,22 +121,41 @@ class Offer:
         return f"{self.count} {self.one if self.count == 1 else self.many}"
 
 
+MIN_OFFERED = 2  # "Accept many figures (1)" is no offer: one item is decided on its card
+
+
 def offers(result: DocumentResult) -> list[Offer]:
-    """The bulk actions worth showing: those with something to accept."""
+    """The bulk actions worth showing: those with at least two items to accept."""
     out = []
     for slug, spec in BULK_KINDS.items():
         n = len(candidates(result, slug))
-        if n:
+        if n >= MIN_OFFERED:
             out.append(Offer(slug, n, spec.title, spec.one, spec.many))
     return out
 
 
-def accept_all(result: DocumentResult, slug: str) -> list[ReviewChange]:
-    """Accept every candidate, in place: one ordinary Accept per fix, each marked as one of
-    a bulk action in its record (`BULK_KEY` holds the kind's slug). Raises ReviewInvalid when
-    there is none."""
+PAGE_SIZE = 20  # the confirming page lists this many at a time (`page_of`)
+
+
+def page_of(found: list[Fix], page: int) -> tuple[list[Fix], int, int]:
+    """One page of the list the confirming page shows: (its fixes, its number, the pages in
+    all). A page number out of range is the nearest page that exists."""
+    pages = max(1, -(-len(found) // PAGE_SIZE))
+    page = min(max(page, 1), pages)
+    return found[(page - 1) * PAGE_SIZE : page * PAGE_SIZE], page, pages
+
+
+def accept_all(
+    result: DocumentResult, slug: str, only: Collection[str] | None = None
+) -> list[ReviewChange]:
+    """Accept the candidates, in place: one ordinary Accept per fix, each marked as one of
+    a bulk action in its record (`BULK_KEY` holds the kind's slug). `only`: the element ids
+    the person was shown (one page of the list); without it, every candidate. Raises
+    ReviewInvalid when there is none."""
     spec = BULK_KINDS[slug]
     waiting = candidates(result, slug)
+    if only is not None:
+        waiting = [f for f in waiting if f.element_id in only]
     if not waiting:
         raise ReviewInvalid([FieldError(f"bulk-{slug}", spec.nothing)])
     changes = [apply_review(result, fix.element_id, "accept", {}) for fix in waiting]

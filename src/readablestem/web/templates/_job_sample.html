@@ -1,6 +1,8 @@
+{# Audiences: owner, reviewer #}
+{% from "components/notices.html" import notice_box %}
 {# T3-9: this document is the recorded sample (web/sample.py). Says what it is, where it comes
    from and that it costs nothing, so nobody mistakes it for their own file. #}
-<div class="notice" id="sample-note">
+{% call notice_box("info", id="sample-note") %}
   <p><strong>This is a sample document, not your file.</strong> It is a section of a physics
     textbook, converted once ahead of time, so you can try the review screen before you upload
     your own PDF. Opening it, reviewing it and downloading it use none of your pages, send
@@ -11,4 +13,4 @@
     {% if job.sample.licence_url %}<a href="{{ job.sample.licence_url }}">{{ job.sample.licence }}</a>{% else %}{{ job.sample.licence }}{% endif %}.
     {% if job.sample.source_url %}<a href="{{ job.sample.source_url }}">The original page</a>.{% endif %}</p>
   {% endif %}
-</div>
+{% endcall %}

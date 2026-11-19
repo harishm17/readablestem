@@ -1,0 +1,128 @@
+{# The site footer, in one place: the one list of footer links (each target has one label) and the
+   three arrangements `base.html` asks for through `frame_mode`:
+     "minimal"  the sign-in pages: only the notices that bear on signing in;
+     "compact"  signed-in pages: the help and trust links on one line (the guides and the page
+                for accessibility offices are reached from the header and the guides page);
+     "full"     the public pages.
+   `frame_wrap` is the page's width class. A link marks itself `aria-current="page"` when `active`
+   (`web.deps.current_section`, worked out from the path) is one of the sections it stands for. #}
+{# The feedback target is the form when one is set, else the contact address; each has one label. #}
+{% if feedback_url %}
+  {% set feedback_href = feedback_url %}
+  {% set feedback_label = "Send feedback" %}
+{% elif contact_email %}
+  {% set feedback_href = "mailto:" ~ contact_email ~ "?subject=ReadableSTEM%20feedback" %}
+  {% set feedback_label = "Send feedback by email" %}
+{% endif %}
+{% set links = {
+  "demo": ("/demo", "Demo"),
+  "help": ("/help", "Help"),
+  "posting": ("/help/posting", "Posting in your course"),
+  "status": ("/status", "Service status"),
+  "privacy": ("/privacy", "Privacy"),
+  "terms": ("/terms", "Terms"),
+  "limits": ("/limits", "Known limits"),
+  "offices": ("/for-accessibility-offices", "For accessibility offices"),
+  "continuity": ("/for-accessibility-offices#continuity", "Support and continuity"),
+  "guides": ("/guides", "All guides"),
+  "guide-ada": ("/guides/ada-title-ii-stem-course-materials", "ADA Title II guide"),
+  "guide-compare": ("/guides/readablestem-mathpix-latexml", "Choosing a tool"),
+  "open-source": ("/terms#open-source", "Open source"),
+  "source": (source_url, "Source code"),
+  "examples": ("/showcase/examples/", "Worked examples"),
+  "method": ("/showcase/method/", "Method and limits"),
+  "feedback": (feedback_href|default(""), feedback_label|default("")),
+  "contact": ("mailto:" ~ (contact_email or ""), "Contact"),
+  "author": ("https://harishmanoharan.com/?ref=readablestem", "Harish Manoharan"),
+} %}
+{% set marks = {
+  "help": ("help", "help-review", "help-latex"),
+  "demo": ("demo",), "posting": ("posting",), "status": ("status",), "privacy": ("privacy",),
+  "terms": ("terms",), "limits": ("limits",), "offices": ("offices",), "guides": ("guides",),
+  "guide-ada": ("guide-ada",), "guide-compare": ("guide-compare",),
+} %}
+{% macro link(key) -%}
+<a href="{{ links[key][0] }}"{% if active in marks.get(key, ()) %} aria-current="page"{% endif %}>{{ links[key][1] }}</a>
+{%- endmacro %}
+{% macro note() -%}
+<p class="footer-note">Built and maintained by {{ link("author") }}.
+        {{ link("continuity") }}.
+        {% if frame_mode == "full" %}{{ link("source") }}{% if contact_email %} · {{ link("contact") }}{% endif %}{% else %}{{ link("open-source") }}.{% endif %}</p>
+{%- endmacro %}
+{% if frame_mode == "minimal" %}
+<footer class="site-footer site-footer-compact">
+  <div class="{{ frame_wrap }}">
+    <nav aria-label="Footer">
+      <ul class="footer-compact-links">
+        {% for key in ("terms", "privacy", "limits", "status", "open-source") %}
+        <li>{{ link(key) }}</li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </div>
+</footer>
+{% elif frame_mode == "compact" %}
+<footer class="site-footer site-footer-compact">
+  <div class="{{ frame_wrap }}">
+    <nav aria-label="Footer">
+      <ul class="footer-compact-links">
+        {% for key in ("help", "posting", "limits", "privacy", "terms", "status") %}
+        <li>{{ link(key) }}</li>
+        {% endfor %}
+        {% if feedback_href is defined %}
+        <li>{{ link("feedback") }}</li>
+        {% endif %}
+      </ul>
+    </nav>
+    {{ note() }}
+  </div>
+</footer>
+{% else %}
+<footer class="site-footer">
+  <div class="{{ frame_wrap }}">
+    <nav aria-label="Footer" class="footer-cols">
+      <div>
+        <h2 class="card-title">Product</h2>
+        <ul>
+          {% for key in ("demo", "help", "posting", "status") %}
+          <li>{{ link(key) }}</li>
+          {% endfor %}
+          {% if showcase_on %}
+          <li>{{ link("examples") }}</li>
+          {% endif %}
+        </ul>
+      </div>
+      <div>
+        <h2 class="card-title">Trust</h2>
+        <ul>
+          {% for key in ("privacy", "terms", "limits", "offices") %}
+          <li>{{ link(key) }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h2 class="card-title">Guides</h2>
+        <ul>
+          {% for key in ("guides", "guide-ada", "guide-compare") %}
+          <li>{{ link(key) }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div>
+        <h2 class="card-title">Source</h2>
+        <ul>
+          <li>{{ link("source") }}</li>
+          <li>{{ link("open-source") }}</li>
+          {% if showcase_on %}
+          <li>{{ link("method") }}</li>
+          {% endif %}
+          {% if feedback_href is defined %}
+          <li>{{ link("feedback") }}</li>
+          {% endif %}
+        </ul>
+      </div>
+    </nav>
+    {{ note() }}
+  </div>
+</footer>
+{% endif %}

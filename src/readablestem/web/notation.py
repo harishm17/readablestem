@@ -36,6 +36,7 @@ from readablestem.config import Settings
 from readablestem.core.mathchars import STYLE_GROUPS, base_char, char_variant
 from readablestem.core.notation import MAX_SYMBOL_CHARS, canonical_from_parts, canonical_symbol
 from readablestem.core.types import (
+    AppliedSymbol,
     ConversionOptions,
     DocumentResult,
     Element,
@@ -45,7 +46,15 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline import notation_memory, notation_suggest
-from readablestem.web.db import Course, CourseNotation, Job, JobStatus, ReviewEdit, utcnow
+from readablestem.web.db import (
+    Course,
+    CourseGrant,
+    CourseNotation,
+    Job,
+    JobStatus,
+    ReviewEdit,
+    utcnow,
+)
 
 MAX_NAME_CHARS = 200  # courses.name
 MAX_NOTE_CHARS = 200  # notation_entries.note
@@ -84,6 +93,12 @@ _REMEMBERED_MEANING = {"bold": "vector", "double-struck": "set"}
 
 def enabled(settings: Settings) -> bool:
     return settings.feature_notation_memory
+
+
+def course_grants_enabled(settings: Settings) -> bool:
+    """Whether course grants exist at all (WS27.1): the setting, and the courses it hangs
+    from. Off: the People routes are 404 and no grant row gives any right."""
+    return settings.feature_course_grants and settings.feature_notation_memory
 
 
 # --------------------------------------------------------------------------- errors
@@ -260,6 +275,29 @@ def rename_course(session: Session, course: Course, name: str) -> None:
     course.name = name
 
 
+def course_named(session: Session, user_id: str, name: str) -> str | None:
+    """The id of the owner's course with this name (as `create_course` compares names), if
+    any: a second click on Add course finds the course the first one made (SW43)."""
+    try:
+        name = clean_name(name)
+    except NotationInvalid:
+        return None
+    return session.scalar(
+        select(Course.id)
+        .where(Course.user_id == user_id, func.lower(Course.name) == name.lower())
+        .limit(1)
+    )
+
+
+def same_entry(course: Course, entry: EntryInput) -> CourseNotation | None:
+    """The course's entry that says exactly what `entry` says (symbol, meaning and note):
+    a second click on Add made it already (SW43)."""
+    row = _existing(course, entry.canonical)
+    if row is None or (row.meaning, row.note or "") != (entry.meaning, entry.note or ""):
+        return None
+    return row
+
+
 def _refuse_same_name(
     session: Session, user_id: str, name: str, *, field_id: str, other_than: str | None = None
 ) -> None:
@@ -274,10 +312,12 @@ def _refuse_same_name(
 
 
 def delete_course(session: Session, course: Course) -> None:
-    """The course and its entries. Jobs that used it keep their results and lose only
-    the link (as the foreign key's ON DELETE SET NULL does, done here explicitly)."""
+    """The course, its entries and the people it was open to. Jobs that used it keep their
+    results and lose only the link (as the foreign key's ON DELETE SET NULL does, done here
+    explicitly), so no grant covers them any more."""
     session.execute(update(Job).where(Job.course_id == course.id).values(course_id=None))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id == course.id))
+    session.execute(delete(CourseGrant).where(CourseGrant.course_id == course.id))
     session.delete(course)
 
 
@@ -489,10 +529,12 @@ def conversion_options(
     factory: sessionmaker[Session], settings: Settings, job_id: str
 ) -> ConversionOptions | None:
     """The job's run options: its course notation (when the feature is on and the course
-    has entries), its exam choice (`Job.exam_mode`, the upload form's box) and whether its
+    has entries), its exam choice (`Job.exam_mode`, the upload form's box), its language
+    (`Job.language`, the form's select) and whether its
     scanned and handwritten pages are converted (`Job.image_pages`, the form's other box; the
     feature flag only offers it, so a job that did not ask for it never has it). None when
-    the job has neither a course, nor an exam, and the settings' own flags are what it needs."""
+    the job has neither a course, nor an exam, nor a language, and the settings' own flags are
+    what it needs."""
     from readablestem.web.db import session_scope
 
     with session_scope(factory) as session:
@@ -500,18 +542,52 @@ def conversion_options(
         if job is None:
             return None
         exam = bool(job.exam_mode)
+        chosen = job.language or None
         image_pages = bool(job.image_pages) and settings.feature_image_pages
         found: list[NotationEntry] = []
         if enabled(settings) and job.course_id is not None:
             course = owned_course(session, job.course_id, job.user_id)
             if course is not None:
                 found = notation_entries(course.notation)
-    if not found and not exam and not image_pages and not settings.feature_image_pages:
+    if (
+        not found
+        and not exam
+        and not chosen
+        and not image_pages
+        and not settings.feature_image_pages
+    ):
         return None
     options = ConversionOptions.from_settings(settings)
     return options.model_copy(
-        update={"notation": found, "exam_mode": exam, "image_pages": image_pages}
+        update={
+            "notation": found,
+            "exam_mode": exam,
+            "image_pages": image_pages,
+            "language": chosen,
+        }
     )
+
+
+def applied_record(
+    settings: Settings, job: Job, result: DocumentResult, handed: Iterable[NotationEntry]
+) -> list[AppliedSymbol] | None:
+    """What to keep with a finished conversion of the symbols it was handed (`handed`: the
+    entries the worker passed to the pipeline, `conversion_options`): each one's key and
+    meaning, nothing else. None where no course notation was in play: the feature is off, the
+    job has no course, or the document is not a PDF (a source file never gets the course's
+    list). An empty list says the course had no symbols then. User content: it is stored with
+    the result, deleted with the job and never logged."""
+    if not enabled(settings) or job.course_id is None or result.origin != "pdf":
+        return None
+    return [AppliedSymbol(canonical=e.canonical, meaning=e.meaning) for e in handed]
+
+
+def applied_phrases(record: list[AppliedSymbol] | None) -> list[str] | None:
+    """The record kept with a result (`applied_record`) as the job page lists it, "bold d is
+    a vector"; None when there is no record (never a guess from the course as it is now)."""
+    if record is None:
+        return None
+    return [notation_memory.phrase(symbol.canonical, symbol.meaning) for symbol in record]
 
 
 @contextmanager

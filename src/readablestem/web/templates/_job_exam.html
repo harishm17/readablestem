@@ -1,0 +1,18 @@
+{# Audiences: owner, reviewer #}
+{# The exam choice made at upload (`Job.exam_mode`, words in web/exam.py), said where the
+   document is handled. "Change" is the revised upload, which asks for the file again with
+   this choice ready to change and carries the decisions over; it is offered to the owner
+   of a finished document. When a finished document was converted normally and its title or
+   file name reads as an exam (`exam_word`, web/exam.py), one more line says the word and
+   offers the same control: a hint, computed here and stored nowhere, that changes no count
+   and blocks nothing. The student's page and files never say any of it. #}
+{% if not job.is_sample %}
+{% set can_change = job.is_owner and job.status == "done" and (not job.summary or job.summary.checked.origin == "pdf") %}
+{% set word = exam_word(job.title, job.filename) if job.status == "done" and not job.exam_mode else "" %}
+<p id="job-exam">{{ exam_words.on if job.exam_mode else exam_words.off }}
+  {% if can_change and not word %}<a href="/app?revises={{ job.id }}#exam">{{ exam_words.change }}</a>{% endif %}</p>
+{% if word %}
+<p class="hint" id="job-exam-hint">{{ exam_words.title_hint.format(word=word) }}
+  {% if can_change %}{{ exam_words.title_ask }} <a href="/app?revises={{ job.id }}#exam">{{ exam_words.change }}</a>{% endif %}</p>
+{% endif %}
+{% endif %}

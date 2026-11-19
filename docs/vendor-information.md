@@ -25,8 +25,9 @@ decided and when, what was not converted, and what was not checked.
 | What may be uploaded | Course material the instructor wrote or may adapt. Not student records or graded work. No school-official or data processing agreement is offered. |
 | What is stored | The PDF and file name, images cut from it, the conversion result, the HTML, and the review decisions with their times. |
 | How long | Deleted 24 hours after the instructor last worked on it; 7 days if the instructor keeps it; 30 days if the instructor also lets us look at the results. Deleting by hand is immediate. Backups are kept about 6 days. |
-| Where it goes | Railway hosts the application and database (United States). Images cut from the page (a picture of each scanned or handwritten page, if the instructor asks for those), with a little nearby text, go to the model provider's API (Anthropic or OpenAI, as set). Never sent: the PDF file, its file name, the email address. Providers say API data is not used for training by default; OpenAI requests are sent with `store` off; Anthropic's policy is to delete API data within 30 days (longer if flagged). Tracing, if on, sends timings and counts only. |
-| Logs and usage notes | Event names, random ids, counts, timings, costs and error categories. No document text, images, file names or email addresses. |
+| Where it goes | Railway hosts the application and database (United States). What the next row lists goes to the model provider's API (Anthropic or OpenAI, as set). Never sent: the PDF file, its file name, the email address. Providers say API data is not used for training by default; OpenAI requests are sent with `store` off; Anthropic's policy is to delete API data within 30 days (longer if flagged). Tracing, if on, sends timings and counts only. |
+| What is sent to a model | Always: pictures of the equations and figures cut from the file, with a little nearby text, and a picture of a region or table cell the instructor asks to have read on the review screen. With `FEATURE_TABLES`: pictures of the tables. With `FEATURE_NOTATION_MEMORY`: a course's notation, for a document uploaded to that course. With `FEATURE_IMAGE_PAGES`: a picture of each scanned or handwritten page, only if the instructor asks for those pages to be converted. With `FEATURE_PAGE_WITNESS` or `FEATURE_PAGE_MATH`: a picture of each whole page that holds math, with its text. With `MATH_READER_CLAUDE_ENABLED` or `MATH_READER_OPENAI_ENABLED`: a close-up of a handwritten expression, to that reader's company. Which of these settings are on in production is in `src/readablestem/ops/production.profile.toml`; the site's privacy page lists what its settings send, with the day each kind was first stated there. |
+| Logs and usage notes | Event names, random ids, counts, timings, costs and error categories; for a review decision, fixed categories of what was decided and the tool's version. No document text, images, file names or email addresses. |
 | Accounts | Email address, name and the sign-in provider's id. One session cookie; no analytics or advertising cookies. |
 | Who can see a document | Its owner, and people the owner names. Others get the same "not found" page as for a document that does not exist. We look only if the instructor chose that, for 30 days. |
 
@@ -35,8 +36,8 @@ decided and when, what was not converted, and what was not checked.
 - **Accuracy was measured on 26 documents** the tool had not seen (registered before the
   run; version 0.5.9, November 4, 2026; 1,715 equations). 0.79 of equations came out exactly
   right end to end. Scored by how a screen reader reads them, 0.840 against 0.836 for a
-  general chatbot: no difference the test can detect. It asked about 46% of its wrong
-  equations (goal 60%). Earlier test (version 0.4.0): headings F1 0.96; a model judged 97% of figure descriptions acceptable.
+  general chatbot: no difference the test can detect. How many of its wrong equations pass
+  without a decision is being scored again, so no figure is given. Earlier test (version 0.4.0): headings F1 0.96; a model judged 97% of figure descriptions acceptable.
   Chemistry is the weakest area. The tool accepts what its checks pass without a person
   looking; the review record lists those parts.
 - **Scanned and handwritten pages** convert only when the instructor checks "Convert scanned or

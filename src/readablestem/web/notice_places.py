@@ -6,8 +6,9 @@ who needs to know *which* link or figure it is about and to be taken to it. This
 that out again each time from the result as it is now:
 
 - `names`: the specific things it is about. For a link whose text says nothing on its own,
-  the text of each such link in the paragraph ("click here"); for a figure, table or page,
-  its name in the review ("Figure 2", "Table 3", "Page 4");
+  the text of each such link in the paragraph ("click here"); for struck text, the struck
+  words ("October 3"); for a figure, table or page, its name in the review ("Figure 2",
+  "Table 3", "Page 4");
 - `snippet`: for a notice about a paragraph, its first words, so two notices on one page
   are told apart;
 - `query`: the Split View address of its place (the part after `/jobs/{id}/review?`): the
@@ -23,6 +24,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from urllib.parse import quote, urlencode
 
+from readablestem.core import inline
 from readablestem.core.types import DocumentResult, Element, Fix, Kind, Notice
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.text_pass import context_words, unclear_link_text, visible_text
@@ -32,13 +34,17 @@ NAME_CHARS = 60
 MAX_NAMES = 5
 # Notices that are a decision of their own (the table or page kept as an image is a fix the
 # reviewer decides): they are in the queue, not in the optional checks.
-DECISION_CODES = frozenset({"table_not_rebuilt"}) | notice_rules.KEPT_IMAGE_CODES
+DECISION_CODES = (
+    frozenset({"table_not_rebuilt", *notice_rules.TEXT_CODES}) | notice_rules.KEPT_IMAGE_CODES
+)
 # What the names are, in a sentence ("Links: “click here”"). Anything else: "Here:".
 NAMES_LEAD = {
     "link_text_unclear": "The link text",
     "colour_only": "The figure",
     "long_description_missing": "The figure",
     "table_not_rebuilt": "The table",
+    "struck_text": "The struck text",
+    "attachments_not_converted": "The files",
 }
 
 
@@ -86,10 +92,21 @@ def unclear_links(element: Element) -> list[str]:
     text = element.text or ""
     found = []
     for link in element.links:
-        if link.kind == "crossref":
-            continue
+        if link.kind in ("crossref", "typed"):
+            continue  # not links of the file: the pass never judged their text
         shown = visible_text(text, link.start, link.end)
         if shown and unclear_link_text(shown, context_words(text, link.start, link.end)):
+            found.append(_shorten(shown, NAME_CHARS))
+    return found
+
+
+def struck_words(element: Element) -> list[str]:
+    """The words of each struck run of the element (`Element.runs`, "deleted")."""
+    text = element.text or ""
+    found = []
+    for run in inline.spans(element).runs:
+        shown = visible_text(text, run.start, run.end) if run.kind == "deleted" else ""
+        if shown:
             found.append(_shorten(shown, NAME_CHARS))
     return found
 
@@ -105,16 +122,27 @@ def place_of(
     page = f"page={shown}" if shown is not None else ""
     element = elements.get(notice.element_id or "")
     if element is None:
-        return Place(notice, query=page)
+        return Place(notice, names=tuple(notice.names), query=page)
     fix = fixes.get(element.id)
     if fix is not None and fix.kind in {Kind.FIGURE, Kind.TABLE, Kind.EQUATION, Kind.HEADING}:
         name = labels.get(element.id, "")
         query = urlencode({"item": element.id} | ({"page": shown} if shown is not None else {}))
         return Place(notice, names=(name,) if name else (), query=query)
+    if (
+        fix is not None
+        and fix.kind in notice_rules.TEXT_DECISION_KINDS
+        and fix.reason in notice_rules.TEXT_NOTICE_OF
+    ):  # the paragraph or list item with the decision: its card, with its first words
+        query = urlencode({"item": element.id} | ({"page": shown} if shown is not None else {}))
+        return Place(
+            notice, snippet=_shorten(readable(element.text or ""), SNIPPET_CHARS), query=query
+        )
     key = note_key(notice)
     names: list[str] = []
     if notice.code == "link_text_unclear":
         names = unclear_links(element)[:MAX_NAMES]
+    elif notice.code == "struck_text":
+        names = struck_words(element)[:MAX_NAMES]
     snippet = _shorten(readable(element.text or ""), SNIPPET_CHARS)
     query = urlencode({"page": shown, "note": key}) if shown is not None else f"note={quote(key)}"
     return Place(notice, names=tuple(names), snippet=snippet, query=query, key=key)

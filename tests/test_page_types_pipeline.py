@@ -27,7 +27,9 @@ from readablestem.core.types import Kind, Status
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout
+from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.run import convert_pdf
+from readablestem.web import states
 from readablestem.web.db import Job, User, session_scope
 from readablestem.web.worker import Worker, result_outcome
 
@@ -65,6 +67,37 @@ def test_layout_reads_no_hidden_text_and_keeps_the_clip_mode_title():
     assert doc.kept_pages == {}
 
 
+def test_text_in_the_colour_of_its_background_or_too_small_to_see_is_left_out_and_counted():
+    # Painted, in a normal render mode, and still not seen: white on the white page, a
+    # near-white grey, one point high, navy on a navy box, black on a black box. Light grey
+    # text and white text on a dark box are read, so they stay.
+    lines = [
+        ("Visible black line about circuits", (0, 0, 0), 12, None),
+        ("Hidden white on the page", (1, 1, 1), 12, None),
+        ("Visible grey seventy five percent", (0.75, 0.75, 0.75), 12, None),
+        ("Hidden near white grey", (0.98, 0.98, 0.98), 12, None),
+        ("Hidden one point text", (0, 0, 0), 1, None),
+        ("Hidden navy on navy", (0, 0, 0.5), 12, (0, 0, 0.5)),
+        ("Hidden black on black", (0, 0, 0), 12, (0, 0, 0)),
+        ("Visible white on navy", (1, 1, 1), 12, (0, 0, 0.5)),
+        ("Visible black line about voltage", (0, 0, 0), 12, None),
+    ]
+    doc = pymupdf.open()
+    page = doc.new_page()
+    for i, (text, colour, size, box) in enumerate(lines):
+        y = 80 + 30 * i
+        if box:
+            page.draw_rect(pymupdf.Rect(60, y - 14, 540, y + 5), color=None, fill=box)
+        page.insert_text((72, y), text, fontsize=size, color=colour)
+
+    out = layout.analyze(doc.tobytes())
+    assert [e.text for e in out.elements] == [t for t, *_ in lines if t.startswith("Visible")]
+    hidden = sum(len(t.replace(" ", "")) for t, *_ in lines if t.startswith("Hidden"))
+    assert [(n.code, n.page, n.count, n.review) for n in out.notices] == [
+        ("hidden_text_ignored", 0, hidden, "optional")
+    ]
+
+
 def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     doc = layout.analyze(data("typed_with_ink.pdf"))
     ink = [e for e in doc.elements if "handwriting" in e.reasons]
@@ -73,6 +106,37 @@ def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     assert len(paragraphs) == 3
     assert all(p.bbox[3] <= ink[0].bbox[1] + 1 for p in paragraphs)  # the ink is below
     assert doc.kept_pages == {}
+
+
+def test_a_part_kept_as_a_picture_never_says_handwriting_and_a_persons_words_win():
+    """WS21.9: a box of lines was named handwriting before the reader had pen evidence, so a
+    result that records `handwriting_on_page` tells the student only that the part is a
+    picture, in its note, its alt text and its link in the statement. The alt text is never
+    made at render: what a person wrote for it replaces our words, and nothing else does."""
+    result = convert("typed_with_ink.pdf").result
+    kept = [f for f in result.fixes if f.reason == "handwriting_on_page"]
+    assert len(kept) == 1
+
+    def visible(html: str) -> str:
+        """What a student can read: the text and the alt texts, not the stored reason."""
+        alts = " ".join(re.findall(r'alt="([^"]*)"', html))
+        return f"{text_of(html)} {alts}".lower()
+
+    html = result.html
+    assert "handwrit" not in visible(html)
+    assert "Shown as a picture, not converted to text" in html
+    alt = re.search(
+        r'<img[^>]* alt="([^"]*)"', html[html.index('data-reason="handwriting_on_page"') :]
+    )
+    assert alt is not None and alt.group(1).strip()
+
+    kept[0].described = "A sketch of a spring with the mass hanging from it"
+    again = render_html(
+        title=result.title, lang=result.lang, elements=result.elements, fixes=result.fixes,
+        crops=convert("typed_with_ink.pdf").crops,
+    )  # fmt: skip
+    assert 'alt="A sketch of a spring with the mass hanging from it"' in again
+    assert "handwrit" not in visible(again)
 
 
 def test_a_stroke_off_the_page_is_never_loose_ink():
@@ -305,6 +369,30 @@ def test_a_comment_icon_or_a_file_icon_over_a_word_hides_nothing():
         assert line in " ".join(e.text or "" for e in out.elements if e.page == n)
 
 
+def test_a_sticky_note_a_caret_and_a_pushpin_are_no_figure_and_no_handwriting():
+    # F-362, F-541: the appearances of a reviewer's annotations were drawings: a figure sent
+    # to the figure step, or a "handwriting on the page" decision, for each.
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    for y, words in {
+        100: "The report is due May 1 at noon.",
+        160: "Measure 25 mL of buffer.",
+    }.items():
+        page.insert_text((72, y), words, fontsize=12)
+    day = page.search_for("May 1")[0]
+    page.add_strikeout_annot(day)
+    page.add_caret_annot(day.br).set_info(content="May 8")
+    page.add_text_annot((500, 100), "Correction.")
+    page.add_file_annot((500, 160), b"notes", "notes.txt")
+    page.add_rect_annot(pymupdf.Rect(66, 144, 300, 166)).set_info(content="Check this.")
+    for annot in page.annots():
+        annot.update()
+    out = layout.analyze(doc.tobytes())
+    assert [e.kind for e in out.elements if e.kind is Kind.FIGURE] == []
+    assert out.page_types[0].kind == "born_digital"
+    assert [n.code for n in out.notices] == []
+
+
 def test_text_under_a_clip_a_shading_or_a_thick_stroke_never_reaches_the_student_file():
     text = text_of(convert("painted_over.pdf").result.html)
     assert not any(word in text for word in SECRET_WORDS)
@@ -373,7 +461,8 @@ def test_a_course_pdf_with_kept_pages_is_reported_and_decided_once_per_reason(en
     assert (job.status, job.error_code) == ("done", "pages_not_converted")
 
     page = text_of(env.browser.get(f"/jobs/{job_id}").text)
-    assert "Finished, with pages not converted" in page
+    # Decisions are open, so that is the state; the kept pages are its gap note.
+    assert states.TABLE["needs_decisions"].label in page
     assert "Pages 2 and 3 are handwritten, so they were not converted." in page
     assert "Page 4 is a scanned image, so it was not converted." in page
     assert "Hidden text that a tablet or a text recognition (OCR) program guessed" in page
@@ -441,7 +530,7 @@ def test_the_list_view_keeps_the_group_and_refuses_anything_but_keep(env):
     assert "these images have nothing else to accept" in text_of(refused.text)
     assert 'href="#group-actions-pg-p2-e0"' in refused.text  # the error summary's link
     kept = _post(env, job_id, "pg-p4-e0", "reject", "list")
-    assert kept.status_code == 303 and "/review/list#" in kept.headers["location"]
+    assert kept.status_code == 303 and "/review/list?at=" in kept.headers["location"]
     listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "Needs your decision (1)" in listing
     assert "Kept by you" in listing  # the scanned page, in "Your decisions"
@@ -480,14 +569,14 @@ def test_a_kept_page_stays_a_marked_image_after_its_group_decision(env):
     ("name", "says", "figures"),
     [
         ("note_titled.pdf", "drawings or writing this tool could not read", 0),
-        ("typed_with_note.pdf", "Finished, with handwriting not converted", 0),
+        ("typed_with_note.pdf", "handwriting on typed text", 0),
         ("framed_plots.pdf", None, 5),
         # The second final verify's: full-page plots with their axes, axes drawn as one
         # path, timelines, hand marks over typed lines.
         ("full_page_plots.pdf", None, 4),
         ("open_axes.pdf", None, 2),
         ("timelines.pdf", None, 2),
-        ("marks_over_text.pdf", "Finished, with handwriting not converted", 0),
+        ("marks_over_text.pdf", "handwriting on typed text", 0),
     ],
 )
 def test_nothing_dropped_is_ever_called_converted_on_the_job_page(env, name, says, figures):

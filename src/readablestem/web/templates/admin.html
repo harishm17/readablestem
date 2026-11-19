@@ -1,9 +1,13 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
+{% from "components/notices.html" import notice_box %}
 {% block title %}{% if errors|default([]) %}Error: {% endif %}Admin{% endblock %}
 {% block content %}
 <h1>Admin</h1>
 {% include "_error_summary.html" %}
 <p>Numbers and category codes only: nothing here shows document content.</p>
+<p><a href="/admin/reports">Problem reports</a> (what people sent from "Report this item" and from a stopped document)</p>
 
 <section aria-labelledby="spend-heading">
   <h2 id="spend-heading">Model spend today ({{ spend.day.isoformat() }}, UTC)</h2>
@@ -56,6 +60,7 @@
     <div><dt>Seconds a page, for 95 in 100</dt><dd>{% if steps.s_per_page_p95 is not none %}{{ "%.1f"|format(steps.s_per_page_p95) }}{% else %}Not timed{% endif %}</dd></div>
     <div><dt>Model calls a page</dt><dd>{{ "%.1f"|format(steps.calls_per_page) }}</dd></div>
     <div><dt>Dollars a page</dt><dd>{{ steps.usd_per_page|usd }}</dd></div>
+    <div><dt>Charged at their hold, no usage came back</dt><dd>{{ steps.billed_unseen_calls }} calls, {{ steps.billed_unseen_usd|usd }}</dd></div>
   </dl>
   {% else %}
   <p>No document measured yet.</p>
@@ -64,21 +69,20 @@
 
 <section aria-labelledby="signup-heading">
   <h2 id="signup-heading">Sign-up</h2>
-  <p>{% if signup.open %}Open: anyone with a verified Google account (or an allowed Microsoft
-    account) gets an account on first sign-in, in the open tier. New accounts can convert
+  <p>{% if signup.open %}Open: anyone with a verified {{ signup_words or "Google" }} account gets an account on first sign-in, in the open tier. New accounts can convert
     {{ signup.page_quota }} pages and start {{ signup.rereads }} model reads from review a day.
     {% else %}By invitation: only the people listed below can sign in. (Accounts made while
     sign-up was open keep working until you block them.){% endif %}
     Set with <code>SIGNUP_MODE</code>.</p>
   {% if signup.full %}
-  <div class="notice notice-warning" role="status">
-    <p>Today's limit on new accounts is reached ({{ signup.today }} of {{ signup.limit }}). New
+  {% call notice_box("warning", role="status") %}
+    <p>Today's limit on new accounts is reached: {{ allowance(signup.today, signup.limit, "account") }} New
       people are told to come back tomorrow. Raise <code>MAX_NEW_ACCOUNTS_PER_DAY</code> if that
       is not what you want.</p>
-  </div>
+  {% endcall %}
   {% endif %}
   <dl class="summary-list">
-    <div><dt>New accounts today (UTC)</dt><dd>{{ signup.today }} of {{ signup.limit }}</dd></div>
+    <div><dt>New accounts today (UTC day)</dt><dd>{{ allowance(signup.today, signup.limit, "account") }}</dd></div>
     <div><dt>Invited accounts</dt><dd>{{ signup.invited }}</dd></div>
     <div><dt>Open-tier accounts</dt><dd>{{ signup.open_accounts }}</dd></div>
     <div><dt>Blocked accounts</dt><dd>{{ signup.blocked }}</dd></div>
@@ -92,6 +96,9 @@
     {% if ops.storage %}
     <div><dt>Stored uploads</dt><dd>{{ ops.storage.stored_mb }} MB of {{ ops.storage.limit_mb }} MB{% if ops.storage.full %} (full: new uploads are refused){% endif %}</dd></div>
     {% endif %}
+    {% if ops.canaries %}
+    <div><dt>Daily checks</dt><dd>{% for name, label in (("decisions", "Decisions"), ("claude", "Claude second check")) %}{{ label }}: {% if ops.canaries[name] %}{{ ops.canaries[name].status }} on {{ ops.canaries[name].day }}{% else %}no result in the last 7 days{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</dd></div>
+    {% endif %}
     <div><dt>Sandbox probe</dt><dd>{{ ops.sandbox.state }}</dd></div>
   </dl>
   <p>The same as JSON: <a href="/admin/health">/admin/health</a>.</p>
@@ -99,12 +106,14 @@
 
 <section aria-labelledby="queue-heading">
   <h2 id="queue-heading">Queue</h2>
-  <dl class="summary-list">
-    <div><dt>Waiting</dt><dd>{{ queue.queued }}</dd></div>
-    <div><dt>Converting</dt><dd>{{ queue.running }}</dd></div>
-    <div><dt>Finished (not yet deleted)</dt><dd>{{ queue.done }}</dd></div>
-    <div><dt>Stopped (not yet deleted)</dt><dd>{{ queue.failed }}</dd></div>
+  {# Jobs not yet deleted, by state, in the words of every other page (web/states.py). #}
+  {% if queue %}
+  <dl class="summary-list" id="queue-states">
+    {% for label, n in queue.items() %}<div><dt>{{ label }}</dt><dd>{{ n }}</dd></div>{% endfor %}
   </dl>
+  {% else %}
+  <p>No documents are stored.</p>
+  {% endif %}
 </section>
 
 <section aria-labelledby="allowlist-heading">
@@ -115,21 +124,18 @@
     signed themselves up is in the <strong>open</strong> tier; you can block them here.
     {% if people_rows %}The newest {{ people_rows }} accounts are listed; to block an older one, use
     "Block by email" below.{% endif %}</p>
-  <form method="post" action="/admin/allowlist" novalidate class="stack-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <div class="field{% if email_error %} field-error{% endif %}">
-      <label for="allow-email">Email address to allow</label>
-      {% if email_error %}<p class="error-message" id="allow-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
+  {% call form("admin.allow", "/admin/allowlist", {"novalidate": true, "class": "stack-form"}) %}
+    {% call(aria) field("allow-email", "Email address to allow", error=email_error) %}
       <input type="email" id="allow-email" name="email" autocomplete="off" spellcheck="false"
-             value="{{ email_value }}"{% if email_error %} aria-invalid="true" aria-describedby="allow-email-error"{% endif %}>
-    </div>
+             value="{{ email_value }}"{{ aria }}>
+    {% endcall %}
     <div class="field checkbox-field">
       <input type="checkbox" id="allow-admin" name="admin" value="on" aria-describedby="allow-admin-hint">
       <label for="allow-admin">Make this person an admin</label>
       <p class="hint" id="allow-admin-hint">Leave it unchecked to keep the role of someone who is already listed.</p>
     </div>
     <button type="submit" class="button">Allow</button>
-  </form>
+  {% endcall %}
 
   {# A table wider than the screen scrolls in its box; the box is a named region a keyboard can
      reach (axe scrollable-region-focusable, T1-16). #}
@@ -137,24 +143,22 @@
   <table>
     <caption id="allowlist-caption" class="visually-hidden">People on the allowlist</caption>
     <thead>
-      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Access</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove or block</th></tr>
+      <tr><th scope="col">Email</th><th scope="col">Access</th><th scope="col">Other Google accounts</th><th scope="col">Last sign-in</th><th scope="col">Remove or block</th></tr>
     </thead>
     <tbody>
       {% for person in users %}
       <tr>
         <th scope="row">{{ person.email }}</th>
-        <td>{{ "Admin" if person.is_admin else "Instructor" }}</td>
-        <td>{{ "Open" if person.tier == "open" else "Invited" }}</td>
+        <td>{{ "Open" if person.tier == "open" else "Invited" }}{% if person.is_admin %}, admin{% endif %}</td>
         <td>
           {% if person.linked %}
           <ul class="plain-list">
             {% for other in person.linked %}
             <li>{{ other }}
-              <form method="post" action="/admin/linked-emails/remove" class="inline-form">
-                <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+              {% call form("admin.unlink", "/admin/linked-emails/remove", {"class": "inline-form"}) %}
                 <input type="hidden" name="other" value="{{ other }}">
                 <button type="submit" class="button-secondary">Unlink<span class="visually-hidden"> {{ other }} from {{ person.email }}</span></button>
-              </form>
+              {% endcall %}
             </li>
             {% endfor %}
           </ul>
@@ -163,11 +167,12 @@
         <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
         <td>
           {% if person.email != user.email %}
-          <form method="post" action="{{ '/admin/users/block' if person.tier == 'open' else '/admin/allowlist/remove' }}" class="inline-form">
-            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          {% set blocks = person.tier == "open" %}
+          {# Asks first: the POST without `confirm` answers with the question (routes/admin.py). #}
+          {% call form("admin.block" if blocks else "admin.remove", "/admin/users/block" if blocks else "/admin/allowlist/remove", {"class": "inline-form"}) %}
             <input type="hidden" name="email" value="{{ person.email }}">
-            <button type="submit" class="button-secondary">{{ "Block" if person.tier == "open" else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></button>
-          </form>
+            <button type="submit" class="button-secondary">{{ "Block" if blocks else "Remove" }}<span class="visually-hidden"> {{ person.email }}</span></button>
+          {% endcall %}
           {% else %}
           You
           {% endif %}
@@ -181,14 +186,14 @@
   <h3 id="block-heading">Block by email</h3>
   <p>Stops any account, whether or not it is in the list above: it is signed out everywhere,
     its queued and running jobs are stopped, and its sign-ins are refused.</p>
-  <form method="post" action="/admin/users/block" novalidate class="stack-form" aria-labelledby="block-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {# Opens the question (routes/admin.py): nothing is blocked until the next page's button. #}
+  {% call form("admin.block", "/admin/users/block", {"novalidate": true, "class": "stack-form", "aria-labelledby": "block-heading"}) %}
     <div class="field">
       <label for="block-email">Email address to block</label>
       <input type="email" id="block-email" name="email" autocomplete="off" spellcheck="false">
     </div>
     <button type="submit" class="button-secondary">Block</button>
-  </form>
+  {% endcall %}
 
   <h3 id="blocked-heading">Blocked accounts</h3>
   <p>Accounts that cannot sign in: people you removed or blocked. Their documents are deleted
@@ -208,11 +213,10 @@
         <td>{{ "Open" if person.tier == "open" else "Invited" }}</td>
         <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
         <td>
-          <form method="post" action="/admin/users/unblock" class="inline-form">
-            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          {% call form("admin.unblock", "/admin/users/unblock", {"class": "inline-form"}) %}
             <input type="hidden" name="email" value="{{ person.email }}">
             <button type="submit" class="button-secondary">Unblock<span class="visually-hidden"> {{ person.email }}</span></button>
-          </form>
+          {% endcall %}
         </td>
       </tr>
       {% endfor %}
@@ -228,20 +232,17 @@
     only under another, for example a personal account. The instructor must already be on
     the allowlist. Signing in with the other account opens the same documents. Unlinking it
     signs the instructor out everywhere.</p>
-  <form method="post" action="/admin/linked-emails" novalidate class="stack-form" aria-labelledby="link-heading">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("admin.link", "/admin/linked-emails", {"novalidate": true, "class": "stack-form", "aria-labelledby": "link-heading"}) %}
     <div class="field">
       <label for="link-owner">Instructor's address on the allowlist</label>
       <input type="email" id="link-owner" name="email" autocomplete="off" spellcheck="false" value="{{ link_owner_value }}">
     </div>
-    <div class="field{% if link_error %} field-error{% endif %}">
-      <label for="link-other">Their other Google address</label>
-      {% if link_error %}<p class="error-message" id="link-other-error"><span class="visually-hidden">Error: </span>{{ link_error }}</p>{% endif %}
+    {% call(aria) field("link-other", "Their other Google address", error=link_error) %}
       <input type="email" id="link-other" name="other" autocomplete="off" spellcheck="false"
-             value="{{ link_other_value }}"{% if link_error %} aria-invalid="true" aria-describedby="link-other-error"{% endif %}>
-    </div>
+             value="{{ link_other_value }}"{{ aria }}>
+    {% endcall %}
     <button type="submit" class="button">Link account</button>
-  </form>
+  {% endcall %}
 </section>
 
 <section aria-labelledby="aggregates-heading">

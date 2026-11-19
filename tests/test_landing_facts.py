@@ -59,21 +59,20 @@ def pages(tmp_path_factory) -> dict[str, str]:
 
 def test_limits_latest_registered_numbers_match_the_fresh5_report(pages):
     text = squash(pages["/limits"])
-    assert "run once on 2026-11-04 with version 0.5.9" in text
+    assert "It ran on 2026-11-04 with version 0.5.9" in text
+    assert "did not record its settings" in text and "live service uses" not in text
     for number in ("0.840", "0.836", "+0.004", "−0.023 to +0.036", "0.793", "0.770"):
         assert number in text, number
     for report_cell in (
         "0.840** [0.791, 0.876]",
         "0.836 [0.778, 0.878]",
         "+0.004 | [-0.023, +0.036]",
-        "5.02 [3.55, 6.39]",
-        "9.56 [5.86, 14.55]",
-        "0.461 [0.309, 0.613]",
         "0.333 (41/123)",
     ):
         assert report_cell in FRESH5, report_cell
     assert "no difference this set can detect" in text
     assert "so it was not met" in text and "do not claim that ReadableSTEM does better" in text
+    assert "is being scored again" in text and "5.0 per 100" not in text
     assert "26 / 1,715 / 131" in FRESH5 and "26 documents" in text and "1,715" in text
     assert "0.33 right as chemistry" in text and "not measured" in text
     # PROOF.md is the replayed report of the first registered result and says nothing of fresh5.

@@ -18,7 +18,7 @@ these back (`web.review.undo_last`). Nothing typed is logged.
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable
+from collections.abc import Callable, Collection
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -26,7 +26,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from readablestem.core.types import DocumentResult, Element, Kind
-from readablestem.web import events, notation, outcomes, page_edits, page_images
+from readablestem.web import events, notation, outcomes, output, page_edits, page_images
 from readablestem.web.db import Blob, Job, session_scope
 from readablestem.web.deps import (
     ELEMENT_ID,
@@ -38,6 +38,7 @@ from readablestem.web.deps import (
     get_ctx,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.page_edits import StructureChange
 from readablestem.web.review import (
@@ -52,6 +53,7 @@ from readablestem.web.review import (
     cell_region,
     field_id,
     is_stale,
+    review_anchor,
 )
 from readablestem.web.review import accept_clean_tables as accept_clean_tables_rule
 from readablestem.web.routes.jobs import (
@@ -67,6 +69,8 @@ from readablestem.web.routes.review import (
     _split_redirect,
     _stale_page,
     done_message,
+    refuse_stale,
+    written_with,
 )
 from readablestem.web.shares import REVIEW
 from readablestem.web.worker import db_safe
@@ -74,7 +78,11 @@ from readablestem.web.worker import db_safe
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-STALE_FLASH = "Nothing was changed: this document changed after this page was opened."
+# The page the person lands on is drawn from the document as it is now.
+STALE_FLASH = (
+    "Nothing was changed: this document changed after this page was opened. "
+    "Check the page as it is now and make the change again."
+)
 
 
 def page_number(raw: str, count: int) -> int:
@@ -90,18 +98,23 @@ def write_structure(
     user: CurrentUser,
     version: str,
     make: Callable[[DocumentResult, Job, Session], StructureChange],
+    *,
+    decision: bool = True,
+    acts_on: Callable[[DocumentResult], Collection[str]] | None = None,
 ) -> tuple[StructureChange, DocumentResult, str]:
     """One structural edit as one transaction: `make` applies it to the stored result and
     returns what to record, with the id of the owned job row (what a redirect is built
-    from, never the request's). Raises ReviewStale, ReviewInvalid (nothing saved; both
-    carry that id as `job_id`) or a PageError (404)."""
+    from, never the request's). `decision`: it counts as a decision made (usage events);
+    reading an item again is not one. `acts_on`: the elements the edit changes, for an edit
+    that moves no other element (`routes.review.refuse_stale`); without it any write since
+    the page was drawn refuses the edit. Raises ReviewStale, ReviewInvalid (nothing saved;
+    both carry that id as `job_id`) or a PageError (404)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, REVIEW, lock=True)
         require_done(job)
-        if is_stale(job.result_version, version):
-            raise ReviewStale(job.id)
         result = DocumentResult.model_validate(job.result_json or {})
+        refuse_stale(session, job, version, acts_on(result) if acts_on else None)
         open_before = _open_decisions(result)
         try:
             change = make(result, job, session)
@@ -118,11 +131,11 @@ def write_structure(
                     content=png,
                 )
             )
-        job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+        output.output_changed(job, output.PAGE_EDIT)  # the file is made again when asked for
         # Text the reviewer typed: NUL (which Postgres refuses in JSON) is taken out.
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
-        restart_owner_clock(job, user, ctx.settings)
+        restart_owner_clock(job, user, ctx.settings, request)
         outcomes.record_write(
             session,
             ctx.settings,
@@ -133,17 +146,18 @@ def write_structure(
             write_mode="structure",
         )
         session.add(_review_edit(job.id, user, change, written))
-        events.add_decision(
-            session,
-            ctx.settings,
-            user_id=user.id,
-            job=job,
-            kind="structure",
-            changed=1,
-            # "Review completed" only when this edit closed the last decision: an edit to
-            # a document that asked for none is not a finished review.
-            open_after=_open_decisions(result) if open_before else 1,
-        )
+        if decision:
+            events.add_decision(
+                session,
+                ctx.settings,
+                user_id=user.id,
+                job=job,
+                kind="structure",
+                changed=1,
+                # "Review completed" only when this edit closed the last decision: an edit to
+                # a document that asked for none is not a finished review.
+                open_after=_open_decisions(result) if open_before else 1,
+            )
         owned_id = job.id
     return change, result, owned_id
 
@@ -207,17 +221,18 @@ def _page_action(
     except (ReviewStale, ReviewInvalid) as exc:
         if isinstance(exc, ReviewInvalid):
             log_event(logger, "review_invalid", job_id=job_id, action=f"{action}_page")
-            flash(request, " ".join(e.message for e in exc.errors), undo=False)
+            flash(request, " ".join(e.message for e in exc.errors), undo=False, kind="warning")
         else:
             log_event(logger, "review_stale", job_id=job_id)
-            flash(request, STALE_FLASH, undo=False)
+            flash(request, STALE_FLASH, undo=False, kind="warning")
         return back(exc.job_id, page + 1)
     log_event(logger, f"page_{action}", job_id=job_id)
-    flash(request, change.message)
+    flash(request, change.message, edit=True, kind="success")
     return back(owned_id, page + 1, result)
 
 
 @router.post("/jobs/{job_id}/pages/{number}/omit", dependencies=[Depends(require_csrf)])
+@submit_once("review.omit_page")
 def omit_page(
     request: Request,
     job_id: str,
@@ -234,6 +249,7 @@ def omit_page(
 
 
 @router.post("/jobs/{job_id}/pages/{number}/restore", dependencies=[Depends(require_csrf)])
+@submit_once("review.restore_page")
 def restore_page(
     request: Request,
     job_id: str,
@@ -299,6 +315,7 @@ def _page_of(request: Request, job_id: str, user: CurrentUser, ref: str) -> tupl
 
 
 @router.post("/jobs/{job_id}/edit/{element_id}", dependencies=[Depends(require_csrf)])
+@submit_once("review.edit_element")
 def edit_element(
     request: Request,
     job_id: str,
@@ -321,18 +338,20 @@ def edit_element(
         return page_edits.make_heading(result, element_id, level)
 
     try:
-        change, _, owned_id = write_structure(request, job_id, user, version, make)
+        change, _, owned_id = write_structure(
+            request, job_id, user, version, make, acts_on=lambda _: [element_id]
+        )
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
-        flash(request, STALE_FLASH, undo=False)
+        flash(request, STALE_FLASH, undo=False, kind="warning")
         return back_to_page(exc.job_id, page)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"edit_{action}")
         return _invalid_screen(request, job_id, user, page, element_id, exc, change=element_id)
     log_event(logger, f"edit_{action}", job_id=job_id)
-    flash(request, change.message, element_id=element_id)
+    flash(request, change.message, element_id=element_id, edit=True, kind="success")
     return back_to_page(owned_id, page)
 
 
@@ -349,9 +368,10 @@ def _page_size(
     request: Request, job_id: str, user: CurrentUser, number: str
 ) -> tuple[int, float, float]:
     """(0-based page, width, height in points) of a page of the user's job."""
-    from readablestem.web.routes.split import _load, resolve_page_sizes
+    from readablestem.web.routes.review import _load_result
+    from readablestem.web.routes.split import resolve_page_sizes
 
-    _, result, _ = _load(request, job_id, user)
+    result = _load_result(request, job_id, user)
     pages = page_edits.page_count(result, 0)
     page = page_number(number, pages)
     sizes = resolve_page_sizes(request, job_id, user, result)
@@ -371,7 +391,12 @@ def region_clip(box: tuple[float, float, float, float]) -> tuple[float, float, f
     return box[0] - p, box[1] - p, box[2] + p, box[3] + p
 
 
-def render_region_crop(pdf: bytes, page: int, box: tuple[float, float, float, float]) -> bytes:
+def render_region_crop(
+    pdf: bytes | Callable[[], bytes],
+    page: int,
+    box: tuple[float, float, float, float],
+    cache_as: tuple[str, str] | None = None,
+) -> bytes:
     """The crop of a marked region as the student file will carry it (about 200 dpi)."""
     from readablestem.web import page_images
 
@@ -381,6 +406,7 @@ def render_region_crop(pdf: bytes, page: int, box: tuple[float, float, float, fl
         zoom=REGION_DPI / 72.0,
         max_side=REGION_MAX_SIDE_PX,
         clip=region_clip(box),
+        cache_as=cache_as,
     )
 
 
@@ -399,7 +425,7 @@ def region_preview(
     anything is added. Rendered now from the job's own upload in the render child, never
     stored; owner only, `private, no-store` like every page image."""
     from readablestem.web import page_images
-    from readablestem.web.routes.split import _png, _render_failed, _upload
+    from readablestem.web.routes.split import _lazy_upload, _png, _render_failed
 
     page, width, height = _page_size(request, job_id, user, number)
     try:
@@ -408,13 +434,15 @@ def region_preview(
         raise PageError(404, *NOT_FOUND) from None
     try:
         with page_images.render_slot(user.id):
-            png = render_region_crop(_upload(request, job_id, user), page, box)
+            pdf, kept = _lazy_upload(request, job_id, user)
+            png = render_region_crop(pdf, page, box, cache_as=kept)
     except page_images.RenderFailed as exc:
         return _render_failed(job_id, exc, "region")
     return _png(png)
 
 
 @router.post("/jobs/{job_id}/pages/{number}/add", dependencies=[Depends(require_csrf)])
+@submit_once("review.add_region")
 def add_region(
     request: Request,
     job_id: str,
@@ -483,7 +511,7 @@ def add_region(
         change, result, owned_id = write_structure(request, job_id, user, version, make)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
-        flash(request, STALE_FLASH, undo=False)
+        flash(request, STALE_FLASH, undo=False, kind="warning")
         return back_to_page(exc.job_id, page + 1)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"add_{kind}")
@@ -495,7 +523,7 @@ def add_region(
     except page_images.RenderFailed:
         return refuse("The page could not be read just now. Try again in a moment.", "add")
     log_event(logger, f"add_{kind}", job_id=job_id)
-    flash(request, change.message, element_id=change.shows)
+    flash(request, change.message, element_id=change.shows, edit=True, kind="success")
     from readablestem.web.routes.split import review_url
 
     return RedirectResponse(
@@ -535,7 +563,166 @@ def _read_new_equation(
     page_edits.insert_element(probe, element.model_copy())
     placed = sorted(probe.elements, key=lambda e: e.order)
     context = pipeline_run.context_texts(placed).get(element_id)
-    return read_equation(request, job, user.id, element, png, context)
+    return read_equation(request, job, user.id, element, png, context)[0]
+
+
+# --------------------------------------------------------------------------- an equation's card
+
+EMPTY_READ = "The read returned nothing."
+GIVEN_BACK = " It did not count against today's reads."
+NO_CROP = "There is no picture of this equation to read again."
+NOT_WAITING = "This equation is not waiting for a decision."
+
+
+def _item_refusal(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    view: str,
+    element_id: str,
+    message: str,
+) -> Response:
+    from readablestem.web.routes.review import _invalid_page
+
+    exc = ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    return _invalid_page(request, job_id, user, view, element_id, exc)
+
+
+def _after_item(
+    owned_id: str, result: DocumentResult, element_id: str, view: str, flt: str
+) -> Response:
+    """Where the reviewer lands after a new reading on an item's card: the item, to check
+    what was read. The address holds the stored element's id, not the one the form sent."""
+    from readablestem.web.routes.review import keep_filter, list_url
+    from readablestem.web.routes.split import review_url
+
+    stored = next((e.id for e in result.elements if e.id == element_id), None)
+    if stored is None:  # the write took it out: the screen, at its first item
+        return RedirectResponse(review_url(owned_id), status_code=303)
+    if view == "list":
+        where = list_url(owned_id, review_anchor(result, stored))
+        return keep_filter(RedirectResponse(where, status_code=303), flt)
+    where = review_url(owned_id, item=stored, anchor="decision-title")
+    return RedirectResponse(where, status_code=303)
+
+
+def read_again(
+    request: Request,
+    job_id: str,
+    element_id: str,
+    user: CurrentUser,
+    version: str,
+    view: str,
+    flt: str,
+) -> Response:
+    """ "Read again" on an equation card: the equation step reads the item's own picture again
+    and the new reading replaces the proposal on the same item, still waiting for a decision
+    (`page_edits.read_again`). An empty answer changes nothing and is given back against the
+    day's count. Reached from the decision route (`routes.review.review_action`), so the
+    form's submit rule is that route's. One read at a time, the same spend controls as marking
+    an equation, and one call made with no lock held."""
+    from sqlalchemy import select
+
+    from readablestem.pipeline import run as pipeline_run
+    from readablestem.web.reread import ReadRefused, is_empty, read_equation
+
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = job_access(session, job_id, user, REVIEW)
+        # One budget per document's owner, so sharing never raises how fast it can spend.
+        enforce(request, "reread", job.user_id)
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        element_id = element_ref(result, element_id)
+        stale = _stale_now(session, job, version, written_with(result, element_id))
+        png = session.scalar(
+            select(Blob.content).where(
+                Blob.job_id == job.id, Blob.kind == "crop", Blob.element_id == element_id
+            )
+        )
+    fix = result.fix_for(element_id)
+    element = next((e for e in result.elements if e.id == element_id), None)
+    if fix is None or element is None or fix.kind is not Kind.EQUATION:
+        raise PageError(404, *NOT_FOUND)
+    if stale:
+        return _stale_page(request, job_id, user, view, element_id, changed=stale.changed)
+    if not fix.pending:
+        return _item_refusal(request, job_id, user, view, element_id, NOT_WAITING)
+    if png is None:
+        return _item_refusal(request, job_id, user, view, element_id, NO_CROP)
+    reading = element.model_copy(deep=True)
+    placed = sorted(result.elements, key=lambda e: e.order)
+    context = pipeline_run.context_texts(placed).get(element_id)
+    try:
+        read, asked = read_equation(
+            request, job, user.id, reading, bytes(png), context, escalate=True
+        )
+    except ReadRefused as exc:
+        return _item_refusal(request, job_id, user, view, element_id, exc.message)
+    if is_empty(read):
+        return _item_refusal(request, job_id, user, view, element_id, EMPTY_READ + GIVEN_BACK)
+    try:
+        change, result, owned_id = write_structure(
+            request,
+            job_id,
+            user,
+            version,
+            lambda stored, job, session: page_edits.read_again(stored, reading, read, fresh=asked),
+            decision=False,
+            acts_on=lambda stored: written_with(stored, element_id),
+        )
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, element_id, changed=exc.changed)
+    except LookupError:
+        raise PageError(404, *NOT_FOUND) from None
+    log_event(logger, "read_again", job_id=job_id, element_id=element_id)
+    flash(request, change.message, element_id=element_id, kind="success")
+    return _after_item(owned_id, result, element_id, view, flt)
+
+
+def not_an_equation(
+    request: Request,
+    job_id: str,
+    element_id: str,
+    user: CurrentUser,
+    version: str,
+    view: str,
+    flt: str,
+) -> Response:
+    """ "Not an equation" on an equation card: its glyphs go back to the text
+    (`page_edits.not_an_equation`), recorded as a structural edit the reviewer can undo, and
+    the reviewer goes on to the next decision. No model is asked."""
+    from readablestem.web import queue
+    from readablestem.web.routes.review import _invalid_page
+
+    try:
+        decided: list[str | None] = []
+
+        def make(result: DocumentResult, job: Job, session: Session) -> StructureChange:
+            real = element_ref(result, element_id)
+            decisions = queue.decisions(result)
+            nxt = queue.next_open(decisions, queue.find(decisions, real))
+            decided[:] = [real, nxt.key if nxt is not None else None]
+            return page_edits.not_an_equation(result, real)
+
+        change, _, owned_id = write_structure(request, job_id, user, version, make)
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, element_id)
+    except ReviewInvalid as exc:
+        log_event(logger, "review_invalid", job_id=job_id, action="not_equation")
+        return _invalid_page(request, job_id, user, view, element_id, exc)
+    except LookupError:
+        raise PageError(404, *NOT_FOUND) from None
+    from readablestem.web.routes.review import keep_filter, list_url
+    from readablestem.web.routes.split import review_url
+
+    real, after = decided
+    log_event(logger, "not_equation", job_id=job_id, element_id=real)
+    flash(request, change.message, element_id=after, kind="success")
+    if view == "list":
+        anchor = f"item-{after}" if after else "review-progress"
+        return keep_filter(RedirectResponse(list_url(owned_id, anchor), status_code=303), flt)
+    return RedirectResponse(review_url(owned_id, item=after), status_code=303)
 
 
 # --------------------------------------------------------------------------- tables (T3-11)
@@ -549,12 +736,16 @@ def write_review(
     make: Callable[[DocumentResult], list[ReviewChange]],
     *,
     kind: str,
+    acts_on: Callable[[DocumentResult], Collection[str]] | None = None,
 ) -> tuple[list[ReviewChange], DocumentResult, str]:
     """Review decisions as one write, as the decision route makes them: lock the job, apply
     `make` to the stored result, store a `ReviewEdit` for each fix it changed, count the
     write. Returns the id of the owned job row too (what a redirect is built from, never
-    the request's). Raises ReviewStale, ReviewInvalid (nothing saved; both carry that id
-    as `job_id`) or a PageError."""
+    the request's). `acts_on`: the elements the write may change (a table and its equations,
+    every item of the kind a many-item action writes); a write since the page was drawn that
+    touched none of them does not refuse it (`routes.review.refuse_stale`). Raises
+    ReviewStale, ReviewInvalid (nothing saved; both carry that id as `job_id`) or a
+    PageError."""
     ctx = get_ctx(request)
     with (
         session_scope(ctx.factory) as session,
@@ -562,18 +753,17 @@ def write_review(
     ):
         job = job_access(session, job_id, user, REVIEW, lock=True)
         require_done(job)
-        if is_stale(job.result_version, version):
-            raise ReviewStale(job.id)
         result = DocumentResult.model_validate(job.result_json or {})
+        refuse_stale(session, job, version, acts_on(result) if acts_on else None)
         try:
             changes = make(result)
         except ReviewInvalid as exc:
             exc.job_id = job.id
             raise
-        job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
+        output.output_changed(job, output.DECISION)  # the file is made again when asked for
         job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
         written = bump_result_version(job)
-        restart_owner_clock(job, user, ctx.settings)
+        restart_owner_clock(job, user, ctx.settings, request)
         outcomes.record_write(
             session,
             ctx.settings,
@@ -597,6 +787,22 @@ def write_review(
     return changes, result, owned_id
 
 
+def _stale_now(
+    session: Session, job: Job, version: str, acts_on: Collection[str]
+) -> ReviewStale | None:
+    """`refuse_stale` as an answer, for a route that checks before it spends a read."""
+    try:
+        refuse_stale(session, job, version, acts_on)
+    except ReviewStale as exc:
+        return exc
+    return None
+
+
+def _all_tables(result: DocumentResult) -> list[str]:
+    """Every table: the items the "accept the clean tables" action may write."""
+    return [f.element_id for f in result.fixes if f.kind is Kind.TABLE]
+
+
 def _marked_bulk(result: DocumentResult) -> list[ReviewChange]:
     """The clean tables accepted, each marked in the record as one of an action (T3-6)."""
     changes = accept_clean_tables_rule(result)
@@ -606,6 +812,7 @@ def _marked_bulk(result: DocumentResult) -> list[ReviewChange]:
 
 
 @router.post("/jobs/{job_id}/tables/accept-clean", dependencies=[Depends(require_csrf)])
+@submit_once("review.accept_clean_tables")
 def accept_clean_tables(
     request: Request,
     job_id: str,
@@ -621,13 +828,13 @@ def accept_clean_tables(
     view = LIST_VIEW if view == LIST_VIEW else "split"
     try:
         changes, result, owned_id = write_review(
-            request, job_id, user, version, _marked_bulk, kind="group"
+            request, job_id, user, version, _marked_bulk, kind="group", acts_on=_all_tables
         )
-    except ReviewStale:
-        return _stale_page(request, job_id, user, view, "tables")
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, view, "tables", changed=exc.changed)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="accept_clean")
-        flash(request, " ".join(e.message for e in exc.errors), undo=False)
+        flash(request, " ".join(e.message for e in exc.errors), undo=False, kind="warning")
         where = (
             list_url(exc.job_id, "group-tables") if view == LIST_VIEW else review_url(exc.job_id)
         )
@@ -638,6 +845,7 @@ def accept_clean_tables(
         request,
         f"Accepted {n} clean {'table' if n == 1 else 'tables'}.",
         element_id=GROUP_FLASH + "tables",
+        kind="success",
     )
     if view == LIST_VIEW:
         return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)
@@ -645,6 +853,7 @@ def accept_clean_tables(
 
 
 @router.post("/jobs/{job_id}/tables/{element_id}/read-cell", dependencies=[Depends(require_csrf)])
+@submit_once("review.read_cell")
 def read_cell(
     request: Request,
     job_id: str,
@@ -671,15 +880,15 @@ def read_cell(
         # One budget per document's owner, so sharing never raises how fast it can spend.
         enforce(request, "reread", job.user_id)
         require_done(job)
-        stale = is_stale(job.result_version, version)
         result = DocumentResult.model_validate(job.result_json or {})
-    element_id = element_ref(result, element_id)
+        element_id = element_ref(result, element_id)
+        stale = _stale_now(session, job, version, written_with(result, element_id))
     fix = result.fix_for(element_id)
     element = next((e for e in result.elements if e.id == element_id), None)
     if fix is None or element is None or fix.kind is not Kind.TABLE:
         raise PageError(404, *NOT_FOUND)
     if stale:
-        return _stale_page(request, job_id, user, "split", element_id)
+        return _stale_page(request, job_id, user, "split", element_id, changed=stale.changed)
     values = {"row": row, "col": col}
 
     def refuse(message: str) -> Response:
@@ -703,7 +912,7 @@ def read_cell(
     try:
         with page_images.render_slot(user.id):
             png = render_region_crop(_upload(request, job_id, user), element.page, box)
-        read = read_equation(request, job, user.id, reading, png, element.caption)
+        read, _ = read_equation(request, job, user.id, reading, png, element.caption)
     except page_images.RenderFailed:
         return refuse("The page could not be read just now. Try again in a moment.")
     except ReadRefused as exc:
@@ -719,9 +928,10 @@ def read_cell(
             version,
             lambda stored: _marked_model_read(apply_review(stored, element_id, "edit", form)).every,
             kind="single",
+            acts_on=lambda stored: written_with(stored, element_id),
         )
-    except ReviewStale:
-        return _stale_page(request, job_id, user, "split", element_id)
+    except ReviewStale as exc:
+        return _stale_page(request, job_id, user, "split", element_id, changed=exc.changed)
     except ReviewInvalid as exc:
         # What it read does not pass as it stands: shown in the cell's box, with what
         # differs from the PDF, for the reviewer to correct or to use anyway.
@@ -732,7 +942,7 @@ def read_cell(
         logger, "review", job_id=job_id, element_id=element_id, action="edit", change="read_cell"
     )
     message = "The tool read this cell. " + done_message(change, element)
-    flash(request, message, element_id=element_id)
+    flash(request, message, element_id=element_id, kind="success")
     from readablestem.web.routes.split import review_url
 
     return RedirectResponse(review_url(owned_id, item=element_id), status_code=303)

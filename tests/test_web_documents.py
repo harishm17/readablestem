@@ -5,6 +5,7 @@ review BW5, BW9, MF10, MF11, MF16, MF20, MF21, MF22, MF24)."""
 from __future__ import annotations
 
 import re
+from datetime import timedelta
 from pathlib import Path
 
 import pymupdf
@@ -22,7 +23,10 @@ from fixtures.web.support import (
 )
 from readablestem.core.content_budget import PAGE_CONTENT_BUDGET_BYTES
 from readablestem.core.types import Status
-from readablestem.web.db import Job, session_scope
+from readablestem.ops.retention import purge_expired
+from readablestem.web import states
+from readablestem.web.dates import format_when
+from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.pdf_probe import ProbeRejected, probe
 
 LAYOUT = Path(__file__).resolve().parent / "fixtures" / "layout"
@@ -82,6 +86,38 @@ def test_someone_elses_live_document_is_a_plain_not_found(web):
     flat = text(bob.get(f"/jobs/{job_id}").text)
     assert "There is no document at this address that this account can open." in flat
     assert "has been deleted" not in flat and "not yours to see" not in flat
+
+
+def test_an_expired_document_says_when_it_went_and_never_a_negative_span(web):
+    """F-050: a row whose deletion time is before its upload time printed "after -2 hours".
+    The page names the date, and a span is only printed when it is a real one. After the
+    purge the row is gone and only the upload date is known: it says that and stops."""
+    job_id = finish(web)
+    gone = utcnow() - timedelta(hours=2)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.created_at, job.retain_until = utcnow() - timedelta(hours=1), gone
+    flat = text(web.browser.get(f"/jobs/{job_id}").text)
+    assert format_when(gone) in flat
+    assert not re.search(r"-\d|after 0 hour", flat)
+
+    purge_expired(web.ctx.factory)
+    flat = text(web.browser.get(f"/jobs/{job_id}").text)
+    assert "has been deleted" in flat and format_when(gone) not in flat
+    assert re.search(r"\b20\d\d, \d\d:\d\d UTC", flat)  # the upload date
+
+
+def test_the_list_marks_a_document_in_its_last_hours_and_no_other(web):
+    soon, later = finish(web, filename="soon.pdf"), finish(web, filename="later.pdf")
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, soon)
+        assert job is not None
+        job.retain_until = utcnow() + timedelta(hours=3)
+    html = web.browser.get("/app/documents", headers={"HX-Request": "true"}).text
+    cell = r'id="doc-(\w+)".*?(<td[^>]*Deleted.*?</td>)'
+    rows = dict(re.findall(cell, html, re.S))
+    assert "<strong>" in rows[soon] and "<strong>" not in rows[later]
 
 
 # --------------------------------------------------------------------------- uploads
@@ -160,6 +196,23 @@ class Reads:
         return self.sql
 
 
+def test_a_stopped_document_is_listed_with_what_needs_you_and_offers_try_again(web):
+    """F-414: a stopped document is not grouped with the ones still working: it is under
+    "Needs you" with its reason in its label and "Try again" as its next step."""
+    finish(web, filename="decide.pdf")
+    stopped = finish(web, filename="stopped.pdf")
+    waiting = job_id_from(upload(web.browser, make_pdf(1), filename="waiting.pdf"))
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, stopped)
+        assert job is not None
+        job.status, job.error_code = JobStatus.FAILED, "timeout"
+    html = web.browser.get("/app/documents", headers={"HX-Request": "true"}).text
+    needs = html[html.index(f'id="docs-{states.NEEDS}"') : html.index("</table>")]
+    assert f'id="doc-{stopped}"' in needs and f'id="doc-{waiting}"' not in needs
+    assert states.TABLE["stopped_service"].label in text(needs)
+    assert re.search(rf'action="/jobs/{stopped}/retry".*?id="act-{stopped}"', needs, re.S)
+
+
 def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
     job_id = finish(web, title="Old one")
     with session_scope(web.ctx.factory) as session:
@@ -170,8 +223,117 @@ def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
         )
     assert web.job(job_id).open_decisions is None
     first = text(web.browser.get("/app").text)
-    assert "Old one" in first and "3 decisions to make" in first
-    assert (web.job(job_id).open_decisions, web.job(job_id).result_title) == (3, "Old one")
+    shown = web.job(job_id).result_title
+    assert shown and shown in first and "3 decisions to make" in first
+    assert (web.job(job_id).open_decisions, web.job(job_id).result_title) == (3, shown)
     reads = Reads(web)
-    web.browser.get("/app/documents")
+    web.browser.get("/app/documents", headers={"HX-Request": "true"})
     assert not any("result_json" in s for s in reads.stop())  # read once, not every poll
+
+
+def test_the_list_of_finished_documents_costs_the_same_for_two_as_for_fifty_and_loads_no_result(
+    web,
+):
+    """F-496, F-497: the state of a finished document with nothing open is read from the facts
+    stored with its result, so the list, the batch page and the counts load no result and the
+    statements do not grow with the documents. A row from before the column costs one read
+    of its result, once."""
+    from sqlalchemy import select
+
+    from readablestem.core.types import DocumentResult
+    from readablestem.pipeline import checked
+    from readablestem.web import upload_result
+
+    first = finish(web, filename="first.pdf", decided=True)
+
+    def copies(count: int) -> None:
+        with session_scope(web.ctx.factory) as session:
+            source = session.get(Job, first)
+            assert source is not None
+            for i in range(count):
+                copy = Job(
+                    user_id=source.user_id,
+                    status=source.status,
+                    filename=f"copy{i}.pdf",
+                    page_count=source.page_count,
+                    retain_until=source.retain_until,
+                )
+                copy.result_json = source.result_json
+                session.add(copy)
+
+    def cost() -> tuple[int, int, dict[str, str]]:
+        with session_scope(web.ctx.factory) as session:
+            ids = list(session.scalars(select(Job.id)))
+            batch = upload_result.store(
+                session,
+                session.get(Job, first).user_id,
+                [{"filename": "x", "job_id": i} for i in ids],
+            )
+        reads = Reads(web)
+        for url in ("/app", f"/app/batch/{batch}"):
+            assert web.browser.get(url).status_code == 200
+        sql = reads.stop()
+        loaded = [s for s in sql if "jobs.result_json" in s.split(" FROM ")[0]]
+        with session_scope(web.ctx.factory) as session:
+            return len(sql), len(loaded), {j: v.key for j, v in states.load(session, ids).items()}
+
+    copies(1)
+    few, few_loaded, _ = cost()
+    copies(48)
+    many, many_loaded, many_states = cost()
+    assert (few_loaded, many_loaded) == (0, 0) and many == few
+
+    # The state is the one the job's own page names from its result.
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, first)
+        assert job is not None
+        whole = states.state_of(
+            states.Facts.of(job),
+            states.counts_of(checked.of_result(DocumentResult.model_validate(job.result_json))),
+        )
+    assert set(many_states.values()) == {whole.key}
+
+    with session_scope(web.ctx.factory) as session:  # every row from before the column
+        session.execute(Job.__table__.update().values(state_facts=None))
+    _, first_loaded, _ = cost()
+    _, again_loaded, again_states = cost()
+    assert (first_loaded, again_loaded) == (50, 0)
+    assert again_states == many_states
+
+
+def test_the_zip_link_says_how_many_documents_the_zip_holds_and_names_the_rest(web, monkeypatch):
+    """F-325: with more ready documents than one zip holds, the link counts what the zip has
+    (the number the route returns) and the others are listed with the held-back one named."""
+    import io
+    import zipfile
+
+    from readablestem.web import bundle
+
+    monkeypatch.setattr(bundle, "MAX_DOCUMENTS", 3)
+    for number in range(5):
+        finish(web, filename=f"ready{number}.pdf", title=f"Ready {number}", decided=True)
+    finish(web, filename="draft.pdf", title="Draft")  # decisions still open
+    page = web.browser.get("/app").text
+    words = text(page)
+    assert "Download 3 of 5 ready documents (zip)" in words
+    assert "One zip holds at most 3 documents" in words
+    assert "1 document with decisions still to make is not in it" in words
+    rest = page[page.index('id="zip-rest"') : page.index("</details>", page.index('id="zip-rest"'))]
+    assert len(re.findall(r'href="/jobs/', rest)) == 2
+    members = zipfile.ZipFile(io.BytesIO(web.browser.get("/app/download").content)).namelist()
+    assert len([n for n in members if n.endswith(".html")]) == 3
+    # The five share a title (the same first heading): the file in each control's name keeps
+    # two rows from being the same words.
+    assert all(f", file ready{number}.pdf" in words for number in range(5))
+
+
+def test_every_delete_page_says_what_deleting_does_not_reach(web):
+    """F-328: the two sentences account deletion has (backups, the model provider's own
+    retention) are on the document's delete page too (the waiting file's and the course's
+    pages include the same partial, `templates/_delete_notes.html`)."""
+    job_id = finish(web)
+    pages = [web.browser.get(f"/jobs/{job_id}/delete").text]
+    pages.append(web.browser.get("/account/delete").text)
+    for html in pages:
+        words = text(html)
+        assert "Backups keep a copy for about a week." in words and "stay under" in words

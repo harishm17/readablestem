@@ -24,8 +24,8 @@ from xml.etree.ElementTree import ParseError
 import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
-from readablestem.core.mathchars import bake_bold_variants
 from readablestem.core.mathml_intent import intent_allowed
+from readablestem.pipeline.mathml_shape import ALIGNED_ROWS, normal_form
 
 Display = Literal["block", "inline"]
 
@@ -64,7 +64,7 @@ MATHML_ATTRIBUTES = frozenset(
         "movablelimits", "accent", "accentunder", "linethickness", "width", "height",
         "depth", "voffset", "notation", "columnalign", "rowalign", "columnspan", "rowspan",
         "columnlines", "rowlines", "columnspacing", "rowspacing", "frame", "framespacing",
-        "align", "linebreak", "lquote", "rquote",
+        "align", "linebreak", "lquote", "rquote", ALIGNED_ROWS,
     }
 )  # fmt: skip
 _ATTR_VALUE = re.compile(r"[A-Za-z0-9 .%+\-]{0,64}")
@@ -128,6 +128,18 @@ def _attributes(node: XmlElement) -> str:
     return "".join(kept)
 
 
+# Longest speech written as alttext. A reading cut short would mislead more than none, so a
+# longer one is left out and the screen reader reads the MathML itself.
+MAX_ALTTEXT_CHARS = 300
+
+
+def alttext_from_speech(speech: str | None) -> str | None:
+    """A reading as an `alttext` value (one line of text), or None when there is none or it
+    is too long to be a useful label. Body equations and table cells both write it."""
+    text = " ".join((speech or "").split())
+    return text if text and len(text) <= MAX_ALTTEXT_CHARS else None
+
+
 def sanitize_mathml(
     mathml: str,
     *,
@@ -153,7 +165,7 @@ def sanitize_mathml(
     ns, name = split_tag(root.tag)
     if name != "math" or ns not in ("", MATHML_NS):
         return None
-    bake_bold_variants(root)
+    normal_form(root)
     writer = _MathWriter()
     try:
         inner = writer.children(root, depth=1)

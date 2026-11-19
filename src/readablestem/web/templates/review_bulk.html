@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Accept many at once (routes/bulk.py, web/bulk_accept.py): what would be accepted, listed,
    and the form that does it. Without JavaScript it is the same two steps. #}
 {% block title %}{{ spec.title }}: {{ job.filename }}{% endblock %}
 {% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 {% from "_hear.html" import hear_button %}
+{% from "_crop.html" import crop_image %}
 {% block content %}
 <h1>{{ spec.title }}</h1>
 <p class="lede">{{ job.filename }}</p>
@@ -21,9 +23,17 @@
 <p><a class="button" href="/jobs/{{ job.id }}">Back to the results</a></p>
 {% endif %}
 {% else %}
-<p id="bulk-summary">{{ counted|capitalize }} {{ "is" if count == 1 else "are" }} waiting with every check passed. Compare {{ "it" if count == 1 else "each" }} with the original, then accept. Anything that failed a check or was flagged stays for you. Undo reverses this in one step.</p>
+<p id="bulk-summary">{{ counted|capitalize }} {{ "is" if count == 1 else "are" }} waiting with every check passed. Compare {{ "it" if count == 1 else "each" }} with the original, then accept. Anything that failed a check or was flagged stays for you. Undo reverses this in one step.{% if pages > 1 %} The list is {{ pages }} pages long, {{ shown }} on this one. The button accepts the {{ shown }} listed here and nothing on the other pages.{% endif %}</p>
 
-<h2 id="bulk-list-title">To accept ({{ count }})</h2>
+{% macro confirm_buttons(where) %}
+<div class="button-row bulk-buttons" data-where="{{ where }}">
+  <button type="submit" form="bulk-form" class="button" aria-describedby="bulk-summary">Accept {% if spec.slug == "figures" %}{{ "this alt text" if shown == 1 else "these " ~ shown ~ " alt texts" }}{% else %}{{ "this equation" if shown == 1 else "these " ~ shown ~ " equations" }}{% endif %}</button>
+  <a class="button-secondary" href="{{ back_href }}">Cancel</a>
+</div>
+{% endmacro %}
+
+<h2 id="bulk-list-title">To accept ({% if pages > 1 %}{{ first_shown }} to {{ first_shown + shown - 1 }} of {{ count }}{% else %}{{ count }}{% endif %})</h2>
+{{ confirm_buttons("top") }}
 <ol class="bulk-preview" aria-labelledby="bulk-list-title">
   {% for item in items %}
   <li id="bulk-{{ item.element_id }}">
@@ -32,7 +42,7 @@
     <div class="fix-body">
     <figure class="crop">
       {% if item.crop_url %}
-      <img src="{{ item.crop_url }}" loading="lazy" alt="The original {{ item.label|lower }} from page {{ item.page }} of the PDF, as an image.">
+      {{ crop_image(item, "The original " ~ item.label|lower ~ " from page " ~ item.page ~ " of the PDF, as an image.") }}
       {% else %}
       <p>No image of the original is available.</p>
       {% endif %}
@@ -51,14 +61,19 @@
   </li>
   {% endfor %}
 </ol>
-<form method="post" action="/jobs/{{ job.id }}/accept/{{ spec.slug }}" class="bulk-confirm">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("review.accept_kind", "/jobs/" ~ job.id ~ "/accept/" ~ spec.slug, {"class": "bulk-confirm", "id": "bulk-form"}) %}
   <input type="hidden" name="version" value="{{ result_version }}">
   <input type="hidden" name="view" value="{{ view }}">
-  <div class="button-row">
-    <button type="submit" class="button" aria-describedby="bulk-summary">Accept {% if spec.slug == "figures" %}{{ "this alt text" if count == 1 else "these " ~ count ~ " alt texts" }}{% else %}{{ "this equation" if count == 1 else "these " ~ count ~ " equations" }}{% endif %}</button>
-    <a class="button-secondary" href="{{ back_href }}">Cancel</a>
-  </div>
-</form>
+  {% for item in items %}<input type="hidden" name="ids" value="{{ item.element_id }}">{% endfor %}
+{% endcall %}
+{% if pages > 1 %}
+<nav class="bulk-pages" aria-label="Pages of the list">
+  <p>Page {{ page }} of {{ pages }}.
+    {% if prev_href %}<a href="{{ prev_href }}">Previous page</a>{% endif %}
+    {% if prev_href and next_href %} · {% endif %}
+    {% if next_href %}<a href="{{ next_href }}">Next page</a>{% endif %}</p>
+</nav>
+{% endif %}
+{{ confirm_buttons("bottom") }}
 {% endif %}
 {% endblock %}

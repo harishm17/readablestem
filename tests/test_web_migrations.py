@@ -14,6 +14,7 @@ from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
+from sqlalchemy.exc import IntegrityError
 
 from fixtures.web.support import make_settings
 from readablestem.config import ConfigError
@@ -491,6 +492,76 @@ def test_the_upload_results_migration_downgrades_and_upgrades_again(tmp_path):
     engine = create_engine(url)
     try:
         assert "upload_results" in inspect(engine).get_table_names()
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_job_links_migration_downgrades_and_upgrades_again(tmp_path):
+    """WS27.2: `job_links` is one step past the revision before it, and a link row goes with
+    its job (the foreign key cascades) on a database made by the migration."""
+    url = f"sqlite:///{tmp_path}/links.db"
+    upgrade(url)
+    migrate(url, "a9c3e5b7d1f2", down=True)
+    engine = create_engine(url)
+    try:
+        assert "job_links" not in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        inspector = inspect(engine)
+        assert "job_links" in inspector.get_table_names()
+        unique = {tuple(u["column_names"]) for u in inspector.get_unique_constraints("job_links")}
+        assert ("token_hash",) in unique
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_course_grants_migration_downgrades_and_upgrades_again(tmp_path):
+    """WS27.1: `course_grants` is one step past the revision before it, and a grant goes with
+    its course (the foreign key cascades) on a database made by the migration."""
+    url = f"sqlite:///{tmp_path}/grants.db"
+    upgrade(url)
+    migrate(url, "c5d9e1a3b7f4", down=True)
+    engine = create_engine(url)
+    try:
+        assert "course_grants" not in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        inspector = inspect(engine)
+        assert "course_grants" in inspector.get_table_names()
+        unique = {
+            tuple(u["column_names"]) for u in inspector.get_unique_constraints("course_grants")
+        }
+        assert ("course_id", "email") in unique
+        with engine.begin() as conn:
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+            conn.execute(text(INSERT_USER))
+            conn.execute(
+                text(
+                    "INSERT INTO courses (id, user_id, name, created_at) "
+                    "VALUES ('c1', 'u1', 'Physics', '2026-11-18 00:00:00')"
+                )
+            )
+            grant = (
+                "INSERT INTO course_grants (id, course_id, email, role, created_at) "
+                "VALUES ('g1', 'c1', 'ta@example.org', '{}', '2026-11-18 00:00:00')"
+            )
+            conn.execute(text(grant.format("review")))
+            with pytest.raises(IntegrityError):  # a right the table does not allow
+                conn.execute(text(grant.replace("'g1'", "'g2'").format("owner")))
+        with engine.begin() as conn:
+            conn.execute(text("PRAGMA foreign_keys=ON"))
+            conn.execute(text("DELETE FROM courses WHERE id = 'c1'"))
+            assert conn.execute(text("SELECT count(*) FROM course_grants")).scalar() == 0
         with engine.connect() as conn:
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:

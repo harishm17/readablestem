@@ -18,8 +18,8 @@ decisions they made, or pay for the pages a second time.
   waiting or converting, at most `MAX_RETRIES_PER_JOB` tries, and the per-person and
   per-address rate limits on the route.
 
-Which stops can be tried again is decided here, once (`offer`), for the page that shows the
-button and for the route that does the work.
+Which stops can be tried again is decided by the job's state (`web.states`), once, for the
+message, the page that shows the button and the route that does the work (`offer`).
 """
 
 from __future__ import annotations
@@ -27,29 +27,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from readablestem.web import states
 from readablestem.web.db import Job, JobStatus
-from readablestem.web.outcome import is_outage
 
-# Tries a person may ask for on one job. Each one costs only what was not finished before,
-# but a job that fails the same way four times is not going to be helped by a fifth.
-MAX_RETRIES_PER_JOB = 3
-
-# Failed jobs worth trying again: stopped by something that is not about the file.
-# `model_not_configured` is here for the day the person who runs the site has set the key.
-RETRYABLE_FAILURES = frozenset(
-    {
-        "timeout",
-        "lease_expired",
-        "conversion_unavailable",
-        "store_failed",
-        "internal_error",
-        "model_not_configured",
-        "budget_daily",
-    }
-)
-# Finished jobs worth trying again: stopped early by the day's budget, or converted while
-# the AI service was down (read from the result).
-RETRYABLE_STOPS = frozenset({"budget_daily"})
+# The tries and the codes worth trying again are the state table's (`web.states`): the
+# message, the offer and this route read the same rows.
+MAX_RETRIES_PER_JOB = states.MAX_RETRIES_PER_JOB
+RETRYABLE_FAILURES = states.RETRYABLE_FAILURES
+RETRYABLE_STOPS = states.RETRYABLE_STOPS
 
 
 @dataclass(frozen=True)
@@ -65,25 +50,15 @@ def offer(
     *, status: str, error_code: str | None, result_json: dict[str, Any] | None, retries: int
 ) -> Offer | None:
     """The "Try again" offer for a job, or None when trying again cannot help (a file this
-    tool cannot convert, no tries left, or the job is not stopped)."""
-    if retries >= MAX_RETRIES_PER_JOB:
+    tool cannot convert, no tries left, or the job is not stopped). The job's state says it
+    (`states.State.retry`), so the offer and the stop message cannot disagree."""
+    facts = states.Facts(
+        id="", status=status, error_code=error_code, result_json=result_json, retries=retries
+    )
+    step = states.state_of(facts).retry
+    if step is None:
         return None
-    left = MAX_RETRIES_PER_JOB - retries
-    if status == JobStatus.FAILED and error_code in RETRYABLE_FAILURES:
-        return Offer(
-            "Try again",
-            "Try again puts your document back in the queue. Nothing is counted against your "
-            "daily pages, and anything that was already converted is kept.",
-            left,
-        )
-    if status == JobStatus.DONE and (error_code in RETRYABLE_STOPS or is_outage(result_json)):
-        return Offer(
-            "Convert the missing parts",
-            "Only the parts that were not converted are sent again. Nothing is counted "
-            "against your daily pages, and your decisions are kept.",
-            left,
-        )
-    return None
+    return Offer(step.label, step.explain, states.tries_left(retries))
 
 
 class RetryRefused(Exception):
@@ -94,12 +69,20 @@ class RetryRefused(Exception):
         self.code = code
 
 
-def start(job: Job, *, active_others: int, max_active: int) -> None:
-    """Put `job` back in the queue (the caller holds the row's lock and commits).
+def start(job: Job, *, active_others: int, max_active: int) -> str:
+    """Put `job` back in the queue (the caller holds the row's lock and commits). Returns
+    "retry", or "rerun" for a finished document made by an older converter
+    (`states.rerun_step`).
+
+    A re-run is not a try after a failure: it uses no try, and its spend caps count from what
+    the job had spent when it began (`Job.cap_base_usd`), so a document that used most of its
+    cap the first time can be read again. It is offered once for each version
+    (`Job.rerun_version`).
 
     Raises `RetryRefused`: "not_stopped" (nothing to try again), "no_tries_left" or
     "too_many_active" (the person already has `max_active` documents waiting or converting).
     """
+    rerun = False
     if (
         offer(
             status=str(job.status),
@@ -109,16 +92,30 @@ def start(job: Job, *, active_others: int, max_active: int) -> None:
         )
         is None
     ):
-        refused = "no_tries_left" if (job.retries or 0) >= MAX_RETRIES_PER_JOB else "not_stopped"
-        raise RetryRefused(refused)
+        if states.rerun_step(states.Facts.of(job)) is None:
+            refused = (
+                "no_tries_left" if (job.retries or 0) >= MAX_RETRIES_PER_JOB else "not_stopped"
+            )
+            raise RetryRefused(refused)
+        rerun = True
     if active_others >= max_active:
         raise RetryRefused("too_many_active")
+    canceled = job.error_code == states.CANCELED
     job.status = JobStatus.QUEUED
     job.error_code = None
+    job.cancel_requested_at = None
     job.error_detail = None
     job.finished_at = None
     job.lease_until = None
     job.pages_done = 0
     job.progress_json = None
-    job.retries = (job.retries or 0) + 1
+    if rerun:
+        from readablestem.pipeline.run import PIPELINE_VERSION
+
+        job.rerun_version = PIPELINE_VERSION
+        job.cap_base_usd = float(job.cost_usd or 0.0)
+        job.cap_base_calls = int(job.model_calls or 0)
+    elif not canceled:  # converting what its owner stopped is not a try after a failure
+        job.retries = (job.retries or 0) + 1
     job.attempts_at_retry = job.attempts or 0
+    return "rerun" if rerun else "retry"

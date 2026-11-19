@@ -3,6 +3,9 @@
    print, and the same facts as a CSV. It is a record of what was done, checked and decided,
    not a verdict: the words never say the document meets a standard or a law. #}
 {% block title %}Review record: {{ record.title }}{% endblock %}
+{# An item the record names: a link to its card on the review screen for a reader who may open
+   it, its words with a note when it is no longer in the document. #}
+{% macro item_ref(r) %}{% if r.href %}<a href="{{ r.href }}">{{ r.text }}</a>{% else %}{{ r.text }}{% if r.note %} ({{ r.note }}){% endif %}{% endif %}{% endmacro %}
 {% block content %}
 <h1>Review record</h1>
 <p class="doc-file">{{ record.title }}</p>
@@ -17,14 +20,16 @@
   <h2 id="record-document">The document</h2>
   <dl class="summary-list">
     <div><dt>Title</dt><dd>{{ record.title }}</dd></div>
-    <div><dt>File name</dt><dd>{{ record.filename }}</dd></div>
+    <div class="summary-long"><dt>File name</dt><dd>{{ record.filename|breakable }}</dd></div>
     <div><dt>Pages</dt><dd>{{ record.pages }}</dd></div>
     <div><dt>Converted on</dt><dd>{{ long_when(record.converted_at) or "Not recorded" }}</dd></div>
     <div><dt>Converted by</dt><dd>{{ record.owner }}</dd></div>
     <div><dt>Tool</dt><dd>{{ record.tool }}</dd></div>
     <div><dt>Language</dt><dd>{{ record.language }}</dd></div>
+    <div><dt>Exam or quiz</dt><dd>{{ exam_words.on if record.exam_mode else exam_words.off }}</dd></div>
     <div><dt>Record made on</dt><dd>{{ long_when(record.made_at) }}</dd></div>
     <div><dt>Reference</dt><dd>{{ record.job_ref }}</dd></div>
+    {% if record.state %}<div><dt>State</dt><dd>{{ record.state }}</dd></div>{% endif %}
     {% if record.downloaded is not none %}<div><dt>File types downloaded</dt><dd>{{ record.downloaded|join(", ") or "None yet" }}</dd></div>{% endif %}
   </dl>
 </section>
@@ -36,16 +41,19 @@
     <li>{{ c.items }} {{ "part" if c.items == 1 else "parts" }} found
       {%- if record.by_kind %} ({% for kind, n in record.by_kind.items() %}{{ n }} {{ kind }}{{ ", " if not loop.last }}{% endfor %}){% endif %}.</li>
     <li>{{ c.accepted }} accepted by the tool after its own automatic checks, with no decision from a person.</li>
-    <li>{{ c.decided }} decided by a person ({{ record.decisions|length }} {{ "step" if record.decisions|length == 1 else "steps" }} listed below).</li>
+    <li>{{ record.count_line }} Each is listed below.</li>
     <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
-    <li>{{ c.as_image }} {{ "part" if c.as_image == 1 else "parts" }} shown as pictures of the original.</li>
+    {% if record.checked.pictures %}<li>{{ checked_words.as_image_sentence(record.checked) }}</li>
+    {% elif record.checked.all_found_converted %}<li>{{ checked_words.READY_ALL }}</li>{% endif %}
     {% for name, n in record.by_hand.items() %}<li>{{ name }}: {{ n }}.</li>{% endfor %}
+    {% for title, text in record.gaps %}<li>{{ title }}: {{ text }}</li>{% endfor %}
+    {% if record.checked.cut_off %}<li>{{ checked_words.cut_off_owner(record.checked) }}</li>{% endif %}
     {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
   </ul>
 </section>
 
 <section aria-labelledby="record-decisions">
-  <h2 id="record-decisions">Decisions made by a person</h2>
+  <h2 id="record-decisions">Decisions and changes made by a person</h2>
   {% if record.decisions %}
   <div class="table-scroll" role="group" aria-label="Decisions table" tabindex="0">
   <table>
@@ -57,7 +65,7 @@
       {% for d in record.decisions %}
       <tr>
         <td>{{ long_when(d.when) }}</td>
-        <td>{{ d.item }}</td>
+        <td>{% for r in d.refs %}{{ item_ref(r) }}{{ ", " if not loop.last }}{% endfor %}{% if d.more %} and {{ d.more }} more{% endif %}</td>
         <td>{{ d.page or "" }}</td>
         <td>{{ d.tool_had }}</td>
         <td>{{ d.decision }}</td>
@@ -68,12 +76,12 @@
   </table>
   </div>
   {% else %}
-  <p>No decision was made by a person on this document.</p>
+  <p>No decision was made and no page was changed by a person on this document.</p>
   {% endif %}
   {% if record.open_items %}
   <h3 id="record-open">Waiting for a decision</h3>
   <ul aria-labelledby="record-open">
-    {% for item in record.open_items %}<li>{{ item }}</li>{% endfor %}
+    {% for item in record.open_items %}<li>{{ item_ref(item) }}</li>{% endfor %}
   </ul>
   {% endif %}
 </section>
@@ -83,26 +91,20 @@
   {% if record.kept_as_images %}
   <p>These parts could not be converted to text. Screen readers cannot read them.</p>
   <ul>
-    {% for i in record.kept_as_images %}<li>{{ i.item }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
+    {% for i in record.kept_as_images %}<li>{{ item_ref(i.ref) }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
   </ul>
   {% else %}
-  <p>Every part was converted.</p>
+  <p>{{ checked_words.record_pictures(record.checked) }}</p>
   {% endif %}
 </section>
 
 <section aria-labelledby="record-checks">
-  <h2 id="record-checks">Automatic checks</h2>
-  {% if record.checks_run %}
-  <p>{{ record.checks_run }} checks of the structure of the HTML file ran
-    (language, title, order of headings, lists, links, tables and the alt attribute of every image).
-    {% if record.failed_checks %}{{ record.failed_checks|length }} did not pass:{% else %}All passed.{% endif %}</p>
+  <h2 id="record-checks">Structure checks</h2>
+  <p>{{ checked_words.record_checks(record.checked) }}</p>
   {% if record.failed_checks %}
   <ul>
     {% for ch in record.failed_checks %}<li><strong>{{ ch.severity }}:</strong> {{ ch.text }}</li>{% endfor %}
   </ul>
-  {% endif %}
-  {% else %}
-  <p>No structure checks are stored for this file.</p>
   {% endif %}
 </section>
 

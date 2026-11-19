@@ -40,7 +40,15 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
-from readablestem.web import access, analytics, events, linked_emails, microsoft, tombstones
+from readablestem.web import (
+    access,
+    analytics,
+    events,
+    forms,
+    linked_emails,
+    microsoft,
+    tombstones,
+)
 from readablestem.web.database import rowcount
 from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.deps import (
@@ -67,7 +75,7 @@ from readablestem.web.identities import (
     remember,
 )
 from readablestem.web.logsafe import log_event, log_exception
-from readablestem.web.quota import next_day_start
+from readablestem.web.quota import next_day_start, retry_after
 from readablestem.web.return_to import take_return
 
 logger = logging.getLogger(__name__)
@@ -147,6 +155,7 @@ def set_allowed(
         user.is_admin = False
         # Signed-in sessions end now and stay ended if they are allowed back later.
         user.session_version += 1
+        forms.forget_user(session, user.id)
         stop_jobs_of(session, user.id, "access_removed")
     elif admin is not None:
         user.is_admin = admin
@@ -244,7 +253,7 @@ def _sign_in_by_email(
                 refused="blocked" if open_signup is not None else "not_allowlisted", email=email
             )
         user.last_login_at = utcnow()
-        if name and not created:
+        if name and not created and not user.name:  # a name the person chose stays
             user.name = name[:200]
         return SignIn(user_id=user.id, session_version=user.session_version, created=created)
 
@@ -258,6 +267,7 @@ def end_sessions(factory: sessionmaker[Session], user_id: str) -> None:
             .values(session_version=User.session_version + 1)
             .execution_options(synchronize_session=False)
         )
+        forms.forget_user(session, user_id)  # the sessions' request tokens end with them
 
 
 def finish_login(
@@ -308,7 +318,7 @@ def refused_page(request: Request, result: SignIn, provider: str) -> Response:
             "signups_full.html",
             {"email": result.email, "next_reset": next_day_start(utcnow())},
             status_code=503,
-            headers={"Retry-After": "3600"},
+            headers={"Retry-After": retry_after().header},
         )
     return render(
         request,
@@ -392,7 +402,7 @@ def login_page(request: Request) -> Response:
     return render(request, "login.html")
 
 
-@router.post("/login", dependencies=[limited("login"), Depends(require_csrf)])
+@router.post("/login", dependencies=[Depends(require_csrf), limited("login_google")])
 async def login_start(request: Request) -> Response:
     ctx = get_ctx(request)
     google = ctx.sign_in_client(GOOGLE)
@@ -410,12 +420,10 @@ async def auth_callback(request: Request) -> Response:
     google = ctx.sign_in_client(GOOGLE)
     if google is None:
         raise PageError(404, "Page not found", "There is nothing at this address.")
-    from authlib.integrations.starlette_client import OAuthError
-
     try:
         token = await google.authorize_access_token(request)
-    except OAuthError:
-        log_event(logger, "login_failed", reason="oauth_error")
+    except Exception as exc:  # authlib's base error (no code, a bad token), or no answer
+        log_exception(logger, "login_failed", exc, reason="provider_error", provider=GOOGLE)
         raise PageError(
             400, "Sign-in did not finish", "Google did not complete the sign-in. Please try again."
         ) from None
@@ -451,7 +459,7 @@ MS_DID_NOT_FINISH = (
 )
 
 
-@router.post("/login/microsoft", dependencies=[limited("login"), Depends(require_csrf)])
+@router.post("/login/microsoft", dependencies=[Depends(require_csrf), limited("login_microsoft")])
 async def microsoft_login_start(request: Request) -> Response:
     ctx = get_ctx(request)
     client = ctx.sign_in_client(MICROSOFT)
@@ -521,6 +529,7 @@ def _back_from_admin_consent(request: Request) -> Response:
         "university account."
         if approved
         else "Microsoft did not finish the approval. You can open the approval link again.",
+        kind="info" if approved else "warning",
     )
     return RedirectResponse("/login", status_code=303)
 
@@ -537,7 +546,7 @@ def dev_login_page(request: Request) -> Response:
 
 @router.post(
     "/dev-login",
-    dependencies=[Depends(_require_dev_login), limited("login"), Depends(require_csrf)],
+    dependencies=[Depends(_require_dev_login), Depends(require_csrf), limited("login_dev")],
 )
 def dev_login(request: Request, email: Annotated[str, Form()] = "") -> Response:
     normalised = normalise_email(email)
@@ -561,4 +570,5 @@ def logout(request: Request) -> Response:
         end_sessions(get_ctx(request).factory, user.id)
         log_event(logger, "logout", user_id=user.id)
     request.session.clear()
+    flash(request, "You are signed out on every device.", undo=False, kind="success")
     return RedirectResponse("/", status_code=303)

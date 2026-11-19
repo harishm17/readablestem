@@ -85,6 +85,21 @@ def test_the_report_gives_each_step_and_stage_by_page_and_by_percentile():
     assert steps.share == pytest.approx(0.75)
 
 
+def test_a_call_charged_at_its_hold_is_totaled_apart_from_settled_spend():
+    unseen = call("describe", 5.0, 0.04, outcome="timeout", billed_unseen_usd=0.04)
+    seen = call("describe", 1.0, 0.01)
+    made = report(
+        [
+            Measured(
+                pages=1, facts=StepFacts(calls=[seen, unseen]), settled_usd=0.05, counted_calls=2
+            )
+        ]
+    )
+    assert (made.billed_unseen_calls, made.billed_unseen_usd) == (1, pytest.approx(0.04))
+    assert made.usd == pytest.approx(0.01)  # settled spend only
+    assert made.steps[0].call_usd_p99 == 0.01
+
+
 def test_a_report_of_no_jobs_is_empty_and_divides_by_nothing():
     made = report([])
     assert (made.jobs, made.pages, made.usd_per_page, made.calls_per_page) == (0, 0, 0.0, 0.0)

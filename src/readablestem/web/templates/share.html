@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field, field_classes, field_error, field_aria %}
 {# Who can open one document (routes/sharing.py, web/shares.py). Owner only. Plain forms: no
    script is needed. Nothing is emailed; the owner copies the address and sends it. The page
    leads with the three steps; the exact-address rule and what only the owner can do are under
@@ -12,18 +14,15 @@
 
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add a person</h2>
-  <form method="post" action="/jobs/{{ job_id }}/share" novalidate>
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <div class="field{% if email_error %} field-error{% endif %}">
-      <label for="share-email">Their email address</label>
-      <p class="hint" id="share-email-hint">The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.</p>
-      {% if email_error %}<p class="error-message" id="share-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
+  {% call form("share.add", "/jobs/" ~ job_id ~ "/share", {"novalidate": true}) %}
+    {% set email_hint %}The address they sign in with{% if sign_in_words %} ({{ sign_in_words }}){% endif %}. Nothing is sent to it.{% endset %}
+    {% call(aria) field("share-email", "Their email address", error=email_error, hint=email_hint) %}
       <input type="email" id="share-email" name="email" maxlength="320" autocomplete="off" spellcheck="false"
-             value="{{ typed }}" aria-describedby="share-email-hint{% if email_error %} share-email-error{% endif %}"{% if email_error %} aria-invalid="true"{% endif %}>
-    </div>
-    <fieldset class="field{% if role_error %} field-error{% endif %}" id="share-role">
+             value="{{ typed }}"{{ aria }}>
+    {% endcall %}
+    <fieldset class="{{ field_classes(role_error) }}" id="share-role"{{ field_aria("share-role-error", role_error, invalid=false) }}>
       <legend>What they can do</legend>
-      {% if role_error %}<p class="error-message" id="share-role-error"><span class="visually-hidden">Error: </span>{{ role_error }}</p>{% endif %}
+      {{ field_error("share-role-error", role_error) }}
       <div class="role-list">
       {% for value, label, help in roles %}
       <label class="role-row" for="share-role-{{ value }}">
@@ -41,27 +40,26 @@
       <button type="submit" class="button">Share</button>
       {% if retain_until %}<p class="hint share-expiry-note">Access ends {{ retain_until|utc }}, or when you remove them.</p>{% endif %}
     </div>
-  </form>
+  {% endcall %}
 </section>
 
 <section aria-labelledby="people-heading">
   <h2 id="people-heading">People with access</h2>
+  <p class="hint" id="share-count">{{ shares|length }} of {{ max_shares }} people.{% if shares|length >= max_shares %} To add someone else, remove a person first.{% endif %}</p>
   {% if shares %}
   <ul class="share-list">
     {% for row in shares %}
     <li>
       <p class="share-person"><strong>{{ row.email }}</strong>: {{ role_words[row.role] }}</p>
       <div class="share-actions">
-      <form method="post" action="/jobs/{{ job_id }}/share" class="inline-form">
-        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      {% call form("share.add", "/jobs/" ~ job_id ~ "/share", {"class": "inline-form"}) %}
         <input type="hidden" name="email" value="{{ row.email }}">
         <input type="hidden" name="role" value="{{ 'review' if row.role == 'view' else 'view' }}">
         <button type="submit" class="button-secondary">Change {{ row.email }} to {{ role_words['review' if row.role == 'view' else 'view']|lower }}</button>
-      </form>
-      <form method="post" action="/jobs/{{ job_id }}/share/{{ row.id }}/revoke" class="inline-form">
-        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      {% endcall %}
+      {% call form("share.revoke", "/jobs/" ~ job_id ~ "/share/" ~ row.id ~ "/revoke", {"class": "inline-form"}) %}
         <button type="submit" class="button-danger">Remove {{ row.email }}</button>
-      </form>
+      {% endcall %}
       </div>
     </li>
     {% endfor %}
@@ -71,25 +69,39 @@
   {% endif %}
 </section>
 
+{% if course_people %}
+<section aria-labelledby="course-people-heading">
+  <h2 id="course-people-heading">Through the course {{ course_people.course_name }}</h2>
+  <p class="hint">These people can open this document too, because you gave them access to the whole course. You change that in the course's <a href="/courses/{{ course_people.course_id }}#people-heading">People</a> section, not here.</p>
+  <ul class="share-list">
+    {% for email, right in course_people.people %}
+    <li><p class="share-person"><strong>{{ email }}</strong>: {{ role_words[right] }}</p></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
 <section aria-labelledby="address-heading">
   <h2 id="address-heading">Link</h2>
-  <p class="hint" id="address-hint">Opens only for the people above, after they sign in.</p>
+  <p class="hint" id="address-hint">Opens only for the people listed above, after they sign in.</p>
   <label for="share-address" class="visually-hidden">Address of this document</label>
   <div class="copy-row">
-    <input type="text" id="share-address" readonly value="{{ address }}" aria-describedby="address-hint">
+    <textarea id="share-address" readonly rows="3" spellcheck="false" aria-describedby="address-hint">{{ address }}</textarea>
     {# Shown by static/copy-link.js; without script the field above is selected by hand. #}
     <button type="button" class="button-secondary" data-copy-target="share-address" data-copy-state="share-copy-state" hidden>Copy link</button>
   </div>
   <p class="hint" id="share-copy-state" role="status"></p>
-  {% if retain_until %}
+  {% if retain_until and not (class_link and class_link.link and class_link.link.kept) %}
   <p class="share-expiry" id="share-expiry">Deleted automatically on {{ retain_until|utc }}; the link stops working then.
-    {%- if retention_mode != "dev" %} Sharing does not extend the deletion date; your own work does. <a href="/jobs/{{ job_id }}#delete-heading">Keep it longer</a>.{% endif %}</p>
+    {%- if retention_mode != "dev" %} Sharing does not extend the deletion date; your own work does. <a href="/jobs/{{ job_id }}#retention-line">Keep it longer</a>.{% endif %}</p>
   {% endif %}
 </section>
 
+{% include "_share_class_link.html" %}
+
 <details class="share-help">
   <summary>Help with sharing</summary>
-  <p>They must sign in with exactly this address (case does not matter): an alias does not match. There are no public links.</p>
+  <p>They must sign in with exactly this address (case does not matter): an alias does not match. {% if class_link %}The only link that opens without signing in is the class link, and it shows only the published student version.{% else %}There are no public links.{% endif %}</p>
 </details>
 
 <p><a href="/jobs/{{ job_id }}">Back to the document</a></p>

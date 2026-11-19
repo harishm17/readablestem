@@ -151,6 +151,9 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 # "[image_facts]"): what this image carries (TeX Live packages, LaTeXML, pandoc, LibreOffice,
 # lxml), measured here and written into the installed copy of the profile, so they are filled by
 # the build and never typed. A check that needs a program counts as on only when these name it.
+# The same command writes the TeX distribution's package names (names only, from texdoc's data
+# in texlive-base) beside src/readablestem/source/support.py, so a stopped LaTeX job can tell a
+# TeX package this tool does not read from the instructor's own; without LaTeXML there is none.
 RUN readablestem ops image-facts --write
 
 USER 10001:10001

@@ -142,3 +142,78 @@ def test_the_combined_file_in_an_unknown_type_is_a_400_and_changes_nothing(web):
     assert web.alice.get(f"/jobs/{jobs[0].id}/combine?format=pdf").status_code == 400
     with session_scope(web.ctx.factory) as session:
         assert all(as_utc(session.get(Job, j.id).retain_until) == as_utc(soon) for j in jobs)
+
+
+# ----------------------------------------------------------------------------- the page
+
+
+def test_the_combine_page_answers_with_decisions_open_and_links_to_the_first_of_each(web):  # noqa: F811
+    web.converter.output = fake_output()  # every part keeps its decisions open
+    upload_id = keep_big(web, 12)
+    assert choose(web, upload_id, "1-4\n5-8\n9-12").status_code == 303
+    for _ in range(3):
+        web.run_worker()
+    jobs = jobs_of(web)
+    # Before: nothing is ready, and the download refused with a 409 and no way on.
+    response = web.alice.get(f"/jobs/{jobs[0].id}/combine/parts")
+    assert response.status_code == 200
+    page = text_of(response.text)
+    assert "Combining needs at least two ready parts; 0 are ready now." in page
+    assert "Make the decisions in 3 parts" in page
+    for job in jobs:
+        links = re.findall(rf'href="(/jobs/{job.id}/review\?item=[^"]+)"', response.text)
+        assert len(links) == 1  # the first open decision of this part, by its key
+        assert web.alice.get(links[0]).status_code == 200
+    assert web.alice.get(f"/jobs/{jobs[0].id}/combine").status_code == 200  # no longer a dead end
+    assert web.bob.get(f"/jobs/{jobs[0].id}/combine/parts").status_code == 404
+
+
+def test_the_combine_page_offers_the_ready_parts_and_says_what_it_leaves_out(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    with session_scope(web.ctx.factory) as session:
+        row = session.get(Job, jobs[1].id)
+        result = dict(row.result_json)
+        result["fixes"] = [
+            dict(f, status="needs_review", review="required") for f in result["fixes"]
+        ]
+        row.result_json = result
+        row.open_decisions = len(result["fixes"])
+    page = text_of(web.alice.get(f"/jobs/{jobs[0].id}/combine/parts").text)
+    assert "Combine the 2 ready parts (leaves out 1)" in page
+
+
+def test_the_language_is_asked_once_for_the_whole_file_and_each_part_keeps_its_own(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    page_url = f"/jobs/{jobs[0].id}/combine/parts"
+    assert "combine-language" not in web.alice.get(page_url).text  # all three read the same
+
+    def set_result(job: Job, lang: str, notices: tuple[str, ...] = ()) -> None:
+        with session_scope(web.ctx.factory) as session:
+            row = session.get(Job, job.id)
+            result = dict(row.result_json)
+            kept = [n for n in result.get("notices", []) if not n["code"].startswith("lang_")]
+            result["lang"] = lang
+            result["notices"] = [*kept, *({"code": c, "review": "required"} for c in notices)]
+            row.result_json = result
+
+    # two parts assumed to be English: one sentence, not one per part, and the file stays English
+    set_result(jobs[0], "en", ("lang_assumed",))
+    set_result(jobs[1], "en", ("lang_assumed",))
+    set_result(jobs[2], "en")
+    page = text_of(web.alice.get(page_url).text)
+    assert page.count("confirm the language") == 1
+    assert "The language of 2 parts was assumed" in page
+    assert "Open the parts for pages 1-4, pages 5-8, then confirm" in page  # named, not counted
+    assert '<html lang="en">' in combine(web, jobs[0]).text
+    # no part waits, and no language has most of the parts: said once, each part marked
+    set_result(jobs[0], "de")
+    set_result(jobs[1], "fr")
+    set_result(jobs[2], "es")
+    page = text_of(web.alice.get(page_url).text)
+    assert page.count("no language has most of them") == 1
+    html = combine(web, jobs[0]).text
+    assert '<html lang="de">' in html and 'lang="fr"' in html and 'lang="es"' in html
+    # two of three agree: nothing to ask, the third is marked
+    set_result(jobs[1], "de")
+    assert "combine-language" not in web.alice.get(page_url).text
+    assert '<html lang="de">' in combine(web, jobs[0]).text

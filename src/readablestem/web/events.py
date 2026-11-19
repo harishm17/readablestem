@@ -76,6 +76,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from readablestem.config import Settings
+from readablestem.core import triage
 from readablestem.web.database import as_utc
 from readablestem.web.db import Event, Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.logsafe import log_exception
@@ -123,8 +124,10 @@ OUTCOME_KINDS = ("heading", "paragraph", "equation", "figure", "list_item", "tab
 OUTCOMES = ("kept", "edited", "replaced", "rejected", "removed", "added")
 ORIGINS = ("page", "source")  # read from a page (a PDF), or from a LaTeX source
 # What put the thing in front of the reviewer: a flag the pipeline raised, or nothing (the
-# reviewer found it). The sources of WS8.22 add their names here when they arrive.
-SOURCES = ("pipeline", "browsing")
+# reviewer found it). The flags' names are the rows of `core.triage.SOURCES`, so a row added
+# there can be recorded here, and a name outside the table cannot.
+BROWSING = "browsing"
+SOURCES = (*triage.SOURCES, BROWSING)
 MODES = ("single", "group")  # the write changed one thing, or several
 WRITE_MODES = ("single", "group", "structure")
 NO_REASON = "none"  # nobody was asked about it
@@ -173,7 +176,6 @@ def reason_codes() -> frozenset[str]:
     """Every reason a flag can carry: the codes and check names of the review screen's
     message tables (which `tests/test_web_review_messages.py` keeps equal to what the
     pipeline emits), the triage codes, "none" and "other"."""
-    from readablestem.core import triage
     from readablestem.web.messages import CHECK_MESSAGES, REASON_MESSAGES, TABLE_CHECK_PARTS
 
     codes = {c for pair in CHECK_MESSAGES for c in pair} | set(REASON_MESSAGES)
@@ -553,13 +555,17 @@ def uploaded_at(session: Session, user_id: str, job_id: str) -> datetime | None:
 
 # Columns of the admin page's tables: (counter key, heading). A key is an event name, or
 # "name:code" for one of its codes.
+# The per-person counts that are not an event name: decisions that stand (the outcome counts net
+# of undo) and documents with a review write. The only review figures shown per account.
+DECISIONS = "decisions"
+DOCUMENTS_REVIEWED = "documents_reviewed"
 DAY_COLUMNS = (
     (SIGNED_IN, "Sign-ins"),
     (UPLOADED, "Uploads"),
     (REUPLOADED, "Same file again"),
     (FINISHED, "Finished"),
     (REVIEW_OPENED, "Reviews opened"),
-    (DECISION_MADE, "Decisions"),
+    (DECISION_MADE, "Review writes"),
     (REVIEW_COMPLETED, "Reviews completed"),
     (HTML_VIEWED, "Viewed"),
     (DOWNLOADED, "Downloads"),
@@ -570,7 +576,9 @@ PERSON_COLUMNS = (
     ("days", "Days active"),
     (UPLOADED, "Uploads"),
     (FINISHED, "Finished"),
-    (DECISION_MADE, "Decisions"),
+    (DECISION_MADE, "Review writes"),
+    (DECISIONS, "Decisions"),
+    (DOCUMENTS_REVIEWED, "Documents reviewed"),
     (REVIEW_COMPLETED, "Reviews completed"),
     (DOWNLOADED, "Downloads"),
     (f"{WILL_POST}:yes", "Will post: yes"),
@@ -604,33 +612,44 @@ def pseudonym(user_id: str) -> str:
     return "u-" + user_id[:8]
 
 
-def usage(session: Session, *, days: int = 28, now: datetime | None = None) -> Usage:
+def usage(
+    session: Session, *, days: int = 28, now: datetime | None = None, user_id: str | None = None
+) -> Usage:
     """Counts per UTC day (the last `days` days, newest first; days with events only)
-    and per person (every event kept), for the admin page. Numbers only. A beta has a
-    few people and a few thousand events, so they are counted here, not in SQL."""
+    and per person (every event kept), for the admin page; with `user_id`, only that
+    account's events (the support lookup). Numbers only. A beta has a few people and a few
+    thousand events, so they are counted here, not in SQL."""
     now = as_utc(now) or utcnow()
     first_day = (now - timedelta(days=days - 1)).date()
     by_day: dict[str, UsageRow] = {}
     by_person: dict[str, UsageRow] = {}
     active: dict[str, set[str]] = {}
-    rows = session.execute(
-        select(Event.user_id, Event.name, Event.code, Event.value, Event.created_at)
-    ).all()
-    for user_id, name, code, value, created in rows:
+    reviewed: dict[str, set[str]] = {}
+    query = select(
+        Event.user_id, Event.name, Event.code, Event.value, Event.created_at, Event.job_ref
+    )
+    if user_id is not None:
+        query = query.where(Event.user_id == user_id)
+    for who, name, code, value, created, job_ref in session.execute(query).all():
         at = as_utc(created)
         if at is None:
             continue
         day = at.date().isoformat()
         keys = [name] + ([f"{name}:{code}"] if code and name in {DOWNLOADED, WILL_POST} else [])
-        person = by_person.setdefault(user_id, UsageRow(pseudonym(user_id)))
+        person = by_person.setdefault(who, UsageRow(pseudonym(who)))
         person.counts.update(keys)
         if name == MINUTES_SAVED and value is not None:
             person.counts["minutes"] += round(value)
-        active.setdefault(user_id, set()).add(day)
+        if name == DECISION_OUTCOME and value is not None:
+            person.counts[DECISIONS] += round(value)
+        if name == DECISION_MADE and job_ref:
+            reviewed.setdefault(who, set()).add(job_ref)
+        active.setdefault(who, set()).add(day)
         if at.date() >= first_day:
             by_day.setdefault(day, UsageRow(day)).counts.update(keys)
-    for user_id, person in by_person.items():
-        person.counts["days"] = len(active[user_id])
+    for who, person in by_person.items():
+        person.counts["days"] = len(active[who])
+        person.counts[DOCUMENTS_REVIEWED] = len(reviewed.get(who, ()))
     return Usage(
         days=days,
         by_day=[by_day[d] for d in sorted(by_day, reverse=True)],
@@ -648,6 +667,14 @@ MIN_DOCUMENTS = 10
 MAX_SHARE = 0.5
 ALL_LANES = "all"
 TRUE_OUTCOMES = frozenset({"edited", "replaced", "rejected", "removed", "added"})
+# What a flag's source is, by source name (decision A16.4): a "doubt" flag is one a check or a
+# reader raised because readings disagreed, and counts in false flags per true flag; a "rule"
+# flag is a look a rule asks for whatever the readers say, and is counted on its own line,
+# never in that ratio. Made from the one table of sources (`core.triage.SOURCES`); a flag whose
+# source is not in it is "not classified" and no ratio is claimed for it.
+DOUBT = triage.DOUBT
+RULE = triage.RULE
+SOURCE_CLASSES: dict[str, str] = {name: row.flag for name, row in triage.SOURCES.items()}
 
 
 @dataclass
@@ -663,9 +690,12 @@ class OutcomeCell:
     documents: int = 0
     pages: int = 0
     decisions: int = 0
-    false_flags: int = 0  # flagged, and kept as the tool had it
-    true_flags: int = 0  # flagged, and changed (edited, replaced, rejected, removed, added)
+    false_flags: int = 0  # doubt flags kept as the tool had them
+    true_flags: int = 0  # doubt flags changed (edited, replaced, rejected, removed, added)
     kept_in_bulk: int = 0  # of the false flags, kept by a group or bulk write
+    required: int = 0  # decisions a rule asks for, whatever the readers say
+    required_changed: int = 0  # of those, how many changed something
+    not_classified: int = 0  # flags whose source has no class yet: in no ratio
     unflagged: int = 0  # anything changed or added that carried no flag: silent misses found
     added: int = 0  # of those, content put in by hand
     false_per_true: float | None = None
@@ -680,6 +710,17 @@ class _Tally:
     documents: dict[str, str] = field(default_factory=dict)  # job -> account
     per_document: Counter[str] = field(default_factory=Counter)
     counts: Counter[str] = field(default_factory=Counter)
+
+
+def outcome_releases(session: Session) -> list[str]:
+    """Every release that has outcome rows, the one written last first."""
+    rows = session.scalars(
+        select(Event.release)
+        .where(Event.name == DECISION_OUTCOME, Event.release.is_not(None))
+        .group_by(Event.release)
+        .order_by(func.max(Event.created_at).desc(), Event.release)
+    )
+    return [release for release in rows if release]
 
 
 def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
@@ -698,6 +739,7 @@ def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
             Event.kind,
             Event.reason,
             Event.outcome,
+            Event.source,
             Event.write_mode,
             func.sum(Event.value),
         )
@@ -713,6 +755,7 @@ def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
             Event.kind,
             Event.reason,
             Event.outcome,
+            Event.source,
             Event.write_mode,
         )
     ).all()
@@ -726,7 +769,7 @@ def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
         )
         pages = {job: int(n or 0) for job, n in uploads if job}
     tallies: dict[str, _Tally] = defaultdict(_Tally)
-    for user, job, kind, reason, outcome, write_mode, total in rows:
+    for user, job, kind, reason, outcome, source, write_mode, total in rows:
         count = int(total or 0)
         if not count or not job:
             continue
@@ -736,16 +779,26 @@ def outcome_cells(session: Session, release: str) -> list[OutcomeCell]:
             tally.documents[job] = user
             tally.per_document[job] += count
             tally.counts["decisions"] += count
+            changed = outcome in TRUE_OUTCOMES
             if reason == NO_REASON:
-                tally.counts["unflagged"] += count
+                if changed:
+                    tally.counts["unflagged"] += count
                 if outcome == "added":
                     tally.counts["added"] += count
-            elif outcome == "kept":
+                continue
+            flag_class = SOURCE_CLASSES.get(source or "")
+            if flag_class == DOUBT and outcome == "kept":
                 tally.counts["false_flags"] += count
                 if write_mode == "group":
                     tally.counts["kept_in_bulk"] += count
-            elif outcome in TRUE_OUTCOMES:
+            elif flag_class == DOUBT and changed:
                 tally.counts["true_flags"] += count
+            elif flag_class == RULE:
+                tally.counts["required"] += count
+                if changed:
+                    tally.counts["required_changed"] += count
+            else:
+                tally.counts["not_classified"] += count
     cells = {lane: _cell(lane, tally, pages) for lane, tally in tallies.items()}
     lanes = sorted((c for c in cells.values() if c.lane != ALL_LANES), key=lambda c: c.lane)
     withheld = [c for c in lanes if not c.shown]
@@ -770,10 +823,13 @@ def _cell(lane: str, tally: _Tally, pages: dict[str, int]) -> OutcomeCell:
         false_flags=counts["false_flags"],
         true_flags=counts["true_flags"],
         kept_in_bulk=counts["kept_in_bulk"],
+        required=counts["required"],
+        required_changed=counts["required_changed"],
+        not_classified=counts["not_classified"],
         unflagged=counts["unflagged"],
         added=counts["added"],
     )
-    if cell.true_flags:
+    if cell.true_flags:  # over doubt flags only, and only once one was true
         cell.false_per_true = round(cell.false_flags / cell.true_flags, 2)
     if total_pages:
         cell.unflagged_per_100_pages = round(100 * cell.unflagged / total_pages, 2)

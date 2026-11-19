@@ -386,9 +386,11 @@ def as_pictures(data: bytes, pages: tuple[int, ...]) -> bytes:
 
 
 def _builders():
-    tests = str(REPO / "tests" / "workflows")
-    if tests not in sys.path:
-        sys.path.insert(0, tests)
+    # The builders share the Office fixture with the tests (`fixtures.office`), so both
+    # folders are on the path: pytest puts `tests` there itself, the command line does not.
+    for folder in (REPO / "tests", REPO / "tests" / "workflows"):
+        if str(folder) not in sys.path:
+            sys.path.insert(0, str(folder))
     return importlib.import_module("builders")
 
 

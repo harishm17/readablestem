@@ -40,10 +40,12 @@ PIPELINE_MODULES = (
     "html_checks",
     "run",
     "table_step",
+    "table_math",
     "notation_memory",
     "image_page",
     "image_page_vector",
     "image_page_reconcile",
+    "decoration",
     "source/ltx_reader",  # LaTeX source: the codes it emits have sentences too
 )
 CHECK_NAME = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")

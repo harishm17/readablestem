@@ -91,10 +91,33 @@ def test_too_many_pages_is_refused_with_the_limit_given():
     assert intake.inspect("a.tex", long.encode(), max_pages=6).pages == 6
 
 
-def test_beamer_is_refused_until_it_is_switched_on():
-    deck = "\\documentclass[aspectratio=169]{beamer}\n\\begin{document}\\end{document}"
-    assert refusal("a.tex", deck.encode()) == "source_beamer"
-    assert intake.inspect("a.tex", deck.encode(), beamer_ok=True).beamer is True
+@pytest.mark.parametrize(
+    ("preamble", "code"),
+    [
+        ("\\documentclass[aspectratio=169]{beamer}", "source_beamer"),
+        ("\\documentclass[addpoints]{exam}", "source_unsupported_class"),
+        (
+            "\\documentclass{article}\n\\usepackage[autostyle]{csquotes}",
+            "source_unsupported_package",
+        ),
+    ],
+    ids=["beamer", "exam", "csquotes"],
+)
+def test_a_source_this_tool_does_not_read_yet_is_refused(preamble, code):
+    source = f"{preamble}\n\\begin{{document}}\\end{{document}}"
+    assert refusal("a.tex", source.encode()) == code
+    assert refusal("a.zip", make_zip({"main.tex": source})) == code
+    if code == "source_beamer":  # a deck is taken once its switch is on; the others never
+        assert intake.inspect("a.tex", source.encode(), beamer_ok=True).beamer is True
+    else:
+        assert refusal("a.tex", source.encode(), beamer_ok=True) == code
+    # A class read as an article, one on no list, and a package named only in a comment go on
+    # to LaTeXML (whose report stops them if errors follow).
+    for other in (
+        "\\documentclass{scrartcl}",
+        "\\documentclass{tufte-handout}\n%\\usepackage{csquotes}",
+    ):
+        assert intake.inspect("a.tex", f"{other}\n\\begin{{document}}\\end{{document}}".encode())
 
 
 @pytest.mark.parametrize(

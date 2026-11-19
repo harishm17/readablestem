@@ -45,11 +45,15 @@ from readablestem.core.types import (
 from readablestem.models import OFFLINE_DEFAULTS, make_vision_client
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import estimate_max_cost_usd
+from readablestem.pipeline import page_type
 from readablestem.pipeline.run import convert_pdf
+from readablestem.web import outcome, pdf_probe, quota, states
 from readablestem.web.auth import set_allowed
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, SpendDay, User, session_scope, utcnow
+from readablestem.web.routes import jobs as jobs_routes
 from readablestem.web.spend import largest_reservation_usd
+from readablestem.web.uploads import UploadRejected
 from readablestem.web.worker import (
     JobCancelled,
     Worker,
@@ -107,8 +111,8 @@ def page_text(html: str) -> str:
     return re.sub(r"\s+", " ", unescape(re.sub(r"<[^>]+>", " ", html)))
 
 
-def scanned_pdf(pages: int = 2, *, then_text: bool = False) -> bytes:
-    """Pages that are one full-page image and no text (a scan), optionally then a text page."""
+def scanned_pdf(pages: int = 2, *, then_text: bool = False, text_pages: int = 1) -> bytes:
+    """Pages that are one full-page image and no text (a scan), optionally then text pages."""
     picture = pymupdf.open()
     source = picture.new_page()
     source.insert_text((72, 72), "Scanned lecture notes", fontsize=24)
@@ -117,7 +121,7 @@ def scanned_pdf(pages: int = 2, *, then_text: bool = False) -> bytes:
     for _ in range(pages):
         page = doc.new_page()
         page.insert_image(page.rect, stream=png)
-    if then_text:
+    for _ in range(text_pages if then_text else 0):
         doc.new_page().insert_text((72, 72), "Kinematics: velocity is the rate of change.")
     data = doc.tobytes()
     doc.close()
@@ -181,7 +185,10 @@ def test_a_job_the_daily_cap_stops_part_way_is_not_shown_as_a_normal_success(env
     assert f"{len(failed)} of {len(model_fixes)} equations and figures were not converted" in text
     assert "After 00:00 UTC" in text and "Convert the missing parts" in text
     assert "The accessible HTML is ready" not in text
-    assert "Stopped early" in page_text(env.browser.get("/app").text)
+    # The list says what is left to do, never that it is ready (F-033).
+    listed = page_text(env.browser.get("/app").text)
+    assert states.TABLE["ready"].label not in listed
+    assert any(states.TABLE[k].label in listed for k in ("needs_decisions", "partly_converted"))
     # The partial result is still there to use.
     assert fetch(env.browser, f"/jobs/{job_id}/download").status_code == 200
 
@@ -213,7 +220,7 @@ def test_the_worker_claims_nothing_while_the_daily_budget_is_spent(env, caplog):
 
     text = page_text(env.browser.get(f"/jobs/{job_id}").text)
     assert "Waiting" in text and "Today's conversion budget has been used up" in text
-    status = env.browser.get(f"/jobs/{job_id}/status")
+    status = env.browser.get(f"/jobs/{job_id}/status", headers={"HX-Request": "true"})
     assert "used up" in status.text and 'hx-get="/jobs/' in status.text
 
     leave_under_cap(env, CAP)  # a new day
@@ -375,6 +382,47 @@ def test_pdfs_with_nothing_to_convert_are_refused_at_upload(env, data, code, mes
         assert session.scalar(select(Job.id)) is None  # nothing queued, no quota spent
 
 
+def test_a_file_of_only_handwriting_the_probe_could_not_finish_gives_its_pages_back(
+    env, monkeypatch
+):
+    """The upload refuses a file of nothing but handwriting without counting a page, when its
+    probe can tell inside its allowance of path items. When it cannot, the file becomes a job and
+    the conversion fails it with the same words: the pages come back, so what a person pays does
+    not depend on whether the probe got to the end."""
+    ink = (Path(__file__).parent / "fixtures" / "handwriting" / "ink_no_layer.pdf").read_bytes()
+
+    def probe_here(data, *, max_pages, **_):
+        # The probe runs in a child process, which a patched constant does not reach.
+        try:
+            return pdf_probe.probe(data, max_pages=max_pages)
+        except pdf_probe.ProbeRejected as exc:
+            raise UploadRejected(exc.code, exc.pages) from None
+
+    monkeypatch.setattr(jobs_routes, "inspect_pdf_isolated", probe_here)
+    refused = upload(env.browser, ink)
+    assert refused.status_code == 422  # the probe finished: refused, nothing counted
+    with pytest.raises(pdf_probe.ProbeRejected) as said:
+        pdf_probe.probe(ink, max_pages=30)
+    assert pages_used_today(env) == 0
+
+    monkeypatch.setattr(page_type, "PROBE_MAX_ITEMS", 1)  # the allowance runs out on this page
+    job_id = job_id_from(upload(env.browser, ink))
+    assert pages_used_today(env) == 1
+    assert real_worker(env).run_once() == job_id
+    job = env.job(job_id)
+    assert job.status == "failed" and job.error_code == said.value.code
+    assert page_text(outcome.failed_message(job.error_code)) in page_text(
+        env.browser.get(f"/jobs/{job_id}").text
+    )
+    assert pages_used_today(env) == 0
+
+
+def pages_used_today(env) -> int:
+    with session_scope(env.ctx.factory) as session:
+        user = session.scalar(select(User).where(User.email == ALICE))
+        return quota.pages_used(session, user.id, utc_today())
+
+
 def test_scanned_pages_in_a_mixed_pdf_are_kept_flagged_and_reported(env):
     job_id = job_id_from(upload(env.browser, scanned_pdf(2, then_text=True)))
     assert real_worker(env).run_once() == job_id
@@ -399,6 +447,26 @@ def test_scanned_pages_in_a_mixed_pdf_are_kept_flagged_and_reported(env):
     text = page_text(env.browser.get(f"/jobs/{job_id}").text)
     assert "Pages 1 and 2 are scanned images, so they were not converted" in text
     assert "OCR" not in text  # the old advice made exactly these files
+
+
+def test_the_pages_note_offers_to_read_them_with_the_price_and_the_form_filled_in(tmp_path):
+    """With the option offered and its box not checked, the job page says what reading the pages
+    would cost (the per-page setting) and the way to ask: the upload form with the box checked."""
+    env = WebEnv(tmp_path, daily_spend_cap_usd=CAP, max_pages_per_job=30, feature_image_pages=True)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        # Fewer than half are scans: a file of mostly scans waits for the choice first (WS7.8).
+        mixed = scanned_pdf(2, then_text=True, text_pages=3)
+        job_id = job_id_from(upload(client, mixed))
+        assert real_worker(env).run_once() == job_id
+        page = client.get(f"/jobs/{job_id}").text
+        text = page_text(page)
+        assert "Pages 1 and 2 are scanned images, so they were not converted" in text
+        assert "up to $0.50" in text and "2 pages at up to $0.25 each" in text
+        assert f"/app?revises={job_id}&amp;image_pages=on" in page
+        form = client.get(f"/app?revises={job_id}&image_pages=on").text
+        assert re.search(r'id="image_pages"[^>]*\schecked', form)
 
 
 def test_a_pipeline_result_with_nothing_in_it_fails_instead_of_finishing_empty(env):

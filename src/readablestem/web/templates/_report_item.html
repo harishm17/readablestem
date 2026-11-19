@@ -1,9 +1,7 @@
-{# "Report this item" on a review card: the feedback path (web/report_item.py) with the job
-   and item ids filled in, nothing from the document. No link when no path is set up.
-   Import with context (it reads `report_url`). #}
+{# Audiences: owner, reviewer #}
+{# "Report this item" on a review card: a link to the app's own report form
+   (web/report_item.py, routes/reports.py) with the item's id in the address, nothing from the
+   document. Import with context (it reads `report_url`). #}
 {% macro report_link(job_id, item_id, name) %}
-{% set url = report_url(job_id, item_id) %}
-{% if url %}
-<p class="report-link"><a href="{{ url }}"{% if not url.startswith("mailto:") %} rel="noopener"{% endif %} data-role="report-item">Report this item<span class="visually-hidden">: {{ name }}{% if url.startswith("mailto:") %} (opens your email program){% endif %}</span></a></p>
-{% endif %}
+<p class="report-link"><a href="{{ report_url(job_id, item_id) }}" data-role="report-item">Report this item<span class="visually-hidden">: {{ name }}</span></a></p>
 {% endmacro %}

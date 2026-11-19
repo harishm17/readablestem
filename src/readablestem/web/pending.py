@@ -74,7 +74,10 @@ def create(
     mode: str,
     course_id: str | None,
     exam: bool,
+    language: str | None = None,
     image_pages: bool = False,
+    office: dict | None = None,
+    scans: dict | None = None,
     now: datetime | None = None,
 ) -> PendingUpload:
     """Keep a large file for the person to choose its pages. Raises `TooManyPending`, or
@@ -96,7 +99,10 @@ def create(
         content=data,
         course_id=course_id,
         exam_mode=exam,
+        language=language,
         image_pages=image_pages,
+        office_json=office,
+        scans_json=scans,
         retention_mode=mode,
         done_pages=[],
         created_at=moment,

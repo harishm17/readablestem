@@ -33,6 +33,7 @@ from readablestem.core.types import (
 from readablestem.ops.retention import purge_expired
 from readablestem.web import heading_groups, job_page
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_when
 from readablestem.web.db import Job, session_scope, utcnow
 
 
@@ -150,17 +151,36 @@ def test_activity_never_shortens_the_time_kept(ux):
 
 def test_keep_7_more_days_on_the_job_page(ux):
     html = page(ux)
-    assert "Keep for 7 days" in html and "Then it is deleted on" in html
+    until = format_when(stored_job(ux).retain_until)
+    line = html.split('id="retention-line"', 1)[1].split("</div>", 1)[0]
+    assert until in text_of(line) and f'action="/jobs/{ux.job_id}/keep"' in line
     assert html.count(f'action="/jobs/{ux.job_id}/keep"') == 1  # once, not repeated below
-    assert (
-        html.index('id="retention-line"') > html.index('id="next-actions"') or "Review" not in html
-    )
+    # under the status box, before the review and download group
+    assert html.index('id="retention-line"') < html.index('id="review-and-download"')
     set_retain_until(ux, utcnow() + timedelta(hours=1))
-    post(ux, "/keep")
+    response = post(ux, "/keep")
     job = stored_job(ux)
     assert (job.retention_mode, job.opt_in_retention) == ("week", False)
     assert timedelta(days=6, hours=23) < retain_in(ux) <= timedelta(days=7)
-    assert "7 days after you last work on it" in text_of(page(ux))
+    after = page(ux)
+    assert format_when(job.retain_until) in text_of(after)  # the notice and the line
+    assert response.headers["location"] == f"/jobs/{ux.job_id}"
+
+
+def test_an_action_that_restarts_the_clock_says_the_new_time(ux):
+    """F-051: the deletion time moved with every action and nothing said so. After a
+    decision that moved it by hours, the notice names the new time; a decision that moved it
+    by seconds is not worth a sentence."""
+    set_retain_until(ux, utcnow() + timedelta(hours=2))
+    response = decide(ux, "p1-e2", action="accept")
+    moved = stored_job(ux).retain_until
+    assert timedelta(hours=23) < retain_in(ux) <= timedelta(hours=24)
+    landing = ux.browser.get(response.headers["location"]).text
+    assert format_when(moved) in text_of(landing)
+    again = decide(ux, "p1-e5", action="accept")
+    assert format_when(stored_job(ux).retain_until) not in text_of(
+        ux.browser.get(again.headers["location"]).text
+    )
 
 
 def test_keeping_needs_the_csrf_token_and_the_owner(ux):
@@ -234,7 +254,8 @@ def test_an_empty_title_goes_back_to_the_pdfs(titled):
     post(titled, "/title", title="Calculus")
     post(titled, "/title", title="")
     assert stored_job(titled).title_override is None
-    assert title_field(page(titled)) == "Derivatives"
+    # Back to the title students hear without one: the page's own (SW6c: its one H1).
+    assert title_field(page(titled)) == html_title(stored_job(titled).html) != "Calculus"
 
 
 def test_a_title_that_is_too_long_is_refused_with_what_was_typed(titled):
@@ -269,21 +290,20 @@ def test_a_title_is_escaped_in_the_page_and_the_file(titled):
 
 
 def footer_of(html: str) -> str:
-    return html[html.index("<footer") :]
+    """The student note, which holds the contact line (inside `<main>`, after the content)."""
+    return html[html.index('<section id="about-conversion"') :]
 
 
 def test_the_contact_line_goes_in_the_student_footer(ux):
     post(ux, "/contact", contact="prof.lee@example.edu")
     footer = footer_of(stored_job(ux).html)
-    assert (
-        'tell your instructor: <a href="mailto:prof.lee@example.edu">prof.lee@example.edu</a>.'
-        in footer
-    )
+    assert 'tell your instructor: <a href="mailto:prof.lee@example.edu?subject=' in footer
+    assert "(prof.lee@example.edu)." in footer
     html = page(ux)
     assert 'id="contact"' in html and 'value="prof.lee@example.edu"' in html
     assert "added to the student file" in text_of(html)
     downloaded = fetch(ux.browser, f"/jobs/{ux.job_id}/download").text
-    assert 'href="mailto:prof.lee@example.edu"' in downloaded
+    assert 'href="mailto:prof.lee@example.edu?subject=' in downloaded
 
 
 def test_a_web_address_is_accepted_and_clearing_it_removes_the_line(ux):
@@ -440,7 +460,12 @@ def tables(tmp_path):
     output = table_output()
     fix = output.result.fix_for("p1-e1")
     assert fix is not None
-    fix.checks = [Check(name="table.headers", passed=False, severity="warning", code="no_headers")]
+    # The common case: the grid read from the PDF after no model answer could be used, in
+    # which nothing says a row is a header. Two findings, and still no Accept.
+    fix.checks = [
+        Check(name="table.source", passed=False, severity="warning", code="local_grid"),
+        Check(name="table.headers", passed=False, severity="warning", code="no_headers"),
+    ]
     env = make_env(tmp_path, output, table_pdf())
     with env.running() as client:
         env.allow(ALICE)
@@ -451,17 +476,31 @@ def tables(tmp_path):
         yield env
 
 
-def test_the_button_sets_the_first_row_as_headers_and_settles_the_table(tables):
+def test_a_table_with_no_header_cell_is_a_choice_of_four_and_a_choice_settles_it(tables):
+    page = tables.browser.get(f"/jobs/{tables.job_id}/review?item=p1-e1").text
+    for answer in (
+        "Use the first row as headers",
+        "Use the first column as headers",
+        "Use the first row and column as headers",
+        "This grid is not a table",
+    ):
+        assert answer in page
+    assert 'data-role="accept"' not in page
     version = tables.job(tables.job_id).result_version
+    # Accepting it as it is is refused, whoever sends the request.
+    refused = post(tables, "/review/p1-e1", status=422, action="accept", version=str(version))
+    assert "cannot be accepted as it is" in refused.text
     post(
         tables,
         "/review/p1-e1",
         action="edit",
         change="headers",
-        header_row="on",
+        header_col="on",
         version=str(version),
     )
     result = DocumentResult.model_validate(tables.job(tables.job_id).result_json)
     fix = result.fix_for("p1-e1")
     assert fix is not None and fix.table is not None
-    assert fix.table.grid.header_rows == 1 and not fix.pending
+    grid = fix.table.grid
+    assert (grid.header_rows, grid.header_cols, grid.header_source) == (0, 1, "reviewer")
+    assert not fix.pending

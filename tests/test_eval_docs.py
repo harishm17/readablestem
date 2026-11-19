@@ -58,3 +58,10 @@ def test_the_two_version_numbers_are_told_apart() -> None:
     assert "PIPELINE_VERSION" in section and "__version__" in section
     assert readablestem.__version__ in section
     assert run.PIPELINE_VERSION  # the number reports are measured under, not the package's
+
+
+def test_the_readme_states_the_pipeline_version_the_code_has() -> None:
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    stated = re.search(r"The pipeline is version (\d+\.\d+\.\d+) \(`PIPELINE_VERSION`\)", readme)
+    assert stated, "the README no longer says which pipeline version the code is"
+    assert stated.group(1) == run.PIPELINE_VERSION

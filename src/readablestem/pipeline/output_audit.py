@@ -389,6 +389,8 @@ class _HtmlReader:
             run.words.append(" ")
         elif node.attrs.get("role") == "doc-noteref":
             run.words.append(THING)  # a note's mark: each format numbers its own
+        elif node.attrs.get("role") == "doc-backlink":
+            pass  # the way back from a note: Word's footnote has its own, so no part of the note
         elif inner.flag and not state.flag:
             # A flag inside a line (a kept equation, an unreadable character): what it
             # says is the tool's notice, and a voice adds words of its own after it.

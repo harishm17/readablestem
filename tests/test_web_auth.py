@@ -171,6 +171,21 @@ def test_logout_is_post_only_with_csrf(web):
     assert web.browser.get("/app").status_code == 303
 
 
+@pytest.mark.parametrize("path", ["/", "/limits", "/privacy", "/no-such-page"])
+def test_a_page_with_no_form_sets_no_cookie_and_the_sign_in_page_sets_one(web, path):
+    fresh = web.client()
+    assert "set-cookie" not in fresh.get(path).headers
+    assert "set-cookie" in fresh.get("/dev-login").headers  # its form needs a token
+    fresh.close()
+
+
+def test_signing_out_says_it_ended_every_session(web):
+    web.allow(ALICE)
+    login(web.browser, ALICE)
+    sign_out(web.browser)
+    assert "signed out on every device" in web.browser.get("/").text
+
+
 def test_removing_someone_from_the_allowlist_ends_their_access_immediately(web):
     web.allow(ALICE)
     login(web.browser, ALICE)
@@ -231,10 +246,12 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     assert posts == [
         "/account/delete",  # a person deletes their own account (open sign-up)
         "/account/keep-default",  # a person's own "keep 7 days by default" setting
+        "/account/name",  # the name a person's shared documents show beside their address
         "/admin/allowlist",
         "/admin/allowlist/remove",
         "/admin/linked-emails",  # another Google account for an instructor (T3-10)
         "/admin/linked-emails/remove",
+        "/admin/reports/{report_id}/close",  # the operator closes a problem report
         "/admin/users/block",  # open sign-up: stop an account, or let it back
         "/admin/users/unblock",
         # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
@@ -244,6 +261,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/courses/{course_id}/entries",
         "/courses/{course_id}/entries/{entry_id}",
         "/courses/{course_id}/entries/{entry_id}/delete",
+        "/courses/{course_id}/people",  # a person's access to every document of a course (WS27.1)
+        "/courses/{course_id}/people/{grant_id}/remove",
         "/courses/{course_id}/remember",
         "/courses/{course_id}/rename",
         "/courses/{course_id}/starter",  # add the ticked starter symbols
@@ -252,7 +271,9 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
         "/jobs/{job_id}/accept/{slug}",  # many accepts at once, after a preview
+        "/jobs/{job_id}/cancel",  # stop a waiting or converting document
         "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
+        "/jobs/{job_id}/cut-off",  # "continue" on a file that looks cut off (WS14.5)
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/draft",  # "Download the draft anyway": makes the confirm (SW21)
         "/jobs/{job_id}/edit/{element_id}",  # the words of a paragraph; a heading made (T3-5)
@@ -262,10 +283,16 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/pages/{number}/add",  # a picture or an equation the tool missed (T3-5)
         "/jobs/{job_id}/pages/{number}/omit",  # a page left out (T3-16)
         "/jobs/{job_id}/pages/{number}/restore",
+        "/jobs/{job_id}/report",  # a problem report to the operator
         "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/jobs/{job_id}/share",  # give a named person access, or change their right (G1)
+        "/jobs/{job_id}/share/link",  # the class link (WS27.2), and its changes
+        "/jobs/{job_id}/share/link/pause",
+        "/jobs/{job_id}/share/link/remove",
+        "/jobs/{job_id}/share/link/resume",
+        "/jobs/{job_id}/share/link/update",
         "/jobs/{job_id}/share/{share_id}/revoke",  # take it away (G1)
         "/jobs/{job_id}/symbols",
         "/jobs/{job_id}/tables/accept-clean",  # the clean tables, in one write (T3-11)
@@ -288,6 +315,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
             url.replace("{upload_id}", JOB)
             .replace("{slug}", "equations")
             .replace("{share_id}", JOB)
+            .replace("{grant_id}", JOB)
+            .replace("{report_id}", JOB)
         )
         if path == "/jobs":
             response = web.browser.post(
@@ -363,6 +392,28 @@ def test_google_sign_in_requires_a_verified_email(google):
     assert response.status_code == 403
     assert "not verified" in response.text
     assert google.browser.get("/app").status_code == 303
+
+
+def _callback_failures():
+    """What authlib or the network can raise on the way back from Google that is not an
+    `OAuthError`: no code at all, a token that does not verify, an unreachable provider."""
+    import httpx
+    from authlib.jose.errors import BadSignatureError
+    from authlib.oauth2.rfc6749.errors import MissingCodeException
+
+    return [MissingCodeException(), BadSignatureError("x"), httpx.ConnectError("down")]
+
+
+@pytest.mark.parametrize("failure", _callback_failures(), ids=lambda e: type(e).__name__)
+def test_a_callback_that_breaks_in_any_way_shows_the_retry_page_not_a_500(
+    google, monkeypatch, failure
+):
+    async def broken(request, **kwargs):
+        raise failure
+
+    monkeypatch.setattr(google.ctx.oauth.google, "authorize_access_token", broken)
+    response = google.browser.get("/auth/callback")
+    assert response.status_code == 400 and "Sign-in did not finish" in response.text
 
 
 def test_google_error_shows_a_retry_page(google):

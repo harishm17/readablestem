@@ -12,7 +12,8 @@ most one `events.Outcome`: its kind, the reason code that put it in front of the
 - replaced: the other reading was taken (a second reader's or the page witness's choice on
   the card, or "Use the grid read from the PDF" on a table).
 - rejected: "Keep as image", "Keep the original", a heading kept as bold text.
-- removed: "This is not a table", a page left out (a page put back takes it back: -1).
+- removed: "This is not a table", "Not an equation", a page left
+  out (a page put back takes it back: -1).
 - added: a picture or an equation marked by hand.
 
 One thing, one outcome: a write on something whose content the reviewer already changed
@@ -64,6 +65,7 @@ _STRUCTURE_OUTCOMES = {
     "restore_page": "removed",
     "add_figure": "added",
     "add_equation": "added",
+    "not_equation": "removed",
 }
 
 Change = ReviewChange | StructureChange
@@ -82,7 +84,7 @@ def record_write(
     """Record what this write did (`events.add_outcomes`) and mark each change's `after`
     with it, for Undo. Call before the write's ReviewEdits are made."""
     firsts = _first_befores(session, job.id, [c.element_id for c in changes])
-    origin = "source" if result.origin in {"latex", "beamer"} else "page"
+    origin = "source" if result.origin in {"latex", "beamer", "docx"} else "page"
     recorded: list[events.Outcome] = []
     for change in changes:
         structural = isinstance(change, StructureChange)
@@ -189,7 +191,7 @@ def _outcome(
     reason = events.NO_REASON if decided else _flag_reason(change.fix, before)
     if outcome == "kept" and reason == events.NO_REASON:
         return None  # nobody was asked, and nothing changed
-    return _made(change.fix.kind.value, reason, outcome, origin)
+    return _made(change.fix.kind.value, reason, outcome, origin, source=_opener(change.fix))
 
 
 def _structure_outcome(
@@ -208,23 +210,43 @@ def _structure_outcome(
         return _made("equation", events.NO_REASON, outcome, origin)
     element = (held.get("elements") or {}).get(change.element_id) or {}
     kind = str(element.get("kind", "paragraph"))
+    if change.action == "not_equation":
+        # The equation that was asked about, and the code that asked.
+        asked = (held.get("fixes") or {}).get(change.element_id)
+        reason, source = events.NO_REASON, triage.PIPELINE
+        if isinstance(asked, dict):
+            fix = Fix.model_validate(asked)
+            if not fix.decided_by_reviewer:
+                reason, source = _flag_reason(fix, {}), _opener(fix)
+        return _made(kind, reason, outcome, origin, source=source)
     if change.action == "edit_text":
         was = ((first or {}).get(STRUCTURE_KEY) or {}).get("elements", {}).get(change.element_id)
         if isinstance(was, dict) and was.get("text") != element.get("text"):
             return None  # its words were already changed by a person, and counted
     fix = result.fix_for(change.element_id) if change.action == "edit_text" else None
-    reason = events.NO_REASON
+    reason, source = events.NO_REASON, triage.PIPELINE
     if fix is not None and not fix.decided_by_reviewer:
-        reason = _flag_reason(fix, {})
-    return _made(kind, reason, outcome, origin)
+        reason, source = _flag_reason(fix, {}), _opener(fix)
+    return _made(kind, reason, outcome, origin, source=source)
+
+
+def _opener(fix: Fix) -> str:
+    """The source that put this fix in front of the reviewer: the first it names."""
+    return triage.sources_of(fix)[0]
 
 
 def _made(
-    kind: str, reason: str, outcome: str, origin: str, count: int = 1
+    kind: str,
+    reason: str,
+    outcome: str,
+    origin: str,
+    count: int = 1,
+    source: str = triage.PIPELINE,
 ) -> events.Outcome | None:
     if kind not in events.OUTCOME_KINDS:
         return None
-    source = "browsing" if reason == events.NO_REASON else "pipeline"
+    if reason == events.NO_REASON:
+        source = events.BROWSING
     return events.Outcome(kind, reason, outcome, origin, source, count)
 
 

@@ -86,19 +86,26 @@ def test_the_public_pages_in_open_mode_pass_axe(site, browser, axe_source, path)
     assert not violations, describe(violations)
 
 
-@pytest.mark.parametrize("path", ["/account", "/account/delete", "/admin", "/app"])
+@pytest.mark.parametrize(
+    "path",
+    ["/account", "/account/delete", "/admin", "/admin: the question before a block", "/app"],
+)
 def test_the_account_and_admin_pages_pass_axe(site, browser, axe_source, path):
     context = browser.new_context(bypass_csp=True)
     page = context.new_page()
     sign_in(page, site.base, CAROL)  # makes the account (open tier)
-    if path == "/admin":
+    if path.startswith("/admin"):
         context.close()
         context = browser.new_context(bypass_csp=True)
         page = context.new_page()
         _make_a_blocked_person(site)
         sign_in(page, site.base, ADMIN)
-    response = page.goto(site.base + path)
+    response = page.goto(site.base + path.partition(":")[0])
     assert response is not None and response.status == 200
+    if ":" in path:  # the question is the answer to the form, never an address of its own
+        page.fill("#block-email", CAROL)
+        page.click("form[aria-labelledby='block-heading'] button[type=submit]")
+        page.wait_for_selector(".confirm-actions")
     violations = axe_violations(page, axe_source)
     context.close()
     assert not violations, describe(violations)

@@ -5,7 +5,7 @@
   "text_layer": "Δ𝐝 Δ𝑡. 2.4",
   "mathml": "<math display=\"block\"><mrow><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>.</mo></mrow></math>",
   "label": "2.4",
-  "speech": "capital delta bold d over capital delta t",
+  "speech": "cap delta bold d over cap delta t",
   "glyphs": [
     40,
     41,

@@ -14,6 +14,8 @@ import json
 from functools import cache
 from pathlib import Path
 
+import pymupdf
+
 from readablestem.core.types import Element, Kind
 from readablestem.pipeline import layout, slides
 from readablestem.pipeline.layout import analyze
@@ -93,6 +95,95 @@ def test_a_selection_of_pages_is_read_as_a_deck_of_those_pages():
     result = analyze(pdf, pages=[0, 1, 2])
     assert result.pages == [2]
     assert [e.text for e in result.elements if e.kind == Kind.HEADING] == ["Wave Speed"]
+
+
+# ------------------------------------------------------------------ decks with no Beamer, no labels
+
+SLIDE = (720.0, 540.0)
+WIDE = (720.0, 405.0)  # 16:9
+LETTER = (792.0, 612.0)  # a letter sheet on its side
+
+
+def title_slide(text: str, size: float = 66.0, size_of_page=SLIDE) -> tuple:
+    return size_of_page, [(text, 240, size), ("A short subtitle for this talk", 330, 24)]
+
+
+def slide(title: str, *lines: str, size_of_page=SLIDE, ordinary: float = 36.0) -> tuple:
+    body = [(line, 150 + 50 * i, 20) for i, line in enumerate(lines)]
+    return size_of_page, [(title, 80, ordinary), *body]
+
+
+def deck_pdf(pages: list[tuple]) -> bytes:
+    """A PDF with no creator, no labels and no theme: a page is (size, [(text, y, font size)])."""
+    doc = pymupdf.open()
+    for (width, height), lines in pages:
+        page = doc.new_page(width=width, height=height)
+        for text, y, size in lines:
+            page.insert_text((60, y), text, fontsize=size)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def heading_levels_of(result: layout.Layout) -> dict[str, int]:
+    from readablestem.pipeline import heading_step
+
+    fixes = heading_step.heading_fixes(result.elements)
+    level = {f.element_id: f.heading.level for f in fixes if f.heading is not None}
+    return {e.text: level[e.id] for e in result.elements if e.id in level and e.text}
+
+
+def test_a_powerpoint_style_deck_loses_its_earlier_steps_and_only_when_it_has_titles():
+    one = ["Wave one rises"]
+    two = [*one, "Wave two follows"]
+    three = [*two, "Wave three ends"]
+    # A deck printed to PDF is on a letter sheet turned on its side: its titles make it a deck.
+    for sheet in (SLIDE, LETTER):
+        pages = [
+            slide("Waves", *one, size_of_page=sheet),
+            slide("Waves", *two, size_of_page=sheet),
+            slide("Waves", *three, size_of_page=sheet),
+            slide("Energy", "Energy is conserved", size_of_page=sheet),
+        ]
+        result = analyze(deck_pdf(pages))
+        assert result.pages == [2, 3]  # the first two pages are steps of the third
+        assert [e.text for e in result.elements if e.kind == Kind.HEADING] == ["Waves", "Energy"]
+        # the same pages with no title on any of them are not slides: nothing is dropped
+        plain = [(size, [(t, y, 20) for t, y, _ in lines[1:]]) for size, lines in pages]
+        assert analyze(deck_pdf(plain)).pages == [0, 1, 2, 3]
+
+
+def test_a_second_title_slide_or_a_new_page_size_starts_a_second_deck_at_the_same_level():
+    for second in (SLIDE, WIDE):
+        pages = [
+            title_slide("First Lecture"),
+            slide("Alpha", "First point"),
+            slide("Beta", "Second point"),
+            title_slide("Second Lecture", 50.0, second),
+            slide("Gamma", "Third point", size_of_page=second),
+            slide("Delta", "Fourth point", size_of_page=second),
+        ]
+        if (
+            second == WIDE
+        ):  # a new size alone starts a deck: its first page need not be a title slide
+            pages[3] = slide("Second Lecture", "A line", size_of_page=second, ordinary=50.0)
+        levels = heading_levels_of(analyze(deck_pdf(pages)))
+        assert levels["First Lecture"] == levels["Second Lecture"] == 1
+        assert {levels[t] for t in ("Alpha", "Beta", "Gamma", "Delta")} == {2}
+
+
+def test_a_formula_larger_than_the_slide_title_does_not_make_a_title_slide():
+    def formula(title: str) -> tuple:
+        return SLIDE, [
+            (title, 80, 36),
+            ("x = -b / 2a", 270, 50),
+            ("The roots of the polynomial follow from this formula", 480, 20),
+        ]
+
+    pages = [title_slide("First Lecture"), formula("Alpha"), formula("Beta"), formula("Gamma")]
+    levels = heading_levels_of(analyze(deck_pdf(pages)))
+    assert levels["First Lecture"] == 1
+    assert {levels[t] for t in ("Alpha", "Beta", "Gamma")} == {2}
 
 
 # ------------------------------------------------------------------ non-slide files

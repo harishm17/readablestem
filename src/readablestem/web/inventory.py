@@ -37,6 +37,7 @@ Words inside `\text{}` and similar commands are not symbols.
 from __future__ import annotations
 
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Final
@@ -50,6 +51,7 @@ from readablestem.core.types import (
     Fix,
     Kind,
 )
+from readablestem.pipeline.speech import CAP, SPEECH_VERSION, in_full_words
 from readablestem.web.review import (
     INVENTORY_KEY,
     RELABEL_ACTION,
@@ -245,7 +247,7 @@ def name_of(key: str) -> str:
     if key.isdigit():
         return f"the digit {key}"
     if key.isalpha():
-        return said if said.lower().startswith("capital") else f"small {key}"
+        return in_full_words(said) if said.startswith(f"{CAP} ") else f"small {key}"
     return said
 
 
@@ -276,6 +278,7 @@ class Place:
     after: str
     changeable: bool  # the equation still waits for a decision
     crop: bool  # a picture of the equation is kept
+    crop_size: tuple[int, int] | None  # its size in pixels (the file's header)
 
     @property
     def value(self) -> str:
@@ -391,7 +394,7 @@ def _family_name(family: tuple[str, ...]) -> str:
     return ", ".join(_rendered(k)[0] for k in family)
 
 
-def inventory(result: DocumentResult, crop_ids: set[str]) -> Inventory:
+def inventory(result: DocumentResult, crop_ids: Mapping[str, tuple[int, int] | None]) -> Inventory:
     """Every symbol of the handwritten equations, grouped with the ones that look alike:
     the families with more than one symbol read first, then the others, then the symbols in
     no family. Within a family, the order of the family's own list."""
@@ -420,6 +423,7 @@ def inventory(result: DocumentResult, crop_ids: set[str]) -> Inventory:
                     after=after,
                     changeable=fix.pending,
                     crop=element.id in crop_ids,
+                    crop_size=crop_ids.get(element.id),
                 )
             )
     families: list[Family] = []
@@ -484,7 +488,7 @@ def relabel(
     each fix stays."""
     from readablestem.web import edit_check
 
-    found = inventory(result, set()).row(source)
+    found = inventory(result, {}).row(source)
     family = FAMILY_OF.get(source)
     if found is None:
         raise ReviewInvalid([FieldError("symbols", "That symbol is not in these equations.")])
@@ -513,7 +517,7 @@ def relabel(
         before = snapshot(fix)
         fix.equation = EquationFix(
             latex=checked.latex, mathml=checked.mathml, speech=checked.speech,
-            display=checked.display,
+            speech_version=SPEECH_VERSION, display=checked.display,
         )  # fmt: skip
         fix.checks = _kept_checks(fix.checks, checked.checks)
         after = snapshot(fix)

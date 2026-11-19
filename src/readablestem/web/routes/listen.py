@@ -1,7 +1,8 @@
 """Listen as a student: the transcript of what a screen reader says for a converted document.
 
 `GET /jobs/{job_id}/listen` is for the owner and anyone the document was shared with (access
-`view`, like the student preview), and `GET /demo/listen` is public, for the stored demo. Both
+`view`, like the student preview, and like it never read out as a draft to a person who may not
+take one: `output.shown`), and `GET /demo/listen` is public, for the stored demo. Both
 only read: no POST, nothing stored, nothing logged, and the transcript is made from the same
 HTML the student gets (`web.listen`), kept in memory per job result version.
 """
@@ -15,12 +16,13 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 
 from readablestem.core.types import DocumentResult
-from readablestem.web import documents, listen
+from readablestem.web import documents, listen, output
 from readablestem.web.db import session_scope
 from readablestem.web.deps import UserDep, get_ctx, render
 from readablestem.web.routes.jobs import current_html, job_access, require_done
 from readablestem.web.routes.pages import DEMO_DIR, DEMO_PAGE
-from readablestem.web.shares import VIEW
+from readablestem.web.shares import VIEW, role_of
+from readablestem.web.views import audience_of
 
 router = APIRouter()
 
@@ -31,10 +33,11 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, VIEW)
         require_done(job)
+        role = role_of(session, job, user) or VIEW
+        audience = audience_of(role)
+        output.shown(job, role)  # a reader is not read a draft: the transcript is built from it
         html = current_html(ctx, session, job).html or ""
-        title = documents.display_title(
-            (job.result_json or {}).get("title"), job.filename, job.title_override
-        )
+        title = documents.document_title(job).text
         result_json, version = job.result_json, job.result_version or 0
 
     def speeches() -> dict[str, str]:
@@ -47,9 +50,12 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
         {
             "items": items,
             "title": title,
+            "audience": audience,
             "back_url": f"/jobs/{job_id}",
-            "back_label": "Back to the results",
+            "back_label": "Back to the results" if audience == "owner" else "Back to the document",
             "student_url": f"/jobs/{job_id}/view",
+            "listen_doc": job_id,
+            "listen_version": version,
         },
     )
 
@@ -66,7 +72,7 @@ def _demo_items() -> list[listen.Item]:
 @router.get("/demo/listen")
 def demo_listen(request: Request) -> Response:
     if not DEMO_PAGE.is_file():
-        return render(request, "demo_pending.html", {"active": "demo"})
+        return render(request, "demo_pending.html")
     return render(
         request,
         "listen.html",
@@ -76,6 +82,7 @@ def demo_listen(request: Request) -> Response:
             "back_url": "/demo",
             "back_label": "Back to the demo",
             "student_url": "",
-            "active": "demo",
+            "listen_doc": "demo",
+            "listen_version": "demo",
         },
     )

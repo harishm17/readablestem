@@ -23,6 +23,7 @@ import pytest
 
 from fixtures.web.review_doc import PAGE, review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.ops import retention
 from readablestem.web import page_images, pdf_probe
 from readablestem.web.db import Job, session_scope, utcnow
 
@@ -57,7 +58,7 @@ def urls(env) -> list[str]:
         f"{base}/regions/p1-e2.png",
         f"{base}/regions/p1-e3.png",
         f"{base}/regions/p1-e6.png",
-        f"{base}/review/marks.css",
+        f"{base}/review/marks.css?page=1",
     ]
 
 
@@ -68,7 +69,9 @@ def test_page_and_region_images_are_rendered_for_the_owner_and_never_cached(web)
     for url in urls(web):
         response = web.browser.get(url)
         assert response.status_code == 200, url
-        assert response.headers["cache-control"] == "private, no-store", url
+        # The marks are asked again each time and answered 304 when nothing changed.
+        control = "private, no-cache" if "marks.css" in url else "private, no-store"
+        assert response.headers["cache-control"] == control, url
         if url.endswith(".png"):
             assert response.headers["content-type"] == "image/png"
     page = web.browser.get(f"/jobs/{web.job_id}/pages/1.png").content
@@ -83,8 +86,10 @@ def test_page_and_region_images_are_rendered_for_the_owner_and_never_cached(web)
 def test_nobody_else_gets_the_images(web):
     bob = web.client()
     login(bob, BOB)
+    tag = web.browser.get(urls(web)[-1]).headers["etag"]  # the owner's stylesheet tag
     for url in urls(web):
         assert bob.get(url).status_code == 404, url
+        assert bob.get(url, headers={"If-None-Match": tag}).status_code == 404, url
     assert bob.get(f"/jobs/{web.job_id}/review").status_code == 404
 
 
@@ -190,6 +195,35 @@ def test_one_user_cannot_tie_up_the_renders_and_waits_hold_no_pdf(web, monkeypat
         web.run_worker()
         assert bob.get(f"/jobs/{own}/pages/1.png").status_code == 200
     assert web.browser.get(f"/jobs/{web.job_id}/pages/1.png").status_code == 200
+
+
+def test_a_picture_asked_for_again_is_not_drawn_again_and_goes_with_its_job(web, monkeypatch):
+    drawn = []
+    real = page_images._child
+    monkeypatch.setattr(page_images, "_child", lambda *a: (drawn.append(a[0]), real(*a))[1])
+    base = f"/jobs/{web.job_id}"
+    pictures = [f"{base}/pages/1.png", f"{base}/regions/p1-e2.png"]
+    first = [web.browser.get(url) for url in pictures]
+    again = [web.browser.get(url) for url in pictures]
+    assert len(drawn) == 2
+    for before, after in zip(first, again, strict=True):
+        assert after.content == before.content
+        assert after.headers["cache-control"] == "private, no-store"
+    assert page_images.CACHE.size()[0] == 2
+
+    bob = web.client()
+    login(bob, BOB)
+    assert [bob.get(url).status_code for url in pictures] == [
+        404,
+        404,
+    ]  # the cache is behind the access check
+
+    with session_scope(web.ctx.factory) as session:
+        retention.delete_jobs(session, [web.job_id])
+    assert page_images.CACHE.size() == (0, 0)
+    # A render that was still running when the job went keeps nothing either.
+    page_images.CACHE.put(web.job_id, "upload", ("render", "0"), first[0].content)
+    assert page_images.CACHE.size() == (0, 0)
 
 
 # --------------------------------------------------------------------------- the child

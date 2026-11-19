@@ -11,12 +11,17 @@ Uploads are untrusted bytes from the internet, so:
   `web.pdf_probe`): a malformed file that crashes or hangs MuPDF takes down a child, not
   the web server.
 
+- A body that says (Content-Length) it is more than the person may still store is refused
+  before any of it is read (`routes.jobs._storage_refusal`, with the words of a file refused
+  after being read).
 - At most `MAX_CONCURRENT_UPLOADS` uploads are taken in at once, and one per user
-  (`UploadGate`). An upload is held in memory while it is read, copied once, and read
-  again by the probe child, so each costs about three times its size: with the defaults
-  (3 at once, up to 100 MB each: `MAX_LARGE_UPLOAD_MB`) that is at most about 900 MB when all
-  three are as large as allowed, and near 100 MB for ordinary 5 to 10 MB files, however many
-  requests arrive at once (the limit was set when Cloud Run sent up to 20 at a time); see
+  (`UploadGate`). The file is held once while it is read (`_body_of` hands out the parser's
+  buffer, it does not copy it), and a second and third time by the database driver when it is
+  stored (measured with SQLite: 3 times in all; Postgres has not been measured). The probe child
+  reads it from a pipe. So each costs about three times its size: with the defaults (3 at once,
+  up to 100 MB each: `MAX_LARGE_UPLOAD_MB`) that is at most about 900 MB when all three are as
+  large as allowed, and near 100 MB for ordinary 5 to 10 MB files, however many requests arrive
+  at once (the limit was set when Cloud Run sent up to 20 at a time); see
   docs/deploy-railway.md, "Request size", for the memory to allow. A batch zip
   (`FEATURE_BATCH_ZIP`, docs/web.md "memory, per request") adds to that the text of its `.tex`
   files (24 MB) and one unpacked document (at most 100 MB, the budget of
@@ -30,6 +35,7 @@ Every rejection is an `UploadRejected` with a category `code`, safe to log.
 
 from __future__ import annotations
 
+import io
 import json
 import subprocess
 import sys
@@ -37,14 +43,19 @@ import threading
 import unicodedata
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass, field
+from typing import TYPE_CHECKING
 
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import Request
 
 from readablestem.core.childenv import child_env
-from readablestem.web import office_convert
+from readablestem.web import archive_intake, office_convert
 from readablestem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
+
+if TYPE_CHECKING:
+    from readablestem.config import Settings
+    from readablestem.pipeline.page_type import ImagePageCount
 
 # Room for the multipart boundaries and the small text fields around the file itself.
 FORM_OVERHEAD_BYTES = 64 * 1024
@@ -122,6 +133,34 @@ class UploadForm:
 
 def max_upload_bytes(max_upload_mb: int) -> int:
     return max_upload_mb * 1024 * 1024
+
+
+# The two sizes an upload is held to, each with one name wherever a page or a refusal says it
+# (SW12). Both are read from the settings, never typed:
+# - "one document" (`max_pages_per_job`, `max_upload_mb`): converted as it is;
+# - "one file" (`source_page_limit`, `upload_limit_mb`): the most one upload may be. A file
+#   bigger than one document is kept so its pages can be chosen, in parts that are documents.
+def one_document(settings: Settings) -> str:
+    """The size of one document, as the pages say it: "100 pages and 50 MB"."""
+    return f"{settings.max_pages_per_job} pages and {settings.max_upload_mb} MB"
+
+
+def zip_limits(unpacked_bytes: int | None = None) -> str:
+    """What a zip may be, as the pages say it: "20 MB, 100 MB unpacked and 500 files", read
+    from the limits the intake enforces (`archive_intake.DEFAULT_LIMITS`); `unpacked_bytes`
+    for a zip of documents, whose unpacked size is the request's budget."""
+    limits = archive_intake.DEFAULT_LIMITS
+    mb = 1024 * 1024
+    unpacked = limits.max_unpacked_bytes if unpacked_bytes is None else unpacked_bytes
+    return (
+        f"{limits.max_zip_bytes // mb} MB, {unpacked // mb} MB unpacked and "
+        f"{limits.max_entries} files"
+    )
+
+
+def one_file(settings: Settings) -> str:
+    """The size of one file, as the pages say it: "500 pages and 100 MB"."""
+    return f"{settings.source_page_limit} pages and {settings.upload_limit_mb} MB"
 
 
 @dataclass
@@ -213,13 +252,25 @@ async def read_upload_form(
             raise UploadRejected("too_many_files")
         files = []
         for upload in uploads:
-            data = await upload.read()
+            data = _body_of(upload)
             if len(data) > max_bytes:
                 raise UploadRejected("too_large")
             files.append(UploadedFile(safe_filename(upload.filename), data))
         return UploadForm(fields=fields, files=files)
     finally:
         await form.close()
+
+
+def _body_of(upload: UploadFile) -> bytes:
+    """The bytes of an uploaded file, without a second copy of them. The parser keeps the file
+    in a `BytesIO` (`_InMemoryParser`), and `read()` copies it, so a 100 MB file peaked at
+    twice its size; `getvalue()` hands out the buffer itself. A file that is not in memory (not
+    the case here) is read."""
+    held = getattr(upload.file, "_file", None)  # SpooledTemporaryFile's in-memory buffer
+    if isinstance(held, io.BytesIO):
+        return held.getvalue()
+    upload.file.seek(0)
+    return upload.file.read()
 
 
 def safe_filename(raw: str | None, *, limit: int = 200) -> str:
@@ -271,10 +322,13 @@ def inspect_pdf_detail(
     max_pages: int,
     timeout_s: float = INSPECT_TIMEOUT_S,
     allow_image_pages: bool = False,
-) -> tuple[int, int]:
+    count_image_pages: bool = False,
+) -> tuple[int, ImagePageCount]:
     """`(pages, image_pages)`: `inspect_pdf_isolated` and, when `allow_image_pages` (the person
-    asked for scanned and handwritten pages to be converted), how many pages the probe found
-    scanned or handwritten (0 without the request)."""
+    asked for scanned and handwritten pages to be converted) or `count_image_pages` (the
+    deployment offers to read them), how many pages the probe found the image page pass would
+    read, by kind, "at least" when some page's drawings were not analysed
+    (`page_type.ImagePageCount`; none without either)."""
     if not data:
         raise UploadRejected("empty")
     if not looks_like_pdf(data):
@@ -286,7 +340,7 @@ def inspect_pdf_detail(
                 "-m",
                 "readablestem.web.pdf_probe",
                 str(max_pages),
-                *(["image_pages"] if allow_image_pages else []),
+                *(["image_pages"] if allow_image_pages else ["count"] if count_image_pages else []),
             ],
             input=data,
             capture_output=True,  # MuPDF's own messages are discarded, never logged
@@ -300,8 +354,21 @@ def inspect_pdf_detail(
     if not isinstance(answer, dict):
         raise UploadRejected("unreadable")
     if answer.get("ok") is True and isinstance(answer.get("pages"), int):
-        found = answer.get("image_pages")
-        return answer["pages"], found if isinstance(found, int) and found >= 0 else 0
+        from readablestem.pipeline.page_type import ImagePageCount
+
+        counts = answer.get("image_pages")
+        counts = counts if isinstance(counts, dict) else {}
+
+        def count(key: str) -> int:
+            value = counts.get(key)
+            return value if isinstance(value, int) and not isinstance(value, bool) else 0
+
+        return answer["pages"], ImagePageCount(
+            max(count("scanned"), 0),
+            max(count("handwritten"), 0),
+            max(count("unread"), 0),
+            max(count("unanalysed"), 0),
+        )
     code = answer.get("code")
     pages = answer.get("pages")
     raise UploadRejected(
@@ -348,6 +415,31 @@ def extract_part_isolated(
     return completed.stdout
 
 
+OUTLINE_TIMEOUT_S = 15.0
+
+
+def outline_starts_isolated(data: bytes, *, timeout_s: float = OUTLINE_TIMEOUT_S) -> list[int]:
+    """The 0-based pages where the PDF's top-level bookmarks point, read in a child process
+    like the probe; empty when it has none or anything goes wrong (the suggestion then cuts
+    evenly). Call it from a worker thread, not the event loop."""
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "readablestem.web.pdf_probe", "outline"],
+            input=data,
+            capture_output=True,
+            timeout=timeout_s,
+            check=False,
+            env=child_env(),
+        )
+        if completed.returncode != 0:
+            return []
+        answer = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+        starts = answer["starts"]
+        return [p for p in starts if isinstance(p, int)] if isinstance(starts, list) else []
+    except (subprocess.TimeoutExpired, OSError, ValueError, KeyError, IndexError):
+        return []
+
+
 # --------------------------------------------------------------------------- Word and PowerPoint
 
 OFFICE_WAIT_S = 5.0  # how long a second conversion waits for the first before "busy"
@@ -364,10 +456,11 @@ def is_office_upload(data: bytes) -> bool:
 
 def convert_office_isolated(
     data: bytes, *, soffice: str | None, timeout_s: float = office_convert.DEFAULT_TIMEOUT_S
-) -> bytes:
+) -> tuple[bytes, office_convert.Census]:
     """A Word or PowerPoint file as a tagged PDF, made in a child process
-    (`web.office_convert`), or `UploadRejected` with a category. Call it from a worker
-    thread. The caller probes the PDF afterwards like any upload."""
+    (`web.office_convert`), with the census the child counted in the file (what the PDF route
+    does with it), or `UploadRejected` with a category. Call it from a worker thread. The
+    caller probes the PDF afterwards like any upload."""
     if soffice is None:
         raise UploadRejected("office_unavailable")
     if not _OFFICE_SLOT.acquire(timeout=OFFICE_WAIT_S):
@@ -378,7 +471,51 @@ def convert_office_isolated(
         _OFFICE_SLOT.release()
 
 
-def _run_office_child(data: bytes, soffice: str, timeout_s: float) -> bytes:
+WORD_CHECK_TIMEOUT_S = 30.0
+
+
+def check_word_isolated(data: bytes) -> tuple[office_convert.Census, int]:
+    """The gate of the Word reader (`source.docx_package.check`) run in a child process, as
+    the conversion is: the file's census and the pages it will count as, or `UploadRejected`
+    with the category the Office route uses for the same file. Nothing is converted."""
+    try:
+        child = subprocess.Popen(
+            [sys.executable, "-m", "readablestem.web.office_convert", "--check"],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.DEVNULL,
+            env=child_env(),
+            start_new_session=True,
+        )
+    except OSError:
+        raise UploadRejected("office_failed") from None
+    try:
+        out, _ = child.communicate(data, timeout=WORD_CHECK_TIMEOUT_S)
+    except (subprocess.TimeoutExpired, OSError):
+        office_convert.kill_group(child)
+        raise UploadRejected("office_failed") from None
+    finally:
+        office_convert.kill_group(child)
+    try:
+        answer = json.loads(out.partition(b"\n")[0].decode("utf-8"))
+    except ValueError:
+        raise UploadRejected("office_failed") from None
+    if isinstance(answer, dict) and answer.get("ok") is True:
+        pages = answer.get("pages")
+        try:
+            census = office_convert.Census.from_json(answer.get("census"))
+        except ValueError:
+            raise UploadRejected("office_failed") from None
+        if isinstance(pages, int) and not isinstance(pages, bool) and pages >= 1:
+            return census, pages
+        raise UploadRejected("office_failed")
+    code = answer.get("code") if isinstance(answer, dict) else None
+    raise UploadRejected(code if code in REJECTION_STATUS else "office_failed")
+
+
+def _run_office_child(
+    data: bytes, soffice: str, timeout_s: float
+) -> tuple[bytes, office_convert.Census]:
     try:
         child = subprocess.Popen(
             [sys.executable, "-m", "readablestem.web.office_convert", soffice, str(timeout_s)],
@@ -403,6 +540,9 @@ def _run_office_child(data: bytes, soffice: str, timeout_s: float) -> bytes:
     except ValueError:
         raise UploadRejected("office_failed") from None
     if isinstance(answer, dict) and answer.get("ok") is True and body.startswith(b"%PDF-"):
-        return body
+        try:
+            return body, office_convert.Census.from_json(answer.get("census"))
+        except ValueError:  # a child that sends no census is not the one that was started
+            raise UploadRejected("office_failed") from None
     code = answer.get("code") if isinstance(answer, dict) else None
     raise UploadRejected(code if code in REJECTION_STATUS else "office_failed")

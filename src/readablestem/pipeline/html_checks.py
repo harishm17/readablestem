@@ -11,6 +11,7 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.heading_order | heading_skip | a heading more than one level below the previous one |
 | html.heading_text | empty_heading | a heading with no text (or img alt) in it |
 | html.img_alt | img_missing_alt | `<img>` without an `alt` attribute (`alt=""` is allowed) |
+| html.img_alt_content | empty_alt_content | `alt=""` on an `<img>` not marked as decoration |
 | html.unique_ids | duplicate_id | an id used twice |
 | html.list_structure | list_structure | an `<li>` outside a list, or anything but `<li>` in one |
 | html.math_display | math_missing_display | `<math>` with no block/inline display (warning) |
@@ -42,7 +43,12 @@ Maths, pictures and the tool's own words inside the text count as something ther
 The character rule (`output_chars`) fails on a private-use character, U+FFFD, a
 noncharacter or a control other than tab and line end, anywhere in the file, and on the
 marked gap the student page writes in place of one: each is a place a screen reader says
-nothing or "question mark". Rules added after the first set carry the day they were added
+nothing or "question mark".
+
+The empty-alt rule allows `alt=""` only inside an element with `assemble.DECORATIVE_CLASS`,
+which the renderer writes only for decoration with evidence (`pipeline.decoration`,
+WS6.4): any other picture with empty alt text is content screen readers skip. Rules added
+after the first set carry the day they were added
 (`RULE_ADDED`), stored with a failed check (`Check.added_on`).
 
 Documents with a `<table>` get five more rules (`_table_rules`, docs/tables.md), so a
@@ -82,9 +88,10 @@ from importlib import resources
 from itertools import pairwise
 from typing import Any, Literal
 
+from readablestem.core.captions import TABLE_CAPTION
 from readablestem.core.types import Check, is_safe_href
 from readablestem.pipeline import contrast, output_chars
-from readablestem.pipeline.assemble import AUTHORED_CLASS, UNREAD_PARTS_CLASS
+from readablestem.pipeline.assemble import AUTHORED_CLASS, DECORATIVE_CLASS, UNREAD_PARTS_CLASS
 from readablestem.pipeline.inline_text import COLOUR_CLASS_PREFIX
 from readablestem.pipeline.language import is_language_tag
 
@@ -104,7 +111,7 @@ LISTS = frozenset({"ul", "ol", "menu"})
 LIST_CHILDREN = frozenset({"li", "script", "template"})
 _BANNED = re.compile(r"\bcomplian(?:t|ce)\b", re.IGNORECASE)
 _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
-# A colour class rule as `inline_text.colour_css` writes it: ".tc-ff0000 { color: #ee0000; }".
+# A colour class rule as `student_sheet.colour` writes it: ".tc-ff0000 { color: #ee0000; }".
 _COLOUR_RULE = re.compile(
     rf"\.({re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}})\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
 )
@@ -129,6 +136,7 @@ def has_hole(text: str) -> bool:
 RULE_ADDED: dict[str, date] = {
     "html.sentence_holes": date(2026, 11, 11),
     "html.characters": date(2026, 11, 11),
+    "html.img_alt_content": date(2026, 11, 11),
 }
 
 AXE_VERSION = "4.14.0"
@@ -160,12 +168,14 @@ class _Collector(HTMLParser):
         self.mains = 0
         self.headings: list[tuple[int, str]] = []
         self.imgs_without_alt = 0
+        self.content_imgs_empty_alt = 0  # alt="" outside decoration
         self.ids: Counter[str] = Counter()
         self.maths_without_display = 0
         self.external = 0
         self.authored_text: list[str] = []
         self.list_errors = 0  # <li> outside a list, or other content directly in one
-        self._stack: list[tuple[str, bool]] = []  # (tag, inside authored text)
+        # (tag, inside authored text, inside decoration)
+        self._stack: list[tuple[str, bool, bool]] = []
         self._heading: tuple[int, list[str]] | None = None
         self._in_title = False
         self._in_style = False
@@ -204,7 +214,7 @@ class _Collector(HTMLParser):
             self._link = None
         if tag == "math" and self._maths:
             self._maths -= 1
-        names = [name for name, _ in self._stack]
+        names = [name for name, *_ in self._stack]
         if tag in names:  # pop to the matching start tag (closes anything left open)
             del self._stack[len(names) - 1 - names[::-1].index(tag) :]
 
@@ -258,8 +268,11 @@ class _Collector(HTMLParser):
         if tag == "math" and not void:
             self._maths += 1
         if not void:
-            inherited = bool(self._stack) and self._stack[-1][1]
-            self._stack.append((tag, inherited or AUTHORED_CLASS in classes))
+            authored = bool(self._stack) and self._stack[-1][1]
+            decorative = bool(self._stack) and self._stack[-1][2]
+            authored = authored or AUTHORED_CLASS in classes
+            decorative = decorative or DECORATIVE_CLASS in classes
+            self._stack.append((tag, authored, decorative))
 
     def _unread_text(self, tag: str, attrs: dict[str, str | None], classes: Sequence[str]) -> None:
         if UNREAD_PARTS_CLASS in classes:
@@ -279,6 +292,8 @@ class _Collector(HTMLParser):
         alt = attrs.get("alt")
         if alt is None:
             self.imgs_without_alt += 1
+        elif not alt.strip() and not (self._stack and self._stack[-1][2]):
+            self.content_imgs_empty_alt += 1
         elif self._heading is not None:
             self._heading[1].append(alt)
         if alt is not None and self._link is not None:
@@ -328,6 +343,7 @@ def static_checks(html: str) -> list[Check]:
         ),
         _check("html.heading_text", all(text.strip() for _, text in doc.headings), "empty_heading"),
         _check("html.img_alt", doc.imgs_without_alt == 0, "img_missing_alt"),
+        _check("html.img_alt_content", doc.content_imgs_empty_alt == 0, "empty_alt_content"),
         _check("html.unique_ids", all(n == 1 for n in doc.ids.values()), "duplicate_id"),
         _check("html.list_structure", doc.list_errors == 0, "list_structure"),
         _check(
@@ -352,12 +368,6 @@ def static_checks(html: str) -> list[Check]:
 
 # --------------------------------------------------------------------------- tables
 
-# "Table 2.1 Speeds of ...", "TABLE 3: ...", but not "Table 2 shows that ..." (layout's
-# "Figure N" caption rule, for tables).
-TABLE_CAPTION = re.compile(
-    r"^(?:Table|TABLE|Tab\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
-    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
-)
 PRESENTATIONAL_ROLES = frozenset({"presentation", "none"})
 # Blocks that can sit between a paragraph and a table (wrapper <div>s do not count: a
 # rebuilt table sits in one).

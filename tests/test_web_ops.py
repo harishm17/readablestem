@@ -53,7 +53,7 @@ def ops(monkeypatch):
             raise state["aggregate_raises"]
         return 4
 
-    def purge_expired(factory, now=None) -> PurgeStats:
+    def purge_expired(factory, now=None, **_) -> PurgeStats:
         calls.append("purge")
         return PurgeStats(jobs_deleted=3, blobs_deleted=9, unaggregated_deleted=0)
 
@@ -129,9 +129,20 @@ def test_admin_can_allow_and_remove_people_but_not_themselves(web):
         user = session.scalar(select(User).where(User.email == "new@example.org"))
         assert user is not None and user.is_allowed and user.is_admin
 
-    web.browser.post(
-        "/admin/allowlist/remove", data={"csrf_token": csrf, "email": "new@example.org"}
+    asks = {"csrf_token": csrf, "email": "new@example.org"}
+    question = web.browser.post("/admin/allowlist/remove", data=asks)
+    assert (
+        question.status_code == 200
+        and "Remove new@example.org from the allowlist?" in question.text
     )
+    assert (
+        'action="/admin/allowlist/remove"' in question.text
+        and "stop being an admin" in question.text
+    )
+    with session_scope(web.ctx.factory) as session:  # asking changes nothing
+        asked = session.scalar(select(User).where(User.email == "new@example.org"))
+        assert asked is not None and asked.is_allowed
+    web.browser.post("/admin/allowlist/remove", data=asks | {"confirm": "yes"})
     web.browser.post("/admin/allowlist/remove", data={"csrf_token": csrf, "email": ADMIN})
     with session_scope(web.ctx.factory) as session:
         removed = session.scalar(select(User).where(User.email == "new@example.org"))
@@ -145,7 +156,7 @@ def test_admin_can_allow_and_remove_people_but_not_themselves(web):
 
 
 def test_security_headers_on_app_pages(web):
-    response = web.browser.get("/")
+    response = web.browser.get("/login")
     headers = response.headers
     assert headers["content-security-policy"] == (
         "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
@@ -180,7 +191,9 @@ def test_document_content_never_reaches_the_logs(tmp_path, monkeypatch, caplog):
     monkeypatch.setattr(validate, "safe_latex_to_mathml", lambda latex, display="block": "<math/>")
     monkeypatch.setattr(validate, "check_mathml", lambda mathml: [])
     monkeypatch.setattr(
-        speech, "mathml_to_speech", lambda m: (_ for _ in ()).throw(ValueError("SECRET-DOC-TEXT"))
+        speech,
+        "mathml_to_speech",
+        lambda m, **kw: (_ for _ in ()).throw(ValueError("SECRET-DOC-TEXT")),
     )
     monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>SECRET-DOC-TEXT</html>")
     caplog.set_level(logging.DEBUG)

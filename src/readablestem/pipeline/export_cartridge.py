@@ -35,6 +35,7 @@ from urllib.parse import quote
 from defusedxml import ElementTree
 from defusedxml.common import DefusedXmlException
 
+from readablestem.pipeline.assemble import DEFAULT_TITLE, with_medium
 from readablestem.pipeline.export_canvas import ZIP_TIME, CanvasExport
 
 NS_CP = "http://www.imsglobal.org/xsd/imsccv1p3/imscp_v1p1"
@@ -68,7 +69,7 @@ def _language(lang: str) -> str:
 def manifest_xml(export: CanvasExport, files: list[str]) -> str:
     """`imsmanifest.xml` for the cartridge holding `files` (paths inside the zip, the page
     first)."""
-    title = escape(" ".join(export.title.split()) or "Document", quote=True)
+    title = escape(" ".join(export.title.split()) or DEFAULT_TITLE, quote=True)
     seed = export.folder
     page = files[0]
     lines = [
@@ -116,7 +117,7 @@ def build_cartridge(export: CanvasExport) -> bytes:
     pictures = sorted(f"{base}/{name}" for name in export.images)
     files = [page, *pictures]
     entries: list[tuple[str, bytes]] = [(MANIFEST, manifest_xml(export, files).encode("utf-8"))]
-    entries.append((page, export.index_html.encode("utf-8")))
+    entries.append((page, with_medium(export.index_html, "Common Cartridge").encode("utf-8")))
     entries += [(f"{base}/{name}", data) for name, data in sorted(export.images.items())]
     out = BytesIO()
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as archive:

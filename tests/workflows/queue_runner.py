@@ -22,6 +22,16 @@ from readablestem.web.app import create_app
 from readablestem.web.worker import Worker, default_client_factory
 
 
+def _peak_kb() -> int:
+    """This process's own highest memory use, from /proc. `ru_maxrss` of a process that
+    another started begins at the highest use of the one that started it, so it would count
+    whatever the test worker had run before."""
+    for line in Path("/proc/self/status").read_text(encoding="utf-8").splitlines():
+        if line.startswith("VmHWM:"):
+            return int(line.split()[1])
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+
+
 def main(settings_file: str, out_file: str) -> None:
     settings: Settings = pickle.loads(Path(settings_file).read_bytes())
     clients: list[Any] = []
@@ -49,7 +59,7 @@ def main(settings_file: str, out_file: str) -> None:
                     "missed": missed,
                     # Linux counts both in KB. The second is the largest process this one
                     # started and waited for: a sandboxed program.
-                    "own_kb": resource.getrusage(resource.RUSAGE_SELF).ru_maxrss,
+                    "own_kb": _peak_kb(),
                     "started_kb": resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss,
                 }
             ),

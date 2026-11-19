@@ -20,6 +20,7 @@ list.
 from __future__ import annotations
 
 import logging
+import unicodedata
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -31,7 +32,16 @@ from readablestem.ops.retention import erase_user
 from readablestem.web import access, documents, tombstones
 from readablestem.web.database import as_utc, utc_today
 from readablestem.web.db import Job, User, session_scope, utcnow
-from readablestem.web.deps import CurrentUser, UserDep, flash, get_ctx, render, require_csrf
+from readablestem.web.deps import (
+    CurrentUser,
+    UserDep,
+    flash,
+    get_ctx,
+    render,
+    require_csrf,
+    require_user,
+)
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import next_day_start, pages_left, rereads_used
 from readablestem.web.recipients import recipients
@@ -50,27 +60,33 @@ def _context(request: Request, user: CurrentUser) -> dict[str, Any]:
     allowance = access.reread_allowance(s, user.access_tier)
     with session_scope(ctx.factory) as session:
         left = pages_left(session, user.id, quota=quota, day=utc_today(now))
-        rereads_left = (
-            None
-            if allowance is None
-            else max(0, allowance - rereads_used(session, user.id, utc_today(now)))
-        )
+        rereads = rereads_used(session, user.id, utc_today(now))
+        # The same documents storage counts: not the sample, not one past its deletion time.
         documents = int(
-            session.scalar(select(func.count()).select_from(Job).where(Job.user_id == user.id)) or 0
+            session.scalar(
+                select(func.count())
+                .select_from(Job)
+                .where(
+                    Job.user_id == user.id,
+                    Job.retain_until > now,
+                    Job.is_sample.is_(False),
+                )
+            )
+            or 0
         )
         row = session.get(User, user.id)
         joined = as_utc(row.created_at) if row is not None else None
         keep_default = bool(row is not None and row.keep_week_default)
     return {
-        "active": "account",
         "joined": joined,
         "keep_default": keep_default,
         "tier_open": access.is_open(user.access_tier),
         "page_quota": quota,
         "pages_left": left,
         "reread_allowance": allowance,
-        "rereads_left": rereads_left,
+        "rereads_used": rereads,
         "documents": documents,
+        "name": user.name or "",
         "is_admin": user.is_admin,
         "recipients": recipients(s),
         "signup_open": s.signup_open,
@@ -88,6 +104,7 @@ KEEP_OFF = "New uploads now start with “Keep for 7 days” unchecked."
 
 
 @router.post("/account/keep-default", dependencies=[Depends(require_csrf)])
+@submit_once("account.keep_default")
 def save_keep_default(
     request: Request, user: UserDep, keep_default: Annotated[str, Form()] = ""
 ) -> Response:
@@ -99,8 +116,28 @@ def save_keep_default(
         row = session.get(User, user.id)
         if row is not None:
             row.keep_week_default = on
-    flash(request, KEEP_ON if on else KEEP_OFF, undo=False)
-    return RedirectResponse("/account#account-keep", status_code=303)
+    flash(request, KEEP_ON if on else KEEP_OFF, undo=False, kind="success")
+    return RedirectResponse("/account", status_code=303)  # no fragment: the notice takes focus
+
+
+MAX_NAME = 200
+NAME_SAVED = "Your name is saved."
+NAME_CLEARED = "Your name is removed."
+
+
+@router.post("/account/name", dependencies=[Depends(require_csrf)])
+@submit_once("account.name")
+def save_name(request: Request, user: UserDep, name: Annotated[str, Form()] = "") -> Response:
+    """The name people you share a document with see beside your address (`web.views`). One
+    line, at most 200 characters, no control characters; empty removes it."""
+    cleaned = " ".join("".join(ch for ch in name if unicodedata.category(ch)[0] != "C").split())
+    cleaned = cleaned[:MAX_NAME]
+    with session_scope(get_ctx(request).factory) as session:
+        row = session.get(User, user.id)
+        if row is not None:
+            row.name = cleaned or None
+    flash(request, NAME_SAVED if cleaned else NAME_CLEARED, undo=False, kind="success")
+    return RedirectResponse("/account", status_code=303)
 
 
 def _ready_documents(request: Request, user: CurrentUser) -> int:
@@ -130,12 +167,14 @@ def confirm_delete(request: Request, user: UserDep) -> Response:
 
 
 @router.post("/account/delete", dependencies=[Depends(require_csrf)])
-async def delete_account(
-    request: Request, user: UserDep, confirm: Annotated[str, Form()] = ""
-) -> Response:
+@submit_once("account.delete")
+async def delete_account(request: Request, confirm: Annotated[str, Form()] = "") -> Response:
     """Delete only with `confirm=yes`; any other POST gets the confirmation page first.
     Erasing an account cannot be undone, so it is confirmed (WCAG 3.3.4), and it works
-    without JavaScript."""
+    without JavaScript. The person is looked up here, after `submit_once`, not as a route
+    dependency: a second click arrives signed out and gets the "deleted" notice again
+    (`web.forms`) instead of the sign-in page."""
+    user = await run_in_threadpool(require_user, request)
     if confirm != "yes":
         return await run_in_threadpool(_confirm_page, request, user)
     return await run_in_threadpool(_delete_now, request, user)
@@ -150,5 +189,5 @@ def _delete_now(request: Request, user: CurrentUser) -> Response:
     log_event(logger, "account_deleted", jobs=stats.jobs_deleted, tier=user.access_tier)
     request.session.clear()  # signed out; the cookie is signed, so nothing else to end
     request.state.user = None
-    flash(request, DELETED)
+    flash(request, DELETED, kind="success")
     return RedirectResponse("/", status_code=303)

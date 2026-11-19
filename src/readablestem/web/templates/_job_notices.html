@@ -1,3 +1,4 @@
+{# Audiences: owner, reviewer #}
 {# What the file does not handle, and what is worth a look, per page (pipeline/notices.py
    and web/job_page.py `notice_lists`). A notice never adds a decision: when one has a
    decision, the line links to it and says whether it is still open. #}
@@ -9,8 +10,8 @@
   {% elif line.names %} <span class="notice-names">{{ line.lead }}: {% for name in line.names %}“{{ name }}”{% if not loop.last %}, {% endif %}{% endfor %}.</span>{% elif line.snippet %} <span class="notice-names">In the text “{{ line.snippet }}”.</span>{% endif %}
   {#- The space before each sentence is inside its block: the environment strips the
       whitespace around block tags. #}
-  {% if line.decision == "open" and line.element_id and links %} <a href="/jobs/{{ job_id }}/review?item={{ line.element_id }}">Decide it<span class="visually-hidden">: {{ line.label }}</span></a> (one of your decisions).{% elif line.decision == "made" %} You have decided it{% if line.label %} ({{ line.label }}){% endif %}.{% elif line.with_label %} It is decided together with {{ line.with_label }}.{% endif %}
-  {% if line.code in ("lang_detected", "lang_assumed") %} <a href="#language-heading">Check the language</a>.{% endif %}
+  {% if line.decision == "open" and line.element_id and links %} <a href="/jobs/{{ job_id }}/review?item={{ line.element_id }}">Decide it<span class="visually-hidden">: {{ line.label }}</span></a> ({{ "one of your decisions" if job.is_owner else "one of the open decisions" }}).{% elif line.decision == "made" %} {{ "You have decided it" if job.is_owner else "It has been decided" }}{% if line.label %} ({{ line.label }}){% endif %}.{% elif line.with_label %} It is decided together with {{ line.with_label }}.{% endif %}
+  {% if line.code in ("lang_detected", "lang_assumed", "lang_mixed") %} <a href="#language-heading">Check the language</a>.{% endif %}
   {% if line.place and not line.decision and not line.with_label and links %} <a href="/jobs/{{ job_id }}/review?{{ line.place }}">See it on the page<span class="visually-hidden">: {{ line.where }}{% if line.names %}, {{ line.names|join(", ") }}{% endif %}</span></a>.{% endif %}</li>
 {% endfor %}
 {% endmacro %}
@@ -19,6 +20,15 @@
   <h2 id="not-handled-heading">Not handled in this file</h2>
   <ul class="check-list">
     {{ notice_items(pg.notices.not_handled, job.id, job.can_review) }}
+  </ul>
+</section>
+{% endif %}
+{% if pg.notices.handled %}
+<section aria-labelledby="handled-heading">
+  <h2 id="handled-heading">Handled in this file</h2>
+  <ul class="check-list">
+    {% for line in pg.notices.handled %}<li>{{ line.text }}</li>
+    {% endfor %}
   </ul>
 </section>
 {% endif %}

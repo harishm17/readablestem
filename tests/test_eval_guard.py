@@ -25,6 +25,22 @@ class Settings:
 """
 PROMPT = "src/readablestem/models/prompts/equation.md"
 CFG = "src/readablestem/config.py"
+STEP = "src/readablestem/pipeline/equation_step.py"
+RECORD = "data/eval/burden-corpus.json"
+STEP_SOURCE = '''
+"""Reads an equation."""
+SKIP_ESCALATION_FROM = 0.80
+LOOSE = 3
+
+
+def _fix(confidence):
+    """Accept it or ask."""
+    return Status.ACCEPTED if confidence >= SKIP_ESCALATION_FROM else Status.NEEDS_REVIEW
+
+
+def _helper(x):
+    return x + LOOSE
+'''
 
 
 def test_prompt_change_without_report_fails_and_points_to_docs() -> None:
@@ -50,15 +66,24 @@ def test_unlisted_prompt_needs_the_document_report() -> None:
 
 
 @pytest.mark.parametrize(
-    "name",
-    ["image_page", "image_page_crops", "image_page_notation", "math_reader", "math_reader_claude"],
+    ("name", "report"),
+    [
+        ("image_page", "latest-image-pages.json"),
+        ("image_page_crops", "latest-image-pages.json"),
+        ("image_page_notation", "latest-image-pages.json"),
+        ("math_reader", "latest-image-pages.json"),
+        ("math_reader_claude", "latest-image-pages.json"),
+        ("page_audit", "latest-page-audit.json"),
+    ],
 )
-def test_an_image_page_prompt_needs_the_image_pages_report(name: str) -> None:
+def test_a_prompt_the_document_task_does_not_run_needs_its_own_report(
+    name: str, report: str
+) -> None:
     path = f"src/readablestem/models/prompts/{name}.md"
     code, lines = guard.check([path], "", "")
     text = "\n".join(lines)
-    assert code == 1 and "latest-image-pages.json" in text and "latest-document.json" not in text
-    assert guard.check([path, "data/eval/latest-image-pages.json"], "", "")[0] == 0
+    assert code == 1 and report in text and "latest-document.json" not in text
+    assert guard.check([path, f"data/eval/{report}"], "", "")[0] == 0
 
 
 def test_claude_model_change_needs_every_claude_report() -> None:
@@ -101,7 +126,14 @@ def _git(repo: Path, *args: str) -> str:
 @pytest.fixture
 def repo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     _git(tmp_path, "init", "-q", "-b", "main")
-    for rel, text in ((CFG, CONFIG), (PROMPT, "ask\n"), ("data/eval/latest-equations.json", "{}")):
+    files = (
+        (CFG, CONFIG),
+        (PROMPT, "ask\n"),
+        ("data/eval/latest-equations.json", "{}"),
+        (STEP, STEP_SOURCE),
+        (RECORD, "{}"),
+    )
+    for rel, text in files:
         path = tmp_path / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text)
@@ -116,3 +148,34 @@ def test_main_model_constant_change_in_a_real_repository(repo: Path) -> None:
     (repo / CFG).write_text(CONFIG.replace("gpt-6.1-sol", "gpt-6.2-sol"))
     _git(repo, "commit", "-qam", "bump the OpenAI model")
     assert guard.main(["--base", "main"]) == 1
+
+
+def test_an_acceptance_constant_needs_the_replay_record(repo: Path, capsys) -> None:
+    """A rule that decides what is accepted moves no model and no prompt; the guard still
+    wants the record of the replay, and a change that is no rule needs nothing."""
+    (repo / STEP).write_text(STEP_SOURCE.replace("0.80", "0.75"))
+    _git(repo, "commit", "-qam", "accept from 0.75")
+    assert guard.main(["--base", "main"]) == 1
+    assert (
+        "burden-corpus.json: acceptance rule pipeline/equation_step.py: SKIP_ESCALATION_FROM"
+        in (capsys.readouterr().out)
+    )
+
+    (repo / RECORD).write_text('{"made": "again"}')
+    _git(repo, "commit", "-qam", "re-make the record")
+    assert guard.main(["--base", "main"]) == 0
+
+
+def test_a_comment_a_docstring_or_a_module_that_decides_nothing_is_no_rule(repo: Path) -> None:
+    reworded = STEP_SOURCE.replace("Accept it or ask.", "Say yes or ask.")
+    (repo / STEP).write_text("# a comment\n" + reworded.replace("0.80", "0.8"))
+    _git(repo, "commit", "-qam", "reword")
+    assert guard.main(["--base", "main"]) == 0
+
+    plain = repo / "src/readablestem/pipeline/layout.py"
+    plain.write_text("GAP = 3\n")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-qm", "a module that decides nothing")
+    plain.write_text("GAP = 4\n")
+    _git(repo, "commit", "-qam", "tune it")
+    assert guard.main(["--base", "HEAD~2"]) == 0

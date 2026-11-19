@@ -184,13 +184,115 @@ def test_refusal_codes(pages, code):
     assert page_type.refusal_code(pages) == code
 
 
-def test_ink_over_the_time_budget_is_not_analysed_and_the_page_kept_as_an_image():
+def test_ink_the_clock_guard_stops_is_not_analysed_and_the_page_kept_as_an_image():
     (page,) = classify(HANDWRITING / "ink_no_layer.pdf", budget=page_type.InkBudget(0))
     assert not page.ink.analysed and "ink_not_analysed" in page.reasons
+    assert page.to_record(0).ink_cause == "time"
     assert page.kind == "vector_no_text" and page_type.kept_reason(page) == "unread_page"
     # Not sure what it is, so the upload is not refused: the conversion keeps the page.
     assert refusal(HANDWRITING / "ink_no_layer.pdf", budget_s=0) is None
     assert refusal(HANDWRITING / "ink_no_layer.pdf") == "handwritten_no_text"
+
+
+def _heavy_then_written() -> bytes:
+    """A page of 250,000 drawing items (25,000 paths of ten segments; 15,000 of them seen, so
+    the analysis has 150,000 items to read, the rest white on white), then a page of
+    handwriting: what the second page is must not depend on how long the first took."""
+    doc = pymupdf.open()
+    page = doc.new_page()
+    paths = []
+    for i in range(25_000):
+        x, y = 20 + (i % 250) * 2.2, 20 + (i // 250) * 7.5
+        legs = " ".join(f"{x + k * 0.2:.1f} {y + (k % 2) * 3:.1f} l" for k in range(1, 11))
+        colour = "0 0 0 RG" if i < 15_000 else "1 1 1 RG"
+        paths.append(f"{colour} {x:.1f} {y:.1f} m {legs} S")
+    page.insert_text((20, 800), "Notes")  # gives the page a content stream to replace
+    doc.update_stream(page.get_contents()[0], "\n".join(paths).encode())
+    with pymupdf.open(HANDWRITING / "ink_no_layer.pdf") as written:
+        doc.insert_pdf(written)
+    return doc.tobytes()
+
+
+def _kinds(data: bytes) -> list[tuple[str, list[str]]]:
+    """Each page's type, read as layout reads a document: one budget for all its pages."""
+    budget = page_type.InkBudget()
+    with pymupdf.open(stream=data, filetype="pdf") as doc:
+        found = []
+        for page in doc:
+            raw = page.get_text("rawdict", flags=page_type.TEXT_FLAGS)["blocks"]
+            kind = page_type.classify(page, raw, page.get_cdrawings(), budget=budget)
+            found.append((kind.kind, kind.reasons))
+        return found
+
+
+@pytest.mark.parametrize("speed", [10.0, 0.1])
+def test_a_page_is_the_same_whatever_the_clock_says(monkeypatch, speed):
+    data = _heavy_then_written()
+    quiet = _kinds(data)
+    assert "ink_not_analysed" not in quiet[0][1] and quiet[1][0] == "handwritten"
+    real = page_type.time.monotonic
+    start = real()
+    # `speed` 10: the clock runs ten times faster than the work, as on a machine ten times
+    # slower; 0.1: ten times faster.
+    monkeypatch.setattr(page_type.time, "monotonic", lambda: start + (real() - start) * speed)
+    assert [_kinds(data) for _ in range(5)] == [quiet] * 5
+
+
+def test_a_page_the_guard_stops_is_named_in_the_checks_and_still_counted(monkeypatch):
+    from readablestem.config import Settings
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline import checked, run
+    from readablestem.web import job_page, states
+
+    monkeypatch.setattr(page_type, "INK_GUARD_S", 0.0)
+
+    result = run.convert_pdf(
+        (HANDWRITING / "typed_with_ink.pdf").read_bytes(),
+        settings=Settings(_env_file=None),
+        client=FakeVisionClient(),  # type: ignore[call-arg]
+    ).result
+    checks = job_page.notice_lists(result)
+    # ... as the job page counts it once no decision is left open
+    waiting = {f.element_id for f in result.fixes if f.pending}
+    settled = result.model_copy(
+        update={
+            "elements": [e for e in result.elements if e.id not in waiting],
+            "fixes": [f for f in result.fixes if not f.pending],
+        }
+    )
+    facts = states.Facts(id="j", status="done", result_json=settled.model_dump(mode="json"))
+    state = states.state_of(facts, states.counts_of(checked.of_result(settled)))
+
+    lines = [c for c in checks.worth_checking + checks.not_handled if "not analyzed" in c.text]
+    assert [line.where for line in lines] == ["Page 1"]
+    assert state.key != "ready" and "not analyzed" in state.message
+    # The upload count: a scan is a scan whatever its drawings, and a page of drawings the
+    # guard stopped is still a page the pass reads, so the count stays exact.
+    doc = pymupdf.open()
+    for name in ("typed_with_ink.pdf", "scan_ocr.pdf", "ink_no_layer.pdf"):
+        with pymupdf.open(HANDWRITING / name) as part:
+            doc.insert_pdf(part)
+    assert page_type.image_page_count(doc, budget_s=0).words == "2"
+    assert page_type.image_page_count(doc).words == "2"
+
+
+def test_the_upload_probe_stops_analysing_ink_at_its_allowance_whatever_the_clock(monkeypatch):
+    """Notes of many dense pages made the upload request take seconds (the analysis of their
+    ink): the request analyses a fixed number of path items, not a time. A page left unanalysed
+    is never refused, and with less than a line of text it still counts as an unread page, so
+    the count of the pages the image page pass reads does not depend on the allowance."""
+    doc = pymupdf.open()
+    for _ in range(6):  # six pages of handwriting with no text layer, 6,178 path items each
+        with pymupdf.open(HANDWRITING / "ink_no_layer.pdf") as part:
+            doc.insert_pdf(part)
+    whole = page_type.probe_pages(doc, count=True)
+    assert whole[0] == "handwritten_no_text" and whole[1].handwritten == 6
+
+    monkeypatch.setattr(page_type, "PROBE_MAX_ITEMS", 13_000)  # two pages of it, not three
+    refusal, count = page_type.probe_pages(doc, count=True)
+    assert refusal is None  # the pages past the allowance may be anything: not refused
+    assert (count.handwritten, count.unread, count.unanalysed) == (2, 4, 0)
+    assert count.found == 6  # the same pages are counted as before, only told apart less
 
 
 def test_a_page_with_too_many_path_items_is_not_analysed(monkeypatch):

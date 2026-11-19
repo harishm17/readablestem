@@ -123,6 +123,34 @@
   "sha256": "fcb9e61fc7495d9898a2007fc91360d53fbb8bf4fd26f94654d932b7968d9719",
   "bytes": 90
  },
+ "docx-inflating-part.docx": {
+  "sha256": "0074846d2acc0e204de5f26c1457f769cd0fc326b2d64efa46c142bf716834fd",
+  "bytes": 60822
+ },
+ "docx-member-leaves-package.docx": {
+  "sha256": "5ceb1dee01a4d32c5ec0dfb89f5ab428a1d66959dba6e308640724d93230ca14",
+  "bytes": 2443
+ },
+ "docx-macro-part.docx": {
+  "sha256": "2a63b6785ed360592ed3ee37d758da202e54cda05b08c195708410f3b2bb3f92",
+  "bytes": 2460
+ },
+ "docx-linked-picture.docx": {
+  "sha256": "2f484fad2ff897230d95a55569f5536200d081eef37be83c796d3aad44d15e23",
+  "bytes": 2360
+ },
+ "docx-entity.docx": {
+  "sha256": "c1740059d9512141cee275d0199360dabb15c24652e98d70ac8a2e9c911c007c",
+  "bytes": 2378
+ },
+ "docx-nested-deep.docx": {
+  "sha256": "71af409b08ef54061013fc3a61d94df4bd4d6bc6a36d5524f21a9b2efab28167",
+  "bytes": 2760
+ },
+ "docx-embedded-object.docx": {
+  "sha256": "d4b1286de67b87412f64cf2142b39af9ef9ac7b33338abf9678d5183b6c6a53b",
+  "bytes": 2591
+ },
  "kinetics-pset.docx": {
   "sha256": "7f6653be5136aa4038ccad9a8508d7bb967c4b6b72183b089f3c560ccc220869",
   "bytes": 37006

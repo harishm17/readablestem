@@ -1,29 +1,34 @@
-"""My documents as a to-do list (UX review BW5): what needs a decision first, then what is
-ready to download, then the rest, each document under its own title.
+"""My documents as a to-do list (UX review BW5, F-414): what needs the person first, then
+what is still working, then what is ready, each document under its own title. A row's words,
+badge and next step are its state (`web.states`), and the group is the state's tone:
 
-- "Needs your decisions": finished, with decisions still open. Oldest first: it is a
-  queue of work, and the oldest is deleted first. "Review next" opens the first one's
-  review screen, which starts at its first open decision.
-- "Ready to download": finished with no decision open, newest first. A result that is
-  only partly converted (a budget stop, scanned pages) says so in its status.
-- "Converting, waiting or stopped": newest first, as uploaded.
+- "Needs you": finished with decisions still open, oldest first (it is a queue of work, and
+  the oldest is deleted first), then every stopped document, newest first, each with its
+  reason in its label and its next step ("Try again" as a form). "Review next" opens the
+  first one's review screen, which starts at its first open decision.
+- "Working": waiting, converting or restarting, newest first.
+- "Ready": finished with no decision open, newest first. A result that is only partly
+  converted (a budget stop, scanned pages) says so in its label.
 
-A document is led by the file name the person uploaded (with the pages of a part), and its
-title (the PDF's title or its first heading, as in the HTML's `<title>`) sits under it when it
-says something else: generated titles repeat across a course's files, file names do not. The
-recorded sample, which has no file of the person's, and a title the person chose themselves
-(T1-7) lead with the title. Titles and file names are document-derived: shown to their owner
-only, never logged.
+A document is led by its title (`document_title`, the one title every file and page of it
+carries: the one the person chose, the PDF's title, its first heading, else the file name) with
+the pages of a part, and the file name the person uploaded sits under it when it says something
+else (SW14, F-368): the batch table leads the same way. Titles and file names are
+document-derived: shown to their owner only, never logged.
 
-The list reads no stored result. The two facts it needs from one, the title and how many
-decisions are open, are columns of the job (`jobs.result_title`, `jobs.open_decisions`),
+A job with decisions open needs no stored result: the title and how many decisions are open
+are columns of the job (`jobs.result_title`, `jobs.open_decisions`),
 set whenever a result is stored (`list_facts`, called from the `Job.result_json` set
 event in `web.db`): while anything is waiting or converting, htmx polls
 `GET /app/documents` and every change of a page count rebuilds the list, which used to
 load and validate the fixes of every finished document each time. `list_version` says
 whether anything changed from the jobs' own columns alone, so an unchanged list costs one
 small query and a 204. A finished job from before the columns existed (both NULL) is read
-once from its result and the two facts are stored.
+once from its result and the two facts are stored. A finished job with no decision open reads
+what its label needs of the result from `jobs.state_facts` (`states.finished_facts`): "Ready
+to share" or "Ready" is the summary's (`pipeline.checked`), stored as what it says (SW7). Only
+one with an outcome code, or whose facts say it has a gap note or a notice to word, has its
+result read (`states.load`).
 """
 
 from __future__ import annotations
@@ -31,7 +36,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Sequence
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Any
 
 from pydantic import ValidationError
@@ -39,15 +44,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from readablestem.core import triage
-from readablestem.core.types import Fix
-from readablestem.web import titles
+from readablestem.core.types import Element, Fix
+from readablestem.pipeline import assemble, checked, output_chars
+from readablestem.web import retention, states, titles
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobStatus
-from readablestem.web.outcome import job_outcome
-
-# The assembler's title for a PDF with no title and no level-1 heading: the file name
-# says more.
-FALLBACK_TITLE = "Converted document"
+from readablestem.web.db import SOURCE_MEDIA_PREFIX, Blob, Job, JobStatus
 
 
 def plural(n: int, one: str, many: str) -> str:
@@ -64,43 +65,92 @@ class DocumentRow:
     status: str  # a JobStatus value
     created_at: datetime | None
     retain_until: datetime | None
-    label: str = ""  # the status in words
-    badge: str = ""  # status-<badge> (app.css): the colour only repeats the words
     open_decisions: int = 0
-    partial: bool = False
+    # "Deleted in under 5 hours" for a document in its last hours (`retention.LAST_HOURS`).
+    ending: str = ""
+    # The job's state (`web.states`): its label, badge, group and next step.
+    state: states.State | None = None
     # One part of a larger file converted in parts (T3-3): the pages it holds, "31-59".
     part_label: str = ""
     is_sample: bool = False  # the recorded sample document (T3-9)
-    titled_by_you: bool = False  # the owner set the title students hear (T1-7): it leads
+    exam_mode: bool = False  # converted as an exam or quiz (`web.exam`); the row marks it
+    # The file is Word read from the file itself, LaTeX or a project zip: `pages` is the count
+    # it counts as (one per 3,000 characters or picture, `source.intake`), not a printed count.
+    estimated: bool = False
+
+    @property
+    def page_words(self) -> str:
+        """The file's pages in words: "14 pages", or "counts as 14 pages" when it is an estimate."""
+        words = plural(self.pages, "page", "pages")
+        return f"counts as {words}" if self.estimated else words
 
     @property
     def name(self) -> str:
-        """What the list leads with: the file the person uploaded, with the pages of a part,
-        because generated titles repeat (two parts of one file, or two files of one course
-        share a title) and the file name is what the person recognises. A title the person
-        chose themselves leads instead, and so does the recorded sample's (no file of
-        theirs)."""
-        if self.is_sample or self.titled_by_you:
-            return self.title
-        return f"{self.filename}, pages {self.part_label}" if self.part_label else self.filename
+        """What the list leads with: the document's title, with the pages of a part."""
+        return f"{self.title}, pages {self.part_label}" if self.part_label else self.title
 
     @property
-    def title_note(self) -> str:
-        """The document's own title, shown under the name when it says something else."""
-        if self.is_sample or self.titled_by_you:
+    def file_note(self) -> str:
+        """The file the person uploaded, shown under the title when it says something else:
+        two files of a course can share a title, and the file name is what the person
+        recognises. One line only when the title is the file name as written; a title made from
+        its words ("a" for a.pdf) still shows the file, which says what kind it is. The
+        recorded sample has no file of theirs."""
+        if self.is_sample or self.title == self.filename:
             return ""
-        return "" if self.title == self.filename else self.title
+        return self.filename
+
+    @property
+    def control_name(self) -> str:
+        """The name a screen reader hears on the row's links and buttons ("Delete Kinematics,
+        file notes.pdf"): the document's title and, when it says something else, the file's
+        name, so two rows are never the same words (F-096)."""
+        return f"{self.name}, file {self.file_note}" if self.file_note else self.name
+
+    @property
+    def label(self) -> str:
+        """The state's label, with what it is waiting for or how far it has got: "Needs your
+        decisions: 3 decisions to make", "Converting: 4 of 10 pages done"."""
+        assert self.state is not None
+        label = self.state.label
+        if self.state.key == "converting":
+            counted = "counted " if self.estimated else ""
+            of = f"{self.pages} {counted}{'page' if self.pages == 1 else 'pages'}"
+            return f"{label}: {self.pages_done} of {of} done"
+        if self.decide and self.open_decisions:
+            return f"{label}: {plural(self.open_decisions, 'decision', 'decisions')} to make"
+        return label
+
+    @property
+    def badge(self) -> str:
+        """status-<badge> (app.css): the color only repeats the words."""
+        return self.state.badge if self.state is not None else ""
 
     @property
     def group(self) -> str:
-        if self.status != JobStatus.DONE:
-            return "other"
-        return "decide" if self.open_decisions else "ready"
+        return self.state.group if self.state is not None else states.WORK
 
     @property
-    def action(self) -> str | None:
-        """The one next step offered in the row: "review" or "download"."""
-        return {"decide": "review", "ready": "download"}.get(self.group)
+    def action(self) -> states.Step | None:
+        """The one next step offered in the row (the state's first)."""
+        return self.state.primary if self.state is not None else None
+
+    @property
+    def decide(self) -> bool:
+        """Finished, with decisions open: a row "Review next" can open."""
+        return self.group == states.NEEDS and not (self.state and self.state.stopped)
+
+
+def ready_newest_first(rows: Sequence[DocumentRow]) -> list[DocumentRow]:
+    """The finished documents with no decision open, newest first: the order "Download all"
+    (routes/bundle.py `_ready_files`) takes them in, so the ones past the zip's limit can be
+    named."""
+    ready = sorted(
+        (r for r in rows if r.status == JobStatus.DONE and not r.open_decisions), key=lambda r: r.id
+    )
+    return sorted(
+        ready, key=lambda r: r.created_at or datetime.min.replace(tzinfo=UTC), reverse=True
+    )
 
 
 @dataclass
@@ -128,13 +178,14 @@ class DocumentList:
 
     @property
     def review_next(self) -> DocumentRow | None:
-        rows = self.group("decide").rows
+        rows = [row for row in self.group(states.NEEDS).rows if row.decide]
         return rows[0] if rows else None
 
     @property
     def summary(self) -> str:
-        """'2 need your decisions (5 in all) · 1 ready to download · 1 converting'."""
-        decide, ready = self.group("decide").rows, self.group("ready").rows
+        """The groups in their order: '2 need your decisions (5 in all) · 1 stopped ·
+        1 converting · 1 ready to download'."""
+        decide = [row for row in self.group(states.NEEDS).rows if row.decide]
         parts = []
         if decide:
             total = sum(row.open_decisions for row in decide)
@@ -143,17 +194,17 @@ class DocumentList:
                 f"{plural(len(decide), 'document', 'documents')} {verb} your decisions "
                 f"({plural(total, 'decision', 'decisions')} in all)"
             )
+        tones = [row.state.tone for row in self.rows if row.state is not None]
+        for tone, words in (
+            (states.FAILED, "stopped"),
+            (states.WORKING, "converting"),
+            (states.WAITING, "waiting"),
+        ):
+            if tones.count(tone):
+                parts.append(f"{tones.count(tone)} {words}")
+        ready = self.group(states.READY).rows
         if ready:
             parts.append(f"{len(ready)} ready to download")
-        converting = sum(row.status == JobStatus.RUNNING for row in self.rows)
-        waiting = sum(row.status == JobStatus.QUEUED for row in self.rows)
-        stopped = sum(row.status == JobStatus.FAILED for row in self.rows)
-        if converting:
-            parts.append(f"{converting} converting")
-        if waiting:
-            parts.append(f"{waiting} waiting")
-        if stopped:
-            parts.append(f"{stopped} stopped")
         return " · ".join(parts)
 
     @property
@@ -166,9 +217,30 @@ class DocumentList:
 
 
 def display_title(title: object, filename: str, override: str | None = None) -> str:
-    """The title the instructor chose, else the stored result's title without its section
-    number (T1-7), else the file name."""
+    """What a list or a heading calls a document when only the job's columns are at hand
+    (`document_title`): the title the instructor chose, else the stored title, else the file
+    name."""
     return titles.effective_title(override, title, filename)
+
+
+def document_title(job: Job) -> assemble.DocumentTitle:
+    """The one title of a document and its source, for every place it is named: the student
+    page's `<title>`, the Word, EPUB, Canvas and Cartridge files and their names, the download
+    name, the list and the batch table, feedback, the record, Listen and the share page
+    (SW14). Read from the job's columns, so no result is loaded."""
+    found = assemble.document_title(
+        job.title_override, "", (stored_title(job) or "",), job.filename
+    )
+    return assemble.DocumentTitle(output_chars.plain(found.text), found.source)
+
+
+def stored_title(job: Job) -> str | None:
+    """The title in the job's stored result, read from `jobs.result_title` so a route that
+    needs only the title does not load the result. A finished job from before that column is
+    read once and the column filled (the set event, as for the list)."""
+    if job.result_title is None and job.status == JobStatus.DONE:
+        job.result_json = job.result_json
+    return job.result_title or None
 
 
 def _fixes(fixes: object) -> list[Fix]:
@@ -182,16 +254,32 @@ def _fixes(fixes: object) -> list[Fix]:
 
 
 def open_decisions(fixes: object) -> int:
-    """Decisions still open in a stored result's fixes (a heading group is one)."""
-    return triage.open_decisions(_fixes(fixes))
+    """Decisions still open in a stored result's fixes (a heading group is one): the
+    summary's count (`pipeline.checked.open_required`), which the stored
+    `jobs.open_decisions`, the draft gate and the job's state all read."""
+    return checked.open_required(_fixes(fixes))
 
 
-def list_facts(result: object) -> tuple[int, str]:
-    """(decisions still open, title) of a stored result, the two facts the list shows."""
+def list_facts(result: object, filename: str = "") -> tuple[int, str]:
+    """(decisions still open, title) of a stored result, the two facts the list shows. The
+    title is the one the document's page writes without the instructor's choice
+    (`assemble.title_plan`, with the file name): "" when there is none, so that the stock
+    title is never stored as if it were one."""
     if not isinstance(result, dict):
         return 0, ""
-    title = result.get("title")
-    return open_decisions(result.get("fixes")), title if isinstance(title, str) else ""
+    fixes = _fixes(result.get("fixes"))
+    raw = result.get("title")
+    headings = []
+    for element in result.get("elements") or []:
+        if isinstance(element, dict) and element.get("kind") == "heading":
+            try:
+                headings.append(Element.model_validate(element))
+            except ValidationError:
+                continue
+    plan = assemble.title_plan(
+        headings, fixes, title=raw if isinstance(raw, str) else None, filename=filename
+    )
+    return checked.open_required(fixes), "" if plan.source == assemble.TITLE_STOCK else plan.text
 
 
 def decided_by_you(fixes: object) -> int:
@@ -262,16 +350,25 @@ def documents(
             Job.result_version,
             Job.part_label,
             Job.is_sample,
+            Job.exam_mode,
         )
         .where(*_live(user_id, now, course_id, job_ids))
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
+    estimated = set(
+        session.scalars(
+            select(Blob.job_id).where(
+                Blob.job_id.in_([job.id for job in jobs]),
+                Blob.kind == "upload",
+                Blob.media_type.like(SOURCE_MEDIA_PREFIX + "%"),
+            )
+        )
+    )
     stored = _stored_facts(session, [job.id for job in jobs if job.status == JobStatus.DONE])
-    groups = [
-        Group("decide", "Needs your decisions"),
-        Group("ready", "Ready to download"),
-        Group("other", "Converting, waiting or stopped"),
-    ]
+    found = states.load(
+        session, [job.id for job in jobs], context=states.Context(budget_closed=budget_closed)
+    )
+    groups = [Group(key, heading) for key, heading in states.GROUP_HEADINGS.items()]
     by_key = {g.key: g for g in groups}
     for job in jobs:
         title, open_count, own = stored.get(job.id, (None, 0, None))
@@ -284,14 +381,20 @@ def documents(
             status=str(job.status),
             created_at=as_utc(job.created_at),
             retain_until=as_utc(job.retain_until),
+            ending=retention.last_hours_note(job.retain_until, now),
             open_decisions=open_count,
             part_label=job.part_label or "",
             is_sample=bool(job.is_sample),
-            titled_by_you=bool(own),
+            exam_mode=bool(job.exam_mode),
+            estimated=job.id in estimated,
+            state=found.get(job.id),
         )
-        _label(row, job.error_code, budget_closed)
         by_key[row.group].rows.append(row)
-    by_key["decide"].rows.reverse()  # oldest first (module docstring)
+    # Decisions oldest first, then the stopped documents newest first (module docstring).
+    needs = by_key[states.NEEDS].rows
+    by_key[states.NEEDS].rows = [r for r in reversed(needs) if r.decide] + [
+        r for r in needs if not r.decide
+    ]
     # The same digest `list_version` makes, from the rows already read: no second query.
     keys = sorted((j.id, j.status, j.pages_done, j.result_version, j.error_code) for j in jobs)
     return DocumentList(groups=groups, version=_version(keys, budget_closed))
@@ -320,25 +423,3 @@ def _stored_facts(session: Session, done: list[str]) -> dict[str, tuple[str, int
             job.result_json = job.result_json  # the set event stores the two facts
             stored[job.id] = (job.result_title or "", job.open_decisions or 0, job.title_override)
     return stored
-
-
-def _label(row: DocumentRow, error_code: str | None, budget_closed: bool) -> None:
-    outcome = job_outcome(status=row.status, error_code=error_code, budget_closed=budget_closed)
-    row.partial = bool(outcome and outcome.partial)
-    if row.status == JobStatus.QUEUED:
-        row.label, row.badge = (outcome.label if outcome else "Waiting"), "queued"
-    elif row.status == JobStatus.RUNNING:
-        row.label = f"Converting: {row.pages_done} of {plural(row.pages, 'page', 'pages')} done"
-        row.badge = "running"
-    elif row.status == JobStatus.FAILED:
-        row.label, row.badge = (outcome.label if outcome else "Stopped"), "failed"
-    elif outcome is not None and row.partial:
-        # Partly converted (a budget stop, scanned pages): say so first, whatever is open.
-        decide = plural(row.open_decisions, "decision", "decisions")
-        row.label = outcome.label + (f", {decide} to make" if row.open_decisions else "")
-        row.badge = "partial"
-    elif row.open_decisions:
-        row.label = f"{plural(row.open_decisions, 'decision', 'decisions')} to make"
-        row.badge = "decisions"
-    else:
-        row.label, row.badge = "Ready to download", "done"

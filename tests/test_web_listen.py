@@ -36,16 +36,20 @@ def test_page_title_landmarks_headings_paragraphs_and_lists():
     )
     spoken = said(items)
     assert spoken[:2] == ["Page title: Kinematics", "Page language: English"]
-    assert "link Skip to main content" in spoken
-    assert "Navigation landmark, Contents" in spoken
-    assert "Main landmark" in spoken
+    # F-120: the skip link and the bare landmark are said before the lesson, chosen by kind;
+    # Play starts at the navigation, the first item with content. F-122: plain role words.
+    assert spoken[2:4] == ["Skip link: Skip to main content", "Navigation, Contents"]
+    assert [i.before for i in items[:5]] == [True, True, True, False, False]
+    assert "Main content" in spoken
+    assert items[2].kind == "skip-link"
+    assert "Navigation, Contents" in spoken
     assert "Heading level 1: Motion" in spoken
     assert "Heading level 2: Kinematics" in spoken
     assert "Speed is distance over time." in spoken
     assert "List, 3 items" in spoken
     assert "List, 1 item, nested" in spoken
     assert spoken.index("one") < spoken.index("two") < spoken.index("inner") < spoken.index("three")
-    assert "Content information landmark, About this version" in spoken
+    assert "Footer, About this version" in spoken
     # the style sheet is never read
     assert not any("color" in s for s in spoken)
     assert [i.kind for i in items if i.kind == "heading"] == ["heading", "heading"]
@@ -104,7 +108,7 @@ def test_chemistry_is_spoken_by_the_chemistry_rules():
     water = safe_latex_to_mathml(convert_ce_commands(r"\ce{2 H2 + O2 -> 2 H2O}"), "block")
     items = listen.build_transcript(doc(f"<main>{water}</main>"))
     eq = next(i for i in items if i.kind == "equation")
-    assert eq.say == "Equation: 2 H 2 plus O 2 reacts to form 2 H 2 O"
+    assert eq.say == "Equation: 2, H 2 plus O 2 reacts to form 2, H 2 O"
 
 
 def test_figure_alt_caption_and_long_description():
@@ -122,7 +126,7 @@ def test_figure_alt_caption_and_long_description():
     spoken = said(items)
     assert "Figure: A rising line." in spoken
     assert "Figure 2.1 Position." in spoken
-    assert "Expandable section, collapsed: Long description of figure 2.1" in spoken
+    assert "Collapsed section: Long description of figure 2.1" in spoken
     assert "The line starts at zero." in spoken
     assert next(i for i in items if i.text == "The line starts at zero.").role == (
         "Long description"
@@ -186,7 +190,7 @@ def test_table_cells_with_maths_are_spoken():
             "<math><mi>F</mi><mo>=</mo><mi>m</mi><mi>a</mi></math></td></tr></tbody></table></main>"
         )
     )
-    assert "Row 1 of 1: Law: capital F equals m a" in said(items)
+    assert "Row 1 of 1: Law: cap F equals m a" in said(items)
 
 
 def test_a_slide_deck_reads_frame_titles_as_headings_with_their_step():
@@ -241,6 +245,25 @@ def test_page_breaks_definitions_code_and_ordered_lists():
     assert next(i for i in items if i.text == "b" or i.say == "b").role == "List item 2 of 2"
 
 
+def test_every_item_has_an_id_from_its_element_that_is_stable_and_unique():
+    html = doc(
+        '<main><h1 id="h1">Kinematics</h1><p>First</p><p>Second</p><p id="p9">Third</p>'
+        "<table><tr><th>a</th></tr><tr><td>1</td></tr><tr><td>2</td></tr></table>"
+        '<ul><li>one</li><li>two</li></ul><hr role="doc-pagebreak" aria-label="Page 2" id="pg2">'
+        "</main>"
+    )
+    first = listen.build_transcript(html)
+    refs = [i.ref for i in first]
+    assert all(refs) and len(set(refs)) == len(refs)
+    assert refs == [i.ref for i in listen.build_transcript(html)]
+    by_text = {i.text: i.ref for i in first}
+    assert by_text["Kinematics"] == "h1" and by_text["Third"] == "p9"
+    assert by_text["Page 2"] == "pg2"
+    # An element with no id is named by its place, so a new heading elsewhere leaves it be.
+    later = listen.build_transcript(html.replace("<h1", "<h2 id='new'>New</h2><h1"))
+    assert {i.text: i.ref for i in later}["Second"] == by_text["Second"]
+
+
 def test_very_long_transcripts_stop_with_a_note():
     body = "".join(f"<p>p{n}</p>" for n in range(listen.MAX_ITEMS + 50))
     items = listen.build_transcript(doc(f"<main>{body}</main>"))
@@ -253,3 +276,15 @@ def test_speakable_rule_matches_the_review_screen():
 
     for text in ("v equals d over t", r"\frac{d}{t}", "x^2", "a_b", "{x}", "", None, "  "):
         assert _speakable(text) == listen.speakable(text)
+
+
+def test_a_line_break_is_a_pause_and_a_quotation_ends():
+    items = listen.build_transcript(
+        doc(
+            "<main><p>Line one<br>line two<br><br>three.<br></p>"
+            "<blockquote><p>To be.</p></blockquote></main>"
+        )
+    )
+    spoken = said(items)
+    assert "Line one, line two, three." in spoken
+    assert spoken[-3:] == ["Quote", "To be.", "End quote"]

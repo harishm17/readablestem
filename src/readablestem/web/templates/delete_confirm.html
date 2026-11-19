@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Confirm deleting one document (routes/jobs.py). The button names the document; the
    consequence is one short paragraph; both choices are the same size. #}
 {% block title %}Delete {{ title }}?{% endblock %}
@@ -7,13 +8,13 @@
 <h1>Delete “{{ title }}”?</h1>
 <p>{% if title != filename %}{{ filename }}, uploaded{% else %}Uploaded{% endif %} {{ uploaded|utc }}.
   {% if decided %}You made {{ decided }} {{ "decision" if decided == 1 else "decisions" }} on it.{% endif %}</p>
-<p>Deletes the PDF, the converted HTML, its images and your decisions. It cannot be undone. Files you downloaded are not affected.</p>
+<p>Deletes the file we kept, the converted HTML, its images and your decisions. It cannot be undone. Files you downloaded are not affected.</p>
+{% include "_delete_notes.html" %}
 <div class="confirm-actions">
-  <form method="post" action="/jobs/{{ job_id }}/delete" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("job.delete", "/jobs/" ~ job_id ~ "/delete", {"class": "inline-form"}) %}
     <input type="hidden" name="confirm" value="yes">
     <button type="submit" class="button-danger">Delete “{{ title|truncate(48, True, "…") }}”</button>
-  </form>
+  {% endcall %}
   <a class="button-secondary" href="{{ back }}">No, keep it</a>
 </div>
 {% endblock %}

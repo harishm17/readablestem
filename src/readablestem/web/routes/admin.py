@@ -12,17 +12,18 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
 from sqlalchemy import case, func, select
+from sqlalchemy.orm import Session
 
 from readablestem.ops import profile, step_report
-from readablestem.web import access, events, linked_emails, step_facts
+from readablestem.web import access, events, linked_emails, reports, shares, states, step_facts
 from readablestem.web.auth import normalise_email, set_allowed, set_blocked
 from readablestem.web.database import as_utc, utc_today
-from readablestem.web.db import ErrorAggregate, Job, JobStatus, QuotaDay, User, session_scope
+from readablestem.web.db import ErrorAggregate, Job, QuotaDay, User, session_scope
 from readablestem.web.deps import (
     AdminDep,
     flash,
@@ -30,6 +31,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.health import ops_report
 from readablestem.web.logsafe import log_event
 from readablestem.web.quota import signups_today
@@ -44,6 +46,26 @@ USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 # of accounts: the page lists the newest and says so, and the "Block by email" form reaches
 # any account, listed or not.
 PEOPLE_ROWS = 300
+# A second Link for a link already made (SW43).
+LINK_EXISTS = "That address was already linked to this instructor. Nothing was changed."
+# What the admin is told, by what happened (the shape of `routes/sharing.SHARE_OUTCOME`): no
+# address is in a notice, and nothing reports success when no row changed. A change names
+# what changed, in `{what}`.
+ALLOW_OUTCOME = {
+    shares.ADDED: "Added to the allowlist. Nothing was sent: tell them to sign in.",
+    shares.CHANGED: "Changed: {what}.",
+    shares.UNCHANGED: "Nothing changed: that address was already allowed.",
+}
+NOTHING = "Nothing changed: "
+
+
+def _done_kind(message: str) -> Literal["info", "success"]:
+    """A notice that says nothing changed is information; any other says what was done."""
+    return "info" if message.startswith(NOTHING) else "success"
+
+
+NO_ADDRESS = NOTHING + "enter an email address, like name@example.org."
+NO_ACCOUNT = NOTHING + "nobody has an account under that address."
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
 # "Model work of recent documents": the newest documents finished in this many days.
 STEP_DAYS = 7
@@ -123,8 +145,19 @@ def admin_context(request: Request) -> dict[str, Any]:
             "page_quota": ctx.settings.open_tier_daily_page_quota,
             "rereads": ctx.settings.open_tier_daily_rereads,
         }
-        rows = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
-        counts = {str(status): int(count) for status, count in rows}
+        # The queue in the words of every other page (F-213): how many jobs are in each
+        # state of the table (`web.states`), in the table's order.
+        snapshot = ctx.guard.snapshot()
+        closed = (
+            snapshot.remaining_usd is not None and snapshot.remaining_usd <= ctx.min_headroom_usd
+        )
+        found = states.load(
+            session, session.scalars(select(Job.id)), context=states.Context(budget_closed=closed)
+        )
+        order = list(states.TABLE)
+        queue: dict[str, int] = {}
+        for state in sorted(found.values(), key=lambda s: order.index(s.key)):
+            queue[state.label] = queue.get(state.label, 0) + 1
         aggregates = session.execute(
             select(
                 ErrorAggregate.day,
@@ -167,11 +200,10 @@ def admin_context(request: Request) -> dict[str, Any]:
         "steps": steps,
         "step_days": STEP_DAYS,
         "step_jobs": STEP_JOBS,
-        "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},
+        "queue": queue,
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,
         "ops": ops_report(ctx)[1],
-        "active": "admin",
         "errors": [],
         "email_error": "",
         "email_value": "",
@@ -186,6 +218,55 @@ def admin_page(request: Request, user: AdminDep) -> Response:
     return render(request, "admin.html", admin_context(request))
 
 
+@router.get("/admin/reports")
+def admin_reports(request: Request, user: AdminDep) -> Response:
+    """Problem reports from "Report this item" and the stopped-document link (`web.reports`),
+    open ones first, with the sender's account. Ids, codes and what the sender typed (shown
+    escaped, never as a link); nothing from a document."""
+    with session_scope(get_ctx(request).factory) as session:
+        rows = [
+            {
+                "id": report.id,
+                "open": report.status == reports.OPEN,
+                "kind": report.kind,
+                "sender": email,
+                "job_ref": report.job_ref,
+                "item_ref": report.item_ref,
+                "item_kind": report.item_kind,
+                "page": report.page,
+                "code": report.code,
+                "version": report.pipeline_version,
+                "text": report.text,
+                "created_at": as_utc(report.created_at),
+                "closed_at": as_utc(report.closed_at),
+            }
+            for report, email in reports.listed(session)
+        ]
+    context = {
+        "rows": rows,
+        "open_count": sum(1 for row in rows if row["open"]),
+        "closed_days": reports.CLOSED_DAYS,
+        "max_days": reports.MAX_DAYS,
+    }
+    return render(request, "admin_reports.html", context)
+
+
+@router.post("/admin/reports/{report_id}/close", dependencies=[Depends(require_csrf)])
+@submit_once("admin.report_close")
+def close_report(request: Request, user: AdminDep, report_id: int) -> Response:
+    with session_scope(get_ctx(request).factory) as session:
+        closed = reports.close(session, report_id)
+    if closed:
+        log_event(logger, "report_closed", by=user.id)
+    flash(
+        request,
+        "Closed." if closed else NOTHING + "that report is already closed or does not exist.",
+        undo=False,
+        kind="success" if closed else "info",
+    )
+    return RedirectResponse("/admin/reports", status_code=303)
+
+
 @router.get("/admin/health")
 def admin_health(request: Request, user: AdminDep) -> Response:
     """What `/healthz/ops` used to show everyone: which scheduled tasks are late, the stored
@@ -198,6 +279,7 @@ def admin_health(request: Request, user: AdminDep) -> Response:
 
 
 @router.post("/admin/allowlist", dependencies=[Depends(require_csrf)])
+@submit_once("admin.allow")
 def allow(
     request: Request,
     user: AdminDep,
@@ -206,7 +288,7 @@ def allow(
 ) -> Response:
     normalised = normalise_email(email)
     if normalised is None:
-        message = "Enter an email address, like name@example.org."
+        message = NO_ADDRESS
         context = admin_context(request) | {
             "errors": [{"field_id": "allow-email", "message": message}],
             "email_error": message,
@@ -215,65 +297,168 @@ def allow(
         return render(request, "admin.html", context, status_code=422)
     try:
         with session_scope(get_ctx(request).factory) as session:
-            # Unticked keeps the person's current role: re-adding an admin must not demote them.
-            set_allowed(session, normalised, allowed=True, admin=True if admin == "on" else None)
+            outcome, what = _allow(session, normalised, admin=True if admin == "on" else None)
     except linked_emails.LinkRefused as refused:
+        message = NOTHING + refused.message[:1].lower() + refused.message[1:]
         context = admin_context(request) | {
-            "errors": [{"field_id": "allow-email", "message": refused.message}],
-            "email_error": refused.message,
+            "errors": [{"field_id": "allow-email", "message": message}],
+            "email_error": message,
             "email_value": email,
         }
         return render(request, "admin.html", context, status_code=422)
-    log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
-    flash(request, "The allowlist was updated.")
+    if outcome != shares.UNCHANGED:
+        log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
+    flash(
+        request,
+        ALLOW_OUTCOME[outcome].format(what=what),
+        undo=False,
+        kind="info" if outcome == shares.UNCHANGED else "success",
+    )
     return RedirectResponse("/admin", status_code=303)
+
+
+def _allow(session: Session, email: str, *, admin: bool | None) -> tuple[str, str]:
+    """Allow `email` (unticked `admin` keeps the person's current role: re-adding an admin
+    must not demote them) and say what happened: `ADDED` (a new account), `CHANGED` (and what
+    changed) or `UNCHANGED`."""
+    before = session.scalar(select(User).where(User.email == email))
+    was = None if before is None else (before.is_allowed, before.access_tier, before.is_admin)
+    after = set_allowed(session, email, allowed=True, admin=admin)
+    if was is None or after is None:
+        return shares.ADDED, ""
+    changes = []
+    if not was[0]:
+        changes.append("they can sign in again")
+    if was[1] != after.access_tier:
+        changes.append("they are now invited, with the instructors' limits")
+    if was[2] != after.is_admin:
+        changes.append("they are now an admin" if after.is_admin else "they are no longer an admin")
+    return (shares.CHANGED, "; ".join(changes)) if changes else (shares.UNCHANGED, "")
+
+
+def _confirm_stop(request: Request, user: AdminDep, email: str, *, blocking: bool) -> Response:
+    """The question before an account is stopped: Block and Remove both sign the person out,
+    stop their queued and running work and take their admin rights, so each is asked first.
+    An address that cannot be stopped gets its notice on the admin page at once. The question
+    is the answer to the POST without `confirm=yes` (as a course's deletion asks), not a GET
+    page: a person's address never goes into a URL, where the host's request log would keep it."""
+    normalised = normalise_email(email)
+    word = "block" if blocking else "remove"
+    message = ""
+    context: dict[str, Any] = {"blocking": blocking}
+    if normalised == user.email:
+        message = f"You cannot {word} yourself. Ask another admin."
+    elif normalised is None:
+        message = NO_ADDRESS
+    else:
+        with session_scope(get_ctx(request).factory) as session:
+            person = session.scalar(select(User).where(User.email == normalised))
+            if person is None:
+                message = NO_ACCOUNT
+            elif not person.is_allowed:
+                message = NOTHING + (
+                    "that account was already blocked."
+                    if blocking
+                    else "that address was already off the allowlist."
+                )
+            else:
+                context |= {"email": person.email, "is_admin": person.is_admin}
+    if message:
+        flash(request, message, undo=False)
+        return RedirectResponse("/admin", status_code=303)
+    return render(request, "admin_stop_confirm.html", context)
 
 
 @router.post("/admin/allowlist/remove", dependencies=[Depends(require_csrf)])
-def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
+@submit_once("admin.remove")
+def remove(
+    request: Request,
+    user: AdminDep,
+    email: Annotated[str, Form()] = "",
+    confirm: Annotated[str, Form()] = "",
+) -> Response:
+    """Remove only with `confirm=yes`; the "Remove" button gets the question first."""
+    if confirm != "yes":
+        return _confirm_stop(request, user, email, blocking=False)
     normalised = normalise_email(email)
     if normalised == user.email:
-        flash(request, "You cannot remove yourself. Ask another admin.")
+        flash(request, "You cannot remove yourself. Ask another admin.", undo=False, kind="warning")
         return RedirectResponse("/admin", status_code=303)
-    if normalised is not None:
+    if normalised is None:
+        message = NO_ADDRESS
+    else:
         with session_scope(get_ctx(request).factory) as session:
-            set_allowed(session, normalised, allowed=False)
-        log_event(logger, "allowlist_remove", by=user.id)
-    flash(request, "The allowlist was updated.")
+            was = _was_allowed(session, normalised)
+            if was:
+                set_allowed(session, normalised, allowed=False)
+        if was:
+            log_event(logger, "allowlist_remove", by=user.id)
+            message = "Removed from the allowlist. They were signed out and their work stopped."
+        else:
+            message = (
+                NO_ACCOUNT
+                if was is None
+                else NOTHING + "that address was already off the allowlist."
+            )
+    flash(request, message, undo=False, kind=_done_kind(message))
     return RedirectResponse("/admin", status_code=303)
+
+
+def _was_allowed(session: Session, email: str) -> bool | None:
+    """Whether the account may sign in now; None when nobody has that address."""
+    return session.scalar(select(User.is_allowed).where(User.email == email))
 
 
 def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Response:
     normalised = normalise_email(email)
     if blocked and normalised == user.email:
-        flash(request, "You cannot block yourself. Ask another admin.")
+        flash(request, "You cannot block yourself. Ask another admin.", undo=False, kind="warning")
         return RedirectResponse("/admin", status_code=303)
-    found = None
-    if normalised is not None:
-        with session_scope(get_ctx(request).factory) as session:
-            found = set_blocked(session, normalised, blocked=blocked)
-    if found is None:
-        flash(request, "Nobody has an account under that address.")
+    if normalised is None:
+        message = NO_ADDRESS
     else:
-        log_event(logger, "user_blocked" if blocked else "user_unblocked", by=user.id)
-        flash(request, "The account was blocked." if blocked else "The account was unblocked.")
+        with session_scope(get_ctx(request).factory) as session:
+            was = _was_allowed(session, normalised)
+            if was is not None and was == blocked:  # allowed to be blocked, blocked to be let in
+                set_blocked(session, normalised, blocked=blocked)
+        if was is None:
+            message = NO_ACCOUNT
+        elif was != blocked:
+            message = NOTHING + (
+                "that account was already blocked." if blocked else "that account was not blocked."
+            )
+        else:
+            log_event(logger, "user_blocked" if blocked else "user_unblocked", by=user.id)
+            message = "The account was blocked." if blocked else "The account was unblocked."
+    flash(request, message, undo=False, kind=_done_kind(message))
     return RedirectResponse("/admin", status_code=303)
 
 
 @router.post("/admin/users/block", dependencies=[Depends(require_csrf)])
-def block(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
+@submit_once("admin.block")
+def block(
+    request: Request,
+    user: AdminDep,
+    email: Annotated[str, Form()] = "",
+    confirm: Annotated[str, Form()] = "",
+) -> Response:
     """Stop an account: signed out everywhere, its queued and running jobs stopped, and its
-    sign-ins refused (in either sign-up mode) until it is unblocked."""
+    sign-ins refused (in either sign-up mode) until it is unblocked. Only with `confirm=yes`;
+    the "Block" buttons get the question first."""
+    if confirm != "yes":
+        return _confirm_stop(request, user, email, blocking=True)
     return _block(request, user, email, blocked=True)
 
 
 @router.post("/admin/users/unblock", dependencies=[Depends(require_csrf)])
+@submit_once("admin.unblock")
 def unblock(request: Request, user: AdminDep, email: Annotated[str, Form()] = "") -> Response:
     """Let a blocked account sign in again, with the tier it had."""
     return _block(request, user, email, blocked=False)
 
 
 @router.post("/admin/linked-emails", dependencies=[Depends(require_csrf)])
+@submit_once("admin.link")
 def link_email(
     request: Request,
     user: AdminDep,
@@ -284,13 +469,18 @@ def link_email(
     owner, linked = normalise_email(email), normalise_email(other)
     message = ""
     if owner is None or linked is None:
-        message = "Enter both email addresses, like name@example.org."
+        message = NOTHING + "enter both email addresses, like name@example.org."
     else:
         try:
             with session_scope(get_ctx(request).factory) as session:
                 linked_emails.link(session, owner, linked)
         except linked_emails.LinkRefused as refused:
-            message = refused.message
+            message = NOTHING + refused.message[:1].lower() + refused.message[1:]
+            if refused.code == "already_linked" and _linked_to(request, linked, owner):
+                # This very link is there already (often a second click): nothing to fix
+                # (SW43, "identical repeat").
+                flash(request, LINK_EXISTS, undo=False)
+                return RedirectResponse("/admin", status_code=303)
     if message:
         context = admin_context(request) | {
             "errors": [{"field_id": "link-other", "message": message}],
@@ -300,16 +490,30 @@ def link_email(
         }
         return render(request, "admin.html", context, status_code=422)
     log_event(logger, "linked_email_add", by=user.id)
-    flash(request, "The other Google account was linked.")
+    flash(request, "The other Google account was linked.", undo=False, kind="success")
     return RedirectResponse("/admin", status_code=303)
 
 
+def _linked_to(request: Request, linked: str, owner: str) -> bool:
+    """`linked` is linked to the instructor `owner` already."""
+    with session_scope(get_ctx(request).factory) as session:
+        user = session.scalar(select(User).where(User.email == owner))
+        return user is not None and linked in linked_emails.linked_to(session, user.id)
+
+
 @router.post("/admin/linked-emails/remove", dependencies=[Depends(require_csrf)])
+@submit_once("admin.unlink")
 def unlink_email(request: Request, user: AdminDep, other: Annotated[str, Form()] = "") -> Response:
     linked = normalise_email(other)
-    if linked is not None:
+    if linked is None:
+        message = NO_ADDRESS
+    else:
         with session_scope(get_ctx(request).factory) as session:
-            linked_emails.unlink(session, linked)
-        log_event(logger, "linked_email_remove", by=user.id)
-    flash(request, "The other Google account was removed. That instructor was signed out.")
+            removed = linked_emails.unlink(session, linked)
+        if removed:
+            log_event(logger, "linked_email_remove", by=user.id)
+            message = "The other Google account was removed. That instructor was signed out."
+        else:
+            message = NOTHING + "that address was not linked to anyone."
+    flash(request, message, undo=False, kind=_done_kind(message))
     return RedirectResponse("/admin", status_code=303)

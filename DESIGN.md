@@ -108,6 +108,15 @@ Links in text are always underlined. Yellow is reserved for focus.
 
 Source Sans 3 (400, 700) for text everywhere; Source Serif 4 600 for display, h1 and h2 on Read/Persuade surfaces; Source Code Pro 400 for LaTeX and code; Latin Modern Math only for equations. Self-hosted woff2, latin plus a greek range loaded on demand, about 59 KB on a typical page. Scale: 56 (fluid 36-56) / 44 (fluid 32-44) / 28 / 22 / 18 / 16 / 14. 14px is the floor. Prose line height 1.6; UI 1.4. No tracking except -0.01em at display size.
 
+Text and headings are set once, in the top of `app.css`, by the kind of screen:
+
+| | Text | h1 | h2 | h3 | h4 | `.hint`, `.small` |
+|---|---|---|---|---|---|---|
+| Operate screens | 16 | 28 | 22 | 18 | 16 | 14 |
+| Read pages (`body.mode-read`) | 18 | 44 (fluid 32-44) | 28 | 22 | 18 | 16 |
+
+The header and footer stay at 16 on every page. No rule sets a heading's size by where it sits. A title that has to be an h2 or h3 for the outline but should look smaller takes `.card-title` (18, sans, 700); otherwise use a lower level. Heading levels do not skip. The landing page's h1 is display size, the one named exception. `.lede` (22) is an intro paragraph, not body text.
+
 ## Layout
 
 4px grid (`--space-1` to `--space-9`: 4, 8, 12, 16, 24, 32, 48, 64, 96). Page container 75rem; review screen up to 90rem; prose column 68ch; hero h1 20 to 22ch. Section rhythm 64px desktop, 48px mobile. Targets are 44px for primary actions, never under 24px. Below 52rem two-pane layouts stack, PDF first; below 40rem the navigation folds into a Menu disclosure. 200% zoom and 320px width must not scroll sideways. The landing page is short, in this order: headline, one line and two buttons; "Hear the difference" (one equation, two readings, two rows from 48rem, stacked on a phone, no cards inside cards, no badges); "How accurate it is" (two charts, one line, one link); three lines on what it handles; the questions folded. About 300 words are visible before anything is opened; each fact is said once and the detail lives on /limits, /privacy and the guides.
@@ -123,6 +132,14 @@ Flat. Depth comes from 1px borders and surface tints, not shadows. The only shad
 ## Components
 
 Header (brand, nav, Sign in as a secondary button, Menu disclosure; signed in, the workspace links come first: My documents, Courses, Account, then Guides and For accessibility offices), column footer (Product, Trust, Guides, Source) on public pages, a one-line footer of at most six links on signed-in pages and a five-link one on sign-in pages (footer and cancel links are 44px targets), buttons (primary filled, secondary outlined, danger, small), tags (status in words), notices, form fields with hint and error, card, stat tile (number, label, set and date, a "how measured" link), two-pane before/after (the job and review screens), "Hear the difference" (the landing page's one equation read two ways: a label, the equation on a small sheet of paper, what a screen reader says in plain text, a 44px Play button; side by side from 48rem), compact comparison chart (two charts and one line of words), comparison table (a collapsed disclosure per topic under 52rem), role rows (a native radio inside a whole-row label, with its description), "On this page" contents, FAQ in native details, data matrix (a table from 40rem, a list on a phone) and retention table for the offices and privacy pages, term and description list for limits, focusable scroll box for any table that can be wider than a phone (`_table_scroll.html`). Buttons live in `controls.css`, shared with the listening player and the showcase. A decision's row of choices sticks to the bottom of the window on wide screens; the listening transport sticks to the top. The focus ring is a 3px dark outline with a 5px yellow halo (yellow outline with a dark gap in dark mode, `Highlight` outline in forced colors) and is not to be changed. All are shown on `/style`, each demonstration in a dashed box labeled as an inert example, with the light, dark and forced-color states side by side.
+
+### Field
+
+`templates/components/fields.html` is the one place the classes `field`, `field-error` and `error-message` are written. `field(id, label, error, hint)` is a call block around one control (the control writes the `aria` it is handed: `aria-describedby` to the hint and the message, `aria-invalid="true"` in error); a radio group, a file input or a field inside a card uses its parts (`field_classes`, `field_error`, `field_aria`). A field in error is found without color: a thicker start border on the field and a glyph (a circle with an exclamation mark) before the message, which also starts with a hidden "Error:". In forced colors both use CanvasText and the border is 3px. The upload form's script draws the same line, so the glyph is CSS, not markup. The error summary links to a field by the control's id; keep every id a route, a test or `app.js` names.
+
+### Notice
+
+`templates/components/notices.html` is the one place the classes `notice`, `notice-success`, `notice-warning` and `error-summary` are written: `notice_box(kind, title, body, ...)`, kind `info`, `success`, `warning` or `error`. Success is the ok tint with a circled check (a shape, not color alone) and `role="status"`; a flash passes its kind (`web.deps.flash(..., kind=)`: success for something saved or done, warning for a refusal or something left as it was, info for anything else). `error` is the error summary and the stale-page notice, which take the page's focus; `_error_summary.html` and `_stale_notice.html` call the macro and stay the only places that use it. The Undo line under a decision (`decision-notice`) and the `notice-names`, `notice-actions` and `notice-excerpt` helpers inside a body are other things. Written to every kind and state on `/style`.
 
 Motion: none by default; 120ms color transitions only under `prefers-reduced-motion: no-preference`.
 
@@ -170,6 +187,7 @@ Shared constants (`tokens.css`):
 - Do show the real PDF and the real converted page, with the numbers' sample sizes.
 - Do keep any text at 7:1 or better, 14px or larger.
 - Do add a forced-colors rule for anything that relies on a background or a shadow.
+- Do keep modes honest. Anything marked only by a background also has a border in forced colors; anything marked only by color also has a word or a shape (an error field gets a thick double edge, the filled danger button too). A read-only value a person must see whole wraps; it is not a one-line input. An element that shows the source or the converted page keeps paper colors in dark mode with a visible frame, and what explains marks on paper (the legend) uses the same `--pmark-*` tokens as the marks.
 - Don't add a second accent, gradients, glass, eyebrows, section numbers or identical icon-card grids.
 - Don't put a colored stripe on one side of a card or notice; use a full border or a top rule.
 - Don't use a pill shape, or a radius other than 4 and 8.

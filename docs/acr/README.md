@@ -13,8 +13,8 @@ tested and what has not.
   to meet the criterion everywhere. **Not Applicable** where the web app has nothing the
   criterion is about (no audio or video). **Not yet evaluated** where the answer depends on
   what a screen reader says, or where nobody has looked yet. Those rows stay that way until a
-  session with VoiceOver in Safari is recorded ([../screen-reader-test.md](../screen-reader-test.md),
-  its results table names the rows each result feeds). The VPAT form itself allows "Not
+  session with VoiceOver in Safari is recorded ([../device-checks.md](../device-checks.md), D3 and D4,
+  its criterion rows say which rows each result feeds). The VPAT form itself allows "Not
   Evaluated" only for level AAA, so before publication every such row is given a tested level.
 - The converted file (the student's document) is a separate subject: its structure is described in
   [../output.md](../output.md) and checked by the output suites, and it is not part of this report.

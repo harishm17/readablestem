@@ -31,7 +31,7 @@ from readablestem.config import Settings
 from readablestem.core.types import Kind
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
-from readablestem.pipeline import layout, page_type
+from readablestem.pipeline import layout, page_type, say_once
 from readablestem.pipeline.run import convert_pdf
 
 HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
@@ -95,6 +95,31 @@ def _tick(page, x, y, size=12.0, colour=(0.8, 0.1, 0.1)) -> None:
     shape.draw_polyline([(x, y + size * 0.55), (x + size * 0.35, y + size), (x + size, y)])
     shape.finish(color=colour, width=1.4, lineCap=1, lineJoin=1, closePath=False)
     shape.commit()
+
+
+def _seal(page, centre, r, colour=(0.75, 0.1, 0.15)) -> tuple:
+    """A printed seal: two rings open at the foot, drawn as even Bezier arcs, round a
+    filled star."""
+    cx, cy = centre
+    shape = page.new_shape()
+    for radius in (r, 0.75 * r):
+        a, k = math.radians(110), math.radians(80)  # four arcs of 80 degrees, open below
+        for _ in range(4):
+            t = 4 / 3 * math.tan(k / 4)
+            p0 = (cx + radius * math.cos(a), cy + radius * math.sin(a))
+            p3 = (cx + radius * math.cos(a + k), cy + radius * math.sin(a + k))
+            c1 = (p0[0] - t * radius * math.sin(a), p0[1] + t * radius * math.cos(a))
+            c2 = (p3[0] + t * radius * math.sin(a + k), p3[1] - t * radius * math.cos(a + k))
+            shape.draw_bezier(p0, c1, c2, p3)
+            a += k
+        shape.finish(color=colour, width=1.5, closePath=False)
+    star = [(cx + r * (0.55 if i % 2 == 0 else 0.22) * math.sin(i * math.pi / 5),
+             cy - r * (0.55 if i % 2 == 0 else 0.22) * math.cos(i * math.pi / 5))
+            for i in range(10)]  # fmt: skip
+    shape.draw_polyline(star)
+    shape.finish(color=None, fill=colour, closePath=True)
+    shape.commit()
+    return cx - r, cy - r, cx + r, cy + r
 
 
 def _photo(w: int, h: int, seed: int = 5) -> pymupdf.Pixmap:
@@ -205,11 +230,20 @@ def test_a_step_plot_drawn_in_separate_lines_is_a_figure(little_text):
 
 
 @pytest.mark.parametrize(
-    "marks",
-    ["tick", "ticks and cross", "straight strokes", "mixed pen widths", "one stroke",
-     "two strokes over text", "signature"],
+    ("marks", "pen"),
+    [("tick", True), ("ticks and cross", True), ("straight strokes", True),
+     ("mixed pen widths", True), ("one stroke", True), ("two strokes over text", True),
+     ("signature", True), ("glyph outline in a line of text", False),
+     ("printed curved stamp", False)],
 )  # fmt: skip
-def test_hand_marks_on_a_typed_page_are_cut_out_as_handwriting(marks):
+def test_marks_on_a_typed_page_are_kept_and_named_handwriting_only_with_pen_evidence(marks, pen):
+    # Every mark ends in an element. Marks with pen evidence in their strokes are cut out
+    # as handwriting ("not converted"): the page type's pen strokes, a stroke too long for
+    # them that still bends as a pen does (the signature), and short straight strokes
+    # that neither meet another at its ends nor run beside it (a tick, a cross, loose
+    # strokes). A filled outline set inside a line of typed text is a glyph drawn as a
+    # path, and a printed seal (filled outlines, rings that turn evenly) is a drawing:
+    # both go to the figure step (WS6.10: F-364's outline maths, F-400's bond lines).
     doc = pymupdf.open()
     page = _page(doc)
     _title(page, "Quiz 1, question 2")
@@ -243,6 +277,18 @@ def test_hand_marks_on_a_typed_page_are_cut_out_as_handwriting(marks):
         boxes = _hand(page, 20, 300, 1, seed=1)
     elif marks == "two strokes over text":
         boxes = _hand(page, 200, 118, 2, seed=2)
+    elif marks == "glyph outline in a line of text":
+        # Two letters drawn as filled outlines at x-height between the typed words of one
+        # line: the page type takes them for pen strokes.
+        y = end + 24
+        page.insert_text((72, y), "The force on the cart is F = m", fontsize=11)
+        writer = Writer(page, 4, "ribbon", INK_BLACK, width=1.0)
+        after = writer.word("an", 219, y, 7.0, 0.15)
+        writer.commit()
+        page.insert_text((after + 3, y), "for the whole run.", fontsize=11)
+        boxes = writer.word_boxes
+    elif marks == "printed curved stamp":
+        boxes = [_seal(page, (450, end + 30), 11)]
     else:  # one stroke, too long for the stroke tests, under the text
         shape = page.new_shape()
         y = end + 20
@@ -254,8 +300,7 @@ def test_hand_marks_on_a_typed_page_are_cut_out_as_handwriting(marks):
     out = layout.analyze(doc.tobytes())
     assert out.page_types[0].kind == "born_digital"
     assert out.kept_pages == {}
-    regions = _regions(out)
-    assert regions, "the marks became no handwriting region"
+    assert bool(_regions(out)) == pen
     for box in boxes:
         assert _held(out, 0, box, kinds=(Kind.FIGURE,))
     assert "It has a direction" in _text(out)  # the typed text is read whole
@@ -479,3 +524,94 @@ def test_strokes_under_a_hidden_layer_and_a_title_are_handwriting_not_a_scan():
 
 
 # --------------------------------------------------------------------------- end to end
+
+
+def test_a_page_set_in_bitmap_tex_fonts_is_read_and_not_blank():
+    # dvips writes each bitmap font as a Type 3 font measured in pixels and sets it at 72
+    # over the printer's resolution: 10 pt text states a size of 0.24 pt. Two such pages of
+    # the public parsing benchmark were typed blank and came out empty with no flag.
+    doc = pymupdf.open()
+    page = _page(doc, LETTER)
+    glyph = doc.get_new_xref()
+    doc.update_object(glyph, "<<>>")
+    doc.update_stream(glyph, b"20 0 2 -31 18 10 d1 2 -31 16 41 re f")
+    font = doc.get_new_xref()
+    doc.update_object(
+        font,
+        "<< /Type /Font /Subtype /Type3 /Name /T1 /FontBBox [2 -31 18 10]"
+        " /FontMatrix [1 0 0 -1 0 0] /FirstChar 97 /LastChar 99 /Widths [20 20 20]"
+        " /Encoding << /Type /Encoding /Differences [97 /a /b /c] >>"
+        f" /CharProcs << /a {glyph} 0 R /b {glyph} 0 R /c {glyph} 0 R >> >>",
+    )
+    doc.xref_set_key(page.xref, "Resources", f"<< /Font << /T1 {font} 0 R >> >>")
+    words = [
+        f"1 0 0 1 {72 + 40 * column} {700 - 14 * row} Tm (abcab) Tj"
+        for row in range(10)
+        for column in range(8)
+    ]
+    text = doc.get_new_xref()
+    doc.update_object(text, "<<>>")
+    doc.update_stream(text, ("BT /T1 0.24 Tf " + " ".join(words) + " ET").encode())
+    doc.xref_set_key(page.xref, "Contents", f"{text} 0 R")
+    out = layout.analyze(doc.tobytes())
+    assert out.page_types[0].kind == "born_digital"
+    read = "".join(element.text or "" for element in out.elements)
+    assert read.count("abcab") == 80
+
+
+# --------------------------------------------------------------------------- say once
+# A17 / SW60: what the page says is counted against what the elements say, and the
+# conversion notes, in shadow and content-free, a page that lost a block.
+
+
+def _text_page() -> bytes:
+    doc = pymupdf.open()
+    page = _page(doc)
+    _title(page, "Motion")
+    _paragraphs(page, n=3)
+    return doc.tobytes()
+
+
+def _noted(pdf: bytes, monkeypatch, *, lose: int | None = None):
+    """What a conversion of `pdf` keeps of the say-once measure, with its `lose`-th paragraph
+    taken out of layout's answer (a block layout lost) when asked."""
+    real = layout.analyze
+
+    def analyze(*args, **kwargs):
+        out = real(*args, **kwargs)
+        if lose is not None:
+            gone = [e for e in out.elements if e.kind == Kind.PARAGRAPH][lose]
+            out.elements = [e for e in out.elements if e is not gone]
+        return out
+
+    monkeypatch.setattr(layout, "analyze", analyze)
+    client = FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS))
+    done = convert_pdf(pdf, settings=Settings(_env_file=None), client=client)  # type: ignore[call-arg]
+    assert done.facts is not None
+    return [f for f in done.facts.shadow if f.step == say_once.NOTICE_CODE]
+
+
+def test_a_page_with_a_block_left_out_is_noted_in_shadow_and_a_clean_page_is_not(monkeypatch):
+    pdf = _text_page()
+    (clean,) = _noted(pdf, monkeypatch)
+    assert (clean.page, clean.outcome, clean.share) == (0, "same", 0.0)
+    (lost,) = _noted(pdf, monkeypatch, lose=1)
+    assert (lost.page, lost.outcome) == (0, "differs")
+    assert lost.share is not None and 0.2 < lost.share < 0.5  # one of three paragraphs
+
+
+def test_a_phrase_said_by_two_elements_is_counted_and_a_running_footer_is_not(monkeypatch):
+    doc = pymupdf.open()
+    for n in range(3):
+        page = _page(doc)
+        _paragraphs(page, n=2)
+        page.insert_text((72, 770), "PHYS 101 lab notes", fontsize=9)
+        page.insert_text((300, 770), str(n + 1), fontsize=9)
+    out = layout.analyze(doc.tobytes())
+    page = say_once.measure(out.sources, out.elements)[0]
+    assert page.count("no_owner") == 0 and page.count("said_twice") == 0
+    assert page.left_out["furniture"] > 0  # layout's own rule, counted and not a fault
+    first = out.elements[0]
+    out.elements[0] = first.model_copy(update={"text": f"{first.text} {first.text}"})
+    again = say_once.measure(out.sources, out.elements)[0]
+    assert again.count("said_twice") > 20 and again.count("no_owner") == 0

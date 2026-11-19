@@ -11,12 +11,25 @@ from __future__ import annotations
 import random
 import re
 from html.parser import HTMLParser
+from unittest.mock import patch
 
 import pytest
 from latex2mathml.converter import convert
 
-from readablestem.core.types import TableCell, TableGrid, grid_problems
+from readablestem.core.types import (
+    Element,
+    EquationFix,
+    Fix,
+    Kind,
+    Status,
+    TableCell,
+    TableGrid,
+    grid_problems,
+    inline_marker,
+)
 from readablestem.pipeline import html_checks
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.speech import SPEECH_VERSION, SpeechError, mathml_to_speech
 from readablestem.pipeline.table_html import needs_header_ids, render_table
 
 
@@ -335,6 +348,17 @@ def assert_rectangular(html: str, rows: int, cols: int) -> None:
 # --------------------------------------------------------------------------- the patterns
 
 
+def test_a_stored_table_without_a_header_source_loads_writes_the_same_and_keeps_none():
+    stored = simple_grid().model_dump(mode="json")
+    assert "header_source" not in stored  # an older record has no such key
+    again = TableGrid.model_validate(stored)
+    assert again.header_source is None and again == simple_grid()
+    assert render_table(again, id_prefix="t") == render_table(simple_grid(), id_prefix="t")
+    assert "header_source" not in again.model_dump(mode="json")
+    chosen = again.model_copy(update={"header_source": "reviewer"})
+    assert TableGrid.model_validate(chosen.model_dump(mode="json")).header_source == "reviewer"
+
+
 def test_one_header_row_is_a_thead_with_column_scopes():
     html = render_table(simple_grid(), id_prefix="p1-e3")
     assert html.startswith('<table><caption id="p1-e3-caption">Table 1 Free fall.</caption>')
@@ -396,18 +420,86 @@ def test_maths_cells_are_sanitised_mathml():
     assert block.count('<math display="block">') == 2
 
 
-def test_a_header_that_is_only_maths_is_named_by_its_reading():
-    # Browsers name a <th> from its text, never from MathML: without the reading the
-    # column of g values would be announced with no header.
-    html = render_table(maths_header_grid(), id_prefix="t1")
-    assert (
-        '<th scope="col"><span class="visually-hidden readablestem">g open parenthesis m/s '
-        'squared close parenthesis</span><span aria-hidden="true"><math display="inline">'
-    ) in html
-    assert html.count("<math") == 1
-    assert not [c for c in html_checks.static_checks(page([html])) if not c.passed]
-    # A maths data cell is left as it is: its text is the MathML itself.
-    assert "<td><math" in render_table(maths_grid(), id_prefix="t2")
+def body_maths(latexes: list[str], *, alttext: bool) -> list[str]:
+    """The `<math>` of each formula as the text writes an equation, without its id."""
+    elements = [
+        Element(
+            id="p1-t",
+            kind=Kind.PARAGRAPH,
+            page=0,
+            bbox=(72, 60, 300, 80),
+            order=0,
+            text="See " + " ".join(inline_marker(f"p1-e{i}") for i in range(len(latexes))),
+        )
+    ]
+    fixes = []
+    for i, latex in enumerate(latexes):
+        mathml = convert(latex)
+        elements.append(
+            Element(
+                id=f"p1-e{i}",
+                kind=Kind.EQUATION,
+                page=0,
+                bbox=(72, 100, 172, 120),
+                order=i + 1,
+                display="inline",
+            )
+        )
+        fixes.append(
+            Fix(
+                element_id=f"p1-e{i}",
+                kind=Kind.EQUATION,
+                status=Status.ACCEPTED,
+                confidence=0.95,
+                equation=EquationFix(
+                    latex=latex,
+                    mathml=mathml,
+                    speech=mathml_to_speech(mathml),
+                    speech_version=SPEECH_VERSION,
+                    display="inline",
+                ),
+            )
+        )
+    html = render_html(
+        title="T", lang="en", elements=elements, fixes=fixes, crops={}, math_alttext=alttext
+    )
+    return [re.sub(r' id="[^"]*"', "", m) for m in re.findall(r"<math.*?</math>", html, re.S)]
+
+
+@pytest.mark.parametrize("alttext", [False, True])
+def test_a_maths_cell_is_written_as_the_text_writes_an_equation(alttext):
+    header, data, words = r"g\ (\text{m/s}^2)", r"\frac{1}{2}mv^2", r"\mu"
+    grid = TableGrid(
+        rows=2,
+        cols=3,
+        cells=[
+            maths_cell(0, 0, "g (m/s^2)", header).model_copy(update={"header": "col"}),
+            c(0, 1, "Name", header="col"),
+            c(0, 2, "Particle", header="col"),
+            c(1, 0, "x"),
+            maths_cell(1, 1, "KE", data),
+            maths_cell(1, 2, "Muon (mu)", r"\text{Muon (}\mu\text{)}"),
+        ],
+        header_rows=1,
+    )
+    html = render_table(grid, id_prefix="t1", math_alttext=alttext)
+    in_table = re.findall(r"<math.*?</math>", html, re.S)
+    in_text = body_maths([header, data, words], alttext=alttext)
+    assert in_table == in_text  # the same markup, and with `alttext` on the same reading
+    # Nothing is hidden from assistive technology, and no cell writes its LaTeX.
+    assert "aria-hidden" not in html and "visually-hidden" not in html and "\\frac" not in html
+    # A header's name is the reading the text's equation has.
+    name = re.search(r'<th scope="col" aria-label="([^"]*)"', html)
+    assert name and name.group(1) == "g open parenthesis m/s squared close parenthesis"
+    assert not [x for x in html_checks.static_checks(page([html])) if not x.passed]
+    # A formula that cannot be read is still its MathML, with no name made up from its LaTeX.
+    only = TableCell(
+        row=0, col=0, latex=r"\badmacro", mathml="<math><mi>q</mi></math>", header="col"
+    )
+    lone = TableGrid(rows=1, cols=1, cells=[only], header_rows=1)
+    with patch("readablestem.pipeline.speech.mathml_to_speech", side_effect=SpeechError("x")):
+        table = render_table(lone, id_prefix="t2")
+    assert "aria-label" not in table and "badmacro" not in table and "<math" in table
 
 
 @pytest.mark.browser

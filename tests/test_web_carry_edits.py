@@ -93,13 +93,18 @@ def pdf_with(change) -> bytes:
     return data
 
 
-def revise(env, first: str, data: bytes) -> str:
+def revise(env, first: str, data: bytes, delete_first: bool = False) -> str:
     response = env.browser.post(
         "/jobs",
         data={"csrf_token": token(env.browser), "revises": first},
         files={"pdf": ("notes-v2.pdf", data, "application/pdf")},
     )
     second = job_id_from(response)
+    if delete_first:  # while the revised one waits to be converted
+        env.browser.post(
+            f"/jobs/{first}/delete",
+            data={"csrf_token": token(env.browser, "/app"), "confirm": "yes"},
+        )
     env.converter.output = review_output()
     env.run_worker()
     return second
@@ -122,9 +127,12 @@ def carried_rows(env, job_id: str) -> dict[str, dict]:
 # --------------------------------------------------------------------------- a revised PDF
 
 
-def test_edits_by_hand_come_back_on_a_revised_pdf_where_nothing_changed(web):
+@pytest.mark.parametrize("delete_first", [False, True])
+def test_edits_by_hand_come_back_on_a_revised_pdf_where_nothing_changed(web, delete_first):
+    """Also when the earlier document is deleted after the upload and before the revised one
+    is converted: the picture added by hand is put back by what was kept at the upload."""
     make_edits(web, web.first)
-    second = revise(web, web.first, pdf_with(lambda doc: None))  # other bytes, same pages
+    second = revise(web, web.first, pdf_with(lambda doc: None), delete_first)  # other bytes
     result = stored(web, second)
     assert element(result, PLAIN).text == "Discuss vectors and scalars with your class."
     heading = element(result, LATER)
@@ -150,7 +158,7 @@ def test_edits_by_hand_come_back_on_a_revised_pdf_where_nothing_changed(web):
 
     page = text_of(web.browser.get(f"/jobs/{second}").text)
     assert "3 changes you made by hand were carried over" in page
-    assert "not carried over" not in page
+    assert "not made again" not in page
 
 
 def env_job(env, job_id: str) -> Job:
@@ -161,10 +169,20 @@ def env_job(env, job_id: str) -> Job:
 
 
 def stop(env, job_id: str) -> None:
-    """The conversion stopped part way (the day's budget ran out): "Convert the missing parts"."""
+    """The conversion stopped part way (the day's budget ran out): "Convert the missing parts".
+    As a real stop leaves it, one equation was never converted; a budget stop with nothing
+    left out offers no try (F-319)."""
     with session_scope(env.ctx.factory) as session:
         job = session.get(Job, job_id)
         assert job is not None
+        result = dict(job.result_json or {})
+        result["fixes"] = [
+            {**f, "status": "failed", "reason": "budget_daily"}
+            if f.get("element_id") == "p1-e5"
+            else f
+            for f in result.get("fixes") or []
+        ]
+        job.result_json = result
         job.error_code = "budget_daily"
         job.status = JobStatus.DONE
 
@@ -196,3 +214,41 @@ def test_edits_by_hand_survive_trying_a_document_again(web):
     assert described.described == "v equals d over t"
     # A try-again keeps its own review edits and adds none (carried rows are for revisions).
     assert carried_rows(web, web.first) == {}
+
+
+def test_not_an_equation_comes_back_on_a_revised_pdf_for_the_same_picture(web):
+    """The equation given back to its paragraph stays text in a revised file: found by the
+    same picture and the same words under it."""
+    inline = "p1-e2"
+    assert stored(web, web.first).fix_for(inline) is not None
+    decide(web, web.first, inline, action="not_equation")
+    assert stored(web, web.first).fix_for(inline) is None
+
+    second = revise(web, web.first, pdf_with(lambda doc: None))
+    result = stored(web, second)
+    assert result.fix_for(inline) is None and element(result, inline) is None
+    assert "𝛚" in (element(result, "p1-e1").text or "")
+    report = carry.CarryReport.from_json(env_job(web, second).carried_json)
+    assert report.edits == [inline] and report.edits_dropped == 0
+
+
+def test_a_revision_lists_each_change_it_could_not_make_again_by_name_and_page(web):
+    """A page left out and a paragraph edited come back; a picture added where the page
+    now looks different does not, and the job page names it with its page."""
+    edit(web, web.first, PLAIN, action="text", text="Discuss vectors and scalars with your class.")
+    page_post(web, web.first, 1, "add", kind="picture", alt=ALT, **REGION)
+    page_post(web, web.first, 2, "omit")
+
+    def draw_in_the_region(doc):
+        page = doc[0]
+        page.insert_text((page.rect.width * 0.2, page.rect.height * 0.83), "A new line of text")
+
+    second = revise(web, web.first, pdf_with(draw_in_the_region))
+    result = stored(web, second)
+    assert element(result, PLAIN).text == "Discuss vectors and scalars with your class."
+    assert element(result, "p1-x1") is None and result.omitted_pages == [1]
+    report = carry.CarryReport.from_json(env_job(web, second).carried_json)
+    assert report.edits_not_applied == [("picture", 1)]
+    page = text_of(web.browser.get(f"/jobs/{second}").text)
+    assert "1 change you made by hand was not made again" in page
+    assert "Page 1: picture you added" in page

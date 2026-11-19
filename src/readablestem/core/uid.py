@@ -71,7 +71,7 @@ from readablestem.core.types import INLINE_MARKER_RE, DocumentResult, Element, K
 PICTURE_KINDS = frozenset({Kind.EQUATION, Kind.FIGURE, Kind.TABLE})
 # Origins read from a source and not from pages (`DocumentResult.origin`): uids are counted
 # over the whole document.
-SOURCE_ORIGINS = frozenset({"latex", "beamer"})
+SOURCE_ORIGINS = frozenset({"latex", "beamer", "docx"})
 # Elements a reviewer added by hand ("p3-x0", `web.page_edits.next_added_id`) are a group of
 # their own, so adding one never renumbers what the tool found.
 _ADDED = re.compile(r"-x\d+$")
@@ -94,18 +94,22 @@ def _hash(parts: list[str]) -> str:
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
 
-def fingerprint(element: Element, crop: bytes | None = None) -> str:
+def fingerprint(element: Element, crop: bytes | None = None, *, crop_sha: str | None = None) -> str:
     """The content of one element, as a hex digest: two elements with the same fingerprint
     say the same thing. The one function behind both the uid and decision carry-over.
 
     `crop` is the picture of an equation, figure or table (carry-over has it): the picture
     then stands for the content, so a picture that differs by one pixel is another item.
-    Without it (uids are computed from the result alone) the element's fields are read.
+    `crop_sha` is the SHA-256 of that picture when only the digest was kept (the snapshot of an
+    earlier version, `web.carry_snapshot`); it gives the same fingerprint as the picture.
+    Without either (uids are computed from the result alone) the element's fields are read.
     """
     kind = element.kind
     parts = [kind.value]
-    if crop is not None and kind in PICTURE_KINDS:
-        parts.append(hashlib.sha256(crop).hexdigest())
+    if crop is not None:
+        crop_sha = hashlib.sha256(crop).hexdigest()
+    if crop_sha is not None and kind in PICTURE_KINDS:
+        parts.append(crop_sha)
         if kind is Kind.EQUATION:
             parts.append(element.display or "")
         elif kind is Kind.FIGURE:

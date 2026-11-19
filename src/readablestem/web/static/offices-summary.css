@@ -1,7 +1,7 @@
   /* The downloaded one-page summary (templates/offices_summary.html). It is a file on its
      own, so this stylesheet is put inline; no outside font or link. Headings step down by
      size and weight: page title, section heading, then text. */
-  @page { margin: 12mm; }
+  @page { margin: 10mm; }
   body { font-family: system-ui, "Segoe UI", Arial, sans-serif; color: #1b1b1f; background: #fff; line-height: 1.5; font-size: 1rem; max-width: 46rem; margin: 1.5rem auto; padding: 0 1rem; }
   h1 { font-size: 2rem; line-height: 1.15; margin: 0 0 0.5rem; }
   h2 { font-size: 1.3125rem; line-height: 1.25; margin: 1.75rem 0 0.5rem; padding-top: 0.75rem; border-top: 2px solid #1b1b1f; break-after: avoid; }
@@ -17,13 +17,13 @@
   a { color: #1a4fa0; }
   .meta { color: #4a4a55; }
   @media print {
-    body { font-size: 8.5pt; line-height: 1.32; margin: 0; max-width: none; padding: 0; }
-    h1 { font-size: 20pt; margin-bottom: 3pt; }
-    h2 { font-size: 12.5pt; margin: 9pt 0 3pt; padding-top: 4pt; border-top-width: 1.5pt; }
-    p, ul, ol { margin: 3pt 0; }
+    body { font-size: 8pt; line-height: 1.28; margin: 0; max-width: none; padding: 0; }
+    h1 { font-size: 18pt; margin-bottom: 3pt; }
+    h2 { font-size: 11.5pt; margin: 7pt 0 2pt; padding-top: 3pt; border-top-width: 1.5pt; }
+    p, ul, ol { margin: 2pt 0; }
     li { margin: 1pt 0; }
-    table { font-size: 8pt; line-height: 1.25; }
-    th, td { padding: 2pt 4pt; }
+    table { font-size: 7.5pt; line-height: 1.2; }
+    th, td { padding: 1.5pt 3.5pt; }
     ol.pilot { columns: 2; column-gap: 14pt; }
     ol.pilot li { break-inside: avoid; }
   }

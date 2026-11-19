@@ -91,7 +91,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import case, delete, select, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -100,33 +100,29 @@ from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation, Spe
 from readablestem.core.types import (
     ConversionOutput,
     DocumentResult,
+    NotationEntry,
     ProgressEvent,
     StageFact,
     StepFacts,
 )
 from readablestem.ops import limits
 from readablestem.pipeline import step_facts as pipeline_step_facts
-from readablestem.web import access, carry_edits, events, step_facts
+from readablestem.web import access, carry_edits, carry_snapshot, events, office_census, step_facts
 from readablestem.web import combine as combine_rules
 from readablestem.web import retry as retry_rules
-from readablestem.web.database import as_utc, rowcount
+from readablestem.web.carry_snapshot import Earlier
+from readablestem.web.database import as_utc, rowcount, utc_today
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
 from readablestem.web.fair_queue import claim_order_by
 from readablestem.web.isolated_convert import ConversionFailed, convert_isolated, self_check
 from readablestem.web.logsafe import log_event, log_exception
+from readablestem.web.pdf_probe import IMAGE_PAGE_REFUSALS
 from readablestem.web.provider_health import HEALTH
+from readablestem.web.quota import give_back_pages
 from readablestem.web.spend import DbSpendGuard, conversion_headroom_usd
+from readablestem.web.states import CANCELED
 from readablestem.web.step_cache import DbStepCache
 from readablestem.web.step_cache import forget as forget_steps
-
-# `ReviewEdit.action` of the edits that change the structure and not a fix (web.page_edits):
-# their rows are read when a new conversion inherits from an earlier one.
-STRUCTURE_ACTIONS = frozenset(
-    {"edit_text", "make_heading", "add_figure", "add_equation", "omit_page", "restore_page"}
-)
-# A region or a page compared between two files is drawn at this size (pixels per point).
-COMPARE_ZOOM = 1.5
-COMPARE_MAX_SIDE_PX = 2400
 
 if TYPE_CHECKING:
     from readablestem.core.types import ConversionOptions
@@ -316,8 +312,7 @@ def job_caps(settings: Settings, page_count: int, image_pages: bool = False) -> 
     pages = page_count if page_count > 0 else settings.max_pages_per_job
     usd = min(settings.max_usd_per_job, pages * settings.max_usd_per_page)
     if image_pages and settings.feature_image_pages:
-        wider = min(settings.image_pages_max_usd_per_job, pages * settings.image_pages_usd_per_page)
-        usd = max(usd, wider)
+        usd = max(usd, settings.image_pages_estimate(pages))
     return (
         usd,
         min(settings.max_model_calls_per_job, pages * settings.max_model_calls_per_page),
@@ -374,29 +369,36 @@ class _AttemptBudget(JobBudget):
 
     hold_on_job: Callable[[float, int], None] | None = field(default=None, repr=False)
     release_on_job: Callable[[float, int], None] | None = field(default=None, repr=False)
-    settle_on_job: Callable[[float], None] | None = field(default=None, repr=False)
+    # (the call's cost, what it held)
+    settle_on_job: Callable[[float, float], None] | None = field(default=None, repr=False)
 
-    def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
+    def _reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
         calls = 1 if count_call else 0
         if self.hold_on_job is not None:
             self.hold_on_job(amount_usd, calls)
         try:
-            return super().reserve(amount_usd, count_call=count_call)
+            return super()._reserve(amount_usd, count_call=count_call)
         except BaseException:
             if self.release_on_job is not None:
                 self.release_on_job(amount_usd, calls)
             raise
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
-        super().settle(reservation, actual_usd)
+        # The job's row first: a call waiting on this settlement (`JobBudget.reserve`) is woken
+        # by `super().settle` and must find the row settled.
         if self.settle_on_job is not None:
-            self.settle_on_job(max(0.0, actual_usd) - reservation.amount_usd)
+            self.settle_on_job(max(0.0, actual_usd), reservation.amount_usd)
+        super().settle(reservation, actual_usd)
 
 
 @dataclass(frozen=True)
 class Claim:
     job_id: str
     attempt: int
+    # When the claim was asked for (`time.monotonic`), the same moment as the job's
+    # `started_at`: the job's stages are counted from here, so the claim's own write is
+    # inside `start_up`.
+    began: float | None = None
 
 
 @dataclass
@@ -420,20 +422,9 @@ class _Attempt:
     began: float | None = None
     converted: float | None = None
     facts: StepFacts | None = None
-
-
-@dataclass
-class _Earlier:
-    """The result a new one inherits decisions from (`Worker._earlier_version`): it, its
-    crops, its file name, and whether it is the job's own earlier result (a try-again)."""
-
-    result: DocumentResult
-    crops: dict[str, bytes]
-    name: str
-    own: bool
-    # The job it came from, and its structural edits (`web.carry_edits`), oldest first.
-    source_id: str = ""
-    edits: list[carry_edits.EditRow] = field(default_factory=list)
+    # The course symbols this attempt's conversion was handed (`_converter_kwargs`), kept with
+    # the result (`web.notation.applied_record`). User content: never logged.
+    notation: list[NotationEntry] = field(default_factory=list)
 
 
 @dataclass
@@ -459,6 +450,7 @@ class Worker:
         timeout_grace_s: float = TIMEOUT_GRACE_S,
         headroom_usd: float | None = None,
         tracer: Tracer | None = None,
+        purge: bool = True,
     ) -> None:
         self.settings = settings
         self.factory = factory
@@ -482,10 +474,13 @@ class Worker:
         # ones included): what one more concurrent step may need.
         self._largest_usd = limits.largest_reservation_usd(settings)
         self._stop = threading.Event()
+        # Set by an upload (`wake`) or by `stop`: ends the idle wait between two polls.
+        self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._current: _Attempt | None = None
         self._paused = False
-        self._next_purge = time.monotonic() + PURGE_FIRST_S
+        # `purge=False`: another slot of the `worker` command runs the retention backstop.
+        self._next_purge = time.monotonic() + PURGE_FIRST_S if purge else float("inf")
         # When the loop (or a running conversion's heartbeat) last showed life; /readyz.
         self._seen_at = time.monotonic()
         self._shutdown_thread: threading.Thread | None = None
@@ -558,6 +553,7 @@ class Worker:
         least recently, then oldest), or None.
 
         Only jobs whose owner is still on the allowlist are taken."""
+        began = time.monotonic()
         now = now or self.clock()
         claimed = {
             "status": JobStatus.RUNNING,
@@ -595,7 +591,7 @@ class Worker:
                 if won == 1:
                     attempt = session.scalar(select(Job.attempts).where(Job.id == job_id))
                     log_event(logger, "job_claimed", job_id=job_id, attempt=attempt)
-                    return Claim(job_id=job_id, attempt=int(attempt or 1))
+                    return Claim(job_id=job_id, attempt=int(attempt or 1), began=began)
         return None
 
     def budget_closed(self) -> bool:
@@ -652,7 +648,10 @@ class Worker:
         """
         if attempt.cancelled.is_set():
             raise JobCancelled()
-        under_caps = [Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON]
+        under_caps = [
+            Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON,
+            Job.cancel_requested_at.is_(None),  # "Cancel" pressed: no more model calls
+        ]
         if calls:
             under_caps.append(Job.model_calls + calls <= attempt.max_calls)
         with session_scope(self.factory) as session:
@@ -660,26 +659,39 @@ class Worker:
                 session.execute(
                     update(Job)
                     .where(*self._owned(attempt.claim), *under_caps)
-                    .values(cost_usd=Job.cost_usd + amount_usd, model_calls=Job.model_calls + calls)
+                    .values(
+                        cost_usd=Job.cost_usd + amount_usd,
+                        held_usd=Job.held_usd + amount_usd,
+                        model_calls=Job.model_calls + calls,
+                    )
                     .execution_options(synchronize_session=False)
                 )
             )
             if won == 1:
                 return
             row = session.execute(
-                select(Job.cost_usd, Job.model_calls).where(*self._owned(attempt.claim))
+                select(Job.cost_usd, Job.model_calls, Job.cancel_requested_at).where(
+                    *self._owned(attempt.claim)
+                )
             ).one_or_none()
         if row is None:
             self._cancel(attempt, "not_owned")
+            raise JobCancelled()
+        if row.cancel_requested_at is not None:
+            self._finish_failed(attempt, CANCELED)
+            self._cancel(attempt, "canceled")
             raise JobCancelled()
         if calls and int(row.model_calls or 0) + calls > attempt.max_calls:
             raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")
         raise BudgetExceeded("job_usd", f"job spend cap ${attempt.max_usd:.2f} reached")
 
-    def _adjust_job(self, attempt: _Attempt, cost_delta: float, calls_delta: int) -> None:
+    def _adjust_job(
+        self, attempt: _Attempt, cost_delta: float, calls_delta: int, held_delta: float = 0.0
+    ) -> None:
         """Change the job's totals by a delta (a released hold or a settled call), whoever
-        owns the job now: the hold was added to this row. Never raises."""
-        if not cost_delta and not calls_delta:
+        owns the job now: the hold was added to this row. `held_delta` is what leaves the
+        row's held part (never below 0: a hold that was already given back). Never raises."""
+        if not cost_delta and not calls_delta and not held_delta:
             return
         try:
             with session_scope(self.factory) as session:
@@ -688,6 +700,9 @@ class Worker:
                     .where(Job.id == attempt.claim.job_id)
                     .values(
                         cost_usd=Job.cost_usd + cost_delta,
+                        held_usd=case(
+                            (Job.held_usd + held_delta < 0, 0.0), else_=Job.held_usd + held_delta
+                        ),
                         model_calls=Job.model_calls + calls_delta,
                     )
                     .execution_options(synchronize_session=False)
@@ -742,8 +757,13 @@ class Worker:
         pool: str | None = None,
         image_pages: bool = False,
         user_id: str | None = None,
+        base_usd: float = 0.0,
+        base_calls: int = 0,
     ) -> _Attempt:
+        # The caps count from `base_*`: what the job had spent when a re-run after a new
+        # version began (`Job.cap_base_usd`, `web.retry.start`); 0 for any other run.
         max_usd, max_calls = job_caps(self.settings, page_count, image_pages)
+        max_usd, max_calls = max_usd + base_usd, max_calls + base_calls
         attempt = _Attempt(
             claim=claim,
             prior_usd=prior_usd,
@@ -757,8 +777,10 @@ class Worker:
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
             hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
-            release_on_job=lambda amount, calls: self._adjust_job(attempt, -amount, -calls),
-            settle_on_job=lambda delta: self._adjust_job(attempt, delta, 0),
+            release_on_job=lambda amount, calls: self._adjust_job(
+                attempt, -amount, -calls, -amount
+            ),
+            settle_on_job=lambda actual, held: self._adjust_job(attempt, actual - held, 0, -held),
         )
         return attempt
 
@@ -777,6 +799,22 @@ class Worker:
             return
         if not owned:
             self._cancel(attempt, "not_owned")
+        elif self._cancel_asked(attempt.claim):
+            # The owner pressed "Cancel" (`routes.jobs.cancel_job`): end the job as canceled and
+            # stop what has not been sent, as for a deleted job. The pages are not returned.
+            self._finish_failed(attempt, CANCELED)
+            self._cancel(attempt, "canceled")
+
+    def _cancel_asked(self, claim: Claim) -> bool:
+        try:
+            with session_scope(self.factory) as session:
+                return (
+                    session.scalar(select(Job.cancel_requested_at).where(*self._owned(claim)))
+                    is not None
+                )
+        except Exception as exc:  # a missed check is made again at the next beat
+            log_exception(logger, "cancel_check_failed", exc, job_id=claim.job_id)
+            return False
 
     def _progress(self, attempt: _Attempt) -> ProgressFn:
         """Progress callback. Raising from it aborts `convert_pdf` (queued steps cancelled)."""
@@ -807,6 +845,7 @@ class Worker:
         options = notation.conversion_options(self.factory, self.settings, attempt.claim.job_id)
         if options is not None:
             kwargs["options"] = options
+        attempt.notation = list(options.notation) if options is not None else []
 
         # stage_progress: live progress by stage, stored on the job row for its page
         # (only to a converter that takes it: older fakes and scripts do not).
@@ -969,7 +1008,7 @@ class Worker:
     def process(self, claim: Claim) -> str:
         """Convert one claimed job and store the outcome. Returns the final status
         ("done", "failed") or "discarded" when the job stopped being ours meanwhile."""
-        started = time.monotonic()
+        started = claim.began if claim.began is not None else time.monotonic()
         with session_scope(self.factory) as session:
             job = session.execute(
                 select(
@@ -978,6 +1017,8 @@ class Worker:
                     Job.model_calls,
                     Job.user_id,
                     Job.image_pages,
+                    Job.cap_base_usd,
+                    Job.cap_base_calls,
                 ).where(Job.id == claim.job_id)
             ).one_or_none()
             pool = access.spend_pool(access.tier_of(session, job.user_id)) if job else None
@@ -996,9 +1037,20 @@ class Worker:
             pool,
             bool(job.image_pages),
             job.user_id,
+            float(job.cap_base_usd or 0.0),
+            int(job.cap_base_calls or 0),
         )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")
+        with session_scope(self.factory) as session:
+            # What a dead attempt of this job still held stays in `cost_usd` (it may have been
+            # billed) as spend: it is not in flight any more.
+            session.execute(
+                update(Job)
+                .where(Job.id == claim.job_id, Job.held_usd > 0)
+                .values(held_usd=0.0)
+                .execution_options(synchronize_session=False)
+            )
         self._current = attempt
         try:
             return self._convert_and_store(attempt, pdf, page_count, started)
@@ -1039,13 +1091,17 @@ class Worker:
         self, attempt: _Attempt, code: str, detail: dict[str, Any] | None = None
     ) -> str:
         """Mark the job FAILED if this worker still owns it; "discarded" if not. `detail`:
-        the names that stopped a source (`Job.error_detail`)."""
+        the names that stopped a source (`Job.error_detail`). A file that is only scans or
+        handwriting (`IMAGE_PAGE_REFUSALS`) gives its pages back in the same transaction, when
+        they were counted today: the upload refuses the same file without counting it when its
+        probe can tell in its allowance (`web.quota`)."""
         values: dict[str, object] = {
             "status": JobStatus.FAILED,
             "error_code": code,
             "error_detail": detail,
             "finished_at": self.clock(),
             "lease_until": None,
+            "held_usd": 0.0,  # nothing of a stopped job is in flight any more
         }
         with session_scope(self.factory) as session:
             updated = rowcount(
@@ -1056,7 +1112,17 @@ class Worker:
                     .execution_options(synchronize_session=False)
                 )
             )
+            if updated == 1 and code in IMAGE_PAGE_REFUSALS:
+                self._give_back_pages(session, attempt.claim.job_id)
         return JobStatus.FAILED if updated == 1 else DISCARDED
+
+    def _give_back_pages(self, session: Session, job_id: str) -> None:
+        """The pages of a job the upload could not tell was only scans or handwriting, back on
+        the day they were counted (`quota.give_back_pages`): the day of the upload, so a job
+        that fails after midnight gives nothing back, as for a canceled one."""
+        job = session.get(Job, job_id)
+        if job is not None and utc_today(as_utc(job.created_at)) == utc_today(self.clock()):
+            give_back_pages(session, job.user_id, job.page_count, day=utc_today(self.clock()))
 
     def _store(self, attempt: _Attempt, output: ConversionOutput, seconds: float) -> str:
         job_id = attempt.claim.job_id
@@ -1116,9 +1182,10 @@ class Worker:
         for a conversion that measured nothing (a stand-in converter).
 
         `queue_wait` is the time from the upload to the first claim; a later try has none,
-        because the row does not say when it was asked for. `start_up` is what the
-        conversion call took outside the conversion's own stages: starting its process,
-        loading it, and passing the file in and the result back. `store` is from the end
+        because the row does not say when it was asked for. `start_up` is the time from
+        the claim to the end of the conversion call outside the conversion's own stages:
+        the claim's write, starting the process, loading it, and passing the file in and
+        the result back. `store` is from the end
         of the conversion to this write."""
         if output.facts is None:
             return None
@@ -1156,6 +1223,12 @@ class Worker:
                 or job.attempts != attempt.claim.attempt
             ):
                 return False
+            from readablestem.web import notation
+            from readablestem.web import output as output_rules  # imports the app's deps
+
+            result.notation_applied = notation.applied_record(
+                self.settings, job, result, attempt.notation
+            )
             earlier = self._earlier_version(session, job)  # before its crops are replaced
             session.execute(delete(Blob).where(Blob.job_id == job.id, Blob.kind == "crop"))
             for element_id, png in output.crops.items():
@@ -1172,10 +1245,22 @@ class Worker:
                 self._carry_decisions(session, job, result, output.crops, earlier)
             # A part of a longer file: its pages are numbered as in that file, and the file
             # is made again from the result (lazily, `current_html`) to say so.
-            numbered = combine_rules.number_part_pages(job, result)
+            combine_rules.number_part_pages(job, result)
+            # A Word or PowerPoint upload: what its PDF route left out or kept open (T3-30).
+            result.notices = office_census.with_notices(
+                result.notices, office_census.parse(job.office_json), result.origin
+            )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
+            # A job that already had a file (a part tried again, a re-run after a release) has
+            # its output changed by this one; the first file is version 1 (WS20.1).
+            had_output = job.has_html
             job.html = db_safe(result.html)
-            job.html_stale = numbered  # False: the file is made from this result
+            # The file is made again from the stored result on first use, with its version id
+            # (the pipeline has no job to name), the file name when the PDF and its headings
+            # have no title (SW14) and the part's page numbers.
+            output_rules.output_changed(
+                job, output_rules.RERUN if had_output else output_rules.CONVERTED, self.clock()
+            )
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
             # The steps given back by the cache cost this much when they were first run: it
@@ -1187,6 +1272,7 @@ class Worker:
                 float(job.cost_usd or 0.0),
                 round(attempt.prior_usd + result.stats.cost_usd - reused_usd, 8),
             )
+            job.held_usd = 0.0
             job.model_calls = max(
                 int(job.model_calls or 0),
                 attempt.prior_calls + result.stats.model_calls - reused_calls,
@@ -1213,19 +1299,22 @@ class Worker:
 
     # ------------------------------------------------------------------ earlier decisions
 
-    def _earlier_version(self, session: Session, job: Job) -> _Earlier | None:
+    def _earlier_version(self, session: Session, job: Job) -> Earlier | None:
         """The result whose decisions this one inherits, with its crops, or None.
 
         A job being tried again inherits from its own earlier result (T3-1: the decisions
         made on a partly converted document survive "Convert the missing parts"). Else the
         earlier version the upload said it revises (T3-2, `web.carry`), if it is still the
-        owner's, finished and not past its deletion time."""
-        if job.retries and job.result_json:
+        owner's, finished and not past its deletion time. When it is not (deleted, or past
+        its time, while this one waited or converted) the snapshot taken at the upload is
+        used (`web.carry_snapshot`); it is removed here either way, its use being over."""
+        if (job.retries or job.rerun_version) and job.result_json:
             source, own = job, True
         elif job.revises_job_id:
             source, own = session.get(Job, job.revises_job_id), False
         else:
             return None
+        snapshot = None if own else carry_snapshot.pop(session, job.id)
         if (
             source is None
             or source.user_id != job.user_id
@@ -1234,20 +1323,8 @@ class Worker:
             or (retain := as_utc(source.retain_until)) is None
             or retain <= self.clock()
         ):
-            return None
-        try:
-            earlier = DocumentResult.model_validate(source.result_json)
-        except ValueError:
-            return None
-        blobs = session.scalars(select(Blob).where(Blob.job_id == source.id, Blob.kind == "crop"))
-        crops = {b.element_id: b.content for b in blobs if b.element_id}
-        rows = session.scalars(
-            select(ReviewEdit)
-            .where(ReviewEdit.job_id == source.id, ReviewEdit.action.in_(STRUCTURE_ACTIONS))
-            .order_by(ReviewEdit.created_at, ReviewEdit.id)
-        )
-        edits = [carry_edits.EditRow(r.element_id, r.action, r.before, r.after) for r in rows]
-        return _Earlier(earlier, crops, source.filename, own, source.id, edits)
+            return snapshot
+        return carry_snapshot.read(session, source, own=own) or snapshot
 
     def _upload_of(self, session: Session, job_id: str) -> bytes | None:
         found = session.scalar(
@@ -1255,13 +1332,15 @@ class Worker:
         )
         return bytes(found) if found is not None else None
 
-    def _unchanged(self, session: Session, job: Job, earlier: _Earlier) -> carry_edits.Unchanged:
+    def _unchanged(self, session: Session, job: Job, earlier: Earlier) -> carry_edits.Unchanged:
         """Does a page, or a region of it, look the same in the earlier file and in the new
         one? A try-again is the same file, so yes. Else both are drawn the same way and the
         pictures compared; a file that cannot be read, or a drawing that fails, is "no"."""
         if earlier.own:
             return lambda page, box: True
         new_pdf = self._upload_of(session, job.id)
+        if earlier.looks is not None:  # a snapshot: the earlier PDF is not kept with it
+            return carry_snapshot.unchanged_after(earlier, new_pdf)
         old_pdf = self._upload_of(session, earlier.source_id)
         if new_pdf is None or old_pdf is None:
             return lambda page, box: False
@@ -1273,7 +1352,11 @@ class Worker:
             try:
                 drawn = [
                     page_images.render_region(
-                        pdf, page, zoom=COMPARE_ZOOM, max_side=COMPARE_MAX_SIDE_PX, clip=box
+                        pdf,
+                        page,
+                        zoom=carry_snapshot.COMPARE_ZOOM,
+                        max_side=carry_snapshot.COMPARE_MAX_SIDE_PX,
+                        clip=box,
                     )
                     for pdf in (old_pdf, new_pdf)
                 ]
@@ -1289,7 +1372,7 @@ class Worker:
         job: Job,
         result: DocumentResult,
         crops: dict[str, bytes],
-        earlier: _Earlier,
+        earlier: Earlier,
     ) -> None:
         """Put the earlier result's decisions and edits on the new result
         (`carry.carry_decisions`, `carry_edits`) and make the HTML file again from it. For a
@@ -1324,6 +1407,7 @@ class Worker:
             )
             report.edits = edits.ids
             report.edits_dropped = edits.dropped
+            report.edits_not_applied = edits.not_applied
             if changes or edits.items:
                 from readablestem.web import notation
 
@@ -1447,7 +1531,8 @@ class Worker:
                 log_exception(logger, "worker_loop_error", exc)
                 ran = None
             if ran is None:
-                self._stop.wait(self.settings.worker_poll_s)
+                self._wake.wait(self.settings.worker_poll_s)
+                self._wake.clear()
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -1478,6 +1563,10 @@ class Worker:
                 target=tables.preload, name="readablestem-preload", daemon=True
             ).start()
 
+    def wake(self) -> None:
+        """A job was queued: look for it now instead of at the next poll (`worker_poll_s`)."""
+        self._wake.set()
+
     @property
     def alive(self) -> bool:
         """The worker thread is running and has not been told to stop."""
@@ -1504,6 +1593,7 @@ class Worker:
         if self._shutdown_thread is not None:
             return
         self._stop.set()
+        self._wake.set()
         self._shutdown_thread = threading.Thread(
             target=self.stop, kwargs={"timeout": timeout}, name="readablestem-shutdown", daemon=True
         )
@@ -1514,6 +1604,7 @@ class Worker:
         lease ended now, so another instance requeues it at once instead of after the
         lease runs out."""
         self._stop.set()
+        self._wake.set()
         attempt = self._current
         if attempt is not None:
             self._cancel(attempt, "shutdown")

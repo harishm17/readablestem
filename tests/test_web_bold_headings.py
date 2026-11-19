@@ -61,7 +61,6 @@ def test_bold_headings_are_not_counted_as_images():
             fix.reviewed = True
     counts = job_page.breakdown(result.fixes)
     assert counts.as_image == 0
-    assert counts.as_image_sentence == ""
     # The three headings are one decision made by the instructor.
     assert counts.decided == 3
     assert counts.decided_units == 1

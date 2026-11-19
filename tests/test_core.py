@@ -86,6 +86,32 @@ def test_job_budget_caps_calls_and_dollars():
     assert exc.value.scope == "job_calls"
 
 
+def _run_cap_with_calls_in_flight(settled_by_the_first: float):
+    """The recorded $0.60 run: $0.27 settled, seven equation reads in flight at their measured
+    size ($0.046), an eighth that no longer fits. One in-flight call settles a moment later."""
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=100), max_usd=0.60, max_calls=1000)
+    budget.settle(budget.reserve(0.27), 0.27)
+    in_flight = [budget.reserve(0.046) for _ in range(7)]
+    threading.Timer(0.05, budget.settle, (in_flight[0], settled_by_the_first)).start()
+    return budget
+
+
+def test_a_call_that_does_not_fit_waits_for_the_calls_in_flight_and_is_asked_once_more():
+    budget = _run_cap_with_calls_in_flight(0.003)
+    waited = budget.reserve(0.046)  # refused at once ($0.27 + 7 x $0.046 + $0.046), then fits
+    assert waited.amount_usd == pytest.approx(0.046)
+    assert budget.spent_usd == pytest.approx(0.273)
+
+
+def test_a_call_that_still_does_not_fit_after_the_wait_is_refused_once(monkeypatch):
+    monkeypatch.setattr("readablestem.core.budget.SETTLE_WAIT_S", 5.0)
+    budget = _run_cap_with_calls_in_flight(0.046)  # the settled call used all it held
+    with pytest.raises(BudgetExceeded) as exc:
+        budget.reserve(0.3)  # still more than is left after the wait
+    assert exc.value.scope == "job_usd"
+    assert budget.spent_usd == pytest.approx(0.27 + 0.046)
+
+
 def test_a_request_that_is_not_a_model_call_holds_dollars_only():
     # The second automated check (ADR 0005): every dollar cap applies, the call cap not.
     guard = InMemorySpendGuard(cap_usd=0.03)

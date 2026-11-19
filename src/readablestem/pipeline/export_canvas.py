@@ -21,10 +21,10 @@ steps or its output, and writes two things from it:
   Files folder with that name, expands it, and pastes this into the Page's HTML editor.
 
 The text, MathML, alt text, headings, lists, tables and links are not touched. Presentation
-is: a rule is carried over only if its property is one Canvas keeps (`CANVAS_PROPERTIES`;
-tests check this set against the encoded allowlist), and what cannot be carried is counted
-in `Notes`, so the README and the tests can say it. Nothing here edits, adds or removes
-content.
+is: a rule is carried over only if its property is one Canvas keeps
+(`student_sheet.CANVAS_PROPERTIES`; tests check this set against the encoded allowlist),
+and what cannot be carried is counted in `Notes`, so the README and the tests can say it.
+Nothing here edits, adds or removes content.
 """
 
 from __future__ import annotations
@@ -41,66 +41,14 @@ from html import escape
 from html.parser import HTMLParser
 from io import BytesIO
 
-from readablestem.pipeline import navigation, output_chars
+from readablestem.pipeline import checked_words, navigation, output_chars, student_sheet
+from readablestem.pipeline.assemble import SUMMARY_META, with_medium
 
 # Canvas stores a Page's body in a column of at most this many characters
 # (`maximum_long_text_length` = 500 KB - 1, config/initializers/active_record.rb;
 # WikiPage validates :body with it). A longer page is not offered for pasting.
 CANVAS_PAGE_LIMIT = 500 * 1024 - 1
 
-# The CSS properties this module writes into `style` attributes: those of the pipeline's
-# own stylesheet (assemble.STYLE and the feature CSS) that Canvas also keeps. Every one is
-# in the sanitizer's `css_properties`; a property of the stylesheet that is not here is
-# dropped and recorded in `Notes.dropped_css`.
-CANVAS_PROPERTIES = frozenset(
-    [
-        "align-items",
-        "background",
-        "border",
-        "border-bottom-width",
-        "border-collapse",
-        "border-radius",
-        "border-top",
-        "clip",
-        "color",
-        "cursor",
-        "display",
-        "flex",
-        "flex-wrap",
-        "font",
-        "font-family",
-        "font-size",
-        "gap",
-        "height",
-        "line-height",
-        "list-style",
-        "margin",
-        "margin-bottom",
-        "margin-left",
-        "margin-top",
-        "max-width",
-        "min-width",
-        "overflow",
-        "overflow-x",
-        "overflow-y",
-        "padding",
-        "padding-bottom",
-        "padding-left",
-        "position",
-        "text-align",
-        "text-indent",
-        "vertical-align",
-        "white-space",
-        "width",
-    ]
-)
-# A property Canvas drops, written as one it keeps (same look, other spelling).
-_REWRITES = {("clip-path", "inset(50%)"): ("clip", "rect(0,0,0,0)")}
-# Rules on these bare elements are the page's typography; Canvas has its own for a Page,
-# so they are left to it in the paste version (the standalone page has none and keeps them).
-_BASELINE_TAGS = frozenset(
-    ["body", "main", "p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li"]
-)
 _VOID = frozenset(
     [
         "area",
@@ -122,18 +70,6 @@ _VOID = frozenset(
 _IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 _DATA_URI = re.compile(r"data:(?P<type>[A-Za-z0-9.+/-]+);base64,(?P<data>[A-Za-z0-9+/=\s]+)\Z")
 _COURSE_NUMBER = re.compile(r"[0-9]{1,20}\Z")
-# The fonts a `<math>` element asks for, in order (T3-8). Canvas keeps `font-family` in a
-# `style` attribute but has no `@font-face` or style block, so the stack can only name fonts
-# the reader's computer has. Native MathML in Chrome, Edge, Firefox and Safari needs one with
-# an OpenType MATH table; this list is the families that have one, most widely installed
-# last-resort first: Latin Modern Math and STIX Two Math (TeX distributions, Linux, recent
-# macOS), Cambria Math (Windows, Office for Mac), Noto Sans Math, Libertinus, TeX Gyre,
-# XITS, Asana and DejaVu (Linux packages), then the browser's own `math` family.
-MATH_FONT_STACK = (
-    "'Latin Modern Math','STIX Two Math','Cambria Math','Noto Sans Math','Libertinus Math',"
-    "'TeX Gyre Pagella Math','XITS Math','Asana Math','DejaVu Math TeX Gyre',math"
-)
-_MATH_RULE = f"\nmath {{ font-family: {MATH_FONT_STACK}; }}\n"
 HIDDEN_CLASS = "visually-hidden"
 CANVAS_HIDDEN_CLASS = "screenreader-only"  # Canvas's own class for the same thing
 
@@ -265,7 +201,7 @@ class _Rule:
     def baseline(self) -> bool:
         """Only bare element names, and the subject one of the page's typography."""
         bare = all(not (c.classes or c.attrs or c.ids) for _, c in self.parts)
-        return bare and self.parts[-1][1].tag in _BASELINE_TAGS
+        return bare and self.parts[-1][1].tag in student_sheet.CANVAS_BASELINE_TAGS
 
 
 _COMPOUND = re.compile(r"(?P<tag>[A-Za-z][\w-]*|\*)?(?P<rest>(?:\.[\w-]+|#[\w-]+|\[[^\]]+\])*)\Z")
@@ -429,6 +365,9 @@ class CanvasExport:
     images: dict[str, bytes]  # "images/image-01.png" -> bytes
     notes: Notes
     course_number: str | None = None
+    # The page's statement of what was converted and reviewed (`pipeline.checked`, from its
+    # head, `assemble.SUMMARY_META`): the README's first lines. "" for a page without one.
+    statement: str = ""
 
 
 def _styles_of(root: _Node) -> str:
@@ -443,6 +382,14 @@ def _find(root: _Node, tag: str) -> _Node | None:
     return next((n for n in root.walk() if n.tag == tag), None)
 
 
+def page_meta(root: _Node, name: str) -> str | None:
+    """The content of the page's `<meta name=...>`, or None when it has none."""
+    for node in root.walk():
+        if node.tag == "meta" and node.attrs.get("name") == name:
+            return node.attrs.get("content", "")
+    return None
+
+
 def _inline_styles(root: _Node, rules: list[_Rule], notes: Notes, *, page: bool) -> None:
     """Write the carried rules into each element's `style` attribute, in place."""
     for node in list(root.walk()):
@@ -453,8 +400,10 @@ def _inline_styles(root: _Node, rules: list[_Rule], notes: Notes, *, page: bool)
         merged: dict[str, str] = {}
         own = _declarations(node.attrs.get("style", ""))
         for name, value in [*(d for r in matched for d in r.declarations), *own]:
-            name, value = _REWRITES.get((name, value.replace(" ", "")), (name, value))
-            if name not in CANVAS_PROPERTIES:
+            name, value = student_sheet.CANVAS_REWRITES.get(
+                (name, value.replace(" ", "")), (name, value)
+            )
+            if name not in student_sheet.CANVAS_PROPERTIES:
                 notes.dropped_css.add(name)
                 continue
             merged.pop(name, None)  # the later value goes last, as the cascade decides
@@ -521,9 +470,11 @@ def export_canvas(
     if course_number is not None and not valid_course_number(course_number):
         raise CanvasExportError("a course number is digits only")
 
+    html = with_medium(html, "Canvas")
     notes = Notes()
     standalone = _parse(html)
-    rules = _parse_css(_styles_of(standalone) + _MATH_RULE, notes)
+    statement = page_meta(standalone, SUMMARY_META) or ""
+    rules = _parse_css(_styles_of(standalone) + student_sheet.CANVAS_MATH_RULE, notes)
     root_tag = _find(standalone, "html")
     lang = (root_tag.attrs.get("lang") if root_tag else None) or "en"
     notes.tables_with_headers = sum(
@@ -534,7 +485,7 @@ def export_canvas(
     notes.scroll_boxes = sum(
         1
         for n in standalone.walk()
-        if "tabindex" in n.attrs and n.attrs.get("id") != navigation.MAIN_ID
+        if n.attrs.get("tabindex") == "0"  # "-1" is the skip link's target, not a scroll box
     )
 
     # The paste version is its own copy of the tree: it differs in image addresses, in
@@ -556,11 +507,13 @@ def export_canvas(
         base = f"/courses/{course_number}/file_contents/course%20files/{folder}/"
         _extract_images(page_tree, Notes(), lambda name: base + name)
         for node in list(page_tree.walk()):
-            if "skip-link" in node.classes() or node.attrs.get("id") == navigation.MAIN_ID:
+            if "skip-link" in node.classes():
                 if node.parent is not None:
                     node.parent.children.remove(node)
                     notes.skip_link_left_out = True
                 continue
+            if node.attrs.get("id") == navigation.MAIN_ID:
+                del node.attrs["id"]  # what the skip link pointed to; nothing points to it now
             if HIDDEN_CLASS in node.classes():
                 node.attrs["class"] = f"{node.attrs['class']} {CANVAS_HIDDEN_CLASS}"
             node.attrs.pop("tabindex", None)
@@ -570,7 +523,9 @@ def export_canvas(
         if len(page_html) > CANVAS_PAGE_LIMIT:
             notes.page_too_large, page_html = True, None
 
-    export = CanvasExport(folder, title, lang, index_html, page_html, images, notes, course_number)
+    export = CanvasExport(
+        folder, title, lang, index_html, page_html, images, notes, course_number, statement
+    )
     check_text(folder, title, index_html, page_html, readme(export))
     return export
 
@@ -594,8 +549,7 @@ def readme(export: CanvasExport) -> str:
     paste = export.page_html is not None
     lines = [
         f"Canvas version of: {' '.join(export.title.split())}",
-        "Made by ReadableSTEM, a tool that assists with accessibility. Read the result through",
-        "once before you share it.",
+        *_wrap(export.statement or checked_words.SUMMARY_UNKNOWN, ""),
         "",
         "WHAT IS IN THIS ZIP",
         "  index.html         the whole document as one web page. Canvas removes style blocks,",

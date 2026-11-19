@@ -61,6 +61,7 @@ from __future__ import annotations
 import logging
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
@@ -73,6 +74,7 @@ from readablestem.config import ConfigError, Settings
 from readablestem.core import triage, types
 from readablestem.core.budget import BudgetExceeded
 from readablestem.core.images import open_within_budget
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     IMAGE_PAGE_OMISSION_REASON,
     BBox,
@@ -90,6 +92,7 @@ from readablestem.core.types import (
     TableFix,
     inline_marker,
 )
+from readablestem.models import router
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.pricing import UnknownModelError
 from readablestem.models.prompts import load_prompt
@@ -98,10 +101,13 @@ from readablestem.pipeline import (
     equation_step,
     image_page_vector,
     layout,
+    page_type,
     table_step,
 )
 from readablestem.pipeline import image_page_check as second
 from readablestem.pipeline import image_page_omission as omission
+from readablestem.pipeline.page_type import PageTypeResult
+from readablestem.pipeline.speech import SPEECH_VERSION
 from readablestem.pipeline.validate import check_alt, clean_alt, has_errors
 
 log = logging.getLogger(__name__)
@@ -115,9 +121,6 @@ IMAGE_PAGE_REASON = types.IMAGE_PAGE_REASON
 ORIGINAL_REASON = types.IMAGE_PAGE_ORIGINAL_REASON
 NO_BOX_REASON = types.IMAGE_PAGE_NO_BOX_REASON
 NO_CROP_REASON = types.IMAGE_PAGE_NO_CROP_REASON
-# Kept-page reasons (`page_type`) the pass reads. `unread_page` (a page with some typed text)
-# and handwriting on a typed page are not scans or notebooks and stay as they were.
-READ_REASONS = frozenset({"scanned_page", "handwritten_page"})
 ILLEGIBLE = "[illegible]"
 INLINE_MARKER = re.compile(r"⟦[^⟧]*⟧")  # where an inline formula stands in a block's text
 
@@ -262,8 +265,15 @@ def read_page(client: VisionClient, settings: Settings, page: int, png: bytes) -
     """Ask for one page's blocks. Never raises for a bad answer (a refused, cut-off or
     invalid one is a read with no output); `BudgetExceeded`, `ConfigError` and
     `UnknownModelError` propagate."""
-    parsed, call = client.run(build_request(settings, png), ImagePageOutput)
-    return PageRead(page, parsed, [call], call.outcome, png)
+    # A refusal or a service error is asked once more of the other model (`models.router`).
+    parsed, calls = router.call_with_fallback(
+        client,
+        build_request(settings, png),
+        ImagePageOutput,
+        settings=settings,
+        retry_on=router.PAGE_RETRYABLE,
+    )
+    return PageRead(page, parsed, calls, calls[-1].outcome, png)
 
 
 def run(
@@ -308,7 +318,9 @@ def run(
             raise error
         if isinstance(error, BudgetExceeded):
             result.stopped = error
-            result.reads[number] = PageRead(number, None, [], "budget_exceeded", work[number])
+            result.reads[number] = PageRead(
+                number, None, router.calls_made(error), "budget_exceeded", work[number]
+            )
             continue
         if read is not None:
             result.reads[number] = read
@@ -719,7 +731,13 @@ def _inline_equation(
         kind=Kind.EQUATION,
         status=Status.ACCEPTED,
         confidence=CONFIDENCE_VALUE[block.confidence],
-        equation=EquationFix(latex=cleaned, mathml=mathml, speech=speech, display="inline"),
+        equation=EquationFix(
+            latex=cleaned,
+            mathml=mathml,
+            speech=speech,
+            speech_version=SPEECH_VERSION,
+            display="inline",
+        ),
         checks=[*checks, speech_check],
         review="none",
     )
@@ -974,7 +992,13 @@ def _add_equation(block: Block, builder: _Builder, *, skip_marker: bool = False)
             kind=Kind.EQUATION,
             status=Status.NEEDS_REVIEW,
             confidence=min(CONFIDENCE_VALUE[block.confidence], 0.6),
-            equation=EquationFix(latex=latex, mathml=mathml, speech=speech, display="block"),
+            equation=EquationFix(
+                latex=latex,
+                mathml=mathml,
+                speech=speech,
+                speech_version=SPEECH_VERSION,
+                display="block",
+            ),
             checks=[
                 *checks,
                 speech_check,
@@ -1208,6 +1232,26 @@ def _add_omissions(
     builder.elements = [e.model_copy(update={"order": i}) for i, e in enumerate(builder.elements)]
 
 
+def _kept_typed(typed: Sequence[Element], blocks: Sequence[Block]) -> list[Element]:
+    """The typed text of the page (`build`'s `typed`) that the read does not hold: a title
+    the model passed over stays in the page, as the PDF has it. Words are compared, and text
+    counts as read when at least half of its words are in the read: a paragraph the model
+    read with a small difference is not written a second time."""
+
+    def words(text: str) -> list[str]:
+        return re.findall(r"\w+", text.casefold())
+
+    read = Counter(words(" ".join(r.value for b in blocks for r in b.runs if r.kind == "text")))
+    kept: list[Element] = []
+    for element in typed:
+        own = Counter(words(element.text or ""))
+        if element.kind not in {Kind.HEADING, Kind.PARAGRAPH, Kind.LIST_ITEM} or not own:
+            continue
+        if 2 * (own & read).total() < own.total():
+            kept.append(element)
+    return kept
+
+
 def build(
     page: int,
     output: ImagePageOutput,
@@ -1219,8 +1263,13 @@ def build(
     accept_agreed: bool = False,
     maths_required: bool = False,
     page_ink: image_page_vector.VectorPage | None = None,
+    typed: Sequence[Element] = (),
 ) -> Built | None:
     """The elements and decided fixes of one page, or None when nothing on it was usable.
+
+    `typed` is the visible typed text the page had before it was read (layout's elements: a
+    title over notes, a stamp over a scan). What the read leaves out of it is kept, first
+    after the page's own picture (`_keep_typed`).
 
     `page_ink` is the page's pen strokes when its ink is vector: the omission check then
     compares the strokes (not the picture) with the blocks' boxes.
@@ -1238,6 +1287,9 @@ def build(
     builder = _Builder(page, box, ink)
     original = _original_figure(builder)
     builder.elements.append(original.model_copy(update={"order": 0}))
+    kept_typed = _kept_typed(typed, output.blocks[:MAX_BLOCKS])
+    for element in kept_typed:
+        builder.add(element.model_copy(update={"id": builder.new_id()}))
     by_kind: dict[str, int] = {}
     for index, block in enumerate(output.blocks[:MAX_BLOCKS]):
         before = len(builder.elements)
@@ -1340,7 +1392,11 @@ def rescued(fix: Fix, element: Element) -> Fix:
             "review": "required",
             "confidence": min(CONFIDENCE_VALUE.get(element.image_confidence or "low", 0.4), 0.6),
             "equation": EquationFix(
-                latex=element.page_latex, mathml=mathml, speech=speech, display="block"
+                latex=element.page_latex,
+                mathml=mathml,
+                speech=speech,
+                speech_version=SPEECH_VERSION,
+                display="block",
             ),
             "checks": [
                 *checks,
@@ -1384,9 +1440,17 @@ def no_crop(element: Element, fixes: Mapping[str, Fix]) -> bool:
     return NO_CROP_REASON in element.reasons and element.id in fixes
 
 
-def kept_reads(kept: Mapping[int, str]) -> list[int]:
-    """The kept pages (page -> reason) this pass reads, in page order."""
-    return sorted(page for page, reason in kept.items() if reason in READ_REASONS)
+def kept_reads(kept: Mapping[int, str], types: Mapping[int, PageTypeResult]) -> list[int]:
+    """The kept pages (page -> reason) this pass reads, in page order: those whose type is one
+    the pass reads (`page_type.reads_image`) and that are kept for that reason (a page layout
+    failed on is kept for another)."""
+    return sorted(
+        page
+        for page, reason in kept.items()
+        if (kind := types.get(page)) is not None
+        and page_type.reads_image(kind)
+        and reason == page_type.kept_reason(kind)
+    )
 
 
 def record_of(read: PageRead, settings: Settings, built: Built | None) -> ImagePageRecord:
@@ -1444,7 +1508,7 @@ def final_counts(
         if record.outcome != "converted":
             continue
         mine = [f for f in fixes if page_of.get(f.element_id) == record.page]
-        record.required = len(triage.units(f for f in mine if f.review == "required"))
+        record.required = len(triage.units(f for f in mine if triage.tier_for(f) == "required"))
         record.optional = sum(1 for f in mine if f.review == "optional")
 
 
@@ -1493,8 +1557,6 @@ def enforce_maths_required(elements: Sequence[Element], fixes: dict[str, Fix]) -
 def notices(built: Mapping[int, Built]) -> list[Notice]:
     """One content-free notice per converted page: how many blocks were read from the image."""
     return [
-        Notice(
-            code="image_page_converted", page=page, count=max(1, b.record.blocks), review="optional"
-        )
+        make("image_page_converted", page=page, count=max(1, b.record.blocks))
         for page, b in sorted(built.items())
     ]

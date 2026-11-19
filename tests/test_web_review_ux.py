@@ -117,15 +117,41 @@ def test_a_write_from_an_out_of_date_tab_is_refused_and_says_so(ux):
     assert 'name="version" value="1"' in page
 
 
+def test_a_page_from_before_other_decisions_still_saves_the_items_they_did_not_touch(ux):
+    # Five decisions on five different items, every one sent from the page drawn at version 0
+    # (a second tab, or cards decided in quick succession): all five are stored.
+    members = [f.element_id for f in stored(ux).fixes if f.group_key == GROUP]
+    for target in ["p1-e2", "p1-e6", *members]:
+        assert post(ux, target, action="accept", version="0").status_code == 303, target
+    pending = [f.element_id for f in stored(ux).fixes if f.pending]
+    assert pending == [] and version_of(ux) == 5 and len(edits(ux)) == 5
+    # The item itself having changed since is what refuses a write, and only that one.
+    assert post(ux, "p1-e2", action="reject", version="0").status_code == 409
+    assert stored(ux).fix_for("p1-e2").status.value == "accepted"
+    # A page left out moves other elements: it refuses every item's form drawn before it.
+    omit = ux.browser.post(
+        f"/jobs/{ux.job_id}/pages/2/omit",
+        data={"csrf_token": token(ux.browser, f"/jobs/{ux.job_id}/review"), "version": "5"},
+    )
+    assert omit.status_code == 303 and version_of(ux) == 6
+    assert post(ux, "p1-e6", action="reject", version="5").status_code == 409
+    # A write that left no record of what it touched (the tool's own) cannot be told apart.
+    with session_scope(ux.ctx.factory) as session:
+        job = session.get(Job, ux.job_id)
+        assert job is not None
+        job.result_version += 1
+    assert post(ux, "p1-e6", action="reject", version="6").status_code == 409
+
+
 def test_a_refused_stale_edit_keeps_what_was_typed(ux):
-    assert post(ux, "p1-e6", action="accept", version="0").status_code == 303
+    assert post(ux, "p1-e2", action="accept", version="0").status_code == 303
     response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
     assert response.status_code == 409
     assert r"\boldsymbol{\omega}</textarea>" in panel(response.text)
     # ... in an open edit box, and the notice says it is there.
     assert '<details class="edit-box" open>' in panel(response.text)
     assert "What you typed is kept below." in response.text
-    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
+    assert stored(ux).fix_for("p1-e2").status.value == "accepted"  # the first tab's decision stands
     # Choosing again from the refreshed page works.
     assert (
         post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="1").status_code
@@ -134,16 +160,24 @@ def test_a_refused_stale_edit_keeps_what_was_typed(ux):
 
 
 def test_stale_group_and_list_view_writes_are_refused_too(ux):
-    assert post(ux, "p1-e2", action="accept", version="0").status_code == 303
+    # One member of the group decided in another tab: the group action, drawn before, is refused.
+    assert post(ux, "p1-e7", action="accept", version="0").status_code == 303
     group = post(ux, GROUP, action="reject", version="0")
     assert group.status_code == 409
     assert "Your choice was not saved" in group.text
-    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"needs_review"}
-    listed = post(ux, "p1-e6", action="accept", version="0", view="list")
+    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {
+        "accepted",
+        "needs_review",
+    }
+    assert post(ux, "p1-e6", action="accept", version="1").status_code == 303
+    listed = post(ux, "p1-e6", action="reject", version="1", view="list")
     assert listed.status_code == 409
     assert "<h1>All items as a list</h1>" in listed.text
-    assert f'href="/jobs/{ux.job_id}/review/list#item-p1-e6">Reload this page</a>' in listed.text
-    assert stored(ux).fix_for("p1-e6").status.value == "needs_review"
+    assert (
+        f'href="/jobs/{ux.job_id}/review/list?at=item-p1-e6#item-p1-e6">Reload this page</a>'
+        in listed.text
+    )
+    assert stored(ux).fix_for("p1-e6").status.value == "accepted"
 
 
 # --------------------------------------------------------------------------- MF3 edits
@@ -430,7 +464,7 @@ def spoken(env, element_id: str, speech: str) -> None:
         ("sine theta", "sin θ"),  # a function name
         ("v equals d divided by t", "v = d / t"),
         ("the fraction a plus b over c end fraction", "a + b c"),  # structure words
-        ("double-struck capital R to the power n", "Rn"),  # a style the PDF cannot carry
+        ("double-struck cap R to the power n", "Rn"),  # a style the PDF cannot carry
         ("omega", ""),
         ("", "𝛚"),
     ],
@@ -456,24 +490,55 @@ JOB = "0123456789abcdef0123456789abcdef"
         (f"/jobs/{JOB}/review?item=p1-e2&page=2&accepted=1", True),
         (f"/jobs/{JOB}/review/list", True),
         (f"/jobs/{JOB}/view", True),
+        ("/courses", True),  # every page of a signed-in person is built from the routes
+        ("/account", True),
+        (f"/jobs/{JOB}/share", True),
+        (f"/jobs/{JOB}/listen", True),
         ("//elsewhere.example/app", False),
         ("/\\elsewhere.example", False),
         ("https://elsewhere.example/app", False),
         ("/app?next=//elsewhere.example", False),
         (f"/jobs/{JOB}/review?item=%3Cscript%3E", False),
-        (f"/jobs/{JOB}/pages/1.png", False),  # an image asked for in the background
-        (f"/jobs/{JOB}/review/marks.css", False),
-        (f"/jobs/{JOB}/download", False),
-        ("/jobs/not-a-job/review", False),
+        ("/jobs/../app", False),
+        ("/static/app.js", False),  # not a page of a signed-in person
+        (f"/jobs/{JOB}/nothing-here", False),
         ("/login", False),
         ("", False),
         (None, False),
     ],
 )
-def test_only_pages_of_this_app_are_come_back_to(path, kept):
+def test_only_pages_of_this_app_are_come_back_to(ux, path, kept):
+    from types import SimpleNamespace
+
     from readablestem.web.return_to import safe_return
 
-    assert safe_return(path) == (path if kept else None)
+    request = SimpleNamespace(app=ux.browser.app)  # ty: ignore[invalid-argument-type]
+    assert safe_return(request, path) == (path if kept else None)  # ty: ignore[invalid-argument-type]
+
+
+def test_signing_in_comes_back_to_the_page_and_not_to_one_of_its_pictures(ux):
+    """A page whose session ended still asks for its pictures and stylesheet: they are not
+    where signing in goes."""
+    ux.browser.cookies.clear()
+    page = f"/jobs/{ux.job_id}/review"
+    assert ux.browser.get(page, follow_redirects=False).status_code == 303
+    picture = ux.browser.get(
+        f"/jobs/{ux.job_id}/pages/1.png",
+        headers={"Sec-Fetch-Dest": "image"},
+        follow_redirects=False,
+    )
+    assert picture.status_code == 303
+    assert login(ux.browser, ALICE).headers["location"] == page
+
+
+def test_a_form_posted_after_the_cookie_expired_gets_the_signed_out_page(ux):
+    """Not only a decision: any form posted when nobody is signed in says the session ended
+    (the cookie, and the form's token with it, were gone)."""
+    ux.browser.cookies.clear()
+    response = ux.browser.post("/courses", data={"csrf_token": "stale", "name": "Physics"})
+    assert response.status_code == 403
+    assert "Your session ended, so this was not saved." in response.text
+    assert 'href="/dev-login"' in response.text
 
 
 def sign_out_elsewhere(env) -> None:

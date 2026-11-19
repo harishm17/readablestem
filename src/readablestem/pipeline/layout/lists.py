@@ -1,0 +1,331 @@
+"""List markers: bullets (text or drawn), ordered markers confirmed by a sibling, roman numerals,
+the columns of a list and its levels.
+"""
+
+from __future__ import annotations
+
+import bisect
+import re
+from collections.abc import Iterable, Sequence
+from dataclasses import dataclass, replace
+
+from readablestem.core.types import Kind
+from readablestem.pipeline.layout.context import _PageGuard
+from readablestem.pipeline.layout.glyphs import _BULLET_GLYPHS, _Char, _clean
+from readablestem.pipeline.layout.shared import _Block, _Context, _Marker, _Path, _Row, _tokens
+
+# Bullets only at the start of a line and followed by a space (LaTeX's second-level "\u2013",
+# third-level "\u2217", Markdown's "-" and "*"); maths or punctuation anywhere else. They
+# need a sibling (the same glyph starting another line at the same indent), because a
+# wrapped sentence can start a line with a dash.
+_LINE_START_BULLETS = frozenset("-\u2013\u2014*\u2217\u00b7\u2219\u22c5")
+
+# Ordered list markers: "1.", "2)", "(3)", "a.", "b)", "(c)", "iv.", "(ii)", "A.", "IV)".
+_ORDERED_MARKER = re.compile(
+    r"^(?:\((?P<inner>\d{1,3}|[A-Za-z]|[ivxlc]{2,6}|[IVXLC]{2,6})\)"
+    r"|(?P<plain>\d{1,3}|[A-Za-z]|[ivxlc]{2,6}|[IVXLC]{2,6})(?P<sep>[.)]))$"
+)
+
+
+MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its text
+MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
+DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
+
+
+@dataclass(frozen=True, eq=False)
+class _MarkerCandidate:
+    """A row that starts like a list item, before siblings confirm it."""
+
+    row: _Row
+    marker: _Marker
+    family: tuple[str, str]  # ("decimal" | "letter", "{}." | "{})" | "({})") or ("bullet", glyph)
+    readings: tuple[tuple[str, int], ...]  # (style, ordinal) readings of an ordered marker
+    x0: float  # left edge of the marker itself
+    sure: bool  # needs no sibling: a bullet glyph, a drawn bullet, or "3." before a capital
+
+
+_ROMAN_STEPS = (
+    (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"),
+    (1, "i"),
+)  # fmt: skip
+
+
+def roman_value(text: str) -> int | None:
+    """ "iv" -> 4, "XII" -> 12; None unless `text` is a canonical roman numeral below 400."""
+    lower = text.lower()
+    if not lower or any(c not in _ROMAN for c in lower):
+        return None
+    total = 0
+    for i, c in enumerate(lower):
+        value = _ROMAN[c]
+        total += -value if i + 1 < len(lower) and _ROMAN[lower[i + 1]] > value else value
+    canonical, rest = "", total
+    for number, letters in _ROMAN_STEPS:
+        while rest >= number:
+            canonical, rest = canonical + letters, rest - number
+    return total if 0 < total < 400 and canonical == lower else None
+
+
+def marker_readings(body: str) -> tuple[tuple[str, int], ...]:
+    """Possible (style, ordinal) readings of an ordered marker's body.
+
+    "3" -> decimal 3; "b" -> lower-alpha 2; "iv" -> lower-roman 4; "i" is both lower-alpha
+    9 and lower-roman 1 (its siblings decide); "C" is upper-alpha 3 and upper-roman 100.
+    """
+    if body.isdigit():
+        return (("decimal", int(body)),)
+    readings: list[tuple[str, int]] = []
+    case = "lower" if body.islower() else "upper"
+    if len(body) == 1 and body.isascii() and body.isalpha():
+        readings.append((f"{case}-alpha", ord(body.lower()) - ord("a") + 1))
+    roman = roman_value(body)
+    if roman is not None and (body.islower() or body.isupper()):
+        readings.append((f"{case}-roman", roman))
+    return tuple(readings)
+
+
+def _ordered_marker(text: str) -> tuple[str, str] | None:
+    """(form, body) of an ordered marker token: "(iv)" -> ("({})", "iv"), "3." -> ("{}.", "3")."""
+    match = _ORDERED_MARKER.match(text)
+    if not match:
+        return None
+    if match["inner"] is not None:
+        return "({})", match["inner"]
+    return "{}" + match["sep"], match["plain"]
+
+
+def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | None:
+    """Does `row` start like a list item? A bullet glyph, an ordered marker ("a.", "(3)",
+    "iv)", "3 ." as OpenStax prints it) or a drawn bullet just left of it, followed by
+    the item's text within MAX_MARKER_GAP x font size."""
+    if row.vertical:
+        return None
+    drawn = bullets.left_of(row)
+    tokens = _tokens(row)
+    if drawn is not None:
+        if not tokens:
+            return None
+        start = tokens[0][0]
+        marker = _Marker(drawn[1], False, start, row.chars[start].x0)
+        return _MarkerCandidate(row, marker, ("bullet", drawn[1]), (), drawn[0], True)
+    if len(tokens) < 2:
+        return None
+    chars = row.chars
+    (m0, m1), rest = tokens[0], tokens[1:]
+    first = chars[m0].c
+    if m1 - m0 == 1 and first in _DASHES and _signed_value(chars[m0], chars[rest[0][0] :]):
+        return None  # "- 40 m/s", "\u2013 5 \u00b0C": a negative value, not a dash bullet
+    if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS):
+        glyph = _clean(first)
+        family: tuple[str, str] = ("bullet", glyph)
+        readings: tuple[tuple[str, int], ...] = ()
+        sure = first in _BULLET_GLYPHS
+        text = glyph
+    else:
+        text = "".join(c.c for c in chars[m0:m1])
+        if text.isdigit() and "".join(c.c for c in chars[slice(*rest[0])]) in (".", ")"):
+            m1 = rest[0][1]  # "3 ." (OpenStax prints the number and its full stop apart)
+            rest = rest[1:]
+            text += chars[m1 - 1].c
+        parsed = _ordered_marker(text)
+        if parsed is None or not rest:
+            return None
+        form, body = parsed
+        readings = marker_readings(body)
+        if not readings:
+            return None
+        family = ("decimal" if body.isdigit() else "letter", form)
+        following = chars[rest[0][0]].c
+        sure = body.isdigit() and (following.isupper() or following in "(\"'\u201c")
+    start = rest[0][0]
+    if chars[start].x0 - chars[m1 - 1].x1 > MAX_MARKER_GAP * row.size:
+        return None
+    if not any(c.c.isalnum() or c.math for c in chars[start:]):
+        return None
+    marker = _Marker(text, family[0] != "bullet", start, chars[start].x0)
+    return _MarkerCandidate(row, marker, family, readings, chars[m0].x0, sure)
+
+
+class _ColumnRows:
+    """One page's rows per column, top to bottom: the lines above and below a row."""
+
+    def __init__(self, rows: Sequence[_Row]) -> None:
+        self.columns: dict[str, list[_Row]] = {}
+        for row in rows:
+            if not row.vertical:
+                self.columns.setdefault(row.column, []).append(row)
+        for column in self.columns.values():
+            column.sort(key=lambda r: r.baseline)
+        self.baselines = {k: [r.baseline for r in v] for k, v in self.columns.items()}
+
+    def neighbour(self, row: _Row, step: int) -> _Row | None:
+        """The nearest row above (step -1) or below (+1) in `row`'s column that overlaps
+        it in x."""
+        rows, baselines = self.columns.get(row.column, []), self.baselines.get(row.column, [])
+        if step < 0:
+            k = bisect.bisect_left(baselines, row.baseline - 0.3 * row.size) - 1
+            span = range(k, -1, -1)
+        else:
+            k = bisect.bisect_right(baselines, row.baseline + 0.3 * row.size)
+            span = range(k, len(rows))
+        return next((rows[i] for i in span if rows[i].x0 < row.x1 and rows[i].x1 > row.x0), None)
+
+    def wraps_into(self, candidate: _MarkerCandidate, ctx: _Context) -> bool:
+        """Is the candidate's row the next line of the paragraph above, which happens to
+        start "2. The"? The line above is at the usual pitch and size, starts as far left
+        as the marker or further right, and does not end a sentence or clause; and the
+        line below does not hang at the item text's indent."""
+        row = candidate.row
+        above = self.neighbour(row, -1)
+        if above is None:
+            return False
+        size = row.size
+        pitch = row.baseline - above.baseline
+        limit = max(1.3 * ctx.pitch * size / ctx.body, 1.25 * size)
+        if abs(above.size - size) > max(1.0, 0.12 * size) or not 0.5 * size <= pitch <= limit:
+            return False
+        if candidate.x0 > above.x0 + 0.5 * size:
+            return False  # the marker is indented past the text above
+        if above.clean[-1:] in tuple(".:;!?"):
+            return False
+        below = self.neighbour(row, 1)
+        hanging = (
+            below is not None
+            and below.baseline - row.baseline <= limit
+            and abs(below.x0 - candidate.marker.x) <= 1.5
+            and candidate.marker.x - candidate.x0 > 1.5
+        )
+        return not hanging
+
+
+_DASHES = frozenset("-\u2013\u2014")  # line-start bullets that are also how minus is typed
+
+
+def _signed_value(dash: _Char, after: list[_Char]) -> bool:
+    """Is a line-start dash the sign of the value after it? It is when the value starts
+    with a digit or a decimal point ("- 40 m/s"; Word turns a spaced hyphen into "\u2013"),
+    or when the dash is set in a maths font (a minus sign)."""
+    text = "".join(c.c for c in after).lstrip()
+    return dash.math or text[:1].isdigit() or (text[:1] in ".," and text[1:2].isdigit())
+
+
+class _DrawnBullets:
+    """Small drawn shapes that can be list bullets (Chromium draws CSS disc markers as
+    paths), indexed by vertical centre."""
+
+    def __init__(self, paths: Sequence[_Path], body: float) -> None:
+        marks = []
+        for path in paths:
+            x0, y0, x1, y1 = path.bbox
+            if path.kind == "shape" and 0.5 <= max(x1 - x0, y1 - y0) <= 1.2 * body:
+                glyph = ("\u2022" if path.curved else "\u25aa") if path.filled else "\u25e6"
+                marks.append(((y0 + y1) / 2, path.bbox, glyph))
+        marks.sort(key=lambda m: m[0])
+        self.marks = marks
+        self.centres = [m[0] for m in marks]
+
+    def left_of(self, row: _Row) -> tuple[float, str] | None:
+        """(left edge, glyph) of a bullet drawn just left of `row` at its height."""
+        lo = bisect.bisect_left(self.centres, row.y0)
+        hi = bisect.bisect_right(self.centres, row.y1)
+        for _, (x0, y0, x1, y1), glyph in self.marks[lo:hi]:
+            side = max(x1 - x0, y1 - y0)
+            if side <= DRAWN_BULLET_RATIO * row.size and 0 <= row.x0 - x1 <= 2.5 * row.size:
+                return x0, glyph
+        return None
+
+
+def _list_markers(
+    rows_by_page: dict[int, list[_Row]],
+    paths: dict[int, list[_Path]],
+    ctx: _Context,
+    guard: _PageGuard,
+) -> None:
+    """Set `row.marker` on every row that starts a list item, in all analysed pages.
+
+    A bullet glyph or a drawn bullet is enough, and so is a number before a capital
+    letter ("3. Measure"), unless that row is the next line of a wrapped paragraph
+    (`_ColumnRows.wraps_into`). Letters, roman numerals, bare numbers and line-start
+    dashes need a sibling: another row with the same kind of marker, the next or
+    previous value ("b." for "a."; the same glyph for a dash) and the marker or the item
+    text starting within MARKER_ALIGN in x, anywhere in the document (lists cross
+    pages). "A ball rolls", "2.3 Speed", "2.5 metres", a lone "B. Smith", "... is
+    exactly" / "2. The heavier ball ...", a spaced minus ("- 40 m/s") or a sentence
+    wrapped onto a new line after a dash do not start lists.
+
+    The candidates are found page by page (a page that raises, `guard`, has none) and judged
+    together; the rows of a page that failed get no marker.
+    """
+    candidates: list[_MarkerCandidate] = []
+    for number, rows in rows_by_page.items():
+        with guard(number):
+            bullets = _DrawnBullets(paths.get(number, []), ctx.body)
+            found = [c for row in rows if (c := _marker_candidate(row, bullets)) is not None]
+            if any(c.sure and c.readings for c in found):
+                columns = _ColumnRows(rows)
+                found = [
+                    replace(c, sure=False)
+                    if c.sure and c.readings and columns.wraps_into(c, ctx)
+                    else c
+                    for c in found
+                ]
+            candidates.extend(found)
+    index: dict[tuple, tuple[list[float], list[float]]] = {}
+    for candidate in candidates:
+        for reading in candidate.readings or (("bullet", 0),):
+            lists = index.setdefault((candidate.family, reading), ([], []))
+            lists[0].append(candidate.x0)
+            lists[1].append(candidate.marker.x)
+    for lists in index.values():
+        lists[0].sort()
+        lists[1].sort()
+
+    def aligned(key: tuple, candidate: _MarkerCandidate, needed: int) -> bool:
+        lists = index.get(key)
+        if lists is None:
+            return False
+        for values, x in ((lists[0], candidate.x0), (lists[1], candidate.marker.x)):
+            near = bisect.bisect_right(values, x + MARKER_ALIGN)
+            if near - bisect.bisect_left(values, x - MARKER_ALIGN) >= needed:
+                return True
+        return False
+
+    for candidate in candidates:
+        if candidate.readings:
+            confirmed = any(
+                aligned((candidate.family, (style, value + step)), candidate, 1)
+                for style, value in candidate.readings
+                for step in (-1, 1)
+            )
+        else:  # the same bullet glyph on another row (this one counts itself)
+            confirmed = aligned((candidate.family, ("bullet", 0)), candidate, 2)
+        if candidate.sure or confirmed:
+            candidate.row.marker = candidate.marker
+
+
+def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
+    """Nesting level (1 = top) per list-item block id, from the indent of the item text.
+
+    Consecutive items in reading order form one list (display equations inside an item
+    do not end it; anything else does). A deeper indent opens a level, a shallower one
+    closes levels until one matches. Indents are measured from the left edge of the
+    item's column (`_Block.origin`), so a list that goes on in the next column or on a
+    page with another margin keeps its levels.
+    """
+    levels: dict[int, int] = {}
+    stack: list[float] = []
+    for block in blocks:
+        if block.marker is None:
+            if block.kind != Kind.EQUATION:
+                stack = []
+            continue
+        x = block.marker.x - block.origin
+        while stack and x < stack[-1] - tolerance:
+            stack.pop()
+        if not stack or x > stack[-1] + tolerance:
+            stack.append(x)
+        levels[id(block)] = len(stack)
+    return levels
+
+
+_ROMAN = {"i": 1, "v": 5, "x": 10}

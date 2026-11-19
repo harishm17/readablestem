@@ -8,6 +8,7 @@ Browser behaviour (the listening player, the page fields, the keyboard walks) is
 from __future__ import annotations
 
 import re
+from datetime import UTC, datetime
 from html import unescape
 
 import pytest
@@ -34,7 +35,7 @@ def test_the_preview_agrees_with_the_parser_on_what_is_acceptable():
         assert [len(p.pages) for p in good] == [r.count for r in shown]
     assert ranges.preview("", total=59, limit=30) == []
     assert ranges.preview("1-3", total=9, limit=30, taken={0})[0].error.endswith(
-        "page 1 was already converted."
+        "Page 1 was already converted."
     )
 
 
@@ -44,17 +45,20 @@ def test_too_many_parts_are_one_more_row_not_a_crash():
     assert len(rows) == ranges.MAX_PARTS + 1 and rows[-1].error.startswith("That is ")
 
 
-def test_the_summary_says_how_many_parts_and_pages_and_where_today_runs_out():
+def test_the_summary_says_in_whole_sentences_which_parts_start_now_and_which_wait():
+    reset = datetime(2026, 11, 19, tzinfo=UTC)
     rows = ranges.preview("1-30\n31-59", total=59, limit=30)
-    assert preview_summary(rows, 100) == "2 parts, 59 pages."
-    assert preview_summary(rows, 40) == (
-        "2 parts, 59 pages. Only 40 pages are left today: "
-        "the first 1 part starts, the rest wait here."
+    assert text_of(preview_summary(rows, 100, reset)) == "All 2 parts (59 pages) start now."
+    assert text_of(preview_summary(rows[:1], None, reset)) == "Part 1 (pages 1 to 30) starts now."
+    waiting = text_of(preview_summary(rows, 40, reset))
+    assert waiting.startswith("Part 1 (pages 1 to 30) starts now. Part 2 can start after Nov 19")
+    assert waiting.endswith("when your pages reset.")
+    assert text_of(preview_summary(rows, 10, reset)).startswith(
+        "No part starts today. Parts 1 and 2"
     )
-    assert "none starts today" in preview_summary(rows, 10)
     bad = ranges.preview("1-30\nx", total=59, limit=30)
-    assert preview_summary(bad, 100).endswith("Fix 1 before converting.")
-    assert preview_summary([], 100) == "No parts yet."
+    assert preview_summary(bad, 100, reset) == "Fix the part marked below before converting."
+    assert preview_summary([], 100, reset) == "No parts yet."
 
 
 # --------------------------------------------------------------------------- the chooser page
@@ -95,7 +99,8 @@ def test_the_preview_is_a_fragment_for_the_typed_text_and_only_the_owners(parts_
     fragment = parts_web.alice.get(url, params={"parts": "1-2\n3-6"}, headers=hx)
     assert fragment.status_code == 200 and "<html" not in fragment.text
     assert 'id="parts-summary"' in fragment.text and 'hx-swap-oob="innerHTML"' in fragment.text
-    assert "2 parts, 6 pages." in text_of(fragment.text)
+    assert "All 2 parts (6 pages) start now." in text_of(fragment.text)
+    assert "Part 2: pages 3 to 6 (4 pages)" in text_of(fragment.text)
     assert 'data-remove-part="2"' in fragment.text
     empty = parts_web.alice.get(url, params={"parts": ""}, headers=hx)
     assert "No parts yet." in text_of(empty.text)
@@ -234,9 +239,9 @@ def test_documents_already_converted_can_be_added_to_a_course_and_the_page_says_
     assert response.status_code == 303
     assert web.job(kept).course_id == course_id
     assert web.job(job_id_from(inside)).course_id == other  # already in a course: left alone
-    assert "Added 1 document to Physics 1. They were not converted again." in text_of(
-        web.browser.get(path).text
-    )
+    said = text_of(web.browser.get(path).text)
+    assert "Added 1 document to Physics 1. They were not converted again." in said
+    assert "2 you chose could not be added: a document joins a course only when" in said
     assert "Add converted documents" not in web.browser.get(path).text
 
 
@@ -256,6 +261,9 @@ def test_only_ones_own_finished_documents_can_be_added(web):
         data={"csrf_token": token(web.browser, path), "job": [theirs, job_id_from(queued)]},
     )
     assert web.job(theirs).course_id is None
+    assert "Nothing was added: a document joins a course only when" in text_of(
+        web.browser.get(path).text
+    )
     assert web.job(job_id_from(queued)).course_id is None
     assert web.job(job_id_from(queued)).status == JobStatus.QUEUED
     # Someone else's course is a 404.

@@ -48,7 +48,13 @@ provider's own handling of what is sent to it (see "Where document data goes").
   token of which only the SHA-256 is stored, one use, 15 minutes, a newer link replacing
   older ones, a button page so a mail scanner cannot use the link up, CSRF on the
   button, a limit of three messages per target address per 15 minutes besides the
-  sign-in rate limits, nothing about the address or token logged. Tests:
+  sign-in rate limits (a browser that has asked before is told how long to wait, in the same
+  words for every address), the link made and sent after the page is answered so the answer
+  takes the same time for a known and an unknown address, nothing about the address or token
+  logged. Each way of starting a sign-in has its own rule (`login_google`, `login_microsoft`,
+  `login_email`, `login_dev`), counted after the form's CSRF check, so an expired form uses no
+  attempt and one way in does not block another. The CSRF token is made when a page prints
+  it, so a page with no form sets no cookie. Tests:
   `test_web_email_login.py`, `test_web_signin_browser.py`.
 - Access is `users.is_allowed`, checked on **every request**, so removing or blocking
   someone ends their session at once, and admin demotion likewise (`test_audit_auth.py`).
@@ -87,24 +93,28 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/terms`, `/limits`, `/for-accessibility-offices` and its `/summary` download, `/help/posting`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
-| Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` (CSRF-checked; sets the caller's own "keep 7 days by default" only), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages, including the owner-only `GET /uploads/{id}/preview`), everything under `/courses/...` (including `/courses/{id}/download`, and the CSRF-checked `POST /courses/{id}/starter` and `POST /courses/{id}/documents`, which touch only the caller's own course and documents) |
-| Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/users/block`, `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
+| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/terms`, `/limits`, `/pricing`, `/security`, `/for-accessibility-offices` and its `/summary` download, `/help`, `/help/review`, `/help/posting`, `/help/latex`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
+| Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` and `POST /account/name` (CSRF-checked; set the caller's own "keep 7 days by default" and name only), `GET /account/export` ("Download everything": the caller's own ready documents in each file type, their review records, courses and settings, built from the same rows as `/app/download`), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages, including the owner-only `GET /uploads/{id}/preview`), everything under `/courses/...` (including `/courses/{id}/download`, and the CSRF-checked `POST /courses/{id}/starter` and `POST /courses/{id}/documents`, which touch only the caller's own course and documents) |
+| Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove` and `POST /admin/users/block` (each answers with a question first and acts only with `confirm=yes`; the address is in the form, never in a URL), `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove`, `GET /admin/reports`, `POST /admin/reports/{report_id}/close` (the problem reports, readable by the operator only) |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare; production refuses a `CRON_TOKEN` shorter than 32 characters; wrong tokens count against the cron limit below) |
 
+`GET /s/{token}` (the class link, `FEATURE_CLASS_LINK`, off; `routes/class_link.py`) is the one route that returns a user's document content without a sign-in, and it returns only the published student copy of the one document its token was made for. It never calls `job_access` or touches the session (no cookie), answers every wrong, paused, removed, not-yet-open or closed token with one identical 404, is limited by address (`class_link`, `class_link_miss`), sends `X-Robots-Tag: noindex, nofollow`, `Referrer-Policy: no-referrer`, `Cache-Control: private, no-store` and the `/view` sandbox CSP, and stores only the token's SHA-256. The token is in the URL, so a browser history, a proxy or any log that records URLs holds it; the app's own request log records the route template, not the address. `POST /jobs/{id}/share/link` and `/share/link/pause`, `/resume`, `/remove`, `/update` are owner-only (not a person shared with, at any rank) and CSRF-checked; with the switch off all of them and `/s/...` answer 404 (docs/web.md, "The class link").
+
 `GET /jobs/{id}/share` and `POST /jobs/{id}/share` and `/share/{share_id}/revoke` (who can open a document, below) are owner-only; the POSTs are CSRF-checked and not rate limited (they send nothing, and a document holds at most 10 shares).
 
-`POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
+`POST /jobs/{id}/cancel` ("Cancel", on a waiting or converting document) is owner-only, CSRF-checked and rate limited like the retry route; it stores a request and changes nothing else about the job. `POST /jobs/{id}/retry` ("Try again", and "Convert it again" for a finished document made by an older converter) is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
 
 The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, are owner-only
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
 which are not limited either), the body limit applies, and the number of documents a person
-can hold is capped. `/jobs/{id}/download/canvas`, `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge), `/jobs/{id}/download.docx` and `/jobs/{id}/download.epub` are GETs for the owner, like `/download`. The Word file is made by pandoc in a child process (minimal environment, CPU, size and heap limits, 60 s, two at a time) from HTML that went through the EPUB's sanitiser, so it cannot fetch a picture or read a file (docs/output.md, "The Word export"). So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). `/app/download`, `/courses/{id}/download` and `/jobs/{id}/combine` take `?format=docx` or `?format=epub` (any other value is a 400; the same owner checks, the same sanitised path and the same two-at-a-time pandoc limit as the single downloads; a Word zip holds at most 10 documents). A
+can hold is capped. `/jobs/{id}/download/canvas`, `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge), `/jobs/{id}/download.docx` and `/jobs/{id}/download.epub` are GETs like `/download`: the owner and a person the document is shared with, even as a viewer, may take them (`job_access` with `VIEW`, through the same draft gate); a viewer's download restarts no clock and is recorded as the viewer's own. The Word file is made by pandoc in a child process (minimal environment, CPU, size and heap limits, 60 s, two at a time) from HTML that went through the EPUB's sanitiser, so it cannot fetch a picture or read a file (docs/output.md, "The Word export"). `/jobs/{id}/combine/parts` is the owner's page that lists the parts a combined file would hold and which are held back (`job_access` with `OWNER`; it builds nothing and restarts no clock). So is `/jobs/{id}/combine` (one file from the person's own finished, still-kept parts of one source; another person's part in the same group is never included, a part with a decision open is held back, and it restarts the clock of the parts it took and records the downloads, as "Download all" does). `/app/download`, `/courses/{id}/download` and `/jobs/{id}/combine` take `?format=docx` or `?format=epub` (any other value is a 400; the same owner checks, the same sanitised path and the same two-at-a-time pandoc limit as the single downloads; a Word zip holds at most 10 documents). A
 download restarts the deletion clock of the person's own document (`retention.restart_clock`),
-which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
-other change.
+which is the one thing a GET changes. A HEAD request to a download or export route answers with
+the GET's status and content headers and no body, and changes nothing: the file is not built,
+the clock stays and no download is recorded (`routes.jobs.head_reply`).
+`test_get_requests_change_nothing` allows the clock and no other change.
 
 The review edits (T3-5, T3-11, T3-16) are owner-only and CSRF-checked like the decisions, and
 each carries the review version its page was drawn at (a form from an out-of-date tab is
@@ -123,7 +133,11 @@ needs), and a model read (an equation marked on a page, a table cell read) is 20
 per person (`"reread"`), one at a time per person (`reread.ReadGate`), and reserves its
 worst-case cost against the day's cap and the job's own caps before anything is sent
 (`reread.ReadBudget`, the same conditional UPDATEs as the worker's); a refused reservation is a
-sentence on the page, not an error. Added pictures and equations are at most 30 a document.
+sentence on the page, not an error. A question the model has already answered for the document
+(the same crop, prompt version, model and text sent with it: `models.question.question_key`) is
+answered from the document's step records (`web.step_cache`) with no call, no reservation, no
+charge and no unit of the day's count; the records hold the model's answer and a hash key, and
+go with the job (`ops.retention`). The rate limit still counts the request. Added pictures and equations are at most 30 a document.
 Text the person types reaches the student file exactly as other review edits do: cleaned
 (`validate.clean_alt` or the same without collapsing lines for code; NUL, controls and
 invisible format characters out), checked (`check_alt` for alt text and descriptions), kept in
@@ -160,10 +174,14 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   domain rule, no `+tag` folding. Signing in is still the service's own gate (`users.is_allowed`,
   or open sign-up), so a share does not let anyone in who could not sign in. Nothing is emailed
   and there are no links that work without signing in.
-- **What.** Two rights. `view`: the job page, `/view` preview, `/listen` (the listening
-  transcript, a GET that only reads; no POST), the downloads, the crops and the
-  review record. `review`: also the review screen and every decision and edit. The owner alone
-  can delete, retry, change the title, contact line, language or retention, upload a revision,
+- **What.** Two rights. `view`: the reader's job page (`job_reader.html`), `/view` preview,
+  `/listen` (the listening transcript, a GET that only reads; no POST), the downloads, the
+  crops and the review record. None of these hands a `view` sharee a draft: `/view`, `/listen`
+  and every download ask the one export-state function (`output.shown`, `output.check`), so
+  while a decision is open they refuse (a 403 page), and the page says only that the owner is
+  still checking. `review`: also the review screen and every decision and edit. The owner alone
+  can delete, retry, change the title, contact line, language or retention, answer the
+  question of a file that looks cut off, upload a revision,
   combine parts, use "Download all", add or change or remove a share, or read the course
   notation. A person who is shared a document cannot share it further.
 - **One check.** `job_access(session, job_id, user, need)` with `need` `view`, `review` or
@@ -176,17 +194,20 @@ the `job_shares` table). It adds a way in, so it is described in full here.
   deletes their `ReviewEdit` rows on other people's documents (as for any erased account), so
   the owner's record loses those rows and the reviewer's decisions stay in the stored result.
 - **Who did what.** `ReviewEdit.user_id` is the person who made the edit, and the review
-  record's "Decided by" column names them. Only the owner sees email addresses: the owner gets
-  "Name (address)", everyone else gets names only ("the owner" or "a reviewer" when a person
-  has no name). The banner on a shared document and the "Shared with you" list name the owner
+  record's "Decided by" column and the review list's "Accepted by ..." text name them, with
+  one function (`shares.names_of`): "you" for the person reading, and for anyone else a name
+  ("the owner" or "a reviewer" when a person has no name). Only the owner sees email
+  addresses: once at the top of the record ("Converted by"), a person with no name by their
+  address, and the CSV has a "by" column in the owner's file only. The banner on a shared document and the "Shared with you" list name the owner
   the same way. The sharing page, which lists addresses, is owner-only.
 - **Undo.** Undo takes back the last write only if the person asking made it; nobody undoes
   another person's write (the owner does not undo a reviewer's, nor the reverse).
 - **Money and limits.** A re-read a reviewer asks for uses the owner's daily allowance, spend
   pool and the document's caps (`reread.read_equation`), and its rate limit is keyed by the
   owner (`enforce(..., "reread", job.user_id)`), so any number of reviewers share one budget
-  and sharing never raises what a document can spend or how fast. One read at a time per
-  person still applies to each asker. Only the owner's own actions restart the deletion clock
+  and sharing never raises what a document can spend or how fast. The review screen says so
+  beside each button that starts a read (`reread.SHARED_NOTE`), without the owner's name. One
+  read at a time per person still applies to each asker. Only the owner's own actions restart the deletion clock
   (`routes.jobs.restart_owner_clock`): not a viewer's download, nor a reviewer's decision.
 - **Logs.** `share_set`, `share_revoked` and `share_refused` carry the job id, the right and a
   category; never an address. The flash notices on the sharing page are text without addresses,
@@ -194,6 +215,41 @@ the `job_shares` table). It adds a way in, so it is described in full here.
 - **Tests.** `tests/test_job_shares.py` runs every job route against the owner, a viewer, a
   reviewer, a person whose share was removed and a stranger; and the new routes are in
   `test_audit_authz.py::ROUTES` and the CSRF list of `test_web_auth.py`.
+
+### Course grants (WS27.1)
+
+An owner can give a person every document of one course, now and later (`web/shares.py`, the
+`course_grants` table, `FEATURE_COURSE_GRANTS`, off). It adds a second way into a document, so
+it is described here. The rule of "Sharing a document with named people" holds unchanged: a
+person's right is whatever `shares.role_of` returns, and nothing else decides it.
+
+- **The rule.** `role_of` returns the highest of: owner; the person's `job_shares` row on the
+  document; the person's `course_grants` row on `job.course_id`. The grant is read only when all
+  of these hold: the setting is on (`shares.grants_in_force`, from `session.info`, which the app
+  factory fills from the live settings, so an unconfigured session is off), the document has a
+  course, the course belongs to the document's owner (`Course.user_id == Job.user_id`), and the
+  person's sign-in *proved* the address (`CurrentUser.email_verified`, as for a share). With
+  the setting off a row gives nothing, so turning the setting off is a complete switch.
+- **Consequences, each with its path.** A document added to the course later is covered, because
+  the lookup is by `job.course_id` at each request. A document taken out of the course (the
+  column is cleared or set to another course) or a deleted course (`notation.delete_course`
+  clears the column and deletes the grants; the foreign key cascades too) is not covered. A
+  revised version keeps its course. `job_access` refuses an expired document before it calls
+  `role_of`, so no grant is read for it. Rank never goes above `review`: the table only holds
+  `view` and `review`. `is_owner`, delete, retry, title, retention, revision, combine, share,
+  the course notation and "Remember for" stay owner-only; the course pages and the People
+  section stay owner-only. Listings scoped by `Job.user_id` stay owner-scoped; "Shared with you"
+  is the one listing that adds grant-reached documents.
+- **Unproven address.** A person whose session proved nothing gets the plain 404 for a document
+  they reach only through a course (`names_unproved` looks at `job_shares` only), the same as a
+  stranger, so a course's membership is not revealed.
+- **Who sees addresses.** The owner, on the People section and on the document's share page.
+  A grantee sees no address; the review record keeps its rule.
+- **Money.** A grantee's re-read is the owner's (`reread.read_equation`, `job.user_id`).
+- **Logs.** Ids, the right and a category, never an address.
+- **Tests.** `tests/test_job_shares.py` (the course actors in the matrix of every job route; the
+  setting off; moved out; expired; unproven; the limit; erasure), and the new routes are in the
+  CSRF list of `test_web_auth.py`.
 
 ### Headers and the served document
 
@@ -225,10 +281,10 @@ script injected into an app page is refused by the policy.
 | Upload size | `MAX_UPLOAD_MB` a file converted at once, `MAX_LARGE_UPLOAD_MB` a file kept for choosing its pages and the whole request; checked while streaming, never spooled to disk (a Word or PowerPoint file is written to a private temporary directory by the converter for the seconds it takes: below) | `web/uploads.py` |
 | Pages per upload | `MAX_PAGES_PER_JOB` converted at once, `MAX_SOURCE_PAGES` for a file kept for choosing its pages; the quota counts only the pages converted | the probe, before quota or model |
 | Page size | 5000 pt a side | probe |
-| Uploads in progress | 3 per instance, 1 per person; each is held in memory about three times over, so at most about 900 MB at the largest size (`MAX_LARGE_UPLOAD_MB`) | `UploadGate` |
-| Stored bytes per person | `STORAGE_PER_USER_MB` (300, invited) or `STORAGE_OPEN_TIER_MB` (250, open tier): everything they have stored (source PDFs, crops, results, kept large files) that is not past its deletion time, counted in the same transaction as the job with the person's row locked, so two uploads cannot both pass; a new upload that would go over is refused (413) with how much is used and to delete documents. The old worst case was 2.2 GB a person | `web/storage.py`, `web/intake.py`, `web/pending.py` |
+| Uploads in progress | 3 per instance, 1 per person; each is held once while it is read and twice more by the database driver when it is stored, so at most about 900 MB at the largest size (`MAX_LARGE_UPLOAD_MB`) | `UploadGate` |
+| Stored bytes per person | `STORAGE_PER_USER_MB` (300, invited) or `STORAGE_OPEN_TIER_MB` (250, open tier): everything they have stored (the uploaded file, whether a PDF, a LaTeX source or a Word file, or the PDF made from a PowerPoint or Word file; crops, results, kept large files) that is not past its deletion time, counted in the same transaction as the job with the person's row locked, so two uploads cannot both pass; a new upload that would go over is refused (413) with how much is used and to delete documents. The old worst case was 2.2 GB a person | `web/storage.py`, `web/intake.py`, `web/pending.py` |
 | Stored upload bytes, whole service | `STORAGE_GLOBAL_MAX_MB` (2000): over it new uploads get a plain 503 before the body is read, and `/healthz/ops` goes 503 (`/admin/health` names `storage`), until the hourly purge has deleted enough | `web/storage.py`, `routes/jobs.py`, `web/health.py` |
-| Files in one upload | 30 for invited people and pilots, 10 for an account made by open sign-up (`access.files_per_upload`, also the cap on documents waiting or converting); the request, files together, at most `MAX_LARGE_UPLOAD_MB` (100); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `web/access.py`, `routes/jobs.py` |
+| Files in one upload | 30 for invited people and pilots, 10 for an account made by open sign-up (`access.files_per_upload`, also the cap on documents waiting or converting); the request, files together, at most `MAX_LARGE_UPLOAD_MB` (100); each file after the first counts as an upload for `upload_user`, and a file that is refused (or a part that is not started) gives its count back, so the per-person rule counts accepted files only while the per-address `upload` rule stays on requests; the probes of one request share 120 s | `web/uploads.py`, `web/access.py`, `routes/jobs.py` |
 | Zip of documents (`FEATURE_BATCH_ZIP`) | The zip rules of LaTeX source (20 MB, 500 entries, no links, absolute or `..` paths, nested zips, EPS or SVG, an extension allowlist) with one unpacked budget per request (twice the upload limit, shared by all its zips), the documents read one at a time and a PDF over the upload limit refused unread (docs/web.md, "memory, per request"); a member that does not read, or a header that lies about its size, is a refusal; each document is then held to every control an upload has; the zip counts once for the upload rate limit | `web/batch_intake.py`, `web/archive_intake.py` |
 | Large files kept for choosing their pages | 2 per person, up to 100 MB and 500 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
 | LaTeX source (`FEATURE_LATEX_SOURCE`) | A `.tex` file or a zip of at most 20 MB, 100 MB unpacked, 500 entries, 50 MB a file, expansion at most 200 times, depth 8; no symlinks, absolute or `..` paths, encrypted members, nested zips, EPS or SVG; an extension allowlist; the lint; checked again in the conversion child; LaTeXML in the sandbox below | `web/archive_intake.py`, `source/intake.py`, `source/lint.py`, `source/convert.py` |
@@ -239,8 +295,8 @@ script injected into an app page is refused by the policy.
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Conversion child | The whole conversion, in its own process and process group: `CONVERSION_MEMORY_MB` (3072) plus twice the PDF of address space, CPU time 4 times the job's time limit, no core file, killed at the job's time limit, on cancel or shutdown, dies with the web process; minimal environment (no keys, no database URL), model requests and every database write made by the parent; a crash fails that job at once (`conversion_crashed`, `conversion_oom`) | `convert_isolated`, `conversion_child` |
 | Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap (a ZIP of more than 3000 entries, 500 MB unpacked or an entry over 250 MB is refused unopened: with the 100 MB upload limit that is the same room for compression as the 200 MB and 30 MB were; the sizes are read from the ZIP's directory, nothing is unpacked to check); LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
-| Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier) | `web/quota.py`, `web/access.py` |
-| Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and not given back | `web/quota.py` (`try_consume_reread`), `web/reread.py` |
+| Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` (invited), `OPEN_TIER_DAILY_PAGE_QUOTA` (open tier); not given back when a job fails, except a file the conversion finds is only scans or handwriting (the upload refuses it uncounted when its probe can tell), and a document canceled before it began | `web/quota.py`, `web/access.py`, `web/worker.py` |
+| Model reads from review per person per day (open tier) | `OPEN_TIER_DAILY_REREADS`, counted before the read and given back when it reads nothing | `web/quota.py` (`try_consume_reread`, `give_back_reread`), `web/reread.py` |
 | New accounts (open sign-up) | `MAX_NEW_ACCOUNTS_PER_DAY` a UTC day for the service, not given back when an account is deleted; 5 an hour per address; an address deleted today comes back with the day's pages, reads and place already used (a keyed hash of the address, kept to the end of the day) | `web/quota.py` (`try_take_signup`), `web/abuse.py` (`signup`), `web/tombstones.py` |
 | Spend holds of a dead process | Recorded per hold (`spend_holds`) and given back by job when a lease runs out and by age at start-up | `web/spend.py` (`release_holds`), `web/worker.py` |
 | Waiting or running documents per person | 30 for invited people and pilots, 10 for an account made by open sign-up (`access.files_per_upload`) | `web/intake.py` (every route that makes a job: the upload and the parts of a large file) |
@@ -255,8 +311,24 @@ script injected into an app page is refused by the policy.
 | Emailed sign-in links, per target address (off) | 3 per 15 minutes, whoever asks | `web/abuse.py` (`email_link`) |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
+| Zip downloads, per person (`/app/download`, `/courses/{id}/download`, `/app/batch/{id}/download`, `/account/export`: one allowance for the four) | 15 per 10 minutes | `web/abuse.py` (`zip_user`), counted in `routes/bundle.py` |
 | Cron route, per address (every call counts, so wrong tokens are limited too) | 10 per 5 minutes | `web/abuse.py` |
 | Analytics relay `/m/` (only with `ANALYTICS_ENABLED`), per address | 300 per 10 minutes | `web/abuse.py` (`analytics`) |
+
+A zip build loads every ready document of the person and builds each one's files, which takes a
+minute or more for a large set; 15 in 10 minutes is more than anyone downloads by hand (the
+upload rule's size). The count is taken when the build starts and is not given back when the
+build fails or answers 409 ("nothing ready"): the work was already done, so refunding would
+let a script repeat a failing build without limit. A HEAD request builds nothing and does not
+count. The refusal is a 429 page that says how long to wait (`Retry-After`). The single-document
+project and source zips (`routes/jobs.py`) build one document's files and are not on this rule.
+
+Compression and BREACH (`web/security.py`, `CompressionMiddleware`): text responses over 1 KB
+are gzip-compressed when the browser asks, but never a page that printed the CSRF token
+(`deps.csrf_token` marks the request `carries_secret`), so a page that holds a secret next to
+text an attacker can influence is never compressed. That leaves the signed-in form pages
+(including the review screen) uncompressed. Downloads (`Content-Disposition: attachment`),
+streamed answers (no `Content-Length`) and answers over 8 MiB are passed through unchanged.
 
 The rate limit is on by default and production refuses to start with `RATE_LIMITS_ENABLED=false`. It is in memory, per instance: with two instances the allowance is doubled, and a
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the
@@ -271,6 +343,17 @@ visitor share the platform's address. Launch-check runs from the repo and the se
 cannot see the live header; the log line is the only live check.
 
 ### Running uploaded TeX (sandbox)
+
+`source/tex_compile.py` (WS18.22) is the one place the product runs `pdflatex`. It has no caller yet:
+a later feature (the line check) brings its own preamble. A TeX file, alone or with a project folder,
+goes in; a PDF or a named failure (`no_engine`, `no_sandbox`, `not_finished`, `failed`) comes out,
+never TeX's log. It runs in this sandbox under LaTeXML's limits, with the project (or the one file)
+mounted read-only, the PDF folder writable, no network, `-no-shell-escape`, `shell_escape=f`,
+`openin_any=p` and `openout_any=p` (TeX refuses absolute paths and `..` itself, behind the sandbox:
+`\input{/etc/hostname}` and `\input{|cat ...}` end the run), and the programs TeX starts to make a
+missing font off (`MKTEXPK`, `MKTEXTFM`, `MKTEXMF`, `MKTEXFMT` = 0). Tested with the real
+`pdflatex` (`tests/test_tex_compile.py`; skipped by name where pdfTeX is missing). `gold/safe_tex.py`
+is a separate, development-only compile of gold files and is not this function.
 
 A `.tex` file is a program, so a LaTeX upload (the switch is `FEATURE_LATEX_SOURCE`; production's value is in `src/readablestem/ops/production.profile.toml`)
 runs LaTeXML only inside `core/sandbox.py`: bubblewrap with a minimal read-only root (no
@@ -302,7 +385,7 @@ image by `readablestem ops sandbox-probe` (docs/operations.md, "Sandbox probe"; 
 refused with a 503 unless it passed, `web/sandbox_status.py`); a FAIL there means
 LaTeX upload must stay off. In production (2026-11-04) the probe passes on the Landlock backend, so `FEATURE_LATEX_SOURCE`
 is on; `FEATURE_BEAMER_SOURCE` and `FEATURE_BATCH_ZIP` stay off until real decks and course sources
-have been tried. The residual risks below, and under "Residual risks, accepted for the beta", still hold.
+have been tried. `FEATURE_WORD_SOURCE` (off) puts pandoc on an uploaded Word file: it is given a rebuilt working copy and never the upload (`source/docx_package.py`), runs under the same sandbox and lock, with `--sandbox` and limits of its own, and each of a zip bomb, a member name that leaves the package, an outside reference in a relationship, a macro part, an embedded object and an XML entity is refused or made inert before pandoc sees the file (`tests/workflows/test_wf49_hostile_input.py`). The residual risks below, and under "Residual risks, accepted for the beta", still hold.
 
 **Landlock backend** (`core/landlock_exec.py`, `core/sandbox.py`; `tests/test_sandbox_landlock.py`).
 Chosen automatically when bubblewrap cannot start (`sandbox.backend()`; `READABLESTEM_SANDBOX_BACKEND`
@@ -558,7 +641,7 @@ that decodes an image reads its width and height first (the PNG or image header 
 the PDF object's `Width` and `Height` with MuPDF) and does not decode one over
 `core.images.MAX_IMAGE_PIXELS` (40 million): the layout step treats it as "not plain" and
 keeps the picture, the figure and image-page steps leave the image as it is, and the docx
-export and the proof replay skip it. The sites are `pipeline/layout.py`,
+export and the proof replay skip it. The sites are `pipeline/layout/figures.py`,
 `pipeline/image_page.py`, `pipeline/image_page_check.py`, `pipeline/figure_images.py`,
 `pipeline/export_docx.py`, `source/figures.py`, `models/images.py`,
 `models/math_readers/local_reader.py`, `proof/replay.py` and `eval/invented/figures.py`; new
@@ -631,6 +714,12 @@ link, images only as `data:image/png`. It also feeds 12 hostile MathML strings (
 bombs, an external entity, `mglyph`, `annotation-xml`, `maction`, XLink, style URLs) to the
 sanitizer and to the renderer, and shows the review screen hostile alt text and LaTeX.
 
+Text a person cannot see never becomes content, so it cannot carry instructions into a
+prompt through the page's rows: render mode 3, 5 % opacity or less, under 2 pt, in the color
+of the background (white on white, navy on a navy box), or painted over (`docs/layout.md`,
+"Hidden text and page types"). The glyph context of an equation's line skips the first three
+kinds only.
+
 PDF text reaches a model only inside a fenced context field. The model has no tools and no
 way to act; its output is validated as above. A prompt injection in a PDF can at worst make
 a wrong alt text or equation, which the instructor reviews.
@@ -660,6 +749,14 @@ a wrong alt text or equation, which the instructor reviews.
   day. Accounts, the daily spend and quota counters and the content-free aggregates are kept
   until a person deletes the account (counters and aggregates hold no content or link to
   them). Details: docs/operations.md, "Retention".
+- Problem reports (`reports` table, "Report this item" and the stopped job's report line): ids,
+  the item's kind and page, a failure code, the pipeline version and up to 1,000 typed
+  characters; no picture and no item text. Written by the owner or a person with the Review
+  right (5 per 10 minutes per account), read by admins only at `/admin/reports`, text escaped
+  and never made a link. Deleted 30 days after being closed, 180 days after being made whatever
+  the state, and with the sender's account (`ops.retention.purge_closed_reports`,
+  `purge_old_reports`, `erase_user`). The privacy page states the numbers from
+  `web.reports`.
 - Erasure of a person (`readablestem users delete EMAIL --yes`, or the person's own "Delete my
   account", `ops.retention.erase_user`)
   removes their jobs, blobs, review edits, courses and notation, events, sign-in identities,
@@ -680,7 +777,7 @@ a wrong alt text or equation, which the instructor reviews.
 | Recipient | What | How long |
 |---|---|---|
 | Railway (the web service, Railway Postgres and the `backup` volume) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups up to about a week more |
-| The model provider (`MODEL_PROVIDER`; production's is in `src/readablestem/ops/production.profile.toml`) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
+| The model provider (`MODEL_PROVIDER`; production's is in `src/readablestem/ops/production.profile.toml`) | What `web/recipients.py` `sent_material` lists for the settings: always, images cut from the page (equations and figures) with a short fenced piece of nearby text, and the review screen's regions and table cells (below); tables with `FEATURE_TABLES`; a course's notation with `FEATURE_NOTATION_MEMORY`; a picture of each scanned or handwritten page the instructor asks to have converted with `FEATURE_IMAGE_PAGES`; a picture of each whole page that holds math, with its text layer, with `FEATURE_PAGE_WITNESS` or `FEATURE_PAGE_MATH`. No file name, no email, not the PDF file. A production start is refused while a setting that sends one of these is on and the privacy page does not state it with its date (`ops.launch.sent_material_problems`) | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
 | A handwriting reader (`MATH_READER_CLAUDE_ENABLED`, `MATH_READER_OPENAI_ENABLED`; off; the pipeline calls one only when `IMAGE_PAGES_SECOND_READER` names it, and in the hosted conversion child only the local reader can run) | One tight crop of an expression, no text | Anthropic: deleted within 30 days (longer if flagged). OpenAI: sent with `store=False`. Turning one on can add a recipient to this table and to the privacy page (`docs/math-readers.md`). The local reader (`MATH_READER_LOCAL_ENABLED`) runs in the conversion child, sends nothing and adds no recipient |
 | Langfuse (only if tracing is on) | Timings, model names, token counts, costs, error categories, random ids; payloads are masked | Set in the Langfuse project |
 

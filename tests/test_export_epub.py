@@ -12,6 +12,7 @@ import io
 import re
 import zipfile
 from datetime import UTC, datetime
+from html import unescape
 
 import pytest
 from defusedxml import ElementTree
@@ -107,6 +108,8 @@ def test_links_ids_and_images_resolve(made):
         assert f"EPUB/{img.get('src')}" in parts
     nav = xml(parts, ee.NAV)
     for a in nav.iter(f"{XHTML}a"):
+        if a.get("href").startswith("nav.xhtml"):  # the landmark for the contents itself
+            continue
         target = a.get("href").removeprefix("content.xhtml#")
         assert target in ids, target
     assert b"data:" not in parts[ee.CONTENT]
@@ -153,11 +156,20 @@ def _flat(node):
 
 
 def test_metadata_makes_no_conformance_claim(made):
-    _, export, parts = made
+    html, export, parts = made
     meta = metadata(parts)
     assert meta["schema:accessMode"][0] == "textual"
+    # The summary is the page's own statement (SW7); a page without one (made before it
+    # existed) claims nothing. Sufficiency is always said, and a page with no moving picture
+    # has no hazard.
+    said = re.search(r'<meta name="readablestem-summary" content="([^"]*)"', html)
+    if said:
+        assert meta["schema:accessibilitySummary"] == [unescape(said.group(1))]
+    else:
+        assert meta["schema:accessibilitySummary"] == [ee.ACCESSIBILITY_SUMMARY]
+    assert meta["schema:accessModeSufficient"] in (["textual"], ["textual,visual"])
     assert meta["schema:accessibilityHazard"] == ["none"]
-    assert meta["schema:accessibilitySummary"] == [ee.ACCESSIBILITY_SUMMARY]
+    assert "a tool that assists with accessibility" in meta["schema:accessibilitySummary"][0]
     assert ("tableOfContents" in meta["schema:accessibilityFeature"]) == (export.headings > 0)
     assert "dcterms:conformsTo" not in meta
     for name in (ee.PACKAGE, ee.NAV, ee.CONTENT):
@@ -178,6 +190,25 @@ def test_math_stays_native_with_namespace_and_property():
     assert 'properties="mathml"' in export.package
 
 
+def test_a_book_with_maths_carries_the_maths_font_with_its_license_and_one_without_does_not():
+    """A reader's device may have no maths font. The book has the vendored font as a file, and
+    the license it is distributed under beside it (GUST Font License, THIRD_PARTY_NOTICES.md);
+    a book with no maths carries neither."""
+    _export, parts = make(PAGE)
+    fonts = {n for n in parts if n.startswith("EPUB/fonts/")}
+    assert fonts == {
+        "EPUB/fonts/latinmodern-math-1.959.woff2",
+        "EPUB/fonts/GUST-FONT-LICENSE.txt",
+        "EPUB/fonts/MANIFEST-Latin-Modern-Math.txt",
+    }
+    assert parts["EPUB/fonts/latinmodern-math-1.959.woff2"][:4] == b"wOF2"
+    types = {i.get("href"): i.get("media-type") for i in xml(parts, ee.PACKAGE).iter(f"{OPF}item")}
+    assert types["fonts/latinmodern-math-1.959.woff2"] == "font/woff2"
+    assert b"fonts/latinmodern-math-1.959.woff2" in parts[ee.CONTENT]  # the page asks for it
+    _, plain = make(PAGE.replace("math", "span"))
+    assert not [n for n in plain if "fonts/" in n]
+
+
 CHEMISTRY_PAGE = PAGE.replace(
     "</main>",
     '<p><math display="block" intent=":chemical-equation"><mrow><mn>2</mn><msub><mi>H</mi>'
@@ -189,7 +220,7 @@ CHEMISTRY_PAGE = PAGE.replace(
 def test_nav_has_contents_nested_by_level_and_a_page_list():
     export, parts = make(PAGE)
     nav = xml(parts, ee.NAV)
-    toc, pages = [n for n in nav.iter(f"{XHTML}nav")]
+    toc, pages, landmarks = [n for n in nav.iter(f"{XHTML}nav")]
     assert toc.get(f"{EPUB_NS}type") == "toc" and toc.get("role") == "doc-toc"
     assert pages.get(f"{EPUB_NS}type") == "page-list" and pages.get("hidden") is not None
     entries = [(a.get("href"), "".join(a.itertext())) for a in toc.iter(f"{XHTML}a")]
@@ -206,6 +237,12 @@ def test_nav_has_contents_nested_by_level_and_a_page_list():
     labels = [(a.get("href"), a.text) for a in pages.iter(f"{XHTML}a")]
     assert labels == [("content.xhtml#pb2", "Page 2"), ("content.xhtml#page-2", "Page iii")]
     assert export.page_labels == 2
+    # the landmarks: where the text starts (the first heading). Every entry is in the reading
+    # order: EPUBCheck refuses one that points at this file, which is outside it.
+    assert landmarks.get(f"{EPUB_NS}type") == "landmarks"
+    assert [(a.get(f"{EPUB_NS}type"), a.get("href")) for a in landmarks.iter(f"{XHTML}a")] == [
+        ("bodymatter", "content.xhtml#p1-e0"),
+    ]
     assert 'property="source-of">pagination<' in export.package  # what the pages belong to
     assert "source-of" not in make(PAGE.replace('role="doc-pagebreak"', 'role="x"'))[0].package
     content = xml(parts, ee.CONTENT)
@@ -214,9 +251,58 @@ def test_nav_has_contents_nested_by_level_and_a_page_list():
     assert marker.get(f"{EPUB_NS}type") == "pagebreak"
 
 
-def test_sufficiency_is_not_declared_while_items_are_flagged():
-    flagged = PAGE.replace("<p>See", '<div class="flagged" data-status="abstained"></div><p>See')
-    assert "schema:accessModeSufficient" not in metadata(make(flagged)[1])
+def test_text_alone_is_declared_enough_only_when_the_page_says_so_and_nothing_is_flagged():
+    said = PAGE.replace(
+        "</head>", '<meta name="readablestem-access-sufficient" content="textual"></head>'
+    )
+    assert metadata(make(said)[1])["schema:accessModeSufficient"] == ["textual"]
+    flagged = said.replace("<p>See", '<div class="flagged" data-status="abstained"></div><p>See')
+    assert metadata(make(flagged)[1])["schema:accessModeSufficient"] == ["textual,visual"]
+    # a picture that can move may flash, which the tool cannot tell
+    gif = "data:image/gif;base64,R0lGODlhAQABAAAAACw="
+    moving = PAGE.replace("</main>", f'<img src="{gif}" alt="x"></main>')
+    assert metadata(make(moving)[1])["schema:accessibilityHazard"] == ["unknown"]
+
+
+def _long_page(sections: int) -> str:
+    body = "".join(
+        f'<h2 id="s{n}">Part {n}</h2><p id="t{n}">{"Words " * 4000}'
+        f'<a href="#s{(n + 1) % sections}">next part</a></p>'
+        for n in range(sections)
+    )
+    return (
+        '<html lang="en"><head><title>Long</title><style>body { color: #111 } '
+        "main { max-width: 40em; overflow-wrap: anywhere } p { margin: 0; color: red }</style>"
+        f'</head><body><main><h1 id="top">Long</h1>{body}</main></body></html>'
+    )
+
+
+def test_a_long_book_is_chapters_and_every_link_names_its_file():
+    export, parts = make(_long_page(8))
+    assert export.chapters  # cut at the headings
+    spine = [i.get("idref") for i in xml(parts, ee.PACKAGE).iter(f"{OPF}itemref")]
+    hrefs = {i.get("id"): i.get("href") for i in xml(parts, ee.PACKAGE).iter(f"{OPF}item")}
+    files = [hrefs[i] for i in spine]
+    assert files == ["content.xhtml", *export.chapters]
+    where: dict[str, str] = {}
+    for file in files:
+        for e in xml(parts, f"EPUB/{file}").iter():
+            if e.get("id"):
+                assert e.get("id") not in where  # no id twice in the book
+                where[e.get("id")] = file
+    for file in files:
+        doc = xml(parts, f"EPUB/{file}")
+        assert len(list(doc.iter(f"{XHTML}main"))) == 1
+        for a in doc.iter(f"{XHTML}a"):
+            target, _, fragment = a.get("href").partition("#")
+            assert where[fragment] == (target or file), a.get("href")
+    for a in xml(parts, ee.NAV).iter(f"{XHTML}a"):
+        target, _, fragment = a.get("href").partition("#")
+        assert target == "nav.xhtml" or where[fragment] == target, a.get("href")
+    # the sheet leaves the page colors, font and column to the reader and keeps the shape
+    css = " ".join(e.text for e in xml(parts, ee.CONTENT).iter(f"{XHTML}style"))
+    assert "color" not in css and "max-width" not in css and "overflow-wrap" in css
+    assert "margin: 0" in css
 
 
 def test_no_control_characters_reach_the_xml():
@@ -254,7 +340,8 @@ DIRTY = (
     '<html lang="en"><head><title>T</title>'
     '<meta http-equiv="refresh" content="0;url=https://evil.example">'
     '<link rel="stylesheet" href="https://evil.example/a.css">'
-    "<style>@import url(https://evil.example/b.css); p { color: red; background: url(x.png) }"
+    "<style>@import url(https://evil.example/b.css);"
+    " p { border-color: red; background: url(x.png) }"
     " h1 { margin: 0 }</style></head><body><main><h1>Title</h1>"
     '<p style="color: blue; background-image: url(https://evil.example/t.gif)" onclick="x()">'
     'Text <a href="javascript:alert(1)">js</a> <a href="data:text/html,hi">data</a> '
@@ -285,7 +372,7 @@ def test_nothing_loads_runs_or_submits():
     content = xml(parts, ee.CONTENT)
     assert [e.tag for e in content.iter(f"{XHTML}img")] == []
     assert "A remote chart" in text and "A local one" in text  # alt text stays as text
-    assert "color: red" in text and "margin: 0" in text and "color: blue" in text
+    assert "border-color: red" in text and "margin: 0" in text and "color: blue" in text
     assert 'xlink:href="#h"' in text
 
 

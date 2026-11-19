@@ -57,7 +57,7 @@ def test_macros_are_refused():
 
 def test_a_linked_picture_is_refused_but_an_ordinary_hyperlink_is_not():
     assert refused(office.with_external_picture()) == "office_unsafe"
-    assert preflight(office.with_hyperlink()) == "docx"
+    assert preflight(office.with_hyperlink()).kind == "docx"
 
 
 @pytest.mark.parametrize(
@@ -184,6 +184,29 @@ def test_a_decompression_bomb_is_refused_without_being_unpacked():
     assert refused(bomb) == "office_unsafe"
 
 
+def test_the_census_counts_what_the_pdf_route_leaves_out_and_nothing_else():
+    clean = preflight(office.docx())
+    assert (clean.tracked_insertions, clean.tracked_deletions, clean.comments) == (0, 0, 0)
+    assert clean.typed_equations == 0
+    marked = preflight(office.docx_with_changes())
+    assert (marked.tracked_insertions, marked.tracked_deletions, marked.comments) == (1, 1, 1)
+    # text moved with tracking on is printed in both places: one change of each kind
+    moved = preflight(office.docx_with_changes(insertions=0, deletions=0, comments=0, moves=1))
+    assert (moved.tracked_insertions, moved.tracked_deletions) == (1, 1)
+    assert preflight(office.docx_with_equation()).typed_equations == 1
+    deck = preflight(office.pptx_with_extras())
+    assert (deck.comments, deck.speaker_notes, deck.hidden_slides) == (1, 1, 1)
+    assert (deck.typed_equations, deck.units, deck.units_exact) == (2, 2, True)
+    assert json.dumps(deck.to_json()) and office_convert.Census.from_json(deck.to_json()) == deck
+    with pytest.raises(ValueError):
+        office_convert.Census.from_json({"kind": "docx", "comments": -1})
+    # a part that stops in the middle is not counted as far as it goes: the file is refused
+    parts = office.docx_parts()
+    cut = str(parts["word/document.xml"]).split("<w:sectPr>")[0]
+    with pytest.raises(OfficeRejected):
+        preflight(office.rebuild(parts, replace={"word/document.xml": cut}))
+
+
 def test_a_file_that_is_not_what_it_looks_like_never_escapes_as_another_exception():
     """Byte mutations of a good file, and truncations: a category or a kind, never a crash."""
     rng = random.Random(30)
@@ -193,7 +216,7 @@ def test_a_file_that_is_not_what_it_looks_like_never_escapes_as_another_exceptio
             for _ in range(rng.randint(1, 8)):
                 mutated[rng.randrange(len(mutated))] = rng.randrange(256)
             try:
-                assert preflight(bytes(mutated)) in {"docx", "pptx"}
+                assert preflight(bytes(mutated)).kind in {"docx", "pptx"}
             except OfficeRejected as rejected:
                 assert rejected.code.startswith(("office_", "unreadable", "encrypted"))
         for cut in (1, 10, 100, len(source) // 2):
@@ -387,7 +410,7 @@ def child(data: bytes, soffice: str, timeout_s: float = 60) -> tuple[dict, bytes
 def test_a_word_document_becomes_a_tagged_pdf_with_its_headings_and_alt_text():
     assert SOFFICE is not None
     answer, body = child(office.docx(), SOFFICE)
-    assert answer == {"ok": True, "kind": "docx"}
+    assert answer["ok"] is True and answer["census"]["kind"] == "docx"
     assert body.startswith(b"%PDF-")
     document = pymupdf.open(stream=body)
     assert document.page_count == 1
@@ -416,3 +439,32 @@ def test_libreoffice_fetches_nothing_even_if_a_check_missed_a_linked_picture():
         assert pdf.startswith(b"%PDF-")
         with pytest.raises(socket.timeout):
             listener.accept()
+
+
+# ------------------------------------------------- the gate of the Word reader (WS18.14)
+
+
+def test_the_word_gate_runs_in_a_child_and_names_what_it_refuses_that_the_preflight_passes():
+    from readablestem.web.uploads import UploadRejected, check_word_isolated
+
+    census, pages = check_word_isolated(office.docx())
+    assert census.kind == "docx" and pages == 1
+    parts = office.docx_parts()
+    parts["word/../../evil.xml"] = "<x/>"
+    leaving = office.rebuild(parts)
+    assert preflight(leaving).kind == "docx"  # the Office preflight lets the name through
+    with pytest.raises(UploadRejected) as raised:
+        check_word_isolated(leaving)
+    assert raised.value.code == "office_unsafe"
+    with pytest.raises(UploadRejected) as raised:
+        check_word_isolated(office.pptx())  # not a Word file: the PDF route's to take
+    assert raised.value.code == "office_unsupported"
+    strict = str(office.docx_parts()["word/document.xml"]).replace(
+        "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+        "http://purl.oclc.org/ooxml/wordprocessingml/main",
+    )
+    with pytest.raises(UploadRejected) as raised:  # pandoc cannot read Strict Open XML
+        check_word_isolated(
+            office.rebuild(office.docx_parts(), replace={"word/document.xml": strict})
+        )
+    assert raised.value.code == "office_unsupported"

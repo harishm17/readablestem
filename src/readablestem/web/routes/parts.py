@@ -20,15 +20,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import datetime
+from functools import partial
 from typing import Any
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
+from markupsafe import Markup
 
-from readablestem.web import access, events, pending, ranges
+from readablestem.web import access, events, pending, poll, ranges
 from readablestem.web import storage as stored_bytes
 from readablestem.web.database import utc_today
+from readablestem.web.dates import time_tag
 from readablestem.web.db import PendingUpload, session_scope, utcnow
 from readablestem.web.deps import (
     JOB_ID,
@@ -40,23 +44,26 @@ from readablestem.web.deps import (
     enforce,
     flash,
     get_ctx,
+    give_back,
     limited,
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.intake import (
     QuotaRefused,
     TooManyJobs,
     store_job,
 )
 from readablestem.web.logsafe import log_event
-from readablestem.web.quota import next_day_start, pages_left
+from readablestem.web.quota import next_day_start, pages_left, retry_after
 from readablestem.web.uploads import (
     ExtractFailed,
     UploadRejected,
     extract_part_isolated,
     inspect_pdf_detail,
     inspect_pdf_isolated,
+    outline_starts_isolated,
     safe_filename,
 )
 
@@ -110,9 +117,16 @@ def chooser_context(
     shrink: bool | None = None,
     errors: list[dict[str, str]] | None = None,
     started: list[dict[str, str]] | None = None,
+    fragment: bool = False,
 ) -> dict[str, Any]:
+    """What the chooser page shows. `fragment`: only the preview is wanted (it is fetched
+    while the person types), so the suggestion, which reads the file's outline in a child
+    process, is not made."""
     s = ctx.settings
     now = utcnow()
+    from readablestem.pipeline.page_type import ImagePageCount
+    from readablestem.web.routes.jobs import Placed, scans_note
+
     with session_scope(ctx.factory) as session:
         row = owned_pending(session, upload_id, user)
         left = pages_left(
@@ -121,14 +135,31 @@ def chooser_context(
         session.expunge(row)
     done = {p for p in (row.done_pages or []) if isinstance(p, int)}
     remaining = row.pages - len(done)
-    suggested = ranges.suggest_parts(row.pages, s.max_pages_per_job, done)
+    chapters = [] if fragment else outline_starts_isolated(bytes(row.content))
+    suggested = (
+        []
+        if fragment
+        else ranges.suggest_parts(
+            row.pages, s.max_pages_per_job, done, left=left, chapters=chapters
+        )
+    )
     left_out_pages = ranges.left_out(row.pages, done, suggested)
     heavy = row.size_bytes > s.max_upload_mb * 1024 * 1024
     shown_text = ranges.suggestion_text(suggested) if typed is None else typed
     rows = ranges.preview(shown_text, total=row.pages, limit=s.max_pages_per_job, taken=done)
+    # The scanned and handwritten pages the upload probe counted, said as everywhere else
+    # (`scans_note`). A file within the limits with most pages of that kind waits for a choice
+    # about them before anything is converted (WS7.8); a larger one says it beside its parts.
+    note = scans_note(s, Placed(row.filename, row.pages, scans=row.scans_json))
+    counted = ImagePageCount(**row.scans_json) if row.scans_json else ImagePageCount()
+    choice = bool(
+        note and not done and row.pages <= s.max_pages_per_job and counted.mostly(row.pages)
+    )
     context: dict[str, Any] = {
+        "scans_note": note,
+        "scans_choice": choice,
         "preview_rows": rows,
-        "preview_summary": preview_summary(rows, left),
+        "preview_summary": preview_summary(rows, left, next_day_start(now)),
         "pending": row,
         "size_text": pending.size_text(row.size_bytes),
         "examples": ranges.examples(s.max_pages_per_job, row.pages),
@@ -140,6 +171,7 @@ def chooser_context(
         "done_label": ranges.label(sorted(done)) if done else "",
         "done_count": len(done),
         "pages_left": left,
+        "page_quota": access.page_quota(s, user.access_tier),
         "next_reset": next_day_start(now),
         "typed_parts": shown_text,
         "suggestion_lines": len(suggested),
@@ -148,39 +180,52 @@ def chooser_context(
         "shrink_from": SHRINK_FROM_DPI,
         "shrink_to": SHRINK_TO_DPI,
         "started": started or [],
-        "active": "app",
     }
     if errors:
         context |= {"errors": errors, "field_errors": {"parts": errors[0]}}
     return context
 
 
-def preview_summary(rows: list[ranges.PreviewRow], left: int | None) -> str:
-    """The preview in one line: how many parts and pages, what needs fixing, and where today's
-    pages run out ("Parts that do not fit today are not started" is what `_start_parts` does:
-    it stops at the first part that does not fit and the file stays)."""
+def preview_summary(rows: list[ranges.PreviewRow], left: int | None, resets_at: datetime) -> Markup:
+    """The preview in whole sentences, from `ranges.schedule`: which parts start now and which
+    can start after the day's pages reset ("Part 1 (pages 1 to 80) starts now. Parts 2 and 3
+    can start after Nov 19, 2026, 00:00 UTC, when your pages reset."). The parts that wait are
+    not started by the page: `_start_parts` stops at the first part today's pages cannot start
+    and the file stays, so the person sends them again after the reset."""
     if not rows:
-        return "No parts yet."
-    good = [r for r in rows if not r.error]
-    bad = len(rows) - len(good)
-    pages = sum(r.count for r in good)
-    parts_word = "part" if len(good) == 1 else "parts"
-    text = f"{len(good)} {parts_word}, {pages} {'page' if pages == 1 else 'pages'}."
-    if bad:
-        text += f" Fix {bad} before converting."
-    elif left is not None and pages > left:
-        fits, used = 0, 0
-        for r in good:
-            if used + r.count > left:
-                break
-            used += r.count
-            fits += 1
-        text += f" Only {left} pages are left today: " + (
-            f"the first {fits} {'part starts' if fits == 1 else 'parts start'}, the rest wait here."
-            if fits
-            else "none starts today; they wait here."
+        return Markup("No parts yet.")
+    plan = ranges.schedule(rows, left)
+    if plan.bad:
+        return Markup("Fix {} before converting.").format(
+            "the part marked below" if plan.bad == 1 else f"the {plan.bad} parts marked below"
         )
-    return text
+    sentences = []
+    if plan.now:
+        pages = sum(r.count for r in plan.now)
+        if len(plan.now) == 1:
+            row = plan.now[0]
+            what = f"Part {row.number} ({'page' if row.count == 1 else 'pages'} "
+            sentences.append(f"{what}{ranges.spoken(row.label)}) starts now.")
+        elif not plan.later:
+            sentences.append(f"All {len(plan.now)} parts ({pages} pages) start now.")
+        else:
+            sentences.append(f"{_numbers(plan.now)} ({pages} pages) start now.")
+    elif plan.later:
+        sentences.append("No part starts today.")
+    text = Markup(" ".join(sentences))
+    if plan.later:
+        text = Markup("{} {} {} after {}, when your pages reset.").format(
+            text, _numbers(plan.later), "can start", time_tag(resets_at)
+        )
+    return Markup(text.strip())
+
+
+def _numbers(rows: tuple[ranges.PreviewRow, ...]) -> str:
+    """ "Part 3", "Parts 2 and 3", "Parts 2 to 5": the parts a sentence is about."""
+    first, last = rows[0].number, rows[-1].number
+    if first == last:
+        return f"Part {first}"
+    return f"Parts {first} and {last}" if len(rows) == 2 else f"Parts {first} to {last}"
 
 
 @router.get("/uploads/{upload_id}")
@@ -192,7 +237,10 @@ def choose(request: Request, upload_id: str, user: UserDep) -> Response:
 def preview(request: Request, upload_id: str, user: UserDep, parts: str = "") -> Response:
     """The parts as typed, with their page counts: what the chooser's preview swaps in while
     the person types (htmx). Only page numbers are sent; nothing is stored or logged."""
-    context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000])
+    context = chooser_context(get_ctx(request), user, upload_id, typed=parts[:2000], fragment=True)
+    # After the owner check, to the stored upload's own id.
+    if redirect := poll.fragment_or_redirect(request, f"/uploads/{context['pending'].id}"):
+        return redirect
     return render(request, "_parts_preview.html", context | {"oob": True})
 
 
@@ -210,9 +258,20 @@ class Outcome:
 
 
 def _start_parts(
-    ctx: AppContext, user: CurrentUser, upload_id: str, text: str, shrink: bool, enforce_each
+    ctx: AppContext,
+    user: CurrentUser,
+    upload_id: str,
+    text: str,
+    shrink: bool,
+    enforce_each,
+    *,
+    whole: bool = False,
+    images: bool | None = None,
 ) -> Outcome:
-    """Cut out, check and queue the parts typed in `text`, in order, until one cannot be."""
+    """Cut out, check and queue the parts typed in `text`, in order, until one cannot be.
+
+    `whole`: the choice about scanned and handwritten pages (WS7.8): the file as it is, one
+    document with its own name, and `images` says whether those pages are read."""
     s = ctx.settings
     out = Outcome()
     with session_scope(ctx.factory) as session:
@@ -220,7 +279,12 @@ def _start_parts(
         data, name, total = bytes(row.content), row.filename, row.pages
         done = {p for p in (row.done_pages or []) if isinstance(p, int)}
         course, exam, mode = row.course_id, bool(row.exam_mode), row.retention_mode
+        chosen_language = row.language
         asked_images = bool(row.image_pages) and s.feature_image_pages
+        office = dict(row.office_json) if row.office_json else None
+    if whole:
+        text, shrink = f"1-{total}", False
+        asked_images = bool(images) and s.feature_image_pages
     try:
         parts = ranges.parse_parts(text, total=total, limit=s.max_pages_per_job, taken=done)
     except ranges.PartsError as exc:
@@ -232,7 +296,7 @@ def _start_parts(
     for number, part in enumerate(parts, start=1):
         named = f"Part {number} (pages {part.label})" if len(parts) > 1 else f"Pages {part.label}"
         try:
-            cut = extract_part_isolated(data, list(part.pages), shrink=shrink)
+            cut = data if whole else extract_part_isolated(data, list(part.pages), shrink=shrink)
             if len(cut) > limit_bytes:
                 out.error = (
                     f"{named} is {pending.size_text(len(cut))}, over the {s.max_upload_mb} MB "
@@ -245,9 +309,10 @@ def _start_parts(
                 pages, found = inspect_pdf_detail(
                     cut, max_pages=s.max_pages_per_job, allow_image_pages=True
                 )
+                may_have = found.possible
             else:
-                pages, found = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job), 0
-            filename = part_filename(name, part.label)
+                pages, may_have = inspect_pdf_isolated(cut, max_pages=s.max_pages_per_job), False
+            filename = name if whole else part_filename(name, part.label)
             job_id = store_job(
                 ctx.factory,
                 s,
@@ -258,9 +323,11 @@ def _start_parts(
                 mode,
                 course_id=course,
                 exam=exam,
-                image_pages=asked_images and found > 0,
-                part_group=upload_id,
-                part_label=part.label,
+                language=chosen_language,
+                image_pages=asked_images and may_have,
+                part_group=None if whole else upload_id,
+                part_label=None if whole else part.label,
+                office=office,
             )
         except ExtractFailed:
             out.error = (
@@ -296,15 +363,17 @@ def _start_parts(
             out.status, out.retry_after = 413, ""
             break
         except stored_bytes.StorageFull:
+            wait = retry_after(stored_bytes.FULL_WAIT_S)
             out.error = (
                 "The service holds as much uploaded material as it can for now, so "
-                f"{named} was not started. Room frees up through the day: choose it again in "
-                "an hour. This file is kept."
+                f"{named} was not started. Room frees up through the day: choose it again "
+                f"{wait.words}. This file is kept."
             )
-            out.status, out.retry_after = 503, "3600"
+            out.status, out.retry_after = 503, wait.header
             break
         except QuotaRefused as exc:
             left = exc.left
+            wait = retry_after()
             limit = access.page_quota(s, user.access_tier)
             of_today = (
                 f"the {limit} pages a new account can convert today"
@@ -314,11 +383,12 @@ def _start_parts(
             out.error = (
                 f"{named} has {exc.pages} {'page' if exc.pages == 1 else 'pages'}, but you have "
                 f"{left} of {of_today} left. It was not started. "
-                "The count starts again at midnight UTC; this file is kept so you can choose it "
+                f"The count starts again {wait.words}; this file is kept so you can choose it "
                 "then."
             )
-            out.status, out.retry_after = 429, "3600"
+            out.status, out.retry_after = 429, wait.header
             break
+        ctx.wake_worker()
         out.started.append({"id": job_id, "label": part.label})
         sent.update(part.pages)
         events.record_upload(ctx.factory, s, user_id=user.id, job_id=job_id, data=cut, pages=pages)
@@ -341,33 +411,44 @@ def _remember(ctx: AppContext, upload_id: str, sent: set[int]) -> None:
 
 
 @router.post("/uploads/{upload_id}", dependencies=[limited("upload"), Depends(require_csrf)])
+@submit_once("upload.parts")
 async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Response:
     ctx = get_ctx(request)
-    enforce(request, "upload_user", user.id)
+    counted, outcome = [0], Outcome()
     form = await request.form()
     text = str(form.get("parts") or "")
     shrink = form.get("shrink") == "on"
+    whole = form.get("whole") == "1"  # the choice about scanned pages: the file as it is
+    images = form.get("images") == "read"
     if (closed := await run_in_threadpool(conversions_closed, ctx, user)) is not None:
         from readablestem.web.routes.jobs import conversions_paused
 
         log_event(logger, "upload_rejected", code="spend_cap" if closed == "daily" else "open_pool")
-        raise PageError(*conversions_paused(closed, kept=True), headers={"Retry-After": "3600"})
+        raise conversions_paused(closed, kept=True)
     if (refused := ctx.uploads.enter(user.id)) is not None:
-        from readablestem.web.routes.jobs import UPLOAD_BUSY
+        from readablestem.web.routes.jobs import upload_busy
 
         log_event(logger, "upload_rejected", code=f"upload_{refused}")
-        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+        raise upload_busy(refused)
     try:
+        enforce(request, "upload_user", user.id)
+        counted[0] = 1
 
         def enforce_each(count: int) -> None:
             for _ in range(max(0, count - 1)):
                 enforce(request, "upload_user", user.id)
+                counted[0] += 1
 
         outcome = await run_in_threadpool(
-            _start_parts, ctx, user, upload_id, text, shrink, enforce_each
-        )
+            partial(
+                _start_parts, ctx, user, upload_id, text, shrink, enforce_each,
+                whole=whole, images=images,
+            )
+        )  # fmt: skip
     finally:
         ctx.uploads.leave(user.id)
+        # The per-person rule counts accepted parts only: a part not started gives its count back.
+        give_back(request, "upload_user", user.id, counted[0] - len(outcome.started))
     if not outcome.error and outcome.started:
         if len(outcome.started) == 1:
             return RedirectResponse(f"/jobs/{outcome.started[0]['id']}", status_code=303)
@@ -375,6 +456,7 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
             request,
             f"{len(outcome.started)} parts are converting. Each part is its own document.",
             undo=False,
+            kind="success",
         )
         return RedirectResponse("/app", status_code=303)
     errors = [{"field_id": "parts", "message": outcome.error}]
@@ -393,6 +475,7 @@ async def convert_parts(request: Request, upload_id: str, user: UserDep) -> Resp
 
 
 @router.post("/uploads/{upload_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("upload.discard")
 async def discard(request: Request, upload_id: str, user: UserDep) -> Response:
     """Discard a waiting file. Only a POST with `confirm=yes` deletes it; any other POST
     (the "Discard" button) gets the confirmation page first (WCAG 3.3.4)."""
@@ -408,7 +491,7 @@ async def discard(request: Request, upload_id: str, user: UserDep) -> Response:
 
     await run_in_threadpool(delete)
     log_event(logger, "pending_discarded", reason="user")
-    flash(request, "The file was discarded.", undo=False)
+    flash(request, "The file was discarded.", undo=False, kind="success")
     return RedirectResponse("/app", status_code=303)
 
 

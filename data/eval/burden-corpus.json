@@ -2,12 +2,12 @@
  "split": {
   "name": "development",
   "seed": "corpus",
-  "set_sha256": "5dd6cabd1e55eef6af6f5885208c22d4b0b5d539b215384cfe0a64379ee44dd2",
+  "set_sha256": "84a76a99c535293f452328bd3c7d17745a8be1859e24005be724f23157141bc0",
   "documents": 72
  },
  "profile": {
   "name": "production",
-  "sha256": "62b4f1678d3695f82a93261d2178a8ec75af489c017418686a77000de360e5e8",
+  "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,324 +15,223 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.10",
- "commit": "7dea70d9c68acf7e2f2af52663d53fdd010f9955",
+ "pipeline_version": "0.5.12",
+ "commit": "3478921f979896c5a428fea9ca0c2217748049a0+changes",
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
   "cores": 16
  },
+ "not_finished": [],
  "metrics": {
   "uploads": {
-   "measured": 63,
+   "measured": 43,
    "answers_missing": {
     "ar3_sideways90": 2,
     "ar4_sideways270": 2,
-    "d1_scripts": 14,
+    "d1_scripts": 8,
     "e1_mc_columns": 6,
     "e2_solutions_rubric": 6,
     "e3_calendar": 2,
-    "f1_notation": 50,
-    "f2_figures": 30,
+    "f1_notation": 46,
+    "f2_figures": 14,
     "f4_matrices": 12,
-    "w_lecture_5111": 2
+    "r01_syllabus_16851": 6,
+    "r05_labmanual_5310_lab1": 22,
+    "r07_labnotebook_5310": 8,
+    "r09_handout_14451": 18,
+    "r14_exam_513": 44,
+    "r15_openstax_chem_ch3": 2,
+    "r16_openstax_physics_ch4_end": 20,
+    "r17_arxiv_ligo": 74,
+    "r18_arxiv_opt": 34,
+    "r19_poster_codesign": 4,
+    "r20_newsletter_drp": 2,
+    "r21_infographic_orcid": 8,
+    "s15_charts_figures": 4,
+    "w_exam_5111": 38,
+    "w_exam_5111+exam": 38,
+    "w_lecture_5111": 30,
+    "w_notes_6042_ch2": 646,
+    "w_pset_801": 6,
+    "w_slides_60001_lec1": 48,
+    "w_slides_60001_lec10": 98,
+    "w_solutions_1802": 50
    },
    "not_measured": []
   },
-  "pages": 315,
-  "decisions": 567,
-  "per_page": 1.8,
+  "pages": 117,
+  "decisions": 58,
+  "per_page": 0.4957,
   "document": {
-   "p50": 0.2857,
-   "p95": 7.4444,
-   "mean": 1.1968,
-   "max": 10.2143
+   "p50": 0.0,
+   "p95": 2.2,
+   "mean": 0.3543,
+   "max": 3.0
   },
   "page": {
    "p50": 0,
-   "p95": 9,
-   "mean": 1.8,
-   "max": 25,
-   "none": 0.5556
+   "p95": 3,
+   "mean": 0.4957,
+   "max": 8,
+   "none": 0.7692
   },
   "kinds": {
    "dense_math": {
-    "pages": 30,
-    "documents": 10,
-    "decisions": 314,
-    "per_page": 10.4667,
+    "pages": 2,
+    "documents": 1,
+    "decisions": 9,
+    "per_page": 4.5,
     "page": {
-     "p50": 9,
-     "p95": 25,
-     "mean": 10.4667,
-     "max": 25
+     "p50": 4,
+     "p95": 5,
+     "mean": 4.5,
+     "max": 5
     }
    },
    "figure": {
-    "pages": 60,
-    "documents": 19,
-    "decisions": 105,
-    "per_page": 1.75,
-    "page": {
-     "p50": 1,
-     "p95": 7,
-     "mean": 1.75,
-     "max": 13
-    }
-   },
-   "scan": {
-    "pages": 25,
-    "documents": 10,
-    "decisions": 28,
-    "per_page": 1.12,
-    "page": {
-     "p50": 1,
-     "p95": 4,
-     "mean": 1.12,
-     "max": 9
-    }
-   },
-   "slide": {
-    "pages": 45,
-    "documents": 3,
-    "decisions": 13,
-    "per_page": 0.2889,
+    "pages": 6,
+    "documents": 4,
+    "decisions": 4,
+    "per_page": 0.6667,
     "page": {
      "p50": 0,
      "p95": 2,
-     "mean": 0.2889,
+     "mean": 0.6667,
+     "max": 2
+    }
+   },
+   "scan": {
+    "pages": 19,
+    "documents": 4,
+    "decisions": 10,
+    "per_page": 0.5263,
+    "page": {
+     "p50": 0,
+     "p95": 4,
+     "mean": 0.5263,
+     "max": 4
+    }
+   },
+   "slide": {
+    "pages": 11,
+    "documents": 2,
+    "decisions": 5,
+    "per_page": 0.4545,
+    "page": {
+     "p50": 0,
+     "p95": 5,
+     "mean": 0.4545,
      "max": 5
     }
    },
    "table": {
-    "pages": 24,
-    "documents": 17,
-    "decisions": 12,
-    "per_page": 0.5,
+    "pages": 13,
+    "documents": 9,
+    "decisions": 3,
+    "per_page": 0.2308,
     "page": {
      "p50": 0,
      "p95": 1,
-     "mean": 0.5,
-     "max": 2
+     "mean": 0.2308,
+     "max": 1
     }
    },
    "typical": {
-    "pages": 131,
-    "documents": 43,
-    "decisions": 95,
-    "per_page": 0.7252,
+    "pages": 66,
+    "documents": 31,
+    "decisions": 27,
+    "per_page": 0.4091,
     "page": {
      "p50": 0,
-     "p95": 5,
-     "mean": 0.7252,
+     "p95": 3,
+     "mean": 0.4091,
      "max": 8
     }
    }
   },
   "items": {
-   "equation": 384,
-   "figure": 122,
-   "heading": 44,
-   "table": 11,
-   "paragraph": 6
+   "heading": 21,
+   "equation": 15,
+   "figure": 10,
+   "paragraph": 9,
+   "table": 3
   },
   "reasons": {
-   "below_accept": {
-    "decisions": 154,
-    "per_100_pages": 48.89
-   },
-   "symbol_mismatch": {
-    "decisions": 143,
-    "per_100_pages": 45.4
-   },
-   "sign_mismatch": {
-    "decisions": 52,
-    "per_100_pages": 16.51
-   },
-   "glyph_style_mismatch": {
-    "decisions": 51,
-    "per_100_pages": 16.19
-   },
-   "low_confidence": {
-    "decisions": 41,
-    "per_100_pages": 13.02
-   },
    "heading.weak_evidence": {
-    "decisions": 38,
-    "per_100_pages": 12.06
+    "decisions": 21,
+    "per_100_pages": 17.95
    },
    "heading.sentence_like": {
-    "decisions": 28,
-    "per_100_pages": 8.89
+    "decisions": 20,
+    "per_100_pages": 17.09
    },
-   "style_cosmetic": {
-    "decisions": 26,
-    "per_100_pages": 8.25
-   },
-   "long_description_unsure": {
-    "decisions": 22,
-    "per_100_pages": 6.98
-   },
-   "text_layer_mismatch": {
-    "decisions": 19,
-    "per_100_pages": 6.03
-   },
-   "style_mismatch": {
-    "decisions": 18,
-    "per_100_pages": 5.71
-   },
-   "not_equation": {
-    "decisions": 17,
-    "per_100_pages": 5.4
-   },
-   "heading.repeated_label": {
-    "decisions": 16,
-    "per_100_pages": 5.08
-   },
-   "too_long": {
-    "decisions": 15,
-    "per_100_pages": 4.76
-   },
-   "species_mismatch": {
-    "decisions": 10,
-    "per_100_pages": 3.17
-   },
-   "heading.all_caps": {
-    "decisions": 9,
-    "per_100_pages": 2.86
-   },
-   "unread_page": {
-    "decisions": 8,
-    "per_100_pages": 2.54
+   "below_accept": {
+    "decisions": 14,
+    "per_100_pages": 11.97
    },
    "image_page": {
     "decisions": 6,
-    "per_100_pages": 1.9
+    "per_100_pages": 5.13
    },
    "maths_checked": {
     "decisions": 6,
-    "per_100_pages": 1.9
+    "per_100_pages": 5.13
+   },
+   "glyph_style_mismatch": {
+    "decisions": 3,
+    "per_100_pages": 2.56
    },
    "numbers_not_a_table": {
-    "decisions": 6,
-    "per_100_pages": 1.9
+    "decisions": 3,
+    "per_100_pages": 2.56
    },
-   "half_fraction": {
-    "decisions": 5,
-    "per_100_pages": 1.59
+   "text.rtl_order": {
+    "decisions": 3,
+    "per_100_pages": 2.56
+   },
+   "unread_page": {
+    "decisions": 3,
+    "per_100_pages": 2.56
    },
    "heading.list_like": {
-    "decisions": 5,
-    "per_100_pages": 1.59
-   },
-   "invalid_latex": {
-    "decisions": 5,
-    "per_100_pages": 1.59
-   },
-   "flag_policy": {
-    "decisions": 4,
-    "per_100_pages": 1.27
-   },
-   "handwriting_on_page": {
-    "decisions": 4,
-    "per_100_pages": 1.27
-   },
-   "unsupported_ce": {
-    "decisions": 4,
-    "per_100_pages": 1.27
-   },
-   "values_from_image": {
-    "decisions": 3,
-    "per_100_pages": 0.95
-   },
-   "heading.level_repaired": {
     "decisions": 2,
-    "per_100_pages": 0.63
+    "per_100_pages": 1.71
    },
-   "bad_arity": {
-    "decisions": 1,
-    "per_100_pages": 0.32
+   "not_equation": {
+    "decisions": 2,
+    "per_100_pages": 1.71
    },
-   "empty": {
+   "heading.all_caps": {
     "decisions": 1,
-    "per_100_pages": 0.32
+    "per_100_pages": 0.85
    },
-   "grid_size_differs": {
+   "heading.repeated_label": {
     "decisions": 1,
-    "per_100_pages": 0.32
+    "per_100_pages": 0.85
+   },
+   "long_description_unsure": {
+    "decisions": 1,
+    "per_100_pages": 0.85
    },
    "no_headers": {
     "decisions": 1,
-    "per_100_pages": 0.32
-   },
-   "number_mismatch": {
-    "decisions": 1,
-    "per_100_pages": 0.32
+    "per_100_pages": 0.85
    },
    "omitted_region": {
     "decisions": 1,
-    "per_100_pages": 0.32
+    "per_100_pages": 0.85
    },
-   "scanned_page": {
+   "sign_mismatch": {
     "decisions": 1,
-    "per_100_pages": 0.32
-   },
-   "spans_differ": {
-    "decisions": 1,
-    "per_100_pages": 0.32
-   },
-   "text_at_edge": {
-    "decisions": 1,
-    "per_100_pages": 0.32
+    "per_100_pages": 0.85
    }
   },
   "documents": [
    {
-    "upload": "w_solutions_1802",
-    "pages": 14,
-    "decisions": 143,
-    "per_page": 10.2143
-   },
-   {
-    "upload": "r21_infographic_orcid",
+    "upload": "d3_arabic_doc",
     "pages": 1,
-    "decisions": 9,
-    "per_page": 9.0
-   },
-   {
-    "upload": "w_exam_5111",
-    "pages": 9,
-    "decisions": 67,
-    "per_page": 7.4444
-   },
-   {
-    "upload": "w_exam_5111+exam",
-    "pages": 9,
-    "decisions": 67,
-    "per_page": 7.4444
-   },
-   {
-    "upload": "r14_exam_513",
-    "pages": 3,
-    "decisions": 22,
-    "per_page": 7.3333
-   },
-   {
-    "upload": "r05_labmanual_5310_lab1",
-    "pages": 8,
-    "decisions": 28,
-    "per_page": 3.5
-   },
-   {
-    "upload": "w_notes_6042_ch2",
-    "pages": 14,
-    "decisions": 47,
-    "per_page": 3.3571
-   },
-   {
-    "upload": "r17_arxiv_ligo",
-    "pages": 8,
-    "decisions": 23,
-    "per_page": 2.875
+    "decisions": 3,
+    "per_page": 3.0
    },
    {
     "upload": "r11_recitation_2003sc",
@@ -347,34 +246,10 @@
     "per_page": 2.2
    },
    {
-    "upload": "r18_arxiv_opt",
-    "pages": 6,
-    "decisions": 12,
-    "per_page": 2.0
-   },
-   {
-    "upload": "r07_labnotebook_5310",
-    "pages": 3,
-    "decisions": 4,
-    "per_page": 1.3333
-   },
-   {
     "upload": "w_handwritten_6006+image_pages",
     "pages": 4,
     "decisions": 5,
     "per_page": 1.25
-   },
-   {
-    "upload": "w_pset_801",
-    "pages": 8,
-    "decisions": 10,
-    "per_page": 1.25
-   },
-   {
-    "upload": "w_slides_60001_lec10",
-    "pages": 39,
-    "decisions": 40,
-    "per_page": 1.0256
    },
    {
     "upload": "r13_exam_3044",
@@ -383,40 +258,10 @@
     "per_page": 1.0
    },
    {
-    "upload": "r19_poster_codesign",
-    "pages": 1,
-    "decisions": 1,
-    "per_page": 1.0
-   },
-   {
-    "upload": "s05_form_acroform",
-    "pages": 1,
-    "decisions": 1,
-    "per_page": 1.0
-   },
-   {
     "upload": "s16_calendar_grid",
     "pages": 1,
     "decisions": 1,
     "per_page": 1.0
-   },
-   {
-    "upload": "r15_openstax_chem_ch3",
-    "pages": 10,
-    "decisions": 9,
-    "per_page": 0.9
-   },
-   {
-    "upload": "r16_openstax_physics_ch4_end",
-    "pages": 10,
-    "decisions": 9,
-    "per_page": 0.9
-   },
-   {
-    "upload": "r20_newsletter_drp",
-    "pages": 6,
-    "decisions": 5,
-    "per_page": 0.8333
    },
    {
     "upload": "s10_slides_boxes",
@@ -429,12 +274,6 @@
     "pages": 3,
     "decisions": 2,
     "per_page": 0.6667
-   },
-   {
-    "upload": "r09_handout_14451",
-    "pages": 5,
-    "decisions": 3,
-    "per_page": 0.6
    },
    {
     "upload": "r04_grading_5310",
@@ -455,39 +294,21 @@
     "per_page": 0.5
    },
    {
-    "upload": "s15_charts_figures",
-    "pages": 2,
-    "decisions": 1,
-    "per_page": 0.5
-   },
-   {
-    "upload": "w_mixed_slides+image_pages",
-    "pages": 12,
-    "decisions": 5,
-    "per_page": 0.4167
-   },
-   {
     "upload": "r10_handout_4241",
     "pages": 3,
     "decisions": 1,
     "per_page": 0.3333
    },
    {
-    "upload": "r01_syllabus_16851",
-    "pages": 7,
-    "decisions": 2,
-    "per_page": 0.2857
+    "upload": "w_mixed_slides+image_pages",
+    "pages": 12,
+    "decisions": 3,
+    "per_page": 0.25
    },
    {
     "upload": "r06_labsafety_5310",
     "pages": 5,
     "decisions": 1,
-    "per_page": 0.2
-   },
-   {
-    "upload": "w_slides_60001_lec1",
-    "pages": 35,
-    "decisions": 7,
     "per_page": 0.2
    },
    {
@@ -551,12 +372,6 @@
     "per_page": 0.0
    },
    {
-    "upload": "d3_arabic_doc",
-    "pages": 1,
-    "decisions": 0,
-    "per_page": 0.0
-   },
-   {
     "upload": "d4_chinese_doc",
     "pages": 1,
     "decisions": 0,
@@ -601,6 +416,12 @@
    {
     "upload": "s03_lab_callouts",
     "pages": 2,
+    "decisions": 0,
+    "per_page": 0.0
+   },
+   {
+    "upload": "s05_form_acroform",
+    "pages": 1,
     "decisions": 0,
     "per_page": 0.0
    },

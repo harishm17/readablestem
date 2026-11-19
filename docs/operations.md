@@ -11,8 +11,8 @@ cover.
 | What | When | Where |
 |---|---|---|
 | Aggregate, then purge | Hourly at minute 7, the Railway `cron` service | `readablestem ops cron`: needs only the database, prints `aggregated_jobs=... jobs_deleted=...`, exits 1 if aggregation failed (after the purge ran). The HTTP route `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, logs `cron_done`) does the same work, but nothing in production calls it |
-| Decisions canary | Not run in production | Only the HTTP cron route runs it (`ops.canary.maybe_run_daily`), and it is OpenAI's Decisions API, which is off under `MODEL_PROVIDER=anthropic`. By hand only. See "Decisions canary" below |
-| Claude canary | Not run in production | Only the HTTP cron route runs it (`ops.claude_canary.maybe_run_daily`); `ops cron` does not. By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
+| Decisions canary | Once per UTC day, in `ops cron` and the HTTP cron route (`ops.canary.run_daily`) | It is OpenAI's Decisions API, so under `MODEL_PROVIDER=anthropic` (production) it answers `provider_not_openai` and does nothing. See "Decisions canary" below |
+| Claude canary | Once per UTC day, in `ops cron` and the HTTP cron route (`ops.canary.run_daily`) | Does nothing while `CLAUDE_SECOND_CHECK` is `off` (its value in code and in production). By hand: `readablestem ops claude-canary --max-usd 0.25`. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the cron is late |
 | Database backup | Daily at 08:17 UTC, the Railway `backup` service | `pg_dump` to a `.part` file, checked (gzip, completion line, restore into a scratch database, every table and the schema version present), then moved into the `/backups` volume; dumps older than 5 days are deleted (the last 6 are kept); logs `backup_ok file=... tables=... alembic=...`, or `backup_failed reason=...` and exit 1. Records the `backup` heartbeat. See "Backups and restore" |
 | Failed cron or backup run | `/healthz/ops`, checked from outside by GitHub Actions `uptime.yml` every 3 hours | The backup and the cron each write a row of `ops_heartbeat` when they finish well; `/healthz/ops` answers 503 when the backup is older than 26 hours or the cron older than 150 minutes (which one is late is on the admin page, `/admin`), and the failed workflow run is emailed by GitHub. See "Health, readiness and shutdown". Railway's own deployments list still shows the failed run, and its project notifications can mail it (deploy-railway.md, "Logs and monitoring") |
@@ -50,6 +50,12 @@ job past that time together with everything derived from the document: the uploa
 the crops, the result JSON, the HTML, the filename, the review edits and the step facts
 ("Step facts and the step report"). It deletes the child rows itself and does not rely on
 the database cascade alone.
+
+Every sentence about retention is written in `web/retention.py` from the settings: the job page's
+"Kept until ..." line (under the status box, with "Keep for 7 days" beside it), the notice that
+names the new time after an action that moved it by an hour or more, the expired-document page and
+the list's mark on a document with `LAST_HOURS` (6) or less left. A download restarts the clock
+silently: it has no notice to put the time in.
 
 Every deletion goes through `ops.retention.delete_jobs(session, job_ids)`: the hourly
 purge, and the web app's "delete now" (`POST /jobs/{job_id}/delete` must call
@@ -112,6 +118,22 @@ free their own space at once by deleting documents ("Delete" on My documents).
 
 Every daily backup copies what is stored that day, so look at the `backup` volume too.
 
+### Where the bytes are: `ops storage-report`
+
+`uv run readablestem ops storage-report [--largest N]` prints, from the database alone (sizes
+and random ids, nothing of a document's content): the bytes on disk of each table with its
+indexes and large values; on Postgres a row for the database's own catalogs, so the rows add
+up to `pg_database_size` (99.9% on a 60-document test database; on SQLite the total is the
+file's pages and the tables come from `dbstat`); and, for finished documents, the median, 90th
+percentile, largest and total bytes per document split into upload, crops, HTML, result, step
+records and kept exports, with the N largest documents by id.
+
+The per-document figures are the document's content bytes (the same terms as the per-person cap
+above, plus step records and the Word, EPUB and Canvas files kept after a download, which the
+cap leaves out because they can be made again). The table figures are what is on disk, and Postgres compresses large
+HTML out of line, so the document totals can add up to more than the tables do. Use the tables
+for "how full is the volume" and the per-document figures for "what does one document cost".
+
 ### Large files waiting for their pages
 
 A PDF over the page or size limit is kept as a `pending_uploads` row (`web/pending.py`, docs/web.md
@@ -146,12 +168,57 @@ deleted-document page uses them to tell an owner what happened), but not for eve
   year. Changing it means changing the privacy page, which names the number.
 - **With the user.** `readablestem users delete` (`ops.retention.erase_user`) deletes all of
   a person's events at once.
+- **Problem reports** (`reports`). The same hourly purge deletes a report 30 days after it was
+  closed (`reports.CLOSED_DAYS`, `ops.retention.purge_closed_reports`) and every report 180 days
+  after it was made, closed or not (`reports.MAX_DAYS`, `purge_old_reports`); the count is
+  `reports_deleted` in `purge_done`. Erasing the sender deletes theirs. The privacy page names
+  both numbers; change them in `web/reports.py` only.
 - **Off.** `EVENTS_ENABLED=false` writes no new events (and turns the two questions after
   a download off); events already kept follow the rules above.
 
 The upload fingerprint in `uploaded` events is keyed with `SESSION_SECRET`: rotating the
 secret makes the next upload of a file look new (a missed `reuploaded`, nothing else).
-`/admin` shows the counts per day and per pseudonymous person.
+`/admin` shows the counts per day and per pseudonymous person: review writes, decisions that
+stand (the outcome counts net of undo) and documents reviewed, and nothing finer.
+
+### Accuracy in use
+
+`readablestem ops accuracy` prints what reviewers did with each release's output, newest
+release first, from the `decision_outcome` events (`web.events.outcome_cells`, grouped in SQL;
+nothing is copied anywhere, so an erased account and events past 400 days drop out at once).
+A release stored with a profile hash (`0.5.11+0123456789ab`) is its own table. Per lane
+(`web.events.LANES`) and for all lanes:
+
+- **False flags per true flag**, over doubt flags only: a doubt flag is false when it was
+  kept and true when it was edited, replaced, rejected, removed or added. "Of which kept in
+  bulk" are the false ones kept by a group write.
+- **Required by a rule**, on its own line and never in that ratio: decisions a rule asks for
+  whatever the readers say, and how many of them changed something.
+- **Not classified**: a flag whose source has no class in `web.events.SOURCE_CLASSES` yet.
+  Until a source is there, every flag is unclassified and no ratio is printed; the table of
+  sources of WS8.22 fills it in.
+- **Found by a reviewer with no flag**, per 100 pages: edits, replacements, removals and
+  additions of something nothing flagged, with "added by hand" beside it. It is a floor, not
+  the error rate: it counts only what a reviewer found.
+- **Decisions per page**, the median over the documents that were reviewed.
+
+A cell is printed only when it draws on at least 5 accounts and 10 documents and no one
+account supplies more than half of its decisions or pages; otherwise it says "too few to show"
+and how many more accounts it needs, and its counts still go into "All lanes". When exactly one
+lane is withheld the next smallest is withheld with it. Admin accounts and sample documents
+are left out of every count. The command applies this rule for whoever runs it. With
+`EVENTS_ENABLED=false` it says there are no numbers from use. The pages counted are those the
+`uploaded` event recorded for the documents with outcomes.
+
+### Looking up one account for support
+
+`readablestem ops lookup ADDRESS` (`ops/support.py`) prints one account: its tier and state,
+today's pages and re-reads, what it has cost today and in all, its documents (the newest 50)
+as rows of an id, a state, pages, an error category, a cost and two dates, and the three review
+figures `/admin` shows for it (review writes, decisions, documents reviewed). It prints no file
+name, title or document text, and no review outcome by kind, reason or document, so it is not
+a way around the small-count rule above. Each lookup is logged as `support_lookup` with the
+account's pseudonym, never the address. Exit code 1 when nobody has that address.
 
 ### Step facts and the step report
 
@@ -178,10 +245,11 @@ When a job ends `done`, the worker keeps what it took of the models and of the c
   done of elements); `image_page`, one row for each page the limit kept from being read;
   `second_reader`, when its time ran out (`time_limit`) or its own dollar share was spent
   (`cap_reached`), with the equations read of those it could have read; `page_type`, one
-  row for each page that was typed without its ink because the document's time for the ink
-  analysis had run out (`time_limit`; such a page may be handwriting that was not seen as
-  handwriting); `ink_strokes`, when the same time ran out while the strokes of handwritten
-  pages were read for their pictures (pages read of pages).
+  row for each page that was typed without its ink because its ink analysis stopped
+  (`work_budget` when a count of work ran out, the same on every machine; `time_limit` when
+  the clock guard against a hang fired; such a page may be handwriting that was not seen as
+  handwriting); `ink_strokes`, one row for each handwritten page whose strokes were not read
+  for its pictures, for the same two reasons.
   `web.step_facts.not_finished(session, job_id)` is the one place a page or a count reads
   them, and each is also a `job_not_finished` log line.
 
@@ -215,6 +283,8 @@ is never counted. It prints:
 - by step and model: calls, failed calls, calls a page, input, cached input and output
   tokens a page, the share of input read from the prompt cache, the p50 and p95 seconds
   of one call, the p99 dollars of one call and the dollars a page;
+  the dollars leave out calls charged at their reservation because no usage came back; the
+  report counts those apart ("charged at their reservation, no usage came back");
 - by stage: the p50 and p95 seconds of a job and of a page, and the stage's share of the
   wall time of the jobs that have it;
 - in all: dollars and calls beside what the job rows settled, the cache share, and the p50
@@ -446,9 +516,8 @@ of the model or the service, seen the day it happens.
   away) logs one ERROR line `decisions_canary_drift` with the counts, the largest move
   and the case ids, and the command exits 1. A case that got no answer is
   `decisions_canary_incomplete` (WARNING), not drift.
-- **In the HTTP cron route** (`POST /internal/cron/aggregate-and-purge`), after the purge:
-  at most once per UTC day. The Railway cron service runs `ops cron` instead, which does
-  not run it, so no canary runs in production unless something calls the route. The first cron run of the day claims it by inserting the
+- **In `ops cron` and the HTTP cron route** (`POST /internal/cron/aggregate-and-purge`),
+  after the purge: at most once per UTC day. The first cron run of the day claims it by inserting the
   aggregate row (day, `canary`, `decisions:run`) if it is missing, so two instances or
   two runs cannot both send it; a claimed day is not retried, even if the run failed.
   Fail-open: nothing about the canary changes the cron's response or its status code.
@@ -456,7 +525,7 @@ of the model or the service, seen the day it happens.
   key. It reserves through a `JobBudget` of $0.02 on the daily spend cap (dollars only:
   Decisions requests are not model calls, and the budget allows none); a run costs
   about $0.00075 and takes about 3 s; cases still unsent after 60 s count as failed
-  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` does not run it; use the command below.
+  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` runs it too (`ops.canary.run_daily`), through the same day claim; its status is in the cron heartbeat's note and on `/admin`.
 - **By hand:** `uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02`
   (exit 0 no drift, 1 drift, 2 could not compare). After a deliberate change (new
   question wording, new canary cases) or a drift you have looked at and accept:
@@ -475,15 +544,53 @@ failures, for example the weekly GitHub workflow.
 | `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Railway's deploy health check (`.railway/railway.ts`); the Dockerfile's HEALTHCHECK for local Docker |
 | `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | GitHub `uptime.yml` every 5 minutes; you, with `curl` (Cloud Monitoring's uptime check is the Cloud Run path) |
 | `GET /healthz/ops` | 200 `{"status":"ok"}`, or 503 `{"status":"stale"}`: the status word and nothing else, so it says no task, setting or number to someone who is not signed in | GitHub `uptime.yml` every 3 hours, which reads the status code; you, with `curl` |
-| `GET /admin/health` | Admin only. The same status code with the detail: `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}`; `stale` names only the tasks that are late (`database` if the table could not be read, `storage` while full). The admin page shows the same under "Scheduled tasks, storage and sandbox" | you, signed in as an admin |
+| `GET /admin/health` | Admin only. The same status code with the detail: `{"status", "stale": ["backup"], "storage": {"stored_mb", "limit_mb", "full"}, "sandbox": {...}}`; `stale` names only the tasks that are late (`database` if the table could not be read, `storage` while full). The admin page shows the same under "Scheduled tasks, storage and sandbox", with the latest result and day of each daily canary (`canaries`; "Daily checks"), read from the day's counts | you, signed in as an admin |
 
-`/readyz` has three checks, each one word and never a setting's value (so no key, URL or
-model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
+`/readyz` has four checks, each one word and never a setting's value (so no key, URL or
+model name can leak): `database` (`ok`, `unreachable`), `database_write` (`ok`, or `failed`
+when a write that touches no data is not accepted within 1 second, as when another connection
+holds the write lock: pages that only read still work then), `worker` (`ok`; `disabled` when
 `RUN_WORKER=false`; `stopping` after SIGTERM; `stopped` if the thread died; `stalled` if
 neither the loop nor a running conversion has shown life for six minutes; `not_started`),
 `model_provider` (`ok`; `no_key` if the selected provider's key is empty; `unpriced_model`;
 `fake` with `FAKE_MODELS`). A spent daily cap is not "not ready": the service is working
 and says so on `/status`.
+
+**The worker as its own service (`WORKER_MODE=service`).** Off by default (`inline`: the web
+process runs the worker thread, and everything above is as it was). With `WORKER_MODE=service`
+on `web` and a `worker` service running `readablestem worker` (docs/deploy-railway.md, "The
+worker as its own service"):
+
+- The web process starts no worker, so an upload waits in the queue until the `worker` service
+  claims it (within `WORKER_POLL_S`, 2 seconds, since the web process cannot wake a worker that is
+  another process). With no `worker` service running, nothing converts: `/readyz` says
+  `"worker": "not_started"` (or `stopped` once the rows are old) and the job page keeps saying
+  "waiting".
+- The worker beats a row `worker.<slot>` of `ops_heartbeat` every 10 seconds for each of
+  `WORKER_SLOTS`, and the web process's `/readyz` and `/admin` read them. `worker` is `ok` when a
+  slot has beaten in the last 30 seconds and its loop is moving; `stalled` when the beating slots
+  have shown no life for six minutes (as inline); `stopping` after SIGTERM; `stopped` when every
+  row is older than 30 seconds (the process is gone or cannot write to the database);
+  `not_started` when there is no row. Any one healthy slot makes it `ok`.
+- `/status` and the job page's "AI service not answering" line read the row `provider` (the
+  worker's last requests, written with the beat); `/admin` and `/admin/health` show the sandbox
+  probe from the row `sandbox`, which the worker writes after it ran the probe at start-up (the
+  web process runs none). LaTeX source stays switched off in effect until that row says `pass`.
+- **Stopping.** SIGTERM or SIGINT: no new job is claimed, the running conversions are cancelled
+  and their leases end at once, and the process exits within 20 seconds (`DRAIN_S`; the host's
+  draining window must be longer, 30 on `worker`). The job goes back to the queue when a worker
+  next looks (the lease is already over), and runs again from its start: the attempt counts, and
+  three attempts end in `lease_expired`, as when the worker was a thread. A worker that is killed
+  instead leaves the job to the same rule when its lease (two minutes) runs out. Look for
+  `worker_service_started`, `worker_service_stopping`, `job_cancelled reason=shutdown` and
+  `worker_service_stopped`.
+- **Rolling back** is one setting: set `WORKER_MODE=inline` on `web` and redeploy it (the web
+  process runs its own worker again; stop or scale down the `worker` service so that it does not
+  keep claiming, though two claimers are safe). Nothing is migrated: the rows are ordinary rows of
+  `ops_heartbeat` and the table was there before.
+- Memory: a slot is a worker process of about 0.3 GB plus the conversion child it runs (0.4 to
+  0.9 GB, "The conversion child"), so allow 2 GB for one slot and 1 GB more for each further one.
+  The web service no longer holds conversion memory.
 
 `/healthz/ops` says the scheduled tasks ran. The `backup` service and `readablestem ops cron`
 each upsert one row of `ops_heartbeat` (name, `last_ok_at`, a short note of counts) when they
@@ -803,7 +910,7 @@ Nothing it prints is document content.
 | `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: the Postgres service's state and connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
 | `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs (a hung MuPDF no longer stalls the worker: its child is killed at the time limit) | The worker thread is stuck or dead; documents are queued but nothing converts. Redeploy the web service (`railway up --service web`, or Redeploy on its latest deployment) to replace the process; the running job's lease expires and it is requeued |
 | `/readyz` shows `model_provider: no_key` or `unpriced_model` | `ANTHROPIC_API_KEY` is set on the web service; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Set the variable and redeploy, or fix the model name |
-| Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
+| Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see a "Stopped early" note or "Waiting until 00:00 UTC", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |
 | The `cron` service's run failed, or `purge_backstop_deleted` in the web logs | The `cron` service's deployments list and logs; `@message:purge_backstop_deleted OR @message:aggregate_failed` | The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the cron anyway. `aggregate_failed` (with `error_type` and `stack`): the purge still ran, so fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
 | `/healthz/ops` is 503 naming `backup`, or no `backup_ok` line today | The `backup` service's latest deployment log: `backup_failed reason=...` ("Backups and restore") | Read the reason (a full `/backups` volume, a database that cannot be reached, a dump that was cut short or did not restore, a missing table). The previous good dump is kept until it ages out; fix it before then |

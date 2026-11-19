@@ -33,14 +33,23 @@ from __future__ import annotations
 import contextlib
 import logging
 import re
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from xml.etree.ElementTree import Element as XmlElement
 
 import defusedxml.ElementTree as SafeET
 import pymupdf
 
-from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, SourceFacts
-from readablestem.pipeline import layout, text_pass
+from readablestem.core.page_checks import make
+from readablestem.core.types import (
+    KEPT_ORIGINAL_STATUSES,
+    Element,
+    Fix,
+    Kind,
+    Notice,
+    SourceFacts,
+)
+from readablestem.pipeline import layout, page_type, text_pass
+from readablestem.pipeline.notices import CUT_OFF, REPAIRED
 
 log = logging.getLogger(__name__)
 
@@ -237,26 +246,44 @@ def _pictures(page) -> int:
     )
 
 
-def _bold_plain_letters(page, element: Element) -> int:
-    """Letters inside the equation's box that a bold font draws but the text layer
-    stores as plain characters."""
+def _bold_letters(page) -> list[tuple[float, float]]:
+    """Where a bold font draws a plain letter on the page, read once for all the page's
+    equations: the centre (x, y) of each letter."""
+    letters = []
+    for block in page.get_text(
+        "rawdict", flags=pymupdf.TEXTFLAGS_RAWDICT | page_type.actualtext_flag(page)
+    )["blocks"]:
+        for line in block.get("lines", ()):
+            for span in line.get("spans", ()):
+                if not _bold_span(span):
+                    continue
+                letters += [
+                    ((x0 + x1) / 2, (y0 + y1) / 2)
+                    for ch in span.get("chars", ())
+                    if _plain_letter(ch)
+                    for x0, y0, x1, y1 in (ch["bbox"],)
+                ]
+    return letters
+
+
+def _bold_span(span) -> bool:
+    font = str(span.get("font", "")).split("+", 1)[-1]
+    return bool(int(span.get("flags", 0)) & _BOLD_FLAG) or bool(layout._BOLD_FONT.search(font))
+
+
+def _plain_letter(ch) -> bool:
+    return ch.get("c", "").isascii() and ch.get("c", "").isalpha()
+
+
+def _bold_plain_letters(page, element: Element, letters: list[tuple[float, float]]) -> int:
+    """Letters in the equation's box that a bold font draws but the text layer stores as
+    plain characters. `letters`: `_bold_letters` of the page, so the page is read once for
+    all its equations (a clipped read per equation extracted the page again each time: 25 of
+    136 s on a 100-page maths document). A letter is in the box its centre is in."""
     rect = pymupdf.Rect(element.bbox)
     if page.rotation % 360:
         rect = rect * page.derotation_matrix  # element boxes are in the displayed frame
-    count = 0
-    for block in page.get_text("rawdict", clip=rect)["blocks"]:
-        for line in block.get("lines", ()):
-            for span in line.get("spans", ()):
-                font = str(span.get("font", "")).split("+", 1)[-1]
-                flags = int(span.get("flags", 0))
-                bold = bool(flags & _BOLD_FLAG) or bool(layout._BOLD_FONT.search(font))
-                if not bold:
-                    continue
-                count += sum(
-                    1 for ch in span.get("chars", ()) if ch.get("c", "").isascii()
-                    and ch.get("c", "").isalpha()
-                )  # fmt: skip
-    return count
+    return sum(1 for x, y in letters if rect.x0 <= x <= rect.x1 and rect.y0 <= y <= rect.y1)
 
 
 def _from_pdf(
@@ -285,10 +312,13 @@ def _from_pdf(
                 continue
             try:
                 page = doc[number]
+                page_type.turn_page(page)  # element boxes are in the turned frame
                 images += _pictures(page)
                 # Link annotations of any kind, counted as the text pass counts them.
                 links += text_pass.link_count(doc, [number])
-                bold += sum(_bold_plain_letters(page, e) for e in by_page.get(number, ()))
+                if equations_here := by_page.get(number):
+                    letters = _bold_letters(page)  # one read of the page for all of them
+                    bold += sum(_bold_plain_letters(page, e, letters) for e in equations_here)
             except Exception as exc:  # one unreadable page leaves the others counted
                 log.warning("source facts: a page could not be read: %s", type(exc).__name__)
         update |= {"images": images, "links": links, "bold_maths_letters": bold}
@@ -335,3 +365,65 @@ def measure(
             return _from_pdf(pdf_bytes, sorted(set(pages)), equations, facts)
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
+
+
+# --------------------------------------------------------------------------- repaired files
+
+
+def _repair_state(pdf_bytes: bytes) -> tuple[bool, int] | None:
+    """Whether MuPDF had to repair the file when it opened it, and its page count; None when
+    it cannot be opened (layout opened it, so this is not expected). Holds layout's lock and
+    quiets MuPDF's messages, like `measure`."""
+    lock = getattr(layout, "_LOCK", None)
+    with lock if lock is not None else contextlib.nullcontext():
+        pymupdf.TOOLS.mupdf_display_errors(False)
+        pymupdf.TOOLS.mupdf_display_warnings(False)
+        try:
+            doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+            try:
+                pages = doc.page_count  # counting the pages is what repairs a lost page tree
+                return bool(doc.is_repaired), pages
+            finally:
+                doc.close()
+        except Exception as exc:
+            log.warning("repair check: the PDF could not be opened: %s", type(exc).__name__)
+            return None
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
+
+
+def repair_notices(
+    pdf_bytes: bytes, page_types: Mapping[int, page_type.PageTypeResult]
+) -> list[Notice]:
+    """What a person must be told of a PDF that was repaired when it was opened (a download
+    that did not finish, a damaged cross-reference table), from the pages `page_type` found
+    empty (blank, nothing painted at all). A file that was not repaired raises nothing: a
+    blank page in a healthy file is normal.
+
+    - The file's last pages are empty and an earlier page has content: it looks cut off. One
+      `file_cut_off` notice, required: `page` is the first empty page (0-based) and `count`
+      how many there are, to the end of the file. The owner continues with the pages before
+      them or uploads a fresh copy.
+    - Otherwise a repaired file gets one `file_repaired` line, optional. That includes a file
+      with empty pages in the middle: MuPDF reads the pages after them, so the file is not
+      cut short, and a blank page there is as likely meant to be blank as one that lost its
+      content, which nothing in the file can tell apart.
+
+    Never raises: a file it cannot judge says nothing."""
+    try:
+        state = _repair_state(pdf_bytes)
+        if state is None or not state[0] or not page_types:
+            return []
+        empty = {
+            n for n, kind in page_types.items() if kind.kind == "blank" and "empty" in kind.reasons
+        }
+        last = state[1] - 1
+        end = last
+        while end in empty:
+            end -= 1
+        if end < last and any(n <= end and n not in empty for n in page_types):
+            return [make(CUT_OFF, page=end + 1, count=last - end)]
+        return [make(REPAIRED)]
+    except Exception as exc:  # a bug here must not cost the user a finished conversion
+        log.warning("repair check failed: %s", type(exc).__name__)
+        return []

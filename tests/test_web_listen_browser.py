@@ -26,6 +26,9 @@ sync_api = pytest.importorskip("playwright.sync_api")
 
 WIDE = {"width": 1280, "height": 900}
 NARROW = {"width": 320, "height": 640}
+# A laptop window at 200% and at 400% zoom: 1280x900 and 1280x900 CSS px divided by two or four.
+SHORT = {"width": 1280, "height": 450}
+TINY = {"width": 320, "height": 225}
 STRICT = {"moderate", "serious", "critical"}
 
 HTML = as_current(
@@ -34,7 +37,8 @@ HTML = as_current(
     '<math id="p1-e2"><mi>v</mi><mo>=</mo><mi>d</mi><mo>/</mo><mi>t</mi></math>.</p>'
     "<h2>Average speed</h2><p>It is distance over time.</p>"
     '<div class="equation" id="p1-e3"><math display="block"><mi>x</mi><mo>+</mo><mn>1</mn>'
-    "</math></div><ul><li>one</li><li>two</li></ul></main></body></html>"
+    "</math></div><ul><li>one</li><li>two</li></ul>"
+    '<hr role="doc-pagebreak" aria-label="Page 2" id="pg2"></main></body></html>'
 )
 
 # A speech engine that records what it is asked to say. `voices` is set per test; an
@@ -74,9 +78,17 @@ STUB = """
   };
 })();
 """
+# No voice is reported as on this device: one is a network voice by its name (Chrome's
+# "Google ..."), the others are what Firefox on Linux reports for speech-dispatcher voices.
 ONLINE_ONLY = (
-    "window.__voices = [{name: 'Cloud Voice', lang: 'en-US', localService: false, "
+    "window.__voices = [{name: 'Google US English', lang: 'en-US', localService: false, "
     "voiceURI: 'cloud', default: false}];\n"
+)
+NOT_KNOWN = (  # 14,805 of them, as speech-dispatcher gives Firefox on Linux
+    "window.__voices = ['english-us', 'english_rp', 'en-us+Annie', 'german']"
+    ".concat(Array.from({length: 14801}, (_, i) => 'en-us+variant' + i)).map((name, i) => "
+    "({name, lang: name.startsWith('german') ? 'de' : 'en-US', localService: false, "
+    "voiceURI: name, default: i === 0}));\n"
 )
 
 
@@ -155,21 +167,21 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
     assert play.inner_text() == "Play" and stop.is_disabled()
 
-    play.click()  # Play starts at the lesson, past the title and the language
-    assert spoken(page) == ["Main landmark"]
+    play.click()  # Play starts at the lesson, past the title, the language and the bare landmark
+    assert spoken(page) == ["Heading level 1: Kinematics"]
     assert page.locator(".listen-item.is-current").count() == 1
-    assert "Main landmark" in current(page)
+    assert "Kinematics" in current(page)
     assert page.locator(".listen-item.is-current").get_attribute("aria-current") == "true"
     assert status(page) == "Playing."
     assert play.inner_text() == "Pause"  # one button plays and pauses
     assert page.evaluate("window.__spoken[0].voice") == "Local Voice"
 
     page.evaluate("window.__end()")  # the voice finishes an item: the next is spoken
-    assert spoken(page)[1] == "Heading level 1: Kinematics"
+    assert spoken(page)[1] == "The speed is v equals d over t."
 
     page.get_by_role("button", name="Next", exact=True).click()
-    assert spoken(page)[-1].startswith("The speed is")
-    assert "Item 5 of" in page.locator("[data-listen-position]").inner_text()
+    assert spoken(page)[-1] == "Heading level 2: Average speed"
+    assert "Item 6 of" in page.locator("[data-listen-position]").inner_text()
 
     play.click()  # Pause
     assert page.evaluate("window.__paused") is True
@@ -179,17 +191,23 @@ def test_play_pause_next_and_stop_work_with_a_stubbed_voice(site, browser, job):
     assert page.evaluate("window.__paused") is False
     assert status(page) == "Playing."
 
-    page.get_by_role("button", name="Next heading").click()
-    assert spoken(page)[-1] == "Heading level 2: Average speed"
     page.get_by_role("button", name="Previous", exact=True).click()
     assert "The speed is v equals d over t." in spoken(page)[-1]
+    page.get_by_role("button", name="Next heading").click()
+    assert spoken(page)[-1] == "Heading level 2: Average speed"
     page.get_by_role("button", name="Next equation").click()
     assert spoken(page)[-1] == "Equation: x plus 1"
 
-    stop.click()
+    where = current(page)
+    stop.click()  # Stop keeps the place; Play says where it will start and starts there
     assert status(page) == "Stopped."
-    assert page.locator(".listen-item.is-current").count() == 0
-    assert stop.is_disabled() and play.is_enabled() and play.inner_text() == "Play"
+    assert current(page) == where and stop.is_disabled() and play.is_enabled()
+    assert play.inner_text() == "Resume from item 8 of 12"
+    play.click()
+    assert spoken(page)[-1] == "Equation: x plus 1"
+    stop.click()
+    page.get_by_role("button", name="Play from the beginning").click()  # the restart
+    assert spoken(page)[-1] == "Page title: Kinematics notes"
     context.close()
 
 
@@ -211,8 +229,13 @@ def test_keyboard_shortcuts_work_inside_the_page_and_ignore_modifiers(site, brow
     page.keyboard.press("s")
     assert status(page) == "Stopped."
     page.get_by_label("Speed").focus()
+    place = current(page)
     page.keyboard.press("h")  # in a menu the letter selects, it is not a command
-    assert page.locator(".listen-item.is-current").count() == 0
+    assert current(page) == place
+    page.get_by_label("Keyboard shortcuts").uncheck()
+    page.locator("[data-listen=play]").focus()
+    page.keyboard.press("h")  # switched off: the letter does nothing
+    assert current(page) == place
     context.close()
 
 
@@ -232,6 +255,79 @@ def test_a_screen_reader_user_is_not_interrupted(site, browser, job):
     context.close()
 
 
+def test_the_place_and_settings_come_back_and_hold_no_text(site, browser, job):
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.evaluate("document.querySelectorAll('.listen-more').forEach(d => d.open = true)")
+    page.get_by_label("Speed").select_option("1.5")
+    page.get_by_label("Voice").select_option("cloud")
+    # A click on an item and a Pages link in the index each set the place; nothing is spoken.
+    page.locator("#item-9").click()
+    assert "Item 9 of 12" in page.locator("[data-listen-position]").inner_text()
+    page.locator(".listen-index").evaluate("d => d.open = true")
+    page.get_by_role("link", name="Page 2").click()
+    assert current(page).startswith("Page break")
+    assert spoken(page) == []
+    page.reload()  # a return visit offers the place and plays from it, with speed and voice kept
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    play = page.locator("[data-listen=play]")
+    assert play.inner_text() == "Resume from item 12 of 12"
+    assert page.get_by_label("Speed").input_value() == "1.5"
+    play.click()  # the chosen voice is not on this device: the first Play of a visit asks
+    assert spoken(page) == []
+    play.click()
+    assert page.evaluate("window.__spoken[0].voice") == "Cloud Voice"
+    assert page.evaluate("window.__spoken[0].rate") == 1.5
+    assert spoken(page)[0].startswith("Page break")
+    stored = page.evaluate("JSON.stringify(Object.assign({}, localStorage))")
+    for word in ("Kinematics", "speed", "distance", "Average", "equals"):
+        assert word not in stored  # ids and settings only, never the document's words
+
+    # A place whose id is gone (the document changed) falls back to the nearest earlier item
+    # that still exists, and a document with no place at all starts at the lesson.
+    key = page.evaluate(
+        "Object.keys(localStorage).find(k => k.includes(':') && !k.endsWith('places'))"
+    )
+    page.evaluate(
+        "([k, v]) => localStorage.setItem(k, v)",
+        [key, '{"at": "gone", "back": ["gone2", "p1-e3"]}'],
+    )
+    page.reload()
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    assert page.locator("[data-listen=play]").inner_text() == "Resume from item 8 of 12"
+    # Places of other documents do not pile up: twenty are kept, the oldest dropped.
+    page.evaluate(
+        """() => {
+          const keys = [];
+          for (let n = 0; n < 25; n += 1) {
+            keys.push('readablestem.listen:doc' + n + ':1');
+            localStorage.setItem(keys[n], '{"at": "x"}');
+          }
+          localStorage.setItem('readablestem.listen:places', JSON.stringify({keys}));
+        }"""
+    )
+    page.locator("#item-9").click()
+    kept = page.evaluate("Object.keys(localStorage).filter(k => k.includes('doc'))")
+    assert len(kept) == 19 and "readablestem.listen:doc0:1" not in kept
+    page.evaluate("localStorage.clear()")
+    page.reload()
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    assert page.locator("[data-listen=play]").inner_text() == "Play"
+    context.close()
+
+
+def test_a_browser_that_blocks_storage_still_plays(site, browser, job):
+    blocked = (
+        "Object.defineProperty(window, 'localStorage', "
+        "{get() { throw new Error('blocked'); }, configurable: true});\n"
+    )
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=blocked + STUB)
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    page.locator("[data-listen=play]").click()
+    assert spoken(page) == ["Heading level 1: Kinematics"]
+    context.close()
+
+
 def test_scrolling_follows_prefers_reduced_motion(site, browser, job):
     for reduce, expected in (("reduce", "auto"), ("no-preference", "smooth")):
         context, page = open_listen(browser, site, f"/jobs/{job}/listen", reduced_motion=reduce)
@@ -242,24 +338,34 @@ def test_scrolling_follows_prefers_reduced_motion(site, browser, job):
         context.close()
 
 
-def test_online_voices_alone_need_an_explicit_choice(site, browser, job):
-    context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=ONLINE_ONLY + STUB)
+@pytest.mark.parametrize("voices", [ONLINE_ONLY, NOT_KNOWN], ids=["online", "not-known"])
+def test_play_is_never_off_for_the_voice_class_and_asks_once_for_a_voice_off_the_device(
+    site, browser, job, voices
+):
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen", init=voices + STUB)
     page.wait_for_selector("[data-listen-transport]:not([hidden])")
-    # The explanation is beside Play, with the controls still folded away.
     note = page.locator("[data-listen-voice-note]")
-    assert "Only online voices" in note.inner_text()
-    assert note.is_visible() and not page.locator(".listen-more").evaluate("d => d.open")
     play = page.locator("[data-listen=play]")
-    assert play.is_disabled()
-    assert page.get_by_role("button", name="Next", exact=True).is_disabled()
-    assert spoken(page) == []
+    assert play.is_enabled() and play.get_attribute("aria-disabled") is None
+    assert page.get_by_role("button", name="Next", exact=True).is_enabled()
+    play.click()  # the first press asks, in words, and speaks nothing
+    assert spoken(page) == [] and note.is_visible()
+    words = note.inner_text()
+    assert ("send the text" in words) == (voices == ONLINE_ONLY)  # a voice not known is no claim
+    if voices == NOT_KNOWN:
+        assert "does not tell this page whether this voice runs on this device" in words
+        assert "send" not in words.lower() and "online" not in words.lower()
     note.get_by_role("button", name="Choose a voice").click()  # opens the voice menu
-    assert page.locator(".listen-more").evaluate("d => d.open")
     assert page.evaluate("document.activeElement.id") == "listen-voice"
-    page.get_by_label("Voice").select_option("cloud")
-    assert "Online voice" in note.inner_text()
+    page.get_by_role("button", name="Next", exact=True).click()  # no other button answers it
+    assert spoken(page) == []
+    play.click()  # the second press of Play is the answer
+    assert page.evaluate("window.__spoken.length") == 1
+    assert page.evaluate("window.__spoken[0].voice") in {"Google US English", "english-us"}
+    play.click()  # paused: no second question this visit
+    page.locator("[data-listen=stop]").click()
     play.click()
-    assert page.evaluate("window.__spoken[0].voice") == "Cloud Voice"
+    assert page.evaluate("window.__spoken.length") == 2
     context.close()
 
 
@@ -311,8 +417,12 @@ def test_hear_this_on_the_review_screen_plays_the_proposal_then_the_pdf(site, br
     context.close()
 
 
-@pytest.mark.parametrize("viewport", [WIDE, NARROW], ids=["1280", "320"])
-@pytest.mark.parametrize("where", ["job", "demo", "review", "landing"])
+@pytest.mark.parametrize(
+    "viewport, where",
+    [(v, w) for v in (WIDE, NARROW) for w in ("job", "demo", "review", "landing")]
+    + [(v, w) for v in (SHORT, TINY) for w in ("job", "demo")],
+    ids=lambda p: f"{p['width']}x{p['height']}" if isinstance(p, dict) else p,
+)
 def test_the_pages_pass_axe(site, browser, job, axe_source, where, viewport):
     path = {
         "job": f"/jobs/{job}/listen",
@@ -359,4 +469,66 @@ def test_the_scroll_offset_follows_the_real_height_of_the_transport(site, browse
     page.wait_for_timeout(300)
     top = page.locator("#item-6").evaluate("e => e.getBoundingClientRect().top")
     assert top >= height - 1
+    context.close()
+
+
+def test_a_wide_window_shows_the_selected_equation_without_stealing_focus(site, browser, job):
+    """F-465: the second column draws the selected item, is hidden from assistive technology,
+    never takes focus and is not a live region; each item links to its student page place."""
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen")
+    page.wait_for_selector("[data-listen-controls]:not([hidden])")
+    panel = page.locator("[data-listen-thing-panel]")
+    assert panel.get_attribute("aria-hidden") == "true" and panel.get_attribute("aria-live") is None
+    assert not panel.is_visible()  # nothing selected yet
+    page.locator('[data-listen-id="p1-e3"] .listen-text').click()
+    assert panel.is_visible() and panel.locator("math").count() == 1
+    assert page.evaluate("document.activeElement.closest('[data-listen-thing-panel]')") is None
+    assert page.evaluate("document.activeElement.tagName") in {"MAIN", "BODY"}  # not the panel
+    link = page.locator('[data-listen-id="p1-e3"] a.listen-place')
+    assert link.get_attribute("href") == f"/jobs/{job}/view#p1-e3"
+    page.locator('.listen-item[data-kinds^="heading"] .listen-text').first.click()  # no thing
+    assert not panel.is_visible()
+    page.set_viewport_size(NARROW)
+    page.locator('[data-listen-id="p1-e3"] .listen-text').click()
+    assert not panel.is_visible()  # a narrow window has the transcript alone
+    context.close()
+
+
+@pytest.mark.parametrize("viewport", [SHORT, TINY], ids=["1280x450", "320x225"])
+def test_the_transport_stays_in_view_in_a_short_window(site, browser, job, viewport):
+    """F-461: at 200% and 400% zoom the window is a few hundred CSS px tall. After ten items the
+    transport (Play or Pause, Previous, Next, the place) is still inside the window, one
+    compact row of at most a third of it, with no sideways scroll, controls of at least 24 px,
+    and an item the reader tabs to is not under it."""
+    context, page = open_listen(browser, site, f"/jobs/{job}/listen", reduced_motion="reduce")
+    page.set_viewport_size(viewport)
+    page.wait_for_selector("[data-listen-transport]:not([hidden])")
+    page.evaluate(
+        "document.querySelectorAll('.listen-item').forEach(e => { e.style.minHeight = '7rem'; })"
+    )  # a real document is long
+    for _ in range(10):
+        page.get_by_role("button", name="Next", exact=True).click()
+    page.wait_for_timeout(800)
+    bar = page.get_by_role("group", name="Play it").bounding_box()
+    assert bar and bar["y"] >= 0 and bar["y"] + bar["height"] <= viewport["height"]
+    assert bar["height"] <= viewport["height"] / 3
+    assert page.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    for control in ("play", "prev", "next"):
+        box = page.locator(f"[data-listen={control}]").bounding_box()
+        assert (
+            box
+            and box["width"] >= 24
+            and box["height"] >= 24
+            and box["x"] + box["width"] <= viewport["width"]
+        )
+    assert "Item 12 of 12" in page.locator("[data-listen-position]").inner_text()
+    # A link that sits under the row is brought down below it when the browser scrolls it into
+    # view (a Tab, a hash): WCAG 2.4.11, focus is never hidden by sticky content.
+    top = page.evaluate(
+        "(() => { const a = document.querySelectorAll('a.listen-place')[5];"
+        "window.scrollBy(0, a.getBoundingClientRect().top - 5);"
+        "a.scrollIntoView({block: 'nearest', behavior: 'instant'});"
+        "return a.getBoundingClientRect().top; })()"
+    )
+    assert top >= bar["y"] + bar["height"] - 1
     context.close()

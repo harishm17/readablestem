@@ -4,8 +4,8 @@ conversion child, the step cache, the progress events and the spend accounting a
 PDF uses.
 
 1. The upload is unpacked into a private temporary folder (`web.archive_intake`: every limit
-   applies again here, in the process that works on the bytes), linted and its main file found
-   (`source.intake`).
+   applies again here, in the process that works on the bytes), linted, its main file found
+   and its class and packages checked against `source.support` (`source.intake`).
 2. LaTeXML runs on it inside the sandbox (`source.latexml`, `core.sandbox`): no network, a
    minimal root, the project read-only, time, memory and output caps.
 3. What LaTeXML said is read from its messages before the temporary folder goes
@@ -27,15 +27,18 @@ from __future__ import annotations
 import logging
 import tempfile
 import time
+import zipfile
 from collections import Counter
 from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from functools import partial
 from pathlib import Path
 from typing import Any, Literal
 
 from readablestem.config import Settings
-from readablestem.core import sandbox
+from readablestem.core import sandbox, triage
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     ConversionOptions,
     ConversionOutput,
@@ -47,7 +50,7 @@ from readablestem.core.types import (
     SourceReport,
 )
 from readablestem.models.base import VisionClient
-from readablestem.pipeline import assemble, html_checks, step_facts
+from readablestem.pipeline import assemble, decoration, html_checks, step_facts, text_pass
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline import options as run_options
 from readablestem.pipeline import run as pipeline
@@ -62,10 +65,11 @@ log = logging.getLogger(__name__)
 FAILURE_CODES = {
     "source_unavailable",  # no sandbox or no LaTeXML on this machine
     "source_busy",  # the machine had no room for the conversion's tasks right now
-    "source_failed",  # LaTeXML did not produce a document
+    "source_failed",  # LaTeXML (or pandoc, for a Word file) did not produce a document
     "source_unreadable",  # it did, and it is not usable
     "source_refused",  # the source is not allowed (the child checks again)
-    "timeout",
+    "timeout",  # it waited too long for another conversion's turn: worth trying again
+    "source_timeout",  # the program ran out of time on this source: trying again will not help
     *source_report.STOP_CODES,  # it would lose content outside a formula
 }
 
@@ -139,7 +143,8 @@ class _SourceRun(pipeline._Run):
 def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, bool, set[str]]:
     """Unpack the upload under `tmp/project` and return it, the main file's path, whether it
     is a Beamer deck and the packages its files load. The same checks as the web process made:
-    the zip limits, the lint, the main file."""
+    the zip limits, the lint, the main file, and a class or package refused by name
+    (`intake.check_support`), which fails with the code and the name the upload page gives."""
     try:
         kind, hint, data = intake.unwrap(blob)
     except intake.EnvelopeError:
@@ -154,6 +159,12 @@ def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, boo
             if lint.problem(text) is not None:
                 raise SourceFailed("source_refused")
         main = intake.find_main(texts, hint)
+        try:
+            intake.check_support(texts, main)
+        except intake.SourceRefused as refused:  # named, like the stop LaTeXML's errors make
+            key = "class" if refused.code == "source_unsupported_class" else "package"
+            detail: dict[str, object] = {"items": [], "more": 0, key: refused.name}
+            raise SourceFailed(refused.code, detail) from None
         beamer = intake._is_beamer(texts[main])
         if beamer and not beamer_ok:
             raise SourceFailed("source_refused")
@@ -181,8 +192,8 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
         raise SourceFailed("timeout") from None
     except (sandbox.SandboxUnavailable, OSError):
         raise SourceFailed("source_unavailable") from None
-    if outcome.timed_out:
-        raise SourceFailed("timeout")
+    if outcome.timed_out:  # the program hit its own limit: a macro that calls itself, say
+        raise SourceFailed("source_timeout")
     if outcome.busy:
         raise SourceFailed("source_busy")
     document = out / latexml.DOC_PATH
@@ -191,6 +202,44 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
     if document.stat().st_size > ltx_reader.MAX_XHTML_BYTES:
         raise SourceFailed("source_failed")
     return document.read_bytes()
+
+
+def _read_word(blob: bytes) -> ltx_reader.Reading:
+    """The reading of a Word file (envelope kind "docx"): the gate again (the web process's
+    answer is not trusted here), the working copy, pandoc in the sandbox, then the reader.
+    `SourceFailed` with the codes of a LaTeX source: nothing partial is kept."""
+    from readablestem.source import docx_package, docx_reader
+    from readablestem.source import pandoc as pandoc_step
+    from readablestem.web.office_convert import OfficeRejected
+
+    try:
+        data = intake.unwrap(blob)[2]
+        prepared = docx_package.prepare(data)
+    except (intake.EnvelopeError, OfficeRejected):
+        raise SourceFailed("source_refused") from None
+    except (OSError, ValueError, zipfile.BadZipFile):
+        raise SourceFailed("source_unreadable") from None
+    try:
+        with sandbox.exclusive(GATE_NAME, GATE_WAIT_S):  # one source program at a time
+            result = pandoc_step.read("docx", prepared.working)
+    except TimeoutError:
+        raise SourceFailed("timeout") from None
+    except (sandbox.SandboxUnavailable, OSError):
+        raise SourceFailed("source_unavailable") from None
+    if result.tree is None:
+        if result.timed_out:
+            raise SourceFailed("source_timeout")
+        code = {
+            pandoc_step.NO_PANDOC: "source_unavailable",
+            pandoc_step.NO_SANDBOX: "source_unavailable",
+            pandoc_step.BUSY: "source_busy",
+        }
+        raise SourceFailed(code.get(result.failure, "source_failed"))
+    try:
+        reading, _ = docx_reader.read(prepared, result.tree)
+    except docx_reader.ReadError:
+        raise SourceFailed("source_unreadable") from None
+    return reading
 
 
 def _stop_if_lost(report: SourceReport, *, beamer: bool) -> None:
@@ -264,6 +313,28 @@ def _convert(
     watch = step_facts.Stopwatch()
     watch.stage("source")  # LaTeXML in its sandbox, then reading what it wrote
     pipeline._send(stage_progress, "layout")
+    finish = partial(
+        _finish,
+        started=started,
+        watch=watch,
+        settings=settings,
+        client=client,
+        progress=progress,
+        tracer=tracer,
+        concurrency=concurrency,
+        notice=notice,
+        source_note=source_note,
+        options=options,
+        stage_progress=stage_progress,
+        step_cache=step_cache,
+        call_observer=call_observer,
+    )
+    try:
+        kind = intake.unwrap(blob)[0]
+    except intake.EnvelopeError:
+        raise SourceFailed("source_refused") from None
+    if kind == "docx":  # a Word file: read from the file itself, with no LaTeXML
+        return finish(_read_word(blob), origin="docx", report=None)
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
         project, main, beamer, loaded = _project(
@@ -282,32 +353,31 @@ def _convert(
         report = source_report.parse(out, project=project, loaded=loaded)
         try:
             xml = out / latexml.XML_PATH
-            graphics = ltx_reader.graphics_of(xml.read_bytes()) if xml.is_file() else {}
+            graphics = ltx_reader.graphics_of(xml.read_bytes(), project) if xml.is_file() else {}
             reading = ltx_reader.read(xhtml, project, graphics, beamer=beamer)
         except ltx_reader.ReadError:
             _stop_if_lost(report, beamer=beamer)
             raise SourceFailed("source_unreadable") from None
     report = source_report.with_marks(report, reading.marks, reading.error_nodes)
     report.figures = list(reading.figures)
+    report.unread_words = reading.unread_words
+    report.unread_pictures = reading.unread_pictures
+    report.unread_start = reading.unread_start
     _stop_if_lost(report, beamer=beamer)
-    return _finish(
-        reading,
-        started=started,
-        watch=watch,
-        settings=settings,
-        client=client,
-        progress=progress,
-        tracer=tracer,
-        concurrency=concurrency,
-        notice=notice,
-        source_note=source_note,
-        options=options,
-        stage_progress=stage_progress,
-        step_cache=step_cache,
-        call_observer=call_observer,
-        origin="beamer" if beamer else "latex",
-        report=report,
-    )
+    return finish(reading, origin="beamer" if beamer else "latex", report=report)
+
+
+def _source_lines(report: SourceReport | None) -> list[Notice]:
+    """The lines a source job has beyond its reader's own (`source_error`, `source_unread`): what
+    LaTeX reported that the reader could not place, the pictures it could not find, and, for
+    every source, that no compile witness ran (nothing compiles a source in a job yet, so the
+    line is unconditional: the day a witness runs, it is made only when none did)."""
+    found = [make("source_not_compared")]
+    if report is not None and report.unplaced_errors:
+        found.append(make("source_unplaced", count=report.unplaced_errors))
+    if report is not None and report.figures:
+        found.append(make("source_figure_missing", count=len(report.figures)))
+    return found
 
 
 def _finish(
@@ -326,13 +396,26 @@ def _finish(
     stage_progress: pipeline.StageProgressFn | None,
     step_cache: pipeline.StepCache | None,
     call_observer: Callable[[ModelCall], None] | None,
-    origin: Literal["latex", "beamer"] = "latex",
+    origin: Literal["latex", "beamer", "docx"] = "latex",
     report: SourceReport | None = None,
 ) -> ConversionOutput:
     """From a reading to a stored result: the figure steps, the assembler, the checks."""
-    elements = sorted(reading.elements, key=lambda e: e.order)
+    # Addresses typed with no link, and references by number ("Figure 2", "Section 3"), get the
+    # links the PDF text pass gives them; the links the file has are kept as they are.
+    elements = text_pass.source_links(
+        sorted(reading.elements, key=lambda e: e.order), reading.printed
+    )
     for element in elements:  # a source has no pages to number (the reading's are estimates)
         element.page = 0
+    # Struck text (`\\sout`) is written with CONTENT_RUNS (on by default); off, it is counted,
+    # as the PDF text pass counts it (`text_pass.apply`).
+    struck = sum(r.kind == "deleted" for e in elements for r in e.runs)
+    with pipeline._span(tracer, "runs", deleted_runs=struck, written=options.content_runs):
+        if not options.content_runs and struck:
+            elements = [
+                e.model_copy(update={"runs": [r for r in e.runs if r.kind != "deleted"]})
+                for e in elements
+            ]
     page_list = [0]
     counts = Counter(e.kind.value for e in elements)
     pipeline._send(stage_progress, "layout", 1, 1, dict(counts))
@@ -362,12 +445,18 @@ def _finish(
         run.collect(block=True)
     finally:
         run.pool.shutdown(wait=True, cancel_futures=True)
+    decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)  # WS6.4
+    for element_id in reading.unread_formulas:  # a figure step's fix holds the decision too
+        if element_id in run.fixes:
+            run.fixes[element_id] = ltx_reader.needs_decision(
+                run.fixes[element_id], ltx_reader.FORMULA_UNREAD
+            )
     watch.stage("assemble")
     ordered = pipeline._ordered_fixes(elements, run.fixes)
     pipeline._send(stage_progress, "assemble")
     html = assemble.render_html(
         title=reading.title,
-        lang=reading.lang,
+        lang=options.language or reading.lang,
         elements=elements,
         fixes=ordered,
         crops=run.crops,
@@ -375,6 +464,7 @@ def _finish(
         notice=notice,
         math_alttext=settings.mathml_alttext,
         origin=origin,
+        unread=(reading.unread_words, reading.unread_pictures),
     )
     pipeline._send(stage_progress, "checks")
     watch.stage("checks")
@@ -386,10 +476,13 @@ def _finish(
         step_facts.capped(ordered),
     )
     wall_ms = round((time.perf_counter() - started) * 1000)
+    triage.stamp(ordered)  # the risk band each decision was asked at
     stats = pipeline._stats(page_list, elements, ordered, run.page_ms, wall_ms)
-    derived = notice_rules.from_fixes(
-        elements, ordered, long_descriptions=options.long_descriptions
-    )
+    derived = [
+        *notice_rules.from_fixes(elements, ordered, long_descriptions=options.long_descriptions),
+        *notice_rules.from_runs(elements),
+        *_source_lines(report),
+    ]
     notices: list[Notice] = notice_rules.ordered(
         notice_rules.merge(derived, reading.notices), elements
     )
@@ -397,7 +490,7 @@ def _finish(
         pipeline_version=pipeline.PIPELINE_VERSION,
         prompt_versions=pipeline._prompt_versions(ordered),
         title=reading.title,
-        lang=reading.lang,
+        lang=options.language or reading.lang,
         elements=elements,
         fixes=ordered,
         stats=stats,
@@ -405,7 +498,7 @@ def _finish(
         stopped_by=run.stop.reason() if run.stop.scope is not None else None,
         html_checks=checks,
         notices=notices,
-        lang_source="default",
+        lang_source="user" if options.language else "default",
         origin=origin,
         source_report=report,
     )

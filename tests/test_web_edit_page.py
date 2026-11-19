@@ -9,6 +9,7 @@ review's version guard and can be undone.
 
 from __future__ import annotations
 
+import dataclasses
 import re
 from html import unescape
 
@@ -23,11 +24,15 @@ from readablestem.core.types import (
     Element,
     Kind,
     Link,
+    Run,
     Status,
 )
 from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step
 from readablestem.web import page_edits, reread
+from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, session_scope
+from readablestem.web.quota import rereads_used
 
 PARAGRAPH = "p1-e1"  # "A rigid body turning with angular velocity ⟦p1-e2⟧ moves a point ..."
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."
@@ -108,7 +113,10 @@ def test_changing_the_words_keeps_the_equation_where_it_is(edits):
 
 def test_an_equation_may_not_be_left_out_or_repeated_or_invented(edits):
     for typed, problem in [
-        ("A rigid body turning with angular velocity omega moves a point.", "not at all"),
+        (
+            "A rigid body turning with angular velocity omega moves a point.",
+            "Keep the mark [equation 1] in the text, or remove the equation as well.",
+        ),
         ("It is [equation 1] and [equation 1] again.", "twice"),
         ("Angular velocity [equation 1] and ⟦p1-e5⟧ here.", "tool's own"),
     ]:
@@ -165,6 +173,12 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         Link(kind="uri", start=start, end=start + 5, href="https://example.org/notes"),
         Link(kind="uri", start=0, end=7, href="https://example.org/discuss"),
     ]
+    struck = paragraph.text.index("scalars")  # struck through on the page (F-509)
+    bold = paragraph.text.index("vectors")  # set in bold on the page (F-510)
+    paragraph.runs = [
+        Run(start=bold, end=bold + 7, kind="strong"),
+        Run(start=struck, end=struck + 7, kind="deleted"),
+    ]
     env = WebEnv(tmp_path)
     env.converter.output = output
     with env.running() as client:
@@ -186,11 +200,60 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         assert [k.href for k in kept.links] == ["https://example.org/notes"]
         page = client.get(f"/jobs/{env.job_id}/review?page=1&tools=1").text
         assert "1 link was taken off" in unescape(page)
-        # The words of a link changed: that link goes.
-        done = edit_post(
-            env, PLAIN, action="text", text=(kept.text or "").replace("notes", "pages")
-        )
-        assert done.status_code == 303 and element(env, PLAIN).links == []
+        # The bold word and the struck word did not change: still marked, where they now are.
+        text = kept.text or ""
+        assert [(r.kind, text[r.start : r.end]) for r in kept.runs] == [
+            ("strong", "vectors"),
+            ("deleted", "scalars"),
+        ]
+        # The words of a link and the struck word changed: both go, and both are counted. The
+        # bold word is only the look of words that did not change, and stays.
+        changed = text.replace("notes", "pages").replace("scalars", "numbers")
+        done = edit_post(env, PLAIN, action="text", text=changed)
+        assert done.status_code == 303
+        after = element(env, PLAIN)
+        assert after.links == [] and [r.kind for r in after.runs] == ["strong"]
+        page = client.get(f"/jobs/{env.job_id}/review?page=1&tools=1").text
+        assert "1 link and 1 struck-text mark were taken off" in unescape(page)
+
+
+def test_a_kept_line_end_is_written_as_br_and_moves_with_its_words(tmp_path):
+    output = edit_output()
+    paragraph = next(e for e in output.result.elements if e.id == PLAIN)
+    paragraph.text = "Discuss vectors and scalars with the class"
+    first = paragraph.text.index(" vectors")
+    second = paragraph.text.index(" with")
+    paragraph.runs = [
+        Run(start=first, end=first + 1, kind="break"),
+        Run(start=second, end=second + 1, kind="break"),
+    ]
+    older = output.result.elements[0]  # a stored element that has no runs at all
+    assert not older.runs
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        html = with_file(env).html or ""
+        assert "Discuss<br>vectors and scalars<br>with the class" in html
+        assert "<br>" not in html.split("Discuss<br>")[0]  # the older elements: no line ends
+        # The words before the first line end change: both line ends stay at their spaces.
+        done = edit_post(env, PLAIN, action="text", text=paragraph.text.replace("Discuss", "Talk"))
+        assert done.status_code == 303
+        kept = element(env, PLAIN)
+        assert [(kept.text or "")[r.start : r.end] for r in kept.runs if r.kind == "break"] == [
+            " ",
+            " ",
+        ]
+        assert "Talk<br>vectors and scalars<br>with the class" in (with_file(env).html or "")
+        # The space that holds a line end is taken out: that line end goes, the other stays.
+        done = edit_post(env, PLAIN, action="text", text="Talkvectors and scalars with the class")
+        assert done.status_code == 303
+        assert len([r for r in element(env, PLAIN).runs if r.kind == "break"]) == 1
+        assert (with_file(env).html or "").count("<br>") == 1
 
 
 def test_a_glossary_entry_loses_its_term_when_the_term_is_changed(edits):
@@ -211,6 +274,14 @@ def test_unknown_element_or_action_is_not_found(edits):
     assert edit_post(edits, "p9-e9", action="text", text="x").status_code == 404
     assert edit_post(edits, PLAIN, action="delete", text="x").status_code == 404
     assert edit_post(edits, "p1-e2", action="text", text="x").status_code == 422  # an equation
+
+
+def test_the_notice_after_a_text_edit_names_the_edit_and_its_undo_says_change(edits):
+    done = edit_post(edits, PLAIN, action="text", text="Something else entirely.")
+    page = edits.browser.get(done.headers["location"]).text
+    notice = text_of(page.split('id="decision-notice"')[1].split("</div>")[0])
+    assert "The text was changed." in notice and "All decisions made" not in notice
+    assert "Undo this change" in notice and "this decision" not in notice
 
 
 def test_undo_gives_the_words_back(edits):
@@ -334,6 +405,36 @@ def test_a_region_off_the_page_or_too_small_is_refused(edits):
     assert not any(e.id.startswith("p1-x") for e in stored(edits).elements)
 
 
+def test_a_region_given_by_two_lines_is_the_box_the_four_numbers_for_it_would_make(edits):
+    path = f"/jobs/{edits.job_id}/review"
+    # The lines are offered by their first words, with both ends of the page.
+    first = edits.browser.get(path, params={"page": 1, "tools": 1, "add": "picture"})
+    assert "Discuss vectors and scalars with the class." in first.text
+    assert "The top of the page" in first.text and "The bottom of the page" in first.text
+    page = edits.browser.get(
+        path,
+        params={"page": 1, "tools": 1, "add": "picture", "after": PLAIN, "before": "p1-e7"}
+        | {"left": "1", "top": "2", "right": "3", "bottom": "4"},  # the lines win over these
+    )
+    assert page.status_code == 200
+    query = re.search(r"region\.png\?([^\"]+)\"", page.text)
+    assert query is not None
+    edges = dict(pair.split("=") for pair in unescape(query.group(1)).split("&"))
+    above, below = element(edits, PLAIN).bbox, element(edits, "p1-e7").bbox
+    assert float(edges["top"]) >= 100 * above[3] / 792
+    assert float(edges["bottom"]) <= 100 * below[1] / 792
+    response = add_post(edits, "picture", alt="A sketch of a cart on a ramp.", **edges)
+    assert response.status_code == 303
+    added = element(edits, "p1-x1")
+    assert added.bbox == page_edits.region_box(
+        (612.0, 792.0), edges["left"], edges["top"], edges["right"], edges["bottom"], "region"
+    )
+    assert above[3] <= added.bbox[1] and added.bbox[3] <= below[1]
+    # One line alone says what is missing.
+    alone = edits.browser.get(path, params={"page": 1, "add": "picture", "after": PLAIN})
+    assert "Choose both lines" in alone.text and "region.png" not in alone.text
+
+
 def test_the_most_that_can_be_added_is_limited(edits):
     for n in range(page_edits.MAX_ADDED):
         assert (
@@ -357,6 +458,8 @@ def test_the_stale_form_adds_nothing(edits):
     response = edits.browser.post(f"/jobs/{edits.job_id}/pages/1/add", data=data)
     assert response.status_code == 303
     assert not any(e.id.startswith("p1-x") for e in stored(edits).elements)
+    landed = unescape(edits.browser.get(response.headers["location"]).text)
+    assert "Nothing was changed" in landed and "make the change again" in landed  # a next step
 
 
 # --------------------------------------------------------------------------- equations
@@ -389,6 +492,37 @@ def test_an_equation_read_is_refused_when_the_document_has_used_its_allowance(tm
         assert "This document has used its allowance" in unescape(response.text)
         assert not any(e.id == "p1-x1" for e in stored(env).elements)
         assert env.job(env.job_id).cost_usd == pytest.approx(0.01, abs=1e-9)  # the conversion's
+
+
+def _rereads_today(env) -> int:
+    with session_scope(env.ctx.factory) as session:
+        return rereads_used(session, next(iter(_user_ids(env))), utc_today())
+
+
+def test_the_same_crop_read_again_is_answered_from_the_record(edits, monkeypatch):
+    """F-093: the second read of one crop makes no call, charges nothing and counts nothing;
+    a changed prompt is another question."""
+    with_model(edits, EQUATION_ANSWER)
+    before = edits.job(edits.job_id)
+    assert add_post(edits, "equation").status_code == 303
+    one = edits.job(edits.job_id)
+    assert add_post(edits, "equation").status_code == 303
+    two = edits.job(edits.job_id)
+    assert sum(len(c.requests) for c in edits.clients) == 1
+    assert one.model_calls == before.model_calls + 1 and two.model_calls == one.model_calls
+    assert one.cost_usd > before.cost_usd and two.cost_usd == one.cost_usd
+    assert _rereads_today(edits) == 1  # an invited account is counted, not limited
+    assert [e.id for e in stored(edits).elements if e.id.startswith("p1-x")] == ["p1-x1", "p1-x2"]
+
+    real = equation_step.load_prompt
+    monkeypatch.setattr(
+        equation_step,
+        "load_prompt",
+        lambda name: dataclasses.replace(real(name), version="changed"),
+    )
+    assert add_post(edits, "equation").status_code == 303
+    assert sum(len(c.requests) for c in edits.clients) == 2
+    assert _rereads_today(edits) == 2
 
 
 def test_one_read_at_a_time_for_each_person(edits):

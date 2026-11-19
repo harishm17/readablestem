@@ -87,11 +87,15 @@ def test_a_wide_code_block_is_a_named_tab_stop_a_narrow_one_is_not():
         y = prose(page, 100)
         y = code(page, y, [(0, "x = 1"), (0, "y = 2")])
         y = prose(page, y + 10)
-        code(page, y, [(0, "result = compute_the_total(first_value, second_value, third)")])
+        y = code(page, y, [(0, "result = compute_the_total(first_value, second_value, third)")])
+        y = prose(page, y + 10)
+        # 26 characters: scrolls at 320 px with text spacing (F-448), so it is a stop too
+        code(page, y, [(0, "total = add(first, second)")])
 
     html = html_of(page_of(fill))
     assert '<pre id="p1-e1"><code>' in html
     assert 'tabindex="0" role="group" aria-label="Program code"><code>result' in html
+    assert 'aria-label="Program code"><code>total = add(first, second)' in html
 
 
 def test_one_short_monospaced_word_is_not_a_code_block():
@@ -123,6 +127,171 @@ def test_a_box_drawn_round_one_line_of_code_is_not_a_figure():
     assert [e.text for e in elements if e.preformatted] == [
         "cut -d, -f2 grades.csv | sort -n | uniq -c | head"
     ]
+
+
+def test_a_monospaced_quotation_without_code_punctuation_stays_prose():
+    quotation = [
+        "The poem works because it never says what the woods mean.",
+        "The reader supplies the meaning, and the poem lets each reader",
+        "supply a different one.",
+    ]
+
+    def fill(page):
+        y = prose(page, 100)
+        for line in quotation:
+            page.insert_text((72, y), line, fontsize=CODE, fontname="cour")
+            y += 13
+        y = code(page, y + 60, [(0, "total = add(first, second)"), (4, "print(total)")])
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.text for e in elements if e.preformatted] == [
+        "total = add(first, second)\n    print(total)"
+    ]
+    assert any((e.text or "").startswith("The poem works") for e in elements)
+
+
+# ------------------------------------------------------------------- kept line ends
+
+
+def column(page, y: float, text: str, width: float = 468.0) -> float:
+    """A justified-width paragraph wrapped by PyMuPDF, 14 pt a line."""
+    rect = pymupdf.Rect(72, y, 72 + width, y + 200)
+    page.insert_textbox(rect, text, fontsize=BODY, fontname="helv", lineheight=14 / BODY)
+    return y + 14 * 4 + 12
+
+
+def lines_at(page, y: float, lines: list[str], x: float = 72.0) -> float:
+    for text in lines:
+        page.insert_text((x, y), text, fontsize=BODY, fontname="helv")
+        y += 14
+    return y + 8
+
+
+LONG = (
+    "The poem works because it never says what the woods mean, and the reader supplies the "
+    "meaning. It lets each reader supply a different one, and the essay goes on to compare "
+    "that choice with two other poems from the same book before it turns to the last stanza."
+)
+VERSE = [
+    "Whose woods these are I think I know.",
+    "His house is in the village though;",
+    "He will not see me stopping here",
+    "To watch his woods fill up with snow.",
+]
+
+
+WRAPPED = ["Round the answer to three", "decimal places and say what", "the year depends on."]
+
+
+def breaks(element) -> list[int]:
+    return [r.start for r in element.runs if r.kind == "break"]
+
+
+def test_short_lines_keep_their_line_ends_and_a_paragraph_that_ends_short_does_not():
+    def fill(page):
+        y = column(page, 100, LONG)
+        y = lines_at(page, y + 6, VERSE)
+        lines_at(page, y + 20, WRAPPED)  # a narrow paragraph, wrapped in mid-sentence
+
+    elements = analyze(page_of(fill)).elements
+    paragraph, verse, narrow = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert breaks(paragraph) == [] and breaks(narrow) == []
+    assert verse.text == " ".join(VERSE)
+    assert [verse.text[at] for at in breaks(verse)] == [" "] * 3
+    assert breaks(verse) == [len(VERSE[0]), len(" ".join(VERSE[:2])), len(" ".join(VERSE[:3]))]
+    assert html_of(page_of(fill)).count("<br>") == 3
+
+
+def test_two_short_lines_are_not_enough_to_keep_line_ends():
+    def fill(page):
+        y = column(page, 100, LONG)
+        lines_at(page, y + 6, VERSE[:2])
+
+    assert not [e for e in analyze(page_of(fill)).elements if breaks(e)]
+
+
+# ---------------------------------------------------------------- abstract and keywords
+
+
+def test_abstract_alone_on_its_line_is_a_heading_and_keywords_start_their_own_block():
+    def fill(page):
+        page.insert_text((72, 80), "A Study of Fog", fontsize=20, fontname="hebo")
+        page.insert_text((72, 130), "Abstract", fontsize=BODY, fontname="hebo")
+        y = column(page, 150, LONG)
+        # one more line of the abstract, then the keywords at the same indent, no gap
+        page.insert_text((72, y - 12 - 14 + 14), "Keywords: fog, verse, reading", fontsize=BODY,
+                         fontname="helv")  # fmt: skip
+
+    elements = analyze(page_of(fill)).elements
+    kinds = [(e.kind, e.text) for e in elements]
+    assert (Kind.HEADING, "Abstract") in kinds
+    texts = [e.text for e in elements if e.kind is Kind.PARAGRAPH]
+    assert texts[-1] == "Keywords: fog, verse, reading"
+    assert texts[0].startswith("The poem works")
+    assert "Keywords" not in texts[0]
+
+
+def test_abstract_at_the_start_of_a_sentence_is_not_a_heading():
+    def fill(page):
+        y = column(page, 100, "Abstract art is the subject of this chapter. " + LONG)
+        prose(page, y)
+
+    assert Kind.HEADING not in {e.kind for e in analyze(page_of(fill)).elements}
+
+
+# ------------------------------------------------------------------------ algorithms
+
+ALGORITHM = [
+    (0, "input: a line of verse"),
+    (0, "count = 0"),
+    (0, "for each word w in the line do"),
+    (1, "if w is stressed then"),
+    (2, "count = count + 1"),
+    (1, "end if"),
+    (0, "end for"),
+    (0, "return count"),
+]
+
+
+def algorithm(page, y: float, steps=ALGORITHM, caption="Algorithm 1 Count stressed syllables"):
+    page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
+    y += 14
+    for level, text in steps:
+        page.insert_text((72 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+        y += 14
+    return y + 10
+
+
+def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
+    def fill(page):
+        y = prose(page, 100)
+        y = algorithm(page, y + 10)
+        prose(page, y + 10, "The count is printed after the last word.")
+
+    elements = analyze(page_of(fill)).elements
+    steps = [e for e in elements if e.preformatted]
+    assert len(steps) == 1
+    assert steps[0].text.split("\n") == [
+        "input: a line of verse",
+        "count = 0",
+        "for each word w in the line do",
+        "  if w is stressed then",
+        "    count = count + 1",
+        "  end if",
+        "end for",
+        "return count",
+    ]
+    captions = [e.text for e in elements if (e.text or "").startswith("Algorithm 1")]
+    assert captions == ["Algorithm 1 Count stressed syllables"]  # its own block, above
+
+
+def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
+    def fill(page):
+        y = prose(page, 100, "Algorithm 1 shows how the verse is scanned for stress.")
+        prose(page, y, "Each word is checked once, and the count is kept at the end.")
+        prose(page, y + 22, "The result is then compared with the reader's own marks.")
+
+    assert not [e for e in analyze(page_of(fill)).elements if e.preformatted]
 
 
 # ------------------------------------------------------------------------- glossary
@@ -194,6 +363,91 @@ def test_text_outside_a_glossary_section_is_not_made_an_entry():
     assert not [e for e in analyze(page_of(fill)).elements if e.term_end]
 
 
+def lead_term_page(entries: list[tuple[str, str]]) -> bytes:
+    def fill(page):
+        page.insert_text((72, 80), "Notes", fontsize=18, fontname="hebo")
+        y = 120.0
+        for term, definition in entries:
+            page.insert_text((72, y), term, fontsize=BODY, fontname="hebo")
+            gap = pymupdf.get_text_length(term + " ", fontname="hebo", fontsize=BODY)
+            page.insert_text((72 + gap, y), definition, fontsize=BODY, fontname="helv")
+            y += 15
+
+    return page_of(fill)
+
+
+def test_three_lines_that_open_with_a_bold_lead_term_are_entries_not_one_paragraph():
+    entries = [
+        ("Impulse.", "the change in momentum of a body."),
+        ("Inertia.", "the resistance of a body to a change in motion."),
+        ("Momentum.", "the product of mass and velocity."),
+    ]
+    elements = analyze(lead_term_page(entries)).elements
+    found = [e.text[: e.term_end].strip(" .:") for e in elements if e.term_end]
+    assert found == ["Impulse", "Inertia", "Momentum"]
+    # Two such lines are a sentence with a bold start, not a list of entries.
+    assert not [e for e in analyze(lead_term_page(entries[:2])).elements if e.term_end]
+    # A theorem, its proof and a case open with a lead too: three blocks, no list of terms.
+    steps = [
+        ("Theorem 2.", "every bounded sequence has a convergent subsequence."),
+        ("Proof.", "split the interval in two and keep a half with many terms."),
+        ("Case 1:", "the left half holds infinitely many terms of the sequence."),
+    ]
+    blocks = [e for e in analyze(lead_term_page(steps)).elements if e.kind == Kind.PARAGRAPH]
+    assert len(blocks) == 3 and not [e for e in blocks if e.term_end]
+
+
+def test_capital_letters_alone_on_their_lines_head_the_sections_of_an_index():
+    def fill(page):
+        page.insert_text((72, 80), "Index", fontsize=18, fontname="hebo")
+        y = 120.0
+        for letter, words in [
+            ("A", ["acceleration, 4", "angle, 9"]),
+            ("B", ["body, 12", "buoyancy, 15"]),
+            ("C", ["circuit, 20", "current, 22"]),
+        ]:
+            page.insert_text((72, y), letter, fontsize=BODY, fontname="hebo")
+            y += 18
+            for word in words:
+                page.insert_text((72, y), word, fontsize=BODY, fontname="helv")
+                y += 14
+            y += 10
+
+    fixes = heading_fixes(analyze(page_of(fill)).elements)
+    headings = [(f.heading.text, f.heading.level) for f in fixes if f.heading]
+    assert headings == [("Index", 1), ("A", 2), ("B", 2), ("C", 2)]
+
+
+def test_a_hanging_indent_shared_by_entries_makes_each_entry_one_block():
+    filler = ["of", "the", "in", "on", "at", "to", "it", "is", "by"] * 2
+
+    def line(width: float, start: str) -> str:
+        words = [start]
+        for word in filler * 3:
+            if (
+                pymupdf.get_text_length(" ".join([*words, word]), fontname="tiro", fontsize=BODY)
+                > width
+            ):
+                break
+            words.append(word)
+        return " ".join(words)
+
+    def fill(page):
+        page.insert_text((72, 80), "References", fontsize=18, fontname="hebo")
+        y = 120.0
+        for k in range(4):
+            page.insert_text(
+                (72, y), line(468, f"Smith {k}, J., A study"), fontsize=BODY, fontname="tiro"
+            )
+            page.insert_text((96, y + 13), line(444, "and its"), fontsize=BODY, fontname="tiro")
+            page.insert_text((96, y + 26), f"pages 10-{k}0 (2001).", fontsize=BODY, fontname="tiro")
+            y += 39
+
+    paragraphs = [e.text for e in analyze(page_of(fill)).elements if e.kind == Kind.PARAGRAPH]
+    assert [p[:8] for p in paragraphs] == [f"Smith {k}," for k in range(4)]
+    assert all(p.endswith("(2001).") for p in paragraphs)
+
+
 # ------------------------------------------------------------------------ footnotes
 
 
@@ -237,6 +491,62 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
 
     marks = {note.id: layout_module._FootnoteMark(body.id, "no such text", "1")}
     assert layout_module._footnote_links([twice, note], marks)[0].links == []
+
+
+def named_footnote_pdf() -> bytes:
+    """A page whose file names its footnote the way hyperref does (a destination `Hfootnote.2`
+    above the note's line, a link to it from the mark), with a numbered line in small type low
+    on the page that no destination points at, and a mark touching the word after it."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 85), "A sentence long enough to make a paragraph.", fontsize=BODY)
+    page.insert_text(
+        (72, 100), "The pressure matters a great deal here.", fontsize=BODY, fontname="helv"
+    )
+    width = pymupdf.get_text_length(
+        "The pressure matters a great deal here.", fontname="helv", fontsize=BODY
+    )
+    page.insert_text((72 + width, 95), "2", fontsize=7, fontname="helv")
+    page.insert_text((72 + width + 4.5, 100), "Next we measure it.", fontsize=BODY, fontname="helv")
+    # a line of terms becomes list items made from its text, with no rows of their own
+    page.insert_text((72, 160), "Section Key Terms", fontsize=16, fontname="hebo")
+    x = 72.0
+    for term in ("absolute pressure", "gauge pressure", "pascal"):
+        page.insert_text((x, 190), term, fontsize=BODY)
+        x += pymupdf.get_text_length(term, fontname="helv", fontsize=BODY) + 13.0
+    page.draw_line((72, 700), (200, 700))
+    page.insert_text((72, 715), "1 A line number in small type.", fontsize=8)
+    page.insert_text((72, 735), "2 Pressure is measured in pascals.", fontsize=8)
+    names = doc.get_new_xref()
+    doc.update_object(names, f"<< /Names [(Hfootnote.2) [{page.xref} 0 R /XYZ 72 66 null]] >>")
+    tree = doc.get_new_xref()
+    doc.update_object(tree, f"<< /Dests {names} 0 R >>")
+    doc.xref_set_key(doc.pdf_catalog(), "Names", f"{tree} 0 R")
+    annot = doc.get_new_xref()
+    x0, x1 = 72 + width, 72 + width + 4.5
+    doc.update_object(
+        annot,
+        f"<< /Type /Annot /Subtype /Link /Rect [{x0} {792 - 102} {x1} {792 - 88}] "
+        "/Border [0 0 0] /A << /S /GoTo /D (Hfootnote.2) >> >>",
+    )
+    doc.xref_set_key(page.xref, "Annots", f"[{annot} 0 R]")
+    return doc.tobytes()
+
+
+def test_a_file_that_names_its_footnotes_decides_which_blocks_are_footnotes():
+    layout = analyze(named_footnote_pdf())
+    by_id = {e.id: e for e in layout.elements}
+    notes = [by_id[n.element_id] for n in layout.notices if n.code == "footnote"]
+    # the destination's line is the footnote; the numbered small line next to it is not one
+    assert [n.text for n in notes] == ["2 Pressure is measured in pascals."]
+    body = layout.elements[0]
+    (link,) = body.links
+    assert (link.kind, link.target_id) == ("internal", notes[0].id)
+    # the raised mark is set off from the word it touches, not read as part of it
+    assert "here.2 Next we" in (body.text or "")
+    # a list made from a line of terms is read too (it stopped the whole document once)
+    terms = [e.text for e in layout.elements if e.kind == Kind.LIST_ITEM]
+    assert terms == ["absolute pressure", "gauge pressure", "pascal"]
 
 
 # ------------------------------------------------------------------------- contents
@@ -301,6 +611,55 @@ def test_a_page_with_one_dotted_line_is_not_a_contents_page():
         )
 
     assert [e.kind for e in analyze(page_of(fill)).elements] == [Kind.PARAGRAPH]
+
+
+def numbers_only_contents(page_index: int = 0, heading: bool = True) -> bytes:
+    """A contents list with no leaders: each title at the margin and its page number apart,
+    at the right edge, and a real section heading right under the list."""
+
+    def fill(page):
+        if heading:
+            page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        y = 120.0
+        for title, number in [
+            ("Motion", "3"),
+            ("Forces", "9"),
+            ("Energy", "15"),
+            ("Waves", "21"),
+            ("Light", "30"),
+            ("Heat", "41"),
+            ("Fields", "52"),
+            ("Atoms", "63"),
+        ]:
+            page.insert_text((72, y), title, fontsize=BODY, fontname="helv")
+            width = pymupdf.get_text_length(number, fontname="helv", fontsize=BODY)
+            page.insert_text((540 - width, y), number, fontsize=BODY, fontname="helv")
+            y += 18
+        page.insert_text((72, y + 14), "Motion", fontsize=16, fontname="hebo")
+        page.insert_text((72, y + 40), "A body stays at rest.", fontsize=BODY, fontname="helv")
+
+    doc = pymupdf.open()
+    for _ in range(page_index):
+        doc.new_page(width=612, height=792)
+    fill(doc.new_page(width=612, height=792))
+    return doc.tobytes()
+
+
+def test_a_contents_list_with_no_leaders_keeps_its_numbers_and_is_not_a_table():
+    elements = analyze(numbers_only_contents()).elements
+    assert [e.kind for e in elements] == [Kind.HEADING] + [Kind.LIST_ITEM] * 8 + [
+        Kind.HEADING,
+        Kind.PARAGRAPH,
+    ]
+    entries = elements[1:9]
+    assert [e.text for e in entries[:3]] == ["Motion 3", "Forces 9", "Energy 15"]
+    # "Motion" under the list is the real section heading; the first entry links to it.
+    assert [(k.kind, k.target_id) for k in entries[0].links] == [("internal", elements[9].id)]
+
+
+def test_lines_that_end_in_numbers_far_from_the_front_are_not_a_contents_list():
+    elements = analyze(numbers_only_contents(page_index=5, heading=False)).elements
+    assert not [e for e in elements if "contents entry" in e.reasons]
 
 
 # ------------------------------------------------------------------------- axe

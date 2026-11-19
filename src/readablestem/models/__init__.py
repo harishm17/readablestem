@@ -112,7 +112,7 @@ def make_vision_client(
     The client carries the job's second automated check on the same budget (offline, the
     fake): with the OpenAI provider the Decisions API (`models.verifier`) unless both
     uses of it are switched off in the settings; with the Anthropic provider the Claude
-    check (`models.claude_verifier`, shadow mode by default) unless CLAUDE_SECOND_CHECK=off.
+    check (`models.claude_verifier`) when CLAUDE_SECOND_CHECK is shadow or enforce (off by default).
     """
     verifier = job_verifier(settings, budget, fake=fake)
     if fake:

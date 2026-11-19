@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Confirm deleting the account (routes/account.py): download what to keep, what goes, what
    stays, then the button. #}
 {% block title %}Delete your account?{% endblock %}
@@ -6,18 +7,16 @@
 {% block content %}
 <h1>Delete your account?</h1>
 <p>This deletes the account for <strong>{{ user.email }}</strong> and signs you out. It cannot be undone.</p>
-{% if documents %}
 <section aria-labelledby="export-heading" class="confirm-export">
   <h2 id="export-heading">Download what you want to keep first</h2>
   <ul class="actions">
-    {% if ready_documents %}<li><a href="/app/download">Download the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></li>{% endif %}
-    <li><a href="/app">Open My documents</a> for single files, Word and EPUB</li>
+    <li><a href="/account/export">Download everything (zip)</a>: {% if ready_documents %}the {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} in each file type with {{ "its review record" if ready_documents == 1 else "their review records" }}, {% endif %}your courses and your account settings</li>
+    {% if documents %}<li><a href="/app">Open My documents</a> for single files</li>{% endif %}
   </ul>
 </section>
-{% endif %}
 <h2>What is deleted</h2>
 <p>Your email and name, {% if documents %}{{ documents }} {{ "document" if documents == 1 else "documents" }}{% else %}any documents{% endif %} with their decisions, your courses and notation.</p>
-{% include "_account_deletion_notes.html" %}
+{% set for_account = true %}{% include "_delete_notes.html" %}
 {% if invitation_only %}
 <p>You are on the invitation list. Deleting removes you from it.</p>
 {% elif tier_open %}
@@ -26,11 +25,10 @@
 <p>Signing in again makes a new, empty account with new-account limits ({{ open_page_quota }} pages a day).{% if is_admin %} It has no admin rights.{% endif %}</p>
 {% endif %}
 <div class="confirm-actions">
-  <form method="post" action="/account/delete" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("account.delete", "/account/delete", {"class": "inline-form"}) %}
     <input type="hidden" name="confirm" value="yes">
     <button type="submit" class="button-danger">Delete my account</button>
-  </form>
+  {% endcall %}
   <a class="button-secondary" href="/account">No, keep it</a>
 </div>
 {% endblock %}

@@ -20,16 +20,28 @@ Counts are bytes of content only; nothing here logs a name or a text.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime
 
-from sqlalchemy import Text, cast, func, select
+from sqlalchemy import Text, cast, func, select, text
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 
 from readablestem.config import Settings
-from readablestem.web import access
-from readablestem.web.db import Blob, Job, PendingUpload, User, utcnow
+from readablestem.web import access, export_store
+from readablestem.web.db import Blob, Job, JobStatus, PendingUpload, StepRecord, User, utcnow
 
 MB = 1024 * 1024
+# How long a refusal for a full store asks a person to wait: purges run hourly, so room is
+# expected within the hour. Said and sent by `quota.retry_after`.
+FULL_WAIT_S = 3600
+
+# What a stored document is counted as, by every figure here (`user_bytes`, `total_bytes`
+# and `finished_job_bytes`). Text lengths are characters, near enough to bytes for a cap in
+# megabytes.
+_BLOB_BYTES = func.length(Blob.content)
+_HTML_BYTES = func.coalesce(func.length(Job.html), 0)
+_RESULT_BYTES = func.coalesce(func.length(cast(Job.result_json, Text)), 0)
 
 
 class StorageRefused(Exception):
@@ -58,22 +70,13 @@ def user_bytes(session: Session, user_id: str, now: datetime | None = None) -> i
     moment = now or utcnow()
     live = (Job.user_id == user_id, Job.retain_until > moment, Job.is_sample.is_(False))
     blobs = session.scalar(
-        select(func.coalesce(func.sum(func.length(Blob.content)), 0))
+        select(func.coalesce(func.sum(_BLOB_BYTES), 0))
         .select_from(Blob)
         .join(Job, Job.id == Blob.job_id)
-        .where(*live)
+        .where(*live, Blob.kind != export_store.KIND)  # a kept export can be made again
     )
-    # Text lengths are characters, near enough to bytes for a cap in megabytes.
     texts = session.scalar(
-        select(
-            func.coalesce(
-                func.sum(
-                    func.coalesce(func.length(Job.html), 0)
-                    + func.coalesce(func.length(cast(Job.result_json, Text)), 0)
-                ),
-                0,
-            )
-        ).where(*live)
+        select(func.coalesce(func.sum(_HTML_BYTES + _RESULT_BYTES), 0)).where(*live)
     )
     pending = session.scalar(
         select(func.coalesce(func.sum(PendingUpload.size_bytes), 0)).where(
@@ -89,7 +92,7 @@ def total_bytes(session: Session, now: datetime | None = None) -> int:
     header on Postgres, not by reading the value."""
     moment = now or utcnow()
     blobs = session.scalar(
-        select(func.coalesce(func.sum(func.length(Blob.content)), 0))
+        select(func.coalesce(func.sum(_BLOB_BYTES), 0))
         .select_from(Blob)
         .join(Job, Job.id == Blob.job_id)
         .where(Job.retain_until > moment)
@@ -134,3 +137,110 @@ def report(session: Session, settings: Settings) -> dict[str, int | bool]:
         "limit_mb": settings.storage_global_max_mb,
         "full": total >= settings.storage_global_max_mb * MB,
     }
+
+
+# --------------------------------------------------------------------------- measuring
+
+
+@dataclass(frozen=True)
+class JobBytes:
+    """What one finished document stores: its upload (the source PDF), its crops, the HTML
+    file, the result, the step records "Try again" reuses and the Word, EPUB and Canvas files
+    kept after a download (`web.export_store`; not part of a person's cap). Bytes of content,
+    no name."""
+
+    job_id: str
+    upload: int
+    crops: int
+    html: int
+    result: int
+    steps: int
+    exports: int = 0
+
+    @property
+    def total(self) -> int:
+        return self.upload + self.crops + self.html + self.result + self.steps + self.exports
+
+
+def finished_job_bytes(session: Session) -> list[JobBytes]:
+    """The stored bytes of every finished document (`ops storage-report`), counted as
+    `user_bytes` counts them, with the step records."""
+    jobs = session.execute(
+        select(Job.id, _HTML_BYTES, _RESULT_BYTES).where(Job.status == JobStatus.DONE)
+    ).all()
+    blobs: dict[tuple[str, str], int] = {
+        (job_id, kind): int(n or 0)
+        for job_id, kind, n in session.execute(
+            select(Blob.job_id, Blob.kind, func.sum(_BLOB_BYTES)).group_by(Blob.job_id, Blob.kind)
+        )
+    }
+    steps: dict[str, int] = {
+        job_id: int(n or 0)
+        for job_id, n in session.execute(
+            select(
+                StepRecord.job_id, func.sum(func.length(cast(StepRecord.fix_json, Text)))
+            ).group_by(StepRecord.job_id)
+        )
+    }
+    return [
+        JobBytes(
+            job_id,
+            upload=blobs.get((job_id, "upload"), 0),
+            crops=blobs.get((job_id, "crop"), 0),
+            html=int(html),
+            result=int(result),
+            steps=steps.get(job_id, 0),
+            exports=blobs.get((job_id, export_store.KIND), 0),
+        )
+        for job_id, html, result in jobs
+    ]
+
+
+def table_bytes(session: Session) -> tuple[dict[str, int], int | None]:
+    """Bytes on disk of each table with its indexes and out-of-line values, and the database's
+    own size figure (Postgres `pg_database_size`; for SQLite the file's pages), both None or
+    empty when the database cannot say. On Postgres the catalogs are a row of their own, so
+    the rows add up to the database's figure; on SQLite what is in the second and not the
+    first is free pages."""
+    dialect = session.get_bind().dialect.name
+    if dialect == "postgresql":
+        tables = {
+            name: int(size)
+            for name, size in session.execute(
+                text(
+                    "SELECT c.relname, pg_total_relation_size(c.oid) FROM pg_class c "
+                    "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                    "WHERE c.relkind = 'r' AND n.nspname = current_schema()"
+                )
+            )
+        }
+        # The database's own catalogs (this database's copy; the shared ones are not part of
+        # `pg_database_size`), so the tables add up to its figure.
+        catalogs = session.scalar(
+            text(
+                "SELECT sum(pg_total_relation_size(c.oid)) FROM pg_class c "
+                "JOIN pg_namespace n ON n.oid = c.relnamespace "
+                "WHERE c.relkind = 'r' AND NOT c.relisshared "
+                "AND n.nspname IN ('pg_catalog', 'information_schema')"
+            )
+        )
+        if catalogs:
+            tables["(database catalogs)"] = int(catalogs)
+        return tables, int(session.scalar(text("SELECT pg_database_size(current_database())")) or 0)
+    if dialect == "sqlite":
+        pages = session.scalar(text("PRAGMA page_count")) or 0
+        total = int(pages) * int(session.scalar(text("PRAGMA page_size")) or 0)
+        try:
+            # dbstat lists every page of every table and index (a build of SQLite without it
+            # still gives the file's size above).
+            owner = dict(session.execute(text("SELECT name, tbl_name FROM sqlite_master")).all())
+            tables: dict[str, int] = {}
+            for name, size in session.execute(
+                text("SELECT name, SUM(pgsize) FROM dbstat GROUP BY name")
+            ):
+                table = owner.get(name, name)
+                tables[table] = tables.get(table, 0) + int(size)
+            return tables, total
+        except OperationalError:  # no dbstat in this SQLite build
+            return {}, total
+    return {}, None

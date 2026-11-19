@@ -40,7 +40,7 @@ from typing import Any
 from readablestem.core.types import DocumentResult
 from readablestem.eval import measure
 from readablestem.eval.measure import Converted
-from readablestem.pipeline import output_audit
+from readablestem.pipeline import assemble, output_audit
 from readablestem.pipeline.output_audit import CODES, OUTPUTS, Facts, Inventory
 
 # What an inventory holds, counted: the size of what was read, so that a count has
@@ -49,6 +49,15 @@ SIZES = ("blocks", "equations", "pictures", "tables", "links", "notes")
 # The folder and course number of the Canvas export. Any would do: they are in addresses,
 # which are not read.
 _FOLDER, _COURSE = "document-files", "1"
+# The version each file's note says it is (`assemble.with_medium`); the page and the Listen
+# transcript are the web version.
+MEDIA = {
+    output_audit.DOCX: "Word",
+    output_audit.EPUB: "EPUB",
+    output_audit.CANVAS_INDEX: "Canvas",
+    output_audit.CANVAS_PAGE: "Canvas",
+    output_audit.CARTRIDGE: "Common Cartridge",
+}
 # The Listen page reads the first rows of a table and says how many more there are
 # (`listen.MAX_TABLE_ROWS`). The audit reads the transcript with every row, so that what a
 # row says is checked for all of them; the cap itself is the Listen page's, by design.
@@ -87,7 +96,7 @@ def build(
     title = read[output_audit.HTML].title if output_audit.HTML in read else ""
     try:
         canvas = export_canvas.export_canvas(
-            html, title=title or "Document", folder=_FOLDER, course_number=_COURSE
+            html, title=title or assemble.DEFAULT_TITLE, folder=_FOLDER, course_number=_COURSE
         )
     except Exception as exc:
         for output in (output_audit.CANVAS_INDEX, output_audit.CANVAS_PAGE, output_audit.CARTRIDGE):
@@ -125,11 +134,17 @@ def audit_files(html: str, facts: Facts, speeches: Mapping[str, str] | None) -> 
     page = read.get(output_audit.HTML)
     if page is None:
         return {"places": [], "sizes": {}, "failed": failed}
+    # Each file's note names the version it is (`assemble.with_medium`): its page is the page
+    # with that word, so the one sentence that differs is not counted as lost.
+    pages = {
+        medium: output_audit.read_html(assemble.with_medium(html, medium))
+        for medium in MEDIA.values()
+    }
     places = [
         asdict(count)
         for output in OUTPUTS
         if output in read
-        for count in output_audit.audit(read[output], page, facts)
+        for count in output_audit.audit(read[output], pages.get(MEDIA.get(output, ""), page), facts)
     ]
     sizes = {
         output: {name: len(getattr(inventory, name)) for name in SIZES}
@@ -139,7 +154,11 @@ def audit_files(html: str, facts: Facts, speeches: Mapping[str, str] | None) -> 
 
 
 def audit_document(result: DocumentResult) -> dict[str, Any]:
-    """`audit_files` of a converted document: its page, and the readings it stores."""
+    """`audit_files` of a converted document: its page, and the readings it stores (the ones
+    the page, Listen and the files show, so a reading older rules wrote is made again)."""
+    from readablestem.pipeline.speech import refresh_readings
+
+    refresh_readings(result)
     speeches = {
         fix.element_id: fix.equation.speech
         for fix in result.fixes

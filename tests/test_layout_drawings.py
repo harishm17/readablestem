@@ -251,8 +251,101 @@ def _box_plot(page, top: float) -> tuple[float, float, float, float]:
     return 140, ym - 22, 500, ym + 22
 
 
+def _labelled_bars(page, top: float) -> tuple[float, float, float, float]:
+    """Filled bars on axes with their labels where a plotting library sets them: tick
+    marks 3.5 pt long and the labels 3.5 pt beyond them, the category names one row of
+    words far apart, a rotated axis title and a centred one a line beyond the labels.
+    The box returned reaches the middle of every label: the picture cut for the figure
+    step must show them."""
+    x0, y0, x1, y1 = 170, top + 10, 470, top + 170
+    _path(page, [[(x0, y0), (x0, y1), (x1, y1)]])
+    names = ["Forest", "Grassland", "Cropland", "Wetland", "Urban"]
+    for i, (name, h) in enumerate(zip(names, [120, 90, 150, 60, 40], strict=True)):
+        x = x0 + 14 + i * 58
+        _rect(page, (x, y1 - h, x + 34, y1), colour=None, width=0, fill=BLUE)
+        _path(page, [[(x + 17, y1), (x + 17, y1 + 3.5)]], width=0.8)
+        _label(page, (x + 17 - pymupdf.get_text_length(name, fontsize=9) / 2, y1 + 14), name)
+    for k in range(4):
+        value = str(50 * k)
+        width = pymupdf.get_text_length(value, fontsize=9)
+        _path(page, [[(x0 - 3.5, y1 - 50 * k), (x0, y1 - 50 * k)]], width=0.8)
+        _label(page, (x0 - 7 - width, y1 - 50 * k + 3), value)
+    page.insert_text((x0 - 29, (y0 + y1) / 2 + 22), "Area (km2)", fontsize=9, rotate=90)
+    _label(page, (x0 + 128, y1 + 30), "Land cover")
+    box = pymupdf.Rect(x0, y0, x1, y1)
+    for word in page.get_text("words", clip=(x0 - 60, y0 - 5, x1 + 5, y1 + 45)):
+        box.include_point(((word[0] + word[2]) / 2, (word[1] + word[3]) / 2))
+    return box.x0, box.y0, box.x1, box.y1
+
+
+def _with_labels(page, drawn, pad=40.0) -> tuple[float, float, float, float]:
+    """The box of a drawing and the middle of every label of it within `pad` of it: what
+    the picture cut for the figure step must show."""
+    box = pymupdf.Rect(drawn)
+    near = (box.x0 - pad, box.y0 - pad, box.x1 + pad, box.y1 + pad)
+    for word in page.get_text("words", clip=near):
+        box.include_point(((word[0] + word[2]) / 2, (word[1] + word[3]) / 2))
+    return box.x0, box.y0, box.x1, box.y1
+
+
+def _triangle(page, top: float) -> tuple[float, float, float, float]:
+    """A right triangle with its side lengths, one a bare "1", an angle and a vertex name
+    set 3 pt to 8 pt outside its strokes, a rotated one along the long side: labels
+    outside the drawing, none of them inside its box (SW40)."""
+    ax, ay, bx, by, cx, cy = 200, top + 150, 400, top + 150, 200, top + 30
+    _path(page, [[(ax, ay), (bx, by), (cx, cy)]], width=1.2, close=True)
+    _label(page, (292, by + 12), "4 cm", 10)
+    _label(page, (ax - 14, (ay + cy) / 2 + 3), "1", 10)
+    _label(page, (ax + 14, ay - 4), "\u03b8", 10)
+    _label(page, (cx - 6, cy - 6), "A", 10)
+    _label(page, (316, top + 84), "5 cm", 10)
+    return _with_labels(page, (ax, cy, bx, ay))
+
+
+def _timeline(page, top: float) -> tuple[float, float, float, float]:
+    """A timeline: a long thin ruler with ticks, the years under it and an event over each
+    stretch of it, words far apart on one line (WS6.15)."""
+    x0, x1, y = 170, 470, top + 60
+    _path(page, [[(x0, y), (x1, y)]], width=1.2)
+    for i in range(5):
+        _path(page, [[(x0 + i * 75, y - 3), (x0 + i * 75, y + 3)]], width=1.2)
+        _label(page, (x0 + i * 75 - 11, y + 16), str(1905 + 10 * i), 10)
+    _label(page, (x0, y - 8), "Special relativity", 10)
+    _label(page, (x0 + 150, y - 8), "Quantum mechanics", 10)
+    _label(page, (x0 + 290 - 40, y - 8), "First reactor", 10)
+    return _with_labels(page, (x0, y - 3, x1, y + 3))
+
+
+def _free_body(page, top: float) -> tuple[float, float, float, float]:
+    """A free-body diagram: a box and four force arrows that start 20 pt off its sides,
+    each arrow a separate drawing too thin to be a figure alone (WS6.15)."""
+    x0, y0, x1, y1 = 240, top + 70, 330, top + 100
+    xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+    _rect(page, (x0, y0, x1, y1), width=1.2)
+    _label(page, (xm - 3, ym + 4), "m", 10)
+    # (start, end, label at): the head is two short strokes back from the end
+    arrows = [
+        ((xm, y0 - 20), (xm, y0 - 58), (xm + 6, y0 - 56), "N"),
+        ((xm, y1 + 20), (xm, y1 + 58), (xm + 6, y1 + 62), "mg"),
+        ((x1 + 20, ym), (x1 + 58, ym), (x1 + 62, ym + 4), "F = 12 N"),
+        ((x0 - 20, ym), (x0 - 58, ym), (x0 - 70, ym + 4), "f"),
+    ]
+    for a, b, at, name in arrows:
+        _path(page, [[a, b]], width=1.6)
+        back = (b[0] - a[0]) / 38 * 6, (b[1] - a[1]) / 38 * 6
+        for side in (-3, 3):
+            _path(
+                page,
+                [[b, (b[0] - back[0] + side * back[1] / 6, b[1] - back[1] + side * back[0] / 6)]],
+                width=1.6,
+            )
+        _label(page, at, name, 10)
+    return _with_labels(page, (x0 - 58, y0 - 58, x1 + 58, y1 + 58), pad=14.0)
+
+
 DIAGRAMS = {
     "scatter plot with a legend": _scatter,
+    "bar chart with its tick and category labels outside its axes": _labelled_bars,
     "outlined bars on a baseline": _outline_bars,
     "circuit with labels inside its loop": _circuit,
     "flowchart of filled boxes and open arrows": lambda page, top: _flowchart(
@@ -263,6 +356,9 @@ DIAGRAMS = {
     ),
     "timing diagram": _timing,
     "box plot": _box_plot,
+    "triangle with its sides and angle named outside its strokes": _triangle,
+    "timeline with its years and events along a thin ruler": _timeline,
+    "free-body diagram with force arrows apart from its box": _free_body,
 }
 
 
@@ -280,6 +376,31 @@ def test_a_diagram_of_lines_and_boxes_with_labels_inside_is_a_figure(case):
     (figure,) = _figures(out)
     assert _holds(figure, area)
     assert "It has a direction" in _text_of(out) and "Acceleration is" in _text_of(out)
+
+
+def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():
+    # A numbered title a few points over a drawing stays text, a heading of the page, not a
+    # label that the figure's picture takes in (a blind student loses the heading). A slide
+    # template's footer bar, set in from the page's edge, is no figure: the line standing
+    # just over it was taken as a label of the "figure" it made.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    _label(page, (72, y + 28), "5. Blocks and springs", 11, font="hebo")
+    _rect(page, (100, y + 40, 200, y + 90), width=1.2)
+    _label(page, (146, y + 70), "m", 10)
+    _running_text(page, y + 120, 1, start=1)
+    page = _page(doc)
+    _running_text(page, 72, 2)
+    _label(page, (72, 690), "Total of the three: 12", 11)
+    _rect(page, (36, 700, 576, 740), colour=None, width=0, fill=BLUE)
+    _label(page, (60, 724), "LECTURE 10", 8)
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out, 0)
+    assert "Blocks and springs" in _text_of(out)
+    assert figure.bbox[0] > 90  # the picture does not reach out to the title
+    assert _figures(out, 1) == []
+    assert "Total of the three" in _text_of(out)
 
 
 def test_a_worked_example_box_with_a_grid_of_cell_borders_is_still_not_a_figure():
@@ -389,8 +510,18 @@ def _lewis_water(page, ym: float) -> tuple[float, float, float, float]:
     return 281, ym - 19, 313, ym + 10
 
 
+def _skeletal(page, ym: float) -> tuple[float, float, float, float]:
+    """But-1-ene as a skeletal formula: a zigzag of single straight lines meeting at their
+    ends, the double bond's second line parallel to its first, no atom letters."""
+    corners = [(240, ym + 7), (252, ym), (264, ym + 7), (276, ym)]
+    _lines(page, list(itertools.pairwise(corners)), width=1.0)
+    _path(page, [[(243, ym + 8.75), (252, ym + 3.5)]], width=1.0)
+    return 240, ym, 276, ym + 8.75
+
+
 FORMULAS = {
     "Fischer projections": lambda page, y: _fischer(page, 220, y + 40),
+    "a skeletal formula's bond lines": lambda page, y: _skeletal(page, y + 30),
     "ethane's bond lines": lambda page, y: _ethane(page, y + 70),
     "a one-line circuit of boxes and wires": lambda page, y: _flat_circuit(page, y + 20),
     "a Lewis structure's electron dots": lambda page, y: _lewis_water(page, y + 50),
@@ -497,3 +628,26 @@ def test_a_full_page_plot_with_axes_drawn_as_dashes_keeps_its_axes():
     (figure,) = _figures(out)
     assert _holds(figure, (30, 22, 587, 770))
     assert "Projectile height" in _text_of(out)
+
+
+def test_a_structure_of_atom_labels_and_short_bonds_is_one_figure_to_decide_on():
+    # Labels of one to three characters with a short stroke between them (a drawn
+    # molecule), too small and plain for a drawing cluster, were written as a dozen loose
+    # paragraphs, each a decision. They are one figure with the labels kept, and the
+    # running text above and below is still text.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    top = y + 30
+    atoms = ["HO", "C", "H", "O", "C", "NH2", "H", "C", "OH", "H", "C", "O", "H", "CH3"]
+    for i, atom in enumerate(atoms):
+        x, row = 120 + 34 * (i % 7), top + (22 if i % 2 else 0) + 60 * (i // 7)
+        _label(page, (x, row), atom, 10)
+        _lines(page, [[(x + 18, row - 4), (x + 30, row + (10 if i % 2 else -10))]], width=0.8)
+    area = (120, top - 10, 120 + 34 * 6 + 30, top + 60 + 24)
+    _running_text(page, area[3] + 40, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out)
+    assert _holds(figure, area)
+    assert layout.REASON_DRAWING_FRAGMENTS in figure.reasons
+    assert "NH2" not in _text_of(out) and "Acceleration is" in _text_of(out)

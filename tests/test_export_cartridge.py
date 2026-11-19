@@ -15,6 +15,7 @@ import zipfile
 import pytest
 
 from readablestem.pipeline import export_cartridge as cc
+from readablestem.pipeline.assemble import with_medium
 from readablestem.pipeline.export_canvas import export_canvas
 from test_export_canvas import FOLDER, made, source_html, source_ids  # noqa: F401
 
@@ -79,7 +80,7 @@ def test_every_document_the_canvas_export_is_tested_on_makes_a_valid_cartridge(m
     problems = cc.check_cartridge(cc.build_cartridge(export))
     assert problems == []
     page = parts(cc.build_cartridge(export))[f"web_resources/{FOLDER}/index.html"].decode()
-    assert page == export.index_html
+    assert page == with_medium(export.index_html, "Common Cartridge")
 
 
 # --------------------------------------------------------------------------- the check

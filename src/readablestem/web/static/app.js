@@ -126,9 +126,9 @@
  * is empty or is larger than the limit, instead of after sending all of it (35 s at
  * 5 Mbit/s for a refusal the browser can make instantly). The form takes several files
  * (T3-4): too many, or more than the request may carry together, is said the same way.
- * While good files are sent, says so ("Uploading notes.pdf. Keep this tab open.") and keeps
- * a second click from sending them twice. The server checks everything again; without this
- * file the form works the same, only slower to say no.
+ * While good files are sent, says so ("Uploading notes.pdf. Keep this tab open."); the one
+ * submit rule below keeps a second click from sending them twice. The server checks
+ * everything again; without this file the form works the same, only slower to say no.
  */
 (function () {
   "use strict";
@@ -138,7 +138,6 @@
   var form = input.form;
   var box = document.getElementById("pdf-check");
   var status = document.getElementById("upload-status");
-  var button = form.querySelector('button[type="submit"]');
   var field = input.closest(".field");
   var maxBytes = Number(input.getAttribute("data-max-bytes"));
   var limitBytes = Number(input.getAttribute("data-limit-bytes") || maxBytes);
@@ -146,7 +145,7 @@
   var maxFiles = Number(input.getAttribute("data-max-files") || 1);
   var describedBy = input.getAttribute("aria-describedby") || "";
   var serverError = input.getAttribute("aria-invalid") === "true";
-  if (!box || !status || !button || !field) return;
+  if (!box || !status || !field) return;
 
   // A file between the two sizes is allowed: the server keeps it so its pages can be chosen.
   // "docx pptx": the Word and PowerPoint kinds this server converts (data-office, T3-30).
@@ -239,26 +238,170 @@
       return;
     }
     if (!files || !files.length) return; // the server answers "Choose ... to upload."
-    if (button.getAttribute("aria-disabled") === "true") {
-      event.preventDefault(); // already sending
-      return;
-    }
+    if (form.hasAttribute("data-submitting")) return; // already sending: the rule below
+    // Said here, with the file's name; the one submit rule below then says nothing more.
     status.textContent =
       files.length === 1
         ? "Uploading " + files[0].name + ". Keep this tab open."
         : "Uploading " + files.length + " files. Keep this tab open.";
-    button.setAttribute("aria-disabled", "true");
   });
 
   // Back to this page from the next one (the browser's page cache): ready again.
   window.addEventListener("pageshow", function () {
     status.textContent = "";
+  });
+})();
+
+/* Upload form: the "Exam or quiz" hint. When the box is not ticked and a chosen file's name
+ * holds an exam word, a line under the box says so (the polite region #exam-hint, filled the
+ * way #pdf-check is). The words and the sentence come from the box's data attributes (written
+ * once, web/exam.py); a name is read as web.exam.word_in reads it: a camel-case join, digits and
+ * punctuation break words. It never ticks the box and never moves focus. Without this file the
+ * form is as it was, and the job page says the same after the conversion.
+ */
+(function () {
+  "use strict";
+
+  var input = document.getElementById("pdf");
+  var box = document.getElementById("exam");
+  var region = document.getElementById("exam-hint");
+  if (!input || !box || !region || !box.hasAttribute("data-name-words")) return;
+  var words = box.getAttribute("data-name-words").split(" ").filter(Boolean);
+  var sentence = box.getAttribute("data-hint") || "";
+
+  function wordIn(name) {
+    var spaced = name.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[^A-Za-z]+/g, " ").toLowerCase();
+    var found = spaced.split(" ").filter(function (part) { return words.indexOf(part) >= 0; });
+    return found.length ? found[0] : "";
+  }
+
+  function update() {
+    var found = "";
+    if (!box.checked && input.files) {
+      for (var i = 0; i < input.files.length && !found; i++) found = wordIn(input.files[i].name);
+    }
+    var line = region.querySelector("p");
+    if (!found) {
+      if (line) region.textContent = "";
+      return;
+    }
+    var text = sentence.replace("{word}", found);
+    if (line && line.textContent === text) return;
+    region.textContent = "";
+    line = document.createElement("p");
+    line.className = "hint";
+    line.textContent = text;
+    region.appendChild(line);
+  }
+
+  input.addEventListener("change", update);
+  box.addEventListener("change", update);
+  // Back to this page from the browser's page cache: the chosen files may still be there.
+  window.addEventListener("pageshow", update);
+})();
+
+/* The one submit rule, in the browser (SW43; the server's half is web/forms.py). A form
+ * drawn by the form(key) macro (components/forms.html, data-submit-once) is sent once:
+ * the pressed button says what is happening ("Saving…", its data-busy-label or the
+ * form's), is marked aria-busy and aria-disabled (not disabled: a disabled button leaves
+ * the focus order and its name and value would not be sent), a polite live region says
+ * the same words, and a second click or Enter sends nothing. Ready again when the page
+ * comes back from the browser's page cache, and at the end of an htmx request the form
+ * itself made. Another submit handler that stops the send (the upload's file checks)
+ * runs first and wins. Without this file a second click is still answered once, by the
+ * server: the form's request token.
+ */
+(function () {
+  "use strict";
+
+  var region = null;
+
+  // One polite live region for the page, made when first needed.
+  function say(words) {
+    if (!region) {
+      region = document.createElement("p");
+      region.className = "visually-hidden";
+      region.setAttribute("aria-live", "polite");
+      document.body.appendChild(region);
+    }
+    region.textContent = "";
+    // A moment later, so the same words twice in a row are still announced.
+    window.setTimeout(function () { region.textContent = words; }, 50);
+  }
+
+  function pressedButton(form, event) {
+    var button = event.submitter;
+    if (button && button.form === form && button.tagName === "BUTTON") return button;
+    return form.querySelector('button[type="submit"], button:not([type])');
+  }
+
+  function busy(form, button) {
+    form.setAttribute("data-submitting", "");
+    if (!button) return "";
+    var words =
+      button.getAttribute("data-busy-label") || form.getAttribute("data-busy-label") || "";
+    button.setAttribute("aria-disabled", "true");
+    button.setAttribute("aria-busy", "true");
+    button.setAttribute("data-submit-pressed", "");
+    // Only a button whose label is plain text takes the busy words in its place.
+    if (words && !button.children.length) {
+      button.setAttribute("data-label", button.textContent);
+      button.textContent = words;
+    }
+    return words;
+  }
+
+  function ready(form) {
+    form.removeAttribute("data-submitting");
+    var button = form.querySelector("[data-submit-pressed]");
+    if (!button) return;
     button.removeAttribute("aria-disabled");
+    button.removeAttribute("aria-busy");
+    button.removeAttribute("data-submit-pressed");
+    if (button.hasAttribute("data-label")) {
+      button.textContent = button.getAttribute("data-label");
+      button.removeAttribute("data-label");
+    }
+  }
+
+  // Bubbling to the document: the form's own submit handlers have run by now.
+  document.addEventListener("submit", function (event) {
+    var form = event.target;
+    if (!(form instanceof HTMLFormElement) || !form.hasAttribute("data-submit-once")) return;
+    if (form.hasAttribute("data-submitting")) {
+      event.preventDefault(); // already on its way: the first click's answer will come
+      return;
+    }
+    if (event.defaultPrevented) return; // another handler stopped it (a file check)
+    var words = busy(form, pressedButton(form, event));
+    var own = form.querySelector('[role="status"]');
+    if (words && !(own && own.textContent)) say(words);
+  });
+
+  window.addEventListener("pageshow", function () {
+    var forms = document.querySelectorAll("form[data-submitting]");
+    for (var i = 0; i < forms.length; i++) ready(forms[i]);
+  });
+
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var form = event.detail && event.detail.elt;
+    if (form instanceof HTMLFormElement && form.hasAttribute("data-submit-once")) ready(form);
+  });
+
+  // A list that refreshes by itself (web/poll.py) leaves a form that is on its way alone: the
+  // answer would put a fresh, unpressed button where the busy one is. Nothing is lost: the
+  // list still holds the version it had, so the next poll brings the same news.
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var detail = event.detail || {};
+    var trigger = detail.elt && detail.elt.getAttribute ? detail.elt.getAttribute("hx-trigger") : "";
+    var target = detail.target;
+    if (!trigger || trigger.indexOf("every") !== 0 || !target || !target.querySelector) return;
+    if (target.querySelector("form[data-submitting]")) detail.shouldSwap = false;
   });
 })();
 
 /* Upload form option groups (_upload_form.html). Each group is a <details> whose summary
- * line says what is set ("No course · Figures described normally · ..."). The server writes
+ * line says what is set ("No course · Scanned pages kept as pictures"). The server writes
  * that line for the first view; this rewrites it as the boxes inside change, so a closed
  * group never states a choice that is no longer the one made. Without this file the line
  * stays as the page was sent, and the form still submits what is ticked.
@@ -344,6 +487,50 @@
   });
 })();
 
+/* A tab nobody is looking at does not poll (web/poll.py). htmx's "every" trigger keeps asking
+ * in a background tab, and its trigger filter is an expression (`allowEval` is off here), so
+ * the request is cancelled instead. The timer keeps running: the first tick after the tab is
+ * shown asks again, within one interval, and nothing is lost meanwhile (the answer is the
+ * current state, not a queue of changes).
+ */
+document.addEventListener("htmx:beforeRequest", function (event) {
+  var elt = event.detail && event.detail.elt;
+  var trigger = elt && elt.getAttribute ? elt.getAttribute("hx-trigger") : "";
+  if (document.hidden && trigger && trigger.indexOf("every") === 0) event.preventDefault();
+});
+
+/* "Last checked" (job.html, web/poll.py). A page that polls says when it last asked, whether
+ * or not the answer changed anything (a 204 changes nothing, on purpose: a screen reader is not
+ * interrupted). The line sits outside the live region, so it is never read out. It goes when the
+ * job has finished: the page is the finished one then.
+ */
+(function () {
+  "use strict";
+
+  var line = document.getElementById("last-checked");
+  if (!line) return;
+  var time = line.querySelector("[data-last-checked]");
+
+  function stamp() {
+    if (document.querySelector("#job-status[data-finished]")) {
+      line.hidden = true;
+      return;
+    }
+    time.textContent = new Date().toLocaleTimeString([], { timeStyle: "medium" });
+    line.hidden = false;
+  }
+
+  stamp();
+  document.addEventListener("htmx:afterRequest", function (event) {
+    var elt = event.detail && event.detail.elt;
+    var trigger = elt && elt.getAttribute ? elt.getAttribute("hx-trigger") : "";
+    if (trigger && trigger.indexOf("every") === 0 && event.detail.successful) stamp();
+  });
+  document.addEventListener("htmx:afterSettle", function () {
+    if (document.querySelector("#job-status[data-finished]")) line.hidden = true;
+  });
+})();
+
 /* After a download (_after_download.html, web/feedback.py): the two optional questions
  * are in the page but hidden until the download link is used. Without JavaScript they
  * show on the next visit, and a link leads to them.
@@ -368,17 +555,18 @@
 
 /* Review screen (review_split.html). Everything there works without this; it only:
  *
- * - scrolls the page image, inside its own region, so the selected item's mark is in
- *   the region's visible box (side by side, also the window, only as far as keeps the
- *   decision's heading in view; stacked, never the window);
+ * - scrolls the page image, inside its own region, so the selected item's mark is in the
+ *   part of the region that is inside the window (the window itself is never moved on load:
+ *   side by side, the page pane is sized to the space under the header, see sizePane);
  * - asks once more for an image that could not be made (a render refused for a moment),
  *   then says so when the page image still cannot be loaded;
  * - makes "Save edit" the main button once a field of the decision is changed, so an
  *   edit is less likely to be dropped by pressing Accept out of habit (the server
  *   refuses Accept with a changed field in any case);
- * - offers keyboard shortcuts (N, P, A, E). They are off until the reviewer turns them
- *   on (WCAG 2.1.4: single-key shortcuts must be possible to turn off; speech input can
- *   type letters by accident), and never act while focus is in a field.
+ * - offers keyboard shortcuts (N, P, A, E). They are on until the reviewer turns them off
+ *   (WCAG 2.1.4: single-key shortcuts must be possible to turn off; speech input can type
+ *   letters by accident; the choice is remembered), and never act while focus is in a field.
+ *   A key with nothing to act on says so in the status line (#decision-notice).
  */
 (function () {
   "use strict";
@@ -392,29 +580,46 @@
     return start - Math.max(0, Math.min(visible / 3, visible - size));
   }
 
+  // Side by side, the page pane is sticky under the window's top edge. Its height is the
+  // window minus the space above it (the header, when the window is at the top) minus the
+  // sticky offset, so its lower edge is in the window on load; css reads --page-top, which
+  // is not set (and the pane is the window minus two offsets) without this script.
+  function sizePane() {
+    var split = document.querySelector(".split");
+    if (!split) return;
+    function measure() {
+      var top = Math.max(0, Math.round(split.getBoundingClientRect().top + window.scrollY));
+      document.documentElement.style.setProperty("--page-top", top + "px");
+    }
+    measure();
+    window.addEventListener("resize", measure);
+  }
+
   function bringMarkIntoView() {
     var region = document.querySelector(".page-scroll");
     var mark = region && region.querySelector(".box.is-current");
     if (!region || !mark) return;
-    // Inside the region only, against its own visible box: where the window happens to
-    // be does not matter (stacked, the region starts below the window on a phone, at
-    // 320 px and at 400% zoom, and any window term would overshoot).
+    // Inside the region only, against the part of its box that is in the window: where the
+    // window happens to be does not matter, and it is never moved. Stacked, the region
+    // starts below the window (a phone, 320 px, 400% zoom): its whole box counts then, and
+    // any window term would overshoot.
     var r = region.getBoundingClientRect();
     var m = mark.getBoundingClientRect();
-    var top = m.top - r.top - region.clientTop;
-    var left = m.left - r.left - region.clientLeft;
-    region.scrollTop += offset(top, m.height, region.clientHeight);
-    region.scrollLeft += offset(left, m.width, region.clientWidth);
-    // Side by side (wide screens), the page pane starts below the header, so a mark near
-    // the bottom of a page can stay below the window. Move the window just enough, and
-    // never so far that the decision's heading leaves the top of the window.
-    var heading = document.getElementById("decision-title");
+    var box = r.top + region.clientTop;
+    var from = 0;
+    var to = region.clientHeight;
     var side = window.getComputedStyle(region.closest(".page-area")).position === "sticky";
-    m = mark.getBoundingClientRect();
-    if (side && heading && m.bottom > window.innerHeight) {
-      var room = heading.getBoundingClientRect().top - 8;
-      window.scrollBy(0, Math.min(m.bottom - window.innerHeight + 24, Math.max(room, 0)));
+    if (side) {
+      from = Math.max(0, -box);
+      to = Math.min(to, window.innerHeight - box);
     }
+    if (to - from < 1) {
+      from = 0;
+      to = region.clientHeight;
+    }
+    var left = m.left - r.left - region.clientLeft;
+    region.scrollTop += offset(m.top - box - from, m.height, to - from);
+    region.scrollLeft += offset(left, m.width, region.clientWidth);
   }
 
   // A render can be refused for a moment (each person has two at a time, and the
@@ -451,7 +656,17 @@
     document.querySelectorAll(".decide-form").forEach(function (form) {
       // The choices that sit above the form (`data-decide-form` names it) follow it.
       var bars = form.id ? document.querySelectorAll('[data-decide-form="' + form.id + '"]') : [];
+      // A card with no proposal: Save edit waits for something typed (data-needs-edit).
+      var needs = form.querySelectorAll("[data-needs-edit]");
+      needs.forEach(function (button) { button.disabled = true; });
+      function typed() {
+        return Array.prototype.some.call(
+          form.querySelectorAll("textarea[data-edit-field]"),
+          function (field) { return field.value.trim() !== ""; }
+        );
+      }
       function edited() {
+        needs.forEach(function (button) { button.disabled = !typed(); });
         form.classList.add("is-edited");
         bars.forEach(function (bar) { bar.classList.add("is-edited"); });
       }
@@ -467,8 +682,46 @@
   function typing(target) {
     if (!(target instanceof Element)) return false;
     return Boolean(
-      target.closest("input, textarea, select, [contenteditable=''], [contenteditable='true']")
+      target.isContentEditable ||
+        target.closest(
+          "input, textarea, select, [contenteditable=''], [contenteditable='true'], " +
+            "[contenteditable='plaintext-only'], [role='textbox'], [role='combobox'], [role='searchbox']"
+        )
     );
+  }
+
+  // The status line is the one the saved notice uses (#decision-notice, role="status"): the
+  // page always has it, empty when nothing was saved, so what is put in it is announced.
+  // What a key says goes in a span of its own, after the saved notice's own words.
+  function say(text) {
+    var live = document.getElementById("decision-notice");
+    if (!live) return;
+    var note = live.querySelector("[data-key-note]");
+    if (!note) {
+      note = document.createElement("span");
+      note.setAttribute("data-key-note", "");
+      live.appendChild(note);
+    }
+    var gap = note.previousSibling ? " " : "";
+    note.textContent = "";
+    // Emptied first, so the same words said twice are announced twice.
+    window.setTimeout(function () { note.textContent = gap + text; }, 60);
+  }
+
+  // After n or p the new decision is a new page: focus goes to its heading, as it does
+  // after a decision is saved (the server marks that heading autofocus).
+  var FOCUS = "readablestem.focus-decision";
+
+  function focusHeadingAfterKey() {
+    var asked = false;
+    try {
+      asked = window.sessionStorage.getItem(FOCUS) === "1";
+      window.sessionStorage.removeItem(FOCUS);
+    } catch (e) {
+      asked = false;
+    }
+    var heading = document.getElementById("decision-title");
+    if (asked && heading) heading.focus();
   }
 
   function shortcuts() {
@@ -476,11 +729,12 @@
     var toggle = document.getElementById("shortcuts-on");
     if (!box || !toggle) return;
     box.hidden = false;
-    var on = false;
+    // On unless this reviewer turned them off: nothing stored is on.
+    var on = true;
     try {
-      on = window.localStorage.getItem(STORE) === "on";
+      on = window.localStorage.getItem(STORE) !== "off";
     } catch (e) {
-      on = false;
+      on = true;
     }
     toggle.checked = on;
     toggle.addEventListener("change", function () {
@@ -492,36 +746,70 @@
       }
     });
     document.addEventListener("keydown", function (event) {
-      if (!on || event.defaultPrevented || event.repeat || event.isComposing) return;
-      if (event.ctrlKey || event.metaKey || event.altKey) return;
+      if (!on || event.defaultPrevented || event.repeat) return;
+      // A key that is part of an input method's composition, or a chord, is not a shortcut.
+      if (event.isComposing || event.keyCode === 229) return;
+      if (event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
       if (typing(event.target)) return;
+      // Behind a dialog (the enlarged image) the screen is not what the keys would act on.
+      if (document.querySelector("dialog[open]")) return;
       var key = event.key.toLowerCase();
+      if (key !== "n" && key !== "p" && key !== "a" && key !== "e") return;
       var panel = document.getElementById("decision");
       if (!panel) return;
-      var target = null;
-      if (key === "n") target = panel.querySelector('.decision-nav a[rel="next"]');
-      else if (key === "p") target = panel.querySelector('.decision-nav a[rel="prev"]');
-      else if (key === "a") target = panel.querySelector('[data-role="accept"]');
-      else if (key === "e") {
+      event.preventDefault();
+      if (key === "n" || key === "p") {
+        var link = panel.querySelector('.decision-nav a[rel="' + (key === "n" ? "next" : "prev") + '"]');
+        if (!link) {
+          say(key === "n" ? "There is no next decision." : "There is no previous decision.");
+          return;
+        }
+        try {
+          window.sessionStorage.setItem(FOCUS, "1");
+        } catch (e) {
+          /* the page then opens without moving focus */
+        }
+        link.click();
+      } else if (key === "a") {
+        if (panel.getAttribute("data-card") === "page") {
+          say("A does nothing here: this choice keeps or replaces a whole page, so it needs Tab and a press.");
+          return;
+        }
+        var accept = panel.querySelector('[data-role="accept"]');
+        if (!accept || accept.disabled) {
+          say("There is nothing to accept here.");
+        } else if (accept.hasAttribute("data-anyway")) {
+          // Accepting goes against a check, or against what the page suggests for a group of
+          // headings: never by a single key. Focus goes to the button.
+          accept.focus();
+          say(
+            (accept.getAttribute("data-anyway") === "advice"
+              ? "A does not press this one, because the page suggests the other choice."
+              : "A does not accept this one, because accepting goes against a check.") +
+              " Focus is on the button: press it if you mean it."
+          );
+        } else {
+          accept.click();
+        }
+      } else {
         var edit = panel.querySelector(".edit-box");
-        if (edit) edit.open = true;
         // The first field, or where editing starts without being an edit itself (a
         // table's cell list: data-edit-start, which keeps no draft).
-        target = panel.querySelector("[data-edit-field], [data-edit-start]");
-        if (target) {
-          event.preventDefault();
-          target.focus();
+        var field = panel.querySelector("[data-edit-field], [data-edit-start]");
+        if (!field) {
+          say("There is nothing to edit here.");
+          return;
         }
-        return;
+        if (edit) edit.open = true;
+        field.focus();
       }
-      if (!target) return;
-      event.preventDefault();
-      target.click();
     });
   }
 
   if (!document.querySelector(".split")) return;
+  sizePane();
   bringMarkIntoView();
+  focusHeadingAfterKey();
   watchImages();
   watchEdits();
   shortcuts();
@@ -821,6 +1109,12 @@
   }
 
   var finished = false;
+  // The finished answer replaces the part of the page the button is in (#job-body), so where
+  // the keyboard was is noted before the swap takes the button away.
+  var wasInBox = false;
+  document.addEventListener("htmx:beforeSwap", function () {
+    wasInBox = !!box && box.contains(document.activeElement);
+  });
   document.addEventListener("htmx:afterSettle", function () {
     var now = document.getElementById("job-status");
     if (finished || !now || !now.hasAttribute("data-finished")) return;
@@ -829,7 +1123,7 @@
     if (title) document.title = title + " | ReadableSTEM";
     if (box) {
       // Keep the keyboard's place: focus on the button moves to the status box.
-      if (box.contains(document.activeElement)) {
+      if (wasInBox || box.contains(document.activeElement)) {
         region.setAttribute("tabindex", "-1");
         region.focus();
       }
@@ -1112,3 +1406,76 @@
   mark();
 })();
 /* ==== end ux2-lane-b ======================================================================== */
+
+/* The review's decision bar sticks to the bottom of a wide, tall window (app.css). Its height
+ * depends on the item (one or two rows of choices, up to three notes), so the room a focused
+ * control needs to stay above it is measured, not guessed: app.css reads --decision-bar-height
+ * as the page's scroll padding. Without this file the padding is a fixed two rows. */
+(function () {
+  "use strict";
+  var bar = document.querySelector(".decision-area .decision-bar");
+  if (!bar) return;
+  function measure() {
+    var sticky = window.getComputedStyle(bar).position === "sticky";
+    var height = sticky ? Math.ceil(bar.getBoundingClientRect().height) : 0;
+    document.documentElement.style.setProperty("--decision-bar-height", height + "px");
+  }
+  if (window.ResizeObserver) new window.ResizeObserver(measure).observe(bar);
+  window.addEventListener("resize", measure);
+  measure();
+})();
+
+/* Pictures of the PDF (templates/_crop.html) are shown at their own size, so one can be wider
+ * than its column: it scrolls inside its box. The box is a tab stop only while there is
+ * something to scroll to (axe: scrollable-region-focusable; a page of 25 crops is not 25 tab
+ * stops), the line under it appears while the picture is wider than the box, and the box
+ * carries an edge shadow (data-more) until its right-hand end is in view. Without this file
+ * every box stays a tab stop and says nothing, and still scrolls. */
+(function () {
+  "use strict";
+  function update(box) {
+    var scroller = box.querySelector(".crop-scroll");
+    if (!scroller) return;
+    var wide = scroller.scrollWidth > scroller.clientWidth + 1;
+    var atEnd = scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1;
+    var more = box.querySelector(".crop-more");
+    if (more) more.hidden = !wide;
+    if (wide) scroller.setAttribute("tabindex", "0");
+    else scroller.removeAttribute("tabindex");
+    if (wide && !atEnd) box.setAttribute("data-more", "");
+    else box.removeAttribute("data-more");
+  }
+  var observer = window.ResizeObserver
+    ? new window.ResizeObserver(function (entries) {
+        entries.forEach(function (entry) {
+          update(entry.target.closest(".crop-box"));
+        });
+      })
+    : null;
+  function attach(box) {
+    var scroller = box.querySelector(".crop-scroll");
+    if (!scroller || box.hasAttribute("data-crop-ready")) return;
+    box.setAttribute("data-crop-ready", "");
+    scroller.addEventListener("scroll", function () {
+      update(box);
+    });
+    if (observer) observer.observe(scroller);
+    update(box);
+  }
+  function attachAll(root) {
+    root.querySelectorAll(".crop-box").forEach(attach);
+  }
+  attachAll(document);
+  window.addEventListener("resize", function () {
+    document.querySelectorAll(".crop-box").forEach(update);
+  });
+  if (window.MutationObserver) {
+    new window.MutationObserver(function (records) {
+      records.forEach(function (record) {
+        record.addedNodes.forEach(function (node) {
+          if (node.nodeType === 1) attachAll(node);
+        });
+      });
+    }).observe(document.body, { childList: true, subtree: true });
+  }
+})();

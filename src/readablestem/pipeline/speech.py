@@ -29,7 +29,22 @@ conventions, kept short:
   "carbon 14, atomic number 6" (`speech_nuclides`);
 - units: upright letters or text after a number read as a unit, "5 m/s" as "5 meters per
   second" (`speech_units`); an italic letter is a variable and is never a unit;
-- text is read verbatim, except words that are a single maths symbol ("=" -> "equals").
+- text is read verbatim, except words that are a single maths symbol ("=" -> "equals");
+- a capital letter is said "cap K" (`CAP`; a Greek capital "cap delta"), so a voice does not read
+  "capital" before every letter of a formula; the review screen's own sentences still say
+  "capital" (`in_full_words`). An upright run of letters that is a name (`\\mathrm{Var}`: one
+  `mi` per letter) adds no "cap" and no word, and an element symbol in a chemical formula adds
+  none (`speech_chem`);
+- the rules carry a version (`SPEECH_VERSION`): a reading stored by older rules, and not written
+  by a person, is made again from its MathML when it is shown (`reading_for`, `refresh_readings`);
+- two different prints are never said alike: a short fraction or subscript that a plain
+  token follows directly closes itself ("1 over 2 end fraction m v squared" for `\\frac{1}{2}mv^2`,
+  "1 over 2 m v squared" for `\\frac{1}{2m}v^2`);
+- a sign is read for what it does in its place: a bar between the arguments of a probability or
+  an expectation is "given" and in set braces "such that" (elsewhere "divides"); a centered dot or a
+  cross between vectors is "dot" or "cross" (between numbers and scalars "times"); a transpose,
+  a star, a dagger and an inverse function are "A transpose", "x star", "A dagger" and "inverse
+  sine"; a negated relation is read as its own words ("is not less than or equal to").
 """
 
 # This module is a table of maths symbols; characters that look like Latin letters
@@ -41,20 +56,28 @@ from __future__ import annotations
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
+from typing import Any
 
 import defusedxml
 import defusedxml.ElementTree as DET
 
 from readablestem.core.mathml_intent import ALLOWED_INTENTS
 from readablestem.core.notation import canonical_from_parts
+from readablestem.core.types import EquationFix
 from readablestem.eval.equations import normalize
 from readablestem.pipeline import speech_chem
 from readablestem.pipeline.speech_nuclides import ELEMENTS, nuclide_words
 from readablestem.pipeline.speech_units import unit_words
 
 MAX_DEPTH = 64
+
+# The version of these rules. A reading is stored with the version that wrote it
+# (`EquationFix.speech_version`); raise this number whenever a rule changes what is said, and
+# every older stored reading is made again from its MathML where it is shown (`reading_for`).
+# 2: "cap K" for a capital, no word for the letters of a name, a pause after a coefficient.
+SPEECH_VERSION = 2
 
 
 class SpeechError(ValueError):
@@ -68,9 +91,17 @@ GREEK = {
     "ρ": "rho", "ϱ": "rho", "σ": "sigma", "ς": "sigma", "τ": "tau", "υ": "upsilon",
     "φ": "phi", "ϕ": "phi", "χ": "chi", "ψ": "psi", "ω": "omega",
 }  # fmt: skip
-GREEK.update(
-    {ch.upper(): f"capital {name}" for ch, name in list(GREEK.items()) if ch.upper() != ch}
-)
+# A capital letter is "cap K": one syllable, so a formula with many capitals stays quick to hear.
+CAP = "cap"
+
+
+def in_full_words(said: str) -> str:
+    """A reading as the review screen's own sentences name a letter ("capital X", not the
+    "cap X" a voice says): for the words a person reads, not the ones a voice speaks."""
+    return f"capital {said[len(CAP) + 1 :]}" if said.startswith(f"{CAP} ") else said
+
+
+GREEK.update({ch.upper(): f"{CAP} {name}" for ch, name in list(GREEK.items()) if ch.upper() != ch})
 
 SYMBOLS = {
     # operators
@@ -92,7 +123,15 @@ SYMBOLS = {
     "⊂": "is a subset of", "⊆": "is a subset of or equal to", "⊃": "is a superset of",
     "⊥": "is perpendicular to", "∥": "is parallel to", "∣": "divides", "∴": "therefore",
     "∵": "because", "∀": "for all", "∃": "there exists", "¬": "not", "∧": "and",
-    "∨": "or", "∪": "union", "∩": "intersection",
+    "∨": "or", "∪": "union", "∩": "intersection", "∖": "set minus", "⧵": "set minus",
+    "\\": "backslash",
+    "~": "tilde", "†": "dagger", "‡": "double dagger", "⊤": "top", "⊢": "proves",
+    "⊨": "models", "≺": "precedes", "≻": "succeeds", "≼": "precedes or equals",
+    "≽": "succeeds or equals", "∤": "does not divide", "∄": "there does not exist",
+    "⊇": "is a superset of or equal to", "∋": "contains the member", "⟂": "is perpendicular to",
+    "⊲": "is a normal subgroup of", "⊳": "contains as a normal subgroup",
+    "⊴": "is a normal subgroup of or equal to", "⊵": "contains as a normal subgroup or equal to",
+    "⊩": "forces",
     # arrows
     "→": "right arrow", "⟶": "right arrow", "←": "left arrow", "⟵": "left arrow",
     "↔": "left right arrow", "⟷": "left right arrow", "⇒": "implies", "⟹": "implies",
@@ -173,6 +212,8 @@ def _parse(mathml: str) -> ET.Element:
             raise SpeechError("MathML nested too deeply")
         stack.extend((child, depth + 1) for child in elem)
     _restore_upright_symbols(root)
+    _retag_operator_glyphs(root)
+    _join_italic_words(root)
     return normalize(root)
 
 
@@ -197,21 +238,77 @@ def _drop_trailing_punctuation(node: ET.Element) -> None:
 # ------------------------------------------------------------------------- tokens
 
 
+SOLIDUS_OVERLAY = "\u0338"
+# How a relation's words read once it is struck through. Anything not here gets "is not" before
+# a phrase that ends in a preposition ("is not a subset of") and "not" before the rest.
+_NEGATED_WORDS = {
+    "equals": "is not equal to", "approximately equals": "is not approximately equal to",
+    "precedes": "does not precede", "succeeds": "does not succeed",
+    "precedes or equals": "does not precede or equal",
+    "succeeds or equals": "does not succeed or equal",
+    "proves": "does not prove", "models": "does not model", "implies": "does not imply",
+    "maps to": "does not map to", "is implied by": "is not implied by",
+    "if and only if": "is not equivalent to", "forces": "does not force",
+    "less than or equal to": "is neither less than nor equal to",
+    "greater than or equal to": "is neither greater than nor equal to",
+    "is a subset of or equal to": "is neither a subset of nor equal to",
+    "is a superset of or equal to": "is neither a superset of nor equal to",
+    "contains the member": "does not contain the member",
+    "contains as a normal subgroup": "does not contain as a normal subgroup",
+    "contains as a normal subgroup or equal to":
+        "does not contain as a normal subgroup or equal to",
+    "approaches the limit": "does not approach the limit",
+}  # fmt: skip
+_ARROW_WORDS = frozenset(
+    {"right arrow", "left arrow", "left right arrow", "up arrow", "down arrow"}
+)
+
+
+def _struck_base(text: str) -> str | None:
+    """The relation under a negation slash: `≰` -> `≤`, `⟂` + U+0338 -> `⟂`, else None."""
+    if len(text) == 2 and text[1] == SOLIDUS_OVERLAY:
+        return text[0]
+    if len(text) == 1:
+        decomposed = unicodedata.normalize("NFD", text)
+        if len(decomposed) == 2 and decomposed[1] == SOLIDUS_OVERLAY:
+            return decomposed[0]
+    return None
+
+
+def _negated_words(text: str) -> str | None:
+    """Words for a relation with a slash through it, built from the words of the relation, or
+    None when `text` is not one."""
+    base = _struck_base(text)
+    if base is None:
+        return None
+    words = _char_words(base)
+    if words in _ARROW_WORDS:
+        return f"{words} with stroke"
+    if words in _NEGATED_WORDS:
+        return _NEGATED_WORDS[words]
+    if words.startswith("is "):
+        return f"is not {words[3:]}"
+    return f"is not {words}" if words.split()[-1] in {"than", "to", "of"} else f"not {words}"
+
+
 def _char_words(ch: str) -> str:
     if ch in GREEK:
         return GREEK[ch]
     if ch in SYMBOLS:
         return SYMBOLS[ch]
+    negated = _negated_words(ch)
+    if negated is not None:
+        return negated
     if ch.isascii() and ch.isalpha():
-        return f"capital {ch}" if ch.isupper() else ch
+        return f"{CAP} {ch}" if ch.isupper() else ch
     if ch.isascii():
         return ch
     name = unicodedata.name(ch, "")
     if not name:
         return ch
-    # Letterlike symbols (U+211D double-struck R): "double-struck capital R".
+    # Letterlike symbols (U+211D double-struck R): "double-struck cap R".
     base = unicodedata.normalize("NFKC", ch)
-    words = name.lower().split()
+    words = [CAP if w == "capital" else w for w in name.lower().split()]
     if len(base) == 1 and base.isascii() and base.isalpha() and words[-1] == base.lower():
         words[-1] = base
     return " ".join(words)
@@ -244,6 +341,8 @@ def _speak_mi(node: ET.Element) -> list[str]:
     text = node.text or ""
     if not text:
         return []
+    if node.get(_MARK):  # a "~" read as "is distributed as"
+        return [node.get(_MARK, "")]
     variant = _course_reading(text, node.get("mathvariant")) or VARIANT_PREFIX.get(
         node.get("mathvariant", "")
     )
@@ -263,12 +362,14 @@ def _speak_mo(node: ET.Element) -> list[str]:
     text = node.text or ""
     if not text:
         return []
+    if node.get(_MARK):  # a reading the row gave it ("given", "dot"; see `_mark_row`)
+        return [node.get(_MARK, "")]
     for table in (SYMBOLS, FUNCTIONS, LIMIT_OPERATORS):
         if text in table:
             return [table[text]]
     if len(text) == 1:
         return [_char_words(text)]
-    return [text]
+    return [_negated_words(text) or text]
 
 
 def _speak_mtext(node: ET.Element) -> list[str]:
@@ -291,8 +392,76 @@ def _text_of(node: ET.Element) -> str:
     return "".join(node.itertext()).strip()
 
 
+_NAME_SYMBOLS = frozenset("∞∂∇∅ℏℓ")
+
+
 def _is_plain_token(node: ET.Element) -> bool:
-    return node.tag in {"mi", "mn", "mtext"} and _text_of(node) not in FUNCTIONS
+    r"""A letter, a number or a word. The converter leaves some relations and operators as `mi`
+    (`\geqslant`, `\pm`): a sign is not a token a short form can run into."""
+    text = _text_of(node)
+    if node.tag == "mi" and not (text[:1].isalnum() or text[:1] in _NAME_SYMBOLS):
+        return False
+    return node.tag in {"mi", "mn", "mtext"} and text not in FUNCTIONS
+
+
+def _starts_plain(node: ET.Element) -> bool:
+    """A plain token, or a script on one (`b^2` after `a_a` can be taken for the rest of its
+    subscript)."""
+    while node.tag in {"msub", "msup", "msubsup"} and len(node):
+        node = node[0]
+    return _is_plain_token(node)
+
+
+# Nodes a plain token follows directly in the call in progress (`_mark_followed`). A short
+# fraction or subscript there says where it ends, or `\frac{1}{2}mv^2` and `\frac{1}{2m}v^2`
+# would be said alike.
+_FOLLOWED: ContextVar[frozenset[int]] = ContextVar("speech_followed", default=frozenset())
+
+
+def _mark_followed(root: ET.Element) -> frozenset[int]:
+    """The ids of the nodes a plain token follows directly: the next sibling is one, or the node
+    ends a row (`mrow`) that one follows. Only a plain token can be taken for the rest of a short
+    form: a short form holds no operators, so an operator or a bracket after it cannot be."""
+    found: set[int] = set()
+    stack = [(root, False)]
+    while stack:
+        node, followed = stack.pop()
+        kids = list(node)
+        transparent = node.tag in {"math", "mrow"}
+        for k, kid in enumerate(kids):
+            more = k + 1 < len(kids)
+            after = _starts_plain(kids[k + 1]) if more else followed and transparent
+            if after:
+                found.add(id(kid))
+            stack.append((kid, after))
+    return frozenset(found)
+
+
+# Fractions a plain token directly precedes in the call in progress: `a\\frac{b}{2}` takes the
+# long form, or it would be said as `\\frac{ab}{2}` is.
+_PRECEDED: ContextVar[frozenset[int]] = ContextVar("speech_preceded", default=frozenset())
+
+
+def _mixed_number(prev: ET.Element, node: ET.Element) -> bool:
+    """`2\\frac{1}{2}`: a number before a fraction of numbers; `\\frac{21}{2}` is one number."""
+    return prev.tag == "mn" and node.tag == "mfrac" and len(node) == 2 and node[0].tag == "mn"
+
+
+def _mark_preceded(root: ET.Element) -> frozenset[int]:
+    """The ids of the nodes a plain token directly precedes (a first node in a row follows
+    what the row follows)."""
+    found: set[int] = set()
+    stack: list[tuple[ET.Element, ET.Element | None]] = [(root, None)]
+    while stack:
+        node, before = stack.pop()
+        transparent = node.tag in {"math", "mrow"}
+        prev = before if transparent else None
+        for kid in node:
+            if prev is not None and _is_plain_token(prev) and not _mixed_number(prev, kid):
+                found.add(id(kid))
+            stack.append((kid, prev))
+            prev = kid
+    return frozenset(found)
 
 
 def _is_simple(node: ET.Element) -> bool:
@@ -318,12 +487,61 @@ def _speak_fraction(node: ET.Element) -> list[str]:
     num, den = node[0], node[1]
     if node.get("linethickness") == "0":
         return [*_speak(num), "choose", *_speak(den)]
-    if _is_simple(num) and _is_simple(den):
-        return [*_speak(num), "over", *_speak(den)]
+    long_form = id(node) in _PRECEDED.get() and _is_plain_token(num)
+    if _is_simple(num) and _is_simple(den) and not long_form:
+        end = ["end fraction"] if id(node) in _FOLLOWED.get() else []
+        return [*_speak(num), "over", *_speak(den), *end]
     return ["the fraction", *_speak(num), "over", *_speak(den), "end fraction"]
 
 
-def _power_words(sup: ET.Element) -> list[str]:
+_INVERTIBLE = frozenset(
+    {"sin", "cos", "tan", "cot", "sec", "csc", "arcsin", "arccos", "arctan"}
+    | {"sinh", "cosh", "tanh", "log", "lg", "ln", "exp"}
+)
+_BOLD_VARIANTS = frozenset({"bold", "bold-italic", "bold-sans-serif", "sans-serif-bold-italic"})
+
+
+def _inverts(base: ET.Element, sup: ET.Element) -> bool:
+    r"""`\sin^{-1}`: a named function to the power minus one is its inverse, not a power."""
+    return (
+        base.tag == "mi"
+        and _text_of(base) in _INVERTIBLE
+        and sup.tag == "mrow"
+        and len(sup) == 2
+        and _mo_text(sup[0]) in {"−", "-"}
+        and sup[1].tag == "mn"
+        and _text_of(sup[1]) == "1"
+    )
+
+
+def _transposable(base: ET.Element) -> bool:
+    """A matrix or a vector by its print: a capital letter, a bold letter, or a bracketed
+    expression with one of those (or a table) inside."""
+    if base.tag == "mi":
+        text = _text_of(base)
+        bold = base.get("mathvariant") in _BOLD_VARIANTS
+        return len(text) == 1 and text.isascii() and text.isalpha() and (text.isupper() or bold)
+    if base.tag == "mrow" and len(base) > 1 and base[0].tag != "mo":
+        return _transposable(base[-1])  # `\\boldsymbol{BB}^T` is printed as `BB^T`
+    if base.tag == "mrow" and len(base) > 2:
+        bracketed = _mo_text(base[0]) in {"(", "["} and _mo_text(base[-1]) in {")", "]"}
+        return bracketed and any(n.tag == "mtable" or _transposable(n) for n in base.iter())
+    return False
+
+
+def _is_transpose(sup: ET.Element, base: ET.Element) -> bool:
+    r"""`A^{T}` and `A^{\mathrm{T}}` (a plain or upright T alone over a matrix or a vector), and
+    `A^\top` (the top sign, which over anything is a transpose)."""
+    text = _text_of(sup)
+    if text in {"⊤", "⊺"} and sup.tag in {"mi", "mo"}:
+        return True
+    plain_or_upright = sup.get("mathvariant") in {None, "normal"}
+    return sup.tag == "mi" and text == "T" and plain_or_upright and _transposable(base)
+
+
+def _power_words(
+    sup: ET.Element, base: ET.Element | None = None, *, followed: bool = False
+) -> list[str]:
     text = _text_of(sup)
     if sup.tag == "mn" and text == "2":
         return ["squared"]
@@ -331,14 +549,22 @@ def _power_words(sup: ET.Element) -> list[str]:
         return ["cubed"]
     if text in {"′", "″", "‴", "°", "∘"} and sup.tag in _TOKENS:
         return ["degrees"] if text in {"°", "∘"} else [SYMBOLS[text]]
-    if _is_signed_token(sup):
+    if base is not None and _is_transpose(sup, base):
+        return ["transpose"]
+    if sup.tag in {"mo", "mi"} and text in {"*", "∗", "†", "‡"}:
+        return ["star" if text in {"*", "∗"} else SYMBOLS[text]]
+    if base is not None and base.tag == "mn" and sup.tag == "mo" and text in {"+", "−", "-"}:
+        return ["plus" if text == "+" else "minus"]  # a one-sided limit: 0 plus, 0 minus
+    if _is_signed_token(sup) and not (followed and sup.tag == "mo"):  # `e^{-}x` is not `e^{-x}`
         return ["to the power", *_speak(sup)]
     return ["to the power", *_speak(sup), "end power"]
 
 
-def _sub_words(sub: ET.Element) -> list[str]:
+def _sub_words(sub: ET.Element, *, followed: bool = False) -> list[str]:
+    """ "sub i", and "sub i end sub" when a plain token follows (or `x_i y` and `x_{iy}` are said
+    alike); a long subscript always ends."""
     if _is_simple(sub) or _is_signed_token(sub):
-        return ["sub", *_speak(sub)]
+        return ["sub", *_speak(sub), *(["end sub"] if followed else [])]
     return ["sub", *_speak(sub), "end sub"]
 
 
@@ -404,7 +630,9 @@ def _speak_msub(node: ET.Element) -> list[str]:
     if _no_base(base):
         return _pre_script("subscript", sub)
     limits = _with_limits(base, sub, None)
-    return limits if limits is not None else [*_speak(base), *_sub_words(sub)]
+    if limits is not None:
+        return limits
+    return [*_speak(base), *_sub_words(sub, followed=id(node) in _FOLLOWED.get())]
 
 
 def _speak_msup(node: ET.Element) -> list[str]:
@@ -417,7 +645,11 @@ def _speak_msup(node: ET.Element) -> list[str]:
     if _no_base(base):
         return _pre_script("superscript", sup)
     limits = _with_limits(base, None, sup)
-    return limits if limits is not None else [*_speak(base), *_power_words(sup)]
+    if limits is not None:
+        return limits
+    if _inverts(base, sup):
+        return ["inverse", FUNCTIONS[_text_of(base)]]
+    return [*_speak(base), *_power_words(sup, base, followed=id(node) in _FOLLOWED.get())]
 
 
 def _speak_msubsup(node: ET.Element) -> list[str]:
@@ -432,7 +664,11 @@ def _speak_msubsup(node: ET.Element) -> list[str]:
     limits = _with_limits(base, sub, sup)
     if limits is not None:
         return limits
-    return [*_speak(base), *_sub_words(sub), *_power_words(sup)]
+    return [
+        *_speak(base),
+        *_sub_words(sub),
+        *_power_words(sup, base, followed=id(node) in _FOLLOWED.get()),
+    ]
 
 
 def _speak_munder(node: ET.Element) -> list[str]:
@@ -815,9 +1051,177 @@ def _measured_unit(kids: list[ET.Element], i: int) -> tuple[list[str], int] | No
     return found
 
 
+# ------------------------------------------------- a sign read for what it does in its row
+
+_MARK = "speak"  # attribute a row sets on a sign: the words to say in place of its own
+_OPENERS = {"(": ")", "[": "]", "{": "}", "⟨": "⟩"}
+_CLOSERS = frozenset(_OPENERS.values())
+_DOTS = frozenset({"·", "⋅", "∙"})
+_VECTOR_ARROWS = frozenset({"→", "⃗"})
+
+
+def _identifier(node: ET.Element) -> bool:
+    """A letter or a name a bracket can follow like a call: P, E, p_X, Var."""
+    base = node[0] if node.tag in _SCRIPTS and len(node) else node
+    text = _text_of(base)
+    return base.tag == "mi" and bool(text) and text[0].isalpha()
+
+
+def _matching(kids: list[ET.Element], start: int) -> int | None:
+    """The index of the closing bracket of the one at `start`, or None."""
+    depth = 0
+    for j in range(start, len(kids)):
+        text = _mo_text(kids[j])
+        if text in _OPENERS:
+            depth += 1
+        elif text in _CLOSERS:
+            depth -= 1
+            if depth == 0:
+                return j
+    return None
+
+
+def _mark_bars(kids: list[ET.Element]) -> None:
+    """A bar between the arguments of a call ("P(A \\mid B)", "E[X \\mid Y]") is "given", between
+    set braces "such that", inside angle brackets "vertical bar". Elsewhere a `\\mid` stays
+    "divides". A plain `|` is marked only when it is the one bar of its brackets (two are the
+    absolute value)."""
+    for i, kid in enumerate(kids):
+        opener = _mo_text(kid)
+        if opener not in _OPENERS or (end := _matching(kids, i)) is None:
+            continue
+        if opener in {"(", "["}:
+            word = "given" if i > 0 and _identifier(kids[i - 1]) else None
+        else:
+            word = {"{": "such that", "⟨": "vertical bar"}[opener]
+        if word is None:
+            continue
+        depth, bars = 0, []
+        for inner in kids[i + 1 : end]:
+            text = _mo_text(inner)
+            if text in _OPENERS:
+                depth += 1
+            elif text in _CLOSERS:
+                depth -= 1
+            elif depth == 0 and text in {"∣", "|"}:
+                bars.append(inner)
+        # In "{n \mid 3 \mid n}" the first bar is "such that" and the second divides.
+        for bar in bars[:1] if opener == "{" else bars:
+            if _mo_text(bar) == "∣" or len(bars) == 1:
+                bar.set(_MARK, word)
+
+
+def _is_nabla(node: ET.Element) -> bool:
+    return node.tag in {"mi", "mo"} and _text_of(node) == "∇"
+
+
+def _vector_like(node: ET.Element) -> bool:
+    """A vector by its print: a bold letter, a letter with a vector arrow, nabla; either under a
+    script (`\\mathbf{E}_0`)."""
+    base = node
+    while base.tag in _SCRIPTS and len(base):
+        base = base[0]
+    if base.tag == "mover" and len(base) == 2:
+        return _text_of(base[1]) in _VECTOR_ARROWS
+    if base.tag == "mrow" and len(base):
+        return all(_vector_like(child) for child in base)
+    if base.tag == "mi" and base.get("mathvariant") in _BOLD_VARIANTS:
+        return True
+    return _is_nabla(base)
+
+
+def _operand(kids: list[ET.Element], i: int, step: int) -> ET.Element | None:
+    """The operand before (step -1) or after (+1) the sign at `i`: brackets are skipped on the
+    way, and after the sign a unary minus and a differential `d` too (F . d r)."""
+    j = i + step
+    while 0 <= j < len(kids):
+        text = _mo_text(kids[j])
+        if text in _OPENERS or text in _CLOSERS or (step > 0 and text in {"−", "-"}):
+            j += step
+        else:
+            break
+    if not 0 <= j < len(kids):
+        return None
+    differential = kids[j].tag == "mi" and _text_of(kids[j]) in {"d", "δ"}
+    if step > 0 and differential and j + 1 < len(kids) and _vector_like(kids[j + 1]):
+        return kids[j + 1]
+    return kids[j]
+
+
+def _mark_products(kids: list[ET.Element]) -> None:
+    """A centered dot or a cross between vectors (or after or before nabla) is "dot" or "cross";
+    between numbers and scalars both stay "times". The vector test is the one `signs.py` uses on
+    the text layer: a bold letter or a vector arrow on both sides."""
+    for i, kid in enumerate(kids):
+        text = _mo_text(kid)
+        word = "dot" if text in _DOTS else "cross" if text == "×" else None
+        if word is None:
+            continue
+        left, right = _operand(kids, i, -1), _operand(kids, i, 1)
+        if left is None or right is None:
+            continue
+        if _is_nabla(left) or _is_nabla(right) or (_vector_like(left) and _vector_like(right)):
+            kid.set(_MARK, word)
+
+
+def _distribution_follows(kids: list[ET.Element], start: int) -> bool:
+    """A name with an argument list after the sign: `N(0,1)`, `\\mathrm{Bin}(n,p)`, `U[0,1]`."""
+    names, j = [], start
+    while j < len(kids) and kids[j].tag in {"mi", "mtext", *_SCRIPTS}:
+        node = kids[j]
+        names.append(_text_of(node[0] if node.tag in _SCRIPTS and len(node) else node))
+        j += 1
+    word = "".join(names)
+    named = bool(word) and (word[0].isupper() or len(word) > 1)
+    return named and j < len(kids) and _mo_text(kids[j]) in {"(", "["}
+
+
+def _mark_tilde(kids: list[ET.Element]) -> None:
+    """`x \\sim N(0,1)` is "is distributed as", `a \\sim b` "is similar to", a tilde before a
+    number "approximately"."""
+    for i, kid in enumerate(kids):
+        if kid.tag not in {"mi", "mo"} or _text_of(kid) not in {"~", "∼"}:
+            continue
+        if i == 0:
+            word = "approximately"
+        elif _distribution_follows(kids, i + 1):
+            word = "is distributed as"
+        else:
+            word = "is similar to"
+        kid.set(_MARK, word)
+
+
+def _mark_row(kids: list[ET.Element]) -> None:
+    _mark_bars(kids)
+    _mark_products(kids)
+    _mark_tilde(kids)
+
+
+def _name_letter(node: ET.Element) -> bool:
+    """One upright Latin letter: a letter of a name (`\\mathrm{Var}` is three of them)."""
+    text = node.text or ""
+    return (
+        node.tag == "mi"
+        and not len(node)
+        and node.get("mathvariant") == "normal"
+        and len(text) == 1
+        and text.isascii()
+        and text.isalpha()
+    )
+
+
+def _in_name(kids: list[ET.Element], i: int) -> bool:
+    """Is kids[i] a letter in a run of two or more upright letters? Its case is part of how
+    the name is spelled ("Var"), not a capital variable, so it adds no "cap"."""
+    return _name_letter(kids[i]) and (
+        (i > 0 and _name_letter(kids[i - 1])) or (i + 1 < len(kids) and _name_letter(kids[i + 1]))
+    )
+
+
 def _speak_children(node: ET.Element) -> list[str]:
     words: list[str] = []
     kids = list(node)
+    _mark_row(kids)
     chemistry = speech_chem.is_chem_row(kids)
     i = 0
     while i < len(kids):
@@ -829,6 +1233,8 @@ def _speak_children(node: ET.Element) -> list[str]:
         if found is None and i > 0:
             count = _after_number(kids[i - 1])
             found = _unit_run(kids, i, count) if count is not None else None
+        if found is None and _in_name(kids, i):
+            found = [kids[i].text or ""], 1
         if found is None:
             words += _speak(kids[i])
             i += 1
@@ -880,6 +1286,88 @@ def _restore_upright_symbols(root: ET.Element) -> None:
             node.set("mathvariant", "normal")
 
 
+_OPERATOR_GLYPHS = frozenset("|‖∣∥⟨⟩±∓:…")
+
+
+def _retag_operator_glyphs(root: ET.Element) -> None:
+    r"""The converter writes `\vert`, `\Vert`, `\pm` and `\langle` as `mi` and `|`, `\|` as `mo`
+    (gold LaTeX is converted without `mathml_shape`). One print is one reading: they are
+    operators in the speech whichever way they arrive."""
+    for node in root.iter():
+        local = node.tag.rsplit("}", 1)[-1]
+        if local == "mi" and len(node) == 0 and (node.text or "") in _OPERATOR_GLYPHS:
+            node.tag = node.tag[: -len("mi")] + "mo"
+
+
+def _join_italic_words(root: ET.Element) -> None:
+    r"""`\mathit{diff}` arrives as one italic `mi` per letter, which would be spelled out ("d i f
+    f"). Two or more of them in a row are the word. (A plain `diff` has no style on its letters and
+    is still the product d, i, f, f.)"""
+
+    def letter(node: ET.Element) -> bool:
+        text = node.text or ""
+        local = node.tag.rsplit("}", 1)[-1]
+        italic = node.get("mathvariant") == "italic"
+        return local == "mi" and italic and not len(node) and len(text) == 1 and text.isalpha()
+
+    for parent in list(root.iter()):
+        kids, rebuilt, i = list(parent), [], 0
+        while i < len(kids):
+            end = i
+            while end < len(kids) and letter(kids[end]):
+                end += 1
+            if end - i >= 2:
+                word = ET.Element(kids[i].tag, {"mathvariant": "italic"})
+                word.text = "".join(k.text or "" for k in kids[i:end])
+                rebuilt.append(word)
+                i = end
+            else:
+                rebuilt.append(kids[i])
+                i += 1
+        if len(rebuilt) != len(kids):
+            parent[:] = rebuilt
+
+
+def course_readings(applied: Iterable[Any] | None) -> dict[str, str]:
+    """The course's words for its styled letters ("vector" for a bold d), from the symbols a
+    stored result says the conversion was handed (`DocumentResult.notation_applied`): what
+    `mathml_to_speech(readings=...)` needs to say a stored equation as it was first said."""
+    from readablestem.pipeline import notation_memory
+
+    return notation_memory.readings(applied or ())
+
+
+def reading_for(equation: EquationFix, readings: Mapping[str, str] | None = None) -> str:
+    """The reading of a stored equation as the rules in force say it. A reading made by older
+    rules (`EquationFix.speech_version`) is made again from its MathML, at no model cost, so
+    the page, the EPUB and Word file, Listen and the review screen say the same words; one a
+    person wrote (a negative version) and one the rules cannot read stay as they are."""
+    version = equation.speech_version
+    if version < 0 or version >= SPEECH_VERSION or not equation.mathml.strip():
+        return equation.speech
+    try:
+        said = mathml_to_speech(equation.mathml, readings=readings)
+    except Exception:
+        # Not only `SpeechError`: this runs on stored documents each time one is shown, and a
+        # fault in the rules on one equation must leave the page with the reading it has.
+        return equation.speech
+    return said or equation.speech
+
+
+def refresh_readings(result: Any) -> None:
+    """Make every stored reading in a `DocumentResult` that older rules wrote again, in place
+    (`reading_for`, with the course's words from the result). A file is written again from a
+    stored result through this, so the page, and the EPUB and Word file made from it, say what
+    the rules in force say. A reading already current, and one a person wrote, is not touched."""
+    readings = course_readings(result.notation_applied)
+    for fix in result.fixes:
+        equation = fix.equation
+        if equation is None or not 0 <= equation.speech_version < SPEECH_VERSION:
+            continue
+        equation.speech = reading_for(equation, readings)
+        equation.speech_version = SPEECH_VERSION
+
+
 def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) -> str:
     """Plain-English reading of presentation MathML. Raises SpeechError on unreadable input.
 
@@ -888,9 +1376,13 @@ def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) 
     root = _parse(mathml)
     _drop_trailing_punctuation(root)
     token = _READINGS.set(readings or None)
+    followed = _FOLLOWED.set(_mark_followed(root))
+    preceded = _PRECEDED.set(_mark_preceded(root))
     try:
         words = _speak(root)
     finally:
+        _PRECEDED.reset(preceded)
+        _FOLLOWED.reset(followed)
         _READINGS.reset(token)
     text = " ".join(word for word in words if word)
     return _SPACE_BEFORE_PUNCT.sub(r"\1", " ".join(text.split()))

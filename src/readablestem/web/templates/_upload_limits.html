@@ -1,0 +1,45 @@
+{# What a person can upload and how much: the numbers are the settings' (routes/pages.py
+   `limits_context`, web/deps.py). /limits and /pricing both include this list, so the
+   allowance a page states is the one the upload routes enforce. #}
+<dl class="limits-list">
+  <div><dt>File types</dt><dd>{% include "_accepted_types.html" %}{% if word_source %}
+    A Word (.docx) file is read from the file itself and kept as uploaded; it counts as one page for every
+    {{ chars_per_page }} characters or picture in it.{% if office_on %} A PowerPoint file, or a Word file that
+    cannot be read that way, is turned into a PDF first, and its page count applies.{% endif %}{% elif office_on %}
+    A Word or PowerPoint file is turned into a PDF first, and its page count applies.{% endif %}{% if latex_source %} If you
+    have the LaTeX file (.tex) or the zip of the LaTeX project a document was made from, upload
+    that: its headings, lists, tables and equations are then read from the file itself, where
+    from a PDF they have to be worked out from how the page looks. A project zip may be up to
+    {{ project_zip }}, and every {{ chars_per_page }} characters or figure count as one page.
+    Upload a PDF when the source is not available, or when the document is a scan. Not taken yet, so upload the compiled PDF instead: the source of a
+    Beamer slide deck, a source that uses the {{ refused_classes }} class (read without its own
+    rules, its solutions and correct-answer marks could reach students), and one that loads the {{ refused_packages }}
+    package. Other classes without a LaTeXML binding (KOMA-Script, memoir, extarticle) are read
+    as an article.{% else %} It works from the PDF, not from LaTeX source files.{% endif %}</dd></div>
+  <div><dt>Size</dt><dd>One document is up to {{ one_document }}, and it is converted as it is.
+    {% if in_parts %}One file is up to {{ one_file }}: a file bigger than one document is kept
+    for {{ retention_hours }} hours so you can choose which pages to convert; each part becomes a document of its
+    own. When two or more parts are finished, a “Combine parts” link on a part's page joins the
+    ones you still have into one file, in page order; a part you deleted is left out.{% else %}Split longer documents.{% endif %}</dd></div>
+  <div><dt>Daily limits</dt><dd>{% if signup_open %}A new account (one you made by signing in) can convert
+    {{ open_page_quota }} pages and start {{ open_rereads }} reads with the model from the
+    review screen (marking an equation, reading a table cell) a day{% if invited_page_quota %}; an
+    invited account can convert {{ invited_page_quota }} pages a day{% endif %}. New accounts
+    also share a small part of the day's budget for model calls: when it is used up,
+    conversions for new accounts pause until midnight UTC while others go on. Pages dense with
+    equations use more of that share than plain pages, so it lasts for fewer of them. New accounts
+    are limited in number each day too.
+    {% elif invited_page_quota %}You can convert {{ invited_page_quota }} pages a day.
+    {% endif %}
+    All limits start again at midnight UTC, and the whole service pauses for the day when its
+    budget for model calls is used up. When several people upload at once, the queue takes
+    one document from each person in turn.</dd></div>
+  <div><dt>Storage</dt><dd>You can keep up to {{ storage_mb }} MB of uploads and results at
+    once{% if signup_open %} ({{ open_storage_mb }} MB for a new account){% endif %}. An upload
+    that would go over is refused; delete documents you no longer need to make room. When the
+    service as a whole is full, uploads wait until older documents have been deleted.</dd></div>
+  <div><dt>How long it is kept</dt><dd>Your documents are deleted {{ retention_hours }} hours after you last
+    worked on them (7 days if you keep them, for one upload or as your default in
+    <a href="/account#account-keep">Account</a>; {{ opt_in_days }} if you also let us look
+    at the results). Download the file before then.</dd></div>
+</dl>

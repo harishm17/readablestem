@@ -15,8 +15,17 @@ each part. What changes between a part and the whole is only addresses:
   (`p31-e0`), which no other part can have; an id of another shape gets the part's number
   in front. The same rewrite is applied everywhere an id is named: the element and its
   fix, its container, links and cross-references, the equation markers inside text (their
-  length changes, so the offsets of links, colour runs, raised and lowered runs and a term's
-  end are moved with them) and the pictures.
+  length changes, so the offsets of every span of the text (`core.inline`: links, colour,
+  raised and lowered runs, struck text) and a term's end are moved with them) and the pictures.
+- **Links.** A part cannot link to what is in another part (a contents entry for a later
+  chapter, "Chapter 2", "Figure 3"). After the join the same passes that made links in the
+  parts run again over all the elements (`join`), so those resolve; links a part made are kept.
+- **Language.** The file's language is the one most parts have (`common_language`); a part
+  in another language keeps it: its paragraphs, list items and headings are written with their
+  own `lang`, so a screen reader switches voice at the part. A part whose language was assumed
+  or mixed (`lang_assumed`, `lang_mixed`, not yet confirmed) votes for nothing and is marked
+  with nothing, since its tag is a guess: it is read in the file's language until its owner
+  confirms the language on its page, and the combine page says so (`web.combine.language_check`).
 - **Gaps.** Source pages between the first and last part that no part here holds (a part
   deleted, or not finished) are named in the student note as left out of this file, so the
   file never reads as complete when it is not.
@@ -28,23 +37,28 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass
+from typing import Literal
 
+from readablestem.core import inline
 from readablestem.core.types import (
     INLINE_MARKER_RE,
-    ColourRun,
     DocumentResult,
     Element,
     Fix,
     HeadingFix,
-    Link,
-    ScriptRun,
+    Kind,
     inline_marker,
 )
-from readablestem.pipeline import assemble
+from readablestem.pipeline import assemble, language, text_pass
+from readablestem.pipeline.layout.elements import _contents_links
+from readablestem.pipeline.notices import LANGUAGE_CODES
 
 _PAGE_ID = re.compile(r"p(\d+)-(.+)")
+# What the assembler writes a passage's `lang` on (`inline_text.passage_attrs`).
+_TEXT_KINDS = (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING)
+LanguageCheck = Literal["", "unconfirmed", "split"]
 
 
 class CombineError(ValueError):
@@ -78,6 +92,28 @@ class Joined:
     lang: str
 
 
+def unconfirmed(codes: Iterable[str]) -> bool:
+    """Do these notice codes (a part's) say its language was assumed or mixed, and is still
+    waiting for its owner (`set_document_language` takes the notices off)?"""
+    return any(code in LANGUAGE_CODES for code in codes)
+
+
+def common_language(parts: Sequence[tuple[str, bool]]) -> tuple[str, LanguageCheck]:
+    """(the file's language, the check it needs) for parts given as (language, unconfirmed).
+    The language is the one most parts have, by language subtag ("en-US" and "en" are one),
+    an earlier part first on a tie; a part with an unconfirmed language does not vote unless
+    none has a confirmed one. The check is "unconfirmed" when any part's language is, "split"
+    when no language is held by more than half of the parts, else "" (one check for the
+    whole, not one per part)."""
+    stated = [lang for lang, waiting in parts if not waiting] or [lang for lang, _ in parts]
+    votes = Counter(language.primary(lang) for lang in stated)
+    top, count = votes.most_common(1)[0]
+    tag = next(lang for lang in stated if language.primary(lang) == top)
+    if any(waiting for _, waiting in parts):
+        return tag, "unconfirmed"
+    return tag, "split" if count * 2 <= len(parts) else ""
+
+
 def _id_mapper(part: Part, number: int) -> Callable[[str], str]:
     local = {local: source for local, source in enumerate(part.pages)}
 
@@ -109,7 +145,15 @@ def _text_map(text: str, map_id: Callable[[str], str]) -> tuple[str, Callable[[i
     return "".join(out), move
 
 
-def _element(element: Element, map_id: Callable[[str], str], pages: Sequence[int], shift: int):
+def _element(
+    element: Element,
+    map_id: Callable[[str], str],
+    pages: Sequence[int],
+    shift: int,
+    lang: str | None = None,
+):
+    """`element` as it is written in the whole. `lang`: the language of its part, when that is
+    not the whole's (a passage in yet another language keeps its own)."""
     if element.page >= len(pages):
         raise CombineError("page_outside_part")
     update: dict[str, object] = {
@@ -122,6 +166,8 @@ def _element(element: Element, map_id: Callable[[str], str], pages: Sequence[int
         if element.last_page >= len(pages):
             raise CombineError("page_outside_part")
         update["last_page"] = pages[element.last_page]
+    if lang and element.kind in _TEXT_KINDS and not element.lang:
+        update["lang"] = lang
     move: Callable[[int], int] = lambda offset: offset  # noqa: E731
     if element.text:
         update["text"], move = _text_map(element.text, map_id)
@@ -129,22 +175,8 @@ def _element(element: Element, map_id: Callable[[str], str], pages: Sequence[int
         update["caption_marked"] = _text_map(element.caption_marked, map_id)[0]
     if element.term_end is not None:
         update["term_end"] = move(element.term_end)
-    update["links"] = [
-        Link(
-            start=move(k.start),
-            end=move(k.end),
-            kind=k.kind,
-            href=k.href,
-            target_id=map_id(k.target_id) if k.target_id else None,
-        )
-        for k in element.links
-    ]
-    update["colour_runs"] = [
-        ColourRun(start=move(r.start), end=move(r.end), rgb=r.rgb) for r in element.colour_runs
-    ]
-    update["script_runs"] = [
-        ScriptRun(start=move(r.start), end=move(r.end), kind=r.kind) for r in element.script_runs
-    ]
+    spans, _ = inline.moved(element, lambda start, end: (move(start), move(end)), target=map_id)
+    update.update(spans)
     return element.model_copy(update=update)
 
 
@@ -177,9 +209,16 @@ def join(parts: Sequence[Part]) -> Joined:
     footnotes: list[str] = []
     omitted: set[int] = set()
     shift = 0
+    tag, _ = common_language(
+        [(p.result.lang, unconfirmed(n.code for n in p.result.notices)) for p in ordered]
+    )
     for number, part in enumerate(ordered, start=1):
         map_id = _id_mapper(part, number)
-        mine = [_element(e, map_id, part.pages, shift) for e in part.result.elements]
+        own = part.result.lang  # a guessed language marks nothing (the module docstring)
+        other = own if language.primary(own) != language.primary(tag) else None
+        if unconfirmed(n.code for n in part.result.notices):
+            other = None
+        mine = [_element(e, map_id, part.pages, shift, other) for e in part.result.elements]
         shift = max((e.order for e in mine), default=shift - 1) + 1
         elements += mine
         first: set[str] = set()
@@ -200,10 +239,13 @@ def join(parts: Sequence[Part]) -> Joined:
     ids = [e.id for e in elements]
     if len(ids) != len(set(ids)):
         raise CombineError("ids_clash")
+    # A part could not link to what is in another part: a contents entry for a later chapter,
+    # "Chapter 2" or "Figure 3" naming a thing printed elsewhere. The two passes that made
+    # those links in the parts run again over the whole; links the parts made are kept.
+    elements = text_pass.source_links(_contents_links(elements))
 
     held = set(seen)
     omitted |= set(range(min(held), max(held) + 1)) - held  # parts that are not here
-    langs = Counter(part.result.lang for part in ordered)
     return Joined(
         elements=elements,
         fixes=fixes,
@@ -211,7 +253,7 @@ def join(parts: Sequence[Part]) -> Joined:
         page_labels=labels,
         footnote_ids=footnotes,
         omitted_pages=sorted(omitted),
-        lang=langs.most_common(1)[0][0],
+        lang=tag,
     )
 
 

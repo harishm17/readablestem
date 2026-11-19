@@ -113,7 +113,10 @@ def strict_violations(page, axe_source: str) -> list[dict]:
 
 PAGES = {
     "/app": ALICE,
+    "/help": None,
+    "/help/review": None,
     "/help/posting": None,
+    "/help/latex": None,
     "/guides/ada-title-ii-stem-course-materials": None,
     "/guides/readablestem-mathpix-latexml": None,
     "/jobs/{decide}/feedback": ALICE,
@@ -156,7 +159,9 @@ def test_pages_pass_axe_at_desktop_and_phone_widths(
     [
         "/app",
         "/jobs/{decide}/feedback",
+        "/help/review",
         "/help/posting",
+        "/help/latex",
         "/guides/ada-title-ii-stem-course-materials",
         "/guides/readablestem-mathpix-latexml",
     ],
@@ -225,8 +230,10 @@ def test_the_upload_form_refuses_a_wrong_file_before_sending_it(site, browser):
     assert page.locator("#upload-status").inner_text() == (
         "Uploading notes.pdf. Keep this tab open."
     )
-    button = page.get_by_role("button", name="Upload and convert")
+    # The one submit rule (SW43): the pressed button says it is busy and sends nothing more.
+    button = page.get_by_role("button", name="Uploading…")
     assert button.get_attribute("aria-disabled") == "true"
+    assert button.get_attribute("aria-busy") == "true"
     context.close()
 
 
@@ -244,7 +251,7 @@ def test_a_used_up_page_limit_says_when_uploads_open_again(site, browser, axe_so
     page.goto(f"{site.base}/app")
     notice = page.locator("#upload-closed")
     assert "You have converted all 20 pages you can today." in notice.inner_text()
-    assert "Uploads open again at" in notice.inner_text()
+    assert "Resets" in notice.inner_text()
     assert page.locator("#pdf").count() == 0
     violations = strict_violations(page, axe_source)
     context.close()

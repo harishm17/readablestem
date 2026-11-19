@@ -78,6 +78,7 @@ def sample_html(notice: str | None = None) -> str:
         (doc("<h1>A</h1><h2> </h2>"), "empty_heading"),
         (doc("<h1><span></span></h1>"), "empty_heading"),
         (doc('<img src="data:,">'), "img_missing_alt"),
+        (doc('<figure><img src="data:," alt=""></figure>'), "empty_alt_content"),
         (doc('<p id="a">x</p><p id="a">y</p>'), "duplicate_id"),
         (doc('<math display="inline" id="a"><mi>y</mi></math><b id="a"></b>'), "duplicate_id"),
         (doc("<li>stray item</li>"), "list_structure"),
@@ -126,6 +127,7 @@ def test_a_character_that_is_not_text_never_reaches_any_output():
     paragraph.text = "Force \ue000 mass, and \ufffd here. " + (paragraph.text or "")
     html = render_html(
         title="Forces \uf0b7",
+        title_set=True,  # written as the H1, not given way to the one top heading (SW6c)
         lang="en",
         elements=elements,
         fixes=[Fix.model_validate(f) for f in data["fixes"]],
@@ -134,7 +136,7 @@ def test_a_character_that_is_not_text_never_reaches_any_output():
     )
     assert output_chars.count(html) == 0
     body = html.split("<main", 1)[1]
-    assert body.count(output_chars.UNREADABLE) == 2
+    assert body.count(output_chars.UNREADABLE) == 3  # the paragraph's two and the H1's
     assert f"<title>Forces {output_chars.UNREADABLE}" in html
 
     (check,) = [c for c in static_checks(html) if c.name == "html.characters"]
@@ -147,7 +149,9 @@ def test_a_character_that_is_not_text_never_reaches_any_output():
     canvas = export_canvas.export_canvas(html, title="Forces", folder="forces")
     assert output_chars.count_in_zip(export_canvas.build_zip(canvas)) == 0
     if export_docx.available():
-        assert output_chars.count_in_zip(export_docx.export_docx(html, title="Forces").data) == 0
+        docx = export_docx.export_docx(html, title="Forces").data
+        # Word's own bullet glyphs (Wingdings) live in its list styles, which hold no text.
+        assert output_chars.count_in_zip(docx, skip=frozenset({"word/numbering.xml"})) == 0
 
 
 # --------------------------------------------------------------------------- axe (no browser)

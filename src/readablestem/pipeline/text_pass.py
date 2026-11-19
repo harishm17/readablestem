@@ -1,4 +1,4 @@
-"""The text pass: links, cross-references, language and coloured text (pipeline 0.4.0).
+"""The text pass: links, cross-references, language, coloured and struck text (pipeline 0.4.0).
 
 It runs once per conversion, right after layout (`run._convert`, after
 `_with_page_images`, before any step), reads the PDF once more for what layout does not
@@ -9,21 +9,47 @@ keep, and adds to the elements without changing their text or anything a model s
   a link to a place in this document points at the element there (`target_id`); any
   other link (ftp, a file, a program to launch) is dropped and its text stays, with the
   notice `link_scheme_dropped`. URLs are never fetched.
+- `Element.links`, "typed": a web address ("https://...", "http://...", "www....") or an
+  email address typed in the text with no link in the file, checked by `is_safe_href`, the
+  punctuation that ends a sentence left out of it.
 - `Element.links`, "crossref": "Figure 2.3", "Fig. 2", "Table 1", "Equation (3)",
   "Eq. 3", "Eqs. (3) and (4)", and a bare "(3)" only when a display equation has exactly
   that number printed beside it (and not at the start of a paragraph, where it numbers
   the paragraph). Each links to the one figure, table or equation with that number; a
-  number that two targets share, or none has, gets no link.
-- `DocumentResult.lang` and `lang_source`: the PDF's /Lang ("pdf"), else detected from
-  the body text ("detected", notice `lang_detected`), else "en" ("default", notice
-  `lang_assumed`); and `Element.lang` on a paragraph or list item confidently in
+  number that two targets share, or none has, gets no link. The same for "Section 3.2"
+  (a heading that starts with that number), "Chapter 4" (a heading "Chapter 4"), "Appendix A"
+  and "Appendix B.2" (a heading "Appendix A", or "B.2 Title"), and
+  "Theorem 2.1", "Lemma", "Proposition", "Corollary", "Definition" and "Example" (a
+  paragraph or heading that starts with that label and number). A reference inside its own
+  target is not linked.
+  A Word or LaTeX document has no pages, glyphs or link annotations, so only these two kinds
+  of link are made for it (`source_links`, called by `source.convert`), after the links its
+  reader made from the file (web and mail links, and an internal link where the file itself
+  refers to a place in it: a LaTeX reference, equation reference or citation), which are kept as
+  they are.
+- `DocumentResult.lang` and `lang_source`: the language chosen at upload ("user"), else
+  detected from the body text ("detected", notice `lang_detected`; "pdf" when the PDF's own
+  /Lang names the same language; `lang_mixed` when no language holds 60% of the letters),
+  else the PDF's /Lang when the text is too short to say ("pdf"), else "en" ("default",
+  notice `lang_assumed`); and `Element.lang` on a paragraph or list item confidently in
   another language (`pipeline.language`).
 - `Element.colour_runs` (only with FEATURE_COLOUR): text printed in a colour other than
   the body's, and the notice `colour_reference` when text near coloured text refers to
   a colour ("shown in red"). The assembler writes the colour, made dark enough for
-  4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`).
+  4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`). The runs are always found:
+  with the flag off they are counted, not stored, and one notice for the document,
+  `colour_used`, gives how many passages are coloured.
+- `Element.runs`, "highlight": words a Highlight annotation covers, or a colour of its own
+  printed in a rectangle one line high behind them (`highlight_runs`; written as `<mark>`).
 - the notice `link_text_unclear` for a link whose text says nothing on its own ("click
   here", a long bare URL with next to no text around it).
+- `Element.runs`, "deleted" (written with CONTENT_RUNS, on by default; off, they are found and
+  counted in the trace, not written): text the page strikes through, a cancelled date on a
+  syllabus, with the notice `struck_text`. A thin horizontal line or bar crosses glyphs
+  of one row where a strikeout does (`struck_glyphs`), or a StrikeOut annotation covers
+  them. A line under the baseline is an underline and a line under blanks is a blank to
+  fill in: neither crosses a glyph's middle, so neither is struck text. The words stay in
+  the text; the run only marks them (`pipeline.inline_text` writes `<del>`).
 
 Every notice is optional ("Worth checking"); nothing here adds a decision.
 
@@ -47,13 +73,15 @@ import contextlib
 import logging
 import re
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
-from typing import Literal
+from typing import Literal, get_args
+from urllib.parse import urlsplit
 
 import pymupdf
 
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     BBox,
@@ -64,10 +92,15 @@ from readablestem.core.types import (
     LangSource,
     Link,
     Notice,
+    Run,
     is_safe_href,
 )
-from readablestem.pipeline import contrast, language, layout
-from readablestem.pipeline.layout import Glyph
+from readablestem.pipeline import contrast, language, layout, page_type
+from readablestem.pipeline import notices as notice_rules
+from readablestem.pipeline.baseline_rules import STRIKE_X_SLACK, Ink, classify
+from readablestem.pipeline.layout import FormField, Glyph, Highlight, Strike
+from readablestem.pipeline.layout.elements import heading_number
+from readablestem.pipeline.layout.glyphs import clean_text
 
 log = logging.getLogger(__name__)
 
@@ -154,6 +187,21 @@ class PdfLink:
     dest_point: tuple[float, float] | None = None
 
 
+@dataclass(frozen=True)
+class PdfMark:
+    """One reviewer's annotation of a page with a comment to carry (`NOTE_ANNOTS`), in display
+    coordinates. `parent` is the xref of the annotation it replies to (/IRT), `replaces` says
+    the file calls a caret a replacement of the text struck out beside it."""
+
+    page: int
+    xref: int
+    kind: str  # the annotation's type, as PyMuPDF names it ("Text", "Highlight", "Caret")
+    box: BBox
+    contents: str
+    parent: int | None = None
+    replaces: bool = False
+
+
 @dataclass
 class PdfText:
     """What the text pass reads from the PDF itself: /Lang (when present and well formed),
@@ -163,6 +211,18 @@ class PdfText:
     links: dict[int, list[PdfLink]] = field(default_factory=dict)
     glyphs: dict[int, list[Glyph]] = field(default_factory=dict)
     annotations: int = 0  # link annotations of any kind on the analysed pages
+    # Per page, the marks that may strike text through and the ones that may highlight it
+    # (`layout.page_paint`).
+    strikes: dict[int, list[Strike]] = field(default_factory=dict)
+    highlights: dict[int, list[Highlight]] = field(default_factory=dict)
+    # Per page, its fillable fields (`layout.take_form_fields`): the notice, and the value of a
+    # filled field as the run that says it is one.
+    fields: dict[int, list[FormField]] = field(default_factory=dict)
+    # Per page, the annotations that carry a comment, and the names of the files attached to
+    # the PDF (embedded files, and files attached to a page), which are not converted.
+    marks: dict[int, list[PdfMark]] = field(default_factory=dict)
+    attachments: list[str] = field(default_factory=list)
+    attachment_count: int = 0
 
 
 def _catalog_lang(doc: pymupdf.Document) -> str | None:
@@ -211,13 +271,113 @@ def _pdf_links(
     return out
 
 
-def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText:
+# Annotations whose /Contents is a comment to carry: the marks on text, the shapes and lines
+# round it, the sticky note and the caret. A text box (FreeText) is not one, it is page text
+# and is read as such; a popup is the window of its parent's comment, so each comment is read
+# once; an attached file's /Contents is a label for the file, which the notice names.
+NOTE_ANNOTS = page_type.ANNOTATION_ART - {
+    pymupdf.mupdf.PDF_ANNOT_FREE_TEXT,
+    pymupdf.mupdf.PDF_ANNOT_POPUP,
+    pymupdf.mupdf.PDF_ANNOT_SOUND,
+    pymupdf.mupdf.PDF_ANNOT_FILE_ATTACHMENT,
+}
+_NOT_SHOWN = pymupdf.mupdf.PDF_ANNOT_IS_HIDDEN | pymupdf.mupdf.PDF_ANNOT_IS_NO_VIEW
+MAX_MARKS_PER_PAGE = 500  # a page is not read for more comments than any reviewer writes
+MAX_NOTE_CHARS = 10_000
+MAX_ATTACHMENT_NAMES = 20  # names kept for the notice; the count says how many there are
+ATTACHMENT_NAME_CHARS = 120
+REASON_NOTE = "annotation note"  # `Element.reasons` of a paragraph made from a comment
+NOTE_LEAD = "Note on the page: "
+# A caret this near a struck-out passage (pt) is the replacement of that passage.
+CARET_REACH = 14.0
+
+
+def _xref_value(doc: pymupdf.Document, xref: int, key: str) -> tuple[str, str]:
+    try:
+        return doc.xref_get_key(xref, key)
+    except Exception:  # a broken object has no such key
+        return ("null", "null")
+
+
+def page_marks(doc: pymupdf.Document, page: pymupdf.Page) -> tuple[list[PdfMark], list[str], int]:
+    """The comments of the page's annotations (`NOTE_ANNOTS`, not hidden), in the file's
+    order and the display frame, and the names of the files attached to it (a file
+    attachment annotation) with their count. A hidden annotation is not shown to a sighted
+    reader, so it is not read. The caller holds `_LOCK`; the page has been turned
+    (`page_type.turn_page`)."""
+    if page.first_annot is None:
+        return [], [], 0
+    found: list[tuple[int, str, tuple[float, ...], str, int | None, bool]] = []
+    names: list[str] = []
+    attached = 0
+    turned = page.rotation  # an annotation's box is read in unrotated space
+    page.set_rotation(0)
+    try:
+        annots = [a for a in page.annots() or () if not a.flags & _NOT_SHOWN]
+        kinds = {a.xref: a.type[1] for a in annots}
+        for annot in annots:
+            if annot.type[0] == pymupdf.mupdf.PDF_ANNOT_FILE_ATTACHMENT:
+                attached += 1
+                with contextlib.suppress(Exception):  # a broken attachment is counted, unnamed
+                    names.append(_file_name(annot.file_info.get("filename") or ""))
+            if annot.type[0] not in NOTE_ANNOTS or len(found) >= MAX_MARKS_PER_PAGE:
+                continue
+            words = clean_text(str(annot.info.get("content") or ""))[:MAX_NOTE_CHARS]
+            if not words:
+                continue
+            kind, value = _xref_value(doc, annot.xref, "IRT")
+            parent = (
+                int(value.split()[0]) if kind == "xref" and value.split()[0].isdigit() else None
+            )
+            replaces = annot.type[1] == "Caret" and (
+                _xref_value(doc, annot.xref, "IT")[1] == "/Replace"
+                or (parent is not None and kinds.get(parent) == "StrikeOut")
+            )
+            found.append((annot.xref, annot.type[1], tuple(annot.rect), words, parent, replaces))
+    finally:
+        page.set_rotation(turned)
+    turn = page.rotation_matrix
+    number = page.number or 0
+    marks = [
+        PdfMark(number, xref, kind, _display_box(rect, turn), words, parent, replaces)
+        for xref, kind, rect, words, parent, replaces in found
+    ]
+    return marks, names, attached
+
+
+def _display_box(rect: Sequence[float], turn: pymupdf.Matrix) -> BBox:
+    box = pymupdf.Rect(rect) * turn
+    return (float(box.x0), float(box.y0), float(box.x1), float(box.y1))
+
+
+def _file_name(raw: str) -> str:
+    return clean_text(raw)[:ATTACHMENT_NAME_CHARS] or "(no name)"
+
+
+def embedded_files(doc: pymupdf.Document) -> tuple[list[str], int]:
+    """The names of the files embedded in the PDF (at most `MAX_ATTACHMENT_NAMES`) and how
+    many there are. A file in a PDF is never opened here."""
+    try:
+        count = doc.embfile_count()
+        names = []
+        for name in doc.embfile_names()[:MAX_ATTACHMENT_NAMES]:
+            try:
+                names.append(_file_name(doc.embfile_info(name).get("filename") or name))
+            except Exception:  # an entry that cannot be read is counted, unnamed
+                names.append("(no name)")
+        return names, count
+    except Exception:  # a broken name tree: nothing to say
+        return [], 0
+
+
+def read_pdf(pdf_bytes: bytes, pages: Iterable[int]) -> PdfText:
     """/Lang, links and glyphs of the analysed pages (0-based).
 
-    Glyphs are read only where they are needed: pages with links, and every page when
-    colour runs are on. `layout.analyze` has already rendered these pages in its crash
-    probe, so reading them in this process is safe; PyMuPDF is not thread-safe, so this
-    holds layout's lock like every other PyMuPDF call. Raises whatever PyMuPDF raises.
+    Glyphs are read on every page: they carry the colour, weight, slant and pitch of each
+    character (`style_runs`, `colour_runs`), where links and strikes need them too.
+    `layout.analyze` has already rendered these pages in its crash probe, so reading them in
+    this process is safe; PyMuPDF is not thread-safe, so this holds layout's lock like every
+    other PyMuPDF call. Raises whatever PyMuPDF raises.
     """
     wanted = sorted(set(pages))
     found = PdfText()
@@ -229,15 +389,33 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
             doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
             try:
                 found.lang = _catalog_lang(doc)
+                found.attachments, found.attachment_count = embedded_files(doc)
                 in_doc = {p for p in wanted if 0 <= p < doc.page_count}
                 for number in sorted(in_doc):
+                    page_type.turn_page(doc[number])  # layout's display frame
+                    fields = layout.take_form_fields(doc[number])  # before the glyphs are read
+                    if fields:
+                        found.fields[number] = fields
+                    marks, names, attached = page_marks(doc, doc[number])
+                    if marks:
+                        found.marks[number] = marks
+                    found.attachment_count += attached
+                    found.attachments += names[
+                        : max(0, MAX_ATTACHMENT_NAMES - len(found.attachments))
+                    ]
                     annotations = doc[number].get_links()
                     found.annotations += len(annotations)
                     links = _pdf_links(doc, number, annotations, in_doc)
                     if links:
                         found.links[number] = links
-                    if colour or links:
-                        found.glyphs[number] = layout.page_glyphs(doc[number])
+                    strikes, lit = layout.page_paint(doc[number])
+                    found.glyphs[number] = layout.page_glyphs(doc[number])
+                    if lit:
+                        found.highlights[number] = lit
+                    if strikes:
+                        strikes = drawn_strikes(doc[number], strikes, found.glyphs[number])
+                    if strikes:
+                        found.strikes[number] = strikes
             finally:
                 doc.close()
         finally:
@@ -258,9 +436,21 @@ def _marker_ranges(text: str) -> list[tuple[int, int]]:
     return [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
 
 
+def _caseless(c: str) -> str:
+    """One character without its case (a character whose lower case is longer stays itself)."""
+    lower = c.lower()
+    return lower if len(lower) == 1 else c
+
+
 def align(text: str, glyphs: Sequence[Glyph]) -> list[int | None]:
     """For each character of `text`, the index of the glyph in `glyphs` that printed it,
-    or None (spaces, inline markers, and characters the alignment could not place)."""
+    or None (spaces, inline markers, and characters the alignment could not place).
+
+    Characters are matched as printed first. What that leaves unplaced on both sides is then
+    compared without case: layout reads a small capital as the lower-case letter it stands
+    for (`layout.shared.mark_small_capitals`), and the page prints a capital. Only there: a
+    capital that is not in the text (a bold vector of an inline formula) must not take the
+    place of the same letter in lower case beside it."""
     out: list[int | None] = [None] * len(text)
     if not text or not glyphs or len(text) > MAX_ALIGN_CHARS:
         return out
@@ -270,10 +460,18 @@ def align(text: str, glyphs: Sequence[Glyph]) -> list[int | None]:
     offsets = [i for i, c in enumerate(text) if not masked[i] and not c.isspace()]
     ours = "".join(text[i] for i in offsets)
     theirs = "".join(g.c for g in glyphs)
-    matcher = SequenceMatcher(None, ours, theirs, autojunk=False)
-    for a, b, size in matcher.get_matching_blocks():
-        for k in range(size):
-            out[offsets[a + k]] = b + k
+    for tag, a0, a1, b0, b1 in SequenceMatcher(None, ours, theirs, autojunk=False).get_opcodes():
+        if tag == "equal":
+            for k in range(a1 - a0):
+                out[offsets[a0 + k]] = b0 + k
+        elif tag == "replace":
+            left = "".join(map(_caseless, ours[a0:a1]))
+            right = "".join(map(_caseless, theirs[b0:b1]))
+            for a, b, size in SequenceMatcher(
+                None, left, right, autojunk=False
+            ).get_matching_blocks():
+                for k in range(size):
+                    out[offsets[a0 + a + k]] = b0 + b + k
     return out
 
 
@@ -500,18 +698,104 @@ def unclear_link_text(text: str, context: int = 0) -> bool:
     return " ".join(words.split()) in UNCLEAR_LINK_TEXT
 
 
+# ============================================================================ typed addresses
+
+# An email address typed in the text. Not after a letter, digit or sign of an address (the
+# whole address is found from its start), and it ends at its last letter, so the full stop
+# of a sentence is not in it.
+_EMAIL_TEXT = re.compile(
+    r"(?<![A-Za-z0-9_%+\-])[A-Za-z0-9][A-Za-z0-9._%+\-]*@(?:[A-Za-z0-9\-]+\.)+[A-Za-z]{2,}"
+    r"(?![A-Za-z0-9\-])"
+)
+# A web address needs a name with a dot and letters at its end ("www.", "http://x" and
+# "http://localhost" are not worth a link).
+_HOST_NAME = re.compile(r"(?:[\w\-]+\.)+[^\W\d_]{2,}")
+# Punctuation that ends a sentence or a quotation, never an address; a closing bracket ends
+# one only when its opening bracket is not in the address ("(see https://x.org/a)").
+_ADDRESS_END = ".,;:!?'\"\u2019\u201d\u00bb\u2026>"
+_OPENER = {")": "(", "]": "[", "}": "{"}
+
+
+def _address_end(text: str, start: int, end: int) -> int:
+    """Where the address that `_URL_TEXT` found at [start, end) really ends: before an
+    inline equation and before the punctuation that follows it."""
+    if marker := INLINE_MARKER_RE.search(text, start, end):
+        end = marker.start()
+    while end > start:
+        last = text[end - 1]
+        if last in _ADDRESS_END or (
+            last in _OPENER and text.count(last, start, end) > text.count(_OPENER[last], start, end)
+        ):
+            end -= 1
+        else:
+            break
+    return end
+
+
+def typed_addresses(
+    text: str, taken: Sequence[Link] = (), wraps: Callable[[int], bool] | None = None
+) -> list[Link]:
+    """Links for the web and email addresses typed in one element's text that the file
+    gives no link: "https://...", "http://...", "www...." and "name@host.tld". The text is
+    as layout joined it, so an address broken across a line end is whole only where layout
+    joined it without a space. `wraps(offset)`: does the page go to a new line there with
+    the text going on (`_wraps`)? A web address that stops there may be the first part of a
+    longer one, so it gets no link and stays the plain text it was. Each link passes
+    `is_safe_href`; none overlaps a `taken` link or an inline marker."""
+    candidates: list[tuple[int, int, str]] = []
+    for match in _URL_TEXT.finditer(text):
+        start = match.start()
+        if start and text[start - 1].isalnum():
+            continue  # the end of a longer word, not an address
+        if wraps is not None and wraps(match.end()):
+            continue  # cut by the line: a link to the first part would go somewhere else
+        end = _address_end(text, start, match.end())
+        shown = text[start:end]
+        href = shown if shown.lower().startswith("http") else f"https://{shown}"
+        if is_safe_href(href) and _HOST_NAME.fullmatch(urlsplit(href).hostname or ""):
+            candidates.append((start, end, href))
+    for match in _EMAIL_TEXT.finditer(text):
+        href = f"mailto:{match.group()}"
+        if is_safe_href(href):
+            candidates.append((match.start(), match.end(), href))
+    spans = [*((k.start, k.end) for k in taken), *_marker_ranges(text)]
+    found: list[Link] = []
+    for start, end, href in sorted(candidates, key=lambda c: (c[0], -c[1])):
+        if any(s < end and start < e for s, e in spans):
+            continue  # on a link of the file, or on maths; or inside the address before it
+        found.append(Link(start=start, end=end, kind="typed", href=href))
+        spans.append((start, end))
+    return found
+
+
 # ============================================================================ cross-references
 
 # A reference word, then a number, then more numbers joined by "," "and" "or" "&" "to" or a
 # dash ("Eqs. (3) and (4)", "Figures 2, 3 and 5"). Equation numbers may be bracketed.
 _NUMBER = r"\(\s*\d+(?:[.\-]\d+)*[a-z]?\s*\)|\d+(?:[.\-]\d+)*[a-z]?"
 _JOIN = r"\s*(?:,|and|or|&|to|\u2013|-)\s*"
+# "Example" only with a capital: "for example 3 of them" is not a reference.
+_REF_WORDS = (
+    r"figures?|figs?\.|tables?|equations?|eqns?\.?|eqs?\.?"
+    r"|sections?|secs?\.|\u00a7\u00a7?|chapters?|ch\."
+    r"|theorems?|thm\.?|lemmas?|propositions?|prop\.|corollar(?:y|ies)|cor\."
+    r"|definitions?|defs?\.|(?-i:Examples?)"
+)
 CROSSREF = re.compile(
-    r"\b(?P<word>figures?|figs?\.|tables?|equations?|eqns?\.?|eqs?\.?)\s*"
+    rf"(?<!\w)(?P<word>{_REF_WORDS})\s*"
     rf"(?P<first>{_NUMBER})(?P<rest>(?:{_JOIN}(?:{_NUMBER}))*)(?![\w.]?\w)",
     re.IGNORECASE,
 )
 _NUMBER_RE = re.compile(_NUMBER, re.IGNORECASE)
+# "Appendix A", "Appendix B.2", "Appendices A and B": the number of an appendix is a capital letter
+# (or a digit), so the pattern is its own and "Table A" is not a reference.
+_APPENDIX_NUMBER = r"(?-i:[A-Z])(?:\.\d+)*|\d+(?:\.\d+)*"
+APPENDIX_REF = re.compile(
+    rf"(?<!\w)(?P<word>appendix|appendices)\s*(?P<first>{_APPENDIX_NUMBER})"
+    rf"(?P<rest>(?:{_JOIN}(?:{_APPENDIX_NUMBER}))*)(?![\w.]?\w)",
+    re.IGNORECASE,
+)
+_APPENDIX_NUMBER_RE = re.compile(_APPENDIX_NUMBER)
 # "(3)" alone, not right after a letter, digit or bracket ("f(3)", "x_(3)" are maths).
 BARE_EQUATION_REF = re.compile(r"(?<![\w)\]\u27e7])\((?P<num>\d+(?:\.\d+)*[a-z]?)\)(?!\w)")
 # A bare "(3)" is a reference only right after a word that introduces an equation
@@ -538,7 +822,37 @@ _LABEL_NUMBER = re.compile(r"(\()?\s*(\d+(?:[.\-]\d+)*[a-z]?)\s*(\))?")
 _CAPTION_START = re.compile(r"\s*[.:|\u2013\u2014]")
 
 
-TargetKind = Literal["figure", "table", "equation"]
+TargetKind = Literal[
+    "figure",
+    "table",
+    "equation",
+    "section",
+    "chapter",
+    "appendix",
+    "theorem",
+    "lemma",
+    "proposition",
+    "corollary",
+    "definition",
+    "example",
+]
+_TARGET_KINDS: tuple[TargetKind, ...] = get_args(TargetKind)
+# The first letters of a reference word -> its kind ("Fig.", "Figures" -> figure); a word
+# that matches none of these is an equation ("Eq.", "Eqns").
+_KIND_OF_PREFIX: tuple[tuple[str, TargetKind], ...] = (
+    ("fig", "figure"),
+    ("tab", "table"),
+    ("sec", "section"),
+    ("\u00a7", "section"),
+    ("ch", "chapter"),
+    ("app", "appendix"),
+    ("th", "theorem"),
+    ("lem", "lemma"),
+    ("prop", "proposition"),
+    ("cor", "corollary"),
+    ("def", "definition"),
+    ("ex", "example"),
+)
 
 
 def _key(number: str) -> str:
@@ -548,11 +862,21 @@ def _key(number: str) -> str:
 
 def _word_kind(word: str) -> TargetKind:
     lowered = word.lower()
-    if lowered.startswith("fig"):
-        return "figure"
-    if lowered.startswith("tab"):
-        return "table"
+    for prefix, kind in _KIND_OF_PREFIX:
+        if lowered.startswith(prefix):
+            return kind
     return "equation"
+
+
+# What a numbered thing in running text is called where it is defined: a paragraph or
+# heading that starts "Theorem 2.1." / "Definition 3 (Group)" / "Example 4:". The number must
+# be followed by the label's own punctuation (or end the line): "Theorem 2.1 shows that" is a
+# reference, not the theorem.
+_LABELLED = re.compile(
+    r"\s*(?P<word>theorem|lemma|proposition|corollary|definition|example)\s+"
+    r"(?P<num>\d+(?:[.\-]\d+)*[a-z]?)\s*(?=[.:(\u2013\u2014]|$)",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -561,7 +885,7 @@ class _Targets:
     in brackets (only those make a bare "(3)" a reference)."""
 
     ids: dict[str, defaultdict[str, set[str]]] = field(
-        default_factory=lambda: {k: defaultdict(set) for k in ("figure", "table", "equation")}
+        default_factory=lambda: {k: defaultdict(set) for k in _TARGET_KINDS}
     )
     bracketed: set[str] = field(default_factory=set)
 
@@ -570,12 +894,20 @@ class _Targets:
         return next(iter(found)) if len(found) == 1 else None
 
 
-def crossref_targets(elements: Iterable[Element]) -> _Targets:
+def crossref_targets(
+    elements: Iterable[Element], printed: Mapping[str, str] | None = None
+) -> _Targets:
+    """The figures, tables, equations, sections, ... that references can name, by number.
+    `printed` is what a source file printed in front of an element's own text, which its
+    reader left out ("1.2 " before a heading, "Figure 3: " before a caption): the PDF's text
+    holds it, so this is read as if it were there."""
     targets = _Targets()
     for element in elements:
-        if element.kind in (Kind.FIGURE, Kind.TABLE) and element.caption:
+        lead = (printed or {}).get(element.id, "")
+        caption = element.caption or (element.table.caption if element.table else None)
+        if element.kind in (Kind.FIGURE, Kind.TABLE) and caption:
             for kind, pattern in _CAPTION_NUMBER.items():
-                if match := pattern.match(element.caption):
+                if match := pattern.match(lead + caption):
                     targets.ids[kind][_key(match.group(1))].add(element.id)
         elif element.kind is Kind.EQUATION and element.display != "inline":
             for match in _LABEL_NUMBER.finditer(element.equation_label or ""):
@@ -583,7 +915,26 @@ def crossref_targets(elements: Iterable[Element]) -> _Targets:
                 targets.ids["equation"][key].add(element.id)
                 if match.group(1) and match.group(3):
                     targets.bracketed.add(key)
+        elif element.kind in LINK_KINDS and element.text:
+            _label_targets(element, targets, lead)
     return targets
+
+
+def _label_targets(element: Element, targets: _Targets, lead: str = "") -> None:
+    """The section, chapter, appendix, theorem, ... that this heading or paragraph is, by the
+    number it starts with (`heading_number`: "3.2 Title", "Chapter 4", "Appendix A")."""
+    text = lead + (element.text or "")
+    if element.kind is Kind.HEADING and (read := heading_number(text)):
+        label, number = read
+        if label in ("", "section") and number[0].isdigit():
+            targets.ids["section"][_key(number)].add(element.id)
+        if label == "chapter" and number.isdigit():
+            targets.ids["chapter"][_key(number)].add(element.id)
+        if label == "appendix" or (not label and number[0].isalpha() and "." in number):
+            targets.ids["appendix"][_key(number)].add(element.id)
+    if match := _LABELLED.match(text):
+        kind = _word_kind(match.group("word"))
+        targets.ids[kind][_key(match.group("num"))].add(element.id)
 
 
 @dataclass(frozen=True)
@@ -602,15 +953,16 @@ class Reference:
 def references(text: str) -> list[Reference]:
     """Every reference-shaped piece of `text`, in order (targets are not looked up)."""
     found: list[Reference] = []
-    for match in CROSSREF.finditer(text):
-        if match.start() == 0 and _CAPTION_START.match(text, match.end()):
-            continue  # an unattached caption's own number
-        kind = _word_kind(match.group("word"))
-        found.append(Reference(match.start(), match.end("first"), kind, match.group("first")))
-        offset = match.start("rest")
-        for number in _NUMBER_RE.finditer(match.group("rest")):
-            start, end = offset + number.start(), offset + number.end()
-            found.append(Reference(start, end, kind, number.group()))
+    for pattern, numbers in ((CROSSREF, _NUMBER_RE), (APPENDIX_REF, _APPENDIX_NUMBER_RE)):
+        for match in pattern.finditer(text):
+            if match.start() == 0 and _CAPTION_START.match(text, match.end()):
+                continue  # an unattached caption's own number
+            kind = _word_kind(match.group("word"))
+            found.append(Reference(match.start(), match.end("first"), kind, match.group("first")))
+            offset = match.start("rest")
+            for number in numbers.finditer(match.group("rest")):
+                start, end = offset + number.start(), offset + number.end()
+                found.append(Reference(start, end, kind, number.group()))
     taken = [(r.start, r.end) for r in found]
     cued_end = -1  # end of the last bare reference an equation cue introduced
     for match in BARE_EQUATION_REF.finditer(text):
@@ -645,9 +997,13 @@ def widen_internal(text: str, links: list[Link]) -> list[Link]:
     return out
 
 
-def crossrefs(text: str, targets: _Targets, taken: Sequence[Link] = ()) -> list[Link]:
+def crossrefs(
+    text: str, targets: _Targets, taken: Sequence[Link] = (), element_id: str | None = None
+) -> list[Link]:
     """Cross-reference links in one element's text, never overlapping `taken` links or
-    inline markers, and none where the number names no target or more than one."""
+    inline markers, and none where the number names no target or more than one, or where the
+    target is the element itself (`element_id`: "Theorem 2.1 (Rolle)." at the start of
+    theorem 2.1)."""
     markers = _marker_ranges(text)
     found: list[Link] = []
     for ref in references(text):
@@ -655,7 +1011,9 @@ def crossrefs(text: str, targets: _Targets, taken: Sequence[Link] = ()) -> list[
             continue
         target = targets.unique(ref.kind, ref.number)
         spans = [*((k.start, k.end) for k in (*taken, *found)), *markers]
-        if target is None or any(s < ref.end and ref.start < e for s, e in spans):
+        if target is None or target == element_id:
+            continue
+        if any(s < ref.end and ref.start < e for s, e in spans):
             continue
         found.append(Link(start=ref.start, end=ref.end, kind="crossref", target_id=target))
     return found
@@ -731,6 +1089,136 @@ def colour_runs(
     return _without(runs, links, element.text or "")
 
 
+# A style that covers this share of an element's characters or more is the block's own style
+# (a paragraph set in italic, a bold caption), not emphasis inside it.
+STYLE_SHARE = 0.7
+# The glyph trait of each style run kind, in the order the runs are listed.
+STYLE_TRAITS = (("strong", "bold"), ("emphasis", "italic"), ("code", "mono"))
+
+
+def style_runs(element: Element, aligner: _Aligner) -> list[Run]:
+    """The element's bold, italic and fixed-pitch words as runs (`strong`, `emphasis`,
+    `code`; offsets into its text), from the weight, slant and pitch of the characters printed
+    there (`Glyph`). A style that covers `STYLE_SHARE` of the element's placed characters is
+    the block's own and makes no run, a run never contains an inline-equation marker (the
+    equation owns the letters it took as variables) and one italic letter is not a run (a
+    variable the equation path left in the text), and a run is kept only when it has a letter
+    or a digit. A PDF with no italic face has no italic glyph, so it has no italic runs.
+    A code block and a glossary entry (written as a term and a definition) get none."""
+    text = element.text or ""
+    if element.preformatted or element.term_end is not None or not text:
+        return []
+    candidates = aligner.glyphs_in(element)
+    if not any(g.bold or g.italic or g.mono for g in candidates):
+        return []
+    glyphs, alignment = aligner.of(element)
+    placed = [i for i in alignment if i is not None]
+    found: list[Run] = []
+    for kind, trait in STYLE_TRAITS:
+        if not (count := sum(getattr(glyphs[i], trait) for i in placed)):
+            continue
+        if count >= STYLE_SHARE * len(placed):
+            continue
+        spans = labelled_runs(
+            text,
+            alignment,
+            lambda i, trait=trait: True if getattr(glyphs[i], trait) else None,
+            across_markers=False,
+        )
+        for start, end, _ in spans:
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
+            piece = text[start:end]
+            if not any(c.isalnum() for c in piece):
+                continue
+            if kind == "emphasis" and len(piece) == 1:
+                continue  # one italic letter is a variable the equation path left in the text
+            found.append(Run(start=start, end=end, kind=kind))
+    return sorted(found, key=lambda r: (r.start, r.end))
+
+
+# A filled rectangle behind text is a highlight when it hugs one line: no taller than this many
+# times the size of the glyphs it holds (a padded box, a shaded callout, a table's shaded
+# cell, a theorem's frame are taller or wider than their words need) and no shorter than this
+# share of it. Its colour is a real colour of its own: lighter than `HIGHLIGHT_MIN_LIGHTNESS`
+# is dark paint (a bar, reversed text), near white or a grey is the page's or a box's shade.
+HIGHLIGHT_MAX_HEIGHT = 1.5
+HIGHLIGHT_MIN_HEIGHT = 0.6
+HIGHLIGHT_MIN_LIGHTNESS = 0.5
+
+
+def is_highlight_colour(rgb: tuple[int, int, int]) -> bool:
+    """Is a fill in this colour the colour of a highlight (see `HIGHLIGHT_MIN_LIGHTNESS`)?"""
+    lightness, chroma, _ = contrast.oklch(rgb)
+    return HIGHLIGHT_MIN_LIGHTNESS <= lightness < WHITEISH_LIGHTNESS and chroma >= GREY_CHROMA
+
+
+# Filled rectangles of one color and height that stand side by side in a row of this many or
+# more are shading (a table's header row, a heat map, a bar), not a highlight of words.
+HIGHLIGHT_ROW = 3
+
+
+def highlight_marks(marks: Sequence[Highlight]) -> list[Highlight]:
+    """`marks` without the filled rectangles that are shading: those of the same color, top and
+    bottom (to the point) that make a row of `HIGHLIGHT_ROW` or more on the page. A highlight
+    annotation is always kept."""
+    rows = Counter((m.rgb, round(m.bbox[1]), round(m.bbox[3])) for m in marks if m.rgb is not None)
+    return [
+        m
+        for m in marks
+        if m.rgb is None or rows[(m.rgb, round(m.bbox[1]), round(m.bbox[3]))] < HIGHLIGHT_ROW
+    ]
+
+
+def highlighted_glyphs(glyphs: Sequence[Glyph], marks: Iterable[Highlight]) -> set[int]:
+    """Indexes into `glyphs` of the glyphs highlighted: every glyph whose middle is inside a
+    Highlight annotation's quad, or inside a filled rectangle that has the colour of a
+    highlight (`is_highlight_colour`) and the height of one line of the glyphs it holds
+    (`HIGHLIGHT_MAX_HEIGHT`)."""
+    marked: set[int] = set()
+    for mark in marks:
+        if mark.rgb is not None and not is_highlight_colour(mark.rgb):
+            continue
+        inside = [i for i, g in enumerate(glyphs) if _centre_in(g.bbox, mark.bbox, 0.0)]
+        if mark.rgb is not None and inside:
+            size = sorted(glyphs[i].size for i in inside)[len(inside) // 2]
+            height = mark.bbox[3] - mark.bbox[1]
+            if not HIGHLIGHT_MIN_HEIGHT * size <= height <= HIGHLIGHT_MAX_HEIGHT * size:
+                continue
+        marked.update(inside)
+    return marked
+
+
+def highlight_runs(element: Element, aligner: _Aligner, marks: Sequence[Highlight]) -> list[Run]:
+    """The element's highlighted words as runs of kind `highlight` (offsets into its text),
+    from the highlight marks of its page: each run trimmed of spaces and kept only when it has
+    a letter or a digit, and never across an inline-equation marker. A code block and a
+    glossary entry get none, as with `style_runs`."""
+    text = element.text or ""
+    if element.preformatted or element.term_end is not None or not text:
+        return []
+    near = [m for m in marks if _overlaps(m.bbox, element.bbox, BOX_SLACK)]
+    if not near:
+        return []
+    glyphs, alignment = aligner.of(element)
+    lit = highlighted_glyphs(glyphs, near)
+    if not lit:
+        return []
+    found: list[Run] = []
+    for start, end, _ in labelled_runs(
+        text, alignment, lambda i: True if i in lit else None, across_markers=False
+    ):
+        while start < end and text[start].isspace():
+            start += 1
+        while end > start and text[end - 1].isspace():
+            end -= 1
+        if any(c.isalnum() for c in text[start:end]):
+            found.append(Run(start=start, end=end, kind="highlight"))
+    return found
+
+
 def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> list[Notice]:
     """`colour_reference` for running text that names a colour, on or near coloured text
     (the same element, or one of the `COLOUR_REFERENCE_REACH` before or after it on the
@@ -742,32 +1230,356 @@ def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> li
             continue
         reach = running[max(0, index - COLOUR_REFERENCE_REACH) : index + COLOUR_REFERENCE_REACH + 1]
         if any(e.id in coloured and e.page == element.page for e in reach):
-            notices.append(
-                Notice(code="colour_reference", page=element.page, element_id=element.id)
-            )
+            notices.append(make("colour_reference", page=element.page, element_id=element.id))
     return notices
+
+
+# ============================================================================ comments
+
+
+def _gap(a: BBox, b: BBox) -> float:
+    """The distance between two boxes (0 when they touch or overlap)."""
+    dx = max(a[0] - b[2], b[0] - a[2], 0.0)
+    dy = max(a[1] - b[3], b[1] - a[3], 0.0)
+    return (dx * dx + dy * dy) ** 0.5
+
+
+def _overlap_area(a: BBox, b: BBox) -> float:
+    return max(0.0, min(a[2], b[2]) - max(a[0], b[0])) * max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+
+
+def _anchor(body: Sequence[Element], mark: PdfMark, strikes: Sequence[Strike]) -> Element | None:
+    """The element of the page the comment goes after: the one with the most of the
+    annotation's box on it, else the one nearest to it. A caret that stands at the end of a
+    struck-out passage goes after the element that holds the passage."""
+    box = mark.box
+    if mark.kind == "Caret":
+        near = [(_gap(box, k.bbox), k.bbox) for k in strikes if k.annotation]
+        reach = [(gap, bbox) for gap, bbox in near if gap <= CARET_REACH]
+        if reach:
+            box = min(reach)[1]
+    if not body:
+        return None
+
+    def distance(e: Element) -> tuple[bool, float, float, float, int]:
+        # On an element: the one with most of the box on it. Beside the text, in a margin:
+        # the one at the same height, nearest across, as the page reads.
+        away = max(box[1] - e.bbox[3], e.bbox[1] - box[3], 0.0)
+        across = max(box[0] - e.bbox[2], e.bbox[0] - box[2], 0.0)
+        return (_gap(box, e.bbox) > 0, -_overlap_area(box, e.bbox), away, across, e.order)
+
+    return min(body, key=distance)
+
+
+def _in_reading_order(marks: Sequence[PdfMark]) -> list[PdfMark]:
+    """The page's comments from top to bottom, each followed by its replies (/IRT) in the
+    file's order; a reply whose parent has no comment of its own stands at its own place."""
+    known = {m.xref for m in marks}
+    replies: dict[int, list[PdfMark]] = defaultdict(list)
+    for m in marks:
+        if m.parent in known and m.parent != m.xref:
+            replies[m.parent].append(m)
+    out: list[PdfMark] = []
+    seen: set[int] = set()
+
+    def visit(m: PdfMark) -> None:
+        if m.xref in seen:
+            return
+        seen.add(m.xref)
+        out.append(m)
+        for reply in replies.get(m.xref, ()):
+            visit(reply)
+
+    for m in sorted(marks, key=lambda m: (m.box[1], m.box[0])):
+        if m.parent not in known or m.parent == m.xref:
+            visit(m)
+    for m in marks:  # replies in a loop of replies: nobody is their parent, so keep them
+        visit(m)
+    return out
+
+
+def comment_notes(
+    elements: list[Element],
+    marks: Mapping[int, Sequence[PdfMark]],
+    strikes: Mapping[int, Sequence[Strike]],
+) -> tuple[list[Element], int]:
+    """`elements` with one paragraph for each comment of the PDF's annotations, after the
+    element whose text the annotation covers (or is nearest to), and how many were made.
+
+    The paragraph starts "Note on the page: "; a caret the file calls a replacement says
+    "replace with" and then the text. A page with no element of its own has its notes after
+    the last element before it. Nothing before them is renamed: an id is one past the highest
+    on its page, and only `order` is renumbered. Layout keeps no notes field yet, so the
+    comment is a paragraph and can be taken out like any other line."""
+    if not marks:
+        return elements, 0
+    after: dict[str | None, list[Element]] = defaultdict(list)
+    index: dict[int, int] = {}
+    for e in elements:
+        tail = e.id.rsplit("-e", 1)[-1]
+        index[e.page] = max(index.get(e.page, -1), int(tail) if tail.isdecimal() else -1)
+    count = 0
+    for page, found in sorted(marks.items()):
+        body = [e for e in elements if e.page == page and e.display != "inline"]
+        placed: dict[int, Element | None] = {}
+        for mark in _in_reading_order(found):
+            # A reply stands where its parent does (its own box is the parent's, more or less).
+            owner = (
+                placed[mark.parent]
+                if mark.parent in placed
+                else _anchor(body, mark, strikes.get(page, ()))
+            )
+            if owner is None:  # nothing of the page: after the last element before it
+                before = [e for e in elements if e.page < page and e.display != "inline"]
+                owner = before[-1] if before else None
+            placed[mark.xref] = owner
+            index[page] = index.get(page, -1) + 1
+            words = f"replace with {mark.contents}" if mark.replaces else mark.contents
+            after[owner.id if owner else None].append(
+                Element(
+                    id=f"p{page + 1}-e{index[page]}",
+                    kind=Kind.PARAGRAPH,
+                    page=page,
+                    bbox=mark.box,
+                    order=0,
+                    text=NOTE_LEAD + words,
+                    reasons=[REASON_NOTE],
+                )
+            )
+            count += 1
+    if not count:
+        return elements, 0
+    # A note goes after the inline equations that follow its paragraph, not between them.
+    tails: dict[str, str] = {}
+    for e in elements:
+        if e.id in after and e.display != "inline":
+            tails[e.id] = e.id
+    last: str | None = None
+    for e in elements:
+        if e.display == "inline" and e.parent_id in tails and tails[e.parent_id] == last:
+            tails[e.parent_id] = e.id
+        last = e.id
+    moved: dict[str, list[Element]] = defaultdict(list)
+    for owner_id, notes in after.items():
+        if owner_id is not None:
+            moved[tails[owner_id]].extend(notes)
+    out: list[Element] = list(after.get(None, ()))
+    for e in elements:
+        out.append(e)
+        out.extend(moved.get(e.id, ()))
+    return [
+        e if e.order == i else e.model_copy(update={"order": i}) for i, e in enumerate(out)
+    ], count
+
+
+# ============================================================================ struck text
+
+
+def struck_glyphs(glyphs: Sequence[Glyph], strikes: Iterable[Strike]) -> set[int]:
+    """Indexes into `glyphs` of the glyphs struck through.
+
+    A StrikeOut annotation strikes every glyph whose middle is inside it. A drawn line
+    strikes what `baseline_rules.classify` says it strikes: the glyphs of one row it
+    crosses through the middle. An underline, a rule under blanks, an overline, a table rule
+    between rows and a highlight behind text cross no glyph so, and strike nothing."""
+    struck: set[int] = set()
+    ink: list[Ink] | None = None
+    for strike in strikes:
+        if strike.annotation:
+            x0, x1 = strike.bbox[0], strike.bbox[2]
+            struck.update(
+                i
+                for i, g in enumerate(glyphs)
+                if x0 - STRIKE_X_SLACK <= (g.bbox[0] + g.bbox[2]) / 2 <= x1 + STRIKE_X_SLACK
+                and _centre_in(g.bbox, strike.bbox, 0.0)
+            )
+            continue
+        if ink is None:
+            ink = [Ink(g.bbox, g.size, g.baseline) for g in glyphs]
+        verdict = classify(strike.bbox, ink)
+        if verdict.kind == "strike":
+            struck.update(verdict.ink)
+    return struck
+
+
+# A drawn mark that strikes text must also show on the page: the share of its length, at this
+# many pixels to the point, that a render finds inked. Clipped away, covered or in a layer
+# that is off, a mark is in the page's drawings but not on the page (a vector figure's legend
+# sample drawn outside its clip), and a reader who sees no line sees no deleted text.
+STRIKE_SCALE = 8
+STRIKE_DRAWN_SHARE = 0.9
+STRIKE_INK_BELOW = 210  # of 255, grey: a hairline's antialiased row still counts
+
+
+def drawn_strikes(
+    page: pymupdf.Page, strikes: list[Strike], glyphs: Sequence[Glyph]
+) -> list[Strike]:
+    """`strikes` without the drawn marks that would strike text but that the page does not
+    show. Only those marks are rendered (a thin strip along each): the others strike nothing,
+    so whether they show does not matter. A render that fails keeps the mark. The caller holds
+    `_LOCK`."""
+    ink: list[Ink] | None = None
+    kept = []
+    for strike in strikes:
+        if strike.annotation:
+            kept.append(strike)
+            continue
+        x0, y0, x1, y1 = strike.bbox
+        if not any(
+            g.bbox[0] < x1 and g.bbox[2] > x0 and g.bbox[1] < y1 and g.bbox[3] > y0 for g in glyphs
+        ):
+            kept.append(strike)  # crosses no glyph: strikes nothing, never rendered
+            continue
+        if ink is None:
+            ink = [Ink(g.bbox, g.size, g.baseline) for g in glyphs]
+        if classify(strike.bbox, ink).kind != "strike" or _shows(page, strike.bbox):
+            kept.append(strike)
+    return kept
+
+
+def _shows(page: pymupdf.Page, box: BBox) -> bool:
+    """A strip of the page along the drawn mark `box` is inked along its length (every
+    column of the strip, bar the odd gap, holds a pixel darker than paper)."""
+    x0, y0, x1, y1 = box
+    try:
+        strip = pymupdf.Rect(x0, y0 - 0.1, x1, y1 + 0.1) & page.rect
+        if strip.is_empty:
+            return True
+        pix = page.get_pixmap(
+            matrix=pymupdf.Matrix(STRIKE_SCALE, STRIKE_SCALE),
+            clip=strip,
+            colorspace=pymupdf.csGRAY,
+            alpha=False,
+        )
+    except Exception:  # an unreadable render is not evidence the mark is hidden
+        return True
+    rows, width, data = pix.height, pix.width, pix.samples
+    inked = sum(
+        any(data[r * width + c] < STRIKE_INK_BELOW for r in range(rows)) for c in range(width)
+    )
+    return inked >= STRIKE_DRAWN_SHARE * width
+
+
+# A blank typed as underscores (three or more, the way a drawn blank is written into the text
+# by `layout._mark_blanks`) and a printed checkbox: ballot box, with check, with X.
+TOKEN_RE = re.compile(r"_{3,}|[\u2610\u2611\u2612]")
+
+
+def token_runs(element: Element, fields: Sequence[FormField] = ()) -> list[Run]:
+    """The element's blanks and printed checkboxes as runs (SW36), found in its text. The
+    drawn blanks and the empty fields are in the text already, as underscores, and a field's
+    box as a ballot box. No flag and no glyphs: what the text says is what the runs mark, so
+    a reviewer's retyped text gets the same. The value of a filled field (`fields`, SW39) is
+    a blank too: the first place in the element, under the field, where its text stands."""
+    text = element.text or ""
+    if not text or any(r.kind in ("blank", "checkbox") for r in element.runs):
+        return []
+    found = [
+        Run(start=m.start(), end=m.end(), kind="checkbox" if m.group()[0] != "_" else "blank")
+        for m in TOKEN_RE.finditer(text)
+    ]
+    for f in fields:
+        if not f.value or not _overlaps(f.box, element.bbox, BOX_SLACK):
+            continue
+        at = text.find(f.value)
+        while at >= 0 and any(r.start < at + len(f.value) and at < r.end for r in found):
+            at = text.find(f.value, at + 1)
+        if at >= 0:
+            found.append(Run(start=at, end=at + len(f.value), kind="blank"))
+    return sorted(found, key=lambda r: (r.start, r.end))
+
+
+def deleted_runs(
+    element: Element,
+    aligner: _Aligner,
+    strikes: Sequence[Strike],
+    equations: Mapping[str, Element] | None = None,
+) -> list[Run]:
+    """The element's struck runs (offsets into its text): its struck glyphs mapped onto the
+    text, each run trimmed of spaces and kept only when it has a letter, a digit or an
+    inline equation. An inline equation (`equations`, by id) is struck when most of its glyphs
+    are; it has no glyph in the text, so it is a run of its own, joined to a struck run
+    beside it with only spaces between."""
+    box = element.bbox
+    near = [s for s in strikes if _overlaps(s.bbox, box, BOX_SLACK)]
+    if not near:
+        return []
+    glyphs, alignment = aligner.of(element)
+    struck = struck_glyphs(glyphs, near)
+    if not struck:
+        return []
+    text = element.text or ""
+    runs = [
+        (start, end)
+        for start, end, _ in labelled_runs(
+            text, alignment, lambda i: True if i in struck else None, across_markers=True
+        )
+        if INLINE_MARKER_RE.search(text[start:end]) or any(c.isalnum() for c in text[start:end])
+    ]
+    for match in INLINE_MARKER_RE.finditer(text):
+        equation = (equations or {}).get(match.group(1))
+        if equation is None:
+            continue
+        inside = [i for i, g in enumerate(glyphs) if _centre_in(g.bbox, equation.bbox, 0.0)]
+        if inside and sum(i in struck for i in inside) * 2 > len(inside):
+            runs.append((match.start(), match.end()))
+    merged: list[list[int]] = []
+    for start, end in sorted(runs):
+        if merged and not text[merged[-1][1] : start].strip():
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [Run(start=start, end=end, kind="deleted") for start, end in merged]
 
 
 # ============================================================================ language
 
 
 def _document_language(
-    elements: Sequence[Element], pdf_lang: str | None, layout_lang: str
+    elements: Sequence[Element],
+    pdf_lang: str | None,
+    layout_lang: str,
+    chosen: str | None = None,
 ) -> tuple[str, LangSource, list[Notice]]:
-    if pdf_lang:
-        return pdf_lang, "pdf", []
-    if layout_lang and layout_lang != language.DEFAULT_LANG:
+    """The document language, from the first of these that has one (SW20d): what the person
+    chose at upload (stated, so no notice); the text, by script and then the detector
+    (`language.document_language`; the file's own /Lang says the tag when it agrees, and
+    otherwise loses: Word writes en-US into files in other languages); the file's own /Lang
+    when the text is too short to say and is in its script; else English, assumed. A text in
+    no one language (`lang_mixed`) and an assumed one (`lang_assumed`) are checks the
+    instructor answers on the job page (SW20a)."""
+    if chosen and (tag := language.document_tag(chosen)):
+        return tag, "user", []
+    stated = pdf_lang
+    if not stated and layout_lang and layout_lang != language.DEFAULT_LANG:
         # Layout only reports a language other than the default from the PDF's /Lang.
-        return language.document_tag(layout_lang) or language.DEFAULT_LANG, "pdf", []
+        stated = language.document_tag(layout_lang)
     texts = [e.text or "" for e in elements if e.kind in (*RUNNING_KINDS, Kind.HEADING)]
     try:
-        detected = language.document_language(texts)
+        found = language.document_language(texts)
     except Exception as exc:  # the detector (its model file, NumPy) failing to load
         log.warning("language detection failed: %s", type(exc).__name__)
-        detected = None
-    if detected is not None:
-        return detected, "detected", [Notice(code="lang_detected")]
-    return language.DEFAULT_LANG, "default", [Notice(code="lang_assumed")]
+        return (
+            stated or language.DEFAULT_LANG,
+            "pdf" if stated else "default",
+            ([] if stated else [make("lang_assumed")]),
+        )
+    mixed = [make("lang_mixed")] if found and found.mixed else []
+    if found is not None:
+        if stated and _agrees(stated, found.lang):
+            return stated, "pdf", mixed  # the file says it, and the text agrees
+        return found.lang, "detected", [make("lang_detected"), *mixed]
+    if stated and language.fits_text(stated, texts):
+        return stated, "pdf", []
+    return language.DEFAULT_LANG, "default", [make("lang_assumed")]
+
+
+def _agrees(stated: str, detected: str) -> bool:
+    """The file's tag names the language the text is in. Han text without kana is Chinese
+    to the detector and may be a Japanese file in kanji alone."""
+    if language.primary(stated) == detected:
+        return True
+    return detected == "zh" and language.primary(stated) == "ja"
 
 
 def passages(elements: Sequence[Element], document_lang: str) -> dict[str, str | None]:
@@ -798,21 +1610,109 @@ class TextPassResult:
     lang_source: LangSource
     notices: list[Notice]
     annotations: int = 0
+    # Coloured passages found, whether or not they were kept (FEATURE_COLOUR off: counted, and
+    # the notice `colour_used` says so).
+    colour_runs: int = 0
+    # Struck runs found, whether or not they were written (CONTENT_RUNS off: shadow).
+    deleted_runs: int = 0
+    # Bold, italic, fixed-pitch and highlighted runs found, by kind, whether or not written.
+    style_runs: dict[str, int] = field(default_factory=dict)
 
     def counts(self) -> dict[str, int]:
         """Content-free numbers for the trace."""
         links = [k for e in self.elements for k in e.links]
         return {
-            "links": sum(1 for k in links if k.kind != "crossref"),
+            "links": sum(1 for k in links if k.kind in ("uri", "internal")),
+            "typed_links": sum(1 for k in links if k.kind == "typed"),
             "crossrefs": sum(1 for k in links if k.kind == "crossref"),
-            "colour_runs": sum(len(e.colour_runs) for e in self.elements),
+            "colour_runs": self.colour_runs,
+            "deleted_runs": self.deleted_runs,
+            "deleted_runs_written": sum(r.kind == "deleted" for e in self.elements for r in e.runs),
+            "strong_runs": self.style_runs.get("strong", 0),
+            "emphasis_runs": self.style_runs.get("emphasis", 0),
+            "code_runs": self.style_runs.get("code", 0),
+            "highlight_runs": self.style_runs.get("highlight", 0),
+            "blanks": sum(r.kind == "blank" for e in self.elements for r in e.runs),
+            "checkboxes": sum(r.kind == "checkbox" for e in self.elements for r in e.runs),
             "passages": sum(1 for e in self.elements if e.lang),
             "notices": len(self.notices),
         }
 
 
+def _wraps(element: Element, aligner: _Aligner) -> Callable[[int], bool]:
+    """For `typed_addresses`: is the character before offset `at` of the element's text the
+    last of a printed line, with more of the text on a later line? Not at a line end the page
+    keeps (a "break" run: an address block, a list of links), where each line is whole; and
+    not where the glyphs of either side were not placed (nothing is known there)."""
+    text = element.text or ""
+
+    def wraps(at: int) -> bool:
+        after = next((i for i in range(at, len(text)) if not text[i].isspace()), None)
+        if not at or after is None:
+            return False
+        if any(r.kind == "break" and r.start < after and at < r.end for r in element.runs):
+            return False
+        glyphs, alignment = aligner.of(element)
+        last, first = alignment[at - 1], alignment[after]
+        if last is None or first is None:
+            return False
+        top, bottom = glyphs[last].bbox[1], glyphs[last].bbox[3]
+        return not top <= (glyphs[first].bbox[1] + glyphs[first].bbox[3]) / 2 <= bottom
+
+    return wraps
+
+
+def _guessed_links(
+    element: Element,
+    own: list[Link],
+    targets: _Targets,
+    wraps: Callable[[int], bool] | None = None,
+) -> list[Link]:
+    """`own`, the links the file (or layout) gave `element`, with the addresses typed in its
+    text with no link, then the references by number, added. The file's links keep their
+    words, and nothing is linked inside maths. `wraps`: see `typed_addresses`."""
+    text = element.text or ""
+    links = sorted([*own, *typed_addresses(text, own, wraps)], key=lambda k: k.start)
+    if element.kind in RUNNING_KINDS:
+        links = sorted(
+            [*links, *crossrefs(text, targets, links, element.id)], key=lambda k: k.start
+        )
+    return links
+
+
+def source_links(
+    elements: list[Element], printed: Mapping[str, str] | None = None
+) -> list[Element]:
+    """The elements of a source document (Word, LaTeX: `source.convert`), or of parts of a PDF
+    joined into one file (`combine.join`), with the same two
+    kinds of link the PDF pass adds: typed addresses and references by number. Links the
+    reader made from the file (web and email links) are kept, never overlapped; a source has
+    no pages, glyphs or link annotations, so nothing else of the pass runs. `printed` is
+    what the file printed before an element's text and the reader left out (`crossref_targets`)."""
+    targets = crossref_targets(elements, printed)
+    out: list[Element] = []
+    for element in elements:
+        if element.kind not in LINK_KINDS or not element.text:
+            out.append(element)
+            continue
+        own = list(element.links)
+        if element.kind in RUNNING_KINDS:  # the number alone is linked: take in its word
+            own = widen_internal(element.text, own)
+        links = _guessed_links(element, own, targets)
+        out.append(
+            element.model_copy(update={"links": links}) if links != element.links else element
+        )
+    return out
+
+
 def annotate(
-    elements: list[Element], pdf: PdfText, *, layout_lang: str = "en", colour: bool = False
+    elements: list[Element],
+    pdf: PdfText,
+    *,
+    layout_lang: str = "en",
+    colour: bool = False,
+    runs: bool = False,
+    chosen_lang: str | None = None,
 ) -> TextPassResult:
     """The pass on elements and what was read from the PDF (pure; see `apply`)."""
     aligner = _Aligner(pdf.glyphs)
@@ -833,38 +1733,91 @@ def annotate(
             shown = visible_text(element.text, link.start, link.end)
             if unclear_link_text(shown, context_words(element.text, link.start, link.end)):
                 unclear[(element.page, element.id)] += 1
-        if element.kind in RUNNING_KINDS:
-            own = sorted([*own, *crossrefs(element.text, targets, own)], key=lambda k: k.start)
+        # Neither is a link of the file, so neither is judged for its text above.
+        own = _guessed_links(element, own, targets, _wraps(element, aligner))
         if own:
             links[element.id] = own
-    runs: dict[str, list[ColourRun]] = {}
-    if colour:
-        body = body_colour(g for glyphs in pdf.glyphs.values() for g in glyphs)
-        for element in elements:
-            if element.kind in RUNNING_KINDS and element.text:
-                found_runs = colour_runs(element, aligner, body, links.get(element.id, []))
-                if found_runs:
-                    runs[element.id] = found_runs
-    lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang)
+    coloured: dict[str, list[ColourRun]] = {}
+    body = body_colour(g for glyphs in pdf.glyphs.values() for g in glyphs)
+    for element in elements:
+        if element.kind in RUNNING_KINDS and element.text:
+            found_runs = colour_runs(element, aligner, body, links.get(element.id, []))
+            if found_runs:
+                coloured[element.id] = found_runs
+    struck: dict[str, list[Run]] = {}
+    inline_equations = {e.id: e for e in elements if e.kind is Kind.EQUATION}
+    for element in elements:
+        strikes = pdf.strikes.get(element.page)
+        if not strikes or element.kind not in LINK_KINDS or not element.text:
+            continue
+        if found_struck := deleted_runs(element, aligner, strikes, inline_equations):
+            struck[element.id] = found_struck
+    styled: dict[str, list[Run]] = {}
+    marks = {page: highlight_marks(found_marks) for page, found_marks in pdf.highlights.items()}
+    for element in elements:
+        if element.kind not in RUNNING_KINDS or not element.text:
+            continue
+        own = [
+            *style_runs(element, aligner),
+            *highlight_runs(element, aligner, marks.get(element.page, ())),
+        ]
+        if own:
+            styled[element.id] = sorted(own, key=lambda r: (r.start, r.end))
+    lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang, chosen_lang)
     langs = passages(elements, lang)
     updated = []
     for element in elements:
         update: dict[str, object] = {}
         if element.id in links:
             update["links"] = links[element.id]
-        if element.id in runs:
-            update["colour_runs"] = runs[element.id]
+        if colour and element.id in coloured:
+            update["colour_runs"] = coloured[element.id]
+        marked = [*(struck[element.id] if runs and element.id in struck else [])]
+        marked += styled[element.id] if runs and element.id in styled else []
+        if element.kind in LINK_KINDS:
+            marked += token_runs(element, pdf.fields.get(element.page, ()))
+        if marked:
+            update["runs"] = sorted([*element.runs, *marked], key=lambda r: (r.start, r.end))
         if langs.get(element.id):
             update["lang"] = langs[element.id]
         updated.append(element.model_copy(update=update) if update else element)
+    updated, comments = comment_notes(updated, pdf.marks, pdf.strikes)  # after the language
+    if comments:
+        notices.append(make("annotations_read", count=comments))
+    if pdf.attachment_count:
+        notices.append(
+            make(
+                "attachments_not_converted",
+                count=pdf.attachment_count,
+                names=pdf.attachments[:MAX_ATTACHMENT_NAMES],
+            )
+        )
     for (page, owner), count in sorted(found.dropped.items(), key=lambda kv: str(kv[0])):
-        notices.append(Notice(code="link_scheme_dropped", page=page, element_id=owner, count=count))
+        notices.append(make("link_scheme_dropped", page=page, element_id=owner, count=count))
     for (page, owner), count in sorted(unclear.items()):
-        notices.append(Notice(code="link_text_unclear", page=page, element_id=owner, count=count))
+        notices.append(make("link_text_unclear", page=page, element_id=owner, count=count))
     if colour:
-        notices.extend(_colour_reference_notices(updated, set(runs)))
+        notices.extend(_colour_reference_notices(updated, set(coloured)))
+    elif coloured:  # found, not kept: say so once, with how many passages
+        notices.append(make("colour_used", count=sum(len(r) for r in coloured.values())))
+    notices.extend(notice_rules.from_runs(updated))
+    if form := sum(len(v) for v in pdf.fields.values()):
+        notices.append(make("form_fields", count=form))
     notices.extend(lang_notices)
-    return TextPassResult(updated, lang, source, notices, annotations=pdf.annotations)
+    found = sum(len(r) for r in struck.values())
+    style_counts: Counter[str] = Counter(
+        r.kind for found_styled in styled.values() for r in found_styled
+    )
+    return TextPassResult(
+        updated,
+        lang,
+        source,
+        notices,
+        annotations=pdf.annotations,
+        colour_runs=sum(len(r) for r in coloured.values()),
+        deleted_runs=found,
+        style_runs=dict(style_counts),
+    )
 
 
 def apply(
@@ -874,28 +1827,41 @@ def apply(
     pages: Iterable[int],
     layout_lang: str = "en",
     colour: bool = False,
+    runs: bool = False,
+    chosen_lang: str | None = None,
 ) -> TextPassResult:
     """The text pass for one conversion (the module docstring says what it adds).
 
     `pages` are the analysed pages (0-based), `layout_lang` the language layout reported
     (`Layout.lang`: the PDF's /Lang, else "en"), `colour` the FEATURE_COLOUR flag in
-    force. Never raises: a PDF that cannot be read again gives no links or colours (the
+    force, `runs` the CONTENT_RUNS flag (off: struck runs are counted, not written),
+    `chosen_lang` the language the person chose at upload (`ConversionOptions.language`).
+    Never raises: a PDF that cannot be read again gives no links or colours (the
     cross-references and the language still come from the text), and a failure of the
     pass itself leaves the elements as they were, with the language layout reported.
     """
     try:
-        pdf = read_pdf(pdf_bytes, pages, colour=colour)
+        pdf = read_pdf(pdf_bytes, pages)
     except Exception as exc:  # a reading problem never fails the conversion
         log.warning("text pass could not read the PDF: %s", type(exc).__name__)
         pdf = PdfText()
     try:
-        return annotate(elements, pdf, layout_lang=layout_lang, colour=colour)
+        return annotate(
+            elements,
+            pdf,
+            layout_lang=layout_lang,
+            colour=colour,
+            runs=runs,
+            chosen_lang=chosen_lang,
+        )
     except Exception as exc:
         log.warning("text pass failed: %s", type(exc).__name__)
+        if chosen_lang and (tag := language.document_tag(chosen_lang)):
+            return TextPassResult(list(elements), tag, "user", [])
         if pdf.lang or layout_lang != language.DEFAULT_LANG:
             return TextPassResult(list(elements), pdf.lang or layout_lang, "pdf", [])
         # Nothing says which language this is: assumed, and the job page asks.
-        notices = [Notice(code="lang_assumed")]
+        notices = [make("lang_assumed")]
         return TextPassResult(list(elements), language.DEFAULT_LANG, "default", notices)
 
 
@@ -907,7 +1873,7 @@ def set_document_language(result: DocumentResult, tag: str) -> DocumentResult:
 
     `tag` is a BCP 47 tag ("fr", "pt_br") or the English name of a language in
     `language.LANGUAGE_NAMES` ("French"); `lang` becomes its usual form ("fr", "pt-BR")
-    and `lang_source` "user". The `lang_detected` / `lang_assumed` notices go (the
+    and `lang_source` "user". The `lang_detected`, `lang_assumed` and `lang_mixed` notices go (the
     instructor has answered them), and the passage languages are worked out again
     against the new language, so a passage is marked only where it differs from it.
     Raises ValueError for anything else, including tags that name no language ("und",
@@ -923,7 +1889,8 @@ def set_document_language(result: DocumentResult, tag: str) -> DocumentResult:
         e.model_copy(update={"lang": langs.get(e.id)}) if e.id in langs or e.lang else e
         for e in result.elements
     ]
-    notices = [n for n in result.notices if n.code not in ("lang_detected", "lang_assumed")]
+    answered = ("lang_detected", "lang_assumed", "lang_mixed")
+    notices = [n for n in result.notices if n.code not in answered]
     return result.model_copy(
         update={"lang": lang, "lang_source": "user", "elements": elements, "notices": notices}
     )
