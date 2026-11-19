@@ -218,8 +218,10 @@ MATERIALS: tuple[Material, ...] = (
         label="Pictures of regions and table cells you ask to have read on the review screen",
         vendor=(),
         # Sent since the review actions were built (T3-5, T3-11), and first named on its own
-        # on this day; before, only as "images of those parts of the page".
-        stated=date(2026, 11, 11),
+        # in the release that went live on this day (pull request 172; the sentence was
+        # written on 2026-11-11, but the privacy page a visitor could read did not carry it
+        # before the release). Before, only as "images of those parts of the page".
+        stated=date(2026, 11, 19),
     ),
 )
 

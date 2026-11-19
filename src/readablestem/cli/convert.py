@@ -96,7 +96,12 @@ def register(
         help="PDF -> accessible HTML (MathML, headings, alt text); needs --max-usd or --fake",
     )
     convert.add_argument("pdf", type=Path, help="input PDF")
-    convert.add_argument("--out", type=Path, required=True, help="output HTML file")
+    convert.add_argument(
+        "--out",
+        type=Path,
+        help="output HTML file (default: the input's name with .html, beside it); a file with "
+        "decisions still open is a draft, and a default name then ends in -draft",
+    )
     convert.add_argument("--pages", help="1-based page numbers, comma separated (default: all)")
     spend = convert.add_mutually_exclusive_group(required=True)
     spend.add_argument(
@@ -333,6 +338,13 @@ def _pdf_bytes(path: Path, settings: Settings) -> tuple[bytes, office_convert.Ce
         raise _CliError(f"cannot read {path}: {exc.code}") from None
 
 
+def _draft_name(path: Path) -> Path:
+    """`notes.html` -> `notes-draft.html`: how a draft is named (`web.output.file_name`)."""
+    from readablestem.web.output import DRAFT_SUFFIX
+
+    return path.with_name(f"{path.stem}{DRAFT_SUFFIX}{path.suffix}")
+
+
 def _cmd_convert(args: argparse.Namespace) -> int:
     try:
         return _convert(args)
@@ -351,14 +363,21 @@ def _convert(args: argparse.Namespace) -> int:
     settings = get_settings()
     if not args.pdf.is_file():
         raise _CliError(f"PDF not found: {args.pdf}")
-    for target in (args.out, args.report):
+    # Without --out the file is named for the input; a draft's name ends in -draft, as a draft
+    # downloaded from the web app does, and whether it is one is known after the conversion.
+    default_out = args.pdf.with_suffix(".html")
+    for target in (args.out, args.report, default_out, _draft_name(default_out)):
         if target is None:
             continue
         if target.is_dir():
             raise _CliError(f"{target} is a directory; give a file path")
         if target.resolve() == args.pdf.resolve():
             raise _CliError(f"{target} is the input PDF; choose another output path")
-    if args.report is not None and args.report.resolve() == args.out.resolve():
+    if (
+        args.report is not None
+        and args.out is not None
+        and args.report.resolve() == args.out.resolve()
+    ):
         raise _CliError("--report and --out must be different files")
     pdf_bytes, census = _pdf_bytes(args.pdf, settings)
     pages = _parse_pages(args.pages, _page_count(pdf_bytes, args.pdf), args.pdf)
@@ -420,12 +439,28 @@ def _convert(args: argparse.Namespace) -> int:
     html = output.result.html
     checks = output.checks if isinstance(output, PipelineOutput) else static_checks(html)
     axe = axe_checks(html) if args.axe else None
-    args.out.parent.mkdir(parents=True, exist_ok=True)
-    # There is no review step here, so a file with decisions open is a draft and says so
-    # first, as a draft downloaded from the web app does (SW21). The checks read the HTML
-    # as the pipeline wrote it.
+    # There is no review step here, so a file with decisions open is a draft: it says so first
+    # and is worded for the person who checks it, as the draft downloaded from the web app is
+    # (SW21; `web.routes.jobs.served_html`). The checks read the HTML as the pipeline wrote it.
     still_open = triage.open_decisions(output.result.fixes)
-    args.out.write_text(mark_draft(html, still_open) if still_open else html, encoding="utf-8")
+    out = args.out or default_out
+    if still_open:
+        from readablestem.pipeline.assemble import CHECKER
+        from readablestem.web.review import rerender_html
+
+        html = mark_draft(
+            rerender_html(
+                output.result.model_copy(deep=True),
+                output.crops,
+                audience=CHECKER,
+                notice=FAKE_NOTICE if args.fake else None,
+            ),
+            still_open,
+        )
+        if args.out is None:
+            out = _draft_name(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_text(html, encoding="utf-8")
     if args.report:
         _write_report(args.report, output, checks, axe)
 
@@ -437,9 +472,11 @@ def _convert(args: argparse.Namespace) -> int:
         cap_usd=min(cap_usd, settings.max_usd_per_job),
         concurrency=concurrency,
     )
-    print(f"wrote {args.out}")
+    print(f"wrote {out}")
     if still_open:
         print(f"Draft:       the file opens with “{draft_banner(still_open)}”")
+        if args.out is not None:
+            print("             It is a draft because decisions are still open; your name is kept.")
     if args.report:
         print(f"wrote {args.report}")
     return 0
