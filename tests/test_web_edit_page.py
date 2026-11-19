@@ -56,8 +56,9 @@ def edit_output() -> ConversionOutput:
                 text="Vector a quantity with size and direction", term_end=6)
     )  # fmt: skip
     for number, eid in enumerate((NEXT, AFTER)):
+        top = 680.0 + 20 * number
         result.elements.append(
-            Element(id=eid, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, 680.0 + 20 * number, 540.0, 695.0 + 20 * number),
+            Element(id=eid, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, top, 540.0, top + 15.0),
                     order=52 + number, text=f"A paragraph beside it, number {number + 1}.")
         )  # fmt: skip
     return output
@@ -342,7 +343,7 @@ def test_code_and_entries_and_long_paragraphs_are_not_headings(edits):
     assert edit_post(edits, PLAIN, action="heading", level="2").status_code == 422
 
 
-# --------------------------------------------------------------------------- a sidebar or a quotation
+# --------------------------------------------------------------------------- sidebar, quotation
 
 
 def test_a_paragraph_is_made_a_sidebar_or_a_quotation_and_the_page_has_the_wrapper(edits):
@@ -352,7 +353,8 @@ def test_a_paragraph_is_made_a_sidebar_or_a_quotation_and_the_page_has_the_wrapp
     assert element(edits, PLAIN).role == "aside"
     html = with_file(edits).html or ""
     assert re.search(
-        r'<aside aria-label="Sidebar"><p[^>]*>Discuss vectors and scalars with the class\.</p></aside>',
+        r'<aside aria-label="Sidebar"><p[^>]*>Discuss vectors and scalars with the class\.</p>'
+        r"</aside>",
         html,
     )
     shown = unescape(edits.browser.get(page).text)
