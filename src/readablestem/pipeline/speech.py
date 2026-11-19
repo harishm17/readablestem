@@ -1282,6 +1282,9 @@ def _mark_tilde(kids: list[ET.Element]) -> None:
 # Two bars that enclose something are an absolute value (two double bars a norm).
 _ABSOLUTE = {"|": ("the absolute value of", "end absolute value"), "‖": ("the norm of", "end norm")}
 _POSTFIX = frozenset("!′″‴%°")
+# Signs that make what a pair of bars holds a set or a pair of groups: the bars are then a size
+# or an index, not an absolute value.
+_SET_SIGNS = frozenset("∪∩∖⧵:∶")
 
 
 def _bar_operand(node: ET.Element) -> bool:
@@ -1309,6 +1312,16 @@ def _encloses(kids: list[ET.Element], start: int, end: int) -> bool:
     return not (before and after)
 
 
+def _size_or_determinant(inside: list[ET.Element]) -> bool:
+    """Do single bars around this give a set's size, a determinant or a subgroup index as
+    often as an absolute value? One capital letter (`|S|`, `|A|`), or a row with a set sign
+    or a colon (`|A \\cup B|`, `|G:H|`)."""
+    if len(inside) == 1 and inside[0].tag == "mi":
+        letter = _text_of(inside[0])
+        return len(letter) == 1 and letter.isupper()
+    return any(_mo_text(kid) in _SET_SIGNS for kid in inside)
+
+
 def _pair_bars(kids: list[ET.Element]) -> None:
     """Pair the bars of a row that enclose something, and say so on them (`_BAR_ROLE`, the opening
     words in `_MARK`). A bar closes when something it can enclose stands before it (a letter, a
@@ -1316,7 +1329,9 @@ def _pair_bars(kids: list[ET.Element]) -> None:
     says what the bars mean, so it is said only where the row's bars can mean nothing else: every
     bar has its partner and every pair can enclose (`_encloses`). In any other row (`a|b, c|d`,
     a bra and a ket) every bar stays "vertical bar", as does a bar already read another way
-    (`_mark_bars`)."""
+    (`_mark_bars`), and so does a pair of single bars around one capital letter or a row with
+    a set sign, which is a size, a determinant or an index as often as an absolute value
+    (`_size_or_determinant`)."""
     stack: list[int] = []
     pairs: list[tuple[int, int]] = []
     operand = False
@@ -1335,6 +1350,8 @@ def _pair_bars(kids: list[ET.Element]) -> None:
     for start, end in pairs:
         inside = kids[start + 1 : end]
         opener, closer = kids[start], kids[end]
+        if _mo_text(opener) == "|" and _size_or_determinant(inside):
+            continue
         opener.set(_BAR_ROLE, "open")
         opener.set(_MARK, _ABSOLUTE[_mo_text(opener) or ""][0])
         closer.set(_BAR_ROLE, "close")

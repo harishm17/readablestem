@@ -25,6 +25,11 @@
   3). `lists._list_levels` now keeps the marker series of each open level and sends an item of
   another series than the innermost level back to the open level of its own series at the same
   x. Sub-bullets 3 pt or more to the right were already right.
+- Speech: `|S|`, `|A \cup B|`, `\det A = |A|` and `|G:H|` were read "the absolute value of",
+  which is wrong for the size of a set, a determinant and a subgroup index. A pair of single
+  bars around one capital letter, or around a row with a set sign (union, intersection, set
+  minus) or a colon, keeps "vertical bar" as it did before this batch
+  (`speech._size_or_determinant`). `|x|`, `|x - y|` and `|a| + |b|` are still absolute values.
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 

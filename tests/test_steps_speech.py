@@ -64,6 +64,13 @@ def test_every_gold_equation_has_speech(record):
             r"|a\rangle\langle b|",
             "vertical bar a close angle bracket open angle bracket b vertical bar",
         ),
+        # ... and neither is the size of a set, a determinant or a subgroup index
+        (
+            r"|A \cup B| = |G:H|",
+            "vertical bar cap A union cap B vertical bar equals "
+            "vertical bar cap G colon cap H vertical bar",
+        ),
+        (r"\det A = |A|", "determinant cap A equals vertical bar cap A vertical bar"),
         (r"\|x\|", "the norm of x"),
         (r"\bar{a+b}", "the quantity a plus b end quantity bar"),
         # ions: the charge needs no "end power"; a nuclide is read as the element (the data
