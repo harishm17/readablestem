@@ -814,7 +814,17 @@ way, the next or previous value ("b." for "a."; the same glyph for a dash) and t
 or the item text starting within 3 pt in x. "i" is both a letter and a roman numeral; its
 siblings decide. So "A ball rolls", "2.5 metres is", "2.3 Speed", a lone "B. Smith" or
 "I. Newton", and a wrapped sentence that happens to start a line with a dash, stay
-paragraphs. Headings are decided first: "1. Introduction" in a large font is a heading.
+paragraphs. A capital letter and a full stop is the marker of a list only beside its
+neighbour: the item just before or just after it, in reading order (a page's left column,
+then its right), is the next or the previous letter. Some line of a long document starts
+with the next letter, so a row of an author list ("A. Smith, B. Jones" on a line of its own)
+has to find it next to it. Headings are decided first: "1. Introduction" in a large font is a
+heading; so is a line of 2 to 12 words that starts with a capital letter and a full stop and is
+set, all of it, in bold or in italics, and does not end like a sentence ("A. Problem
+Descriptions", IEEE's subsections; reason "lettered title", one level under its section like
+a letter of an index). A line like that is a block of its own, apart from the text under it
+set in another face (`_lettered_title`). A bold line that starts with a bullet glyph is a list
+item, not a heading.
 
 The item text starts after the marker; continuation lines join the item (a hanging
 indent is fine). **Levels** come from the left edge of the item text, which is the same
@@ -829,7 +839,13 @@ than half the font size right of it (`MARKER_INDENT`; slides set the sub-bullets
 15 pt in while their text is 5 to 14 pt right of the text above). Each open level keeps the
 series that opened it: when the sub-bullets' text starts exactly on the text edge of their
 numbered parent, the x does not tell which level "2)" goes back to, so it goes back to the open
-level of its own series at that x. Items of one series (a
+level of its own series at that x. A numbered series that
+starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
+above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
+goes back to the letters. A list that a paragraph, a figure or a table cut ("(i)", the words of
+an answer, "(ii)") goes on where the next item takes up the numbering of one of the levels the
+block closed (the next value of the same series at that level's indent): it keeps those
+levels (`_list_levels`, `_taken_up`). Items of one series (a
 wrapped list of names that start with initials) and the options of a grid are not moved by
 it. The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or
