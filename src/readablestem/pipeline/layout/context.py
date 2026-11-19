@@ -14,7 +14,7 @@ from typing import Literal
 
 from readablestem.config import ConfigError
 from readablestem.core.budget import BudgetExceeded
-from readablestem.core.types import Element, Notice
+from readablestem.core.types import BBox, Element, Notice
 from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import page_type, say_once, tables
 
@@ -151,6 +151,9 @@ class Layout:
     # Per page read for its text, the words the page has to say and what was left out by
     # rule (`pipeline.say_once`): the say-once measure counts them against the elements.
     sources: dict[int, say_once.PageSource] = field(default_factory=dict)
+    # Per page, the table proposals the region tree refused (`REGION_TREE`, WS15.2): the box of
+    # each and why (`regions.REFUSED_*`). Codes and boxes only; their text stays in the page.
+    table_refusals: dict[int, list[tuple[BBox, str]]] = field(default_factory=dict)
 
 
 def _log_page_failure(number: int, exc: Exception) -> None:

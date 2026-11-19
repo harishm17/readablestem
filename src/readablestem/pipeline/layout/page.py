@@ -140,20 +140,12 @@ PEN_MARK_COLOUR = 0.3  # a closed or filled mark differs from the text this much
 PEN_FILL_SHARE = 0.5  # a filled mark is a stroke's ribbon when it covers at most this of its box
 
 
-def _prepare_rows(
-    page: pymupdf.Page,
-    frags: list[_Row],
-    margins: _MarginFilter,
-    rules: Sequence[_Path] = (),
-    source: say_once.PageSource | None = None,
-    *,
-    tables: Sequence[BBox] = (),
-    document: _Document,
-) -> tuple[list[_Row], Gutter, list[_Row]]:
-    """The page's rows without its running headers, footers, page numbers and watermarks,
-    its column gutter, and the rows so dropped (a figure may claim some back as labels:
-    `_figure_labels`). `source` gets what the say-once measure counts: the words of the rows
-    kept, and the glyphs of the rows left out as `furniture`."""
+def _split_furniture(
+    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter
+) -> tuple[list[_Row], list[_Row], set[int], set[int]]:
+    """The page's fragments split into the ones kept, the ones dropped (running headers, footers,
+    page numbers, watermarks) and the ids of the ones gone and the ones placed elsewhere
+    (`_MarginFilter`)."""
     height = page.rect.height
     kept: list[_Row] = []
     dropped: list[_Row] = []
@@ -171,6 +163,56 @@ def _prepare_rows(
             dropped.append(frag)
         elif id(frag) not in placed:
             kept.append(frag)
+    return kept, dropped, gone, placed
+
+
+def _accepted(
+    page: pymupdf.Page,
+    proposals: list[tables.PageTable],
+    frags: list[_Row],
+    paths: Sequence[_Path],
+    margins: _MarginFilter,
+    refused: list[tuple[BBox, str]],
+    *,
+    document: _Document,
+) -> list[tables.PageTable]:
+    """The proposals of `tables.find` that the page's region tree accepts (WS15.2, `REGION_TREE`
+    on). The proposals are made on the raw page, before it has columns, so the tree is built
+    from every fragment of the page, the proposals' lines among them; `regions.table_refusal`
+    judges each proposal against it. A refused one stays in the page's text (nothing is taken
+    out for it, and the tree that reads the page is built after this, with the accepted tables
+    only) and is added to `refused` with its reason: a box and a code, no text."""
+    if not proposals:
+        return proposals
+    kept = _split_furniture(page, frags, margins)[0]
+    tree = regions._tree_of(page, kept, paths, (), document)
+    accepted = []
+    for table in proposals:
+        lines = [(frags[i].bbox, frags[i].clean) for i in sorted(table.lines) if i < len(frags)]
+        why = regions.table_refusal(tree, lines, table.bbox, table.alignment)
+        if why is None:
+            accepted.append(table)
+        else:
+            refused.append((table.bbox, why))
+    return accepted
+
+
+def _prepare_rows(
+    page: pymupdf.Page,
+    frags: list[_Row],
+    margins: _MarginFilter,
+    rules: Sequence[_Path] = (),
+    source: say_once.PageSource | None = None,
+    *,
+    tables: Sequence[BBox] = (),
+    document: _Document,
+) -> tuple[list[_Row], Gutter, list[_Row]]:
+    """The page's rows without its running headers, footers, page numbers and watermarks,
+    its column gutter, and the rows so dropped (a figure may claim some back as labels:
+    `_figure_labels`). `source` gets what the say-once measure counts: the words of the rows
+    kept, and the glyphs of the rows left out as `furniture`."""
+    height = page.rect.height
+    kept, dropped, gone, placed = _split_furniture(page, frags, margins)
     if document.region_tree:  # the page's regions, from the fragments (regions.py)
         # No gutter orders the page here, but a rule at the head of one column must still not
         # become the blank of a line in the other (it would reach across the channel).

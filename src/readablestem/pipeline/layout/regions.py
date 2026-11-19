@@ -1024,6 +1024,111 @@ def prepare(
     return rows, tree, _merge_baselines(dropped, None)
 
 
+# -- table proposals (WS15.2) -----------------------------------------------------------------
+
+REFUSED_PROSE = "prose on both sides of a gutter"
+REFUSED_ALIGNMENT = "rows do not line up across a gutter"
+REFUSED_MATCHING = "two labeled lists side by side"
+MIN_ALIGNMENT = 0.6  # a proposal that crosses a gutter needs at least this share of cells in line
+MATCHING_CELLS = 3  # a labeled list of at least this many cells
+
+
+def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[list[Item]]]:
+    """The gutters of the tree that `lines` (the cells of a table proposal) stand across: for
+    each, the lines on each of its sides. A horizontal cut is no gutter (a table has rows), and
+    a gutter counts only where the page has lines of its own on a side (`rest`: the lines that
+    are not the proposal's): a table whose own columns are cut, with nothing else in the cut,
+    is a table that spans the region."""
+    if not lines:
+        return []
+    found: list[list[list[Item]]] = []
+    if node.kind == "stack":
+        parts: dict[int, list[Item]] = {}
+        for it in lines:
+            parts.setdefault(bisect.bisect_right(node.cuts, (it[0][1] + it[0][3]) / 2), []).append(
+                it
+            )
+        for k, part in parts.items():
+            found += _between(node.children[k], part, rest)
+        return found
+    if node.kind == "grid":
+        cells: dict[int, list[Item]] = {}
+        for it in lines:
+            cells.setdefault(_nearest_cell(node.cells, it[0]), []).append(it)
+        if len(cells) >= 2 and _others(node.box, rest):
+            found.append(list(cells.values()))
+        return found
+    if node.kind == "cols":
+        middle = sum(node.channel) / 2
+        sides = [
+            [it for it in lines if (it[0][0] + it[0][2]) / 2 < middle],
+            [it for it in lines if (it[0][0] + it[0][2]) / 2 >= middle],
+        ]
+        if all(sides) and any(_others(c.box, rest) for c in node.children):
+            found.append(sides)
+        for child, side in zip(node.children, sides, strict=True):
+            found += _between(child, side, rest)
+        return found
+    inside: dict[int, list[Item]] = {}
+    outside: list[Item] = []
+    for it in lines:
+        for k, (rect, _) in enumerate(node.boxes):
+            if _centre_in(it[0], rect):
+                inside.setdefault(k, []).append(it)
+                break
+        else:
+            outside.append(it)
+    groups = ([outside] if outside else []) + list(inside.values())
+    if len(groups) >= 2 and _others(node.box, rest):
+        found.append(groups)
+    for k, part in inside.items():
+        found += _between(node.boxes[k][1], part, rest)
+    return found
+
+
+def _others(box: BBox, rest: Sequence[BBox]) -> bool:
+    """Does a line that is not the proposal's stand in `box`?"""
+    return any(_centre_in(b, box) for b in rest)
+
+
+def _matching(sides: Sequence[list[Item]]) -> bool:
+    """Every side is a list of labeled cells (1. 2. 3., A. B. C.), as the tree reads an exercise
+    that matches terms with definitions (rule 8)."""
+    for side in sides:
+        cells = _cells(side, range(len(side)))
+        if len(cells) < MATCHING_CELLS or any(lab is None for lab, _ in cells):
+            return False
+        if len({lab[0] for lab, _ in cells if lab is not None}) != 1:
+            return False
+    return True
+
+
+def table_refusal(
+    tree: RegionTree, lines: Sequence[Item], box: BBox, alignment: float
+) -> str | None:
+    """Why a table proposal is not accepted, as the reason (`REFUSED_*`), or None. The proposal
+    is made on the raw page, before the page has columns; here the page has its tree. A proposal
+    in one region is accepted, and so is a ruled table that spans the columns on purpose (it is
+    a cut of its own: nothing else of the page stands beside it). One that stands across a
+    gutter is refused only when it has prose on both sides of it, or its rows do not line up
+    (`MIN_ALIGNMENT`), or its sides are two labeled lists (an exercise). `lines` are the lines
+    the proposal takes (cells and caption) and `box` is the box of its cells."""
+    frame = (box[0] - 1, box[1] - 1, box[2] + 1, box[3] + 1)
+    cells = [it for it in lines if _centre_in(it[0], frame)]
+    own = {b for b, _ in lines}
+    rest = [b for b, _ in tree.lines if b not in own]
+    across = _between(tree.root, cells, rest)
+    if not across:
+        return None
+    if any(sum(_prose(side, range(len(side))) for side in sides) >= 2 for sides in across):
+        return REFUSED_PROSE
+    if alignment < MIN_ALIGNMENT:
+        return REFUSED_ALIGNMENT
+    if any(_matching(sides) for sides in across):
+        return REFUSED_MATCHING
+    return None
+
+
 # -- rule 12: numbered runs --------------------------------------------------------------------
 
 _NUMBER_LABEL = re.compile(r"^\s*\(?(\d{1,3})[.)]?(?:\s|$)")
