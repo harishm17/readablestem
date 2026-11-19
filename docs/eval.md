@@ -666,7 +666,13 @@ the differences are listed under the table, and so are the settings of the repor
 production does not use. A report of a run that called no model that has no `flags` is refused
 (re-make it with `eval pipeline`; the two commands are in `eval/reproduce.py`); a report of a model run made before the field
 existed is not refused for that, since its pipeline version already is. Add a switch of either
-kind to the list when a change makes it decide what is asked or accepted. Tolerances live in `data/eval/tolerances.json`; an entry with only
+kind to the list when a change makes it decide what is asked or accepted. A numeric module constant of a `*_step.py` module,
+or of a module `GUARDED_CONSTANTS` already names, that is neither in `GUARDED_CONSTANTS` nor in
+`UNGUARDED_CONSTANTS` with its reason fails `tests/test_eval_gate.py`, which reads the modules'
+own names with no parser of its own: a new bar is a decision made when it is added. It sees a
+constant of a module, not a number written inside a function or a bar held in a dict or tuple.
+A few entries say "NOT YET GUARDED": they decide a request or a bar, and guarding them makes the
+two committed no-model reports stale, so it waits for the batch that makes them again. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -720,6 +726,7 @@ the ones `eval gate` checks.
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
 | `metrics` | per task, as above |
 | `cost`, `latency_ms` | as above |
+| `provenance` | what made the report: `commit` and `clean` (false when the tree had changes), `pipeline_version`, `render_version` and `tools` (`pandoc`, `latexml`, `pymupdf`, `fonts`: the Noto and Liberation packages the pages are drawn with). One helper makes it (`run_record.provenance`), and every report builder calls it: `eval pipeline` (all tasks), `eval tables`, the measured records (`eval cost`, `speed`, `burden`, `order`, `outputs`, `say-once`, `parsing-bench`), the ledger and the page audit. A report made before it has none; the gate reads it as "not stamped" and prints `Made by: ...` to stderr either way. A report copied by `eval promote` keeps the provenance of the run that made it |
 | `recording` | a real run only: `run` (`<set>/runs/<timestamp>`), `sha` (commit, `+dirty` when the tree had changes) and `files` kept there: "Runs keep their recordings" |
 
 `--items PATH` also writes one JSON line per item (per page for headings and document),
@@ -3304,6 +3311,14 @@ An upload whose recording lacks an answer it asks for is left out and named: an 
 request fails its element, and that decision would be the recording's, not the
 conversion's. A record kept before decisions were measured is "not measured", not a
 document that asks nothing.
+
+**Equations and table maths not compared.** The record also says how many equations (and how
+many tables with maths in a cell) the check against the page could not compare, by cause
+(`not_compared` in the record, a table in the printed report): `no_characters`,
+`no_usable_characters`, `unmapped_characters`, `bold_letter`. The check is a passed one, so it
+never shows as a decision; this is where it can be counted. A table cell of maths writes the
+same passed check (`table.math_not_compared`) with the same causes (and `no_local_grid` or
+`grid_not_aligned` when the page's own text has no grid to hold the cell against), and no card.
 
 **The bar** (`--against RECORD`): the whole set and every page kind with at least 10 pages
 ask for no more decisions a page than in the earlier record (`--allowance`, 0 by default).
