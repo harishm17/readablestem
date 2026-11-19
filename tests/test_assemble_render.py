@@ -447,6 +447,15 @@ def test_unsafe_mathml_in_an_accepted_fix_falls_back_to_the_original():
     assert 'data-status="accepted" data-reason="mathml_rejected"' in item
     assert f'alt="{EQUATION_NOT_CONVERTED_ALT}"' in item
     assert "<script" not in html and "<math" not in html
+    # The note counts what the page shows: the refused one is a picture, not MathML.
+    mixed = render(
+        [equation("e1", 0), equation("e2", 1)],
+        [accepted("e1", "<math><mi>x</mi><script>alert(1)</script></math>"),
+         accepted("e2", "<math><mi>y</mi></math>")],
+        {"e1": png(), "e2": png()},
+    )  # fmt: skip
+    assert "1 of its 2 equations is written so that screen readers" in about(mixed)
+    assert block(mixed, "e2").count("<math") == 1
 
 
 def test_missing_crop_shows_extracted_text_and_says_so():

@@ -13,6 +13,7 @@ import glob
 import json
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from readablestem.core.types import (
@@ -91,6 +92,26 @@ def test_only_wide_equations_become_named_tab_stops():
     wide = opening_tag(html, "p1-e1")
     assert 'tabindex="0"' in wide and 'role="group"' in wide and 'aria-label="Equation"' in wide
     assert 'aria-label="Equation (2.4)"' in opening_tag(html, "p1-e2")
+    assert all(c.passed for c in static_checks(html))
+
+
+def test_a_wide_kept_picture_is_a_named_tab_stop_and_a_small_one_is_not():
+    """A kept picture keeps its size under 40 em and its box scrolls, so a keyboard user
+    needs to reach it (axe `scrollable-region-focusable`)."""
+    pixels = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 8, 4), False)
+    elements, fixes = [], []
+    for i, width in enumerate([600, 40]):
+        eid = f"p1-e{i}"
+        elements.append(
+            Element(id=eid, kind=Kind.EQUATION, page=0, bbox=(0, i, width, i + 20), order=i,
+                    display="block")
+        )  # fmt: skip
+        fixes.append(Fix(element_id=eid, kind=Kind.EQUATION, status=Status.NEEDS_REVIEW))
+    html = render_html(title="Kept", lang="en", elements=elements, fixes=fixes,
+                       crops={e.id: pixels.tobytes("png") for e in elements})  # fmt: skip
+    wide = opening_tag(html, "p1-e0")
+    assert 'tabindex="0"' in wide and 'role="group"' in wide and "aria-label=" in wide
+    assert "tabindex" not in opening_tag(html, "p1-e1")
     assert all(c.passed for c in static_checks(html))
 
 

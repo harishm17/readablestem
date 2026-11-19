@@ -88,13 +88,17 @@ W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
 M = "http://schemas.openxmlformats.org/officeDocument/2006/math"
 WP = "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"
 PIC = "http://schemas.openxmlformats.org/drawingml/2006/picture"
+A = "http://schemas.openxmlformats.org/drawingml/2006/main"
+ADEC = "http://schemas.microsoft.com/office/drawing/2017/decorative"
+_DECORATIVE_URI = "{C183D7F6-B498-43B3-948B-1728B52AA6E4}"  # Word's own id for the extension
 _NAMESPACES = {
     "w": W,
     "m": M,
     "wp": WP,
     "pic": PIC,
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
-    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "a": A,
+    "adec": ADEC,
     "o": "urn:schemas-microsoft-com:office:office",
     "v": "urn:schemas-microsoft-com:vml",
     "w10": "urn:schemas-microsoft-com:office:word",
@@ -455,6 +459,18 @@ def _unlink(root: ET.Element, bookmarks: set[str]) -> int:
     return count
 
 
+def _mark_decorative(doc_pr: ET.Element) -> None:
+    """Mark a picture as decorative the way Word does (`adec:decorative` in the extension list
+    of its `docPr`), so Word's checker does not ask for alt text and a screen reader leaves
+    it out."""
+    doc_pr.set("descr", "")
+    extensions = doc_pr.find(f"{{{A}}}extLst")
+    if extensions is None:
+        extensions = ET.SubElement(doc_pr, f"{{{A}}}extLst")
+    extension = ET.SubElement(extensions, f"{{{A}}}ext", {"uri": _DECORATIVE_URI})
+    ET.SubElement(extension, f"{{{ADEC}}}decorative", {"val": "1"})
+
+
 def _fix_document(
     xml: bytes, title: str, bookmarks: set[str]
 ) -> tuple[bytes, tuple[int, int, int, int, int]]:
@@ -472,6 +488,8 @@ def _fix_document(
             else:  # pandoc wrote the address; never leave that to be read aloud
                 name.attrib.pop("descr", None)
         pictures += 1 if descr else 0
+        if not descr and doc_pr is not None:  # the page wrote it as a decoration (empty alt)
+            _mark_decorative(doc_pr)
     tables = headers = 0
     for table in root.iter(f"{{{W}}}tbl"):
         tables += 1

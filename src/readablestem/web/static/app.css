@@ -65,6 +65,9 @@ a:hover { color: var(--accent-hover); text-decoration-thickness: 2px; }
 
 code, kbd, samp { font-family: var(--font-mono); font-size: max(0.875rem, 0.9em); }
 code { overflow-wrap: anywhere; }
+/* A script inside a script is as large as the script it is in (the student sheet's rule):
+   the browser's "smaller" would take another step down on each level. */
+sub sub, sub sup, sup sub, sup sup { font-size: inherit; }
 
 /* Focus: thick dark ring with a light halo, visible on every background. In dark mode the
    ring is yellow with a dark gap. */

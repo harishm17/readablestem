@@ -17,6 +17,10 @@ What a build found out about its file and the job page says beside the download 
 as a count in a note (`NOTE_KIND`, the same key): the Word file's equations that are written as
 words (`export_docx.DocxExport.not_word`). The note goes when its file goes.
 
+The file that joins the parts of one long upload ("Combine parts", `web.combine.combined_file`)
+is kept the same way on the first part, with `COMBINED` in front of its file type. It holds
+every part, so it is deleted when any part of the group is (`ops.retention.delete_jobs`).
+
 Only a finished file is kept: a build that fails (a picture the format cannot hold, pandoc
 busy or missing) stores nothing, and asks again next time. Who may download, whether the
 document is a draft, the usage event and the deletion clock stay in the routes, in front of
@@ -42,6 +46,7 @@ from readablestem.web.db import Blob
 
 KIND = "export"
 NOTE_KIND = "export_note"
+COMBINED = "combine-"  # in front of the file type of a combined file ("Combine parts")
 MAX_PER_JOB = 6
 MAX_BYTES = 32 * 1024 * 1024
 MEDIA_TYPE = "application/octet-stream"

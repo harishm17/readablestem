@@ -40,6 +40,9 @@ body { margin: 0; background: #ffffff; color: #1b1b1b;
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
+/* A script inside a script is as large as the script it is in: the browser's "smaller" would
+   take another step down on each level, under 14 px. */
+sub sub, sub sup, sup sub, sup sup { font-size: inherit; }
 """
 # The heading scale (F-445), in em of the 18 px text: a step at every level down to h4, and
 # h4 larger than the text. h5 and h6 stay at the text's size, never under it, and are told apart
