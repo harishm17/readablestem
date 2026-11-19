@@ -38,8 +38,9 @@
   x" for double bars), closed when more follows, and a single bar keeps "such that", "divides" and
   "given". Simple things stay short ("x squared", "x sub 0", "the square root of 2"). The pair
   search over every formula of up to six signs (56,796 prints) finds 3,765 groups of different
-  prints said alike and 3,120 said alike up to trailing end words before, 15 and 0 after (the 15
-  are the mixed number `1\frac{1}{a}` against a numerator `1 1`, left as it is). One parametrized
+  prints said alike and 3,120 said alike up to trailing end words before, 15 and 0 after; at
+  seven signs (495,459 prints) 99 and 0 after. All of those are the mixed number
+  `1\frac{1}{a}` against a numerator `1 1`, left as it is. One parametrized
   pair list in `tests/test_steps_speech.py` now also fails a pair whose sayings differ only in
   their last "end ..." words. A stored reading from older rules is made again where it is shown
   (no model call); `RENDER_VERSION` and `PIPELINE_VERSION` are not changed here. The spoken-equal
