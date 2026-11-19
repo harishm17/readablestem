@@ -48,6 +48,11 @@
   letters too. A hat the reading dropped is still found.
 - Page editor: a paragraph left out that is past the 120th line of its page is still listed,
   with "Put it back" (the list was cut at 120 lines, so it had no way back on the screen).
+- A proof replay with `--allow-drift` on a checkout of another pipeline version missed every
+  recorded axe-core result, since the page's generator tag now names the pipeline version and
+  the result was keyed by the whole page. The key leaves that tag out (axe-core does not read
+  it); a recording made with the older key is still found (`proof/replay.axe_key`).
+- `web/page_dates.json`: /demo, /security and /help/review changed on 2026-11-19.
 - `data/eval/parsing-bench-olmocr.json` is measured again at pipeline 0.5.13 (commit
   `3b177567`, $0): multi_column 69.2 (68.8 at 0.5.11), headers_footers 34.5 (32.5),
   long_tiny_text 37.3 (37.3), table_tests 66.6 (51.8), baseline 100.0 (99.0). The scores and
