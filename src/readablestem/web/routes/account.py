@@ -116,7 +116,7 @@ def save_keep_default(
         row = session.get(User, user.id)
         if row is not None:
             row.keep_week_default = on
-    flash(request, KEEP_ON if on else KEEP_OFF, undo=False)
+    flash(request, KEEP_ON if on else KEEP_OFF, undo=False, kind="success")
     return RedirectResponse("/account", status_code=303)  # no fragment: the notice takes focus
 
 
@@ -136,7 +136,7 @@ def save_name(request: Request, user: UserDep, name: Annotated[str, Form()] = ""
         row = session.get(User, user.id)
         if row is not None:
             row.name = cleaned or None
-    flash(request, NAME_SAVED if cleaned else NAME_CLEARED, undo=False)
+    flash(request, NAME_SAVED if cleaned else NAME_CLEARED, undo=False, kind="success")
     return RedirectResponse("/account", status_code=303)
 
 
@@ -189,5 +189,5 @@ def _delete_now(request: Request, user: CurrentUser) -> Response:
     log_event(logger, "account_deleted", jobs=stats.jobs_deleted, tier=user.access_tier)
     request.session.clear()  # signed out; the cookie is signed, so nothing else to end
     request.state.user = None
-    flash(request, DELETED)
+    flash(request, DELETED, kind="success")
     return RedirectResponse("/", status_code=303)

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field %}
 {# The problem-report form (routes/reports.py, web/reports.py). What it says before the send
    button is an honesty claim: it must match what `reports.add` stores and what
    `ops/retention.py` deletes. #}
@@ -23,13 +24,9 @@
 
 {% call form("report.send", "/jobs/" ~ job_id ~ "/report", {"novalidate": true, "class": "stack-form", "aria-labelledby": "stored-heading"}) %}
   <input type="hidden" name="item" value="{{ where.item_ref or '' }}">
-  <div class="field{% if text_error %} field-error{% endif %}">
-    <label for="report-text">What is wrong? (optional)</label>
-    <p class="hint" id="report-text-hint">Up to {{ max_text }} characters, as plain text.</p>
-    {% if text_error %}<p class="error-message" id="report-text-error"><span class="visually-hidden">Error: </span>{{ text_error }}</p>{% endif %}
-    <textarea id="report-text" name="text" rows="6" autocomplete="off"
-              aria-describedby="report-text-hint{% if text_error %} report-text-error{% endif %}"{% if text_error %} aria-invalid="true"{% endif %}>{{ text }}</textarea>
-  </div>
+  {% call(aria) field("report-text", "What is wrong? (optional)", error=text_error, hint="Up to " ~ max_text ~ " characters, as plain text.") %}
+    <textarea id="report-text" name="text" rows="6" autocomplete="off"{{ aria }}>{{ text }}</textarea>
+  {% endcall %}
   <button type="submit" class="button">Send report</button>
 {% endcall %}
 {% if contact_email %}<p>If you would rather use email: {{ contact_email }}</p>{% endif %}

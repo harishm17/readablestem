@@ -1,14 +1,14 @@
 {# Audiences: owner, reviewer #}
+{% from "components/notices.html" import notice_box %}
 {% if errors|default([]) %}
 {# autofocus: after a failed form the summary takes focus (with or without JavaScript),
    so keyboard and screen reader users start at the list of problems; its first link then
    leads to the field (the upload form's file chooser), and static/app.js focuses it. #}
-<div class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1" autofocus>
-  <h2 id="error-summary-title" class="card-title">There is a problem</h2>
+{% call notice_box("error", "There is a problem", title_id="error-summary-title", attrs={"tabindex": "-1", "autofocus": true}) %}
   <ul>
     {% for error in errors %}
     <li><a href="#{{ error.field_id }}">{{ error.message }}</a></li>
     {% endfor %}
   </ul>
-</div>
+{% endcall %}
 {% endif %}

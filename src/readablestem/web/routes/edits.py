@@ -221,13 +221,13 @@ def _page_action(
     except (ReviewStale, ReviewInvalid) as exc:
         if isinstance(exc, ReviewInvalid):
             log_event(logger, "review_invalid", job_id=job_id, action=f"{action}_page")
-            flash(request, " ".join(e.message for e in exc.errors), undo=False)
+            flash(request, " ".join(e.message for e in exc.errors), undo=False, kind="warning")
         else:
             log_event(logger, "review_stale", job_id=job_id)
-            flash(request, STALE_FLASH, undo=False)
+            flash(request, STALE_FLASH, undo=False, kind="warning")
         return back(exc.job_id, page + 1)
     log_event(logger, f"page_{action}", job_id=job_id)
-    flash(request, change.message, edit=True)
+    flash(request, change.message, edit=True, kind="success")
     return back(owned_id, page + 1, result)
 
 
@@ -345,13 +345,13 @@ def edit_element(
         raise PageError(404, *NOT_FOUND) from None
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
-        flash(request, STALE_FLASH, undo=False)
+        flash(request, STALE_FLASH, undo=False, kind="warning")
         return back_to_page(exc.job_id, page)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"edit_{action}")
         return _invalid_screen(request, job_id, user, page, element_id, exc, change=element_id)
     log_event(logger, f"edit_{action}", job_id=job_id)
-    flash(request, change.message, element_id=element_id, edit=True)
+    flash(request, change.message, element_id=element_id, edit=True, kind="success")
     return back_to_page(owned_id, page)
 
 
@@ -511,7 +511,7 @@ def add_region(
         change, result, owned_id = write_structure(request, job_id, user, version, make)
     except ReviewStale as exc:
         log_event(logger, "review_stale", job_id=job_id)
-        flash(request, STALE_FLASH, undo=False)
+        flash(request, STALE_FLASH, undo=False, kind="warning")
         return back_to_page(exc.job_id, page + 1)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action=f"add_{kind}")
@@ -523,7 +523,7 @@ def add_region(
     except page_images.RenderFailed:
         return refuse("The page could not be read just now. Try again in a moment.", "add")
     log_event(logger, f"add_{kind}", job_id=job_id)
-    flash(request, change.message, element_id=change.shows, edit=True)
+    flash(request, change.message, element_id=change.shows, edit=True, kind="success")
     from readablestem.web.routes.split import review_url
 
     return RedirectResponse(
@@ -673,7 +673,7 @@ def read_again(
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     log_event(logger, "read_again", job_id=job_id, element_id=element_id)
-    flash(request, change.message, element_id=element_id)
+    flash(request, change.message, element_id=element_id, kind="success")
     return _after_item(owned_id, result, element_id, view, flt)
 
 
@@ -715,7 +715,7 @@ def not_an_equation(
 
     real, after = decided
     log_event(logger, "not_equation", job_id=job_id, element_id=real)
-    flash(request, change.message, element_id=after)
+    flash(request, change.message, element_id=after, kind="success")
     if view == "list":
         anchor = f"item-{after}" if after else "review-progress"
         return keep_filter(RedirectResponse(list_url(owned_id, anchor), status_code=303), flt)
@@ -831,7 +831,7 @@ def accept_clean_tables(
         return _stale_page(request, job_id, user, view, "tables", changed=exc.changed)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="accept_clean")
-        flash(request, " ".join(e.message for e in exc.errors), undo=False)
+        flash(request, " ".join(e.message for e in exc.errors), undo=False, kind="warning")
         where = (
             list_url(exc.job_id, "group-tables") if view == LIST_VIEW else review_url(exc.job_id)
         )
@@ -842,6 +842,7 @@ def accept_clean_tables(
         request,
         f"Accepted {n} clean {'table' if n == 1 else 'tables'}.",
         element_id=GROUP_FLASH + "tables",
+        kind="success",
     )
     if view == LIST_VIEW:
         return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)
@@ -938,7 +939,7 @@ def read_cell(
         logger, "review", job_id=job_id, element_id=element_id, action="edit", change="read_cell"
     )
     message = "The tool read this cell. " + done_message(change, element)
-    flash(request, message, element_id=element_id)
+    flash(request, message, element_id=element_id, kind="success")
     from readablestem.web.routes.split import review_url
 
     return RedirectResponse(review_url(owned_id, item=element_id), status_code=303)

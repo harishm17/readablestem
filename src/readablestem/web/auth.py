@@ -529,6 +529,7 @@ def _back_from_admin_consent(request: Request) -> Response:
         "university account."
         if approved
         else "Microsoft did not finish the approval. You can open the approval link again.",
+        kind="info" if approved else "warning",
     )
     return RedirectResponse("/login", status_code=303)
 
@@ -569,5 +570,5 @@ def logout(request: Request) -> Response:
         end_sessions(get_ctx(request).factory, user.id)
         log_event(logger, "logout", user_id=user.id)
     request.session.clear()
-    flash(request, "You are signed out on every device.", undo=False)
+    flash(request, "You are signed out on every device.", undo=False, kind="success")
     return RedirectResponse("/", status_code=303)

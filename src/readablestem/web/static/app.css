@@ -232,11 +232,19 @@ a.danger-link:hover { color: var(--err-strong); }
 .stat-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
 @media (forced-colors: active) { .stat { border: 1px solid CanvasText; } }
 
+/* Disclosures: every <summary> has one of two looks, set here and nowhere else. Plain, the
+   default: bold, a 44px target, the accent on the marker. Boxed: the summary of a details that
+   has its own frame (.compact-item, .compare-topic): inset to the frame, a rule under it while
+   open. Other rules may lay a summary out (flex, inline) but not restyle it. The header menu
+   (.nav-menu > summary) keeps its own rules. */
+summary { display: list-item; cursor: pointer; min-height: 2.75rem; padding: var(--space-2) 0; font-weight: 700; }
+summary::marker { color: var(--accent); }
+:is(.compact-item, .compare-topic) > summary { padding: var(--space-2) var(--space-4); list-style-position: inside; }
+:is(.compact-item, .compare-topic)[open] > summary { border-bottom: 1px solid var(--border-subtle); }
+
 /* FAQ: native <details>; the whole summary line is the target. */
 .faq details { border-top: 1px solid var(--border-subtle); }
 .faq details:last-child { border-bottom: 1px solid var(--border-subtle); }
-.faq summary { cursor: pointer; padding: var(--space-3) var(--space-1); font-weight: 700; min-height: 2.75rem; display: list-item; }
-.faq details[open] summary { padding-bottom: var(--space-2); }
 .faq details > :not(summary) { padding: 0 var(--space-1); }
 @media (forced-colors: active) { .faq details { border-color: CanvasText; } }
 
@@ -285,12 +293,39 @@ input[type="file"]::file-selector-button {
 input[type="file"]::file-selector-button:hover { background: var(--accent-tint); }
 @media (forced-colors: active) { input[type="file"]::file-selector-button { border-color: ButtonText; } }
 
-/* Errors: red bar plus the word "Error", never colour alone. */
-.field-error { border: 2px solid var(--err); border-radius: var(--radius-control); padding: var(--space-3) var(--space-4); }
+/* The field error (templates/components/fields.html), one block. A field in error is told by
+   more than color: its edge at the start is thicker, and its message has the word "Error"
+   (spoken) and a shape before it (drawn here, so the browser-built line of the upload form
+   has it too). Forced colors drop the red, so both use CanvasText and a thicker frame, and the
+   control gets a double edge. The compound selector outranks `fieldset.field` and
+   `.table-fieldset` further down, which take a frame off. */
+:is(.field, .table-fieldset, .fallback).field-error {
+  border: 2px solid var(--err);
+  border-inline-start-width: var(--space-2);
+  border-radius: var(--radius-control);
+  padding: var(--space-3) var(--space-4);
+}
 .error-message { color: var(--err); font-weight: 700; margin: 0 0 var(--space-2); }
+.error-message::before {
+  content: "";
+  display: inline-block;
+  inline-size: 1.1em;
+  block-size: 1.1em;
+  margin-inline-end: 0.4em;
+  vertical-align: -0.2em;
+  background-color: currentcolor;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 5h2.4v7h-2.4zm0 9h2.4v2.4h-2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.2 5h2.4v7h-2.4zm0 9h2.4v2.4h-2.4z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
 [aria-invalid="true"] { border-color: var(--err); }
-/* Forced colors drop the red, so a field in error gets a different edge: a thick double line. */
-@media (forced-colors: active) { [aria-invalid="true"] { border-width: 4px; border-style: double; } }
+@media (forced-colors: active) {
+  :is(.field, .table-fieldset, .fallback).field-error {
+    border: 3px solid CanvasText;
+    border-inline-start-width: var(--space-2);
+  }
+  .error-message::before { background-color: CanvasText; }
+  [aria-invalid="true"] { border-width: 4px; border-style: double; }
+}
 .error-summary {
   border: 4px solid var(--err);
   border-radius: var(--radius-frame);
@@ -300,12 +335,30 @@ input[type="file"]::file-selector-button:hover { background: var(--accent-tint);
 .error-summary h2 { margin-top: var(--space-1); }
 .error-summary a { color: var(--err); font-weight: 700; }
 
+/* The notice (templates/components/notices.html), one block: info (the default), success
+   (the ok tint and a check shape), warning (a thicker warn frame). The error kind is the
+   error summary above. A shape, not color alone, marks success; forced colors draw every
+   kind with one CanvasText frame and the shape in CanvasText. */
 .notice { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--accent-tint); padding: var(--space-2) var(--space-4); margin: var(--space-4) 0; }
 .notice p { margin: var(--space-1) 0; }
 .notice-warning { background: var(--warn-tint); border: 2px solid var(--warn); }
 .notice-warning h2 { margin-top: var(--space-1); }
+.notice-success { background: var(--ok-tint); border: 2px solid var(--ok); display: grid; grid-template-columns: auto 1fr; column-gap: var(--space-3); }
+.notice-success::before {
+  content: "";
+  inline-size: 1.25rem;
+  block-size: 1.25rem;
+  margin-top: var(--space-2);
+  background-color: var(--ok);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.3 14.2-4.2-4.2 1.7-1.7 2.5 2.5 5.1-5.1 1.7 1.7z'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill-rule='evenodd' d='M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm-1.3 14.2-4.2-4.2 1.7-1.7 2.5 2.5 5.1-5.1 1.7 1.7z'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+.notice-success > * { grid-column: 2; }
 .draft-note { border: 2px dashed var(--warn); border-radius: var(--radius-control); padding: var(--space-2) var(--space-4); color: var(--warn); background: var(--warn-tint); }
-@media (forced-colors: active) { .notice { border: 1px solid CanvasText; } }
+@media (forced-colors: active) {
+  .notice { border: 1px solid CanvasText; }
+  .notice-success::before { background-color: CanvasText; }
+}
 
 /* Tables. `position: relative` makes the scroller the containing block of the
    absolutely positioned .visually-hidden button text inside it; otherwise that text
@@ -337,9 +390,8 @@ tbody th { font-weight: 700; }
 .status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
 .status-sample { border-color: var(--ink-muted); color: var(--ink-muted); }
 
-.job-status { padding: var(--space-3) var(--space-4); background: var(--surface); border-radius: var(--radius-control); }
+.job-status { padding: var(--space-3) var(--space-4); background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
 .job-status p { margin: var(--space-1) 0; }
-@media (forced-colors: active) { .job-status { border: 1px solid CanvasText; } }
 .progress-row { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
 .progress-row label { font-weight: 700; }
 progress { width: 16rem; height: 1.1rem; }
@@ -427,8 +479,6 @@ math[intent] mi { text-transform: none; }
 .review-item { scroll-margin-top: var(--space-2); }
 .review-item:focus { outline: none; }
 .done-group { margin: var(--space-4) 0 var(--space-2); }
-.done-group > summary, .done-item > summary { cursor: pointer; padding: var(--space-2) 0; }
-.done-group > summary { font-weight: 700; }
 .done-list { margin: var(--space-2) 0 0 var(--space-4); }
 .done-item { border-bottom: 1px solid var(--border-subtle); }
 .done-item > .fix-card { margin-top: var(--space-2); }
@@ -707,7 +757,6 @@ p.draft-failed { border-color: var(--warn); background: var(--warn-tint); }
 .decide-note { font-size: var(--step--1); margin: var(--space-1) 0 0; }
 .edit-box { margin: var(--space-2) 0 0; border: 1px solid var(--border-subtle); border-radius: var(--radius-control); padding: 0 var(--space-4); }
 .edit-box[open] { padding-bottom: var(--space-4); }
-.edit-box > summary { cursor: pointer; padding: var(--space-2) 0; font-weight: 700; color: var(--accent); }
 /* With JavaScript, a changed field makes Save edit the main button (app.js). */
 .is-edited [data-role="save"] { background: var(--accent); color: var(--on-accent); }
 .is-edited [data-role="accept"] { background: var(--bg); color: var(--accent); }
@@ -723,10 +772,8 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
 /* The details a person rarely needs: folded under "More about this item". Small controls here
    are at least 24px high. */
 .tech { margin-top: var(--space-4); font-size: var(--step-0); }
-.tech > summary { cursor: pointer; color: var(--ink-muted); display: list-item; min-height: 1.5rem; padding: var(--space-1) 0; }
 /* "More about this item": the details and the report link, folded. */
 .more-box { margin-top: var(--space-4); border-top: 1px solid var(--border-subtle); }
-.more-box > summary { cursor: pointer; display: list-item; min-height: 1.5rem; padding: var(--space-2) 0; color: var(--ink-muted); }
 .more-box .tech { margin-top: 0; }
 .decision-nav { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-4); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
 .decision-nav a[rel="next"] { margin-left: auto; }
@@ -773,7 +820,6 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .optional-box { background: var(--surface); border-radius: var(--radius-frame); padding: var(--space-1) var(--space-4); }
 @media (forced-colors: active) { .optional-box { border: 1px solid CanvasText; } }
 .optional-box[open] { padding-bottom: var(--space-4); }
-.optional-box > summary { cursor: pointer; padding: var(--space-3) 0; font-weight: 700; font-size: var(--step-0); }
 .optional-list { list-style: none; margin: 0; padding: 0; }
 .optional-list li { padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .optional-note { display: block; color: var(--ink-muted); font-size: var(--step-0); }
@@ -959,8 +1005,6 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .table-continue { margin: var(--space-3) 0 0; font-weight: 700; }
 @media (forced-colors: active) {
   .table-view { border-color: CanvasText; }
-  /* After .table-fieldset above, which also sets a border: a fieldset with an error keeps its frame. */
-  .field-error { border: 1px solid CanvasText; }
 }
 /* What the checks found, each with its correction; one place to change it. */
 .finding-list { list-style: none; margin: 0; padding: 0; }
@@ -1036,7 +1080,7 @@ input[type="number"].input-short { width: 6rem; }
 .setting-line { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: baseline; }
 .setting-line p { margin: 0; }
 .setting-line details[open] { flex-basis: 100%; }
-.inline-details > summary { display: inline-block; padding: var(--space-1) 0; cursor: pointer; text-decoration: underline; color: var(--accent); }
+.inline-details > summary { display: inline-block; }
 .inline-details > form { margin-top: var(--space-3); }
 .student-setting { margin: 0 0 var(--space-4); max-width: 40rem; }
 .student-setting input[type="text"] { width: 100%; max-width: 40rem; }
@@ -1090,7 +1134,6 @@ section.job-group { padding-top: 0; }
 .notice-excerpt blockquote { margin: var(--space-1) 0 0; padding: var(--space-2) var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--surface); }
 .notice-excerpt blockquote p { margin: 0; }
 .notice-actions { margin: var(--space-2) 0; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); }
-.page-tools > summary { cursor: pointer; padding: var(--space-3) 0; font-weight: 700; font-size: var(--step-0); }
 .tool-section { padding: var(--space-2) 0 var(--space-3); border-top: 1px solid var(--border-subtle); }
 .tool-section:focus { outline: none; }  /* a link or redirect to a tool lands focus on it */
 .tool-section:first-of-type { border-top: 0; }
@@ -1178,7 +1221,6 @@ section.job-group { padding-top: 0; }
 .symbol-form select { min-height: 2.75rem; max-width: 100%; }
 .symbol-form .button { min-height: 2.75rem; }
 .symbol-places { margin: var(--space-3) 0; }
-.symbol-places summary { display: list-item; min-height: 2.75rem; padding: var(--space-2) 0; box-sizing: border-box; cursor: pointer; }
 .places { list-style: none; margin: var(--space-1) 0 0; padding: 0; }
 .place { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-4); align-items: flex-start; padding: var(--space-2) 0; border-top: 1px solid var(--border-subtle); }
 .place-crop { max-height: 3.5rem; max-width: 12rem; width: auto; height: auto; border: 1px solid var(--border-subtle); background: var(--paper); }
@@ -1219,7 +1261,6 @@ fieldset.option-group { margin: var(--space-5) 0 0; padding: var(--space-3) 0 0;
 fieldset.option-group > legend { font-weight: 700; padding: 0 var(--space-2) 0 0; }
 fieldset.option-group > .hint { margin-top: var(--space-1); }
 .more-detail { margin: 0 0 var(--space-3); max-width: var(--prose-max); }
-.more-detail > summary { cursor: pointer; display: list-item; min-height: 1.5rem; color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
 .checkbox-field .more-detail { grid-column: 2; margin: 0; }
 .more-detail ul { margin: var(--space-2) 0 0; padding-left: var(--space-5); }
 
@@ -1233,8 +1274,6 @@ fieldset.option-group > .hint { margin-top: var(--space-1); }
 .main-file-detail { margin: 0 0 var(--space-3); }
 .option-groups { border-top: 1px solid var(--border-subtle); margin: var(--space-4) 0 0; }
 details.option-group { border-bottom: 1px solid var(--border-subtle); }
-details.option-group > summary { display: list-item; cursor: pointer; padding: var(--space-3) 0; min-height: 2.75rem; }
-details.option-group > summary::marker { color: var(--accent); }
 .group-name { font-weight: 700; margin-right: var(--space-3); }
 .group-change { color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
 details.option-group[open] .group-change { display: none; }
@@ -1279,8 +1318,6 @@ details.option-group[open] .group-change { display: none; }
 .share-submit { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 .share-submit .hint { margin: 0; flex: 1 1 16rem; }
 .share-help { margin: var(--space-5) 0; max-width: var(--prose-max); }
-.share-help > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
-.share-help[open] > summary { margin-bottom: var(--space-2); }
 @media (forced-colors: active) {
   .field .role-row, .field .role-row:hover { border-color: CanvasText; }
   .field .role-row:has(input:checked) { border-color: Highlight; outline: 2px solid Highlight; outline-offset: 1px; }
@@ -1311,11 +1348,9 @@ details.option-group[open] .group-change { display: none; }
   .compare-stack { display: block; }
   .mode-read main > .compare-stack { max-width: none; }
   .compare-topic { margin: 0 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); background: var(--bg); }
-  .compare-topic summary { display: list-item; list-style-position: inside; min-height: 2.75rem; padding: var(--space-3) var(--space-4); cursor: pointer; }
   .compare-topic-name { font-weight: 700; font-size: var(--step-1); }
   .compare-lead { display: block; margin-top: var(--space-1); color: var(--ink-muted); overflow-wrap: anywhere; }
   .compare-topic[open] .compare-lead { display: none; }
-  .compare-topic[open] summary { border-bottom: 1px solid var(--border-subtle); }
   .compare-topic dl { margin: 0; padding: var(--space-3) var(--space-4) var(--space-4); }
   .compare-topic dt { margin: var(--space-3) 0 var(--space-1); font-weight: 700; }
   .compare-topic dt:first-child { margin-top: 0; }
@@ -1512,8 +1547,6 @@ details.option-group[open] .group-change { display: none; }
    before the limits. The deletion notes are a short list with the long wording folded away. */
 .account-keep { background: var(--surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); padding: var(--space-3) var(--space-5) var(--space-4); margin: var(--space-5) 0; }
 .account-delete-details { margin: 0 0 var(--space-4); max-width: var(--prose-max); }
-.account-delete-details > summary { cursor: pointer; min-height: 1.5rem; color: var(--accent); text-decoration: underline; text-underline-offset: 0.18em; }
-.account-delete-details[open] > summary { margin-bottom: var(--space-2); }
 @media (forced-colors: active) { .account-keep { border-color: CanvasText; } }
 
 /* Courses: documents and symbols per course, a jump list on a course page, the starter set
@@ -1537,8 +1570,6 @@ details.option-group[open] .group-change { display: none; }
   .course-table td[data-label]::before { content: attr(data-label) ": "; content: attr(data-label) ": " / ""; color: var(--ink-muted); }
 }
 .attach-documents { margin: var(--space-4) 0; max-width: var(--prose-max); }
-.attach-documents > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
-.attach-documents[open] > summary { margin-bottom: var(--space-2); }
 .course-settings { margin-top: var(--space-7); padding-top: var(--space-3); border-top: 1px solid var(--border-subtle); }
 .course-settings h3 { margin-top: var(--space-4); }
 
@@ -1564,8 +1595,6 @@ details.option-group[open] .group-change { display: none; }
 .parts-row .link-button[hidden] { display: none; }
 .parts-empty { margin: 0 0 var(--space-4); }
 .parts-advanced { margin: var(--space-3) 0 var(--space-4); max-width: 40rem; }
-.parts-advanced > summary { cursor: pointer; min-height: 1.5rem; font-weight: 700; }
-.parts-advanced[open] > summary { margin-bottom: var(--space-3); }
 @media (forced-colors: active) { .parts-problem { color: CanvasText; } .parts-row { border-color: CanvasText; } }
 
 /* Batch: what to do next, and how long ago it was uploaded, above the documents. */
@@ -1576,8 +1605,7 @@ details.option-group[open] .group-change { display: none; }
 /* The review list: a compact row per waiting decision, the first decision first; the tools for
    finding or speeding up the others folded. */
 .compact-item { border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); margin: 0 0 var(--space-3); }
-.compact-item > summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; min-height: 2.75rem; padding: var(--space-2) var(--space-4); font-weight: 700; }
-.compact-item[open] > summary { border-bottom: 1px solid var(--border-subtle); }
+.compact-item > summary { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); align-items: center; }
 .compact-item > .fix-card { border: 0; margin: 0; padding-top: var(--space-1); }
 .compact-status { margin-left: auto; font-weight: 700; }
 .compact-item .fix-meta { display: none; }
@@ -1586,7 +1614,6 @@ details.option-group[open] .group-change { display: none; }
 .list-links a { display: inline-flex; align-items: center; min-height: 1.75rem; }
 .list-tools { margin: var(--space-2) 0 var(--space-4); padding: 0 var(--space-4); border: 1px solid var(--border-subtle); border-radius: var(--radius-frame); }
 .list-tools[open] { padding-bottom: var(--space-3); }
-.list-tools > summary { cursor: pointer; display: list-item; min-height: 2.75rem; padding: var(--space-3) 0; font-weight: 700; }
 .list-tools .review-toc { margin: var(--space-3) 0; }
 .list-tools .review-toc h3 { margin: var(--space-3) 0 var(--space-1); }
 @media (forced-colors: active) { .list-tools { border-color: CanvasText; } }

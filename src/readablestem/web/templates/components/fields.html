@@ -1,0 +1,52 @@
+{#- The one field and the one field error (SW44, WS24.5). Import without context:
+    `{% from "components/fields.html" import field, field_classes, field_error, field_aria %}`.
+    The classes `field`, `field-error` and `error-message`, the spoken "Error:" prefix and the
+    way a control points at its hint and its message are written here and nowhere else (the
+    upload form's script, static/app.js, builds the same line for a file the browser can
+    already see is wrong). Look: static/app.css, "Forms" and "Errors".
+
+    field(id, label, error, hint, ...): the ordinary field, a label, a hint, the message and one
+    control. Used as `{% call(aria) field("email", "Email address", error=err, hint="...") %}`
+    around the control, which writes `{{ aria }}` among its attributes: `aria-describedby` (the
+    hint and the message, then `describedby`) and, in error, `aria-invalid="true"`. `id` is the
+    control's id; the hint is `ID-hint` and the message `ID-error` unless `hint_id` or
+    `error_id` say otherwise (a route, a test or the error summary's link may depend on an id).
+    `error` is a message, or an object with a `.message` (a form error). `hint` is text, or a
+    block set (`{% set hint %}...{% endset %}`) when it holds markup. `extra` adds classes to
+    the wrapper (`file-field`, `field-inline`, `checkbox-field`).
+
+    When the control is too particular for field() (a radio group, a file input, a field that
+    sits inside a card), use the three parts it is made of: `class="{{ field_classes(error) }}"`
+    on the wrapper (`base` is `field`, or another class that takes the error look),
+    `{{ field_error(id, error) }}` where the message goes (above the control, after the hint)
+    and `{{ field_aria(error_id, error, describedby) }}` among the control's attributes (pass
+    `invalid=false` for a fieldset, which takes `aria-describedby` but not `aria-invalid`).
+
+    The error look is a thicker start edge on the wrapper and a glyph before the message, so a
+    field in error is found without color; in forced colors both use CanvasText. -#}
+{% macro field_classes(error, extra="", base="field") -%}
+{{ base }}{% if extra %} {{ extra }}{% endif %}{% if error %} field-error{% endif %}
+{%- endmacro %}
+
+{% macro field_error(id, error) -%}
+{%- if error -%}
+<p class="error-message" id="{{ id }}"><span class="visually-hidden">Error: </span>{{ error.message if error.message is defined else error }}</p>
+{%- endif -%}
+{%- endmacro %}
+
+{% macro field_aria(error_id, error, describedby="", invalid=true) -%}
+{%- set ids = (describedby.strip() ~ " " ~ (error_id if error else "")).strip() -%}
+{%- if ids %} aria-describedby="{{ ids }}"{% endif -%}
+{%- if error and invalid %} aria-invalid="true"{% endif -%}
+{%- endmacro %}
+
+{% macro field(id, label, error=none, hint=none, extra="", hint_id="", error_id="", describedby="") -%}
+{%- set hid = hint_id or id ~ "-hint" -%}
+{%- set eid = error_id or id ~ "-error" -%}
+<div class="{{ field_classes(error, extra) }}">
+  <label for="{{ id }}">{{ label }}</label>
+  {% if hint %}<p class="hint" id="{{ hid }}">{{ hint }}</p>{% endif %}
+  {{ field_error(eid, error) }}
+  {{ caller(field_aria(eid, error, (hid if hint else "") ~ " " ~ describedby)) }}
+</div>
+{%- endmacro %}

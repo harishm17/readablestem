@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import logging
 from datetime import UTC, datetime, timedelta
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse, RedirectResponse, Response
@@ -57,6 +57,13 @@ ALLOW_OUTCOME = {
     shares.UNCHANGED: "Nothing changed: that address was already allowed.",
 }
 NOTHING = "Nothing changed: "
+
+
+def _done_kind(message: str) -> Literal["info", "success"]:
+    """A notice that says nothing changed is information; any other says what was done."""
+    return "info" if message.startswith(NOTHING) else "success"
+
+
 NO_ADDRESS = NOTHING + "enter an email address, like name@example.org."
 NO_ACCOUNT = NOTHING + "nobody has an account under that address."
 SPEND_PEOPLE_ROWS = 20  # the biggest spenders shown in "Model spend by person"
@@ -255,6 +262,7 @@ def close_report(request: Request, user: AdminDep, report_id: int) -> Response:
         request,
         "Closed." if closed else NOTHING + "that report is already closed or does not exist.",
         undo=False,
+        kind="success" if closed else "info",
     )
     return RedirectResponse("/admin/reports", status_code=303)
 
@@ -300,7 +308,12 @@ def allow(
         return render(request, "admin.html", context, status_code=422)
     if outcome != shares.UNCHANGED:
         log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
-    flash(request, ALLOW_OUTCOME[outcome].format(what=what), undo=False)
+    flash(
+        request,
+        ALLOW_OUTCOME[outcome].format(what=what),
+        undo=False,
+        kind="info" if outcome == shares.UNCHANGED else "success",
+    )
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -369,7 +382,7 @@ def remove(
         return _confirm_stop(request, user, email, blocking=False)
     normalised = normalise_email(email)
     if normalised == user.email:
-        flash(request, "You cannot remove yourself. Ask another admin.", undo=False)
+        flash(request, "You cannot remove yourself. Ask another admin.", undo=False, kind="warning")
         return RedirectResponse("/admin", status_code=303)
     if normalised is None:
         message = NO_ADDRESS
@@ -387,7 +400,7 @@ def remove(
                 if was is None
                 else NOTHING + "that address was already off the allowlist."
             )
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind=_done_kind(message))
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -399,7 +412,7 @@ def _was_allowed(session: Session, email: str) -> bool | None:
 def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Response:
     normalised = normalise_email(email)
     if blocked and normalised == user.email:
-        flash(request, "You cannot block yourself. Ask another admin.", undo=False)
+        flash(request, "You cannot block yourself. Ask another admin.", undo=False, kind="warning")
         return RedirectResponse("/admin", status_code=303)
     if normalised is None:
         message = NO_ADDRESS
@@ -417,7 +430,7 @@ def _block(request: Request, user: AdminDep, email: str, *, blocked: bool) -> Re
         else:
             log_event(logger, "user_blocked" if blocked else "user_unblocked", by=user.id)
             message = "The account was blocked." if blocked else "The account was unblocked."
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind=_done_kind(message))
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -477,7 +490,7 @@ def link_email(
         }
         return render(request, "admin.html", context, status_code=422)
     log_event(logger, "linked_email_add", by=user.id)
-    flash(request, "The other Google account was linked.", undo=False)
+    flash(request, "The other Google account was linked.", undo=False, kind="success")
     return RedirectResponse("/admin", status_code=303)
 
 
@@ -502,5 +515,5 @@ def unlink_email(request: Request, user: AdminDep, other: Annotated[str, Form()]
             message = "The other Google account was removed. That instructor was signed out."
         else:
             message = NOTHING + "that address was not linked to anyone."
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind=_done_kind(message))
     return RedirectResponse("/admin", status_code=303)

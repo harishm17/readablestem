@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/notices.html" import notice_box %}
 {# `audience` (web.views.audience_of): the owner is testing what a student hears; anyone the
    document was shared with is just listening to it. The demo has none: it is the owner's view. #}
 {% set for_owner = audience|default("owner") == "owner" %}
@@ -16,7 +17,7 @@
 <p class="crumb"><a href="{{ back_url }}">{{ back_label }}</a></p>
 <h1>{% if for_owner %}Listen as a student{% else %}Listen to this document{% endif %}</h1>
 <p class="listen-doc"><strong>{{ title }}</strong></p>
-<p class="notice listen-honest"><strong>Roughly what a screen reader says.</strong> Each one speaks differently{% if for_owner %}: test with yours{% endif %}.{% if student_url %} <a href="{{ student_url }}">Open the student version</a>.{% endif %}</p>
+{% call notice_box("info", extra="listen-honest") %}<p><strong>Roughly what a screen reader says.</strong> Each one speaks differently{% if for_owner %}: test with yours{% endif %}.{% if student_url %} <a href="{{ student_url }}">Open the student version</a>.{% endif %}</p>{% endcall %}
 {% include "_listen_player.html" %}
 </div>
 {% endblock %}

@@ -144,7 +144,7 @@ def create_course(request: Request, user: UserDep, name: Field = "") -> Response
         extra = _errors(exc) | {"values": exc.values or {"name": name}}
         return _courses_page(request, user, extra, status=422)
     log_event(logger, "course_created", course_id=course_id)
-    flash(request, "Course added. Add the symbols your course uses below.")
+    flash(request, "Course added. Add the symbols your course uses below.", kind="success")
     return RedirectResponse(f"/courses/{course_id}", status_code=303)  # the new row's own id
 
 
@@ -249,7 +249,7 @@ def rename_course(request: Request, course_id: str, user: UserDep, name: Field =
         extra = _errors(exc) | {"rename_value": exc.values.get("rename", name)}
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "course_renamed", course_id=course_id)
-    flash(request, "Course renamed.")
+    flash(request, "Course renamed.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -277,7 +277,7 @@ def delete_course(request: Request, course_id: str, user: UserDep, confirm: Fiel
     with session_scope(get_ctx(request).factory) as session:
         notation.delete_course(session, _course(session, course_id, user))
     log_event(logger, "course_deleted", course_id=course_id)
-    flash(request, "The course and its notation have been deleted.")
+    flash(request, "The course and its notation have been deleted.", kind="success")
     return RedirectResponse("/courses", status_code=303)
 
 
@@ -330,7 +330,12 @@ def add_person(
     if refused is not None:
         return _course_page(request, owned_id, user, refused, status=422)
     log_event(logger, "course_grant_set", course_id=owned_id, role=kept_role)
-    flash(request, GRANT_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]), undo=False)
+    flash(
+        request,
+        GRANT_OUTCOME[outcome].format(right=shares.ROLE_WORDS[kept_role]),
+        undo=False,
+        kind="info" if outcome == shares.UNCHANGED else "success",
+    )
     return RedirectResponse(f"/courses/{owned_id}#people-heading", status_code=303)
 
 
@@ -365,6 +370,7 @@ def remove_person(
         "Access removed. They cannot open this course's documents any more, unless you "
         "shared a document with them by itself.",
         undo=False,
+        kind="success",
     )
     return RedirectResponse(f"/courses/{owned_id}#people-heading", status_code=303)
 
@@ -398,7 +404,7 @@ def add_entry(
         extra = _errors(exc) | {"values": exc.values}
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "notation_added", course_id=course_id, source="user")
-    flash(request, f"Added: {phrase(entry.canonical, entry.meaning)}.")
+    flash(request, f"Added: {phrase(entry.canonical, entry.meaning)}.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -452,7 +458,7 @@ def save_entry(
         extra = _errors(exc) | {"values": exc.values}
         return _entry_page(request, course_id, entry_id, user, extra, status=422)
     log_event(logger, "notation_changed", course_id=course_id)
-    flash(request, f"Saved: {phrase(entry.canonical, entry.meaning)}.")
+    flash(request, f"Saved: {phrase(entry.canonical, entry.meaning)}.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -483,7 +489,7 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
         words = describe(row.canonical)
         session.delete(row)
     log_event(logger, "notation_removed", course_id=course_id)
-    flash(request, f"Removed {words}. To keep it after all, add it again below.")
+    flash(request, f"Removed {words}. To keep it after all, add it again below.", kind="success")
     return RedirectResponse(f"/courses/{owned_id}", status_code=303)
 
 
@@ -528,7 +534,12 @@ def add_suggestions(
             offered = notation.course_suggestions(session, ctx.settings, course, row)
             added, skipped = notation.add_suggested(session, course, offered, chosen)
     if not chosen:
-        flash(request, "Check the symbols to add first. Nothing was added.", undo=False)
+        flash(
+            request,
+            "Check the symbols to add first. Nothing was added.",
+            undo=False,
+            kind="warning",
+        )
     else:
         log_event(logger, "notation_added", course_id=course_id, source="document", n=len(added))
         if not added:
@@ -539,7 +550,7 @@ def add_suggestions(
             parts = [f"Added {len(added)} symbols to {course.name}."]
         if skipped:
             parts.append(f"{skipped} could not be added: already in the course, or not found.")
-        flash(request, " ".join(parts), undo=False)
+        flash(request, " ".join(parts), undo=False, kind="success" if added else "info")
     return RedirectResponse(back, status_code=303)
 
 
@@ -570,7 +581,12 @@ def add_starter(
         added, refused = notation.add_starter(session, course, rows[: notation.MAX_ENTRIES])
         name = course.name
     if not rows:
-        flash(request, "Check the symbols to add first. Nothing was added.", undo=False)
+        flash(
+            request,
+            "Check the symbols to add first. Nothing was added.",
+            undo=False,
+            kind="warning",
+        )
     else:
         log_event(logger, "notation_added", course_id=course_id, source="user", n=len(added))
         parts = []
@@ -587,7 +603,7 @@ def add_starter(
                 f"{len(refused)} could not be added: this tool cannot read the symbol, or the "
                 "course already has it."
             )
-        flash(request, " ".join(parts), undo=False)
+        flash(request, " ".join(parts), undo=False, kind="success" if added else "info")
     return RedirectResponse(back, status_code=303)
 
 
@@ -612,7 +628,12 @@ def add_documents(
         count = notation.attach_documents(session, course, ids) if ids else 0
         name = course.name
     if not ids:
-        flash(request, "Check the documents to add first. Nothing was added.", undo=False)
+        flash(
+            request,
+            "Check the documents to add first. Nothing was added.",
+            undo=False,
+            kind="warning",
+        )
     elif count:
         log_event(logger, "course_documents_added", course_id=course_id, n=count)
         left = len(ids) - count
@@ -622,9 +643,15 @@ def add_documents(
             "They were not converted again."
             + (f" {left} you chose could not be added: {NOT_ADDED}." if left else ""),
             undo=False,
+            kind="success",
         )
     else:
-        flash(request, f"Nothing was added: {NOT_ADDED}. Check the ones you chose.", undo=False)
+        flash(
+            request,
+            f"Nothing was added: {NOT_ADDED}. Check the ones you chose.",
+            undo=False,
+            kind="warning",
+        )
     return RedirectResponse(back, status_code=303)
 
 
@@ -682,12 +709,14 @@ def remember(
             notation.add_entry(session, course, entry, source="review")
         except notation.NotationInvalid as exc:
             message = exc.errors[0].message  # already there, or the course is full
+            kind = "warning"
         else:
             message = f"Remembered for {course.name}: {phrase(canonical, meaning)}."
+            kind = "success"
             log_event(logger, "notation_added", course_id=course_id, source="review")
     # Remembering is no review write: the Undo shown under a decision's notice would
     # take back the decision before it, so none is offered here.
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind=kind)
     return RedirectResponse(back, status_code=303)
 
 

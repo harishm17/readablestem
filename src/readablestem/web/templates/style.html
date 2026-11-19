@@ -1,4 +1,6 @@
 {% extends "base.html" %}
+{% from "components/fields.html" import field, field_classes, field_error, field_aria %}
+{% from "components/notices.html" import notice_box %}
 {% block title %}Style{% endblock %}
 {% block body_class %}mode-read{% endblock %}
 {% block description %}The colors, type and components the site is built from.{% endblock %}
@@ -11,9 +13,9 @@
 <h1>Style</h1>
 <p class="lede">The tokens and components every page is built from, in the theme your browser
   asks for. Colors are the CSS custom properties in <code>tokens.css</code>.</p>
-<div class="notice" role="note"><p><strong>Everything in a dashed box is an inert example.</strong>
+{% call notice_box("info", role="note") %}<p><strong>Everything in a dashed box is an inert example.</strong>
   Its buttons, fields and links do nothing and no form is sent. Where a component is in use,
-  the line under it links to the page.</p></div>
+  the line under it links to the page.</p>{% endcall %}
 
 {% from "_contents.html" import contents %}
 {{ contents([
@@ -72,8 +74,9 @@
   <span class="tag tag-ok">Accepted</span>
   <span class="tag tag-err">Not converted</span>
 </p>
-<p class="error-message">Error: say what is wrong and how to fix it.</p>
-<div class="notice"><p>An information notice.</p></div>
+{{ field_error("sample-error-" ~ ident, "Say what is wrong and how to fix it.") }}
+{{ notice_box("info", body="An information notice.") }}
+{{ notice_box("success", body="A success notice.", role="note") }}
 <p><a href="#states">A link</a>, and <span class="style-focus">the focus ring</span>.</p>
 {% endmacro %}
 <div class="style-states">
@@ -101,27 +104,31 @@
 <div class="style-example" role="group" aria-label="Example: form fields (inert)">
   <p class="style-example-label">Inert example</p>
   <div class="style-form">
-    <div class="field">
-      <label for="style-course">Course name</label>
-      <p class="hint" id="style-course-hint">A hint sits between the label and the field.</p>
-      <input type="text" id="style-course" value="PHYS 2325" aria-describedby="style-course-hint">
-    </div>
-    <div class="field field-error">
-      <label for="style-bad">Field with an error</label>
-      <p class="error-message" id="style-bad-error"><span class="visually-hidden">Error: </span>Say what is wrong and how to fix it.</p>
-      <input type="text" id="style-bad" value="" aria-invalid="true" aria-describedby="style-bad-error">
-    </div>
-    <div class="field checkbox-field">
+    {% call(aria) field("style-course", "Course name", hint="A hint sits between the label and the field.") %}
+      <input type="text" id="style-course" value="PHYS 2325"{{ aria }}>
+    {% endcall %}
+    {% call(aria) field("style-bad", "Field with an error", error="Say what is wrong and how to fix it.") %}
+      <input type="text" id="style-bad" value=""{{ aria }}>
+    {% endcall %}
+    {% call(aria) field("style-bad-hint", "Field with a hint and an error", hint="The hint stays above the message.", error="Say what is wrong and how to fix it.") %}
+      <input type="text" id="style-bad-hint" value="x"{{ aria }}>
+    {% endcall %}
+    <fieldset class="{{ field_classes("A choice is needed.") }}" id="style-choice"{{ field_aria("style-choice-error", "A choice is needed.", invalid=false) }}>
+      <legend>A group in error</legend>
+      {{ field_error("style-choice-error", "A choice is needed.") }}
+      <label><input type="radio" name="style-choice" value="a"> One</label>
+      <label><input type="radio" name="style-choice" value="b"> Two</label>
+    </fieldset>
+    <div class="checkbox-field">
       <input type="checkbox" id="style-check" checked>
       <label for="style-check">A checkbox</label>
     </div>
   </div>
-  <div class="error-summary" aria-labelledby="style-summary-title">
-    <h3 id="style-summary-title">There is a problem</h3>
+  {% call notice_box("error", "There is a problem", title_id="style-summary-title", level=3, role="note") %}
     <ul>
       <li><a href="#style-bad">Field with an error: say what is wrong and how to fix it</a></li>
     </ul>
-  </div>
+  {% endcall %}
   <p class="style-live">In use: the error summary takes focus when <a href="/app">the upload form</a>
     (sign in first) refuses a file; a field with an error is on the same form.</p>
 </div>
@@ -129,8 +136,10 @@
 <h2 id="notices">Notices</h2>
 <div class="style-example" role="group" aria-label="Example: notices (inert)">
   <p class="style-example-label">Inert example</p>
-  <div class="notice" role="note"><p>An information notice.</p></div>
-  <div class="notice notice-warning" role="note"><h3>A warning notice</h3><p>With its heading, in words first.</p></div>
+  {{ notice_box("info", body="An information notice.", role="note") }}
+  {{ notice_box("success", "A success notice", body="Something was saved or done; a check shape marks it, not color alone.", level=3, role="note") }}
+  {{ notice_box("warning", "A warning notice", body="With its heading, in words first.", level=3, role="note") }}
+  {{ notice_box("error", "An error notice", body="A thick error-colored frame, then a list of links to the fields.", level=3, title_id="style-error-notice-title", role="note") }}
   <p class="style-live">In use: <a href="/status">the status page</a> reports a paused service
     in words, and a document that needs decisions says so on its page.</p>
 </div>

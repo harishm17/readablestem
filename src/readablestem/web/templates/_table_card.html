@@ -1,5 +1,7 @@
 {# Audiences: owner, reviewer #}
 {% from "components/forms.html" import form with context %}
+{% from "components/fields.html" import field_classes, field_aria %}
+{% from "_review_shared.html" import error_line with context %}
 {# The table card (web/table_card.py), on the review screen (routes/split.py) and in the
    list view (routes/review.py). Import it with context: it uses `job`, `csrf_field` and
    `csrf_token`. The table is shown as the student would get it (the output's own
@@ -37,11 +39,6 @@
   <p class="hint" id="accept-clean-note">The tables where the checks found nothing wrong. You can still change any of them afterwards.{% if (decision_filter is defined and decision_filter.active) or (parts is defined and parts.count > 1) %} This covers all {{ count }} clean tables in the document, not only the ones this view shows.{% endif %}</p>
 {% endcall %}
 {% endif %}
-{% endmacro %}
-
-{% macro table_error(item, prefix) %}
-{% set err = item.errors.get(prefix) %}
-{% if err %}<p class="error-message" id="{{ prefix }}-error-{{ item.element_id }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
 {% endmacro %}
 
 {% macro table_box(html, label) %}
@@ -121,13 +118,13 @@
   {% set c = t.editing %}
   {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form table-cell-form" ~ (" is-edited" if item.edited else ""), "data-draft-key": "cell-" ~ c.ref}) %}
     {{ table_fields("split") }}<input type="hidden" name="change" value="cell"><input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
-    <div class="field{% if cell_err %} field-error{% endif %}">
+    <div class="{{ field_classes(cell_err) }}">
       <label for="cell-{{ eid }}">{{ "LaTeX in" if c.maths else "Text in" }} {{ c.position|lower }}</label>
       <p class="hint" id="cell-hint-{{ eid }}">{% if c.flat %}This cell holds math that the PDF's text gives flat (“{{ c.flat }}”), so it cannot be used as it is: type it as LaTeX. Save cell checks the LaTeX as it checks an equation.{% elif c.maths %}This cell holds math. Save cell checks the LaTeX as it checks an equation.{% if c.tied %} This cell is also an equation of the document (listed under Equations): your change is made to that equation too, and Undo takes back both.{% endif %}{% else %}As printed in the PDF. Save cell checks it and shows the table again.{% endif %}</p>
-      {{ table_error(item, "cell") }}
+      {{ error_line(item, "cell") }}
       {# autofocus: the reviewer chose this cell to change it. #}
       <textarea id="cell-{{ eid }}" name="cell" rows="2"{% if not c.maths %} class="prose-input"{% else %} spellcheck="false" autocapitalize="off"{% endif %} data-edit-field autofocus
-                aria-describedby="cell-hint-{{ eid }}{% if cell_err %} cell-error-{{ eid }}{% endif %}"{% if cell_err %} aria-invalid="true"{% endif %}>{{ item.values.get("cell", c.value) }}</textarea>
+                {{ field_aria("cell-error-" ~ eid, cell_err, "cell-hint-" ~ eid) }}>{{ item.values.get("cell", c.value) }}</textarea>
     </div>
     <div class="inline-controls">
       <button type="submit" name="action" value="edit" class="button" data-role="save">Save cell<span class="visually-hidden">, {{ c.position|lower }} of {{ name }}</span></button>
@@ -152,12 +149,12 @@
   {# Choosing a cell is a link-like GET: the page comes back with that cell's form open. #}
   <form method="get" action="/jobs/{{ job.id }}/review" class="table-pick">
     <input type="hidden" name="item" value="{{ eid }}">
-    <div class="field{% if cell_err %} field-error{% endif %}">
+    <div class="{{ field_classes(cell_err) }}">
       <label for="cell-pick-{{ eid }}">Cell to change</label>
-      {{ table_error(item, "cell") }}
+      {{ error_line(item, "cell") }}
       <div class="inline-controls">
         {# Choosing a cell is navigation, not an edit: no draft is kept of it. #}
-        <select id="cell-pick-{{ eid }}" name="cell" data-edit-start{% if cell_err %} aria-describedby="cell-error-{{ eid }}" aria-invalid="true"{% endif %}>
+        <select id="cell-pick-{{ eid }}" name="cell" data-edit-start{{ field_aria("cell-error-" ~ eid, cell_err) }}>
           {% for c in t.cells %}<option value="{{ c.ref }}">{{ c.label }}</option>{% endfor %}
         </select>
         <button type="submit" class="button-secondary">Change this cell</button>
@@ -169,11 +166,11 @@
   {% set col_on = (item.values.get("header_col") == "on") if "header_col" in item.values else t.header_col %}
   {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form table-headers", "data-draft-key": "headers"}) %}
     {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers">
-    <fieldset class="table-fieldset{% if header_err %} field-error{% endif %}"{% if header_err %} aria-describedby="header-error-{{ eid }}"{% endif %}>
+    <fieldset class="{{ field_classes(header_err, base="table-fieldset") }}"{{ field_aria("header-error-" ~ eid, header_err, invalid=false) }}>
       <legend>Headers</legend>
-      {{ table_error(item, "header") }}
+      {{ error_line(item, "header") }}
       <div class="checkbox-field">
-        <input type="checkbox" id="header-row-{{ eid }}" name="header_row" value="on" data-edit-field{% if row_on %} checked{% endif %}{% if header_err %} aria-invalid="true"{% endif %}>
+        <input type="checkbox" id="header-row-{{ eid }}" name="header_row" value="on" data-edit-field{% if row_on %} checked{% endif %}{{ field_aria("header-error-" ~ eid, header_err) }}>
         <label for="header-row-{{ eid }}">The first row is a header</label>
       </div>
       <div class="checkbox-field">
@@ -225,7 +222,7 @@
 {% set t = item.table %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
-{{ table_error(item, "actions") }}
+{{ error_line(item, "actions") }}
 {% if t.proposal and (item.can_accept or t.only_headers_missing) %}
 <div class="decision-bar" role="group" aria-label="Choices for {{ name }}">
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
@@ -319,7 +316,7 @@
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
 <div class="review-form">
-  {{ table_error(item, "actions") }}
+  {{ error_line(item, "actions") }}
   <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
     {% if t.proposal and t.only_headers_missing %}
     {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}

@@ -126,6 +126,7 @@ def set_title(
         request,
         f"The title students hear is now “{now_title}”. The HTML file was made again with it.",
         undo=False,
+        kind="success",
     )
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
@@ -160,7 +161,7 @@ def set_contact(
         if line
         else "The contact line was removed from the student file."
     )
-    flash(request, message, undo=False)
+    flash(request, message, undo=False, kind="success")
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)
 
 
@@ -195,7 +196,7 @@ def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
         until = job.retain_until
     if changed:
         log_event(logger, "kept_longer", job_id=job_id)
-        flash(request, retention.keep_done(until), undo=False)
+        flash(request, retention.keep_done(until), undo=False, kind="success")
     else:
         flash(request, retention.keep_already(), undo=False)
     return RedirectResponse(f"/jobs/{owned_id}", status_code=303)

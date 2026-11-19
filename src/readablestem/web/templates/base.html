@@ -1,5 +1,6 @@
 {% from "components/forms.html" import form with context -%}
 <!doctype html>
+{% from "components/notices.html" import notice_box %}
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -109,7 +110,7 @@
     {# A live region present at page load is not announced, so the first one-time notice
        (after a POST-redirect, e.g. "deleted") takes focus instead. #}
     {% for item in flash if not item.element_id %}
-    <div class="notice" role="status" tabindex="-1"{% if loop.first %} autofocus{% endif %}><p>{{ item.message }}</p></div>
+    {{ notice_box(item.kind|default("info"), body=item.message, role="status", attrs={"tabindex": "-1", "autofocus": true if loop.first else none}) }}
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

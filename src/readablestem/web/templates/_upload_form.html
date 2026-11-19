@@ -1,4 +1,6 @@
 {% from "components/forms.html" import form with context %}
+{% from "components/notices.html" import notice_box %}
+{% from "components/fields.html" import field_classes, field_error, field_aria %}
 {# The upload section of My documents (app.html): the file and its submit button together, the
    options as two short groups that each say their current setting in one line and open to
    change it (ux2-lane-a). `form_values`: what the person had set when a refusal sent the form
@@ -46,24 +48,24 @@
   {# The form would only send the whole file to be refused (UX review MF20): say when
      uploads open again instead. `open_pool_closed`: only the budget set aside for new
      accounts is used up. #}
-  <div class="notice notice-warning">
+  {% call notice_box("warning") %}
     {% if open_pool_closed %}
     <p><strong>Conversions for new accounts are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
     {% else %}
     <p><strong>Conversions are paused for today.</strong> Uploads open again at {{ next_reset|utc }}. Documents already queued wait until then.</p>
     {% endif %}
-  </div>
+  {% endcall %}
   {% elif pages_left == 0 %}
   {# The same for this person's daily page limit (MF20): no form that can only fail. #}
-  <div class="notice" id="upload-closed" tabindex="-1">
+  {% call notice_box("info", id="upload-closed", attrs={"tabindex": "-1"}) %}
     <p><strong>You have converted all {{ page_quota }} pages {% if new_account %}a new account can convert{% else %}you can{% endif %} today.</strong>
       {{ allowance(page_quota, page_quota, "page", next_reset) }} {{ PAGES_RULE }}</p>
-  </div>
+  {% endcall %}
   {% else %}
   {% set pdf_error = field_errors.get("pdf") %}
   {% call form("upload.create", "/jobs", {"enctype": "multipart/form-data", "novalidate": true, "class": "upload-form"}, token_in_action=true) %}
     {% if revising %}<input type="hidden" name="revises" value="{{ revising.id }}">{% endif %}
-    <div class="field file-field{% if pdf_error %} field-error{% endif %}">
+    <div class="{{ field_classes(pdf_error, "file-field") }}">
       <label for="pdf">{% if revising %}File{% else %}Files{% endif %}</label>
       {# One fact a line, so it scans; the input's aria-describedby points at the block. #}
       <div class="hint" id="pdf-hint">
@@ -107,7 +109,7 @@
         </ul>
       </details>
       {% if pdf_error %}
-      <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
+      {{ field_error("pdf-error", pdf_error) }}
       {% if pdf_error.help %}<p class="hint"><a href="{{ pdf_error.help }}">What this message means</a></p>{% endif %}
       {% endif %}
       {# app.js checks the size and type as soon as a file is chosen and puts what is
@@ -118,7 +120,7 @@
              {% if latex_source and not revising %}data-latex="1" {% endif %}{% if batch_zip and not revising %}data-zip="1" {% endif %}{% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" {% endif %}data-accepted-what="{{ acc.what }}" data-accepted-note="{{ acc.note }}" data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
              data-limit-bytes="{{ upload_limit_mb * 1024 * 1024 }}" data-limit-mb="{{ upload_limit_mb }}"
              data-max-files="{{ 1 if revising else max_files }}"
-             aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
+             {{ field_aria("pdf-error", pdf_error, "pdf-hint") }}>
     </div>
     {# Only with LaTeX source on, and only for a zip that holds more than one main file. #}
     {% if latex_source and not revising %}
