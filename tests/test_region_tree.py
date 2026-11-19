@@ -111,7 +111,7 @@ def test_a_table_at_the_top_of_a_column_is_read_before_the_text_beside_it():
         widths=[60.0, 60.0, 60.0],
     )
     _lines(page, "A", 40, 200, 30, 44)
-    _lines(page, "B", 320, 116, 40, 44)
+    _lines(page, "B", 320, 130, 40, 44)
     assert _read(doc, on=True) == "TAB"
 
 
