@@ -73,6 +73,23 @@
 - The replay record `data/eval/burden-corpus.json` was re-made: 43 of the 73 uploads, 117
   pages, 58 decisions. The 42 uploads in both records ask the same; three left for answers the
   recording lacks and one came back (docs/eval.md, `eval burden`). No model call, no migration.
+## Unreleased: with the region tree on, a table proposal is accepted against the page's own tree (branch feat/table-proposals-after-tree)
+
+- WS15.2. With `REGION_TREE` on, the table finder still proposes first, but each proposal is now
+  accepted only once the page's region tree exists. A proposal inside one region is accepted. A
+  proposal that crosses a gutter, with lines the table does not take standing on two sides of
+  it, is refused only on narrow grounds: a line of prose on each side, rows that do not line up
+  across the gutter (under 0.6), or two labeled lists side by side. A ruled table that spans
+  columns passes, and so does a real matching table. A refused proposal stays in the page as
+  text and its lines go to the reading tree, and the refusal and its reason are kept on the
+  layout (`Layout.table_refusals`: page, box, reason; no text). Over the 332 development files,
+  381 tables are found before and 378 after: three false tables are refused (two handouts and
+  a syllabus whose Grading box had been taken across the sidebar), all for prose on both sides,
+  and no real table is lost. The development bars do not move with the tree on (`layout-dev-1`
+  162 of 267 pages right and the corpus gold pages unchanged, none made wrong), and with the
+  setting off the output of all 996 analyses is byte-identical. The setting is still off; there
+  is no `PIPELINE_VERSION` bump.
+
 ## Unreleased: the region tree makes none of the development pages wrong (branch fix/region-tree-wrong-pages)
 
 - WS15.1, the nine pages the tree made wrong. With `REGION_TREE` on, `layout-dev-1` goes from 141
