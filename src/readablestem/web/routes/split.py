@@ -1234,11 +1234,14 @@ class SplitBuilder:
         held = [b.element for b in self.result.left_out_blocks if b.element.page == index]
         listed = sorted([*texts, *held], key=lambda e: e.order)
         left_out = {e.id for e in held}
-        for element in listed[:MAX_TEXT_LINES]:
+        # A line left out is listed however far down its page it is: the list is its way back.
+        shown = listed[:MAX_TEXT_LINES]
+        shown += [e for e in listed[MAX_TEXT_LINES:] if e.id in left_out]
+        for element in shown:
             line = self.text_line(element, current=element.id == change)
             line.left_out = element.id in left_out
             tools.lines.append(line)
-        tools.lines_cut = max(0, len(listed) - MAX_TEXT_LINES)
+        tools.lines_cut = len(listed) - len(shown)
         editing = next((e for e in self.result.elements if e.id == change), None)
         if editing is not None and editing.kind in TEXT_KINDS and editing.page == index:
             tools.editor = self.text_editor(editing)

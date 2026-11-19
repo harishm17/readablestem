@@ -46,6 +46,8 @@
   side counted the word's accent and the reading's side counted only `mover` accents.
   `equation_step._mathml_accents` now counts the accents of the reading's `mtext` and `mi`
   letters too. A hat the reading dropped is still found.
+- Page editor: a paragraph left out that is past the 120th line of its page is still listed,
+  with "Put it back" (the list was cut at 120 lines, so it had no way back on the screen).
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 
