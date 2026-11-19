@@ -221,6 +221,7 @@ def test_a_kept_line_end_is_written_as_br_and_moves_with_its_words(tmp_path):
     output = edit_output()
     paragraph = next(e for e in output.result.elements if e.id == PLAIN)
     paragraph.text = "Discuss vectors and scalars with the class"
+    paragraph.role = "aside"  # a text edit keeps what the block is
     first = paragraph.text.index(" vectors")
     second = paragraph.text.index(" with")
     paragraph.runs = [
@@ -244,6 +245,7 @@ def test_a_kept_line_end_is_written_as_br_and_moves_with_its_words(tmp_path):
         done = edit_post(env, PLAIN, action="text", text=paragraph.text.replace("Discuss", "Talk"))
         assert done.status_code == 303
         kept = element(env, PLAIN)
+        assert kept.role == "aside" and "<aside" in (with_file(env).html or "")
         assert [(kept.text or "")[r.start : r.end] for r in kept.runs if r.kind == "break"] == [
             " ",
             " ",

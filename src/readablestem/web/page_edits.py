@@ -512,7 +512,7 @@ def make_heading(result: DocumentResult, element_id: str, level_text: str) -> St
     before = capture(result, elements=[element_id], fixes=[element_id], page=element.page)
     for index, current in enumerate(result.elements):
         if current.id == element_id:
-            result.elements[index] = current.model_copy(update={"kind": Kind.HEADING})
+            result.elements[index] = current.model_copy(update={"kind": Kind.HEADING, "role": None})
     result.fixes.append(
         Fix(
             element_id=element_id,
