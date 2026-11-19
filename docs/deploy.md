@@ -240,15 +240,15 @@ Things that differ from OpenAI, all on by default and safe to leave:
   that a ladder with it can be costed; no step uses it.
 - The instructions are cached (5 minutes), so from a job's second call on, the instruction
   tokens are billed at the cache-read rate.
-- A reservation (the worst case held before each call, then replaced by the real cost) is
-  larger than on OpenAI because it covers thinking and the image. It prices the crop that
-  is actually sent: Claude counts a PNG at about width x height / 750 tokens (scaled to at
+- A reservation (the amount held before each call, then replaced by the real cost) is
+  larger than on OpenAI because it covers thinking and the image. The worst case, below,
+  is what a step with no measured size holds; a step with one holds the smaller of the two
+  (see "Measured sizes"). It prices the crop that is actually sent: Claude counts a PNG at about width x height / 750 tokens (scaled to at
   most 2,576 px on the long edge, capped near 4,800 tokens; measured with the free
   token-counting endpoint on 2026-10-14), with a 1.35 allowance for newer tokenizers. For
-  a typical 600 x 200 equation crop one `claude-opus-5-5` call reserves $0.10 ($0.002 on
-  `claude-haiku-5-5`); the
-  worst case (a 2,048 px crop) is $0.14, $0.22 with long descriptions and $0.53 with
-  tables. It used to be a flat 6,500 image tokens plus an 8,192-token thinking allowance,
+  a typical 600 x 200 equation crop the worst case on `claude-opus-5-5` is $0.10 ($0.002 on
+  `claude-haiku-5-5`); for a 2,048 px crop it is $0.14, $0.22 with long descriptions and
+  $0.53 with tables. It used to be a flat 6,500 image tokens plus an 8,192-token thinking allowance,
   about $0.32 a call: more than the $0.30 a one-page job was allowed, so a one-page upload
   could not make a single call and every element came back "not converted"
   (`budget_job_usd`). `tests/test_models_pricing_images.py` keeps the reservation an upper
@@ -258,8 +258,8 @@ Things that differ from OpenAI, all on by default and safe to leave:
   uploads, 1,376 calls, measured 2026-11-18; `models/pricing.py`, `RESERVATIONS`): twice
   the dearest call of the step and model, rounded up. Equations $0.0015 (`claude-haiku-5-5`)
   and $0.046 (`claude-opus-5-5`); figures $0.0015 and $0.065; image pages $0.142 (opus);
-  tables $0.012 and $0.12. The worst case was $0.0020 to $0.0036 on haiku and $0.10 to $0.27
-  on opus. A step with no row (`page_math`, `page_witness`, OpenAI) keeps the worst case: no
+  tables $0.012 and $0.12. A call holds the smaller of its worst case and its size
+  (`reservation_usd`). A step with no row (`page_math`, `page_witness`, OpenAI) keeps the worst case: no
   call of those steps is in the recordings. The table has no setting: a size changes with a
   new measurement. In the replay no call settled above its reservation. A call that is
   charged at its reservation because no usage came back (a timeout after the send) is stored

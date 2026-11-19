@@ -29,8 +29,8 @@ button, .button, .button-secondary, .button-danger, .button-danger-outline {
 .button-danger, .button-danger:visited { background: var(--err); border-color: var(--err); color: var(--on-accent); }
 .button-danger:hover { background: var(--err-strong); border-color: var(--err-strong); }
 /* Deleting is never styled like Keep or Save. The button that opens the delete confirmation is red
-   text on the page colour with a red border; the confirmation page's own button stays the filled
-   `button-danger`. The label also says what is deleted, so colour is not the only cue. */
+   text on the page color with a red border; the confirmation page's own button stays the filled
+   `button-danger`. The label also says what is deleted, so color is not the only cue. */
 .button-danger-outline, .button-danger-outline:visited { background: var(--bg); color: var(--err); border-color: var(--err); }
 .button-danger-outline:hover, button.button-danger-outline:hover { background: var(--err-tint); color: var(--err-strong); border-color: var(--err-strong); }
 .button-small { min-height: 2.25rem; padding: var(--space-1) var(--space-4); }
@@ -42,7 +42,7 @@ button[disabled], button[aria-disabled="true"], .button[aria-disabled="true"] { 
 .link-button:hover { background: none; color: var(--accent-hover); }
 /* Pressed, and busy while its form is on its way (the one submit rule, app.js): pressed sits
    a pixel lower with an inner edge; busy keeps the disabled look above and adds a dashed
-   outline, so the change is not colour alone. */
+   outline, so the change is not color alone. */
 button:active, .button:active { box-shadow: inset 0 2px 0 var(--border-control); }
 button[aria-busy="true"], .button[aria-busy="true"] { cursor: progress; outline: 2px dashed var(--border-control); outline-offset: 2px; }
 

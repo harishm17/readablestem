@@ -213,6 +213,13 @@ def test_a_run_cap_that_cannot_hold_its_steps_is_refused_and_a_stopped_run_is_a_
     html = out.read_text(encoding="utf-8")
     assert '<meta name="readablestem-state" content="draft">' in html
     assert re.search(r"<body[^>]*><p class=\"draft-mark\"[^>]*><strong>Draft:</strong>", html)
+    # A name the person gave is kept, and a line says why the file is a draft.
+    assert "your name is kept" in capsys.readouterr().out
+    # Without --out the name says it too, as a draft downloaded from the web app does.
+    assert run(pdf, "--max-usd", "0.04") == 0
+    drafted = pdf.with_name(pdf.stem + "-draft.html")
+    assert drafted.is_file() and not pdf.with_suffix(".html").exists()
+    assert f"wrote {drafted}" in capsys.readouterr().out
 
 
 def test_axe_flag_runs_axe_and_summarises_rule_ids(pdf, tmp_path, pipeline, monkeypatch, capsys):

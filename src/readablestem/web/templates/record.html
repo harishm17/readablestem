@@ -26,7 +26,7 @@
     <div><dt>Converted by</dt><dd>{{ record.owner }}</dd></div>
     <div><dt>Tool</dt><dd>{{ record.tool }}</dd></div>
     <div><dt>Language</dt><dd>{{ record.language }}</dd></div>
-    <div><dt>Exam or quiz</dt><dd>{{ exam_words.on if record.exam_mode else exam_words.off }}</dd></div>
+    {% if record.checked.origin == "pdf" %}<div><dt>Exam or quiz</dt><dd>{{ exam_words.on if record.exam_mode else exam_words.off }}</dd></div>{% endif %}
     <div><dt>Record made on</dt><dd>{{ long_when(record.made_at) }}</dd></div>
     <div><dt>Reference</dt><dd>{{ record.job_ref }}</dd></div>
     {% if record.state %}<div><dt>State</dt><dd>{{ record.state }}</dd></div>{% endif %}

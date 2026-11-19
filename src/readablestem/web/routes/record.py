@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from readablestem.core.types import DocumentResult
 from readablestem.pipeline import checked
-from readablestem.web import documents, events, record, shares, states
+from readablestem.web import documents, events, outcome, record, shares, states
 from readablestem.web.database import as_utc
 from readablestem.web.db import ReviewEdit, session_scope, utcnow
 from readablestem.web.deps import CurrentUser, UserDep, get_ctx, render
@@ -87,6 +87,7 @@ def _record(request: Request, job_id: str, user: CurrentUser) -> tuple[record.Re
                 events.downloaded_formats(session, job.id) if ctx.settings.events_enabled else None
             ),
             state=state,
+            scan_cost=outcome.image_pages_cost_offered(ctx.settings),
         )
         return made, f"review-record-{slug(title) or 'document'}-{job.id[:6]}"
 

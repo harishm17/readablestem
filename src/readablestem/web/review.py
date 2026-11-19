@@ -1888,6 +1888,7 @@ def rerender_html(
     filename: str = "",
     audience: str = "student",
     stamp: Stamp | None = None,
+    notice: str | None = None,
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
     `audience` "checker" makes a draft's page in the checker's words (`assemble.CHECKER`);
@@ -1937,6 +1938,7 @@ def rerender_html(
         fixes=result.fixes,
         crops=crops,
         source_note=None,
+        notice=notice,
         checked_on=checked_on,
         pages=result.stats.pages or None,
         math_alttext=math_alttext,

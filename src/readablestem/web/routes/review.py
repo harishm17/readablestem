@@ -78,6 +78,7 @@ from readablestem.web import (
     listen,
     notation,
     notice_places,
+    outcome,
     outcomes,
     output,
     page_edits,
@@ -938,6 +939,7 @@ def _item(
     source_note: str = "",
     origin: str = "pdf",
     tied: frozenset[str] | None = None,
+    scan_cost: str = "",
 ) -> ReviewItem:
     """`label`: the item's name (`web.review.item_labels`), else kind and `number`;
     `source_note`: `messages.source_item_notes` for this item; `origin`: the result's;
@@ -976,7 +978,7 @@ def _item(
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c, note=optional) for c in fix.failed_checks],
-        reason=explain_reason(reason) if reason else None,
+        reason=explain_reason(reason, scan_cost=scan_cost) if reason else None,
         crop_url=f"/jobs/{job_id}/crops/{fix.element_id}.png"
         if fix.element_id in crop_ids
         else None,
@@ -1678,6 +1680,7 @@ def _page(
     places = heading_places(result)
     notes = source_item_notes(result)
     tied = table_math.tied_ids(result.elements)
+    scan_cost = outcome.image_pages_cost_offered(get_ctx(request).settings)
     items = {
         f.element_id: _item(
             f,
@@ -1690,6 +1693,7 @@ def _page(
             source_note=notes.get(f.element_id, ""),
             origin=result.origin,
             tied=tied,
+            scan_cost=scan_cost,
         )
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)

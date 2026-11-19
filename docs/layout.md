@@ -116,6 +116,10 @@ guards PyMuPDF, its warning store and the caches, nothing else.
 
 ## How a page is read
 
+The order and the regions of a page are found by rules, with no model and no learned layout
+reader, neither to find them nor as a second opinion
+([ADR 0010](decisions/0010-reading-order-rules-first.md): the figures and what would change it).
+
 0. **Tables first.** On every analyzed page the data tables are found
    (`pipeline/tables.py`, [tables.md](tables.md)) before anything below: their lines,
    rules and `"Table N"` caption leave the page, and each comes back as one TABLE element
