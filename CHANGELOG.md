@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased: every form is answered once (branch feat/forms-stage-2)
+
+- SW43, stage 2. The forms that were still plain tags now follow the one submit rule: the
+  document, upload and course deletes, Keep for 7 days, the document language, "Continue with
+  the pages before the empty ones", the title and contact line, the feedback questions, the
+  account name and the keep default, a course symbol's edit, the Try again and Convert again
+  buttons of My documents and a batch (`job.retry`), and the sign-in and sign-out forms. A second
+  click gets the first answer and runs nothing (a second delete no longer says "Page not
+  found", a second Keep or feedback no longer says it was already done), and the page marks the
+  button busy ("Deleting…", "Saving…", "Sending…") and blocks a second submit. The sign-in and
+  sign-out forms have no signed-in user for a token to belong to, so they carry the busy label
+  and the block only (`FormRow.token` False). "Download the draft anyway" stays plain: its answer
+  is a file, so the page would stay blocked. `course.delete_ask` is now `course.delete` (the
+  question's button and the asking button share it). `FORMS` has 59 rows
+  (42 before). Of 26 `<form method="post"` tags in the templates, 2 are left: the macro's own
+  and the draft form.
+- The out-of-date notices end with the next step. On the review screen the box now reads
+  what changed, what the item is now, "What you typed is kept below." when it applies, and last
+  "Look at what has changed, then choose again if you still want to." The symbols page says to
+  look at the page as it is now and make the change again. "Nothing to continue", "Nothing to
+  cancel" and "Nothing to try again" say there is nothing more to do and why it may be so.
+- The combine page names the parts whose language is unconfirmed ("Open the parts for pages 1-4,
+  pages 5-8, then confirm the language"), at most three and then "and N more".
+- No migration; no model request, `PIPELINE_VERSION` or `RENDER_VERSION` changed.
+
 ## Unreleased: the icons are drawn from one SVG (branch fix/brand-icons-one-source)
 
 - WS24.9 (F-424), as far as its triage line. The favicon, the 192 and 512 px icons and the touch

@@ -27,8 +27,15 @@ session can live (`purge`). The one row without a user is the account deletion's
 repeat of "Delete my account" arrives signed out, so its row is kept with no user, tied to
 that browser's session, until the session would have lapsed.
 
-`FORMS` is the census of the forms that follow the rule: stage 1 holds the review, create
-and convert forms and the account deletion; `docs/forms.md` describes the rule.
+`FORMS` is the census of the forms that follow the rule: every form of a signed-in person
+that the macro draws (the review, create, convert, delete, setting and feedback forms and
+the account deletion). The sign-in and sign-out forms are in it with `FormRow.token` False:
+the macro draws them with the busy label and the page's block on a second submit but no
+request token, because the token is looked up with a signed-in user's id and these arrive
+without one (their repeat is answered by the identity provider, the one-time sign-in link or
+the session itself). One form stays outside it: "Download the draft anyway" answers with a
+file, so the page does not change and a blocked form would stay blocked. The rule is
+described in `docs/web.md`, "Forms: the one submit rule".
 """
 
 from __future__ import annotations
@@ -100,6 +107,8 @@ BUSY_LABELS = {
     "removing": "Removing…",
     "saving": "Saving…",
     "sending": "Sending…",
+    "signing_in": "Signing in…",
+    "signing_out": "Signing out…",
     "starting": "Starting…",
     "stopping": "Stopping…",
     "undoing": "Undoing…",
@@ -108,6 +117,9 @@ BUSY_LABELS = {
 
 # The repeat rules (SW43, "What identical repeat means"), as `FormRow.repeat` says them.
 SAME_TOKEN = "The same token: the first answer again."
+NO_TOKEN = (
+    "No token (nobody is signed in): the page blocks a second submit; the server runs as before."
+)
 REPEAT_RULES = {
     Kind.CREATE: "Another token, and the thing already exists: a notice that links to it.",
     Kind.DECIDE: "Another token, and the item already has this decision by you: Already saved.",
@@ -131,6 +143,8 @@ class FormRow:
 
     @property
     def repeat(self) -> str:
+        if not self.token:
+            return NO_TOKEN
         return f"{SAME_TOKEN} {REPEAT_RULES.get(self.kind, '')}".strip()
 
     @property
@@ -178,8 +192,8 @@ FORMS: dict[str, FormRow] = {
                 "adding", "a second click said the documents were not available to add"),
         FormRow("course.rename", "POST /courses/{course_id}/rename", Kind.SETTING, "saving",
                 "none: renaming to the same name again changes nothing"),
-        FormRow("course.delete_ask", "POST /courses/{course_id}/delete", Kind.DELETE,
-                "opening", "none: the course page's button only asks first"),
+        FormRow("course.delete", "POST /courses/{course_id}/delete", Kind.DELETE, "deleting",
+                "a second click on the question's button answered 'Page not found'"),
         FormRow("course.remove_entry", "POST /courses/{course_id}/entries/{entry_id}/delete",
                 Kind.DELETE, "removing", "a second click answered 'Page not found'"),
         FormRow("share.add", "POST /jobs/{job_id}/share", Kind.CREATE, "saving",
@@ -232,6 +246,46 @@ FORMS: dict[str, FormRow] = {
                 "a second click said 'Nothing to try again'"),
         FormRow("job.cancel", "POST /jobs/{job_id}/cancel", Kind.STATE, "stopping",
                 "a second click said 'Nothing to cancel'"),
+        # Documents and uploads: the delete forms are drawn twice, as the people forms are: the
+        # button asks (the answer is the question, nothing is written, so no row is kept) and
+        # the question's button deletes. The asking button's own busy label says "Opening…".
+        FormRow("job.delete", "POST /jobs/{job_id}/delete", Kind.DELETE, "deleting",
+                "a second click on the question's button answered 'Page not found'"),
+        FormRow("upload.discard", "POST /uploads/{upload_id}/delete", Kind.DELETE, "deleting",
+                "a second click on the question's button answered 'Page not found'"),
+        FormRow("job.keep", "POST /jobs/{job_id}/keep", Kind.STATE, "saving",
+                "a second click said the document was already kept"),
+        FormRow("job.language", "POST /jobs/{job_id}/language", Kind.SETTING, "saving",
+                "a second click made the HTML file again and left review forms open in "
+                "other tabs out of date"),
+        FormRow("job.cut_off", "POST /jobs/{job_id}/cut-off", Kind.STATE, "saving",
+                "a second click answered 'Nothing to continue' (409)"),
+        FormRow("job.title", "POST /jobs/{job_id}/title", Kind.SETTING, "saving",
+                "a second click said 'The title is already set to that'"),
+        FormRow("job.contact", "POST /jobs/{job_id}/contact", Kind.SETTING, "saving",
+                "a second click said 'The contact line is already set to that'"),
+        FormRow("job.feedback", "POST /jobs/{job_id}/feedback", Kind.SEND, "sending",
+                "a second click said 'You had already answered for this document'"),
+        FormRow("account.name", "POST /account/name", Kind.SETTING, "saving",
+                "none: saving the same name again changes nothing"),
+        FormRow("account.keep_default", "POST /account/keep-default", Kind.SETTING, "saving",
+                "none: saving the same choice again changes nothing"),
+        FormRow("course.save_entry", "POST /courses/{course_id}/entries/{entry_id}",
+                Kind.SETTING, "saving", "a second click saved the same symbol again"),
+        # Sign in and out: no signed-in user, so no request token (`token` False): the busy
+        # label and the page's block on a second submit only.
+        FormRow("signin.google", "POST /login", Kind.SIGN_IN, "signing_in",
+                "a second click started a second sign-in with Google", token=False),
+        FormRow("signin.microsoft", "POST /login/microsoft", Kind.SIGN_IN, "signing_in",
+                "a second click started a second sign-in with Microsoft", token=False),
+        FormRow("signin.email", "POST /login/email", Kind.SIGN_IN, "sending",
+                "a second click sent a second sign-in link", token=False),
+        FormRow("signin.confirm", "POST /login/email/confirm", Kind.SIGN_IN, "signing_in",
+                "a second click said the sign-in link had already been used", token=False),
+        FormRow("signin.dev", "POST /dev-login", Kind.SIGN_IN, "signing_in",
+                "none: a development sign-in again changes nothing", token=False),
+        FormRow("signout", "POST /logout", Kind.SIGN_OUT, "signing_out",
+                "none: signing out again changes nothing", token=False),
         # The account deletion's repeat arrives signed out (see the module docstring).
         FormRow("account.delete", "POST /account/delete", Kind.DELETE, "deleting",
                 "a second click landed on the sign-in page"),

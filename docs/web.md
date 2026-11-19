@@ -383,8 +383,21 @@ sent: a double click, a tap on a slow phone, Back and send again, a retry by the
   course; Add a symbol with the same meaning and note says the course already has it; removing
   a share that is gone, or Try again on a document that is waiting or converting, answers as
   the first click did; linking an address already linked to the same instructor says so.
-- **Without a token** (every POST form outside the review, create and convert forms of
-  stage 1, and any request without the field) the handler runs as it did before the rule.
+- **Without a token** (the forms below that cannot carry one, and any request without the
+  field, such as a script) the handler runs as it did before the rule.
+- **Which forms.** Every POST form of a signed-in person is drawn by the macro and has a row
+  in `FORMS`, except "Download the draft anyway" (`job_draft.html`): its answer is a file
+  download, so the page does not change and a form blocked after one click would stay
+  blocked. The delete forms of a document, an upload and a course are drawn twice, as the
+  people forms are: the button asks (the answer is the question; nothing is written, so no
+  row is kept; its own busy label says "Opening…") and the question's button deletes. The
+  sign-in and sign-out forms (`signin.*`, `signout`) are in `FORMS` with `token=False`: the
+  token is looked up with a signed-in user's id and these arrive without one, so the macro
+  draws them with the busy label and the page's block on a second submit and no request
+  token, and the server runs as before (the identity provider, the one-time sign-in link or
+  the session answers a repeat). The live check of a typed value on the review screen
+  (`hx-post` to `/jobs/{id}/review/{item}/check`) is not a form that changes anything and has
+  no row.
 - **Not CSRF.** The request token is not a CSRF token and replaces none: every route still
   checks `csrf_token` first (`require_csrf`; the upload checks it after the replay, which
   runs nothing).

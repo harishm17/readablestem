@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "components/forms.html" import form with context %}
 {# Confirm deleting a course and its notation (routes/courses.py). #}
 {% block title %}Delete {{ name }}?{% endblock %}
 {% block body_class %}page-confirm{% endblock %}
@@ -7,11 +8,10 @@
 <p>Deletes the course and its {{ entries }} {{ "symbol" if entries == 1 else "symbols" }}. Its documents keep their results.</p>
 {% include "_delete_notes.html" %}
 <div class="confirm-actions">
-  <form method="post" action="/courses/{{ course_id }}/delete" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("course.delete", "/courses/" ~ course_id ~ "/delete", {"class": "inline-form"}) %}
     <input type="hidden" name="confirm" value="yes">
     <button type="submit" class="button-danger">Delete “{{ name|truncate(48, True, "…") }}”</button>
-  </form>
+  {% endcall %}
   <a class="button-secondary" href="/courses/{{ course_id }}">No, keep it</a>
 </div>
 {% endblock %}

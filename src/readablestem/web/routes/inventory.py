@@ -76,7 +76,8 @@ def _page(
         "stale": {
             "title": "This page is out of date",
             "message": "The document changed after this page was opened, so nothing was changed.",
-            "now": "",
+            "now": "Look at the page as it is now, then make the change again if you still "
+            "want it.",
             "href": f"/jobs/{job.id}/symbols?view={view}",
         }
         if stale

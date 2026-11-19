@@ -1,3 +1,4 @@
+{% from "components/forms.html" import form with context %}
 {# The documents of one upload with their status now, what to do next, and "Download all"
    (routes/batch.py). While a document is waiting or converting, htmx polls this address and
    swaps this block (204 while nothing changed; the version includes the minute, so the elapsed
@@ -36,10 +37,9 @@
             {# The state's next step (web/states.py): a link, or "Try again" as a form. #}
             {% set step = row.action %}
             {% if step and step.form %}
-            <form method="post" action="{{ step.href }}" class="inline-form">
-              <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+            {% call form("job.retry", step.href, {"class": "inline-form"}) %}
               <button type="submit" id="batch-act-{{ row.id }}" class="button-secondary button-small">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></button>
-            </form>
+            {% endcall %}
             {% elif step %}
             <a id="batch-act-{{ row.id }}" href="{{ step.href }}">{{ step.label }}<span class="visually-hidden"> {{ row.name }}</span></a>
             {% endif %}

@@ -104,6 +104,7 @@ KEEP_OFF = "New uploads now start with “Keep for 7 days” unchecked."
 
 
 @router.post("/account/keep-default", dependencies=[Depends(require_csrf)])
+@submit_once("account.keep_default")
 def save_keep_default(
     request: Request, user: UserDep, keep_default: Annotated[str, Form()] = ""
 ) -> Response:
@@ -125,6 +126,7 @@ NAME_CLEARED = "Your name is removed."
 
 
 @router.post("/account/name", dependencies=[Depends(require_csrf)])
+@submit_once("account.name")
 def save_name(request: Request, user: UserDep, name: Annotated[str, Form()] = "") -> Response:
     """The name people you share a document with see beside your address (`web.views`). One
     line, at most 200 characters, no control characters; empty removes it."""

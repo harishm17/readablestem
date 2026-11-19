@@ -1,4 +1,5 @@
 {# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
 {# What students see of this file that the instructor sets: the title they hear (T1-7, POST
    /jobs/{id}/title) and a contact line in the footer (T1-17, POST /jobs/{id}/contact). Both
    are CSRF-checked, owner only, and make the HTML file again. #}
@@ -6,8 +7,7 @@
 {% set contact_error = field_errors.get("contact") %}
 <section aria-labelledby="student-file-heading">
   <h{{ hl|default(2) }} id="student-file-heading">{{ "Title and contact line" if hl|default(2) > 2 else "For students" }}</h{{ hl|default(2) }}>
-  <form method="post" action="/jobs/{{ job.id }}/title" class="student-setting">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("job.title", "/jobs/" ~ job.id ~ "/title", {"class": "student-setting"}) %}
     <div class="field{% if title_error %} field-error{% endif %}">
       <label for="title">Title students hear</label>
       <p class="hint" id="title-hint">Read out when the file opens; names the download.
@@ -20,9 +20,8 @@
              aria-describedby="title-hint{% if title_error %} title-error{% endif %}"{% if title_error %} aria-invalid="true"{% endif %}>
     </div>
     <button type="submit" class="button-secondary">Save the title</button>
-  </form>
-  <form method="post" action="/jobs/{{ job.id }}/contact" class="student-setting">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% endcall %}
+  {% call form("job.contact", "/jobs/" ~ job.id ~ "/contact", {"class": "student-setting"}) %}
     <div class="field{% if contact_error %} field-error{% endif %}">
       <label for="contact">Contact line for students (optional)</label>
       <p class="hint" id="contact-hint">An email or web address, shown at the end of the file
@@ -35,5 +34,5 @@
              aria-describedby="contact-hint{% if contact_error %} contact-error{% endif %}"{% if contact_error %} aria-invalid="true"{% endif %}>
     </div>
     <button type="submit" class="button-secondary">Save the contact line</button>
-  </form>
+  {% endcall %}
 </section>

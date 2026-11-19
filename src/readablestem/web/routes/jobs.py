@@ -2016,6 +2016,7 @@ def confirm_draft(
 
 
 @router.post("/jobs/{job_id}/language", dependencies=[Depends(require_csrf)])
+@submit_once("job.language")
 def set_language(
     request: Request, job_id: str, user: UserDep, lang: Annotated[str, Form()] = ""
 ) -> Response:
@@ -2068,6 +2069,7 @@ def set_language(
 
 
 @router.post("/jobs/{job_id}/cut-off", dependencies=[Depends(require_csrf)])
+@submit_once("job.cut_off")
 def continue_cut_off(request: Request, job_id: str, user: UserDep) -> Response:
     """The owner of a PDF that looks cut off (`file_cut_off`) continues with the pages before the
     empty ones: the notice stops holding the document back and stays, so the job page and the
@@ -2083,7 +2085,8 @@ def continue_cut_off(request: Request, job_id: str, user: UserDep) -> Response:
             raise PageError(
                 409,
                 "Nothing to continue",
-                "This document is not waiting for an answer about empty pages.",
+                "This document is not waiting for an answer about empty pages. It may have been "
+                "answered in another tab or window, so there is nothing more to do here.",
                 context={"job_id": job_id},
             )
         result = notice_rules.continue_cut_off(result)
@@ -2104,7 +2107,8 @@ RETRY_REFUSED = {
     "not_stopped": (
         409,
         "Nothing to try again",
-        "This document is not stopped: it has finished completely. Nothing was changed.",
+        "This document is not stopped: it has finished completely, so it can be used as it is. "
+        "Nothing was changed.",
     ),
     "too_many_active": (
         429,
@@ -2233,7 +2237,8 @@ def cancel_job(request: Request, job_id: str, user: UserDep) -> Response:
         raise PageError(
             409,
             "Nothing to cancel",
-            "This document is not waiting or converting. Nothing was changed.",
+            "This document is not waiting or converting, so there is nothing to stop. It may "
+            "have finished or been canceled in another tab or window. Nothing was changed.",
             context={"job_id": job_id},
         )
     log_event(logger, "job_cancel_requested", job_id=owned_id, pages_given_back=gave_back)
@@ -2702,6 +2707,7 @@ def confirm_delete(
 
 
 @router.post("/jobs/{job_id}/delete", dependencies=[Depends(require_csrf)])
+@submit_once("job.delete")
 async def delete_job(request: Request, job_id: str, user: UserDep) -> Response:
     """Delete only with `confirm=yes`; any other POST (the "Delete" buttons) gets the
     confirmation page first. Deleting user data cannot be undone, so it is confirmed

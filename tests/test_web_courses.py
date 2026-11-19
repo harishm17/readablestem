@@ -199,6 +199,52 @@ def test_one_click_makes_one_course_however_often_it_is_sent(web, monkeypatch):
     assert all(r.user_id != alice for r in rows(web, RequestToken))
 
 
+@pytest.mark.parametrize("kind", ["delete", "save", "question"])
+def test_the_course_forms_answer_a_second_submit_as_the_first(web, monkeypatch, kind):
+    """The one submit rule (SW43, stage 2) on forms of other kinds: a delete (a second one
+    would be 'Page not found'), a save that redirects (a second one would run the update
+    again), and the question a button asks before deleting (it writes nothing, so no
+    token is kept and the page is the answer each time)."""
+    from readablestem.web import notation
+    from readablestem.web.db import RequestToken
+
+    course_id = new_course(web.browser, "Physics 1")
+    base = f"/courses/{course_id}"
+    if kind == "delete":
+        sent = request_token(web.browser.get(f"{base}/delete").text)
+        sends = [
+            post(web.browser, f"{base}/delete", base, confirm="yes", request_token=sent)
+            for _ in range(2)
+        ]
+        assert [r.status_code for r in sends] == [303, 303]
+        assert sends[0].headers["location"] == sends[1].headers["location"] == "/courses"
+        assert rows(web, Course) == []
+    elif kind == "save":
+        add(web.browser, course_id, "bold d")
+        (entry,) = rows(web, CourseNotation)
+        saved = []
+        update = notation.update_entry
+        monkeypatch.setattr(
+            notation, "update_entry", lambda *a, **k: saved.append(1) or update(*a, **k)
+        )
+        path = f"{base}/entries/{entry.id}"
+        page = web.browser.get(path).text
+        symbol = re.search(r'id="symbol"[^>]*value="([^"]*)"', page)
+        assert symbol, "the entry page shows the symbol"
+        fields = {"symbol": unescape(symbol.group(1)), "meaning": "matrix"}
+        fields["request_token"] = request_token(page)
+        sends = [post(web.browser, path, base, **fields) for _ in range(2)]
+        assert [r.status_code for r in sends] == [303, 303]
+        assert sends[0].headers["location"] == sends[1].headers["location"]
+        assert saved == [1]
+    else:
+        sent = request_token(web.browser.get(base).text)
+        sends = [post(web.browser, f"{base}/delete", base, request_token=sent) for _ in range(2)]
+        assert [r.status_code for r in sends] == [200, 200]
+        assert all("Delete Physics 1?" in r.text for r in sends)
+        assert len(rows(web, Course)) == 1 and rows(web, RequestToken) == []
+
+
 # --------------------------------------------------------------------------- owner only
 
 

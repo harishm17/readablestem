@@ -391,18 +391,11 @@ class Notice:
 
 
 STALE_TITLE = "Your choice was not saved"
-STALE_MESSAGE = (
-    "This document was changed in another tab or window after this page was opened. It is "
-    "shown below as it is now: check it, then choose again."
-)
-STALE_ITEM_MESSAGE = (
-    "This item was changed in another tab or window after this page was opened. It is shown "
-    "below as it is now: check it, then choose again."
-)
-STALE_MEMBERS_MESSAGE = (
-    "{names} changed in another tab or window after this page was opened, so nothing was "
-    "saved. They are shown below as they are now: check them, then choose again."
-)
+STALE_MESSAGE = "This document was changed in another tab or window after this page was opened."
+STALE_ITEM_MESSAGE = "This item was changed in another tab or window after this page was opened."
+STALE_MEMBERS_MESSAGE = "{names} changed in another tab or window after this page was opened."
+# The one next step, last in the box: the page below is drawn from the document as it is now.
+STALE_NEXT = "Look at what has changed, then choose again if you still want to."
 NAMED_AT_MOST = 3
 
 
@@ -412,7 +405,8 @@ class StaleNotice:
 
     title: str
     message: str
-    now: str  # what the item is now ("Equation 1 is now: accepted by you."), or ""
+    now: str  # what comes after the message: what the item is now ("Equation 1 is now: accepted
+    # by you."), that what was typed is kept, and the next step; the template writes it as is
     href: str  # the page as it is now, by GET (reloading the POST would only re-send it)
     kept: bool = False  # what was typed is back in its field (which is then open)
 
@@ -448,8 +442,8 @@ def stale_notice(
         more = len(names) - NAMED_AT_MOST
         listed = ", ".join(names[:NAMED_AT_MOST]) + (f" and {more} more" if more > 0 else "")
         message = STALE_MEMBERS_MESSAGE.format(names=listed)
-    message = f"{message} {STALE_KEPT}" if kept else message
-    return StaleNotice(STALE_TITLE, message, now, href, kept)
+    after = " ".join(part for part in (now, STALE_KEPT if kept else "", STALE_NEXT) if part)
+    return StaleNotice(STALE_TITLE, message, after, href, kept)
 
 
 def _stale_anchor(result: DocumentResult, target: str) -> str:

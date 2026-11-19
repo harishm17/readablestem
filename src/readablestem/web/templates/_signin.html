@@ -1,25 +1,23 @@
+{% from "components/forms.html" import form with context %}
 {% if microsoft_login %}
-<form method="post" action="/login/microsoft" class="signin-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("signin.microsoft", "/login/microsoft", {"class": "signin-form"}) %}
   <button type="submit" class="button">Sign in with your university account (Microsoft)</button>
-</form>
+{% endcall %}
 {% endif %}
 {% if google_login %}
-<form method="post" action="/login" class="signin-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("signin.google", "/login", {"class": "signin-form"}) %}
   <button type="submit" class="{{ 'button-secondary' if microsoft_login else 'button' }}">Sign in with Google</button>
-</form>
+{% endcall %}
 {% endif %}
 {% if email_login %}
-<form method="post" action="/login/email" novalidate class="stack-form signin-form">
-  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+{% call form("signin.email", "/login/email", {"novalidate": true, "class": "stack-form signin-form"}) %}
   <div class="field">
     <label for="signin-email">Or get a sign-in link by email</label>
     <p class="hint" id="signin-email-hint">It works for an account you already have{% if not signup_open %} (an address on the beta list){% endif %}; it does not make one. The link works once and expires after {{ email_link_minutes }} minutes.</p>
     <input type="email" id="signin-email" name="email" autocomplete="email" spellcheck="false" aria-describedby="signin-email-hint">
   </div>
   <button type="submit" class="{{ 'button' if not (microsoft_login or google_login) else 'button-secondary' }}">Email me a sign-in link</button>
-</form>
+{% endcall %}
 {% endif %}
 {% if dev_login %}
 <p><a href="/dev-login">Development sign-in</a> (this server runs in development mode).</p>

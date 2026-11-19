@@ -24,6 +24,7 @@ from readablestem.web.deps import (
     render,
     require_csrf,
 )
+from readablestem.web.forms import submit_once
 from readablestem.web.logsafe import log_event
 from readablestem.web.routes.jobs import NOT_FOUND, job_access
 from readablestem.web.shares import OWNER
@@ -69,6 +70,7 @@ def feedback_page(request: Request, job_id: str, user: UserDep) -> Response:
 
 
 @router.post("/jobs/{job_id}/feedback", dependencies=[Depends(require_csrf), Depends(_require_on)])
+@submit_once("job.feedback")
 def save_feedback(
     request: Request,
     job_id: str,

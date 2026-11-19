@@ -1,4 +1,5 @@
 {# Audiences: owner #}
+{% from "components/forms.html" import form with context %}
 {# When this document is kept until, why, and the one way to keep it longer
    (web/retention.py writes every word: `retention_line`, `keep_label`, `keep_hint`). It sits
    under the status box on a state that has something to keep, and in the Delete group
@@ -11,11 +12,10 @@
 <div class="retention-line" id="retention-line">
   <p>{{ retention_line }}</p>
   {% if keep_until|default(none) %}
-  <form method="post" action="/jobs/{{ job.id }}/keep" class="inline-form">
-    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% call form("job.keep", "/jobs/" ~ job.id ~ "/keep", {"class": "inline-form"}) %}
     <button type="submit" class="button-secondary button-small" aria-describedby="keep-result">{{ keep_label }}</button>
     <span class="hint" id="keep-result">{{ keep_hint }}</span>
-  </form>
+  {% endcall %}
   {% endif %}
 </div>
 {% endif %}
