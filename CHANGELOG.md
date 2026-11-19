@@ -8,7 +8,8 @@
   entry saw two candidates and stayed plain text. Now, when the entry and a candidate heading
   both print a number (digits and dots, "A.1", a chapter, part or appendix label with its
   number or letter, a roman numeral), it must be the same one; a number on one side only, or
-  none, leaves the title to decide as before, and an entry that still names none or more than
+  none, or a section number against an outline's roman numeral ("4.1 Scope" in the contents,
+  "I. Scope" as the heading), leaves the title to decide as before, and an entry that still names none or more than
   one heading stays plain (`layout.elements._contents_links`). The reading of "the number in
   front" is one function, `heading_number`, which `text_pass` now uses for the targets of
   "Section 3.2" and "Chapter 4" too (it replaces its two patterns; "Chapter 4.1" is no longer

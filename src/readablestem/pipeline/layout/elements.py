@@ -78,12 +78,19 @@ def heading_number(text: str) -> tuple[str, str] | None:
     return None
 
 
+def _roman(number: str) -> bool:
+    """`number` (as `heading_number` gives it) is written in roman numerals."""
+    return re.fullmatch(r"[ivxlc]+", number) is not None
+
+
 def _contents_links(elements: list[Element]) -> list[Element]:
     """Each entry of a table of contents links to the heading it names, when the PDF's own
     links do not already say so (`text_pass` keeps those): a heading later in the document
     whose title is the entry's, once the section number is left out of both. When the entry and
     the heading both print a number ("2.1", "Appendix A"), it must be the same one: "3.1 The
     model" is not "2.1 The model", and of two headings with one title the number picks one.
+    A section number and an outline's roman numeral are not compared ("4.1 Scope" in the
+    contents of a file whose headings are "I. Scope", "II. ..."): there the title decides.
     An entry that names no heading, or more than one, is plain text."""
     headings: dict[str, list[Element]] = {}
     for e in elements:
@@ -104,6 +111,7 @@ def _contents_links(elements: list[Element]) -> list[Element]:
                     printed is None
                     or not (there := heading_number(h.text or ""))
                     or there[1] == printed[1]
+                    or _roman(there[1]) != _roman(printed[1])
                 )
             ]
             if len(found) == 1:

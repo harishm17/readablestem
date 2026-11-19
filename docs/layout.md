@@ -1635,7 +1635,8 @@ entry and the heading both print a number ("2.1", "A.1", "Appendix A", "Chapter 
 reading, `layout.elements.heading_number`, which the references below use too) it must be
 the same number, so "3.1 The model" does not link to "2.1 The model" when only that one is
 here (a part of a book), and of two headings with one title the entry's number picks one. With a
-number on one side only, or none, the title decides. When the PDF's own links already say where
+number on one side only, or none, the title decides; so it does when one is a section number and
+the other an outline's roman numeral ("4.1 Scope" and "I. Scope"), which are not compared. When the PDF's own links already say where
 it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section
 lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).

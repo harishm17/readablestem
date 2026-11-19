@@ -241,6 +241,8 @@ def test_a_part_with_a_pdf_contents_page_keeps_it_and_no_second_list_is_made():
         # a number on one side only, or none: the title decides as before
         (["The model"], ["2.1 The model"], ["2.1 The model"]),
         (["Appendix A Tables"], ["Appendix A  Tables"], ["Appendix A  Tables"]),
+        # a section number against an outline's roman numeral: not compared, the title decides
+        (["4.1 Scope", "4.2 Method"], ["I. Scope", "II. Method"], ["I. Scope", "II. Method"]),
     ],
 )
 def test_a_contents_entry_links_to_the_heading_with_its_number_not_a_namesake(
