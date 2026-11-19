@@ -89,10 +89,10 @@ OWED = {
     # Wave 1a changed what these files' conversions ask (words with their styles, kept line
     # ends, new boxes), and no recording was paid for in it. One refresh owes them all.
     "w_lecture_5111": 30,
-    "w_exam_5111": 38,
+    "w_exam_5111": 40,
     "w_notes_6042_ch2": 646,
     "w_pset_801": 6,
-    "w_slides_60001_lec1": 48,
+    "w_slides_60001_lec1": 50,
     "w_slides_60001_lec10": 98,
     "w_solutions_1802": 50,
     "r01_syllabus_16851": 6,

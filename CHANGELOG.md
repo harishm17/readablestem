@@ -122,6 +122,39 @@
   never joins across a display equation or a heading. A join the test doubts stays cut.
   A joined list item no longer ends its list (`lists.py`). Pipeline version bump owed:
   element ids and counts after a new join shift.
+## Unreleased: four list faults left after the option grids, Word bullets and the block-start rule (branch fix/lists-follow-up)
+
+- A matching exercise ("___ 1." to "___ 3." in a left column, "A." to "C." in a right one under
+  "Match each term ...") was one item and paragraphs. A blank before a label no longer hides it
+  (`_Marker.start`, `lists.lead_blank`), and two series of labels of different kinds set side by
+  side under a question are read column by column as two lists one level below it
+  (`blocks._matching_series`). The option grids (questions 1 to 4 of `e1_mc_columns`) did not
+  change. Real cases on the corpus: one (the self-made `e1_mc_columns`, which matches its gold
+  now); no other file has two such series, so the rule is as narrow as that one shape.
+- A Word bullet that touches its text ("▪Grading", "▪not mandatory": MIT 6.0001 lecture 1) stayed
+  a paragraph because `lists._bullet_apart` splits a glyph from its text only from 0.1 x font
+  size apart. It is an item now when another row of the document starts with the same glyph, like
+  a dash; a lone one stays a paragraph. Cases on the corpus: 2 rows in one private file, none in the
+  public sets, no other row changed.
+- In slides the sub-bullets under "1)" and "2)" sat at the level of their parent because the item
+  texts are within 0.6 x body size of one another when the body is 26 pt. A marker of another
+  series (bullet or number, another number form or bullet glyph) set more than half the font size
+  right of the marker above opens a level (`lists._list_levels`, `MARKER_INDENT`). Items of one
+  series, a grid's options and a marker 0.45 right (`ax_csro`: "(l)" and "2)", siblings) are not
+  moved. Cases: about 90 items in 4 private files move down a level (74 of them sub-lists under
+  "(a)" and "(b)" parts of one problem set), all read as nested; none in the public sets. A
+  wrong change (`ax_csro`, 0.45) is what set the threshold at 0.5.
+- A phrase in another style that goes on over the end of a list item's line ("each instruction in
+  order" in bold) was cut off as a paragraph: the cause is `blocks._merge_style_splits`, which
+  joined a style split to a paragraph but not to a list item (`_same_style` is as it was). A list
+  item set all in bold is a heading read as an item and is not joined to the text under it.
+  Public files: 6 joins in 5 files (4 the last words of an item, 2 the second line of a heading
+  read as an item), all read as right; private files: 7 files, 14 joins, all right.
+- Effect on stored documents and recordings: paragraphs become list items and list levels move, so
+  a stored document made before is out of date (a raise of `PIPELINE_VERSION` is owed; not made
+  here). A conversion now asks about different nearby text in two files: 2 more answers owed for
+  `w_exam_5111` (38 to 40) and 2 for `w_slides_60001_lec1` (48 to 50); `harness.OWED` and the
+  count in docs/eval.md are 1,264 now. No prompt, model setting or render version changed.
 
 ## Unreleased: the eval gate sees switches (branch fix/eval-guard-flags)
 

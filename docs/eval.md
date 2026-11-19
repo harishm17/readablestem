@@ -2787,7 +2787,7 @@ exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only
 that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
 replay pays nothing.
 
-**Answers still owed.** 29 files ask for 1,260 answers that are not in the recording
+**Answers still owed.** 29 files ask for 1,264 answers that are not in the recording
 (2026-11-19). Until wave 1a it was ten files and 126 answers (pictures that changed since the
 first recording, and files added after it). Wave 1a changed what a conversion asks on 18
 files (words with their styles, kept line ends, new boxes) and paid for no recording, so one
