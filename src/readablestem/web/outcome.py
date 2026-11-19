@@ -314,7 +314,8 @@ def _kept(result_json: dict[str, Any] | None) -> tuple[dict[str, list[int]], lis
     hidden = any(
         isinstance(t, dict)
         and t.get("page") in kept
-        and int(t.get("invisible_chars") or 0) + int(t.get("covered_chars") or 0) >= HIDDEN_FEW
+        and sum(int(t.get(key) or 0) for key in ("invisible_chars", "covered_chars", "unseen_chars"))
+        >= HIDDEN_FEW
         for t in data.get("page_types") or []
     )
     return {r: sorted(set(p)) for r, p in by_reason.items()}, sorted(handwriting), hidden

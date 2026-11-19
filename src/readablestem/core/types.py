@@ -1081,6 +1081,10 @@ class PageType(BaseModel):
     visible_chars: int = Field(default=0, ge=0)
     invisible_chars: int = Field(default=0, ge=0)
     covered_chars: int = Field(default=0, ge=0)
+    # Painted where nobody can see it (under 2 pt, or flat on the page): left out like the two
+    # above, but no sign of a text layer from a scan. Not written when 0, and 0 in a record
+    # stored before it was kept.
+    unseen_chars: int = Field(default=0, ge=0, exclude_if=lambda v: not v)
     image_coverage: float = Field(default=0.0, ge=0.0, le=1.0)
     ink_strokes: int = Field(default=0, ge=0)
     ink_rows: int = Field(default=0, ge=0)
@@ -1098,6 +1102,11 @@ class PageType(BaseModel):
     @property
     def untrusted_chars(self) -> int:
         return self.invisible_chars + self.covered_chars
+
+    @property
+    def left_out_chars(self) -> int:
+        """Every character of the page's text layer that was left out: what the notice counts."""
+        return self.untrusted_chars + self.unseen_chars
 
 
 class OmittedPage(BaseModel):

@@ -596,6 +596,7 @@ class PageTypeResult:
             visible_chars=self.text.visible_chars,
             invisible_chars=self.text.invisible_chars,
             covered_chars=self.text.covered_chars,
+            unseen_chars=self.text.unseen_chars,
             image_coverage=round(self.image_coverage, 3),
             ink_strokes=self.ink.strokes,
             ink_rows=self.ink.rows,

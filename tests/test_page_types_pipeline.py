@@ -483,6 +483,15 @@ def test_a_course_pdf_with_kept_pages_is_reported_and_decided_once_per_reason(en
     assert "Needs your decision (2)" in listing
 
 
+def test_the_review_screen_counts_unseen_text_on_a_kept_page_as_the_notice_does(env):
+    with pymupdf.open(HANDWRITING / "mixed_course.pdf") as doc:
+        doc[1].insert_text((72, 700), "A" * 30, fontsize=1.2)  # painted, under 2 pt: nobody sees it
+        job_id = job_id_from(upload(env.browser, doc.tobytes(), filename="course.pdf"))
+    assert _worker(env).run_once() == job_id
+    split = text_of(env.browser.get(f"/jobs/{job_id}/review").text)
+    assert "Hidden text in the PDF" in split and "82 characters" in split
+
+
 def test_one_click_keeps_every_page_of_the_group(env):
     job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
     _worker(env).run_once()
