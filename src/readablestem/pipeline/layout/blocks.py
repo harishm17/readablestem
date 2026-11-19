@@ -1886,6 +1886,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and len(text) <= MAX_BOLD_HEADING_CHARS
         and letters >= 2
         and _title_like(text)
+        and not (rows[0].marker is not None and not rows[0].marker.ordered)  # a bold bullet item
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif upright and len(rows) == 1 and _lettered_title(rows[0]):
