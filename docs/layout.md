@@ -14,7 +14,7 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048, tag_dpi=False) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped; `tag_dpi` writes the resolution into the PNG header (equation crops for the student file, `pipeline/equation_scale.py`) |
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
-| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span color and size, for the text pass |
+| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space), span color and size, and its face's weight, slant and pitch, for the text pass |
 | `page_strikes(page) -> list[Strike]` | thin horizontal rules and bars, and StrikeOut annotation quads, of an open page (display space), for the text pass |
 | `heading_step.heading_fixes(elements) -> list[Fix]` | one `HeadingFix` per heading, outline repaired, with checks and confidence |
 | `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour, runs) -> TextPassResult` | the elements with links, color runs, struck runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
@@ -2408,8 +2408,8 @@ markers are left out of the text side). The alignment is monotonic, so a dehyphe
 word, an extra glyph from another block inside a merged box or an inline equation's
 glyphs only leave characters unplaced; an unplaced character never starts or ends a link
 or a color run on its own. Alignment runs only for elements a link rectangle touches,
-and (with color on) for elements that have glyphs in a run color; text over 20,000
-characters is not aligned.
+and for elements that have glyphs in a run color, a style (bold, italic or fixed pitch) or
+a strike; text over 20,000 characters is not aligned.
 
 A link covers the characters whose glyph box is at least half inside its rectangle
 (`MIN_GLYPH_OVERLAP`), so a rectangle that grazes the next word does not take it. Offsets
@@ -2567,6 +2567,29 @@ in blue", "highlighted in yellow", "the green curve", "red arrows") on or within
 paragraphs of colored text on the same page gets the optional notice
 `colour_reference`. With the flag off there are no runs and no such notices.
 
+### Bold, italic and fixed-pitch words (F-510, `CONTENT_RUNS`)
+
+Each glyph the text pass reads carries its face's weight, slant and pitch (`Glyph.bold`,
+`italic` and `mono`, set once per span by `glyphs.face_traits`: the tests `_Char` makes for
+`Element.bold` and the mono share of a code line, the font's flags then its name; a face
+in a math font has none, so a variable or a bold vector in CMMI or CMMIB is never emphasis).
+The pass makes no second read: the page's glyphs are read once, on every page, for color,
+links, strikes and these runs. For a paragraph or list item, `text_pass.style_runs` maps each
+style onto the text the way it maps color (`labelled_runs`, `across_markers=False`, so a run
+stops at an inline equation) and writes a `strong`, `emphasis` or `code` run for each
+stretch, trimmed of spaces and only with a letter or a digit in it. Three rules keep it from
+inventing emphasis:
+
+- a style that covers 70% or more of the element's placed characters is the block's own
+  style (a paragraph set in italic, a bold caption), and makes no run (`STYLE_SHARE`);
+- one italic letter is not a run: it is a variable the equation path left in the text, and
+  the letters it took are inline-equation markers, which are never placed on a glyph;
+- a PDF with no italic face has no italic glyph, so it has no italic runs. Slant is not
+  guessed from geometry.
+
+Headings, program code (`preformatted`) and glossary entries get none; `Element.bold` stays the
+whole-line evidence heading detection uses. Corpus counts (996 files) are in the changelog.
+
 ### Struck text (F-509, `CONTENT_RUNS`)
 
 Text struck through on the page is kept and marked as a `deleted` run (`Element.runs`), so
@@ -2586,8 +2609,7 @@ A rule under the text (an underline) or under a blank ("Name: ____") crosses no 
 that band and strikes nothing (`baseline_rules.classify`, below). Struck glyphs become runs the same way as color
 (`labelled_runs`, across inline markers), kept only with a letter, a digit or math in them,
 on paragraphs, list items and headings. Each element with runs gets the optional notice
-`struck_text` (with its page; no required decision). Glyphs are now read on any page with a
-strike mark, not only on pages with links or color.
+`struck_text` (with its page; no required decision). Glyphs are read on every page.
 
 Two checks beyond the band rule, both in `text_pass`. A drawn mark that would strike text must
 also show on the page (`drawn_strikes`): a strip of the page along it is rendered (8 pixels to

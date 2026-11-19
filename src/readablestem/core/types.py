@@ -518,8 +518,10 @@ class ScriptRun(_Span):
 # around it (`pipeline.inline_text`). "blank": a gap to fill in, written in text as underscores
 # (typed, or drawn under a gap: `layout._mark_blanks`), and "checkbox": a printed box
 # (U+2610 and its checked forms); both are written with words that say what they are.
-# Later kinds (strong, emphasis, ...) are new values here, not new fields.
-RunKind = Literal["deleted", "blank", "checkbox"]
+# "strong", "emphasis" and "code": words the page sets in bold, in italic or in a fixed-pitch
+# face inside a paragraph or list item (`<strong>`, `<em>`, `<code>`; `text_pass.style_runs`).
+# Later kinds are new values here, not new fields.
+RunKind = Literal["deleted", "blank", "checkbox", "strong", "emphasis", "code"]
 
 
 class Run(_Span):

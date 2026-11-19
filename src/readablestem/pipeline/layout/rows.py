@@ -38,6 +38,7 @@ from readablestem.pipeline.layout.glyphs import (
     _TEXT_MAP,
     _Char,
     _font_traits,
+    face_traits,
     glyph_style,
     mark_greek_words,
 )
@@ -1055,6 +1056,10 @@ class Glyph:
     rgb: tuple[int, int, int]  # the span's fill colour, sRGB
     size: float = 0.0  # the span's font size in points (0: not known)
     baseline: float = 0.0  # y of the glyph's origin (`baseline_rules.classify`)
+    # The face's weight, slant and pitch (`face_traits`), for the runs of emphasis.
+    bold: bool = False
+    italic: bool = False
+    mono: bool = False
 
 
 def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
@@ -1078,11 +1083,13 @@ def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
                 colour = int(span.get("color") or 0) & 0xFFFFFF
                 rgb = ((colour >> 16) & 0xFF, (colour >> 8) & 0xFF, colour & 0xFF)
                 size = float(span.get("size") or 0.0)
+                traits = face_traits(str(span.get("font") or ""), int(span.get("flags") or 0))
                 for ch in span["chars"]:
                     c = ch["c"].translate(_TEXT_MAP)
                     if c and not c.isspace():
                         origin = display.point(*ch["origin"])
-                        glyphs.append(Glyph(c[0], display.box(ch["bbox"]), rgb, size, origin[1]))
+                        box = display.box(ch["bbox"])
+                        glyphs.append(Glyph(c[0], box, rgb, size, origin[1], *traits))
     return glyphs
 
 

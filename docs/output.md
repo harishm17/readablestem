@@ -1163,9 +1163,10 @@ written in the body color, as in pipeline 0.3.0.
 
 Text whose look changes its meaning is kept as a run of the element's text
 (`Element.runs`, `core/types.Run`), offsets into the stored text like links and color
-runs. Three kinds exist: `deleted`, text struck through on the page ("The midterm is
-on ~~October 3~~ October 10"), and `blank` and `checkbox`, a blank to fill in and a printed
-or form check box (below). Bold, italic and highlighted text are not runs yet; they are
+runs. Six kinds exist: `deleted`, text struck through on the page ("The midterm is
+on ~~October 3~~ October 10"), `blank` and `checkbox`, a blank to fill in and a printed
+or form check box (below), and `strong`, `emphasis` and `code`, bold, italic and fixed-pitch
+words inside a paragraph or list item (below). Highlighted text is not a run yet; it is
 written as plain text.
 
 A struck run is kept, never removed, and written as `<del>` with the words said around it:
@@ -1187,7 +1188,7 @@ del { text-decoration-line: line-through; text-decoration-thickness: 0.1em;
 ```
 
 A text decoration is drawn in the text's own color, so it stays in forced-colors mode and
-on the dark page. Nesting, outermost first: link, struck, color, raised or lowered. A struck
+on the dark page. Nesting, outermost first: link, struck, color, style, raised or lowered. A struck
 run is outside color so that a color change inside it never cuts it in two (a cut run would
 be said twice); a link stays outermost so it is never cut. A struck run may cover an inline
 equation (the hidden words go around the math).
@@ -1208,6 +1209,33 @@ no required decision): the instructor may want to take out words students no lon
 A text edit that changes struck words takes the run off, and the edit's message counts it
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
 last run.
+
+### Bold, italic and fixed-pitch words (F-510)
+
+Words a PDF sets in bold, in italic or in a fixed-pitch face inside a paragraph or list item
+are runs of kind `strong`, `emphasis` and `code`, written as `<strong>`, `<em>` and `<code>`:
+
+```html
+<p id="p1-e0">Please <strong>do not open</strong> the exam until told, and read <em>Moby
+  Dick</em> soon, then <strong><em>both at once</em></strong>.</p>
+```
+
+They add markup and no words, so a screen reader that announces emphasis says it and one that
+does not says the same words as before; the output audit and the say-once check count the
+same words. Nesting, outermost first: link, struck, color, `<strong>`, `<em>`, `<code>`, raised
+or lowered. The text is cut at every edge of every run and each piece is wrapped in the tags of
+the runs that cover it, so any mix of links, color, struck text, raised text and bold and
+italic nests: a run that crosses a link's edge is two tags, one in the link and one outside. Bold
+and italic may overlap each other and code. An inline equation or a blank is never inside a
+style tag (a run that reaches one is written in two pieces round it). Headings get no style
+runs (a heading is bold as a whole), nor does program code (`<pre>`) or a glossary entry.
+A document with fixed-pitch words gets one rule, added only then (`code`, 0.9 em, a
+fixed-pitch stack). Word keeps bold, italic and a "Verbatim Char" style for code; EPUB, Canvas
+and Listen are written from the same HTML. A text edit moves the runs with the words that did
+not change and takes off those whose words did, without a message (it is only the look of
+the words). Runs come from the text pass (docs/layout.md "Bold, italic and fixed-pitch
+words"); a Word or LaTeX source has none yet. `CONTENT_RUNS` off finds and counts them
+(`strong_runs`, `emphasis_runs`, `code_runs` in the trace) and writes none.
 
 ### What the reviewers wrote on the page (F-541)
 

@@ -363,14 +363,14 @@ def embedded_files(doc: pymupdf.Document) -> tuple[list[str], int]:
         return [], 0
 
 
-def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText:
+def read_pdf(pdf_bytes: bytes, pages: Iterable[int]) -> PdfText:
     """/Lang, links and glyphs of the analysed pages (0-based).
 
-    Glyphs are read only where they are needed: pages with links, pages with a mark that may
-    strike text through, and every page when colour runs are on. `layout.analyze` has
-    already rendered these pages in its crash probe, so reading them in this process is
-    safe; PyMuPDF is not thread-safe, so this holds layout's lock like every other PyMuPDF
-    call. Raises whatever PyMuPDF raises.
+    Glyphs are read on every page: they carry the colour, weight, slant and pitch of each
+    character (`style_runs`, `colour_runs`), where links and strikes need them too.
+    `layout.analyze` has already rendered these pages in its crash probe, so reading them in
+    this process is safe; PyMuPDF is not thread-safe, so this holds layout's lock like every
+    other PyMuPDF call. Raises whatever PyMuPDF raises.
     """
     wanted = sorted(set(pages))
     found = PdfText()
@@ -402,8 +402,7 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
                     if links:
                         found.links[number] = links
                     strikes = layout.page_strikes(doc[number])
-                    if colour or links or strikes:
-                        found.glyphs[number] = layout.page_glyphs(doc[number])
+                    found.glyphs[number] = layout.page_glyphs(doc[number])
                     if strikes:
                         strikes = drawn_strikes(doc[number], strikes, found.glyphs[number])
                     if strikes:
@@ -1054,6 +1053,56 @@ def colour_runs(
     return _without(runs, links, element.text or "")
 
 
+# A style that covers this share of an element's characters or more is the block's own style
+# (a paragraph set in italic, a bold caption), not emphasis inside it.
+STYLE_SHARE = 0.7
+# The glyph trait of each style run kind, in the order the runs are listed.
+STYLE_TRAITS = (("strong", "bold"), ("emphasis", "italic"), ("code", "mono"))
+
+
+def style_runs(element: Element, aligner: _Aligner) -> list[Run]:
+    """The element's bold, italic and fixed-pitch words as runs (`strong`, `emphasis`,
+    `code`; offsets into its text), from the weight, slant and pitch of the characters printed
+    there (`Glyph`). A style that covers `STYLE_SHARE` of the element's placed characters is
+    the block's own and makes no run, a run never contains an inline-equation marker (the
+    equation owns the letters it took as variables) and one italic letter is not a run (a
+    variable the equation path left in the text), and a run is kept only when it has a letter
+    or a digit. A PDF with no italic face has no italic glyph, so it has no italic runs.
+    A code block and a glossary entry (written as a term and a definition) get none."""
+    text = element.text or ""
+    if element.preformatted or element.term_end is not None or not text:
+        return []
+    candidates = aligner.glyphs_in(element)
+    if not any(g.bold or g.italic or g.mono for g in candidates):
+        return []
+    glyphs, alignment = aligner.of(element)
+    placed = [i for i in alignment if i is not None]
+    found: list[Run] = []
+    for kind, trait in STYLE_TRAITS:
+        if not (count := sum(getattr(glyphs[i], trait) for i in placed)):
+            continue
+        if count >= STYLE_SHARE * len(placed):
+            continue
+        spans = labelled_runs(
+            text,
+            alignment,
+            lambda i, trait=trait: True if getattr(glyphs[i], trait) else None,
+            across_markers=False,
+        )
+        for start, end, _ in spans:
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
+            piece = text[start:end]
+            if not any(c.isalnum() for c in piece):
+                continue
+            if kind == "emphasis" and len(piece) == 1:
+                continue  # one italic letter is a variable the equation path left in the text
+            found.append(Run(start=start, end=end, kind=kind))
+    return sorted(found, key=lambda r: (r.start, r.end))
+
+
 def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> list[Notice]:
     """`colour_reference` for running text that names a colour, on or near coloured text
     (the same element, or one of the `COLOUR_REFERENCE_REACH` before or after it on the
@@ -1449,6 +1498,8 @@ class TextPassResult:
     annotations: int = 0
     # Struck runs found, whether or not they were written (CONTENT_RUNS off: shadow).
     deleted_runs: int = 0
+    # Bold, italic and fixed-pitch runs found, by kind, whether or not they were written.
+    style_runs: dict[str, int] = field(default_factory=dict)
 
     def counts(self) -> dict[str, int]:
         """Content-free numbers for the trace."""
@@ -1460,6 +1511,9 @@ class TextPassResult:
             "colour_runs": sum(len(e.colour_runs) for e in self.elements),
             "deleted_runs": self.deleted_runs,
             "deleted_runs_written": sum(r.kind == "deleted" for e in self.elements for r in e.runs),
+            "strong_runs": self.style_runs.get("strong", 0),
+            "emphasis_runs": self.style_runs.get("emphasis", 0),
+            "code_runs": self.style_runs.get("code", 0),
             "blanks": sum(r.kind == "blank" for e in self.elements for r in e.runs),
             "checkboxes": sum(r.kind == "checkbox" for e in self.elements for r in e.runs),
             "passages": sum(1 for e in self.elements if e.lang),
@@ -1553,6 +1607,10 @@ def annotate(
             continue
         if found_struck := deleted_runs(element, aligner, strikes, inline_equations):
             struck[element.id] = found_struck
+    styled: dict[str, list[Run]] = {}
+    for element in elements:
+        if element.kind in RUNNING_KINDS and element.text and (own := style_runs(element, aligner)):
+            styled[element.id] = own
     lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang, chosen_lang)
     langs = passages(elements, lang)
     updated = []
@@ -1563,6 +1621,7 @@ def annotate(
         if element.id in coloured:
             update["colour_runs"] = coloured[element.id]
         marked = [*(struck[element.id] if runs and element.id in struck else [])]
+        marked += styled[element.id] if runs and element.id in styled else []
         if element.kind in LINK_KINDS:
             marked += token_runs(element, pdf.fields.get(element.page, ()))
         if marked:
@@ -1592,8 +1651,15 @@ def annotate(
         notices.append(Notice(code="form_fields", count=form, review="none"))
     notices.extend(lang_notices)
     found = sum(len(r) for r in struck.values())
+    style_counts = Counter(r.kind for found_styled in styled.values() for r in found_styled)
     return TextPassResult(
-        updated, lang, source, notices, annotations=pdf.annotations, deleted_runs=found
+        updated,
+        lang,
+        source,
+        notices,
+        annotations=pdf.annotations,
+        deleted_runs=found,
+        style_runs=dict(style_counts),
     )
 
 
@@ -1618,7 +1684,7 @@ def apply(
     pass itself leaves the elements as they were, with the language layout reported.
     """
     try:
-        pdf = read_pdf(pdf_bytes, pages, colour=colour)
+        pdf = read_pdf(pdf_bytes, pages)
     except Exception as exc:  # a reading problem never fails the conversion
         log.warning("text pass could not read the PDF: %s", type(exc).__name__)
         pdf = PdfText()

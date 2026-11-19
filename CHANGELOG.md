@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: bold, italic and fixed-pitch words are carried (branch feat/styled-runs)
+
+- SW51b (reduced), F-510. Bold, italic and fixed-pitch words in a paragraph or list item were
+  dropped everywhere ("Do not open the exam" reached the student as plain words). They are now
+  runs of three new kinds, `strong`, `emphasis` and `code` (`RunKind`), written as `<strong>`,
+  `<em>` and `<code>` in the page, EPUB, Canvas and Listen and as bold, italic and Word's
+  "Verbatim Char" style in Word. The runs come from the characters the text pass already reads
+  (`Glyph` gains `bold`, `italic` and `mono`, from `glyphs.face_traits`, the tests layout makes
+  for `Element.bold` and its mono share; a face in a math font has none), computed in
+  `text_pass.style_runs` with the color runs: no second read of the page, no later pass. A style
+  that covers 70% or more of an element is the block's own style and makes no run; a run stops
+  at an inline equation; one italic letter is a variable, not emphasis; a PDF with no italic face
+  has no italic runs. Headings, program code and glossary entries get none. Glyphs are now read
+  on every page.
+- The writer cuts the text at every edge of every run and wraps each piece in the tags of the
+  runs that cover it (`inline_text._styled`): link, struck, color, `<strong>`, `<em>`, `<code>`,
+  raised or lowered, so any mix nests; an equation or a blank is never inside a style tag.
+- A text edit moves the runs with the words that did not change and takes off the others, with
+  no message. The trace counts `strong_runs`, `emphasis_runs` and `code_runs`; with
+  `CONTENT_RUNS` off they are counted and not written. A stored result with these runs does
+  not load in the release before this one (`RunKind` is a closed list there: a validation
+  error), so the release that reads them runs everywhere before one is stored; a result
+  without them is unchanged.
+- No migration; no model request, `PIPELINE_VERSION` or `RENDER_VERSION` changed (a stored
+  document shows the runs after its next conversion or its next render with a raised version).
+
 ## Unreleased: every form is answered once (branch feat/forms-stage-2)
 
 - SW43, stage 2. The forms that were still plain tags now follow the one submit rule: the

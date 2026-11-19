@@ -171,6 +171,11 @@ pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, mono
   pre, pre code { overflow: visible; white-space: pre-wrap; overflow-wrap: anywhere; }
 }
 """
+# Words in a fixed-pitch face inside a paragraph (`<code>` not in a `<pre>`), a little smaller
+# than the text so the line keeps its height (the rule of `pre code` above is more specific).
+INLINE_CODE = """\
+code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
+"""
 DEFINITIONS = """\
 dl { margin: 0 0 1em; }
 dt { margin-top: 0.75em; }

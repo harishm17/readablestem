@@ -252,6 +252,18 @@ class _Char:
         return bool(_REGULAR_FACE.match(self.font.split("+", 1)[-1].replace(" ", "")))
 
 
+@lru_cache(maxsize=1024)
+def face_traits(font: str, flags: int) -> tuple[bool, bool, bool]:
+    """(bold, italic, monospaced) of a face for the runs of emphasis (`text_pass.style_runs`),
+    by the tests `_Char` makes of a glyph (the font's flags, then its name). A letter set in a
+    maths font is a variable or a symbol, not emphasis (the equation path owns it), so such a
+    face has none."""
+    if _font_traits(font)[2]:
+        return False, False, False
+    face = _Char(" ", 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, font, flags)
+    return face.bold, face.italic, face.mono
+
+
 def _greek_letter(c: str) -> bool:
     """A letter of the Greek script, accented ones included (U+0370 to U+03FF, U+1F00 to U+1FFF)."""
     return (0x370 <= ord(c[0]) <= 0x3FF or 0x1F00 <= ord(c[0]) <= 0x1FFF) and c.isalpha()
