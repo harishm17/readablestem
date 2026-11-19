@@ -33,6 +33,8 @@ cross-references", "Language", "Coloured text"):
   that overlap are one run, the earliest. An inline equation is never inside one (a run
   that reaches a marker is written in two pieces around it), and neither is a blank or a
   checkbox.
+  A kept line end (`Element.runs`, kind "break": a poem's line, an address line) is the one
+  space it covers, written as `<br>` in its place, inside whatever else covers it.
 - `passage_attrs`: ` lang="..."` on the element's own block (`<p>`, `<li>`, `<h2>`...)
   when `Element.lang` is set.
 
@@ -153,6 +155,7 @@ class _Segment:
     script: str | None = None  # "sup" or "sub" when this piece is a raised or lowered run
     deleted: bool = False  # inside struck text
     token: int | None = None  # index of the blank or checkbox run this piece is
+    line_end: bool = False  # the space of a kept line end, written as `<br>`
     styles: tuple[str, ...] = ()  # the style kinds ("strong", ...) that cover this piece
 
 
@@ -185,6 +188,7 @@ def render_inline_text(
     scripts: list[ScriptRun] = []
     struck: list[Run] = []
     tokens: list[Run] = []
+    line_ends: list[Run] = []
     styled: dict[str, list[Run]] = {}
     if element is not None:
         found = inline.spans(element)
@@ -197,12 +201,15 @@ def render_inline_text(
             runs = _usable(found.colours, text, markers)
         struck = _usable([r for r in found.runs if r.kind == "deleted"], text, markers)
         tokens = _usable([r for r in found.runs if r.kind in TOKEN_KINDS], text, markers)
+        line_ends = [r for r in found.runs if r.kind == "break" and text[r.start : r.end].isspace()]
         for kind in STYLE_TAGS:
             if mine := _usable([r for r in found.runs if r.kind == kind], text, markers):
                 styled[kind] = mine
-    if not links and not runs and not scripts and not struck and not tokens and not styled:
+    if not (links or runs or scripts or struck or tokens or styled or line_ends):
         return _plain(text, placed)
-    segments = _segments(text, placed, [k for k, _ in links], runs, scripts, struck, tokens, styled)
+    segments = _segments(
+        text, placed, [k for k, _ in links], runs, scripts, struck, tokens, styled, line_ends
+    )
     for rgb in sorted({s.colour for s in segments if s.colour is not None}):
         if add_style is not None:
             add_style(f"colour-{colour_class(rgb)}", student_sheet.colour(colour_class(rgb), rgb))
@@ -240,6 +247,7 @@ def _segments(
     struck: Sequence[Run] = (),
     tokens: Sequence[Run] = (),
     styled: Mapping[str, Sequence[Run]] | None = None,
+    line_ends: Sequence[Run] = (),
 ) -> list[_Segment]:
     """The text cut at every marker, link and run edge, each piece with what covers it."""
     styled = styled or {}
@@ -252,6 +260,7 @@ def _segments(
         *scripts,
         *struck,
         *tokens,
+        *line_ends,
         *(r for v in styled.values() for r in v),
     ):
         cuts |= {span.start, span.end}
@@ -286,7 +295,10 @@ def _segments(
                 if any(r.start <= start and end <= r.end for r in styled.get(kind, ()))
             )
         )
-        segments.append(_Segment(start, end, maths, link, colour, script, deleted, token, styles))
+        line_end = maths is None and any(r.start <= start and end <= r.end for r in line_ends)
+        segments.append(
+            _Segment(start, end, maths, link, colour, script, deleted, token, line_end, styles)
+        )
     return segments
 
 
@@ -328,6 +340,8 @@ def _inner(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) 
             i = j
         elif seg.maths:
             out.append(seg.maths)
+        elif seg.line_end:
+            out.append("<br>")
         elif seg.script:
             tag = seg.script
             following = segments[i + 1] if i + 1 < len(segments) else None

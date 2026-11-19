@@ -353,11 +353,11 @@ no network, no model.
 | Element | Converted | Not converted (ABSTAINED, FAILED, REJECTED, no fix) |
 |---|---|---|
 | Heading | `<h1>`-`<h6>` from the heading fix (with an `id`, and an entry in the contents list, see "Navigation") | `<p>` with the original text; a bold line a reviewer rejected ("Make them bold text") is `<p><strong>`, bold as in the PDF |
-| Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
+| Paragraph | `<p>`, inline equations placed at their markers; a line end the page keeps (a poem, an address: a `break` run, docs/layout.md "Kept line ends") is `<br>` | (no fix) |
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
-| Program code (T2-16) | `<pre><code>` with the lines and indentation as printed, no highlighting; a block with a line over 24 characters (it first scrolls at 30 at 320 px, at 25 with WCAG text spacing) is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
+| Program code (T2-16), algorithm steps (WS2.6) | `<pre><code>` with the lines and indentation as printed, no highlighting (an algorithm's inline equations are written as math inside the `<code>`; in the Word file such a block is lines of a paragraph, its indentation no-break spaces); a block with a line over 24 characters (it first scrolls at 30 at 320 px, at 25 with WCAG text spacing) is `tabindex="0" role="group" aria-label="Program code"` so it can be scrolled by keyboard | (no fix) |
 | Glossary entries (T2-16) | consecutive entries as one `<dl>`: the term in `<dt><strong>`, the definition in `<dd>` (see docs/layout.md "Glossary entries") | (no fix) |
 | Contents page (T2-17) | a list (`<ul>`, nested by indent) of the entries' titles, each a link to the heading it names when there is one; no dot leaders, no page numbers | (no fix) |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure not described", plus a note; also a figure only the model calls decorative (`data-reason="decoration_unproven"`, see "Decoration") |

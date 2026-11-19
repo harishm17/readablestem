@@ -293,6 +293,25 @@ def test_a_file_that_lacks_an_equation_is_refused(tmp_path):
     assert error.value.code == "equations"
 
 
+def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
+    """A poem's `<br>` is a line break; an algorithm (a code block with a formula in a step)
+    is lines of a paragraph with its indentation, and its formula an Office equation."""
+    html = (
+        '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
+        "<p>Whose woods these are<br>His house is in the village</p>"
+        "<pre><code>for each word do\n  if x then\n    <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
+        "\n  end if\nend for</code></pre></main></body></html>"
+    )
+    export = ed.export_docx(html)
+    assert export.equations == 1
+    with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
+        xml = archive.read("word/document.xml").decode()
+    assert len(re.findall(r"<w:br ?/>", xml)) == 5  # one in the poem, four between the steps
+    assert "\N{NO-BREAK SPACE}" * 4 + "<m:oMath>" in xml.replace(
+        "</w:t></w:r><m:oMath>", "<m:oMath>"
+    )
+
+
 def test_one_equation_pandoc_cannot_write_does_not_fail_the_file():
     """F-502: a bold `"` (an instructor's edit) makes pandoc leave raw TeX in the text, and an
     empty `<math>` leaves nothing. The file is made; each such equation is words in its place

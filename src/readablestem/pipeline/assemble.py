@@ -1281,14 +1281,17 @@ class _Renderer:
 
     def code_block(self, element: Element, text: str) -> str:
         """Program code as `<pre><code>`: its lines and indentation as printed, no
-        highlighting. A long line scrolls inside the block (WCAG 1.4.10), and a block with
-        a line wider than a phone screen is a tab stop, so a keyboard user can scroll it
-        (axe `scrollable-region-focusable`), named "Program code" for the focus."""
+        highlighting; the maths in an algorithm's step stays maths. A long line scrolls
+        inside the block (WCAG 1.4.10), and a block with a line wider than a phone screen
+        is a tab stop, so a keyboard user can scroll it (axe `scrollable-region-focusable`),
+        named "Program code" for the focus."""
         self.add_style("code", student_sheet.CODE)
         wide = max((len(line) for line in text.split("\n")), default=0) > CODE_WIDE_CHARS
         stop = ' tabindex="0" role="group" aria-label="Program code"' if wide else ""
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
-        return f"<pre{attrs}{stop}><code>{_escape(text.strip(chr(10)))}</code></pre>"
+        body = text.strip(chr(10))
+        shown = self.rich(body) if INLINE_MARKER_RE.search(body) else _escape(body)  # algorithms
+        return f"<pre{attrs}{stop}><code>{shown}</code></pre>"
 
     def definitions(self, entries: list[Element]) -> str:
         """Glossary entries (`Element.term_end`) as one definition list: the term in a

@@ -1824,6 +1824,72 @@ list of fewer than six lines whose numbers do not stand at one edge, a list on a
 it, a title that wraps onto a second line with the number on the second, and a two-column
 page (the columns are not known when tables are claimed).
 
+### Kept line ends, the abstract and algorithms (SW53 a and e, WS2.6, F-261)
+
+**Kept line ends (SW53 a).** A paragraph joins its lines with a space. A poem, an address
+or a list of short statements needs its line ends, so a paragraph of at least
+`KEPT_MIN_LINES` (3) lines keeps them when every line but the last starts at one left edge
+(within `KEPT_LEFT_SPREAD` 1 em) and stops at least `KEPT_SHORT_BY` (8) em short of the right
+edge its column's text reaches (`_RightEdges`, the edge a quarter of the lines reach), none
+ending in a broken word (`_keeps_lines`, set on `_Block.lines` in `_page_blocks`). A paragraph
+that wraps runs to the edge in every line but the last, a centered line starts each line
+elsewhere, and a slide deck's text box is not measured by its page's edge (slide decks are
+left out), so none of them is one. Two more guards come from the corpus: justified text in a
+column narrower than the edge measured (a two-column page, a text box beside a figure) has at
+least `KEPT_JUSTIFIED` (60%, and two) of its lines ending at one place (within
+`KEPT_SAME_END`, 0.3 em), and a narrow ragged paragraph wraps in mid-sentence, so when at
+least `KEPT_WRAPPED` (25%) of its line ends have no stop (`KEPT_STOPS`: . ? ! : ; ) and
+closing quotes) with a lower-case letter starting the next line, it is a paragraph. It is stored as a `Run` of kind `break` on the single
+space that joins two lines (`script_marks.LINE_END`, a private-use mark put in the text by
+`_append_row` and taken out, with its offset, by `script_marks.split_lines`); the writer
+puts `<br>` there (`inline_text`), and Listen already pauses at a `<br>`. A block that keeps
+its line ends is not joined with the block after a page or column break (`_goes_on`). Not
+read: a poem alone on its page (no line reaches a right edge, so none is "short"), and a
+paragraph of one or two short lines. `break` runs are moved with their space by a page edit
+and dropped when the space is (`web/page_edits.remap_spans`, `core/inline`).
+
+**The abstract (SW53 e).** A single line that says "Abstract" (or "Abstract.", "Abstract:")
+and nothing else, in bold or centered in its column (at least 2 em in from the column's
+left edge, within 1 em of its middle), is a heading with the reason `abstract label`
+(`_label_abstracts`). A heading step reads that reason as strong evidence (confidence
+0.88, like a numbered heading), and `heading_levels` gives it the level under the title (2
+when the document has a heading set larger than the body, else 1). "Abstract" at the start
+of a sentence or run in before its text is not one. A line that begins "Keywords:", "Key
+words -" or "Index Terms -" starts a block of its own (`_KEYWORDS_LINE`, in `_runs`). There
+are no roles and no `keywords` role.
+
+**Algorithms (WS2.6 b).** The lines under a line that opens "Algorithm 2" are read as one
+block, `Element.preformatted`, when at least `ALGORITHM_MIN_ROWS` (3) of them follow, at
+least `ALGORITHM_MIN_WORDS` (2) of them begin with a step word (for, if, else, while, repeat,
+until, end, return, input, output, require, ensure, function, procedure, do, then ...),
+each line in one column and one size and within 2.2 lines of the one above (`_algorithm_groups`).
+A line belongs to the block if it begins with a step word, holds an assignment ("count = 0",
+"c <- 0", `:=`), is a line of math, or starts further right than the first step; the first
+line that is none of these ends the block. The caption stays a block of its own. The text has
+one line to a step and the step's indent level (its distance from the leftmost step in units
+of the smallest step between two left edges) as `ALGORITHM_INDENT` (2) spaces per level
+(`_indents`, `_paragraph_pieces`). Unlike program code its inline math stays math: a math
+row inside it becomes text, the formulas in it are inline equations as in any paragraph, and
+`assemble.code_block` writes them with the equation markup. In the Word file a code block
+that holds an equation is written as lines of a paragraph (pandoc would flatten the
+equation to its characters), the indentation as no-break spaces (`export_docx._lines_of`).
+Not read: an algorithm set under a rule only (no "Algorithm n" line), line numbers beside
+the steps (they make every step start at one edge, so the indentation is lost), and a step
+that wraps to a second line at the left edge.
+
+**Monospaced quotations (WS2.6 c).** A block of monospaced lines that has none of the
+punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier followed by
+`(`, an option such as ` -x`, `//`, `->`), has no line that ends in ":" over a body set
+further right, has at least `QUOTATION_MIN_WORDS` (8) words and a sentence ending in a full
+stop, comma, question mark or exclamation mark is prose, not code (`_is_quotation`). A shell
+command, a name or a short snippet stays code.
+
+**Code joined across prose (WS2.6 a), not built.** Monospaced lines already make one code
+block with their printed indentation (`preformatted`). Joining two listings that only a
+caption or a comment sets apart was measured on the corpus before it was built: of the 37
+places where prose sits between two listings, every one introduces the next listing ("The
+output is:"), so joining them would have made one block of two. The two stay two blocks.
+
 ### Tagged PDFs (T2-18, `pipeline/tagged.py`)
 
 A PDF exported from Word or PowerPoint with tags carries a structure tree. Read once after

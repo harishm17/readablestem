@@ -217,6 +217,45 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         assert "1 link and 1 struck-text mark were taken off" in unescape(page)
 
 
+def test_a_kept_line_end_is_written_as_br_and_moves_with_its_words(tmp_path):
+    output = edit_output()
+    paragraph = next(e for e in output.result.elements if e.id == PLAIN)
+    paragraph.text = "Discuss vectors and scalars with the class"
+    first = paragraph.text.index(" vectors")
+    second = paragraph.text.index(" with")
+    paragraph.runs = [
+        Run(start=first, end=first + 1, kind="break"),
+        Run(start=second, end=second + 1, kind="break"),
+    ]
+    older = output.result.elements[0]  # a stored element that has no runs at all
+    assert not older.runs
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        html = with_file(env).html or ""
+        assert "Discuss<br>vectors and scalars<br>with the class" in html
+        assert "<br>" not in html.split("Discuss<br>")[0]  # the older elements: no line ends
+        # The words before the first line end change: both line ends stay at their spaces.
+        done = edit_post(env, PLAIN, action="text", text=paragraph.text.replace("Discuss", "Talk"))
+        assert done.status_code == 303
+        kept = element(env, PLAIN)
+        assert [(kept.text or "")[r.start : r.end] for r in kept.runs if r.kind == "break"] == [
+            " ",
+            " ",
+        ]
+        assert "Talk<br>vectors and scalars<br>with the class" in (with_file(env).html or "")
+        # The space that holds a line end is taken out: that line end goes, the other stays.
+        done = edit_post(env, PLAIN, action="text", text="Talkvectors and scalars with the class")
+        assert done.status_code == 303
+        assert len([r for r in element(env, PLAIN).runs if r.kind == "break"]) == 1
+        assert (with_file(env).html or "").count("<br>") == 1
+
+
 def test_a_glossary_entry_loses_its_term_when_the_term_is_changed(edits):
     assert (
         edit_post(edits, ENTRY, action="text", text="Scalar a quantity with size only").status_code

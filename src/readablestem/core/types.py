@@ -534,8 +534,13 @@ class ScriptRun(_Span):
 # face inside a paragraph or list item (`<strong>`, `<em>`, `<code>`; `text_pass.style_runs`).
 # "highlight": words the page marks with a highlight annotation or a filled rectangle behind
 # them in a colour of their own (`<mark>`; `text_pass.highlight_runs`).
+# "break": a line end the page keeps (a poem, an address), one run over the space that stands
+# there in `text`, written as `<br>` in its place (`pipeline.inline_text`). It moves with its
+# space when a reviewer edits the words and is dropped when the space goes, like every span.
 # Later kinds are new values here, not new fields.
-RunKind = Literal["deleted", "blank", "checkbox", "strong", "emphasis", "code", "highlight"]
+RunKind = Literal[
+    "deleted", "blank", "checkbox", "strong", "emphasis", "code", "highlight", "break"
+]
 
 
 class Run(_Span):

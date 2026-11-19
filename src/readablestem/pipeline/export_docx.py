@@ -249,9 +249,42 @@ def _replace(node: _Node, replacement: list[_Node | str]) -> None:
     node.parent = None
 
 
+def _lines_of(pre: _Node) -> _Node:
+    """A code block that holds an equation (an algorithm's step), as a paragraph: pandoc reads
+    a code block as plain text and would write the equation as its characters. Its lines are
+    separated by line breaks and its indentation is no-break spaces."""
+    paragraph = _Node("p", {k: v for k, v in pre.attrs.items() if k == "id"})
+    start = True  # nothing but indentation on this line so far
+
+    def add(children: list[_Node | str]) -> None:
+        nonlocal start
+        for child in children:
+            if isinstance(child, _Node) and child.tag == "code":
+                add(child.children)
+            elif isinstance(child, _Node):
+                child.parent = paragraph
+                paragraph.children.append(child)
+                start = False
+            else:
+                for number, line in enumerate(child.split("\n")):
+                    if number:
+                        br = _Node("br", parent=paragraph)
+                        paragraph.children.append(br)
+                        start = True
+                    body = line.lstrip(" ") if start else line
+                    if body:
+                        start = False
+                    if line:
+                        paragraph.children.append("\u00a0" * (len(line) - len(body)) + body)
+
+    add(pre.children)
+    return paragraph
+
+
 def _prepare(root: _Node) -> None:
-    """The two changes only the page's own markup can carry (pandoc drops the elements): a long
-    description's `<details>` as a bold line and paragraphs, and `<main>` unwrapped. Pandoc's
+    """The changes only the page's own markup can carry (pandoc drops the elements): a long
+    description's `<details>` as a bold line and paragraphs, `<main>` unwrapped, and a code
+    block that holds an equation as lines of a paragraph (`_lines_of`). Pandoc's
     HTML reader reads only what is inside `<main>` when there is one (3.7.0.2); the Contents
     and a draft's banner stand before it and are in the file. (The note "About this version"
     is inside `<main>`.) The page markers, the skip link and a figure with no picture are
@@ -266,6 +299,8 @@ def _prepare(root: _Node) -> None:
             node.attrs["data-rsnote"] = "1"
         if node.tag == "main":
             _replace(node, list(node.children))
+        elif node.tag == "pre" and any(n.tag == "math" for n in node.walk()):
+            _replace(node, [_lines_of(node)])
         elif node.tag == "summary":
             strong = _Node("strong", {}, list(node.children))
             for child in strong.children:

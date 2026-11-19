@@ -681,6 +681,7 @@ class _Run:
     block_start: bool  # the run starts after a geometric break, not just a style change
     block_end: bool = True
     code: bool = False  # rows of program code, grouped whatever their indentation
+    algo: bool = False  # the steps of an algorithm under its caption (`_algorithm_groups`)
     contents: bool = False  # a line of a table of contents: a list item of its own
     note: bool = False  # a footnote the file names, from its first line on (`_mark_notes`)
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # union of the rows' boxes
@@ -723,6 +724,13 @@ class _Block:
     # tables: the cells that are one formula, as inline equations of the table (`_cell_maths`)
     cell_inlines: dict[tuple[int, int], _Inline] = field(default_factory=dict)
     code: bool = False  # paragraphs: program code, lines and indentation kept (`_code_text`)
+    # paragraphs: every line end is kept (a poem, an address: `_keeps_lines`), written as a
+    # `break` run on the space that joins two lines.
+    lines: bool = False
+    # An algorithm's steps (`code` too: lines and indentation kept, written as a code block,
+    # but its inline maths stays maths): the indent level of each row.
+    algo: bool = False
+    indents: list[int] = field(default_factory=list)
     term_pieces: int | None = None  # glossary entries: how many of `pieces` are the term
     contents_level: int = 0  # list items: an entry of a table of contents, at this level
     # Raised or lowered text this block's element cannot carry (`Element.script_runs`): it is

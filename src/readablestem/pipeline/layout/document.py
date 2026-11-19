@@ -38,6 +38,7 @@ from readablestem.pipeline.layout.access import (
 )
 from readablestem.pipeline.layout.blocks import (
     MAX_HEADING_CHARS,
+    REASON_ABSTRACT,
     REASON_LARGER_FONT,
     REASON_LETTER,
     _letter_rows,
@@ -223,6 +224,8 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             raw = 1
         elif REASON_LARGER_FONT in e.reasons:
             raw = level_of[group, round(e.font_size or 0.0, 1)]
+        elif REASON_ABSTRACT in e.reasons:
+            raw = min(2, below[group])  # one level under the title, when there is one
         else:
             raw = below[group] + max(0, (depth[e.id] or shallowest) - shallowest)
         levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))

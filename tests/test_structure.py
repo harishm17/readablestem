@@ -129,6 +129,171 @@ def test_a_box_drawn_round_one_line_of_code_is_not_a_figure():
     ]
 
 
+def test_a_monospaced_quotation_without_code_punctuation_stays_prose():
+    quotation = [
+        "The poem works because it never says what the woods mean.",
+        "The reader supplies the meaning, and the poem lets each reader",
+        "supply a different one.",
+    ]
+
+    def fill(page):
+        y = prose(page, 100)
+        for line in quotation:
+            page.insert_text((72, y), line, fontsize=CODE, fontname="cour")
+            y += 13
+        y = code(page, y + 60, [(0, "total = add(first, second)"), (4, "print(total)")])
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.text for e in elements if e.preformatted] == [
+        "total = add(first, second)\n    print(total)"
+    ]
+    assert any((e.text or "").startswith("The poem works") for e in elements)
+
+
+# ------------------------------------------------------------------- kept line ends
+
+
+def column(page, y: float, text: str, width: float = 468.0) -> float:
+    """A justified-width paragraph wrapped by PyMuPDF, 14 pt a line."""
+    rect = pymupdf.Rect(72, y, 72 + width, y + 200)
+    page.insert_textbox(rect, text, fontsize=BODY, fontname="helv", lineheight=14 / BODY)
+    return y + 14 * 4 + 12
+
+
+def lines_at(page, y: float, lines: list[str], x: float = 72.0) -> float:
+    for text in lines:
+        page.insert_text((x, y), text, fontsize=BODY, fontname="helv")
+        y += 14
+    return y + 8
+
+
+LONG = (
+    "The poem works because it never says what the woods mean, and the reader supplies the "
+    "meaning. It lets each reader supply a different one, and the essay goes on to compare "
+    "that choice with two other poems from the same book before it turns to the last stanza."
+)
+VERSE = [
+    "Whose woods these are I think I know.",
+    "His house is in the village though;",
+    "He will not see me stopping here",
+    "To watch his woods fill up with snow.",
+]
+
+
+WRAPPED = ["Round the answer to three", "decimal places and say what", "the year depends on."]
+
+
+def breaks(element) -> list[int]:
+    return [r.start for r in element.runs if r.kind == "break"]
+
+
+def test_short_lines_keep_their_line_ends_and_a_paragraph_that_ends_short_does_not():
+    def fill(page):
+        y = column(page, 100, LONG)
+        y = lines_at(page, y + 6, VERSE)
+        lines_at(page, y + 20, WRAPPED)  # a narrow paragraph, wrapped in mid-sentence
+
+    elements = analyze(page_of(fill)).elements
+    paragraph, verse, narrow = [e for e in elements if e.kind is Kind.PARAGRAPH]
+    assert breaks(paragraph) == [] and breaks(narrow) == []
+    assert verse.text == " ".join(VERSE)
+    assert [verse.text[at] for at in breaks(verse)] == [" "] * 3
+    assert breaks(verse) == [len(VERSE[0]), len(" ".join(VERSE[:2])), len(" ".join(VERSE[:3]))]
+    assert html_of(page_of(fill)).count("<br>") == 3
+
+
+def test_two_short_lines_are_not_enough_to_keep_line_ends():
+    def fill(page):
+        y = column(page, 100, LONG)
+        lines_at(page, y + 6, VERSE[:2])
+
+    assert not [e for e in analyze(page_of(fill)).elements if breaks(e)]
+
+
+# ---------------------------------------------------------------- abstract and keywords
+
+
+def test_abstract_alone_on_its_line_is_a_heading_and_keywords_start_their_own_block():
+    def fill(page):
+        page.insert_text((72, 80), "A Study of Fog", fontsize=20, fontname="hebo")
+        page.insert_text((72, 130), "Abstract", fontsize=BODY, fontname="hebo")
+        y = column(page, 150, LONG)
+        # one more line of the abstract, then the keywords at the same indent, no gap
+        page.insert_text((72, y - 12 - 14 + 14), "Keywords: fog, verse, reading", fontsize=BODY,
+                         fontname="helv")  # fmt: skip
+
+    elements = analyze(page_of(fill)).elements
+    kinds = [(e.kind, e.text) for e in elements]
+    assert (Kind.HEADING, "Abstract") in kinds
+    texts = [e.text for e in elements if e.kind is Kind.PARAGRAPH]
+    assert texts[-1] == "Keywords: fog, verse, reading"
+    assert texts[0].startswith("The poem works")
+    assert "Keywords" not in texts[0]
+
+
+def test_abstract_at_the_start_of_a_sentence_is_not_a_heading():
+    def fill(page):
+        y = column(page, 100, "Abstract art is the subject of this chapter. " + LONG)
+        prose(page, y)
+
+    assert Kind.HEADING not in {e.kind for e in analyze(page_of(fill)).elements}
+
+
+# ------------------------------------------------------------------------ algorithms
+
+ALGORITHM = [
+    (0, "input: a line of verse"),
+    (0, "count = 0"),
+    (0, "for each word w in the line do"),
+    (1, "if w is stressed then"),
+    (2, "count = count + 1"),
+    (1, "end if"),
+    (0, "end for"),
+    (0, "return count"),
+]
+
+
+def algorithm(page, y: float, steps=ALGORITHM, caption="Algorithm 1 Count stressed syllables"):
+    page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
+    y += 14
+    for level, text in steps:
+        page.insert_text((72 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+        y += 14
+    return y + 10
+
+
+def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
+    def fill(page):
+        y = prose(page, 100)
+        y = algorithm(page, y + 10)
+        prose(page, y + 10, "The count is printed after the last word.")
+
+    elements = analyze(page_of(fill)).elements
+    steps = [e for e in elements if e.preformatted]
+    assert len(steps) == 1
+    assert steps[0].text.split("\n") == [
+        "input: a line of verse",
+        "count = 0",
+        "for each word w in the line do",
+        "  if w is stressed then",
+        "    count = count + 1",
+        "  end if",
+        "end for",
+        "return count",
+    ]
+    captions = [e.text for e in elements if (e.text or "").startswith("Algorithm 1")]
+    assert captions == ["Algorithm 1 Count stressed syllables"]  # its own block, above
+
+
+def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
+    def fill(page):
+        y = prose(page, 100, "Algorithm 1 shows how the verse is scanned for stress.")
+        prose(page, y, "Each word is checked once, and the count is kept at the end.")
+        prose(page, y + 22, "The result is then compared with the reader's own marks.")
+
+    assert not [e for e in analyze(page_of(fill)).elements if e.preformatted]
+
+
 # ------------------------------------------------------------------------- glossary
 
 

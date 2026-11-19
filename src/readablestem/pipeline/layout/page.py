@@ -26,6 +26,8 @@ from readablestem.pipeline.layout.blocks import (
     _contents_rows,
     _flag_text,
     _heading_sized,
+    _keeps_lines,
+    _label_abstracts,
     _leave_out_teacher_tags,
     _merge_chapter_numbers,
     _merge_style_splits,
@@ -63,6 +65,7 @@ from readablestem.pipeline.layout.figures import (
     _pad,
     _page_furniture,
     _raster_figures,
+    _RightEdges,
     _round_page,
     _short_label,
     _vector_figures,
@@ -510,8 +513,11 @@ def _page_blocks(
     # beside the next line of the other column, which then reads as a heading across both.
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions, blocks=True)
     final = _merge_column_continuations([blocks[i] for i in order])
+    edges = _RightEdges(text_rows)
+    _label_abstracts(final, text_rows, edges)
     for block in final:
         if block.kind in _TEXT_BLOCKS:
+            block.lines = _keeps_lines(block, edges, document=document)
             block.pieces = _paragraph_pieces(block, document=document)
             if source is not None:
                 _leave_out_teacher_tags(source, block)

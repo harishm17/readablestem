@@ -288,8 +288,10 @@ def _goes_on(
     if (
         last.kind != Kind.PARAGRAPH
         or last.code
+        or last.lines
         or first.kind != Kind.PARAGRAPH
         or first.code
+        or first.lines
         or first.marker is not None
         or first.joined
         or not last.rows

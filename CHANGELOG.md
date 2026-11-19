@@ -34,6 +34,26 @@
   this branch), and the recorded model answers of requests whose element text changed are
   re-recorded.
 - No migration; no model request, prompt, `PIPELINE_VERSION` or `RENDER_VERSION` changed here.
+## Unreleased: kept line ends, the abstract, algorithms (branch feat/kept-lines-and-code)
+
+- SW53 (a, e) and WS2.6 (b, c). A poem, an address or a list of short statements (at least three
+  lines at one left edge, each but the last stopping 8 em short of the column's right edge, not
+  justified and not wrapped in mid-sentence) keeps its line ends: a new run kind `break`
+  (`RunKind`), one run over the space that joins two lines, written as `<br>` and read by Listen
+  as a pause. It moves with its space in a page edit and goes when the space does; it is the
+  only new field. "Abstract" alone on a line, in bold or centered, is a heading under the title
+  (reason `abstract label`, strong evidence for the heading step, which stays deterministic), and
+  a line that starts "Keywords:" starts its own block. An "Algorithm n" caption followed by steps
+  (for, if, while, end, return, input, output ... at stepped indents) makes one preformatted
+  block with a line to a step and two spaces to an indent level; inline math in it stays math,
+  in the page and in the Word file (a block with an equation is written as lines of a paragraph).
+  A monospaced block with no code punctuation, eight words or more and sentence endings is a
+  quotation, not code. Joining code across prose (WS2.6 a) was measured and not built: all 37
+  gaps on the corpus introduce the next listing.
+- No migration. No model request or prompt changed. `PIPELINE_VERSION` and `RENDER_VERSION` are
+  not bumped; a bump is owed before release because stored results change (kept line ends,
+  abstract headings, algorithm blocks), and an older release cannot read a stored result that
+  holds a `break` run.
 
 ## Unreleased: the exam box is suggested from the name (branch feat/exam-suggested-from-title)
 
