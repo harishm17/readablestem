@@ -87,8 +87,8 @@
   proof or example label (after the end of a sentence, or in bold or italic over a line that
   is not; "Remark 5.1 It ..." with no stop only in bold or italic; "Theorem 3.6 we show" and
   "See Example 5 and" go on); and the next number of a column of numbers after a line that
-  stops short of the right edge (the steps of an algorithm, the lines of a code listing).
-  On the 333 development PDFs: 22,254 paragraphs become 22,430; the joins that these
+  stops short of the right edge (the steps of an algorithm, the lines of a code listing; a
+  line number of the margin, in smaller type or set well apart from its line, is not a step). On the 333 development PDFs: 22,254 paragraphs become 22,430; the joins that these
   signals name fall from 255 to 88 raised starts (the 88 left are all in body size, line
   numbers and isotopes), from 21 to 9 theorem labels (the 9 left are references inside a
   sentence), and from 316 to 212 number starts; the cuts in mid-sentence on one page go from

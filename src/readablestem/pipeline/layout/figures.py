@@ -1631,6 +1631,18 @@ def _runs_on(prev: _Row, edges: _RightEdges | None) -> bool:
     return edges is None or prev.x1 >= edges.of(prev) - 3 * prev.size
 
 
+def _margin_number(row: _Row) -> bool:
+    """Is the number that starts the line a line number of the margin, not a step: set in
+    smaller type than the line, or at more than 1.2 em from the text that follows it?"""
+    chars = [c for c in row.chars if not c.blank]
+    count = 0
+    while count < len(chars) and (chars[count].c.isdigit() or chars[count].c in ":."):
+        count += 1
+    if not 0 < count < len(chars):
+        return False
+    return row.is_script(chars[0]) or chars[count].x0 - chars[count - 1].x1 > 1.2 * row.size
+
+
 def _styled_lead(prev: _Row, row: _Row) -> bool:
     """The line starts in bold or italic and the line above does not end in that style."""
     first = next((c for c in row.chars if not c.blank), None)
@@ -1655,8 +1667,9 @@ def _starts_block(
     body, after a line that does not go on); a theorem, definition, proof or example (its
     label, at the end of a sentence or in another style than the line above; a numbered one
     with no stop only in bold or italic); the next number of a column of numbers after a line
-    that ends short of the right edge (the steps of an algorithm, the lines of a listing). The
-    signals that need the page's line ends (`edges`) are not applied without them."""
+    that ends short of the right edge (the steps of an algorithm, the lines of a listing; not
+    the line numbers of a margin, `_margin_number`). The signals that need the page's line
+    ends (`edges`) are not applied without them."""
     text = row.clean
     if ctx.region_tree and entries.starts_entry(prev, row, run):
         return True
@@ -1687,6 +1700,7 @@ def _starts_block(
         and before is not None
         and int(number.group(1)) == int(before.group(1)) + 1
         and prev.x1 < edges.of(prev) - 3 * prev.size
+        and not _margin_number(row)
     )
 
 

@@ -269,7 +269,8 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    the lead-term rule.) The next number of
    a column of numbers ("4 Receive ...", "5: while ...") starts one after a line that stops
    short of the right edge, the steps of an algorithm or the lines of a listing; a line number
-   in the margin of a manuscript, on a line that runs full, does not. Without the page's line
+   in the margin of a manuscript (in smaller type than the line, or more than 1.2 em from its
+   text, `_margin_number`) does not, nor does one on a line that runs full. Without the page's line
    ends (`edges`) only the first group and the note and theorem signals are asked. A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line

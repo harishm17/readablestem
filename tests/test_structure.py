@@ -619,6 +619,19 @@ def test_a_reference_to_a_theorem_or_a_raised_digit_inside_a_sentence_goes_on():
     assert len(paragraphs) == 3  # the poem paragraph, and two sentences of two lines each
 
 
+def test_the_numbers_in_the_margin_of_every_line_do_not_start_blocks():
+    def fill(page):
+        words = LONG.split()
+        for line in range(8):  # ragged lines, each with the next number set in the margin
+            y = 100 + 20 * line
+            start = (line * 5) % 12
+            page.insert_text((96, y), " ".join(words[start : start + 9 + line % 3]), fontsize=BODY)
+            page.insert_text((60, y), str(1 + line), fontsize=8)
+
+    paragraphs = [e.text for e in analyze(page_of(fill)).elements if e.kind is Kind.PARAGRAPH]
+    assert len(paragraphs) == 1
+
+
 # ------------------------------------------------------------------------- contents
 
 
