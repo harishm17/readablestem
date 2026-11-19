@@ -413,6 +413,25 @@ def test_a_read_that_comes_back_empty_is_not_counted_and_a_read_with_something_i
     assert reads_today(reviewing) == 1
 
 
+@pytest.mark.parametrize("mode", ["inline", "service"])
+def test_a_read_again_that_the_provider_fails_shows_in_the_service_status(tmp_path, mode):
+    """F-222. A reread is made in the web process, not the worker: when the AI service is
+    down the status the pages read must say so, with the worker in this process or apart."""
+    env = make_env(tmp_path, open_tier_daily_rereads=2, worker_mode=mode)
+    env.converter.output = review_output()
+    with env.running() as client:
+        env.browser = client
+        login(client, ALICE)
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        env.ctx.client_factory = lambda settings, budget: FakeVisionClient(
+            budget=budget, fail_models=dict.fromkeys(settings.fallback_for, "api_error")
+        )
+        assert reread(env, "p1-e2").status_code == 422
+        requests, failed, _ = env.ctx.provider_health().observed()
+        assert requests >= 1 and failed == requests
+
+
 # --------------------------------------------------------------------------- admin
 
 

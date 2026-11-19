@@ -45,7 +45,7 @@ from readablestem.web.security import CARRIES_SECRET
 from readablestem.web.spend import DbSpendGuard
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import ClientFactory, Converter, Worker
-from readablestem.web.worker_rows import RowReader
+from readablestem.web.worker_rows import RowReader, write_web_provider
 
 CSRF_FIELD = "csrf_token"
 SESSION_USER = "uid"
@@ -91,6 +91,15 @@ class AppContext:
         """The AI service as the worker's recent requests saw it: this process's own memory
         when the worker is a thread here, the worker process's `ops_heartbeat` row when not."""
         return HEALTH if self.rows is None else self.rows.provider()
+
+    def record_provider_call(self, outcome: str) -> None:
+        """A model request made in this (web) process ended with `outcome`: a reread. Inline,
+        `HEALTH` is the very memory the status page reads. With a worker service it is
+        written to this process's own provider row, which `RowReader.provider` adds to the
+        worker's."""
+        HEALTH.record(outcome)
+        if self.rows is not None:
+            write_web_provider(self.factory, HEALTH)
 
     @property
     def dev_login_enabled(self) -> bool:
