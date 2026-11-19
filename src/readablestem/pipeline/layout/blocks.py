@@ -478,9 +478,22 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
         return False
     if _heading_sized(row, ctx) and abs(prev.size - row.size) > 0.5:
         return False
-    if prev.bold != row.bold:
+    if prev.bold != row.bold and not _emphasis_runs_on(prev, row):
         return False
     return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
+
+
+def _emphasis_runs_on(prev: _Row, row: _Row) -> bool:
+    """Does a bold phrase go on over the line break, so one line is all bold and the other is
+    not ("executes each" / "**instruction in order**")? The line above stops short of the end of
+    a sentence or clause, the line starts in lowercase (a bold label or heading starts in
+    capitals), and both are set in one size and typeface."""
+    return (
+        prev.clean[-1:] not in tuple(".:;!?")
+        and row.clean[:1].islower()
+        and abs(prev.size - row.size) <= 0.5
+        and prev.family == row.family
+    )
 
 
 # `Element.reasons` of a table of contents' entry (a list item): the link step looks for

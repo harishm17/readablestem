@@ -105,21 +105,26 @@ def _ordered_marker(text: str) -> tuple[str, str] | None:
     return "{}" + match["sep"], match["plain"]
 
 
-def _bullet_apart(row: _Row, tokens: list[tuple[int, int]]) -> list[tuple[int, int]]:
-    """`tokens` with a bullet glyph at the start of the row cut from the text it touches.
-    `_tokens` splits at 0.3 x the font size, and Word's Wingdings bullet, set as large as the
-    text, leaves 0.23 with no space character in the text layer: the line came out as a
-    paragraph that began with the bullet."""
+def _bullet_apart(
+    row: _Row, tokens: list[tuple[int, int]]
+) -> tuple[list[tuple[int, int]], bool]:
+    """`tokens` with a bullet glyph at the start of the row cut from the text it touches, and
+    whether it was set so close that only a sibling can tell it from a word that starts with
+    the sign. `_tokens` splits at 0.3 x the font size, and Word's Wingdings bullet, set as
+    large as the text, leaves 0.23 with no space character in the text layer: the line came
+    out as a paragraph that began with the bullet. A bullet with no gap at all ("\u25aaGrading")
+    is cut too, and is `glued`."""
     if not tokens:
-        return tokens
+        return tokens, False
     start, end = tokens[0]
     chars = row.chars
     if end - start > 1 and chars[start].c in _BULLET_GLYPHS:
         gap = (chars[start + 1].x0 - chars[start].x1) / row.size
         own_font = chars[start].font != chars[start + 1].font
-        if gap >= (BULLET_APART_OWN_FONT if own_font else BULLET_APART):
-            return [(start, start + 1), (start + 1, end), *tokens[1:]]
-    return tokens
+        apart = BULLET_APART_OWN_FONT if own_font else BULLET_APART
+        if gap >= apart or own_font:
+            return [(start, start + 1), (start + 1, end), *tokens[1:]], gap < apart
+    return tokens, False
 
 
 def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | None:
@@ -129,7 +134,7 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     if row.vertical:
         return None
     drawn = bullets.left_of(row)
-    tokens = _bullet_apart(row, _tokens(row))
+    tokens, glued = _bullet_apart(row, _tokens(row))
     if drawn is not None:
         if not tokens:
             return None
@@ -148,7 +153,7 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
         glyph = _HOLLOW_BULLET if hollow else _clean(first)
         family: tuple[str, str] = ("bullet", glyph)
         readings: tuple[tuple[str, int], ...] = ()
-        sure = first in _BULLET_GLYPHS
+        sure = first in _BULLET_GLYPHS and not glued
         text = glyph
     else:
         text = "".join(c.c for c in chars[m0:m1])
