@@ -32,10 +32,11 @@ Element conventions:
   `equation_label`, as printed, and are not in its `text` or `bbox`, so they are not in
   the crop the model transcribes. A symbolic tag ("(*)", "(†)") is one too. A number at the
   right edge is never a paragraph of its own: it is the label of the equation piece on its
-  baseline (in either column of a page with a two-column section below), or, when it is
-  centered between lines, of the nearest piece within 2.5 font sizes; a bracketed number ending
-  a row (a `multline`'s) is cut off the maths from 0.7 font sizes clear of it, a bare "2.4" from
-  one. Equation pieces that `display_grouping` does not join keep a number each, or none.
+  baseline (in either column of a page with a two-column section below, the same column
+  first), or, when it is centered between lines, of the nearest piece within 2.5 font sizes
+  that has no number yet; a number that fits none stays text. Equation pieces that
+  `display_grouping` does not join keep a number each, or none. A number set less than a
+  font size from its equation (a `multline`'s) is not cut off and stays in the equation's text.
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
   `text` does not include the marker.
