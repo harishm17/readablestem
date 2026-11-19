@@ -57,6 +57,7 @@ from xml.etree.ElementTree import Element as Node
 import defusedxml.ElementTree as SafeET
 
 from readablestem.core import inline
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     Check,
     ColourRun,
@@ -1719,16 +1720,10 @@ def read(
     _count_unread(reader, body)
     if out.unread_words or out.unread_pictures:
         # required: the instructor sees what is missing before the document is shared
-        out.notices.append(
-            Notice(
-                code=SOURCE_UNREAD_NOTICE,
-                count=out.unread_words + out.unread_pictures,
-                review="required",
-            )
-        )
+        out.notices.append(make(SOURCE_UNREAD_NOTICE, count=out.unread_words + out.unread_pictures))
     if reader.errors:
         # required: a formula LaTeX could not read is shown as written and is a decision
-        out.notices.append(Notice(code=SOURCE_ERROR_NOTICE, count=reader.errors, review="required"))
+        out.notices.append(make(SOURCE_ERROR_NOTICE, count=reader.errors))
     return out
 
 

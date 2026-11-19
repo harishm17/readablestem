@@ -43,6 +43,7 @@ from dataclasses import dataclass, field
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     IMAGE_PAGE_REASON,
     Check,
@@ -115,9 +116,9 @@ class Summary:
         """One notice for the document per reason equations were left with one reading."""
         found = []
         if self.unavailable:
-            found.append(Notice(code=UNAVAILABLE, count=self.unavailable, review="optional"))
+            found.append(make(UNAVAILABLE, count=self.unavailable))
         if self.over_budget:
-            found.append(Notice(code=BUDGET, count=self.over_budget, review="optional"))
+            found.append(make(BUDGET, count=self.over_budget))
         return found
 
 

@@ -749,7 +749,7 @@ DECISION_NOTICES = (
 @dataclass(frozen=True)
 class HandledLine:
     """What was found and converted, of one kind, with its count: "3 footnotes: kept where
-    they fall in the text" (`pipeline.notices.HANDLED_CODES`)."""
+    they fall in the text" (`core.page_checks.HANDLED_CODES`)."""
 
     code: str
     count: int

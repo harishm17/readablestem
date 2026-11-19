@@ -39,6 +39,7 @@ from xml.etree.ElementTree import Element as XmlElement
 import defusedxml.ElementTree as SafeET
 import pymupdf
 
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     KEPT_ORIGINAL_STATUSES,
     Element,
@@ -421,8 +422,8 @@ def repair_notices(
         while end in empty:
             end -= 1
         if end < last and any(n <= end and n not in empty for n in page_types):
-            return [Notice(code=CUT_OFF, page=end + 1, count=last - end, review="required")]
-        return [Notice(code=REPAIRED, review="optional")]
+            return [make(CUT_OFF, page=end + 1, count=last - end)]
+        return [make(REPAIRED)]
     except Exception as exc:  # a bug here must not cost the user a finished conversion
         log.warning("repair check failed: %s", type(exc).__name__)
         return []

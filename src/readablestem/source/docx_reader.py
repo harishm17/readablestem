@@ -55,6 +55,7 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from readablestem.core import inline
+from readablestem.core.page_checks import make
 from readablestem.core.types import (
     INLINE_MARKER_RE,
     MAX_TABLE_CELLS,
@@ -67,7 +68,6 @@ from readablestem.core.types import (
     HeadingFix,
     Kind,
     Link,
-    Notice,
     Run,
     ScriptRun,
     Status,
@@ -1074,22 +1074,20 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
     census = prepared.census
     changes = census.tracked_insertions + census.tracked_deletions
     if changes:
-        out.notices.append(Notice(code=CHANGES_NOTICE, count=changes, review="required"))
+        out.notices.append(make(CHANGES_NOTICE, count=changes))
     if facts.hidden_runs:
-        out.notices.append(Notice(code=HIDDEN_NOTICE, count=facts.hidden_runs))
+        out.notices.append(make(HIDDEN_NOTICE, count=facts.hidden_runs))
     if facts.text_boxes:
-        out.notices.append(Notice(code=BOXES_NOTICE, count=facts.text_boxes))
+        out.notices.append(make(BOXES_NOTICE, count=facts.text_boxes))
     if facts.headers_footers:
-        out.notices.append(Notice(code=HEADERS_NOTICE, count=facts.headers_footers))
+        out.notices.append(make(HEADERS_NOTICE, count=facts.headers_footers))
     if facts.rtl_paragraphs:
-        out.notices.append(Notice(code=RTL_NOTICE, count=facts.rtl_paragraphs))
+        out.notices.append(make(RTL_NOTICE, count=facts.rtl_paragraphs))
     objects = facts.smartart + facts.charts + facts.embedded
     if objects:
-        out.notices.append(Notice(code=OBJECTS_NOTICE, count=objects, review="required"))
+        out.notices.append(make(OBJECTS_NOTICE, count=objects))
     if out.unread_words:
-        out.notices.append(
-            Notice(code=SOURCE_UNREAD_NOTICE, count=out.unread_words, review="required")
-        )
+        out.notices.append(make(SOURCE_UNREAD_NOTICE, count=out.unread_words))
     return out, report
 
 

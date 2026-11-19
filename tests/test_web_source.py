@@ -507,6 +507,14 @@ def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_
         assert "web version of a Word file" in (done.html or "")
         page = client.get(f"/jobs/{job_id}").text
         assert "was read from the file itself" in page and "turned into a tagged PDF" not in page
+        # No compile witness ran for a source, so a clean one is not "converted" in a way that
+        # implies its text was compared with a compiled copy: the page and the record say so.
+        said = " ".join(page.split())
+        assert "not compared with its printed pages" in said
+        assert READY_ALL not in said
+        assert (
+            "not compared with its printed pages" in client.get(f"/jobs/{job_id}/record.csv").text
+        )
         assert client.get(f"/jobs/{job_id}/review/list").status_code == 200
         # the notice says the Word file is kept as uploaded, and deleting removes every copy
         assert "the Word .docx file" in " ".join(client.get("/privacy").text.split())

@@ -7,6 +7,7 @@ from __future__ import annotations
 from collections.abc import Collection
 from dataclasses import dataclass
 
+from readablestem.core.page_checks import make
 from readablestem.core.types import Notice
 from readablestem.pipeline import page_type
 from readablestem.pipeline.layout.blocks import _TEXT_BLOCKS
@@ -29,7 +30,7 @@ def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str
     count of work ran out, or the clock guard fired) may hold handwriting nobody looked for:
     "Worth checking". A page kept whole as its image has a notice and a decision of its own."""
     return [
-        Notice(code=NOT_ANALYSED, page=number, review="optional")
+        make(NOT_ANALYSED, page=number)
         for number, kind in sorted(types.items())
         if not kind.ink.analysed and number not in kept
     ]
@@ -49,12 +50,16 @@ def _hidden_text_notices(
         if hidden < page_type.HIDDEN_FEW:
             continue
         if number in kept:
-            notices.append(Notice(code="ocr_text_layer_ignored", page=number, count=hidden,
-                                  review="none"))  # fmt: skip
+            notices.append(make("ocr_text_layer_ignored", page=number, count=hidden))
         else:
-            notices.append(Notice(code="hidden_text_ignored", page=number, count=hidden,
-                                  review="optional"))  # fmt: skip
+            notices.append(make("hidden_text_ignored", page=number, count=hidden))
     return notices
+
+
+def _turned_notices(types: dict[int, page_type.PageTypeResult]) -> list[Notice]:
+    """A page saved sideways with no /Rotate was turned to be read (`page_type.turn_page`): what
+    the pictures of the page show is the turned page. Information, counted per page."""
+    return [make("page_turned", page=number) for number, kind in sorted(types.items()) if kind.turn]
 
 
 FOOTNOTE_CONTEXT = 10  # characters printed before a footnote's mark that find it again
@@ -94,25 +99,21 @@ def _layout_notices(
         for block in page.blocks:
             element_id = block_ids.get(id(block))
             if element_id is not None and block.flat_scripts:
-                notices.append(Notice(code="scripts_flattened", page=page.number,
-                                      element_id=element_id, review="optional"))  # fmt: skip
+                notices.append(make("scripts_flattened", page=page.number, element_id=element_id))
             if block.kind not in _TEXT_BLOCKS or element_id is None:
                 continue
             ink = [c for row in block.rows for c in row.chars if not c.blank]
             # a list item made from a line or grid of terms has text and no rows
             if named is not None and block.rows and block.rows[0].note:
-                notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
-                                      review="none"))  # fmt: skip
+                notices.append(make("footnote", page=page.number, element_id=element_id))
                 started.update(dict.fromkeys(block.rows[0].note, element_id))
             elif block.code or (
                 len(ink) >= CODE_MIN_GLYPHS
                 and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(ink)
             ):
-                notices.append(Notice(code="code_block", page=page.number, element_id=element_id,
-                                      review="none"))  # fmt: skip
+                notices.append(make("code_block", page=page.number, element_id=element_id))
             elif named is None and ink and _footnote(block, ink[0].c, page, ctx, raised.keys()):
-                notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
-                                      review="none"))  # fmt: skip
+                notices.append(make("footnote", page=page.number, element_id=element_id))
                 if marks_out is not None:
                     marks_out[element_id] = raised[ink[0].c]
             for row in block.rows:

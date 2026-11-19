@@ -32,7 +32,7 @@ from typing import Any
 from urllib.parse import quote
 
 from readablestem import __version__
-from readablestem.core import triage
+from readablestem.core import page_checks, triage
 from readablestem.core.types import (
     DocumentResult,
     Element,
@@ -45,7 +45,13 @@ from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import exam, job_page
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_when, machine_date
-from readablestem.web.messages import KIND_LABELS, explain_check, explain_reason, severity_label
+from readablestem.web.messages import (
+    KIND_LABELS,
+    explain_check,
+    explain_notice,
+    explain_reason,
+    severity_label,
+)
 from readablestem.web.review import (
     BULK_KEY,
     CHOICE_KEY,
@@ -393,6 +399,31 @@ def not_checked_list(result: DocumentResult, summary: CheckedSummary) -> list[st
     out.extend(checked_words.record_not_reviewed(summary))
     for line in by_hand_not_checked(result):
         out.append(line)
+    out.extend(notice_not_checked(result))
+    return out
+
+
+def notice_not_checked(result: DocumentResult) -> list[str]:
+    """The lines of the result that say something is not in the file or was not checked (the rows
+    of `core.page_checks` with `not_checked`: words left out, pages whose drawings were not
+    analysed, a source never compared with a compiled copy), one sentence per code: the job
+    page lists them under "Not handled" or "Worth checking", and the record, which says "every
+    part the tool found was converted", says them too. A page-level line names its pages, and a
+    count in the sentence is the total."""
+    out = []
+    for code in page_checks.TABLE:
+        if code not in page_checks.NOT_CHECKED_CODES:
+            continue
+        found = [n for n in result.notices if n.code == code]
+        if not found:
+            continue
+        total = page_checks.make(code, count=sum(n.count for n in found))
+        text = explain_notice(total).text.replace("{count}", f"{total.count:,}")
+        pages = sorted({n.page + 1 for n in found if n.page is not None})
+        if pages:
+            label = "Page" if len(pages) == 1 else "Pages"
+            text = f"{label} {', '.join(str(n) for n in pages)}: {text}"
+        out.append(text)
     return out
 
 

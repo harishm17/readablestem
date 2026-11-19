@@ -563,6 +563,17 @@ NOTICE_MESSAGES: dict[str, str] = {
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
     "source_unread": "This tool could not read part of the source file, so it is not in the file.",
+    # "{count}" is the number of problems, pictures or pages.
+    "source_unplaced": "LaTeX reported {count} problems that could not be matched to a place in "
+    "the converted file, so nothing there says where they are: read the file against your "
+    "source before you share it.",
+    "source_figure_missing": "The source names {count} pictures that are not in the upload or "
+    "that this tool cannot read, so each figure shows no picture: add them and upload again, or "
+    "describe each figure yourself.",
+    # One sentence for a LaTeX and a Word source: nothing compiles or prints either in a job yet.
+    "source_not_compared": "This file was converted from the source itself and was not compared "
+    "with its printed pages: read the converted file against your own copy before you share it.",
+    "page_turned": "This page was saved sideways in the PDF, so it was turned upright to be read.",
     # Word and PowerPoint uploads (`web.office_census`); "{count}" is the number counted.
     "office_tracked_changes": "Tracked changes (insertions and deletions) that nobody "
     "accepted or rejected in this Word file: {count}. The PDF this was read from may show "
@@ -589,7 +600,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "students.",
 }
 
-# What the job page says of what it found and converted (`pipeline.notices.HANDLED_CODES`):
+# What the job page says of what it found and converted (`core.page_checks.HANDLED_CODES`):
 # the thing named singular and plural, then what was done with it, for any count.
 HANDLED_MESSAGES: dict[str, tuple[str, str, str]] = {
     "footnote": (
@@ -602,6 +613,11 @@ HANDLED_MESSAGES: dict[str, tuple[str, str, str]] = {
         "block of program code",
         "blocks of program code",
         "kept as code, with line breaks and indentation, without highlighting.",
+    ),
+    "page_turned": (
+        "page",
+        "pages",
+        "saved sideways in the PDF and turned upright to be read.",
     ),
 }
 

@@ -674,6 +674,18 @@ _HOLDS = {
         "Diagrams or charts in the Word file are not in this file, so check the notices "
         "before you share it."
     ),
+    # `source.convert._source_lines`: LaTeX errors with no place in the result, so no decision
+    # can stand behind them
+    "source_unplaced": (
+        "LaTeX reported problems that could not be matched to a place in the converted file, so "
+        "check the notices before you share it."
+    ),
+    # `source.convert._source_lines`: nothing compiled or printed the source, so the text was not
+    # compared with its pages; "every part the tool found was converted" would read as if it had
+    "source_not_compared": (
+        "This file was converted from the source itself and was not compared with its printed "
+        "pages: read the converted file against your own copy before you share it."
+    ),
     # `pipeline.notices.TEXT_CODES`: a result stored before the text decision existed has the
     # notice and no decision behind it. A result with the decision is counted by the summary.
     "rtl_text": (
