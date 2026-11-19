@@ -48,6 +48,11 @@
   letters too. A hat the reading dropped is still found.
 - Page editor: a paragraph left out that is past the 120th line of its page is still listed,
   with "Put it back" (the list was cut at 120 lines, so it had no way back on the screen).
+- `data/eval/parsing-bench-olmocr.json` is measured again at pipeline 0.5.13 (commit
+  `3b177567`, $0): multi_column 69.2 (68.8 at 0.5.11), headers_footers 34.5 (32.5),
+  long_tiny_text 37.3 (37.3), table_tests 66.6 (51.8), baseline 100.0 (99.0). The scores and
+  counts of docs/eval-parsing-benchmark.md are the new record's; its failures by cause are
+  still those read on the first run.
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 

@@ -24,26 +24,33 @@ page text, no file from the benchmark, no home path).
   spelled out, invisible characters removed, the ellipsis and `''` as the benchmark writes them.
 - Run 2 and run 3 converted all 747 pages from scratch; see "Repeat" below.
 
-## Scores (pipeline 0.5.11, 747 pages, 3,846 checks listed, $0)
+## Scores (pipeline 0.5.13, 747 pages, 3,846 checks listed, $0)
 
-| Category | Ours (checks run) | Run of listed | Dropped |
-|---|---|---|---|
-| multi_column (order) | 68.8 (705) | 884 | 179 scans |
-| headers_footers (absent) | 32.5 (636) | 753 | 117 scans |
-| long_tiny_text (present) | 37.3 (83) | 442 | 359 scans |
-| table_tests (table) | 51.8 (857) | 1,020 | 163 scans |
-| baseline (not blank, no repeats) | 99.0 (586) | 747 | 161 scans |
-| arxiv_math, old_scans_math | not run at $0 | 2,927 and 458 | equations are read by a model |
-| old_scans | not run | 526 | scans: a model reads the picture |
+Measured on 2026-11-19 at commit `3b177567`. The first record (pipeline 0.5.11, 2026-11-18) is
+the second number of each pair.
+
+| Category | Ours (checks run) | At 0.5.11 | Run of listed | Dropped |
+|---|---|---|---|---|
+| multi_column (order) | 69.2 (708) | 68.8 (705) | 884 | 176 scans |
+| headers_footers (absent) | 34.5 (632) | 32.5 (636) | 753 | 121 scans |
+| long_tiny_text (present) | 37.3 (83) | 37.3 (83) | 442 | 359 scans |
+| table_tests (table) | 66.6 (857) | 51.8 (857) | 1,020 | 163 scans |
+| baseline (not blank, no repeats) | 100.0 (586) | 99.0 (586) | 747 | 161 scans |
+| arxiv_math, old_scans_math | not run at $0 | not run | 2,927 and 458 | equations are read by a model |
+| old_scans | not run | not run | 526 | scans: a model reads the picture |
+
+The table score rose as the corner-square fix below measured on the two halves (571 checks
+pass, 444 before); no category fell. The sections under "Failures by cause" were
+read on the 0.5.11 run, and the counts in their headings are that run's.
 
 Dropped checks are in the score of no category; the record also holds each score with the
-dropped checks counted as failed (54.9, 27.5, 7.0, 43.5, 77.6). Of the 161 dropped pages, 60 are
+dropped checks counted as failed (55.4, 29.0, 7.0, 56.0, 78.4). Of the 161 dropped pages, 60 are
 scans with no text layer, 72 are scans with an OCR layer (the product reads such a page from its
-picture and does not use the layer, so at $0 there is no output), 4 are drawings with no text and
-25 are typed as text but hold only pictures (image-only pages). long_tiny_text keeps 83 of 442
-checks (13 of 62 pages), so its score is a thin sample. 603 of the 747 pages asked a model for something (equations 3,038,
-figures 1,266, tables 434, image pages 132); at $0 those parts are left as the text path
-makes them.
+picture and does not use the layer, so at $0 there is no output), 3 are drawings with no text and
+26 are typed otherwise but hold only pictures (image-only pages). long_tiny_text keeps 83 of 442
+checks (13 of 62 pages), so its score is a thin sample. 599 of the 747 pages asked a model for
+something (equations 2,862, figures 1,172, tables 530, image pages 264); at $0 those parts are
+left as the text path makes them.
 
 Published scores of other tools (README; their full runs, all categories): olmOCR 79.4 / 93.4 /
 81.7 / 70.2 / 99.0, Marker 71.0 / 87.1 / 76.9 / 69.8 / 99.5, MinerU 59.0 / 96.6 / 39.1 / 60.9 /
