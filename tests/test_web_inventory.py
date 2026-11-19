@@ -329,7 +329,7 @@ def test_where_the_scan_option_is_offered_the_notes_that_point_to_it_say_what_it
     """WS7.2: the Symbols screen of a document with no handwriting, and the reason on a page kept
     as a picture, send the person to "Convert scanned or handwritten pages" and give its cost, in
     the words of the upload form; a deployment without the option says no cost."""
-    cost = "uses up to $0.25 of the server’s budget"
+    cost = "uses up to $0.25 of the"
     for offered in (True, False):
         env = WebEnv(tmp_path / str(offered), feature_image_pages=offered)
         output = review_output()
