@@ -181,25 +181,40 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
     (`REASON_TAGGED`) has that level. Used by heading_step and for the title.
     """
     headings = [e for e in elements if e.kind == Kind.HEADING]
-    sized = sorted(
-        {round(e.font_size or 0.0, 1) for e in headings if REASON_LARGER_FONT in e.reasons},
-        reverse=True,
-    )
-    level_of: dict[float, int] = {}
-    level, top = 0, None
-    for size in sized:
-        if top is None or size < top * (1 - HEADING_LEVEL_TOLERANCE) - 0.05:
-            level, top = level + 1, size
-        level_of[size] = level
-    below = level + 1
+    # Sizes are judged per slide deck (`slides.DECK_REASON`; every heading of a file with no
+    # deck is in the one group None): a deck's title is level 1 and the rest of its headings
+    # are under it, whatever sizes another deck uses.
+    group_of = {e.id: slides.deck_number(e.reasons) for e in headings}
+    level_of: dict[tuple[int | None, float], int] = {}
+    below: dict[int | None, int] = {}
+    for group in set(group_of.values()):
+        in_group = [e for e in headings if group_of[e.id] == group]
+        titled = any(slides.DECK_TITLE_REASON in e.reasons for e in in_group)
+        sized = sorted(
+            {
+                round(e.font_size or 0.0, 1)
+                for e in in_group
+                if REASON_LARGER_FONT in e.reasons and slides.DECK_TITLE_REASON not in e.reasons
+            },
+            reverse=True,
+        )
+        level, top = int(titled), None  # the deck's title is level 1: the rest start at 2
+        for size in sized:
+            if top is None or size < top * (1 - HEADING_LEVEL_TOLERANCE) - 0.05:
+                level, top = level + 1, size
+            level_of[group, size] = level
+        below[group] = level + 1
     depth = {e.id: _section_depth(e) for e in headings if REASON_LARGER_FONT not in e.reasons}
     shallowest = min((d for d in depth.values() if d), default=1)
     levels: dict[str, int] = {}
     for e in headings:
-        if REASON_LARGER_FONT in e.reasons:
-            raw = level_of[round(e.font_size or 0.0, 1)]
+        group = group_of[e.id]
+        if slides.DECK_TITLE_REASON in e.reasons:
+            raw = 1
+        elif REASON_LARGER_FONT in e.reasons:
+            raw = level_of[group, round(e.font_size or 0.0, 1)]
         else:
-            raw = below + max(0, (depth[e.id] or shallowest) - shallowest)
+            raw = below[group] + max(0, (depth[e.id] or shallowest) - shallowest)
         levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
     section = None  # the level of the last heading that is not a letter of an index
     for e in sorted(headings, key=lambda e: e.order):

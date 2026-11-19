@@ -12,24 +12,40 @@ It knows nothing about PyMuPDF: `layout` hands it a `PageView` of every page it 
 back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, no model calls.
 
 1. `detect`: a deck is a landscape file in a slide shape (4:3, 16:9 or 16:10; not a landscape
-   letter or A4 sheet) that says it is Beamer (`/Creator`), or whose consecutive pages share a
-   page label (an overlay's pages have one, `hyperref`'s). A file that is neither is not a
-   deck and is read as before.
-2. Frames: consecutive pages with the same page label, or without labels the same title text,
-   are one frame. A page of a frame is dropped when every line on it, and every picture, is
-   also on the frame's last page: it is an earlier step of the same slide. Nothing is lost;
+   letter or A4 sheet) that (a) says it is Beamer (`/Creator`), or (b) has consecutive pages
+   that share a page label (an overlay's pages have one, `hyperref`'s), or (c) has a title on
+   most of its pages: the page's largest text in the top third (`_title`), or a title slide's
+   title (`_title_slide`), on at least `TITLED_SHARE` of the pages. (c) needs neither Beamer
+   nor labels: a PowerPoint or Keynote deck exported as PDF has neither. A file that is none
+   of these is not a deck and is read as before.
+2. Decks: a file may hold several. A deck ends where the page size changes, and where a title
+   slide comes (a page with a title-sized line, at least `TITLE_SLIDE_RATIO` x an ordinary
+   slide title, and at most `MAX_SUBTITLE_ROWS` other lines in its body) when the file's first
+   page is one too. A deck that starts on a title slide has that slide's title as its title
+   (`Deck.starts`). When the file holds more than one deck, or a deck has a title, each heading
+   on a deck's pages says which deck it is in (`DECK_REASON`), and `layout.heading_levels`
+   judges heading sizes deck by deck: a deck's title is level 1 and every other heading of the
+   deck is level 2 or lower, so the written outline is the document's title, then each deck's
+   title, then its slide titles (`assemble.title_plan` places the one H1).
+3. Frames: consecutive pages with the same page label, or without labels the same title text,
+   are one frame; in a deck found by (c) alone, a frame is a run of pages each of which extends
+   the page before it (every line and mark of the earlier page is on the later one, as
+   `_repeats` decides). A page of a frame is dropped when every line on it, and every picture,
+   is also on the frame's last page: it is an earlier step of the same slide. Nothing is lost;
    the last page has it all. A page with something the last page does not have (`\\only<1>{A}`
    replaced by `\\only<2>{B}`) stays, as a step: "step 1 of 2" is added to its heading.
-3. Titles: the frame title is the largest text in the top third of the page (at least 1.15 x
-   the body), and always a heading. What lies above it in the page's headline (section and
-   subsection names, a drawn bar) is furniture and is dropped, and slide numbers alone in the
-   top or bottom band are too. The headline's text is kept as `Deck.context` for the page, so
-   a reader of the record can still see which section a frame was in.
+4. Titles: the frame title is the largest text in the top third of the page (at least 1.15 x
+   the body), and always a heading; its lines are one title when they follow each other in one
+   size. What lies above it in the page's headline (section and subsection names, a drawn bar)
+   is furniture and is dropped, and slide numbers alone in the top or bottom band are too. The
+   headline's text is kept as `Deck.context` for the page, so a reader of the record can still
+   see which section a frame was in.
 """
 
 from __future__ import annotations
 
 import re
+import statistics
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
@@ -47,8 +63,19 @@ HEADLINE_ZONE = 0.2  # a headline bar is in this top share
 BAR_WIDTH = 0.6  # a drawn bar is at least this share of the page wide ...
 BAR_HEIGHT = 0.18  # ... and at most this share of its height
 NUMBER_BAND = 0.12  # a slide number alone is in this top or bottom share
+# Most of a deck's pages have a title. The titled files among the 22 landscape ones of the corpus
+# (decks of 6 to 39 pages) have a title on 91 to 100 % of their pages; the files that are not
+# decks (pictured and photographed slides, a template) on 0 to 33 %. Any share between the two
+# separates them; 70 % lets a deck of mostly titled slides keep a third of its pages without
+# one (a picture slide, a credits page).
+TITLED_SHARE = 0.7
+TITLE_SLIDE_RATIO = 1.25  # a title slide's title over an ordinary slide's title
+MAX_SUBTITLE_ROWS = 3  # lines on a title slide besides its title (subtitle, author, date)
+TITLE_LINE_GAP = 1.5  # a title's next line starts within this many times its size
 STEP_REASON = "slide_step"
 TITLE_REASON = "slide_title"
+DECK_REASON = "slide_deck"  # "slide_deck 2": the heading is on a page of the second deck
+DECK_TITLE_REASON = "slide_deck_title"  # the title of a deck that starts on a title slide
 _BEAMER = re.compile(r"\bbeamer\b", re.IGNORECASE)
 _SLIDE_NUMBER = re.compile(r"^\s*\d{1,3}(?:\s*/\s*\d{1,3})?\s*$")
 
@@ -105,9 +132,18 @@ class PageView:
 
 @dataclass(frozen=True)
 class Title:
+    """A title: its text, the box and size of its first line, and where its last line ends
+    (0 when it has one line)."""
+
     text: str
     bbox: BBox
     size: float
+    bottom: float = 0.0
+
+    @property
+    def height(self) -> float:
+        """From the top of the first line to the bottom of the last."""
+        return max(self.bottom, self.bbox[3]) - self.bbox[1]
 
 
 @dataclass
@@ -125,6 +161,20 @@ class Deck:
     # Each kept page's headline text (section and subsection names), top to bottom.
     context: dict[int, tuple[str, ...]] = field(default_factory=dict)
     frames: list[tuple[int, ...]] = field(default_factory=list)  # pages of each frame, as read
+    # Each page of a deck -> its number (1, 2, ...) among the file's decks, kept only when the
+    # file holds several decks or a deck has a title (`DECK_REASON`).
+    numbers: dict[int, int] = field(default_factory=dict)
+    # The first page of a deck that starts on a title slide -> that slide's title.
+    starts: dict[int, Title] = field(default_factory=dict)
+
+
+def deck_number(reasons: Iterable[str]) -> int | None:
+    """The number of the deck a heading is in, from its `DECK_REASON`; None when it has none."""
+    for reason in reasons:
+        head, _, number = reason.partition(" ")
+        if head == DECK_REASON and number.isdigit():
+            return int(number)
+    return None
 
 
 def slide_shaped(width: float, height: float) -> bool:
@@ -224,7 +274,49 @@ def _title(view: PageView, body: float) -> Title | None:
         return None
     largest = max(row.size for row in top)
     best = min((row for row in top if row.size >= largest / 1.05), key=lambda r: r.bbox[1])
-    return Title(best.text.strip(), best.bbox, best.size)
+    return _with_lines(view.rows, best)
+
+
+def _with_lines(rows: Sequence[RowView], first: RowView) -> Title:
+    """The title that starts at `first`: the lines of its size that follow it, each starting
+    within TITLE_LINE_GAP x the size of where the one before ended (a title that wraps)."""
+    text, last = [first.text.strip()], first
+    for row in sorted(rows, key=lambda r: (r.bbox[1], r.bbox[0])):
+        if (
+            not row.vertical
+            and row.text.strip()
+            and row.bbox[1] > last.bbox[1]
+            and abs(row.size - first.size) <= 0.05 * first.size
+            and row.bbox[1] - last.bbox[3] <= (TITLE_LINE_GAP - 1) * first.size
+            and abs(row.bbox[0] - first.bbox[0]) <= first.size
+        ):
+            text.append(row.text.strip())
+            last = row
+    return Title(" ".join(text), first.bbox, first.size, last.bbox[3])
+
+
+def _title_slide(view: PageView, ordinary: float) -> Title | None:
+    """The title of a title slide: a page whose largest line is at least TITLE_SLIDE_RATIO x
+    `ordinary` (the size of an ordinary slide's title) and which has at most MAX_SUBTITLE_ROWS
+    other lines in its body (the top and bottom NUMBER_BAND are the headline and footline).
+    The title may be anywhere on the page: a title slide's is often in the middle."""
+    rows = [r for r in view.rows if not r.vertical and r.text.strip()]
+    if not rows or ordinary <= 0:
+        return None
+    largest = max(r.size for r in rows)
+    if largest < TITLE_SLIDE_RATIO * ordinary:
+        return None
+    first = min((r for r in rows if r.size >= largest / 1.05), key=lambda r: (r.bbox[1], r.bbox[0]))
+    title = _with_lines(rows, first)
+    others = [
+        r
+        for r in rows
+        if r.size < largest / 1.05
+        and NUMBER_BAND * view.height
+        <= (r.bbox[1] + r.bbox[3]) / 2
+        <= (1 - NUMBER_BAND) * view.height
+    ]
+    return title if len(others) <= MAX_SUBTITLE_ROWS else None
 
 
 def _body_size(views: Sequence[PageView]) -> float:
@@ -249,41 +341,92 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     beamer = bool(creator and _BEAMER.search(creator))
     body = _body_size(views)
     titles = {v.number: t for v in views if (t := _title(v, body)) is not None}
+    ordinary = statistics.median(t.size for t in titles.values()) if titles else 0.0
+    title_slides = {v.number: t for v in views if (t := _title_slide(v, ordinary)) is not None}
     frames = _frames(views, titles)
     overlaid = any(len(frame) > 1 for frame in frames)
     # Not Beamer: the pages must have at least two different labels, and the labels must group
     # some pages and not all (a label tree with a prefix and no numbers labels every page alike).
     labelled = len({v.label for v in views if v.label}) >= 2 and len(frames) >= 2
-    if not beamer and not (overlaid and labelled):
+    by_label = beamer or (overlaid and labelled)
+    titled = sum(v.number in titles or v.number in title_slides for v in views)
+    if not by_label and titled < TITLED_SHARE * len(views):
         return None
-    deck = Deck(
-        beamer=beamer,
-        frames=[tuple(v.number for v in frame) for frame in frames],
-        labels={v.number: v.label for v in views if v.label},
-    )
-    for frame in frames:
-        last = frame[-1]
-        kept = [last]
-        for view in frame[:-1]:
-            if _repeats(view, last):
-                deck.dropped[view.number] = last.number
-            else:
-                kept.insert(len(kept) - 1, view)
-        if len(kept) > 1:
-            for k, view in enumerate(kept, start=1):
-                deck.steps[view.number] = (k, len(kept))
-        for view in kept:
-            if (title := titles.get(view.number)) is not None:
-                deck.titles[view.number] = title
-                above = [
-                    row.text.strip()
-                    for row in sorted(view.rows, key=lambda r: (r.bbox[1], r.bbox[0]))
-                    if row.bbox[3] <= title.bbox[1] + 0.2 * (title.bbox[3] - title.bbox[1])
-                    and row.text.strip()
-                ]
-                if above:
-                    deck.context[view.number] = tuple(above)
+    # A title slide recurring starts a deck when the file starts with one.
+    runs = _decks(views, title_slides if views[0].number in title_slides else ())
+    deck = Deck(beamer=beamer, labels={v.number: v.label for v in views if v.label})
+    # A run that is mostly slide-shaped is a deck (the rest of a file, say the portrait pages
+    # between two decks, is not numbered).
+    decks = [
+        run for run in runs if 2 * sum(slide_shaped(v.width, v.height) for v in run) > len(run)
+    ]
+    for run in decks:
+        if run[0].number in title_slides:
+            deck.starts[run[0].number] = title_slides[run[0].number]
+    if len(decks) > 1 or deck.starts:
+        deck.numbers = {v.number: n for n, run in enumerate(decks, start=1) for v in run}
+    for run in runs:
+        for frame in _frames(run, titles) if by_label else _step_frames(run):
+            deck.frames.append(tuple(v.number for v in frame))
+            _read_frame(deck, frame, titles)
     return deck
+
+
+def _shaped(view: PageView) -> bool:
+    return slide_shaped(view.width, view.height)
+
+
+def _decks(views: Sequence[PageView], starts: Iterable[int]) -> list[list[PageView]]:
+    """The file's pages as decks: a new deck starts where the page size changes and at each
+    page in `starts` (title slides)."""
+    begin = set(starts)
+    runs: list[list[PageView]] = []
+    for view in views:
+        if runs:
+            last = runs[-1][-1]
+            same_size = abs(view.width - last.width) <= 1 and abs(view.height - last.height) <= 1
+            if same_size and view.number not in begin:
+                runs[-1].append(view)
+                continue
+        runs.append([view])
+    return runs
+
+
+def _step_frames(views: Sequence[PageView]) -> list[list[PageView]]:
+    """Runs of consecutive pages that are one slide by content: each page extends the page
+    before it (`_repeats`: every line and mark of the earlier page is on the later one)."""
+    frames: list[list[PageView]] = []
+    for view in views:
+        if frames and view.number == frames[-1][-1].number + 1 and _repeats(frames[-1][-1], view):
+            frames[-1].append(view)
+        else:
+            frames.append([view])
+    return frames
+
+
+def _read_frame(deck: Deck, frame: Sequence[PageView], titles: dict[int, Title]) -> None:
+    """Which pages of the frame are earlier steps, which stay as steps, and their titles."""
+    last = frame[-1]
+    kept = [last]
+    for view in frame[:-1]:
+        if _repeats(view, last):
+            deck.dropped[view.number] = last.number
+        else:
+            kept.insert(len(kept) - 1, view)
+    if len(kept) > 1:
+        for k, view in enumerate(kept, start=1):
+            deck.steps[view.number] = (k, len(kept))
+    for view in kept:
+        if (title := titles.get(view.number)) is not None:
+            deck.titles[view.number] = title
+            above = [
+                row.text.strip()
+                for row in sorted(view.rows, key=lambda r: (r.bbox[1], r.bbox[0]))
+                if row.bbox[3] <= title.bbox[1] + 0.2 * (title.bbox[3] - title.bbox[1])
+                and row.text.strip()
+            ]
+            if above:
+                deck.context[view.number] = tuple(above)
 
 
 def _inside(box: BBox, other: BBox) -> float:
@@ -298,7 +441,7 @@ def _is_title(element: Element, title: Title) -> bool:
     """The element is the frame title's own text: it holds the title's box and is no taller
     than a few lines of it (a drawn bar that holds the title as a label is not)."""
     tall = element.bbox[3] - element.bbox[1]
-    return _inside(title.bbox, element.bbox) >= 0.5 and tall <= 3 * (title.bbox[3] - title.bbox[1])
+    return _inside(title.bbox, element.bbox) >= 0.5 and tall <= 3 * title.height
 
 
 def _place(e: Element) -> tuple[int, int]:
@@ -412,11 +555,40 @@ def finish(
             gone.add(e.id)
     # An inline equation goes with its paragraph.
     gone |= {e.id for e in elements if e.parent_id in gone}
-    out = [
-        e.model_copy(update=updates[e.id]) if e.id in updates else e
-        for e in elements
-        if e.id not in gone
-    ]
+    # A deck that starts on a title slide: the element that is its title is a heading, the
+    # deck's.
+    deck_titles: set[str] = set()
+    for page, start in deck.starts.items():
+        found = next(
+            (
+                e
+                for e in elements
+                if e.page == page
+                and e.id not in gone
+                and e.kind in (Kind.PARAGRAPH, Kind.HEADING)
+                and _is_title(e, start)
+            ),
+            None,
+        )
+        if found is not None:
+            deck_titles.add(found.id)
+            if found.kind == Kind.PARAGRAPH and found.id not in updates:
+                updates[found.id] = {
+                    "kind": Kind.HEADING,
+                    "reasons": [*found.reasons, TITLE_REASON, *title_reasons],
+                    "font_size": found.font_size or start.size,
+                }
+    out = []
+    for e in elements:
+        if e.id in gone:
+            continue
+        e = e.model_copy(update=updates[e.id]) if e.id in updates else e
+        if e.kind == Kind.HEADING and (number := deck.numbers.get(e.page)) is not None:
+            reasons = [*e.reasons, f"{DECK_REASON} {number}"]
+            if e.id in deck_titles:
+                reasons.append(DECK_TITLE_REASON)
+            e = e.model_copy(update={"reasons": reasons})
+        out.append(e)
     return [e if e.order == i else e.model_copy(update={"order": i}) for i, e in enumerate(out)]
 
 
