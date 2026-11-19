@@ -12,6 +12,22 @@
   and `data/eval/burden-corpus.json` are re-made at 0.5.13; the golden pages and the stored
   demo page are written again at render 9. Roll back: docs/deploy.md.
 
+## Unreleased: footnotes a file names, found and linked (branch fix/footnotes-found-and-marked)
+
+- A footnote that ended without a full stop (a note that is a URL) took the first paragraph of the
+  next column in with it: the paragraph's words were part of the note and the note's box ran over
+  the page. `_merge_column_continuations` no longer continues a footnote a file names.
+- A file that names its footnotes but puts a destination off the note's line left the note
+  unfound: the symbol notes of a title or author block (`*`, a dagger: the destination is the
+  corner of the page) and a one-line note whose destination is under its line. The first is
+  placed by the glyphs its link covers, when exactly one low line of small type opens with them;
+  the second by the line the point lies just under (`_place_by_mark`, `_row_at`).
+- A footnote's mark was not linked to the note when an inline equation had taken the glyphs just
+  before it, or the mark itself (a mark beside a letter in a maths font). The mark's glyphs are
+  not read as maths, and the context that finds the mark in the text is cut down to the placeholder
+  of the equation (`_mark_spots`, `NOTE_MARK_FLAG`).
+- Docs: docs/layout.md "Footnotes".
+
 ## Unreleased: fixes after the independent review of this batch (branch fix/review-5)
 
 - A part shown as a picture had its "Not converted." label hidden from a screen reader whenever
