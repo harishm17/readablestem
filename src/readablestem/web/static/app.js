@@ -252,6 +252,54 @@
   });
 })();
 
+/* Upload form: the "Exam or quiz" hint. When the box is not ticked and a chosen file's name
+ * holds an exam word, a line under the box says so (the polite region #exam-hint, filled the
+ * way #pdf-check is). The words and the sentence come from the box's data attributes (written
+ * once, web/exam.py); a name is read as web.exam.word_in reads it: a camel-case join, digits and
+ * punctuation break words. It never ticks the box and never moves focus. Without this file the
+ * form is as it was, and the job page says the same after the conversion.
+ */
+(function () {
+  "use strict";
+
+  var input = document.getElementById("pdf");
+  var box = document.getElementById("exam");
+  var region = document.getElementById("exam-hint");
+  if (!input || !box || !region || !box.hasAttribute("data-name-words")) return;
+  var words = box.getAttribute("data-name-words").split(" ").filter(Boolean);
+  var sentence = box.getAttribute("data-hint") || "";
+
+  function wordIn(name) {
+    var spaced = name.replace(/([a-z])([A-Z])/g, "$1 $2").replace(/[^A-Za-z]+/g, " ").toLowerCase();
+    var found = spaced.split(" ").filter(function (part) { return words.indexOf(part) >= 0; });
+    return found.length ? found[0] : "";
+  }
+
+  function update() {
+    var found = "";
+    if (!box.checked && input.files) {
+      for (var i = 0; i < input.files.length && !found; i++) found = wordIn(input.files[i].name);
+    }
+    var line = region.querySelector("p");
+    if (!found) {
+      if (line) region.textContent = "";
+      return;
+    }
+    var text = sentence.replace("{word}", found);
+    if (line && line.textContent === text) return;
+    region.textContent = "";
+    line = document.createElement("p");
+    line.className = "hint";
+    line.textContent = text;
+    region.appendChild(line);
+  }
+
+  input.addEventListener("change", update);
+  box.addEventListener("change", update);
+  // Back to this page from the browser's page cache: the chosen files may still be there.
+  window.addEventListener("pageshow", update);
+})();
+
 /* The one submit rule, in the browser (SW43; the server's half is web/forms.py). A form
  * drawn by the form(key) macro (components/forms.html, data-submit-once) is sent once:
  * the pressed button says what is happening ("Saving…", its data-busy-label or the

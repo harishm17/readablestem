@@ -103,6 +103,21 @@ def test_the_choice_is_said_wherever_the_document_is_handled_and_never_to_the_st
     assert "exam or quiz" not in student.text.casefold()
 
 
+def test_a_document_named_like_an_exam_but_not_converted_as_one_is_said_to_its_owner(web):
+    named = job_id_from(upload(web.browser, make_pdf(1), filename="Midterm2_Fall.pdf"))
+    ticked = job_id_from(upload(web.browser, make_pdf(1), filename="midterm.pdf", exam=True))
+    final = job_id_from(upload(web.browser, make_pdf(1), filename="Lecture_Notes_FINAL.pdf"))
+    for _ in range(3):
+        web.run_worker()
+    hint = "says “midterm”"
+
+    page = web.browser.get(f"/jobs/{named}").text
+    assert hint in page and f"/app?revises={named}" in page
+    assert hint not in web.browser.get(f"/jobs/{ticked}").text  # chosen on purpose
+    assert hint not in web.browser.get(f"/jobs/{final}").text  # "final" alone is a draft label
+    assert web.job(named).exam_mode is False  # a hint only: the choice is still off
+
+
 # --------------------------------------------------------------------------- the note
 
 

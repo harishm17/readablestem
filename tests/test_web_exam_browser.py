@@ -33,3 +33,28 @@ def test_the_box_is_described_by_its_hint_and_toggles_from_the_label(site, brows
     page.keyboard.press("Space")  # the box has focus after the label click
     expect(box).not_to_be_checked()
     context.close()
+
+
+def test_a_chosen_file_named_like_an_exam_gets_one_line_until_the_box_is_ticked(site, browser):
+    context, page = open_page(browser, site)
+    page.goto(f"{site.base}/app")
+
+    def choose(*names: str) -> None:
+        page.set_input_files(
+            "#pdf",
+            [{"name": n, "mimeType": "application/pdf", "buffer": b"%PDF-1.4"} for n in names],
+        )
+
+    hint = page.locator("#exam-hint")
+    choose("Midterm2.pdf")
+    expect(hint).to_contain_text("says “midterm”")
+    expect(hint).to_have_attribute("aria-live", "polite")
+    expect(page.locator("#pdf")).not_to_be_focused()  # the line never takes focus
+    expect(page.get_by_label(LABEL)).not_to_be_checked()  # and never ticks the box
+    page.locator("label[for=exam]").click()
+    expect(hint).to_be_empty()
+    page.locator("label[for=exam]").click()
+    expect(hint).to_contain_text("midterm")
+    choose("Lecture_Notes_FINAL.pdf")
+    expect(hint).to_be_empty()
+    context.close()
