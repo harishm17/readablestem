@@ -73,7 +73,7 @@ def user_bytes(session: Session, user_id: str, now: datetime | None = None) -> i
         select(func.coalesce(func.sum(_BLOB_BYTES), 0))
         .select_from(Blob)
         .join(Job, Job.id == Blob.job_id)
-        .where(*live, Blob.kind != export_store.KIND)  # a kept export can be made again
+        .where(*live, Blob.kind.not_in((export_store.KIND, export_store.NOTE_KIND)))  # made again
     )
     texts = session.scalar(
         select(func.coalesce(func.sum(_HTML_BYTES + _RESULT_BYTES), 0)).where(*live)

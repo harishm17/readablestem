@@ -148,6 +148,9 @@ ROWS: tuple[CheckLine, ...] = (
         not_checked=True,
     ),
     _document("word_tracked_changes", "required", "Word reader: tracked changes taken as accepted"),
+    _document(
+        "word_table_flattened", "required", "Word reader: a table too large for a grid, as a list"
+    ),
     _document("word_rtl_text", "optional", "Word reader: right-to-left paragraphs"),
     # --- a source job (LaTeX or Word read from the file, `source.report`)
     _document("source_error", "required", "LaTeX reported a formula it could not read"),

@@ -103,12 +103,10 @@ class Busy(Exception):
     """Every Word turn is taken and none came free within `WAIT_S`."""
 
 
-def make_file(file_type: str, html: str, title: str) -> bytes:
-    """The Word (`docx`) or EPUB (`epub`) file of finished HTML, in memory. Raises `Busy`,
-    `export_docx.DocxExportError` or `export_epub.CanvasExportError` (a picture the EPUB
-    cannot hold); the callers say it in words. Shared by the single downloads, "Download all"
-    and "Combine parts" (`routes.bundle`, `routes.jobs.combine_parts`), so they cannot drift
-    apart."""
+def _made(file_type: str, html: str, title: str) -> export_store.Built:
+    """The file of finished HTML and, for Word, how many of its equations are written as words
+    (kept with the file: `export_store.NOTE_KIND`). Raises `Busy`, `export_docx.DocxExportError`
+    or `export_epub.CanvasExportError`."""
     if file_type == "docx":
         if not _turns.acquire(timeout=WAIT_S):
             raise Busy
@@ -116,10 +114,19 @@ def make_file(file_type: str, html: str, title: str) -> bytes:
             made = export_docx.export_docx(html, title=title)
             if made.not_word:  # the count only: which equation is document content
                 log_event(logger, "docx_equations_as_words", count=len(made.not_word))
-            return made.data
+            return export_store.Built(made.data, len(made.not_word))
         finally:
             _turns.release()
-    return export_epub.build_epub(export_epub.export_epub(html, title=title))
+    return export_store.Built(export_epub.build_epub(export_epub.export_epub(html, title=title)))
+
+
+def make_file(file_type: str, html: str, title: str) -> bytes:
+    """The Word (`docx`) or EPUB (`epub`) file of finished HTML, in memory. Raises `Busy`,
+    `export_docx.DocxExportError` or `export_epub.CanvasExportError` (a picture the EPUB
+    cannot hold); the callers say it in words. Shared by the single downloads, "Download all"
+    and "Combine parts" (`routes.bundle`, `routes.jobs.combine_parts`), so they cannot drift
+    apart."""
+    return _made(file_type, html, title).data
 
 
 def stored_file(
@@ -140,7 +147,7 @@ def stored_file(
         file_type,
         html,
         title,
-        lambda: make_file(file_type, html, title),
+        lambda: _made(file_type, html, title),
     )
 
 

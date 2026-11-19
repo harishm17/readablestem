@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: what was left before a Word file can be read from the file (branch fix/word-source-leftovers)
+
+- A Word or LaTeX table with no header marking was accepted with no decision, and was read to a
+  blind student as bare cells. It is now the choice a PDF table with no header has (first row,
+  first column, both, or "not a table"), required, with no model call
+  (`ltx_reader.headers_to_choose`). A one-row table is left as it is.
+- A Word table too large for a grid was written as list items holding raw TeX. Each formula in it
+  is now an equation of its row, read and checked like any other, and the table is the required
+  notice `word_table_flattened`.
+- `docx_reader` no longer keeps an `errors` count nobody read: a failed equation is a required
+  decision where it is shown, and is counted in the reader's `Report`.
+- A source's review list named "page 1" for every item and offered a page filter. It names no page
+  and has no filter (`ReviewItem.page` is 0 for a source).
+- The student's words for an equation of a Word file that is shown as LaTeX said it was written in
+  the Word file. They now say the tool made the LaTeX from the Word equation (the note on the page
+  and the sentence in the notice at the top).
+- A Word file read from the file that fails says what to do: save it as a PDF in Word and upload
+  that. The job page no longer links a Word failure to the LaTeX help.
+- The Word file's count of equations written as words is kept with the built file and said on the
+  job page beside the download.
+- `RENDER_VERSION` is owed for the page note of a Word equation shown as LaTeX; none is raised here.
+
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"

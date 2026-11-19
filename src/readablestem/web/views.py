@@ -146,9 +146,28 @@ CHARACTER_ADVICE = {
 }
 
 
+# A Word file read from the file itself that could not be converted (`error_detail` kind "docx",
+# `source.convert`). The PDF route a Word file takes with the reader off is not taken from a
+# stopped job (its upload is the Word file, charged by its own estimate), so the way on is
+# said: save the Word file as a PDF and upload that.
+WORD_SAVE_AS_PDF = "In Word, choose File, Save As (or Export), pick PDF, and upload that PDF."
+WORD_STOP_MESSAGES = {
+    "source_failed": "This Word file could not be read, so nothing was converted. "
+    + WORD_SAVE_AS_PDF,
+    "source_unreadable": "This Word file could not be read, so nothing was converted. "
+    + WORD_SAVE_AS_PDF,
+    "source_timeout": "This Word file did not finish in the time one conversion may take, "
+    "which usually means a very large file. Trying again will not change that. " + WORD_SAVE_AS_PDF,
+    "source_refused": "This Word file has something this tool will not read, so nothing was "
+    "converted. " + WORD_SAVE_AS_PDF,
+}
+
+
 def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
     """The stop sentence of a source job, naming the file or commands from its
     `error_detail` (`source.report.stop`); the plain sentence when there is no detail."""
+    if detail and detail.get("kind") == "docx" and code in WORD_STOP_MESSAGES:
+        return WORD_STOP_MESSAGES[code or ""]
     plain = job_error_message(code)
     if not detail:
         return plain

@@ -162,6 +162,9 @@ def pictures_sentence(s: CheckedSummary) -> str:
     if s.origin == "pdf":
         shown = "is shown as a picture" if k == 1 else "are shown as pictures"
         shown += " of the original"
+    elif s.origin == "docx":  # Word has no LaTeX: the tool made it from Word's own equation
+        shown = "is shown as LaTeX" if k == 1 else "are shown as LaTeX"
+        shown += " that this tool made from the Word file"
     else:
         shown = "is shown as it was written" if k == 1 else "are shown as they were written"
         shown += f" in the {source_noun(s.origin)}"

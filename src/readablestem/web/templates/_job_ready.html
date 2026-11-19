@@ -51,6 +51,9 @@
     <li class="route" id="route-word">
       <h4>Word</h4>
       <p><a class="button-secondary" href="/jobs/{{ job.id }}/download.docx">Download as Word (.docx)</a></p>
+      {% if word_as_words|default(0) %}
+      <p class="hint" id="word-as-words">{{ word_as_words }} {{ "equation" if word_as_words == 1 else "equations" }} of the Word file {{ "is" if word_as_words == 1 else "are" }} written as words, not as Word {{ "equation" if word_as_words == 1 else "equations" }}, and marked so in the file. {{ "It is" if word_as_words == 1 else "They are" }} complete on the web page.</p>
+      {% endif %}
     </li>
     {% endif %}
     <li class="route" id="route-epub">

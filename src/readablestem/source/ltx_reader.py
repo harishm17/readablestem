@@ -178,6 +178,26 @@ def needs_decision(fix: Fix, code: str) -> Fix:
     )
 
 
+def headers_to_choose(fix: Fix, grid: TableGrid) -> Fix:
+    """`fix` of a source table whose file marks no header (`header_source` "none") as a required
+    choice, the one a PDF table with no header has (`table.headers` `no_headers`, WS5.2): read
+    to a blind student, a table with no header is bare cells. A person chooses the first row,
+    the first column or both, or says it is not a table; nothing is guessed, no model is asked.
+    A one-row table and a table that is not data are left as they are."""
+    if grid.header_source != "none" or not grid.is_data or grid.rows < 2:
+        return fix
+    return fix.model_copy(
+        update={
+            "status": Status.NEEDS_REVIEW if fix.status is Status.ACCEPTED else fix.status,
+            "review": "required",
+            "checks": [
+                *fix.checks,
+                Check(name="table.headers", passed=False, severity="warning", code="no_headers"),
+            ],
+        }
+    )
+
+
 @dataclass
 class Reading:
     title: str | None = None
@@ -915,7 +935,8 @@ class _Reader:
             checks=[Check(name="source.exact", passed=True)],
         )
         # a cell whose picture follows the table reads as empty in it
-        self.out.fixes[element.id] = needs_decision(fix, TABLE_PICTURE) if pictures else fix
+        fix = needs_decision(fix, TABLE_PICTURE) if pictures else fix
+        self.out.fixes[element.id] = headers_to_choose(fix, grid)
         self.chars += sum(len(c.text) for c in grid.cells)
         return element
 

@@ -17,7 +17,7 @@ import pytest
 from sqlalchemy import select
 
 from fixtures import office
-from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login
+from fixtures.web.support import ALICE, WebEnv, csrf_from, fetch, job_id_from, login
 from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult, Kind, Status
 from readablestem.pipeline.checked_words import READY_ALL
@@ -521,3 +521,92 @@ def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_
         token = csrf_from(client.get("/app").text)
         gone = client.post(f"/jobs/{job_id}/delete", data={"csrf_token": token, "confirm": "yes"})
         assert gone.status_code == 303 and jobs(env) == [] and blob_count(env) == 0
+
+
+def _omml(inner: str) -> str:
+    return f"<m:oMath><m:r><m:t>{inner}</m:t></m:r></m:oMath>"
+
+
+@pytest.mark.skipif(
+    not (pandoc_step.installed() and sandbox.available()),
+    reason="needs pandoc and a working sandbox (bubblewrap or Landlock)",
+)
+def test_what_a_word_file_leaves_a_person_to_decide_is_said_not_left_to_chance(
+    tmp_path, monkeypatch
+):
+    """A table with no header and a table too large for a grid wait for the instructor, the
+    formulas of the large one are equations (never TeX in the text), no page is named for a
+    source, a failed read says what to do, and the Word file's equations written as words are
+    said beside its download."""
+    from dataclasses import replace
+
+    from readablestem.pipeline import export_docx
+    from readablestem.source import docx_reader
+    from test_source_reader import _cells, word
+
+    big = "".join(
+        f"<w:tr><w:tc><w:p><w:r><w:t>row {n}</w:t></w:r></w:p></w:tc><w:tc><w:p>"
+        f"{_omml('x' if n else 'y=2')}</w:p></w:tc></w:tr>"
+        for n in range(301)
+    )
+    body = (
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>Motion</w:t></w:r></w:p>'
+        + _cells("a|b", "c|d", marked=False).replace('<w:tblLook w:firstRow="1"/>', "")
+        + "<w:tbl><w:tblGrid><w:gridCol w:w='2000'/><w:gridCol w:w='2000'/></w:tblGrid>"
+        + f"{big}</w:tbl>"
+        + "<w:p><m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant></m:oMath></w:p>"
+    )
+    env = WebEnv(tmp_path, feature_word_source=True)
+    env.converter = convert_pdf  # ty: ignore[invalid-assignment]
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        job_id = job_id_from(send(client, word(body), "notes.docx"))
+        assert env.run_worker() == job_id
+        result = DocumentResult.model_validate(env.job(job_id).result_json)
+        # a table with no header is a choice, as a PDF table with none is: it is not accepted
+        table = next(f for f in result.fixes if f.kind is Kind.TABLE)
+        assert table.pending and table.review == "required"
+        listed = client.get(f"/jobs/{job_id}/review/list").text
+        accept = client.post(
+            f"/jobs/{job_id}/review/{table.element_id}",
+            data={"csrf_token": csrf_from(listed), "action": "accept", "view": "list"},
+        )
+        assert accept.status_code == 422
+        # the large table is a list whose formulas are equations of their row, and says so
+        rows = [e for e in result.elements if e.kind is Kind.LIST_ITEM]
+        assert len(rows) == 301 and not any("\\" in (r.text or "") for r in rows)
+        row_ids = {r.id for r in rows}
+        assert sum(e.parent_id in row_ids for e in result.elements) == 301
+        assert "word_table_flattened" in {n.code for n in result.notices}
+        # no page is named for a part of a source
+        review = " ".join(re.sub(r"<[^>]+>", " ", listed).split())
+        assert not re.search(r"\b[Pp]age \d", review)
+        # the tool made the LaTeX of a Word equation: the notes do not say it was written
+        student = client.get(f"/jobs/{job_id}/view").text
+        assert "written in LaTeX" not in student and "written in the Word file" not in review
+        # the Word file is made once; its equations written as words are kept and said
+        real = export_docx.export_docx
+
+        def two_as_words(html, *, title):
+            return replace(real(html, title=title), not_word=["a", "b"])
+
+        monkeypatch.setattr(export_docx, "export_docx", two_as_words)
+        ready = job_id_from(send(client, office.docx_with_equation(), "ready.docx"))
+        assert env.run_worker() == ready
+        assert "written as words" not in client.get(f"/jobs/{ready}").text
+        assert fetch(client, f"/jobs/{ready}/download.docx").status_code == 200
+        assert "2 equations of the Word file are written as words" in " ".join(
+            client.get(f"/jobs/{ready}").text.split()
+        )
+        # a Word file the reader fails on: the way on is to save it as a PDF, not LaTeX help
+        failing = job_id_from(send(client, word(body), "again.docx"))
+
+        def unreadable(*_args):
+            raise docx_reader.ReadError("too deep")
+
+        monkeypatch.setattr(docx_reader, "read", unreadable)
+        assert env.run_worker() == failing
+        page = " ".join(client.get(f"/jobs/{failing}").text.split())
+        assert env.job(failing).error_code == "source_unreadable"
+        assert "PDF" in page and "/help/latex" not in page

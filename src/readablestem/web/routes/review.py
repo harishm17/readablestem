@@ -970,7 +970,8 @@ def _item(
         element_id=fix.element_id,
         kind=fix.kind.value,
         label=label or f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
-        page=(element.page + 1) if element else 0,
+        # a source has no pages (its elements' are 0): 0 says none, and no page is named
+        page=(element.page + 1) if element and origin == "pdf" else 0,
         status=fix.status.value,
         status_label=status_words(fix, element, origin),
         pending=needs_attention(fix.status),

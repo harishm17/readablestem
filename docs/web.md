@@ -855,6 +855,18 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   otherwise counted by the coverage rule: every word of the file is in pandoc's tree or counted as
   `source_unread` (a required notice) so nothing is left out without a number. Tracked changes
   are read as accepted, and say so (`word_tracked_changes`, required).
+- **Tables and equations in the reading.** A table with no header marking (no repeated header
+  row, no first-row flag) is the choice a PDF table with no header has: `table.headers`
+  `no_headers`, required, with the first row, the first column, both, or "not a table", and no
+  Accept; no model is asked (`ltx_reader.headers_to_choose`, which a LaTeX source's table gets
+  too). A table too large for a grid (over 300 rows, 60 columns or 5,000 cells) is a list, one
+  item for each row; a formula in it is an equation element of the item, read and checked like
+  any other, and the table is the required notice `word_table_flattened`. A failed equation is
+  counted in `Report.math_failed` and is a required decision where it is shown; the reading's
+  `errors` count is the LaTeX reader's alone (its `source_error` notice).
+- **Pages.** A source has none: its elements' page is 0, so the review list names no page for
+  an item (`ReviewItem.page` 0) and offers no page filter, and a link or a record row names the
+  part, not a page.
 - **What is stored.** The file as uploaded, wrapped in the envelope (`source/envelope.py`, kind
   `docx`, media type `application/x-readablestem-docx`), as the job's `upload` row of `blobs`: the
   same row, counted in the person's stored bytes and deleted with the document (`delete_jobs`,
@@ -1014,7 +1026,11 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
   room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time limit: a macro that
   calls itself, a very large file; not offered "Try again") or `timeout` and the message "Upload
-  the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
+  the PDF instead"; nothing half-made is kept. A Word file read from the file itself that fails has no
+  PDF route to fall back to (with the switch off the PDF is made at upload, by LibreOffice, and
+  its pages are what is charged; a job made from the Word file has no such PDF), so its job page
+  says what to do: save the Word file as a PDF and upload that (`kind` "docx" in the job's
+  `error_detail`, `views.WORD_STOP_MESSAGES`). If LaTeXML or the sandbox is missing, the upload
   itself is refused at once.
 - **Lost content stops the job.** LaTeXML exits 0 when it drops content; what it said is in its
   log (`out/latexml.out`, `out/post.out`), which `source.report.parse` reads into
