@@ -515,20 +515,22 @@ def options_page(*lines: str) -> bytes:
         # Options run together on one line are one item each.
         (
             ("(A) three metres   (B) five metres   (C) seven metres",),
-            ["(A) three metres", "(B) five metres", "(C) seven metres"],
+            ["three metres", "five metres", "seven metres"],
             False,
         ),
-        # Over two rows they stay one block, and it says so.
+        # Over two rows, with a label missing from the run, they stay one block, and it says so.
         (
-            ("(A) three metres   (B) five metres", "(C) seven metres   (D) nine metres"),
-            ["(A) three metres (B) five metres (C) seven metres (D) nine metres"],
+            ("(A) three metres   (B) five metres", "(C) seven metres   (E) nine metres"),
+            ["(A) three metres (B) five metres (C) seven metres (E) nine metres"],
             True,
         ),
     ],
 )
 def test_answer_options_inside_one_block_are_split_or_flagged_never_silent(lines, texts, flagged):
     layout = analyze(options_page(*lines))
-    options = [e for e in layout.elements if e.text and e.text.startswith("(")]
+    options = [
+        e for e in layout.elements if e.list_marker or (e.text and e.text.startswith("("))
+    ]
     assert [e.text for e in options] == texts
     assert [OPTION_LABELS in e.reasons for e in options] == [flagged] * len(options)
     assert [n.review for n in from_reasons(options)] == ["required"] * flagged

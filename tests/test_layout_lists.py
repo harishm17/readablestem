@@ -67,6 +67,85 @@ def test_openstax_spaced_full_stop_is_part_of_the_marker():
     ]
 
 
+# ---------------------------------------------------------------- option grids
+
+
+def question_with_options(options: dict[str, tuple[float, float]]) -> bytes:
+    """A numbered question with its points at the right margin, then options at x, y."""
+
+    def fill(page):
+        page.insert_text((72, 100), "1. Which organelle makes ATP?", fontsize=BODY)
+        page.insert_text((490, 100), "(2 points)", fontsize=BODY)
+        for text, at in options.items():
+            page.insert_text(at, text, fontsize=BODY)
+        page.insert_text((72, 190), "2. Name the stages of mitosis.", fontsize=BODY)
+
+    return one_page(fill)
+
+
+ROW_MAJOR = {
+    "(A) Nucleus": (90, 120),
+    "(B) Mitochondrion": (300, 120),
+    "(C) Ribosome": (90, 135),
+    "(D) Golgi body": (300, 135),
+}
+
+
+def test_options_two_across_are_one_list_below_their_question_with_its_points():
+    elements = analyze(question_with_options(ROW_MAJOR)).elements
+    assert kinds(elements) == [Kind.LIST_ITEM] * 6  # no paragraph for the points
+    assert items(elements) == [
+        ("1.", True, 1, "Which organelle makes ATP? (2 points)"),
+        ("(A)", True, 2, "Nucleus"),
+        ("(B)", True, 2, "Mitochondrion"),
+        ("(C)", True, 2, "Ribosome"),
+        ("(D)", True, 2, "Golgi body"),
+        ("2.", True, 1, "Name the stages of mitosis."),
+    ]
+
+
+def test_options_set_down_the_columns_are_read_in_label_order():
+    down = {
+        "(A) Nucleus": (90, 120),
+        "(C) Ribosome": (300, 120),
+        "(B) Mitochondrion": (90, 135),
+        "(D) Golgi body": (300, 135),
+    }
+    elements = analyze(question_with_options(down)).elements
+    assert [(marker, level, text) for marker, _, level, text in items(elements)[1:5]] == [
+        ("(A)", 2, "Nucleus"),
+        ("(B)", 2, "Mitochondrion"),
+        ("(C)", 2, "Ribosome"),
+        ("(D)", 2, "Golgi body"),
+    ]
+
+
+def test_a_points_label_at_the_right_margin_joins_a_question_with_no_options():
+    def fill(page):
+        page.insert_text((72, 100), "1. Name the stages of mitosis.", fontsize=BODY)
+        page.insert_text((490, 100), "(4 points)", fontsize=BODY)
+
+    assert items(analyze(one_page(fill)).elements) == [
+        ("1.", True, 1, "Name the stages of mitosis. (4 points)")
+    ]
+
+
+def test_labels_that_are_not_a_full_run_are_left_in_page_order():
+    gap = {
+        "(A) Nucleus": (90, 120),
+        "(C) Ribosome": (300, 120),
+        "(B) Mitochondrion": (90, 135),
+        "(E) Lysosome": (300, 135),
+    }
+    elements = analyze(question_with_options(gap)).elements
+    assert [e.text for e in elements[1:5]] == [
+        "Nucleus",
+        "(C) Ribosome",
+        "Mitochondrion",
+        "(E) Lysosome",
+    ]
+
+
 # ---------------------------------------------------------------- nesting and indents
 
 

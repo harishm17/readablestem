@@ -373,7 +373,7 @@ class _Build:
             return None
         labels = [lab for lab, _ in lc + rc if lab is not None]
         if len({lab[0] for lab in labels}) != 1:
-            return "cols"
+            return self._grid_above(idx, left, right, box, column, lc + rc) or "cols"
         vals = sorted(v for _, v in labels)
         if vals != list(range(vals[0], vals[0] + len(vals))):
             return None
@@ -381,6 +381,40 @@ class _Build:
         node = _Node("grid", _union([items[i][0] for i in idx]), column=column)
         node.cells = [_union([items[i][0] for i in m]) for _, m in cells]
         return node
+
+
+    def _grid_above(
+        self,
+        idx: list[int],
+        left: list[int],
+        right: list[int],
+        box: BBox,
+        column: str,
+        cells: list[tuple[tuple[str, int] | None, list[int]]],
+    ) -> _Node | None:
+        """Rule 8, a grid with the next question under it. Options (A) (C) beside (B) (D) and the
+        number of the next question ("5.") stand in the same two columns, as no blank band
+        parts them: the labels of the cells below the first kind of label are cut off, and the
+        cells above are the grid, a stack of the grid and what is under it."""
+        items = self.items
+        first = min(cells, key=lambda c: min(items[i][0][1] for i in c[1]))
+        kind = first[0][0] if first[0] else ""
+        foreign = [c for c in cells if c[0] is not None and c[0][0] != kind]
+        top = min(items[i][0][1] for c in foreign for i in c[1])
+        centre = {i: (items[i][0][1] + items[i][0][3]) / 2 for i in idx}
+        above = [i for i in idx if centre[i] < top]
+        below = [i for i in idx if centre[i] >= top]
+        if not above or not below:
+            return None
+        grid = self._grid(
+            above, [i for i in left if i in above], [i for i in right if i in above], box, column
+        )
+        if not isinstance(grid, _Node):
+            return None
+        cut = (max(items[i][0][3] for i in above) + top) / 2
+        return _Node(
+            "stack", box, [grid, self.build(below, column, 1)], [cut], column=column
+        )
 
 
 def _side(column: str, side: str) -> str:

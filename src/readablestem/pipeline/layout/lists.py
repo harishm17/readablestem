@@ -314,12 +314,22 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     """
     levels: dict[int, int] = {}
     stack: list[float] = []
+    options: float | None = None  # the x the options of the grid being read are placed at
     for block in blocks:
         if block.marker is None:
             if block.kind != Kind.EQUATION:
                 stack = []
             continue
         x = block.marker.x - block.origin
+        if block.marker.option is None:
+            options = None
+        elif options is None:
+            # The options of a grid are one list below the item they follow, whichever column
+            # each is set in (a row-major grid reads A, B across, C, D below), and all at one level.
+            options = max(x, stack[-1] + 2 * tolerance) if stack else x
+            x = options
+        else:
+            x = options
         while stack and x < stack[-1] - tolerance:
             stack.pop()
         if not stack or x > stack[-1] + tolerance:

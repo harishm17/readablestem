@@ -30,7 +30,12 @@ def _lines(page: pymupdf.Page, tag: str, x: float, top: float, count: int, width
 def _read(doc: pymupdf.Document, pattern: re.Pattern[str] = TAG, *, on: bool) -> str:
     """The letters of the tags in reading order, a run of one letter counted once."""
     result = layout.analyze(doc.tobytes(), region_tree=on)
-    words = [w for e in result.elements for w in (e.text or "").split() if pattern.fullmatch(w)]
+    words = [
+        w
+        for e in result.elements
+        for w in [e.list_marker or "", *(e.text or "").split()]
+        if pattern.fullmatch(w)
+    ]
     return "".join(k for k, _ in itertools.groupby(w[0] for w in words))
 
 
@@ -88,7 +93,7 @@ def test_a_boxed_region_is_read_whole_after_the_text_that_wraps_it():
     _right_only_on(doc, "PBQ")
 
 
-def test_an_option_grid_is_read_in_label_order():
+def test_an_option_grid_is_read_in_label_order_with_the_tree_on_or_off():
     doc, page = _page()
     page.insert_text((40, 100), "Which of the following statements is true?", fontsize=10)
     for k, label in enumerate("abcdef"):
@@ -98,7 +103,8 @@ def test_an_option_grid_is_read_in_label_order():
             page.insert_text(
                 (x + 12, y + 12 * (n + 1)), "a following line of the option", fontsize=10
             )
-    _right_only_on(doc, "abcdef", OPTION)
+    # The default reading puts the options in label order too (`layout._option_grids`).
+    assert _read(doc, OPTION, on=False) == _read(doc, OPTION, on=True) == "abcdef"
 
 
 def test_a_table_at_the_top_of_a_column_is_read_before_the_text_beside_it():

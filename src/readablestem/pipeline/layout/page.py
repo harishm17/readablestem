@@ -33,6 +33,7 @@ from readablestem.pipeline.layout.blocks import (
     _merge_style_splits,
     _paragraph_pieces,
     _runs,
+    _option_order,
     _split_options,
 )
 from readablestem.pipeline.layout.context import _Document, _PageGuard
@@ -518,7 +519,7 @@ def _page_blocks(
     # A caption held by its figure still fills its column: without it the column looks empty
     # beside the next line of the other column, which then reads as a heading across both.
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions, blocks=True)
-    final = _merge_column_continuations([blocks[i] for i in order])
+    final = _option_order(_merge_column_continuations([blocks[i] for i in order]))
     edges = _RightEdges(text_rows)
     _label_abstracts(final, text_rows, edges)
     for block in final:
