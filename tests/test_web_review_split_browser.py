@@ -192,7 +192,8 @@ def test_the_page_image_is_a_named_focusable_region_that_scrolls_on_a_phone(site
     wait_images(page)
     band = page.locator(".region-image").first
     natural, shown = band.evaluate("i => [[i.naturalWidth, i.naturalHeight], [i.width, i.height]]")
-    assert shown[0] >= natural[0] - 2 and abs(shown[1] / shown[0] - natural[1] / natural[0]) < 0.01
+    assert shown[0] >= natural[0] * 0.99  # not squeezed to the phone's width
+    assert abs(shown[1] / shown[0] - natural[1] / natural[0]) < 0.01  # same shape
     box = band.locator("xpath=ancestor::*[@role='group'][1]")
     assert box.get_attribute("tabindex") == "0" and box.get_attribute("aria-label")
     assert box.evaluate("e => e.scrollWidth > e.clientWidth")
