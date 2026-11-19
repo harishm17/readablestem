@@ -99,7 +99,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
     not_compared: Counter[str] = Counter()
     for done in counted:
         held = done.not_compared or {}
-        formulas.update({key: held.get(key, 0) for key in ("equations", "tables_with_maths")})
+        formulas.update({key: held.get(key, 0) for key in ("equations", "tables_with_math")})
         not_compared.update(held.get("causes", {}))
         counts = page_counts(done)
         every_page += counts
@@ -152,7 +152,7 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
         # no decision is asked for these, so they are counted here and not above.
         "not_compared": {
             "equations": formulas["equations"],
-            "tables_with_maths": formulas["tables_with_maths"],
+            "tables_with_math": formulas["tables_with_math"],
             "causes": dict(sorted(not_compared.items())),
         },
         "documents": sorted(rows, key=lambda row: (-row["per_page"], row["upload"])),
@@ -311,7 +311,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         lines += [
             "",
             f"accepted with nothing to hold them against ({held['equations']} equations, "
-            f"{held['tables_with_maths']} tables with math), by cause:",
+            f"{held['tables_with_math']} tables with math), by cause:",
         ]
         lines += measure.table(("check:cause", "count"), list(held["causes"].items()))
     lines += ["", f"the {worst} documents that ask the most a page:"]

@@ -170,7 +170,7 @@ def held_against_nothing(result: DocumentResult) -> dict[str, Any]:
         )
     return {
         "equations": equations,
-        "tables_with_maths": tables,
+        "tables_with_math": tables,
         "causes": dict(sorted(causes.items())),
     }
 

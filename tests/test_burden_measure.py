@@ -135,7 +135,7 @@ def test_a_formula_accepted_with_nothing_to_hold_it_against_is_counted_by_cause(
         run[0],
         not_compared={
             "equations": 7,
-            "tables_with_maths": 2,
+            "tables_with_math": 2,
             "causes": {"equation.not_compared:no_characters": 2, "table.math_not_compared:x": 1},
         },
     )
@@ -145,7 +145,7 @@ def test_a_formula_accepted_with_nothing_to_hold_it_against_is_counted_by_cause(
     out = tmp_path / "out.json"
     assert burden("--from", records(tmp_path, "a", run), "--out", out) == 0
     held = json.loads(out.read_text())["metrics"]["not_compared"]
-    assert (held["equations"], held["tables_with_maths"]) == (8, 2)
+    assert (held["equations"], held["tables_with_math"]) == (8, 2)
     assert held["causes"] == {
         "equation.not_compared:no_characters": 3,
         "table.math_not_compared:x": 1,
