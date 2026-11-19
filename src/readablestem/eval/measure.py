@@ -137,6 +137,9 @@ class Converted:
     # glyphs by code, and what layout left out by name. Counts only. None when the replay
     # did not take them (`eval.say_once_report`), and in a record made before this was kept.
     say_once: list[dict[str, Any]] | None = None
+    # How many formulas the conversion accepted with nothing to hold them against, and why
+    # (`held_against_nothing`). Counts only. None in a record made before this was kept.
+    not_compared: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
@@ -146,6 +149,30 @@ class Converted:
         fields: dict[str, Any] = dict(raw)
         fields["facts"] = StepFacts.model_validate(raw.get("facts") or {})
         return cls(**fields)
+
+
+def held_against_nothing(result: DocumentResult) -> dict[str, Any]:
+    """The formulas of `result` and the passed checks that say one was held against nothing:
+    an equation (`equation.not_compared`) or a table's maths cells (`table.math_not_compared`),
+    each counted under its cause."""
+    from readablestem.pipeline.equation_step import NOT_COMPARED
+    from readablestem.pipeline.table_step import MATH_NOT_COMPARED
+
+    causes: Counter[str] = Counter()
+    equations = tables = 0
+    for fix in result.fixes:
+        equations += fix.kind == Kind.EQUATION
+        tables += fix.kind == Kind.TABLE and any(c.name == "table.math" for c in fix.checks)
+        causes.update(
+            f"{c.name}:{c.code}"
+            for c in fix.checks
+            if c.passed and c.name in (NOT_COMPARED, MATH_NOT_COMPARED)
+        )
+    return {
+        "equations": equations,
+        "tables_with_maths": tables,
+        "causes": dict(sorted(causes.items())),
+    }
 
 
 def every_upload() -> list[Upload]:
@@ -441,6 +468,7 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
         decisions=[asdict(decision) for decision in triage.decisions(result)],
         outputs=audit,
         order=order_rows(upload.entry, pdf, result),
+        not_compared=held_against_nothing(result),
     )
 
 

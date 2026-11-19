@@ -115,3 +115,26 @@ def test_a_record_kept_up_to_date_fails_a_change_in_either_direction(tmp_path, c
 
     # The same documents on a machine that has the answers of the lecture only.
     assert burden("--from", records(tmp_path, "c", more[:1]), "--against", record, "--same") == 0
+
+
+def test_a_formula_accepted_with_nothing_to_hold_it_against_is_counted_by_cause(tmp_path):
+    run = measured()
+    run[0] = replace(
+        run[0],
+        not_compared={
+            "equations": 7,
+            "tables_with_maths": 2,
+            "causes": {"equation.not_compared:no_characters": 2, "table.math_not_compared:x": 1},
+        },
+    )
+    run[1] = replace(
+        run[1], not_compared={"equations": 1, "causes": {"equation.not_compared:no_characters": 1}}
+    )
+    out = tmp_path / "out.json"
+    assert burden("--from", records(tmp_path, "a", run), "--out", out) == 0
+    held = json.loads(out.read_text())["metrics"]["not_compared"]
+    assert (held["equations"], held["tables_with_maths"]) == (8, 2)
+    assert held["causes"] == {
+        "equation.not_compared:no_characters": 3,
+        "table.math_not_compared:x": 1,
+    }
