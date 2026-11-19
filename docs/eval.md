@@ -2787,7 +2787,7 @@ exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only
 that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
 replay pays nothing.
 
-**Answers still owed.** 29 files ask for 1,264 answers that are not in the recording
+**Answers still owed.** 29 files ask for 1,286 answers that are not in the recording
 (2026-11-19). Until wave 1a it was ten files and 126 answers (pictures that changed since the
 first recording, and files added after it). Wave 1a changed what a conversion asks on 18
 files (words with their styles, kept line ends, new boxes) and paid for no recording, so one
@@ -3341,18 +3341,21 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.12 by
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.13 by
 `eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 58 decisions,
 0.496 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
 capitals, equation numbers and kept line ends) make the pipeline ask questions the
-recording does not hold, so 30 uploads are left out for 1,298 answers missing, among them the
-equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 74,
-`w_solutions_1802` 50). The decisions a page of the records are not comparable: the dense
+recording does not hold, so 30 uploads are left out for 1,326 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 76,
+`w_solutions_1802` 64). The decisions a page of the records are not comparable: the dense
 mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
 0.5.11 record (2026-11-18, 45 uploads, 70 decisions), the 42 uploads in both ask the same;
 `r15_openstax_chem_ch3`, `r19_poster_codesign` and `r20_newsletter_drp` left the record (2, 4
-and 2 answers missing) and `w_mixed_slides+image_pages` came back. **A paid recording of the
+and 2 answers missing) and `w_mixed_slides+image_pages` came back. Against the 0.5.12 record the same 43 uploads are
+measured and each asks the same decisions: the list, block-start and page-join changes of
+0.5.13 moved elements only on uploads that were already left out (28 more answers missing on
+seven of them). **A paid recording of the
 answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
 the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.
