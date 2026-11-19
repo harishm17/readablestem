@@ -7,7 +7,7 @@ registered run: the held-out errors were read in the analysis of 2026-10-20, and
 pipeline 0.5.0 were written after the registered run to fix classes of error seen there (the
 development set dev-v2 was built to contain them). The numbers below are therefore optimistic for
 documents in general, and are not to be quoted as held-out results of the system. The registered
-numbers (README, `PROOF.md`, the recorded run `proof/bundles/heldout-2026-10/`) are unchanged and
+numbers (docs/results.md, `PROOF.md`, the recorded run `proof/bundles/heldout-2026-10/`) are unchanged and
 remain the held-out results of the 0.4.0 system; nothing in `proof/` or `PROOF.md` was edited.
 
 **Nothing was tuned after the first held-out number of this run was seen.** The code that ran is
