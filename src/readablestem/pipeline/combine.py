@@ -89,6 +89,7 @@ class Joined:
     page_labels: dict[int, str]
     footnote_ids: list[str]
     omitted_pages: list[int]
+    left_out_blocks: list[int]  # the page of the source of each paragraph left out
     lang: str
 
 
@@ -208,6 +209,7 @@ def join(parts: Sequence[Part]) -> Joined:
     labels: dict[int, str] = {}
     footnotes: list[str] = []
     omitted: set[int] = set()
+    blocks: list[int] = []
     shift = 0
     tag, _ = common_language(
         [(p.result.lang, unconfirmed(n.code for n in p.result.notices)) for p in ordered]
@@ -236,6 +238,7 @@ def join(parts: Sequence[Part]) -> Joined:
             if n.code == "footnote" and n.element_id
         ]
         omitted |= {part.pages[p] for p in part.result.omitted_pages if p < len(part.pages)}
+        blocks += [part.pages[p] for p in part.result.left_out_block_pages if p < len(part.pages)]
     ids = [e.id for e in elements]
     if len(ids) != len(set(ids)):
         raise CombineError("ids_clash")
@@ -253,6 +256,7 @@ def join(parts: Sequence[Part]) -> Joined:
         page_labels=labels,
         footnote_ids=footnotes,
         omitted_pages=sorted(omitted),
+        left_out_blocks=sorted(blocks),
         lang=tag,
     )
 
@@ -277,6 +281,7 @@ def combine(
         contact=contact,
         math_alttext=math_alttext,
         omitted_pages=joined.omitted_pages or None,
+        left_out_blocks=joined.left_out_blocks or None,
         page_labels=joined.page_labels,
         footnote_ids=joined.footnote_ids,
     )

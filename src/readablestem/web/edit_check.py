@@ -49,6 +49,7 @@ MEANING_CODES = frozenset(
         "number_mismatch",
         "case_mismatch",
         "species_mismatch",
+        "accent_mismatch",
     }
 )
 # What the compare sentences (`web.compare`) are about, for each meaning-level code.
@@ -61,6 +62,7 @@ _SAID_FOR = {
     "number_mismatch": ("number",),
     "case_mismatch": ("case",),
     "species_mismatch": ("species",),
+    "accent_mismatch": ("accent",),
 }
 MAX_NAMED = 3  # unknown commands named in one message
 Display = Literal["block", "inline"]
@@ -159,7 +161,9 @@ def check_cell_edit(layer: str | None, typed: str, *, current: str | None = None
         id="cell", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0,
         text=layer or None, display="inline",
     )  # fmt: skip
-    out.mathml, out.speech, out.checks = evaluate(latex, "inline", stand_in, species=False)
+    out.mathml, out.speech, out.checks = evaluate(
+        latex, "inline", stand_in, species=False, accents=False
+    )
     if out.mathml is None:
         out.blocking = latex_problems(latex, out.failed)
         return out
@@ -178,11 +182,12 @@ def _same(typed: str, stored: str) -> bool:
 
 
 def evaluate(
-    latex: str, display: str, element: Element | None, *, species: bool = True
+    latex: str, display: str, element: Element | None, *, species: bool = True, accents: bool = True
 ) -> tuple[str | None, str, list[Check]]:
     """(MathML or None, speech, checks) for already cleaned LaTeX: the equation step's
     `_evaluate` without a model answer, step by step in the same order with the same
-    check names and codes. `species`: also the chemistry check (a table's cell has none)."""
+    check names and codes. `species`: also the chemistry check (a table's cell has none);
+    `accents`: also the accent check (a cell's text has no glyphs to see accents in)."""
     from readablestem.pipeline import equation_step, notation_memory, signs, validate
 
     # The course notation in force (web.notation.in_force), as the step reads it: its
@@ -264,6 +269,11 @@ def evaluate(
                 code="species_mismatch" if found.differ else None,
             )
         )
+    accent = (
+        equation_step.accent_check(element, mathml) if accents and element is not None else None
+    )
+    if accent is not None:
+        checks.append(accent)
     return mathml, speech, checks
 
 

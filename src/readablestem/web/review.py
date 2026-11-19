@@ -1930,6 +1930,7 @@ def rerender_html(
         filename=filename,
         audience=audience,
         stamp=stamp,
+        pipeline_version=result.pipeline_version,
         **chosen,
         lang=result.lang,
         elements=result.elements,
@@ -1945,6 +1946,7 @@ def rerender_html(
             n.element_id for n in result.notices if n.code == "footnote" and n.element_id
         ],
         **({"omitted_pages": result.omitted_pages} if result.omitted else {}),
+        **({"left_out_blocks": result.left_out_block_pages} if result.left_out_blocks else {}),
     )
     result.html_checks = html_checks.static_checks(html)
     return html

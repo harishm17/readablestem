@@ -114,3 +114,32 @@ def base_char(ch: str) -> str:
     if ch in _HOLE_VARIANT:
         return _HOLE_VARIANT[ch][1]
     return unicodedata.normalize("NFKC", ch) if char_variant(ch) else ch
+
+
+# Accents. The characters a PDF's text layer gives an accent as (the spacing mark, or the
+# combining mark after NFD), by the kind of accent.
+ACCENT_CHARS: dict[str, str] = {
+    **dict.fromkeys("ˆ̂", "hat"),
+    **dict.fromkeys("˜̃", "tilde"),
+    **dict.fromkeys("¯̄̅‾ˉ", "bar"),
+    **dict.fromkeys("⃗⃑", "vector"),
+    **dict.fromkeys("˙̇", "dot"),
+    **dict.fromkeys("¨̈", "double dot"),
+    **dict.fromkeys("˘̆", "breve"),
+    **dict.fromkeys("ˇ̌", "check"),
+    **dict.fromkeys("´́", "acute"),
+    "̀": "grave",
+}
+# The over-script of a MathML accent (`mover`), by the kind of accent it is.
+OVER_ACCENT: dict[str, str] = {
+    **dict.fromkeys("^ˆ̂", "hat"),
+    **dict.fromkeys("~˜̃", "tilde"),
+    **dict.fromkeys("¯‾̄̅", "bar"),
+    **dict.fromkeys("→⃗⟶", "vector"),
+    **dict.fromkeys("˙̇", "dot"),
+    **dict.fromkeys("¨̈", "double dot"),
+    "˘": "breve",
+    "ˇ": "check",
+    "´": "acute",
+    "`": "grave",
+}

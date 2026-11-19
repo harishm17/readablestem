@@ -836,8 +836,10 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   links, super- and subscripts, the title style, captions, and every equation typed in Word
   (`m:oMath`): pandoc writes LaTeX, which goes through `read_latex`, `check_latex` and
   `safe_latex_to_mathml` and then to the same fix a LaTeX equation gets. One that cannot be
-  converted is counted and stays what the PDF route would have made of it (a figure for the
-  model step).
+  converted is shown as its LaTeX and is a required decision (the equation element is listed
+  as not converted, and the job stays "Ready"); a formula in a heading or in a table cell has
+  no element of its own, so the heading or the table is the required decision
+  (`source_formula_unread`), as in a LaTeX source.
 - **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
   copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
   `w:lang`, the document language is the most common one; headers and footers (dropped) are
@@ -939,7 +941,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   since the cell reads as empty. A float reads its tables or pictures, the first with the
   caption, then everything else in it in order (the words beside a picture, a note under a
   table, subfigures); a `\captionof` caption goes to the picture just before it. `\intertext`
-  is a paragraph between the equations, `\date` is a line of its own, and a block that holds its
+  is a paragraph between the equations, the paragraphs of a `quote` or `quotation` environment
+  are a block quotation (`role="quote"`; `verse` stays plain paragraphs), `\date` is a line of its own, and a block that holds its
   words with no paragraph inside (a Beamer `\framesubtitle`) is a paragraph. A formula LaTeX could
   not read that a table, a heading or a caption shows as LaTeX code makes that item a required
   decision (`source.read` / `source_formula_unread`). After the walk the reader counts what no
@@ -1488,8 +1491,9 @@ Every sentence about what was converted, checked or reviewed is made from one mo
 writes such a sentence. The summary is computed from the stored result (`checked.of_result`:
 its elements, fixes, pages left out and the page's structure checks) and is never stored. It
 holds what was converted by kind (equations in MathML, figures described or marked as
-decoration, tables rebuilt or written as text, the parts shown as pictures with their kind and
-page, the pages left out), the structure checks (how many ran, which failed), what people did
+decoration, tables rebuilt or written as text, the parts not converted with their kind and page,
+each shown as a picture of the original or, for an equation of a Word or LaTeX file, which has no
+picture, as its LaTeX text (`Picture.as_text`), the pages left out), the structure checks (how many ran, which failed), what people did
 per decision (`core.triage.review_load`: open, accepted, accepted with a check failing,
 edited, kept as a picture, marked as decoration, optional notes never opened), what is never
 checked, the day of the last decision and the version.
@@ -1500,7 +1504,10 @@ checked, the day of the last decision and the version.
 - The state table reads it: with no gap note and nothing open, `ready` only when nothing is a
   picture, nothing is left out and no structure check failed; otherwise `ready_remains`,
   "Ready", whose message says what remains ("2 equations are shown as images that screen
-  readers cannot read. 7 of 8 pages were left out."). With no summary (a caller that passes
+  readers cannot read. 7 of 8 pages were left out."; for a Word or LaTeX file, "2 equations
+  are shown as LaTeX text, not written so that screen readers can read them aloud."). The
+  gate is the same either way: an equation a screen reader gets as raw LaTeX is not converted.
+  With no summary (a caller that passes
   none) the job is never "Ready to share". The documents list reads the result of every
   finished job with no decision open to get this label; a job with decisions open needs only
   its stored count.
@@ -1867,14 +1874,14 @@ it goes with the job too. A job that fails keeps it until the job is deleted. It
 person's stored bytes like any blob.
 
 **Edits that are not decisions (`web/carry_edits.py`).** The review screen also changes what no
-fix covers: the words of a paragraph, a paragraph made a heading, a picture or an equation
-added by hand, an image described in words, a page left out. They are carried by the same rule,
+fix covers: the words of a paragraph, a paragraph made a heading, a paragraph made a sidebar
+or a quotation, a paragraph left out, a picture or an equation added by hand, an image described in words, a page left out. They are carried by the same rule,
 onto an item that is **unchanged**, and never onto changed content; the worker does it in this
 order (`Worker._carry_decisions`): words, headings and added items, then the decisions, then
 the pages left out. The earlier version is read with its omitted pages put back, so a decision
 made before a page was left out is found.
 
-- **Words and headings** are found by what the item said before the edits: the earlier
+- **Words, headings, roles and paragraphs left out** are found by what the item said before the edits: the earlier
   version's `ReviewEdit` rows (`edit_text`, `make_heading`) are walked back from the result as it
   stands, so an edit that was undone is not carried and two edits in a row are one. The new
   file's item must say the same words (case and spacing aside, the content fingerprint of
@@ -1884,7 +1891,13 @@ made before a page was left out is found.
   The inline equations in the text must be the same pictures in the same order, or the words
   are left alone. The edit is made by the review's own functions (`page_edits.edit_text`,
   `make_heading`), so a level the outline would now change is refused and nothing is left half
-  done.
+  done. A role is carried the same way (`set_role` rows, `carry_edits.role_edit`): the latest
+  one whose result is the role the paragraph has now, which is also how a cleared role ("Not a
+  quotation" on what a Word file had as one) is carried, and the new file's paragraph must say
+  the same words. A role that was undone is not carried. If the new file already has that role
+  nothing is changed and it counts as carried. Words, a heading, a role and "left out" are four
+  kinds of change: a paragraph that had two of them is two carried changes, or two listed as not
+  made again (`_apply_words` returns each kind it made), never one.
 - **Pictures and equations added by hand** come back only on the same page, where the region
   looks exactly as it did (both PDFs drawn the same way and compared; a file that is the same
   bytes needs no drawing), and where the tool has not found something new in that place (a
@@ -1899,7 +1912,7 @@ What was not carried is counted (`edits_dropped`, the card says "N changes you m
 were not made again, because the part of the page it was made on is not the same any
 more") and listed by name and page under it (`edits_not_applied` in `carried_json`, the words
 in `carry.NOT_REAPPLIED_WORDS`: "Page 2: words you changed"). An equation read again and a
-page operation that has no carry (a paragraph made a heading, a picture added, an equation
+page operation that has no carry (a picture added, an equation
 marked or given back to the text) are listed there when they are not made again, so nothing a
 person did disappears silently; an equation read again is never made again (the new file has
 the tool's own reading) and one that was undone is not listed. What was carried is a `carried` `ReviewEdit` with the kind in its `after`
@@ -1948,15 +1961,17 @@ both under "Record for your accessibility office".
 It lists, in this order: the document (title, file name, pages, when and by whom it was
 converted, the tool and pipeline version, the language, when the record was made, a short
 reference); what the tool did (parts found by kind, accepted by the tool with no decision
-from a person, decided by a person, still open, shown as pictures); every review decision
+from a person, decided by a person, still open, shown as pictures or, for a Word or LaTeX
+file's equations, as LaTeX text); every review decision
 (`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom:
 "you" for the reader, a name for another person, never an address beyond the one "Converted
 by" line the owner sees); the decisions still open; the
-parts shown as pictures and why; the structure checks (how many ran, which did not pass);
+parts shown as pictures and why (headed "Parts not converted" when they are shown as LaTeX
+text); the structure checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
 lines for the office to sign. Every kind of change a person can make is a row with who and
-when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a
-picture added, an equation marked (the tool read it, a person checked), an image described in
+when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a paragraph made a sidebar or a quotation (or given
+back as neither), a picture added, an equation marked (the tool read it, a person checked), an image described in
 words, a page left out or put back; clean tables accepted together in one action and a table
 cell read by the AI service at the person's request (marks in the `ReviewEdit`'s `after`,
 `review.BULK_KEY` and `MODEL_READ_KEY`); and what was carried over from an earlier version. The
@@ -3004,7 +3019,7 @@ as for the proposal. What fails is said in plain words, in three kinds:
   not a command this tool supports");
 - *differs from the PDF where that changes the meaning* (the codes that make a proposal a
   required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`, `glyph_style_mismatch`,
-  `sign_mismatch`, `number_mismatch`, `case_mismatch`, `species_mismatch`): not used. The card says what differs, in the compare table's words
+  `sign_mismatch`, `number_mismatch`, `case_mismatch`, `species_mismatch`, `accent_mismatch`): not used. The card says what differs, in the compare table's words
   ("The ω is bold in the PDF (a vector) but plain in your edit."), and offers **Use my
   edit anyway** (the PDF's text is sometimes wrong). Choosing it saves the edit with the
   failed checks kept on the fix, and its `ReviewEdit` records `"anyway": true`;
@@ -3408,7 +3423,7 @@ and figures".
 `templates/_page_tools.html`). Under the optional checks, a folded "Change page N" (open after
 an edit or an error, and when `tools=1`) with, in this order:
 
-- *Change the words, or make a line a heading.* Every paragraph, list item and heading of the
+- *Change the words, make a line a heading, set a paragraph apart, or leave it out.* Every paragraph, list item and heading of the
   page by its first words, each a link that opens it. The box holds the words as they read, an
   inline equation as "[equation 3]" (the review's own number for it): the mark the tool keeps in
   the stored text cannot be typed, so it is named and put back when the text is saved. Every
@@ -3424,7 +3439,50 @@ an edit or an error, and when `tools=1`) with, in this order:
   their place in the outline are named (`heading_levels_that_fit`) and another is refused as for
   any heading; the element becomes a heading with a fix the reviewer made (`edited`), so
   "Make plain text" and Undo take it back, and later headings are repaired in the outline as
-  always (the notice says how many moved).
+  always (the notice says how many moved). *Make it a sidebar* and *Make it a quotation* (the
+  same `edit/{element}` route, `action=role`, `role=aside|quote`; `page_edits.set_role`) set
+  `Element.role` on a plain paragraph; on a paragraph that has a role the buttons read *Not a
+  sidebar* / *Not a quotation* (`role=` empty) and the card says in words which it is. They are
+  offered only where the student page writes a role (`page_edits.role_blocked`): not on a list
+  item, a heading, program code, a glossary entry or a footnote, and the route refuses those with
+  the same words. The change is one `ReviewEdit` (`set_role`, an Undo snapshot of the element,
+  counted among the changes to pages), the page's HTML is made again when asked for, and it then
+  has the paragraph in its `<aside aria-label="Sidebar">` or `<blockquote>`, neighbors of one
+  role in one wrapper. There is no keyboard shortcut for it: the list of keys on the review
+  screen (N, P, A, E) is for decisions, and "Make it a heading" has none either. A paragraph made
+  a heading loses its role.
+  *Leave it out of the student file* (`action=leave_out`, `page_edits.leave_out_block`; the same
+  route) takes one paragraph or list item of plain words out of the student file: a running head
+  or stamp that got into the body, a printer's mark, a line a scan repeated, text the tool cannot
+  tell from content. It is a page left out at the size of one element
+  (`DocumentResult.left_out_blocks`, `LeftOutBlock`, stored in the result's JSON like
+  `omitted`, so no migration): the element, its fixes and its own notices move out of
+  `result.elements`, which is the one place every writer, count and decision reads, so the page,
+  Word, EPUB, Listen, the LMS packages and the job page's counts follow with no filter of their
+  own. Nothing is deleted. The page's card keeps it in the list of lines as "Paragraph, left out
+  of the student file" with **Put it back** (`action=put_back`, `page_edits.put_back_block`,
+  which returns the element, its fixes and notices; its reading order was kept in `order`).
+  The honesty rule is the left-out page's: the student file's note counts them ("One paragraph
+  or list item on page 3 of the original PDF was left out of this file.", the same sentence and
+  anchor as for pages, `checked_words.left_out_sentence`, also in a combined document), so the
+  job is "Ready", not "Ready to share", while any is out (`CheckedSummary.all_found_converted`,
+  as for a page); the job page lists the notice `block_omitted` (one per page, with the count);
+  the record's row says "Left a paragraph out of the student file" with the words taken out
+  (`record._left_out_words`, up to 400 characters), by whom and when, and its not-checked list
+  says how many were left out. Refused (`page_edits.left_out_blocked`, each with a sentence): a
+  heading (the outline would change: it is made plain text first, in its own decision), an
+  equation, a figure or a table (each has its own decision), a block an open decision points at,
+  a footnote (the mark above it links to it), a block another element links or cross-refers to
+  (it would dangle), a paragraph that holds an inline equation (the equation has its own
+  decision; a left-out page lets its decisions go with it, and for one paragraph that was judged
+  too easy to bury), and the last paragraph of the document. One `ReviewEdit` each
+  (`leave_out_block`, `restore_block`; an Undo snapshot with the element and the lists;
+  counted among the changes to pages; outcome "removed"), stale only when the item itself
+  changed (`ITEM_ACTIONS`). A document converted again carries it over like a role
+  (`carry_edits`, kind `block_left_out`): the paragraph that says the same words is left out
+  again, only where the new file would allow it (an open decision, a link or an equation there
+  refuses it); a paragraph put back is not carried, and one not made again is listed as
+  "paragraph you left out". No keyboard shortcut.
 - *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
   the proposal read aloud in its place (the sentence before and after for one on its own line),
   and both readings, as speech and as LaTeX, where the page witness read it differently; a

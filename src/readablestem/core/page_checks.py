@@ -125,6 +125,7 @@ ROWS: tuple[CheckLine, ...] = (
     _page("file_cut_off", "required", "the last pages of a repaired PDF are empty"),
     _document("file_repaired", "optional", "a PDF that had to be repaired when opened"),
     _page("page_omitted", "none", "a page the reviewer left out of the student file"),
+    _page("block_omitted", "none", "paragraphs the reviewer left out of the student file"),
     # --- a Word or PowerPoint upload (the census) and a Word file read from the file itself
     _document("office_tracked_changes", "required", "the file's tracked changes, still open"),
     _document("office_speaker_notes", "optional", "speaker notes of slides"),

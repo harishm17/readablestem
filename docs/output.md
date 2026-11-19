@@ -240,7 +240,8 @@ our own would be a second MathML reader to keep right.
     leaves out, or an id the page does not have) is written as its words, not as a link that
     leads nowhere, and counted (`DocxExport.links_unlinked`, printed by the CLI).
 - **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
-  (inside the document by bookmark); tables with their caption; alt text on each picture; the
+  (inside the document by bookmark); a quotation as "Block Text" and an aside as "Sidebar"
+  (WS16.3); tables with their caption; alt text on each picture; the
   document language and title; equations as `m:oMath`, or, where one could not be written, its
   words (above; `DocxExport.not_word` lists their element ids, `readablestem export docx`
   prints them, the route logs the count). The export fails (`equations`) rather than hand over
@@ -380,12 +381,22 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
 <div class="equation" id="p1-e4"><math display="block">...</math></div>
 <div class="flagged" id="p1-e5" data-status="failed" data-reason="budget_job_usd">
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
-  <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span>
+  <p class="flag-note readablestem" role="note"><span class="flag-label" aria-hidden="true">Not converted.</span>
   Shown as an image of the original.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
+
+A picture that was not converted is told once to a screen reader: when its alt text says "not
+converted" (or "not described"), the label beside it ("Not converted.", a figure's "No
+description.") carries `aria-hidden="true"` and stays for the eye, as the label of an inline
+equation does. The note's own sentence and the link to the instructor are read. When the alt text
+gives the PDF's characters ("v = d / t, as written in the PDF") or a description a person wrote,
+it does not say the part was not converted, so the label is read. Without a picture
+(the original's text, or none) the label has no alt text to repeat it, so it is read. The checker's
+"Needs a description." is an instruction, so it is always read. Listen and EPUB skip the hidden
+label; Word, which does not read `aria-hidden`, shows and reads both (`assemble._alt_says_label`).
 
 ## Navigation (skip link, contents list, page markers, footnotes)
 
@@ -469,6 +480,32 @@ document in another language marks it `lang="en"`).
   because the notes are not collected at the end. The assembler is told which elements are
   footnotes by `render_html(footnote_ids=...)` (from the notices; `rerender_html` does the same).
   A link between two blocks that is not to a footnote is an ordinary link.
+- **Block roles (WS16.3).** `Element.role` (`"aside"` or `"quote"`, left out of the JSON when
+  empty, so a stored result reads unchanged) says what a paragraph is to the document. A
+  paragraph with a role is written inside `<aside aria-label="Sidebar">` (a pull quote, a
+  sidebar, a margin note; it is not in the outline and screen readers list it as a
+  complementary landmark) or `<blockquote>` (a block quote); neighbors of one role share one
+  wrapper. A list item or a defined term never takes a wrapper. A footnote is not a role (it is
+  the notice `footnote`, above) and code is `Element.preformatted`. The Word reader
+  (`source/docx_reader.py`) sets `quote` on the paragraphs of a quotation, so a quotation in a
+  Word source comes out as a `<blockquote>`; so does the LaTeX reader (`source/ltx_reader.py`)
+  for the paragraphs of a `quote` or `quotation` environment (LaTeXML's `blockquote.ltx_quote`;
+  a `verse` environment, which LaTeXML marks `ltx_role_verse`, stays plain paragraphs whose line
+  ends are kept: each `\\` is a space with a "break" run over it, written `<br>`, as a kept line end of
+  a PDF is (`_inline_text`, `in_verse`);
+  `displayquote` needs `csquotes`, which is refused at upload). Layout sets no role on a PDF (no
+  detector passes the "at least 2 real cases and no false one" bar, docs/layout.md): there the
+  reviewer sets it, in the page editor's "Change page N" ("Make it a sidebar", "Make it a
+  quotation", "Not a sidebar", "Not a quotation": docs/web.md, `web/page_edits.set_role`). A text
+  edit and carry-over keep the role, a role set by hand is carried to the new conversion of the
+  same words, and "make heading" clears it.
+  Each output: the web page draws an aside with a bar at its left in the text color; Word
+  writes the quote as the paragraph style "Block Text" and an aside as the style "Sidebar"
+  (pandoc drops `<aside>`, so the export wraps it in a styled `div`; Word has no landmark for
+  it, so the role is the style's name); the EPUB keeps `<aside aria-label>` and `<blockquote>`;
+  Canvas and the cartridge keep both elements and the `aria-label` but not the bar (Canvas has
+  no stylesheet; the margin and padding stay inline); Listen says "Side notes, Sidebar" before
+  an aside and "Quote" and "End quote" around a quotation.
 
 The tab order is the skip link, then the contents list's links, then the file.
 
@@ -796,7 +833,7 @@ against the original." (the student's is "This page was read from a picture of t
 small errors are possible."), the alt text of that page's original ("..., shown for checking the
 converted text."), the equation alt suffix "...; not checked" (the student's: "as written in the
 PDF"), the figure label "Needs a description." (the student's: "No description.") and the
-statement's last sentence "Check it before students use it.". `RENDER_VERSION` is 8 for these
+statement's last sentence "Check it before students use it.". `RENDER_VERSION` was raised to 8 for these
 words. A student file with no checker sentence is a rule (`tests/test_assemble_render.py`),
 not a wording.
 
@@ -810,20 +847,28 @@ An equation kept as an image (`assemble.equation_alt`) has the text the PDF hold
 region as alt text, with a marker that says where it comes from: `6.0 m/s, as written in the
 PDF`, or `Equation (2.4): v = d / t, as written in the PDF` when it has a number. The student
 file says only that; a draft, made for the person who checks it, says `read from the PDF
-text; not checked` (audiences, below). Where layout saw fractions, roots,
-exponents or several lines in the region, the marker adds that the text may run them
-together (`v2 = v20 + 2ad` for v squared = v0 squared + 2ad), because the flat text layer
-loses their order and size; an inline equation's exponents are not always known, so
-`g = 9.8 m/s2` can be one. Without usable text (none, no letter or digit, or more than 200
-characters) the alt text is `Equation (2.4), not converted` (the number as printed) or
+text; not checked` (audiences, below). Where layout saw fractions, roots, exponents or several
+lines in the region, the flat text layer has lost their order and size (`v2 = v20 + 2ad` for
+v squared = v0 squared + 2ad), so the alt text says first that the equation is not converted
+and that the characters that follow run fractions and exponents together, and only then gives
+the characters: `Equation (2.2), not converted. The characters the PDF has for it, with
+fractions and exponents run together: d = 12gt2` (`Equation not converted. ...` with no number). A
+listener who stops early has not heard a wrong formula as the equation. A draft's version adds
+`and not compared with the page` before the colon. An inline equation's exponents are not always
+known, so `g = 9.8 m/s2` can be one. Without usable text (none, no letter or digit, or more than
+200 characters) the alt text is `Equation (2.4), not converted` (the number as printed) or
 `Equation not converted`. Nothing is written that the PDF does not hold. The visible note
-and label are unchanged. In a document in another language the alt text is marked
-`lang="en"`, as the other fixed words are.
+and label are unchanged. The evaluations that read the PDF's text back out of the alt text
+(`assemble.equation_alt_text`) strip both forms. In a document in another language the alt
+text is marked `lang="en"`, as the other fixed words are. The page's `generator` tag names the
+pipeline that converted the result the page is made from beside the version of the code
+(`ReadableSTEM 0.1.0, pipeline 0.5.13`), so a stored file made again still says which pipeline
+converted it; a page made from several results names only the code.
 
 - The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The
   border survives forced-colors mode and printing.
 - The note is a `<p role="note">`. On an inline equation the visible label is
-  `aria-hidden`, because the alt text already says the same thing.
+  `aria-hidden` when the alt text already says the same thing, and read when it does not.
 - `data-status` and `data-reason` carry content-free codes for tooling. Reasons come from
   the steps (e.g. `low_confidence`), from the run (`budget_daily`, `budget_job_usd`,
   `budget_job_calls`, `internal_error`, `crop_error`) or from assembly (`no_fix`,
@@ -1467,7 +1512,9 @@ so it says no more than was done. It has no review screen's words ("needs review
 - when something is a picture of the original, how many: "4 parts could not be converted
   and are shown as pictures of the original, marked "Not converted" or "Needs a
   description": ask your instructor for a version you can read." (for a LaTeX source,
-  "shown as they were written in LaTeX"); when whole pages are kept as images, which ones
+  "shown as they were written in LaTeX"); an equation of a Word or LaTeX file has no picture,
+  so the sentence about equations the reader cannot make into MathML ("the others are shown
+  as LaTeX text") never says picture; when whole pages are kept as images, which ones
   (`assemble.kept_pages_note`);
 - when pages were left out, which: "Pages 2, 3 and 4 (3 of 8) of the original PDF were left
   out of this file.";
@@ -1816,6 +1863,12 @@ Keep the two in step when a limit changes.
   "Page 1 of the original PDF was left out of this file." (`assemble.omitted_pages_note`), and an
   internal link or cross-reference to an element on such a page is taken off at render
   (`assemble._without_dead_links`).
-- **Edited words, a paragraph made a heading, an added picture or equation** are ordinary
-  elements and fixes in the stored result (a picture added by hand has the id `p3-x1` and a fix
+- **A paragraph or list item left out** (`DocumentResult.left_out_blocks`) is not in the file,
+  like the elements of a page left out, because it is moved out of the result's elements and
+  the assembler never sees it; the student note counts it ("One paragraph or list item on
+  page 3 of the original PDF was left out of this file.", `checked_words.left_out_sentence`)
+  and says it with the pages left out. Links to it are refused when it is left out, so none
+  dangles.
+- **Edited words, a paragraph made a heading, a sidebar or a quotation, an added picture or
+  equation** are ordinary elements and fixes in the stored result (a picture added by hand has the id `p3-x1` and a fix
   the reviewer made); the assembler writes them like any other.

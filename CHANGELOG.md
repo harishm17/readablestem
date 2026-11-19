@@ -1,7 +1,351 @@
 # Changelog
 
+## Pipeline 0.5.13, render 9 (2026-11-19)
+
+- `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"
+  entry below down to the 0.5.12 entry. What a PDF's result holds changed (lists, where a block
+  starts, paragraphs joined across a page, a table's box, the region tree), a paragraph can hold
+  a role and a reviewer can leave one paragraph out; the student page changed (the sidebar and
+  quotation wrappers, the left-out note, a part that was not converted said once, the words
+  for a Word or LaTeX equation shown as its LaTeX). Stored results load unchanged and their
+  pages are made again. `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`
+  and `data/eval/burden-corpus.json` are re-made at 0.5.13; the golden pages and the stored
+  demo page are written again at render 9. Roll back: docs/deploy.md.
+
+## Unreleased: fixes after the independent review of this batch (branch fix/review-5)
+
+- A part shown as a picture had its "Not converted." label hidden from a screen reader whenever
+  a picture was present. When the picture's alt text gave the PDF's characters ("v = d / t, as
+  written in the PDF") or a description a person wrote, nothing a listener heard said the part
+  was not converted. The label is now hidden only when the alt text itself says "not converted"
+  (or "not described"), for a block and for an inline equation (`assemble._alt_says_label`,
+  `inline_equation`). Two golden pages change by that attribute.
+- Sub-bullets whose text starts exactly on the text edge of their numbered parent made each
+  numbered step one level deeper than the one before ("1)" level 1, "2)" level 2, "3)" level
+  3). `lists._list_levels` now keeps the marker series of each open level and sends an item of
+  another series than the innermost level back to the open level of its own series at the same
+  x. Sub-bullets 3 pt or more to the right were already right.
+- Speech: `|S|`, `|A \cup B|`, `\det A = |A|` and `|G:H|` were read "the absolute value of",
+  which is wrong for the size of a set, a determinant and a subgroup index. A pair of single
+  bars around one capital letter, or around a row with a set sign (union, intersection, set
+  minus) or a colon, keeps "vertical bar" as it did before this batch
+  (`speech._size_or_determinant`). `|x|`, `|x - y|` and `|a| + |b|` are still absolute values.
+- Review record: it said the words of a left-out paragraph "are in the changes below", but a
+  paragraph left out by a change carried over from an earlier version has a row with no words.
+  The summary now lists each left-out paragraph with its page and its words, read from the
+  stored paragraph (`record.Record.left_out_blocks`), and the CSV has one summary row for each
+  ("Paragraph left out of the student file", with the page and the words) in place of the one
+  row of page numbers. Two paragraphs on two pages no longer read "(page 1, 3)".
+- Two refusals a hand-made request could get past (the screens do not offer either): a
+  paragraph left out is not put back while its page is left out (it was in the student file
+  under a note that said the page was out, and the page's count of left-out paragraphs went
+  stale), and text is not left out of a Word or LaTeX file, whose note would have named a page
+  "of the original PDF" (`page_edits.put_back_block`, `left_out_blocked`).
+- The accent check asked for a decision ("An accent differs from the PDF") on a correct reading
+  whose text held an accented word (`x = 1 \text{ même si } y = 0`, "años", "não"): the PDF's
+  side counted the word's accent and the reading's side counted only `mover` accents.
+  `equation_step._mathml_accents` now counts the accents of the reading's `mtext` and `mi`
+  letters too. A hat the reading dropped is still found.
+- Page editor: a paragraph left out that is past the 120th line of its page is still listed,
+  with "Put it back" (the list was cut at 120 lines, so it had no way back on the screen).
+- A proof replay with `--allow-drift` on a checkout of another pipeline version missed every
+  recorded axe-core result, since the page's generator tag now names the pipeline version and
+  the result was keyed by the whole page. The key leaves that tag out (axe-core does not read
+  it); a recording made with the older key is still found (`proof/replay.axe_key`).
+- `web/page_dates.json`: /demo, /security and /help/review changed on 2026-11-19.
+- `data/eval/parsing-bench-olmocr.json` is measured again at pipeline 0.5.13 (commit
+  `3b177567`, $0): multi_column 69.2 (68.8 at 0.5.11), headers_footers 34.5 (32.5),
+  long_tiny_text 37.3 (37.3), table_tests 66.6 (51.8), baseline 100.0 (99.0). The scores and
+  counts of docs/eval-parsing-benchmark.md are the new record's; its failures by cause are
+  still those read on the first run.
+
+## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
+
+- When a document is converted again, a paragraph the reviewer both reworded (or made a heading)
+  and set apart as a sidebar or quotation, or left out, was carried and counted as one change:
+  "1 change you made by hand was carried over", and the record named only the last kind. When the
+  paragraph had changed and none could be made again, "1 change was not made again" listed one
+  kind, so a lost role was reported as a lost wording (or a lost wording as a lost "left out").
+  `carry_edits._apply_words` now returns each kind it made, and `_carry_words` records each, as a
+  carried change or as one not made again. No stored data changes: the counts and the record rows
+  of documents already converted again stay as they were.
+
+## Unreleased: a Word table cell whose formula could not be read is a decision (branch fix/source-equation-words)
+
+- A formula in a cell of a Word table that fails the product's checks (a command it does not
+  allow, such as `\phantom`) stayed in the cell as TeX with no mark, no decision and no notice, and
+  the job read "Ready to share". `docx_reader._table` now makes the table a required decision
+  with the check `source_formula_unread`, as the LaTeX reader does for a table and the Word reader
+  already did for a heading. `Report.math_failed` (counted, read by nothing) is the count it
+  reads. A failed equation of its own was already told to the owner: it is an element with a
+  required decision, listed as not converted. The student page is unchanged; the job is held at
+  "Ready" until the owner decides. Not covered: a table too large for a grid is written as list
+  items whose formulas are TeX with nothing to hold a decision (noticed, not changed).
+
+## Unreleased: a Word or LaTeX equation shown as its LaTeX is not called an image (branch fix/source-equation-words)
+
+- An equation of a Word or LaTeX file that could not be made into MathML is written on the student
+  page as its LaTeX; there is no picture of it. The owner was still told "2 equations are shown as
+  images that screen readers cannot read" (the job page, the record), the job page's equation row
+  said "shown as an image", the student file's note said "the others are pictures", and a draft
+  download said "an image". `checked.Picture` now says whether the part is shown as text
+  (`as_text`, set from the file's origin in `checked.converted`), and each sentence reads it:
+  `checked_words.not_converted_sentence` (was `as_image_sentence`), `maths_sentence`,
+  `card_equations`, the record's section ("Parts not converted") and CSV row ("Shown as LaTeX
+  text, not converted"), and `job_page.draft_sentence`. The count that holds the job at "Ready"
+  and lists the part for the owner is unchanged: an equation a screen reader gets as raw LaTeX is
+  not converted. PDFs read the same as before. This changes the student note (`maths_sentence`) of
+  every Word or LaTeX document that has an equation without MathML, so it owes a `RENDER_VERSION`
+  raise (not raised on this branch).
+
+## Unreleased: a reviewer leaves one paragraph out of the student file (branch fix/review-small-items, WS19.9 in part)
+
+- The page editor has "Leave it out" on a paragraph or list item, and the page's list shows a
+  paragraph left out as "left out of the student file" with "Put it back". It is the route
+  `POST /jobs/{id}/edit/{element}` with `action=leave_out` or `put_back`
+  (`page_edits.leave_out_block`, `put_back_block`). A left-out paragraph is stored the way a left-out
+  page is (`DocumentResult.left_out_blocks`, in the result's JSON: no migration), so the page,
+  Word, EPUB, Listen, the LMS packages and the counts drop it at the one place they already read.
+  Nothing disappears without a trace: the student file's note says how many paragraphs were left
+  out and on which pages, the job is "Ready" and not "Ready to share" while any is out (as for a
+  left-out page), and the record names the words taken out, by whom and when. Refused: a heading,
+  an equation, a figure, a table, a block an open decision points at, a footnote, a block another
+  element links to, a paragraph with an inline equation, and the document's last paragraph.
+  Undo, the outcome counts, the stale-form rule and carry-over to a document converted again
+  work as for "make heading" and the role. `RENDER_VERSION` is not raised by this item; the
+  student note changes only for a document that has a paragraph left out.
+- The review screen's "Keyboard shortcuts" list names only the keys the open decision can use:
+  a table kept as a picture has no Accept, so A is no longer listed there (a decision with no
+  next or previous one drops N or P, one with nothing to edit drops E, and a choice for a whole
+  page drops A). The script reads the card itself (`listKeysTheCardCanUse` in `app.js`), so
+  every kind of card is covered. No stored data changes.
+- A picture that was not converted no longer says so twice to a screen reader. The label beside
+  an equation, table, page or picture shown as an image ("Not converted.", a figure's "No
+  description.") is `aria-hidden` when the picture's alt text already says it
+  (`assemble._alt_says_label`); sighted readers still see it. Without a picture the label is
+  read. This changes the written page of every document that has such a picture, so it owes a
+  `RENDER_VERSION` raise (not raised on this branch). The two flagged goldens
+  (`flags_off_kinematics_slides`, `flags_off_problem_set`) changed by that attribute only.
+- LaTeX: a `verse` environment keeps its line ends. Each `\\` in a verse was a plain space
+  ("A line of verse and its second line"); it is now the space with a "break" run over it, the
+  way a PDF's kept line end is stored, so the page writes `<br>` and Listen, Word and EPUB take it
+  from the same run. No new role, and the verse is still plain paragraphs (`ltx_reader.in_verse`).
+  A LaTeX source with a verse converts differently, so a `PIPELINE_VERSION` raise is owed (not
+  raised here); stored documents keep the space until converted again. No migration.
+
+## Unreleased: a reviewer sets a block's role; LaTeX quotations (branch feat/set-block-role, WS19.9 in part)
+
+- The page editor ("Change page N", under "Change the words, make a line a heading, or set a
+  paragraph apart") has buttons on a plain paragraph: "Make it a sidebar", "Make it a
+  quotation", and, on a paragraph that has a role, "Not a sidebar" / "Not a quotation". The card
+  says in words which role a paragraph has. It is the route `POST /jobs/{id}/edit/{element}` with
+  `action=role` (`page_edits.set_role`), recorded as the change `set_role` (undoable, counted
+  among the changes to pages, shown on the record). It is offered only where the student page
+  writes a role: not on a list item, a heading, program code, a glossary entry or a footnote,
+  and the route refuses those. A document converted again carries the role over to the
+  paragraph that says the same words, as it does "make heading"; one that cannot be carried is
+  listed as a change that was not made again. No keyboard shortcut (the review screen's keys are
+  for decisions). Verse, turn, code and lines are not built.
+- LaTeX: the paragraphs of a `quote` or `quotation` environment are read with `role="quote"`
+  (they were plain paragraphs), so the student page has a `<blockquote>`. `verse` is read as
+  before.
+- No request to a model, prompt, model id or migration changed. A LaTeX source with a quotation
+  converts differently; the batch's `PIPELINE_VERSION` raise covers it.
+
+## Unreleased: block roles, a sidebar and a quotation (branch feat/block-roles, WS16.3)
+
+- One stored field, `Element.role` (`"aside"` or `"quote"`; left out of the JSON when empty, so
+  every stored result reads as before). Every writer follows it: the page writes a role's
+  paragraphs inside `<aside aria-label="Sidebar">` (with a bar at its left in the text color)
+  or `<blockquote>`, adjacent neighbors in one wrapper; the Word file has the paragraph styles
+  "Sidebar" and "Block Text"; the EPUB, Canvas and the cartridge keep the elements and the
+  label (Canvas loses the bar); Listen says "Side notes" and "Quote" / "End quote". A Word
+  source's quotation (a paragraph in the Quote style or a block quote) is read as `quote`. A
+  text edit and carry-over keep the role; making a block a heading clears it.
+- Not built: no layout detector sets a role on a PDF. A box rule for asides and a set-in rule
+  for quotes missed the "2 real cases and no false one" bar (counts in the report of this
+  item); a footnote stays a notice, code stays `preformatted`; `breaks`, `lead_end`, `dir` and
+  `notes` already exist as the run kind `break`, `term_end`, WS16.6 and WS14.4.
+- A document with no role writes the same page as before; no request to a model, prompt, model
+  id, pipeline version, render version or migration changed.
+## Unreleased: paragraphs and list items that cross a page (branch feat/page-joins)
+
+- A paragraph or list item cut by a page break stayed two elements in cases the old test
+  could not see: a figure or table on top of the next page, a page number set low on a tall
+  page, a one-line tail in by its first-line indent, a tail whose last line starts a
+  paragraph, a list item that goes on at its text, and a page whose margin differs from the
+  one before. `_goes_on` compared the document's widest text area and any block's left edge;
+  it now compares the tail and the head each in its own column (the left edge against that
+  column's text edge on its own page), takes the tail from the body flow (`_flow_tail`) and
+  the head as the first block that is not a picture, table or caption (`_flow_head`), and
+  never joins across a display equation or a heading. A join the test doubts stays cut.
+  A joined list item no longer ends its list (`lists.py`). Pipeline version bump owed:
+  element ids and counts after a new join shift.
+## Unreleased: four list faults left after the option grids, Word bullets and the block-start rule (branch fix/lists-follow-up)
+
+- A matching exercise ("___ 1." to "___ 3." in a left column, "A." to "C." in a right one under
+  "Match each term ...") was one item and paragraphs. A blank before a label no longer hides it
+  (`_Marker.start`, `lists.lead_blank`), and two series of labels of different kinds set side by
+  side under a question are read column by column as two lists one level below it
+  (`blocks._matching_series`). The option grids (questions 1 to 4 of `e1_mc_columns`) did not
+  change. Real cases on the corpus: one (the self-made `e1_mc_columns`, which matches its gold
+  now); no other file has two such series, so the rule is as narrow as that one shape.
+- A Word bullet that touches its text ("▪Grading", "▪not mandatory": MIT 6.0001 lecture 1) stayed
+  a paragraph because `lists._bullet_apart` splits a glyph from its text only from 0.1 x font
+  size apart. It is an item now when another row of the document starts with the same glyph, like
+  a dash; a lone one stays a paragraph. Cases on the corpus: 2 rows in one private file, none in the
+  public sets, no other row changed.
+- In slides the sub-bullets under "1)" and "2)" sat at the level of their parent because the item
+  texts are within 0.6 x body size of one another when the body is 26 pt. A marker of another
+  series (bullet or number, another number form or bullet glyph) set more than half the font size
+  right of the marker above opens a level (`lists._list_levels`, `MARKER_INDENT`). Items of one
+  series, a grid's options and a marker 0.45 right (`ax_csro`: "(l)" and "2)", siblings) are not
+  moved. Cases: about 90 items in 4 private files move down a level (74 of them sub-lists under
+  "(a)" and "(b)" parts of one problem set), all read as nested; none in the public sets. A
+  wrong change (`ax_csro`, 0.45) is what set the threshold at 0.5.
+- A phrase in another style that goes on over the end of a list item's line ("each instruction in
+  order" in bold) was cut off as a paragraph: the cause is `blocks._merge_style_splits`, which
+  joined a style split to a paragraph but not to a list item (`_same_style` is as it was). A list
+  item set all in bold is a heading read as an item and is not joined to the text under it.
+  Public files: 6 joins in 5 files (4 the last words of an item, 2 the second line of a heading
+  read as an item), all read as right; private files: 7 files, 14 joins, all right.
+- Effect on stored documents and recordings: paragraphs become list items and list levels move, so
+  a stored document made before is out of date (a raise of `PIPELINE_VERSION` is owed; not made
+  here). A conversion now asks about different nearby text in two files: 2 more answers owed for
+  `w_exam_5111` (38 to 40) and 2 for `w_slides_60001_lec1` (48 to 50); `harness.OWED` and the
+  count in docs/eval.md are 1,264 now. No prompt, model setting or render version changed.
+
+## Unreleased: the eval gate sees switches (branch fix/eval-guard-flags)
+
+- `eval gate --require-current` refused a report made with other prompts, other models or
+  another pipeline version, but not one made with other switches: a setting or a constant that
+  decides what a model is asked or what a step accepts (`REGION_TREE`, `AUTO_ACCEPT_CONFIDENCE`,
+  `equation_step.SKIP_ESCALATION_FROM`, `ACCEPT_SINGLE_READING`) could move and every committed
+  report still passed as current although it measured other behavior. A report now records the
+  values of 137 guarded switches (`flags`, from `eval.gate.guarded_flags`: the behavior
+  settings of the production profile that are not named as left out, and a list of module
+  constants, each read from its module), and the gate names each one that differs from the
+  code, with both values. Without `--require-current` a difference is listed under the table
+  like a changed prompt, with the settings of the report that production does not use.
+- A report of a run that called no model (headings, tables local) that has no `flags` is
+  refused; a report of a model run made before they were recorded is left as it was (its
+  pipeline version already refuses it). `latest-headings.json` and `latest-tables-local.json`
+  were made again at no cost with the same scores and now hold the flags. The two baselines
+  (2026-10-14, pipeline 0.5.0) are not re-made: that would move the numbers they anchor.
+- No prompt, model setting, pipeline version, render version, migration or recording changed.
+
+## Unreleased: an unconverted equation's alt text warns before it gives the characters (branch fix/alt-warning-first)
+
+- An equation kept as an image whose text layer layout saw as flattened (a fraction bar, a
+  radical sign, an exponent or merged lines) had an alt text that gave the PDF's characters first
+  and the caveat after ("Equation (2.2): d = 12gt2,, as written in the PDF, where fractions and
+  exponents may run together"), so a screen reader said "d equals twelve g t two" before the
+  warning, and a listener who stopped early heard a wrong formula as the equation. The alt text
+  now says first that the equation is not converted and that the characters that follow run
+  fractions and exponents together ("Equation (2.2), not converted. The characters the PDF has
+  for it, with fractions and exponents run together: d = 12gt2"; "Equation not converted. ..." with
+  no number), and only then gives them. A draft adds that they were not compared with the page.
+  An equation with no such reason keeps its form ("t = 0, as written in the PDF"); the rule
+  "the text layer or nothing" is unchanged. The evaluations that strip the tool's words to get
+  the PDF's text (`eval/order.py`, `eval/olmocr_bench.py`, `eval/invented/read.py`) strip the
+  new lead too. The notice at the top (`NOT_CONVERTED_WHY`) and the review screen's sentences
+  for "Keep as image" now say what the alt text does. Trailing punctuation the sentence around
+  an equation leaves on the characters ("12gt2,,") is not changed here. One existing test
+  changed, no new test file.
+- The student file's `generator` tag names the pipeline that converted the result, beside the
+  version of the code that made the page ("ReadableSTEM 0.1.0, pipeline 0.5.12"). A page made
+  from several results (a combined file) keeps the code's version only. No new visible text.
+- A stored page says this only after it is made again: `RENDER_VERSION` is owed a raise for this
+  batch (not raised here). No stored field changes, no migration, no model request or prompt
+  changed.
+## Unreleased: an accent the reading dropped or added is a decision (branch fix/accent-agreement)
+
+- Equations. The letter checks leave accents out, so a reading that dropped or added a hat
+  or tilde, or put a tilde for a hat passed every check and was accepted with no card
+  (`equation.text_layer_accents`, code `accent_mismatch`, `equation_step.accent_check`). The
+  accents of the PDF's text and glyphs under the box are compared with the reading's MathML,
+  only for what measured well (`COMPARED_ACCENTS`): a hat or tilde dropped or added, and a
+  tilde for a hat or a check for a breve (one kind in the place of another). Not compared:
+  primes, script ℓ, bars, vector arrows, dots, acute and grave accents. A
+  first version compared all of them and raised 8 flags on two public MIT OCW files (5 of them
+  primes; none was a certain real catch and 4 were certain false alarms: a neighboring
+  line's primes in the box, or a last prime outside it), so those kinds left. It runs after the second-reading decision and before
+  `_fix`: no model request is added or changed, it applies on every acceptance path, the fix
+  becomes a required decision, and bulk accept leaves it out. The review card says what differs
+  ("The PDF shows a hat here; the proposal has a tilde.") and a reviewer's edit gets the same
+  check; a table cell does not. Measured on the recorded readings of the development parts
+  (offline, no model call): 15 flags in 7,069 accepted-or-reviewed readings that match the
+  current layout, 14 real (the PDF and the page's LaTeX show the accent the reading dropped,
+  added or changed), 1 false; none on the public corpus files. Regression tests: a dropped,
+  added and changed accent (one test), and bulk accept leaving it out. No migration; a stored
+  document keeps its checks until it is converted again.
+## Unreleased: a table's box does not take the next numbered question (branch fix/table-box-takes-next-question)
+
+- A box drawn over the next question of a numbered run was read as a table with that question
+  as a row ("8. Explain why cells are small.  (4 points)" under a three-row matching grid,
+  split as "E xplain"; the ruled answer box under it then grew the table over it, "box
+  extended along rules"). `tables._without_captions` now cuts a first or last line off the box
+  when it opens with the number that follows (precedes) the item just above (below) the box, at
+  that item's left edge, and the table has no numbered rows of its own there. The question is a
+  list item again; an unruled grid left with fewer than four lines of cells is text, as before
+  the question made it a table. One regression test.
+- A table whose box changes is sent to the table step with another picture, so its recorded
+  answer no longer matches (rule 10); the count is in the branch report.
+## Unreleased: one rule for where a block starts (SW34, feat/starts-a-block)
+
+- One function, `figures._starts_block`, answers whether a line starts a block though it sits
+  a line's distance below the one above (`_continues` asks it last). It holds the entry
+  (lead-term) and "Keywords:" starts that were spread over `blocks._runs` and `_continues`,
+  and the region tree's index entries, and adds three more that the line geometry does not
+  show: a note or an affiliation (a raised digit or sign at the line start, in type smaller
+  than the body, after a line that does not go on in mid-sentence); a theorem, definition,
+  proof or example label (after the end of a sentence, or in bold or italic over a line that
+  is not; "Remark 5.1 It ..." with no stop only in bold or italic; "Theorem 3.6 we show" and
+  "See Example 5 and" go on); and the next number of a column of numbers after a line that
+  stops short of the right edge (the steps of an algorithm, the lines of a code listing; a
+  line number of the margin, in smaller type or set well apart from its line, is not a step). On the 333 development PDFs: 22,254 paragraphs become 22,430; the joins that these
+  signals name fall from 255 to 88 raised starts (the 88 left are all in body size, line
+  numbers and isotopes), from 21 to 9 theorem labels (the 9 left are references inside a
+  sentence), and from 316 to 212 number starts; the cuts in mid-sentence on one page go from
+  3,107 to 3,104. 30 files change; every change read is a start that was missing or neutral.
+- Not built, as no case was measured: a speaker's turn ("TEACHER:") as a signal (the 11
+  joins found in the development material were 3 real ones, all already cut by the lead-term
+  rule), and the paragraph-end rule. Footnotes that run together are cut by the raised-mark
+  signal; WS2.8 is not built. Nothing here depends on the region tree.
+- Pipeline output changes for pages with notes, labelled theorems or numbered steps, so a
+  PIPELINE_VERSION bump is owed when this merges. No migration.
+
 ## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
 
+- Speech says where a scope ends (`speech.py`, `SPEECH_VERSION` 3). Two different formulas shared
+  every word up to a trailing "end X": `e^{-x}+1` and `e^{-x+1}`, `\sqrt{a}+b` and `\sqrt{a+b}`,
+  `a+\frac{b}{c}` and `\frac{a+b}{c}`; a pair of bars was read "vertical bar x vertical bar".
+  A power, subscript, root, accent or fraction that holds more than one thing, or that something
+  follows, now says where it ends ("e to the power minus x end power plus 1", "the square root of a
+  end root plus b", "x sub i end sub plus 1", "the quantity a plus b end quantity bar"); a fraction
+  that follows something says where it starts ("a plus the fraction b over c end fraction"); what
+  stands last in another scope closes too; paired bars read "the absolute value of x" ("the norm of
+  x" for double bars), closed when more follows, and a single bar keeps "such that", "divides" and
+  "given"; where a bar can be a sign of its own (`a|b, c|d`, a bra and a ket) every bar of the
+  row stays "vertical bar". Simple things stay short ("x squared", "x sub 0", "the square root of
+  2"). The pair
+  search over every formula of up to six signs (56,796 prints) finds 3,765 groups of different
+  prints said alike and 3,120 said alike up to trailing end words before, 15 and 0 after; at
+  seven signs (495,459 prints) 99 and 0 after. All of those are the mixed number
+  `1\frac{1}{a}` against a numerator `1 1`, left as it is. One parametrized
+  pair list in `tests/test_steps_speech.py` now also fails a pair whose sayings differ only in
+  their last "end ..." words. A stored reading from older rules is made again where it is shown
+  (no model call); `RENDER_VERSION` and `PIPELINE_VERSION` are not changed here. The spoken-equal
+  score credits fewer pairs that were only said alike (the strict count does not move).
+- Lists: a first-level bullet that Word sets as large as its text, with no space character
+  after it in the text layer, starts a list item (it came out as a paragraph that began with
+  the bullet), and Word's second-level bullet, the letter "o" in Courier New, is a nested list
+  item marked `◦` (it came out as a paragraph, or ended in the item above). Two cases of one
+  regression test. Stored documents with such lists change when they are converted again.
+  A bullet whose text is only an operator (`◦ **` on a slide) is an item too, and an item
+  takes the nearer of the two innermost open levels, not the deeper one whenever both are
+  within the tolerance (slides set at 26 pt put an item's text 6 pt from the first level
+  and 12 from the second). One more regression test.
 - Migrations: `8b1d5f3a9e04` (the step facts, the head of the release of 2026-11-18) is back
   where that release has it, after `c2f4a8d61e57`. `7b1d3e9a4c28` (`jobs.html_version`) and
   `8b3d5f0e2a71` (`request_tokens`) had been put under it, so a database already at the
@@ -73,6 +417,52 @@
 - The replay record `data/eval/burden-corpus.json` was re-made: 43 of the 73 uploads, 117
   pages, 58 decisions. The 42 uploads in both records ask the same; three left for answers the
   recording lacks and one came back (docs/eval.md, `eval burden`). No model call, no migration.
+## Unreleased: with the region tree on, a table proposal is accepted against the page's own tree (branch feat/table-proposals-after-tree)
+
+- WS15.2. With `REGION_TREE` on, the table finder still proposes first, but each proposal is now
+  accepted only once the page's region tree exists. A proposal inside one region is accepted. A
+  proposal that crosses a gutter, with lines the table does not take standing on two sides of
+  it, is refused on one ground: a line of prose on each side. (The plan's two other grounds,
+  rows that do not line up across the gutter and two labeled lists side by side, had no case
+  on the development files and are not built.) A ruled table that spans
+  columns passes, and so does a real matching table. A refused proposal stays in the page as
+  text and its lines go to the reading tree, and the refusal and its reason are kept on the
+  layout (`Layout.table_refusals`: page, box, reason; no text). Over the 332 development files,
+  381 tables are found before and 378 after: three false tables are refused (two handouts and
+  a syllabus whose Grading box had been taken across the sidebar), all for prose on both sides,
+  and no real table is lost. The development bars do not move with the tree on (`layout-dev-1`
+  162 of 267 pages right and the corpus gold pages unchanged, none made wrong), and with the
+  setting off the output of all 996 analyses is byte-identical. The setting is still off; there
+  is no `PIPELINE_VERSION` bump.
+
+## Unreleased: the region tree makes none of the development pages wrong (branch fix/region-tree-wrong-pages)
+
+- WS15.1, the nine pages the tree made wrong. With `REGION_TREE` on, `layout-dev-1` goes from 141
+  to 163 pages right of 267 (it was 154 with 9 made wrong; now 22 made right, none wrong), and
+  the corpus gold pages stay at 82 right with none made wrong. Five causes, each fixed in the
+  tree or in what it is given: a table and its caption are items of the tree (they were not,
+  so the lines beside one were cut off or a footnote zone took a figure's labels); a picture
+  that starts a little below the first line beside it is in that line's band; the blanks are
+  marked with the page's gutter, so a rule that heads one column is no blank of a line in the
+  other; a channel counts as a cut only where lines stand beside lines across it, and only the
+  channels that count are counted (line numbers in the margins are no column, the gaps of an
+  inline formula are no gutter). Five regression tests, one generated page per cause. With the
+  setting off nothing changes. The setting is still off; turning it on needs a `PIPELINE_VERSION`
+  bump and a recorded re-measurement.
+## Unreleased: option grids are lists in label order (branch feat/option-grids)
+
+- WS2.4b. The commonest exam layout, the options of a question set two or four across, came out
+  at levels taken from x, in row order, with half the options paragraphs, the options of a
+  wrapped grid merged in pairs and flagged `option_labels`, and every "(2 points)" at the right
+  margin a paragraph of its own (which also ended the list, so numbering started again after
+  each question). Now each option is a list item, the options of a question are one list below it
+  in label order (A, B, C, D) whether the page sets them across or down, a points label joins
+  the text of its question, and the list goes on in one numbering. A grid is only made of a full
+  run of labels from the first, with two options on a line, that follows a question (subfigure
+  captions, numbered blanks and enumerations in a sentence are left as they were); any other block that holds a later label is still
+  flagged. Region tree on or off give the same pages (its grid rule now stops above the next
+  question's number). Not done: labeled parts inside one display equation. No migration, no model
+  request changed; a stored document keeps its elements until it is converted again.
 
 ## Unreleased: a capital that is not in the text does not make the next small letter bold
 

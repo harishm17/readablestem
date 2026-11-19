@@ -65,7 +65,7 @@ def test_accepted_fix_has_latex_mathml_speech_checks_and_calls():
     assert eq is not None
     assert eq.latex == r"\Delta t = t_\text{f} - t_0"
     assert eq.mathml.startswith("<math") and 'display="block"' in eq.mathml
-    assert eq.speech == "cap delta t equals t sub f minus t sub 0"
+    assert eq.speech == "cap delta t equals t sub f end sub minus t sub 0"
     assert eq.display == "block"
     assert fix.checks and all(c.passed for c in fix.checks)
     names = {c.name for c in fix.checks}
@@ -382,6 +382,26 @@ def test_any_symbol_difference_needs_a_decision(text_layer, latex):
 
 
 @pytest.mark.parametrize(
+    ("text_layer", "latex"),
+    [
+        pytest.param("\U0001d44a\u02c6= 2", "W = 2", id="dropped-hat"),
+        pytest.param("\u02dc\U0001d44a= 2", "W = 2", id="dropped-tilde"),
+        pytest.param("\U0001d44a= 2", r"\widetilde{W} = 2", id="added-tilde"),
+        pytest.param("\U0001d465\u02c6= 2", r"\widetilde{x} = 2", id="tilde-for-hat"),
+    ],
+)
+def test_an_accent_the_reading_dropped_or_changed_is_a_decision_with_no_second_reading(
+    text_layer, latex
+):
+    # The letters agree, so the letter checks pass and a sure cheap answer used to stand unseen.
+    client = by_model(cheap=out(latex, 0.99), main=out(latex, 0.99))
+    fix = run(client, equation_element(display="inline", text=text_layer))
+    assert codes(fix) == {equation_step.ACCENT_CODE}
+    assert fix.status == Status.NEEDS_REVIEW and fix.review == "required"
+    assert models(client) == [CHEAP_MODEL]  # the check asks no model for anything
+
+
+@pytest.mark.parametrize(
     ("text", "cause"),
     [
         ("\u2192", "no_usable_characters"),  # an arrow and nothing else
@@ -407,6 +427,12 @@ def test_a_reading_the_file_has_nothing_to_hold_against_is_accepted_and_says_why
         # pdfTeX's \Delta is U+2206 INCREMENT (the glyph list's "Delta"); \bar a macron.
         ("\u00afv = \u2206x \u2206t", r"\bar{v} = \frac{\Delta x}{\Delta t}"),
         ("x =", "x ="),  # one symbol is enough to compare
+        # Accents the reading has too: a tilde, and a bar of a drawn rule (no glyph); and the
+        # kind the check leaves alone: a prime added.
+        ("\u02dc\U0001d44a= 2", r"\widetilde{W} = 2"),
+        ("\U0001d458= 2", "k' = 2"),
+        ("\u00afv = 2", r"\overline{v} = 2"),
+        ("v = 2", r"\overline{v} = 2"),
     ],
 )
 def test_the_same_symbols_pass(text_layer, latex):

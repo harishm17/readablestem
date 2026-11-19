@@ -308,7 +308,9 @@ def _page_of(request: Request, job_id: str, user: CurrentUser, ref: str) -> tupl
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
     element_id = element_ref(result, ref)
-    element = next((e for e in result.elements if e.id == element_id), None)
+    element = next((e for e in result.elements if e.id == element_id), None) or next(
+        (b.element for b in result.left_out_blocks if b.element.id == element_id), None
+    )  # a paragraph left out is still listed on its page, to put back
     if element is None:
         raise PageError(404, *NOT_FOUND)
     return element.page + 1, element_id
@@ -324,17 +326,33 @@ def edit_element(
     action: Annotated[str, Form()] = "",
     text: Annotated[str, Form()] = "",
     level: Annotated[str, Form()] = "",
+    role: Annotated[str, Form()] = "",
     version: Annotated[str, Form()] = "",
 ) -> Response:
     """Change what the tool did not propose: the words of a paragraph, list item or heading
-    (`action=text`), or make a paragraph a heading (`action=heading`, with its `level`)."""
-    if not ELEMENT_ID.match(element_id) or action not in {"text", "heading"}:
+    (`action=text`), make a paragraph a heading (`action=heading`, with its `level`), or make it
+    a sidebar or a quotation, or neither (`action=role`, with `role` `aside`, `quote` or empty),
+    or leave a paragraph or list item out of the student file (`action=leave_out`) and put it
+    back (`action=put_back`)."""
+    if not ELEMENT_ID.match(element_id) or action not in {
+        "text",
+        "heading",
+        "role",
+        "leave_out",
+        "put_back",
+    }:
         raise PageError(404, *NOT_FOUND)
     page, element_id = _page_of(request, job_id, user, element_id)
 
     def make(result: DocumentResult, job: Job, session: Session) -> StructureChange:
         if action == "text":
             return page_edits.edit_text(result, element_id, text)
+        if action == "role":
+            return page_edits.set_role(result, element_id, role)
+        if action == "leave_out":
+            return page_edits.leave_out_block(result, element_id)
+        if action == "put_back":
+            return page_edits.put_back_block(result, element_id)
         return page_edits.make_heading(result, element_id, level)
 
     try:

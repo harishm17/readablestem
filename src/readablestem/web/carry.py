@@ -68,6 +68,8 @@ CARRIED_ACTION = "carried"
 NOT_REAPPLIED_WORDS = {
     "text": "words you changed",
     "heading": "paragraph you made a heading",
+    "role": "paragraph you made a sidebar or a quotation",
+    "block_left_out": "paragraph you left out",
     "picture": "picture you added",
     "equation": "equation you marked",
     "page_left_out": "page you left out",

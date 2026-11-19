@@ -52,6 +52,14 @@ layer shows no bold at all, read as a plain variable is the meaning-level
 `style_mismatch`; speech reads such a letter by its meaning ("vector d"); and a bold
 letter layout found in running text gets its fix without a model call.
 
+Accents are checked last (`accent_check`, check `equation.text_layer_accents`, code
+`accent_mismatch`), after the second-reading decision and on every acceptance path, so a failed
+one asks no model for anything: the letter comparison leaves a hat or tilde out, and a model
+reading that drops or adds a hat or tilde, or puts a tilde for a hat or a check for a breve
+is accepted unseen otherwise. The PDF's accents are the modifier characters in the text and in
+the glyphs under the box. Primes, script l, bars, vector arrows, dots, acute and grave accents
+are not compared (`COMPARED_ACCENTS` says why). Meaning-level, so the fix needs a decision.
+
 A picture of an equation (`equation_images`, `Element.reasons`) has no text layer, so
 nothing can confirm the reading: it gets the failed check `equation.no_text_layer`, not
 a reason to ask the main model again, so a usable reading is NEEDS_REVIEW (review
@@ -87,7 +95,13 @@ import defusedxml.ElementTree as DET
 from pydantic import BaseModel, ConfigDict, Field
 
 from readablestem.config import Settings
-from readablestem.core.mathchars import STYLE_GROUPS, base_char, char_variant
+from readablestem.core.mathchars import (
+    ACCENT_CHARS,
+    OVER_ACCENT,
+    STYLE_GROUPS,
+    base_char,
+    char_variant,
+)
 from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
 from readablestem.models import router
 from readablestem.models.base import T, VisionClient, VisionRequest
@@ -828,6 +842,101 @@ def text_layer_number_case_checks(text_layer: str | None, mathml: str) -> list[C
     return checks
 
 
+# The accents of a reading against the accents the PDF shows (`accent_differences`). The letter
+# bag leaves accents out (they are modifier letters), so a hat or tilde the reading dropped, added
+# or changed is no difference to it.
+ACCENT_CHECK = "equation.text_layer_accents"
+ACCENT_CODE = "accent_mismatch"
+# What is compared, by kind and way, is what the measured flags backed up (development parts and
+# public corpus files together): the PDF shows a hat or tilde the reading dropped (`DROPPED`), the
+# reading has a hat or tilde the PDF does not (`ADDED`), or one kind stands in the place of
+# another (`SWAPPED`: tilde for hat, check for breve). A hat and a tilde are one case (the same
+# glyphs of the same fonts, read the same way), so the dropped tilde, with one measured flag, a
+# real one, stays with the dropped hat's two. Every other kind and way left the check: primes
+# (the box does not hold a line's primes), a script l, bars and vector arrows (drawn, not
+# characters), dots, acute and grave accents (too few flags, or none).
+DROPPED, ADDED, SWAPPED = "dropped", "added", "swapped"
+COMPARED_ACCENTS: dict[str, frozenset[str]] = {
+    "hat": frozenset({DROPPED, ADDED, SWAPPED}),
+    "tilde": frozenset({DROPPED, ADDED, SWAPPED}),
+    "breve": frozenset({SWAPPED}),
+    "check": frozenset({SWAPPED}),
+}
+
+
+@dataclass(frozen=True)
+class AccentDifference:
+    kind: str  # "hat", "tilde", "breve", "check"
+    pdf: int  # how many of this kind the PDF shows
+    reading: int  # how many the reading has
+
+
+def _accent_counts(text: str) -> Counter[str]:
+    return Counter(
+        ACCENT_CHARS[ch] for ch in unicodedata.normalize("NFD", text) if ch in ACCENT_CHARS
+    )
+
+
+def _mathml_accents(mathml: str) -> Counter[str]:
+    """The accents of a MathML: an over-script accent character on a base that is no operator
+    (`\\overset{\\sim}{=}` is no accent), and the accents the letters of its text and
+    identifiers carry in themselves ("même", "años" in a `\\text{}`), which the PDF's side counts
+    too."""
+    root = DET.fromstring(mathml, forbid_dtd=True)
+    counts: Counter[str] = Counter()
+    for node in root.iter():
+        if node.tag.rsplit("}", 1)[-1] in ("mtext", "mi"):
+            counts.update(_accent_counts(node.text or ""))
+        if node.tag.rsplit("}", 1)[-1] in ("mover", "munderover") and len(node) >= 2:
+            over = _single_operator(node[-1])
+            kind = OVER_ACCENT.get("".join(over.itertext()).strip()) if over is not None else None
+            if kind is not None and _single_operator(node[0]) is None:
+                counts[kind] += 1
+    return counts
+
+
+def _single_operator(node: Any) -> Any:
+    while node.tag.rsplit("}", 1)[-1] == "mrow" and len(node) == 1:
+        node = node[0]
+    return node if node.tag.rsplit("}", 1)[-1] == "mo" else None
+
+
+def accent_differences(element: Element, mathml: str) -> list[AccentDifference]:
+    """Where the accents the PDF shows for this equation and the reading's differ, for the kinds
+    and ways of `COMPARED_ACCENTS`. Every kind of accent is counted (a hat, tilde, bar, vector
+    arrow, dot, double dot, breve, check, acute, grave), so a kind in the place of another is
+    seen whichever the other is; only the compared ones are reported.
+
+    What the PDF shows, of each kind, is the larger of the text's count and the glyphs' count
+    under the box (`reading_layer`): a wide hat or tilde of a TeX font reaches the text layer as
+    a glyph name that layout turns into the accent character, which the text builder does not
+    always keep. Empty when the PDF has no text for the equation."""
+    layer = reading_layer(element, mathml)
+    if not layer.text:
+        return []
+    shown = _accent_counts(layer.text)
+    glyphs = _accent_counts("".join(char for char, _ in layer.glyphs))
+    pdf = {kind: max(shown[kind], glyphs[kind]) for kind in {*shown, *glyphs}}
+    reading = _mathml_accents(mathml)
+    kinds = sorted({*pdf, *reading})
+    lost = [kind for kind in kinds if pdf.get(kind, 0) > reading[kind]]
+    gained = [kind for kind in kinds if reading[kind] > pdf.get(kind, 0)]
+    out = []
+    for kind in lost + gained:
+        way = (SWAPPED if gained else DROPPED) if kind in lost else (SWAPPED if lost else ADDED)
+        if way in COMPARED_ACCENTS.get(kind, ()):
+            out.append(AccentDifference(kind, pdf.get(kind, 0), reading[kind]))
+    return out
+
+
+def accent_check(element: Element, mathml: str) -> Check | None:
+    """The failed warning `equation.text_layer_accents` when `accent_differences` finds any;
+    None otherwise (a passed check is not written: most equations have no accent)."""
+    if not accent_differences(element, mathml):
+        return None
+    return Check(name=ACCENT_CHECK, passed=False, severity="warning", code=ACCENT_CODE)
+
+
 @dataclass
 class _Candidate:
     """One model attempt (with its fallback) and what the validators made of it."""
@@ -1544,6 +1653,17 @@ def transcribe(
         )
         if candidate.confidence is not None:
             candidate.confidence = min(candidate.confidence, settings.auto_accept_confidence - 0.01)
+    if (
+        candidate.usable
+        and candidate.mathml is not None
+        and candidate.output is not None
+        and candidate.output.is_equation
+    ):
+        # After the second-reading decision, so a failed accent check asks the main model for
+        # nothing; before `_fix`, so it holds the fix for a decision on every acceptance path.
+        accent = accent_check(element, candidate.mathml)
+        if accent is not None:
+            candidate.checks.append(accent)
     if candidate.label and not element.equation_label:
         # The number a display had read into its LaTeX is its number (`glyph_reconcile.edge_label`).
         element.equation_label = candidate.label

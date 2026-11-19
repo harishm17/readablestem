@@ -117,6 +117,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_signs", "sign_mismatch"): "A sign, relation or arrow differs from "
     "the PDF (a minus missing or added, ± read as +, =, <, ≤ or ≈ mixed up, a vector arrow "
     "dropped), so check the minus signs, plus/minus, relations and arrows.",
+    ("equation.text_layer_accents", "accent_mismatch"): "An accent differs from the PDF (a hat "
+    "or tilde dropped or added, or a tilde for a hat, a check for a breve), so look at "
+    "the marks over the letters in the image.",
     ("equation.text_layer_species", "species_mismatch"): "A formula, charge, state or arrow "
     "differs from the PDF (a count, element or minus sign changed, a reaction cut short, or "
     "a neighboring word taken in), so compare each formula with the image.",
@@ -563,6 +566,10 @@ NOTICE_MESSAGES: dict[str, str] = {
     "decision for you.",
     "page_omitted": "You left this page out of the student file and of the review, and the "
     "file says that it is not there.",
+    # "{count}" is the number of paragraphs or list items left out of this page.
+    "block_omitted": "Paragraphs or list items you left out of this page ({count}) are not in "
+    "the student file, and the file says so. They are still listed in the page's tools, each "
+    "with “Put it back”.",
     "source_error": "A formula in the LaTeX source uses a command LaTeX does not know, so it "
     "is shown as it was written and is a decision for you.",
     "source_unread": "This tool could not read part of the source file, so it is not in the file.",

@@ -543,6 +543,14 @@ RunKind = Literal[
 ]
 
 
+# What a block of text is apart from its kind (`Element.role`). "aside": text set apart from
+# the body, a sidebar, a callout box, a margin note or a pull quote (`<aside>`, which a screen
+# reader announces as a landmark). "quote": a block quotation (`<blockquote>`). A footnote is
+# not a role: it is a notice of its own (`Notice` "footnote"), and program code is
+# `Element.preformatted`, each read where it already was.
+Role = Literal["aside", "quote"]
+
+
 class Run(_Span):
     """A run of an element's `text` with a meaning of its own (`RunKind`). The characters
     stay in `text` as they were read: a struck date is kept and marked, never removed."""
@@ -756,6 +764,9 @@ class Element(BaseModel):
     # is `text[:term_end]`, the definition the rest; consecutive entries are written as one
     # definition list. None for every other element.
     term_end: int | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Paragraphs: set apart from the body (`Role`). None for every other element and left out
+    # of the JSON, so an element with no role is stored and written as before roles existed.
+    role: Role | None = Field(default=None, exclude_if=lambda v: v is None)
     # Figures: the alt text the PDF's own tags give this picture (a tagged Word or
     # PowerPoint export), cleaned. A proposal only: the figure step shows it to the model
     # as context, and offers it to a reviewer when the model has no usable description.
@@ -948,6 +959,8 @@ NOTICE_CODES = frozenset(
         "file_repaired",
         # Review edits (T3-16): a page the reviewer left out of the student file.
         "page_omitted",
+        # Review edits: paragraphs or list items of a page the reviewer left out (`count`).
+        "block_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
         "image_page_converted",
         # A second reader of handwritten equations (pipeline.image_page_reconcile) that gave
@@ -1100,6 +1113,19 @@ class OmittedPage(BaseModel):
     # The page was listed in `DocumentResult.image_only_pages` (kept whole as an image): it
     # is taken off that list while it is out, and put back on it with the page.
     image_only: bool = Field(default=False, exclude_if=lambda v: not v)
+
+
+class LeftOutBlock(BaseModel):
+    """One paragraph or list item the reviewer left out of the student file: running-head
+    text, a printer's mark or a scanned line that got into the body. It is the size of one
+    element of what `OmittedPage` is for a page: the element, its fixes and its own notices
+    are moved here, out of the result's lists, so no writer, count or decision sees them;
+    putting it back moves them home again. Nothing is deleted, and the words stay here, so
+    the page's card can list it and the record can say what was taken out."""
+
+    element: Element
+    fixes: list[Fix] = Field(default_factory=list)
+    notices: list[Notice] = Field(default_factory=list)
 
 
 # Where `DocumentResult.lang` came from: the PDF's /Lang, detection from the text, the
@@ -1328,6 +1354,9 @@ class DocumentResult(BaseModel):
     # Pages the reviewer left out (`OmittedPage`); empty for every result before the
     # option existed, and left out of the JSON then.
     omitted: list[OmittedPage] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # Paragraphs and list items the reviewer left out (`LeftOutBlock`); empty for every
+    # result before the option existed, and left out of the JSON then.
+    left_out_blocks: list[LeftOutBlock] = Field(default_factory=list, exclude_if=lambda v: not v)
     # 0-based page -> the page's printed label ("iv", "12"): the PDF's own page label, else
     # the number printed in the margin (`pipeline.page_labels`). Only pages that have one;
     # the output's page markers say the PDF position for the rest. Left out of the JSON when
@@ -1366,6 +1395,12 @@ class DocumentResult(BaseModel):
     def omitted_pages(self) -> list[int]:
         """0-based pages left out, in order."""
         return sorted(o.page for o in self.omitted)
+
+    @property
+    def left_out_block_pages(self) -> list[int]:
+        """0-based page of each paragraph left out, in reading order."""
+        held = sorted(self.left_out_blocks, key=lambda b: (b.element.page, b.element.order))
+        return [b.element.page for b in held]
 
     def fix_for(self, element_id: str) -> Fix | None:
         return next((f for f in self.fixes if f.element_id == element_id), None)

@@ -240,7 +240,11 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    centered on one another (an author over an affiliation) and a line that opens with a
    reference number ("[20]") are not that. A
    two-line paragraph whose second line falls short of the first stays cut. A row continuing a list item never starts left of the item's
-   marker (so the paragraph after a list is not swallowed by its last item).
+   marker (so the paragraph after a list is not swallowed by its last item). Words set in
+another style that run on over the end of a line (a bold phrase that ends a list item's
+first line and goes on) are cut off the block by the style change and joined to the item
+again, as for a paragraph (`_merge_style_splits`; only a block that is a paragraph is joined,
+so a heading is not, and a line that starts a block is not).
    An entry of a glossary, an index or a bibliography is a block of its own (SW34b), by three
    signals that need no heading over them: a lead term (bold, italic or small capitals, at a
    line's start at the paragraph's left edge, ending in a period or a colon, after a line that
@@ -256,7 +260,24 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    line's first word no longer fits (`_hanging_entries`, `_flows`; a contents list nested by
    indent stops where each title does, so it is not one). An entry of one line between such
    entries, at their left edge and short of the right edge, is an entry too (`_one_line`). A one-line entry followed by an indented paragraph starts a paragraph of its own
-   (`_continues`). A change
+   (`_continues`). Every such start is one question, `_starts_block`, asked last by `_continues`
+   (SW34): the entry and the "Keywords:" line above, and three more that the line geometry does
+   not show. A raised digit or sign (`*`, `∗`, `†`, `‡`, `§`, `¶`) at the line start, in type
+   smaller than the body, after a line that does not go on in mid-sentence, is a note or an
+   affiliation of its own (an isotope's mass number in running text is set in body size and is
+   not one). A theorem's label ("Definition 2.", "Example 5:", "Proof.") starts a block after a
+   line that does not go on in mid-sentence, or when it is bold or italic over a line that is
+   not; a numbered label with no stop ("Remark 5.1 It ...") starts one only in bold or italic.
+   "Theorem 3.6 we show" and "see Example 5 and" go on. (A speaker label such as "TEACHER:" is
+   not a signal: in the development material every speaker turn that joined was already cut by
+   the lead-term rule.) The next number of
+   a column of numbers ("4 Receive ...", "5: while ...") starts one after a line that stops
+   short of the right edge, the steps of an algorithm or the lines of a listing; the line
+   numbers in the margin of a passage do not (a number set apart from its line, in smaller
+   type or more than 1.2 em from the text, with a sentence that goes on in lower case across
+   it and no step word such as "end" or "do": `_margin_number`), nor does a number on a line
+   that runs full. Without the page's line
+   ends (`edges`) only the first group and the note and theorem signals are asked. A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
    pitch is the last line of the sentence above (`... exactly one solution,` / `x =
@@ -300,21 +321,34 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    two variables side by side and two formulas with a word between stay separate. The
    joined equation's box is the union of both lines, so its crop also shows the words
    either side of the break.
-   A paragraph that goes on over a page break is one element
-   (`_join_page_splits`, `Element.reasons` "joined across pages"): the lowest body block of
-   a page (footnotes in smaller type below it, and the running header and footer the margin
-   filter dropped, are not in the way) does not end a sentence, the top block of the next
-   page starts with a lower-case letter, and the two share size, typeface, weight and left
-   edge (or the left edge of another body block of its page: a two-column page that ends in
-   the right column and goes on in the left column of the next, which needs a tail of two
-   rows or more, since a one-line tail across columns is too often a license line) with
-   no first-line indent, both at the text area's edges. The element keeps the
+   A paragraph (or list item) that goes on over a page break is one element
+   (`_join_page_splits`, `Element.reasons` "joined across pages"). The tail is the last block
+   of the body flow of a page (`_flow_tail`): a picture, a table or a caption at the foot,
+   footnotes in smaller type, and a lone page number the margin filter left in the body (a
+   footer set low on a tall page) are skipped, but a display equation or a heading is the
+   tail itself, so nothing joins across it. The head is the first block that is not a
+   picture, a table or a caption (`_flow_head`), so a figure on top of the page does not hide
+   it. `_goes_on` is the one test: the tail does not end a sentence, the head is a paragraph
+   without a marker that starts with a lower-case letter and has no first-line indent, and
+   the two share size, typeface and weight. They stand at one edge (`_same_edge`): the same
+   x, or each at the text edge of its own column (`_text_edges` of its own page, so odd and
+   even pages with other margins agree, and a two-column page that ends in the right column
+   goes on in the left one; across columns the tail needs two rows or more, since a
+   one-line tail across columns is too often a license line). A last line that stands in by
+   a first-line indent (the one line of a paragraph, or the first line of the last paragraph
+   of a block) counts as at the edge. A tail of two lines or more whose lines all stand
+   twelve ems or more in from its page's text edge is in the other column of a page whose
+   columns were not told apart (a first page with a one-column head over two columns), and is
+   compared like a tail across columns; an index's lines at several x do not qualify. For a list item the head stands at the item's text,
+   not at its marker. When the place test is in doubt the break stays: a wrong join is worse
+   than a cut. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
    part keeps its own page for its crop. A hyphen at the page break is repaired like one at
    a line break. A paragraph that starts with math, a break onto a column that is not at the
-   left edge of a body block of the next page, and a list item (a lowercase paragraph after
-   a list item at a page foot is a new paragraph) are not joined. `Element.last_page` is the 0-based page of
+   text edge of the next page, and a head at a list item's marker rather than its text
+   are not joined. A list item that is joined no longer ends the list: the next item goes
+   on at the same level. `Element.last_page` is the 0-based page of
    the last part (None when it ends on its own page). The assembler writes the page markers
    of the pages after `page` up to `last_page` right after the joined paragraph (`marks_after`),
    never inside it, so the markers stay in order and continuous (Page 1, Page 2, Page 3) and the
@@ -343,18 +377,24 @@ because merging happens only inside one leaf). A `stack` is horizontal cuts: its
 read from the top. `cols` is one vertical cut: its children are read left to right, with a notes
 column last. A `grid` is a set of labeled cells read in label order. The items cut are the
 unmerged line fragments, the page's raster pictures (they occupy space), the rectangles drawn
-round text, and nothing else; tables are claimed before the rows are made (`_claim_tables`), so
-their cells are not items.
+round text, and the tables found on the page (`_claim_tables` takes their cells and captions out
+of the fragments before the rows are made, so a table is one item with the box of its cells and
+its caption, like a picture). A vector figure is not an item: its drawings are read later.
 
 **The cuts.**
 
-- *Horizontal.* Items are grouped in bands (items that overlap vertically). A run of bands that
+- *Horizontal.* Items are grouped in bands (items that overlap vertically; an item that stands
+  over a shorter one's whole height overlaps it by a fifth of the shorter one's height, so a
+  picture that starts a little below the first line beside it is in that line's band). A run of bands that
   keep one set of white channels is a segment. A band that does not (a line that spans the
   region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
   only when the band below is side by side (rule 6).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
-  lines each side (two on a slide) and a line of three words or more cuts it in two. Each side is
-  cut again, so a page has at most three columns. A column at most 0.35 of its neighbor's width
+  lines each side (two on a slide) that have a line of the other side at their height (the pieces
+  a formula cuts a line into are one line), and a line of three words or more, cuts it in two.
+  Only the channels that count are counted: the numbers in a margin are a channel with no
+  words, and a segment with more than two channels that count is not cut. Each side is cut again,
+  so a page has at most three columns. A column at most 0.35 of its neighbor's width
   and at most 0.6 filled is a notes column: it is read after the body block it stands beside (at
   block level) or after the whole body (at row level).
 - *Boxes (rule 2).* A rectangle drawn at least 40 x 18 pt and less than 0.8 of the page, holding
@@ -393,16 +433,74 @@ adding it changed none. Rule 13 was not ported, and rule 12's page check was not
 on the final block-level order of `_page_blocks`). Row `column` names are the tree's
 (`L`, `R`, `LL`, a `#k` suffix for a box, `~index` on an index page). The setting is
 `Settings.region_tree` (`off` or `on`), passed by `run.py` and the say-once report as
-`layout.analyze(region_tree=True)`.
+`layout.analyze(region_tree=True)`. The blanks (`_mark_blanks`) are marked with the page's
+gutter as with the tree off, so a rule that heads one column is never the blank of a line in the
+other; the tables found on the page (`_claim_tables`) are handed to the tree as boxes.
 
 **Measured** (`eval order --set layout-dev-1` and the corpus gold pages, no model, scored on
-the elements): 267 development pages, 141 right off, 154 on (22 made right, 9 made wrong);
-91 corpus gold pages, 69 right off, 82 on (13 made right, none made wrong). Added alone on top
+the elements): 267 development pages, 141 right off, 163 on (22 made right, none made wrong; 154
+on, 9 made wrong, before the five fixes below); 91 corpus gold pages, 70 right off, 82 on (12
+made right, none made wrong). Added alone on top
 of rules 1 to 8: rule 9 made 1 page right, rule 10 made 8, rule 12 made 1, none made one wrong.
 Leaving one of rules 1 to 8 out (pages that stop being right / pages that become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4 and 7 0/0. Speed: 0.575
-(off) and 0.578 s per page (on).
+(off) and 0.578 s per page (on) on a quiet box; in the runs after the five fixes, with the box
+busy, on took 0.90 of off's time (0.91 before them).
 
-**Why it is off.** It makes 9 development pages wrong while making 22 right, and the 9 are mostly pages with a table, an algorithm box or a figure at the top of one column (the other column's first lines are read first or the table is read after the text below it), two pages where a paragraph is joined across the columns or an inline formula line is read into its paragraph, and a page with line numbers in the margin, where every line becomes its own element. Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION` bump and a recorded re-measurement first.
+**The nine pages the first measurement made wrong** (154 right on, 9 right off and wrong on) are
+right again (163 right on, 22 made right, none made wrong; the corpus gold pages are unchanged at
+82 right, none made wrong). Five causes, each in the tree and none of them per page:
+
+- A table, with its caption, was not an item, so the lines beside it were read as a column of
+  their own and the cut fell inside a paragraph, or a footnote zone took a figure's labels
+  (4 pages: two tables at the top of a column, two tables with captions in both columns).
+- A picture that starts a little below the first line beside it was a band of its own, so that
+  line was cut off as a segment (1 page).
+- A rule drawn at the head of one column was taken as the blank of a line in the other, because
+  the blanks were marked without the page's gutter, which reached that line across the channel
+  (1 page: a boxed algorithm at the top of a column).
+- Three channels (the numbers in the margins and the gutter) were more than three columns, so
+  the page was one leaf and its lines were merged across the gutter (1 page).
+- The gaps that inline formulas leave in two lines were counted as a channel with three lines on
+  each side, which they are in pieces and not in lines (2 pages).
+
+**Where a table proposal is accepted (WS15.2).** `tables.find` proposes tables on the raw page,
+before the page has columns, so a proposal box can take the lines of two columns (a syllabus's
+sidebar and its body, paired at their sentence ends: `s02_syllabus_sidebar` page 1). With the tree
+on, `layout.document._analyze_document` still calls `_claim_tables` first, but `_claim_tables`
+asks `page._accepted` about what the detector proposes before anything is taken out of the page.
+`_accepted` builds the page's tree from every fragment (the proposals' lines among them; no
+table is an item yet) and `regions.table_refusal` judges each proposal against it:
+
+- A proposal whose lines stand in one region (a leaf, a column, a drawn box) is accepted. A
+  horizontal cut is no gutter: a table has rows.
+- A proposal across a gutter (a `cols` channel, the edge of a drawn box, two cells of a label
+  grid) counts only where the page has lines of its own on two sides of it. The page's own lines
+  are the ones no proposal of the page takes (`_between`, `taken`). Without that, the cut that
+  parts a table's own columns, with text below the table in the segment under one of them, was
+  taken for a gutter and two real tables (a ruled rubric, a booktabs table) were refused. A
+  table that spans the columns on purpose, and a table with nothing else in the cut, are
+  therefore accepted, and so is `s04_worksheet`'s matching table (its lists have no line of the
+  page's beside them).
+- A proposal across such a gutter is refused when a line of three words or more stands on each
+  of two sides (`REFUSED_PROSE`). Nothing else refuses it. The plan names two more grounds (rows
+  that do not line up across the gutter, and two labeled lists side by side); neither had a
+  case on the 332 development files, so neither is built.
+- A refused proposal is left where it is: its lines and rules stay in the page, and are read
+  by the tree like any other line. The tree that reads the page is built after the judging,
+  from the accepted tables only, so the tree a proposal was judged against is not the tree that
+  reads the page: it differs by the room the accepted tables take. Verdicts are not made again.
+- The refusals are on `Layout.table_refusals` (page, box and reason code; no text). No page trace
+  exists yet (WS14.8), so this is where they are kept.
+- The next page's continued-table check (`find_continued`) is given only the accepted tables.
+- `_text_block_dropped` and the "box extended along rules" growth (`REASON_EXTENDED`) are not
+  changed: they run on the raw page and take no region argument; that belongs to the second
+  table reader (WS5.16).
+
+Still not an item: a vector figure (its drawings are read after the rows are made), so a figure
+drawn as vectors at the top of a column beside text is placed by its labels only.
+
+**Why it is off.** Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION`
+bump and a recorded re-measurement first.
 
 ### Headings
 
@@ -675,7 +773,18 @@ within 3 x font size:
 
 - a bullet glyph (`•` `◦` `▪` `▫` `■` `□` `●` `○` `‣` `⁃` `➢` `✓` `►` `▸` `▶` `▹` `◆`,
   Word's Symbol and Wingdings bullets (private-use codes, mapped by `font_codes` before this
-  step), beamer's AMS triangle `▶`);
+  step), beamer's AMS triangle `▶`). A bullet glyph at the start of a row counts as a marker
+  when it stands at least 0.1 x font size from text set in another font (0.2 from text in the
+  same font), though no space character separates them (Word's Wingdings bullet leaves 0.23 x
+  font size and no blank in the text layer; the usual split of a row's tokens is 0.3). A
+  bullet that touches its text (a gap under that, "\u25aaGrading" set in a bullet font with no
+  space at all) is the same glyph a word could start with, so it is an item only when another
+  row in the document starts with the same glyph, like a dash; a lone one stays a paragraph;
+- Word's second-level bullet, the letter `o` set in Courier New: a monospaced `o` followed by
+  text that is not monospaced, with a sibling like a dash (so code that starts a line with
+  `o` in one monospaced face is not a list). It is reported as `◦` and nests by its indent.
+  The text after a bullet glyph may be only an operator (`◦ **`); after any other marker it
+  needs a letter, a digit or math;
 - a bullet drawn as a small shape (at most 0.6 x font size) just left of the row at its
   height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
   filled squares "▪";
@@ -684,7 +793,15 @@ within 3 x font size:
   decimal point (`- 40 m/s`, Word's `– 5 °C`), or set in a math font, is the sign of a
   value, not a bullet: the sign stays in the text;
 - an ordered marker: `1.` `2)` `(3)`, `a.` `b)` `(c)`, `A.`, `iv.` `(ii)` `IV)`. OpenStax's
-  "3 ." (number and full stop in separate spans) is read as "3.".
+  "3 ." (number and full stop in separate spans) is read as "3.". A blank to fill in before
+  the marker (three or more underscores, or a drawn rule that `_mark_blanks` writes as five)
+  does not hide it ("___ 1. Osmosis"): the marker is the label after the blank
+  (`_Marker.start` is its first character) and the blank stays in the item's text. A blank
+  before a bullet is no marker. Two series of labels set side by side under one question
+  (matching exercise: "___ 1." to "___ 3." in the left column, "A." to "C." in the right) are
+  read column by column as two lists one level below the question (`_matching_series`, the
+  option-grid machinery with two edges and two kinds of label), the left one first. They need
+  a full run in each, a line holding one label of each, and the question above.
 
 A bullet glyph, a drawn bullet, or a number before a capital letter ("3. Measure") is
 enough, except that the number needs a sibling too when its row reads as the next line of
@@ -704,7 +821,17 @@ indent is fine). **Levels** come from the left edge of the item text, which is t
 for every item of one level even when the markers are right-aligned (LaTeX's "(i)",
 "(ii)", "(iii)"): consecutive items in reading order form one list, a deeper indent
 (more than 0.6 x body size) opens a level, a shallower one closes levels until one
-matches. The indent is measured from the left edge of the item's column on its page (the
+matches; an indent within that tolerance of both of the two innermost open levels takes
+the nearer one (a slide's 26 pt body makes the tolerance 16 pt). Where the item texts agree
+within that tolerance, the marker still opens a level when it is of another series than the
+one of the item above (bullet or number, "1)" or "(a)", another bullet glyph) and stands more
+than half the font size right of it (`MARKER_INDENT`; slides set the sub-bullets under "1)" 13 to
+15 pt in while their text is 5 to 14 pt right of the text above). Each open level keeps the
+series that opened it: when the sub-bullets' text starts exactly on the text edge of their
+numbered parent, the x does not tell which level "2)" goes back to, so it goes back to the open
+level of its own series at that x. Items of one series (a
+wrapped list of names that start with initials) and the options of a grid are not moved by
+it. The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or
 on a page with another margin keeps its levels. A display equation inside an item does
 not end the list; any other block does.
@@ -1351,8 +1478,30 @@ Not built: the page record, the document card, and the per-source switch.
   starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
   its text, set off by a gap wider than half an em, is a grid of options that reading order
   merged. A line of text that stands alone is cut at each later label, one run per option;
-  any other block is kept whole and flagged. Where a table is detected over the grid, the
-  table keeps it (WS2.4b).
+  any other block that `_option_grids` does not resolve is kept whole and flagged. Where a
+  table is detected over the grid, the table keeps it.
+- **Option grids** (`_option_grids`, WS2.4b; default path, tree on or off): options set two or
+  four across are one list in label order, whether the page sets them row by row ((A) (B) over
+  (C) (D)) or column by column ((A) (C) over (B) (D)). A grid starts at a row with an option label
+  and takes the rows after it that start with a label of the same form (a row that holds
+  several labels set apart is cut at each) and the lines wrapped under one of its columns. It
+  is a grid when its labels are a full run of letters or numbers from the first (A, B, C or
+  1, 2, 3), each once, two options share a line, no option ends the way a clause of a
+  sentence does ("(c) X," "(d) Y, and": a list in prose), and it follows a question (`_asks`:
+  a line ending in "?" or ":", or the lines of a list item of another marker family such as
+  "4." over "A."; a grid of capital letters that nothing above it in its column leads into
+  carries on a question from the page before). Subfigure captions "(a) ... (b) ..." and
+  runs of numbered blanks follow no question and are left as they were. Then each option is a list item (flagged `_Marker.option`), the cells are read
+  in label order (`_option_order` keeps that order when the page's blocks are put in reading
+  order by their boxes), and the options are one list a level below the question they follow,
+  whatever the x of their column (`_list_levels`). Anything that is not a full run (a label
+  missing, a label twice) is left as it was, and a block that holds a later label is flagged
+  as above. A right-margin points label ("(2 points)", "[4 pts]") on the baseline of a line is
+  too far from it for `_merge_baselines`; `_runs` puts it at the end of that line's text. The
+  region tree's grid rule (8) does what the default path cannot know: where a grid ends above the
+  number of the next question that stands in the same two columns (`_Build._grid_above`).
+  Not done: labeled parts inside one display equation ("(a) 2x + 3 = 11 (b) ...": the row is
+  an equation, and `_split_labels` cuts only an equation number off its end).
 - **Right-to-left text** (`rtl_text`, `_rtl_words`): a block with two or more words that
   have a strong right-to-left letter (bidi class R or AL) is flagged, because the order of
   the words in the row is the PDF's, which is not always the reading order (the reorder,

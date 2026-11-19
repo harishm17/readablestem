@@ -31,6 +31,7 @@ from readablestem.pipeline.chem_check import compare_species
 # step always agree (and pipeline/equation_step.py needs no change for the screen).
 from readablestem.pipeline.equation_step import (
     LETTER_STYLES,
+    AccentDifference,
     TextLayer,
     _layer_letters,
     _letter_verdict,
@@ -38,6 +39,7 @@ from readablestem.pipeline.equation_step import (
     _MathLetters,
     _mathml_letters,
     _symbol_bag,
+    accent_differences,
     reading_layer,
 )
 from readablestem.pipeline.text_layer_compare import (
@@ -67,7 +69,7 @@ class DiffRow:
     """One line of the "What differs" table. Text only: the table is the way to get this
     information without seeing the outline on the image."""
 
-    what: str  # "Style", "Symbol", "Sign", "Number", "Case" or "Species"
+    what: str  # "Style", "Symbol", "Sign", "Number", "Case", "Species" or "Accent"
     symbol: str  # as the PDF shows it (or the proposal, when only it has it)
     pdf: str  # "bold", "2 times", "not there"
     proposal: str
@@ -87,8 +89,8 @@ class EquationCompare:
     proposal_marks: set[str] = field(default_factory=set)  # ... in the proposed MathML
     summary: str | None = None  # the one sentence that says what to look at
     # Every sentence, by what it is about: "style" (a style that changes the meaning),
-    # "symbol", "sign", "number", "case", "species", "cosmetic" (a style that does not) and
-    # "unseen".
+    # "symbol", "sign", "number", "case", "species", "accent", "cosmetic" (a style that does not)
+    # and "unseen".
     said: dict[str, list[str]] = field(default_factory=dict)
 
     @property
@@ -255,6 +257,7 @@ def compare_equation(
         _numbers_and_case(out, sentences, text, fix.equation.mathml, other)
         _glyph_styles(out, sentences, layer, fix.equation.latex, other)
     _species(out, sentences, text, fix.equation.mathml, other)
+    _accents(out, sentences, accent_differences(element, fix.equation.mathml), other)
     if sentences:
         out.summary = min(sentences, key=lambda s: s[0])[2]
     for _, about, sentence in sorted(sentences, key=lambda s: s[0]):
@@ -315,6 +318,36 @@ def _species(
         else:
             said = f"{_capital(other)} has {got}, which the PDF does not."
         sentences.append((1, "species", said))
+
+
+def _a(kind: str) -> str:
+    return f"{'an' if kind[0] in 'aeiou' else 'a'} {kind}"
+
+
+def _accents(
+    out: EquationCompare,
+    sentences: list[tuple[int, str, str]],
+    differences: list[AccentDifference],
+    other: str,
+) -> None:
+    """The rows and sentences for `accent_mismatch` (the step's `accent_differences`): a hat or
+    tilde the PDF shows that the reading dropped, one it added, a tilde where the PDF has a hat.
+    A dropped accent is paired with an added one of another kind, the way a person would say it."""
+    dropped = [d for d in differences if d.pdf > d.reading]
+    added = [d for d in differences if d.reading > d.pdf]
+    for d in differences:
+        out.rows.append(DiffRow("Accent", d.kind, _times(d.pdf), _times(d.reading), True))
+    for d in dropped:
+        if added:
+            swap = added.pop(0)
+            said = f"The PDF shows {_a(d.kind)} here; {other} has {_a(swap.kind)}."
+        else:
+            said = f"The PDF shows {_a(d.kind)} here that {other} does not have."
+        sentences.append((1, "accent", said))
+    for d in added:
+        sentences.append(
+            (1, "accent", f"{_capital(other)} has {_a(d.kind)} the PDF does not show.")
+        )
 
 
 def _numbers_and_case(

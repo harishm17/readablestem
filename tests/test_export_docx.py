@@ -300,13 +300,18 @@ def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
         '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
         "<p>Whose woods these are<br>His house is in the village</p>"
         "<pre><code>for each word do\n  if x then\n    <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
-        "\n  end if\nend for</code></pre></main></body></html>"
+        "\n  end if\nend for</code></pre>"
+        '<aside aria-label="Sidebar"><p>Set apart.</p></aside>'
+        "<blockquote><p>Quoted.</p></blockquote></main></body></html>"
     )
     export = ed.export_docx(html)
     assert export.equations == 1
     with zipfile.ZipFile(io.BytesIO(export.data)) as archive:
         xml = archive.read("word/document.xml").decode()
     assert len(re.findall(r"<w:br ?/>", xml)) == 5  # one in the poem, four between the steps
+    # A sidebar and a quotation keep a style of their own in Word, so neither reads as body text.
+    assert re.search(r'w:val="Sidebar".*?Set apart', xml, re.S)
+    assert re.search(r'w:val="BlockText".*?Quoted', xml, re.S)
     assert "\N{NO-BREAK SPACE}" * 4 + "<m:oMath>" in xml.replace(
         "</w:t></w:r><m:oMath>", "<m:oMath>"
     )

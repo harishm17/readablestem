@@ -133,16 +133,28 @@ def _intersect(
     return out
 
 
+def _over_shorter(items: Sequence[Item], band: Sequence[int], y0: float, y1: float) -> bool:
+    """Does the item from `y0` to `y1` overlap a shorter member of `band` by a fifth of that
+    member's height?"""
+    for j in band:
+        top, bottom = items[j][0][1], items[j][0][3]
+        if bottom - top < y1 - y0 and min(bottom, y1) - y0 > 0.2 * (bottom - top):
+            return True
+    return False
+
+
 def _bands(items: Sequence[Item]) -> list[list[int]]:
     """Indexes of `items` grouped in bands: items that overlap vertically (all but a fifth of
-    their height) are one band."""
+    their height) are one band. An item that stands over a shorter one's whole height, but
+    starts a little below it (a picture beside the first line of a column), overlaps it by a
+    fifth of the shorter one's height."""
     order = sorted(range(len(items)), key=lambda i: items[i][0][1])
     bands: list[list[int]] = []
     bottom = 0.0
     for i in order:
         y0, y1 = items[i][0][1], items[i][0][3]
         shrink = 0.2 * (y1 - y0)
-        if bands and y0 + shrink < bottom:
+        if bands and (y0 + shrink < bottom or _over_shorter(items, bands[-1], y0, y1)):
             bands[-1].append(i)
             bottom = max(bottom, y1 - shrink)
         else:
@@ -284,7 +296,7 @@ class _Build:
         items = self.items
         box = _union([items[i][0] for i in idx])
         inner = _interior(chans, items, idx)
-        if not inner or len(inner) > MAX_COLUMNS - 1:
+        if not inner:
             return _Node("leaf", box, column=column)
         if len(inner) == 1:
             (a, b), left, right = inner[0]
@@ -302,15 +314,14 @@ class _Build:
                     channel=(a, b),
                 )
         need = 2 if self.slide else 3
+        # a channel counts when text stands beside text across it (the numbers of a margin,
+        # the gaps a formula leaves in a line are no columns), and only then are they counted
         good = [
             c
             for c in inner
-            if sum(self.weight.get(i, 1) for i in c[1]) >= need
-            and sum(self.weight.get(i, 1) for i in c[2]) >= need
-            and _prose(items, c[1])
-            and _prose(items, c[2])
+            if self._beside(c[1], c[2]) >= need and _prose(items, c[1]) and _prose(items, c[2])
         ]
-        if not good:
+        if not good or len(good) > MAX_COLUMNS - 1:
             return _Node("leaf", box, column=column)
         (a, b), left, right = max(good, key=lambda g: g[0][1] - g[0][0])
         lnode = self.build(left, _side(column, "L"), depth + 1)
@@ -323,6 +334,31 @@ class _Build:
             if widths[k] <= NOTE_RATIO * widths[1 - k] and filled <= NOTE_FILL * height:
                 node.notes = k
         return node
+
+    def _rows(self, side: Sequence[int]) -> list[tuple[float, float, int]]:
+        """A column's lines: (top, bottom, how many lines it holds) of each band of its
+        items, so that the pieces a formula cuts one line into are one line."""
+        items = self.items
+        return [
+            (
+                min(items[side[k]][0][1] for k in band),
+                max(items[side[k]][0][3] for k in band),
+                max(self.weight.get(side[k], 1) for k in band),
+            )
+            for band in _bands([items[i] for i in side])
+        ]
+
+    def _beside(self, left: Sequence[int], right: Sequence[int]) -> int:
+        """The lines (the fewer of the two columns') that have a line of the other column
+        at their height."""
+        lrows, rrows = self._rows(left), self._rows(right)
+
+        def facing(
+            rows: Sequence[tuple[float, float, int]], others: Sequence[tuple[float, float, int]]
+        ) -> int:
+            return sum(n for a, b, n in rows if any(min(b, d) > max(a, c) for c, d, _ in others))
+
+        return min(facing(lrows, rrows), facing(rrows, lrows))
 
     def _grid(
         self, idx: list[int], left: list[int], right: list[int], box: BBox, column: str
@@ -337,7 +373,7 @@ class _Build:
             return None
         labels = [lab for lab, _ in lc + rc if lab is not None]
         if len({lab[0] for lab in labels}) != 1:
-            return "cols"
+            return self._grid_above(idx, left, right, box, column, lc + rc) or "cols"
         vals = sorted(v for _, v in labels)
         if vals != list(range(vals[0], vals[0] + len(vals))):
             return None
@@ -345,6 +381,37 @@ class _Build:
         node = _Node("grid", _union([items[i][0] for i in idx]), column=column)
         node.cells = [_union([items[i][0] for i in m]) for _, m in cells]
         return node
+
+    def _grid_above(
+        self,
+        idx: list[int],
+        left: list[int],
+        right: list[int],
+        box: BBox,
+        column: str,
+        cells: list[tuple[tuple[str, int] | None, list[int]]],
+    ) -> _Node | None:
+        """Rule 8, a grid with the next question under it. Options (A) (C) beside (B) (D) and the
+        number of the next question ("5.") stand in the same two columns, as no blank band
+        parts them: the labels of the cells below the first kind of label are cut off, and the
+        cells above are the grid, a stack of the grid and what is under it."""
+        items = self.items
+        first = min(cells, key=lambda c: min(items[i][0][1] for i in c[1]))
+        kind = first[0][0] if first[0] else ""
+        foreign = [c for c in cells if c[0] is not None and c[0][0] != kind]
+        top = min(items[i][0][1] for c in foreign for i in c[1])
+        centre = {i: (items[i][0][1] + items[i][0][3]) / 2 for i in idx}
+        above = [i for i in idx if centre[i] < top]
+        below = [i for i in idx if centre[i] >= top]
+        if not above or not below:
+            return None
+        grid = self._grid(
+            above, [i for i in left if i in above], [i for i in right if i in above], box, column
+        )
+        if not isinstance(grid, _Node):
+            return None
+        cut = (max(items[i][0][3] for i in above) + top) / 2
+        return _Node("stack", box, [grid, self.build(below, column, 1)], [cut], column=column)
 
 
 def _side(column: str, side: str) -> str:
@@ -871,10 +938,22 @@ def _pictures(page: pymupdf.Page, height: float) -> list[Item]:
     return out
 
 
+def _takes_room(box: BBox, width: float, height: float) -> bool:
+    w, h = box[2] - box[0], box[3] - box[1]
+    return (
+        w >= PICTURE_MIN_PT and h >= PICTURE_MIN_PT and w * h < PICTURE_MAX_SHARE * width * height
+    )
+
+
 def _tree_of(
-    page: pymupdf.Page, kept: Sequence[_Row], paths: Sequence[_Path], document: _Document
+    page: pymupdf.Page,
+    kept: Sequence[_Row],
+    paths: Sequence[_Path],
+    tables: Sequence[BBox],
+    document: _Document,
 ) -> RegionTree:
-    """The region tree of a page from the fragments that are kept."""
+    """The region tree of a page from the fragments that are kept and the tables found on it
+    (their cells are no fragments of the page, but the table takes its room like a picture)."""
     height = page.rect.height
     body = [f for f in kept if not f.vertical and _margin_zone(f, height) is None]
     items: list[Item] = [(f.bbox, f.clean) for f in body]
@@ -883,6 +962,7 @@ def _tree_of(
     sizes = [f.size for f in body if len(f.clean.split()) >= 4]
     body_size = statistics.median(sizes) if sizes else 10.0
     items += _pictures(page, height)
+    items += [(t, "") for t in tables if _takes_room(t, page.rect.width, height)]
     rects = _boxes_of(paths, (page.rect.width, height), items)
     build = _Build(items, document.slide_deck, pitch, rects)
     root = build.build(list(range(len(items))), "S")
@@ -917,12 +997,13 @@ def prepare(
     dropped: list[_Row],
     rules: Sequence[_Path],
     *,
+    tables: Sequence[BBox] = (),
     document: _Document,
 ) -> tuple[list[_Row], RegionTree, list[_Row]]:
     """The rows of a page from the region tree: fragments grouped by the leaf they stand in,
     baselines merged inside a leaf only. Returns the rows, the tree (in place of the gutter)
     and the dropped rows."""
-    tree = _tree_of(page, kept, rules, document)
+    tree = _tree_of(page, kept, rules, tables, document)
     groups: dict[tuple[int, int], list[_Row]] = {}
     for f in kept:
         if f.vertical:
@@ -941,6 +1022,97 @@ def prepare(
         if not row.vertical:
             row.column = tree.column_of(row.bbox) + index
     return rows, tree, _merge_baselines(dropped, None)
+
+
+# -- table proposals (WS15.2) -----------------------------------------------------------------
+
+REFUSED_PROSE = "prose on both sides of a gutter"
+
+
+def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[list[Item]]]:
+    """The gutters of the tree that `lines` (the cells of a table proposal) stand across: for
+    each, the lines on each of its sides. A horizontal cut is no gutter (a table has rows), and
+    a gutter counts only where the page has lines of its own on two sides (`rest`: the lines that
+    are not the proposal's): a table whose own columns are cut is no gutter of the page, though
+    text below it may stand under one of its columns."""
+    if not lines:
+        return []
+    found: list[list[list[Item]]] = []
+    if node.kind == "stack":
+        parts: dict[int, list[Item]] = {}
+        for it in lines:
+            parts.setdefault(bisect.bisect_right(node.cuts, (it[0][1] + it[0][3]) / 2), []).append(
+                it
+            )
+        for k, part in parts.items():
+            found += _between(node.children[k], part, rest)
+        return found
+    if node.kind == "grid":
+        cells: dict[int, list[Item]] = {}
+        for it in lines:
+            cells.setdefault(_nearest_cell(node.cells, it[0]), []).append(it)
+        if len(cells) >= 2 and sum(_others(c, rest) for c in node.cells) >= 2:
+            found.append(list(cells.values()))
+        return found
+    if node.kind == "cols":
+        middle = sum(node.channel) / 2
+        sides = [
+            [it for it in lines if (it[0][0] + it[0][2]) / 2 < middle],
+            [it for it in lines if (it[0][0] + it[0][2]) / 2 >= middle],
+        ]
+        if all(sides) and all(_others(c.box, rest) for c in node.children):
+            found.append(sides)
+        for child, side in zip(node.children, sides, strict=True):
+            found += _between(child, side, rest)
+        return found
+    inside: dict[int, list[Item]] = {}
+    outside: list[Item] = []
+    for it in lines:
+        for k, (rect, _) in enumerate(node.boxes):
+            if _centre_in(it[0], rect):
+                inside.setdefault(k, []).append(it)
+                break
+        else:
+            outside.append(it)
+    groups = ([outside] if outside else []) + list(inside.values())
+    standing = sum(_others(node.boxes[k][0], rest) for k in inside)
+    if outside:  # the page's own lines in the leaf itself, outside its boxes
+        standing += any(_centre_in(b, node.box) and not _in_a_box(b, node) for b in rest)
+    if len(groups) >= 2 and standing >= 2:
+        found.append(groups)
+    for k, part in inside.items():
+        found += _between(node.boxes[k][1], part, rest)
+    return found
+
+
+def _in_a_box(box: BBox, leaf: _Node) -> bool:
+    return any(_centre_in(box, rect) for rect, _ in leaf.boxes)
+
+
+def _others(box: BBox, rest: Sequence[BBox]) -> bool:
+    """Does a line that is not the proposal's stand in `box`?"""
+    return any(_centre_in(b, box) for b in rest)
+
+
+def table_refusal(
+    tree: RegionTree, lines: Sequence[Item], box: BBox, taken: set[BBox]
+) -> str | None:
+    """Why a table proposal is not accepted, as the reason (`REFUSED_*`), or None. The proposal
+    is made on the raw page, before the page has columns; here the page has its tree. A proposal
+    in one region is accepted, and so is a ruled table that spans the columns on purpose (it is
+    a cut of its own: nothing else of the page stands beside it). One that stands across a
+    gutter is refused only when it has prose on both sides of it. `lines` are the lines
+    the proposal takes (cells and caption), `box` the box of its cells and `taken` the boxes of
+    the lines every proposal of the page takes: the page's own lines are the others."""
+    frame = (box[0] - 1, box[1] - 1, box[2] + 1, box[3] + 1)
+    cells = [it for it in lines if _centre_in(it[0], frame)]
+    rest = [b for b, _ in tree.lines if b not in taken]
+    across = _between(tree.root, cells, rest)
+    if not across:
+        return None
+    if any(sum(_prose(side, range(len(side))) for side in sides) >= 2 for sides in across):
+        return REFUSED_PROSE
+    return None
 
 
 # -- rule 12: numbered runs --------------------------------------------------------------------

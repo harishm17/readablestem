@@ -259,6 +259,58 @@ the compare table says them as "Number" and "Case" rows. Table cells are not cov
 case flags on 1,748 gold equations compared with their own print; on synthetic errors, 457
 of 481 digit swaps and 1,438 of 1,438 case flips are found.
 
+## Accent check (equations)
+
+`equation_step.accent_check` (check `equation.text_layer_accents`, code `accent_mismatch`).
+The symbol bags above leave accents out (a hat or a tilde is a modifier character, not a
+letter), so a reading that dropped or added a hat or tilde, or put a tilde for a hat had
+every letter check passing, and it sits on the single-reading path (`SKIP_ESCALATION_FROM`,
+`ACCEPT_SINGLE_READING`).
+
+What it compares: the accents of the PDF's text and of the glyphs under the box
+(`reading_layer`; the larger count of the two, since a wide hat or tilde of a TeX font reaches
+the glyphs as a name layout turns into the accent character) against the accents of the MathML
+(`mover` with an accent character over a base that is no operator, and the accents the letters of
+an `mtext` or `mi` carry in themselves, so "même" or "años" in a `\text{}` is on both sides).
+Every kind is counted (hat,
+tilde, bar, vector arrow, dot, double dot, breve, check, acute, grave), so a kind in the place of
+another is seen. Only these kinds and ways are reported (`COMPARED_ACCENTS`): a hat or a tilde
+the reading dropped, one it added, and one kind in the place of another for a hat, tilde, breve
+or check (a tilde for a hat, a check for a breve). Nothing is checked when the PDF has no text
+for the equation.
+
+What it does not compare, because the measured flags did not back it up. The rule was: a kind
+and way stays only if at least 2 of its flags are real and at least two thirds of its judged
+flags are real, over the development parts and the public corpus files together.
+
+- Primes. The accent of a prime is often outside the box (a neighboring line's primes sit in
+  the layer, or the last prime of the equation is cut off), so the PDF's count is unreliable in
+  both ways: 6 flags on the development parts and the public MIT OCW files together were 2 real,
+  3 false and 1 not decided. A prime read from a layer that agrees with itself and is not
+  extended past the box would have kept 3 flags (2 real, 1 false) and no corpus flag; that is
+  too little to stand on, so primes are not compared.
+- Script ℓ read as a plain l (1 flag), a bar or a vector arrow (drawn, not characters; 1 flag),
+  a dot or double dot (1 flag, not decided), acute and grave accents (none).
+
+One way is kept on less than the rule asks: a tilde the reading dropped has 1 flag, a real one.
+A hat and a tilde are the same glyphs of the same fonts read the same way, and the dropped hat
+has 2 of 2 real, so the two are taken as one case.
+
+The glyphs exist only with `EQUATION_GLYPH_CHECKS` (on in production's profile); without them
+the check reads the text alone, which misses the wide accents and so flags fewer and falsely
+flags the wide tildes and hats that only the glyphs show. An accent the PDF draws just outside
+the box is not counted (the box cannot tell it from a neighboring line's).
+
+It runs in `transcribe` after the second-reading decision and before `_fix`, beside
+`no_text_layer` and `half_fraction`, so it adds no model request and applies on every
+acceptance path (a sure cheap answer, a single reading, a second reading, a page-witness
+settlement). It is a failed warning with a meaning-level code: the fix needs a decision
+(`NEEDS_REVIEW`, review "required"), it is never accepted in bulk (`web.bulk_accept` takes only a
+fix with no failed check), and a reviewer's edit gets the same check (`web.edit_check`, a
+table cell does not: its text has no glyphs). The review card says what differs ("The PDF shows a
+tilde here; the proposal has a hat.", the compare table's "Accent" rows). The confidence is not
+changed.
+
 ## Chemistry species check (equations)
 
 `pipeline/chem_check.py`, check `equation.text_layer_species`, code `species_mismatch`. The
@@ -934,25 +986,25 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 
 | Construct | Reading |
 |---|---|
-| Simple fraction (each side one or two plain tokens) | "a over b", "cap delta bold d over cap delta t"; "a over b end fraction" when a plain token follows it, and the long form after a plain token, so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}` are not said alike |
-| Other fractions | "the fraction ... over ... end fraction" |
+| Simple fraction (each side one or two plain tokens) | "a over b", "cap delta bold d over cap delta t"; "a over b end fraction" when a plain token follows it, and the long form after something (a sign, a number, a letter), so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}`, `a+\frac{b}{c}` and `\frac{a+b}{c}` are not said alike |
+| Other fractions | "the fraction ... over ... end fraction"; after something it says where it starts ("a plus the fraction b over c end fraction"), and a fraction inside another is always long |
 | `linethickness=0` fraction | "n choose k" |
-| Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power" |
+| Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power"; a power that holds more than one thing, or that something follows, says where it ends: `e^{-x}+1` "e to the power minus x end power plus 1" against `e^{-x+1}` "e to the power minus x plus 1 end power" |
 | Primes, degrees | "y double prime", "30 degrees" |
-| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a short subscript a plain token (or a script on one) follows is closed, "x sub i end sub y" against `x_{iy}` "x sub i y" |
+| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a subscript that something follows (a plain token, a sign, the power of `x_i^2`) is closed: "x sub i end sub y" against `x_{iy}` "x sub i y", `x_i+1` "x sub i end sub plus 1" against `x_{i+1}` "x sub i plus 1 end sub" |
 | Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "cap A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
-| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides" and a pair of bars the absolute value |
+| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides". A pair of bars is "the absolute value of x" and a pair of double bars "the norm of x", closed ("... end absolute value", "... end norm") when more follows or the content is more than one thing; a pair that carries a script (`|x|^2`) keeps "vertical bar", and so does every bar of a row where one bar has no partner or the bars of a pair each stand between two operands (`a|b, c|d`, a bra and a ket): there a bar can be a sign of its own. A pair of single bars around one capital letter (`|S|`, `|A|`) or around a row with a set sign or a colon (`|A \cup B|`, `|G:H|`) also keeps "vertical bar": it is the size of a set, a determinant or an index as often as an absolute value |
 | A centered dot or a cross | between vectors (bold letters, arrows, nabla, the test of `signs.py`) "dot" and "cross"; between numbers and scalars "times" |
 | A negated relation | "is not an element of", "is neither less than nor equal to", "not equal to", "is not a subset of", ...; a relation with no word of its own "with stroke" |
 | Distribution and sets | `\sim` after a variable before a distribution "is distributed as"; `\setminus` "set minus"; `\mathit{diff}` is the word "diff" (a plain `diff` is still d, i, f, f) |
-| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
+| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power" unless something follows: "Cu to the power 2 plus end power divided by Cu") |
 | Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
-| Roots | "the square root of x", "... end root" when compound, "the cube root of", "the root of index n of" |
+| Roots | "the square root of x", "... end root" when compound or when something follows (`\sqrt{a}+b` "the square root of a end root plus b" against `\sqrt{a+b}` "the square root of a plus b end root"), "the cube root of", "the root of index n of" |
 | Large operators | "the sum from i equals 1 to n of", "the integral from 0 to 1 of", "the product over k of" |
 | Limits | "the limit as x approaches 0 of" (an arrow under `lim` reads "approaches") |
 | Operators and relations | equals, minus, plus or minus, times, divided by, less than or equal to, approximately equals, proportional to, right arrow, ... |
 | Letters | "x", "cap F" (a capital is "cap", never "capital"); Greek "delta", "cap delta"; bold "bold d"; double-struck "double-struck cap R"; the letters of an upright name (`\mathrm{Var}`) add no "cap" ("V a r") |
-| Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde" |
+| Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde"; over more than one thing "the quantity a plus b end quantity bar" (`\bar{a+b}` and `a+\bar{b}` are not said alike) |
 | Functions | "sine", "cosine", "natural log", ... |
 | Tables | "row 1: ...; row 2: ..." when there are several rows; cells of an aligned equation read as one line, matrix cells are comma-separated |
 | Matrices | a table inside parentheses or brackets: "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix"; one column "the 3 by 1 column matrix", one row "the 1 by 3 row matrix"; inside bars "the 2 by 2 determinant; ...; end determinant". A single fenced cell, an aligned table and brace-fenced tables are not matrices |
@@ -962,7 +1014,7 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Text | verbatim, except words that are a single math symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
 
-Two prints that differ are not said alike, and two spellings of one print are: an operator the
+Two prints that differ are not said alike, nor is one the other up to the "end ..." words that close its last scopes ("e to the power minus x plus 1" is not the start of "e to the power minus x plus 1 end power"). A scoped construct (power, subscript, root, accent, fraction, bars) that holds more than one thing, or that something follows, says where it ends; what stands last in another scope says so too ("the square root of the square root of a plus b end root end root"), and simple things stay short ("x squared", "x sub 0", "the square root of 2"). The generated search that checks this (every sequence of the letters a and b, the number 1, `+`, `-` and a product, with roots, bars, brackets, accents, fractions and scripts, up to size 7; 495,459 prints) finds no two prints said alike except `1\frac{1}{a}` and `\frac{1 1}{a}`, a mixed number written the way a numerator with two numbers is (99 groups, all of that one kind), and no print said as another up to a trailing end word. Two spellings of one print are said alike: an operator the
 converter leaves as an identifier (`\vert`, `\Vert`, `\pm`, `\langle`, `\geqslant`) reads as the operator,
 and a transposed run of letters (`\boldsymbol{BB}^T`) as one print with `BB^T`. Left alike on
 purpose: `ab_2` and `{ab}_2` (the same print), round and square matrix brackets, `\cdot`, `\times` and
@@ -974,7 +1026,7 @@ before a change to these rules:
 
 - The reading stored with an equation (`EquationFix.speech`) is made in the equation step and
   carries the version of the speech rules that made it (`EquationFix.speech_version`, the code's
-  `speech.SPEECH_VERSION`, 2 since "cap" and the pauses in a formula; 0 where none was stored).
+  `speech.SPEECH_VERSION`, 3 since the scope ends and "the absolute value of"; 2 since "cap" and the pauses in a formula; 0 where none was stored).
   A stored reading made by older rules and not written by a person is made again from its MathML,
   without a model, where it is read: `speech.refresh_readings` on the result in
   `web.review.rerender_html` (the page, the EPUB's `describedMath` and the Word fallback text),

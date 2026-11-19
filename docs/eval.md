@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.12 as of 2026-11-19; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.13 as of 2026-11-19; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,14 +43,14 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.12 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.13 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
 **What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
 report is held to its baseline only when this pipeline version made it (`eval gate
 --require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
-so CI's `eval-gate` job gates those two, re-made at 0.5.12. Equations, figures and document
+so CI's `eval-gate` job gates those two, re-made at 0.5.13. Equations, figures and document
 need a paid run: their latest and baseline reports are historical records of the 0.5.0
 system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
 the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
@@ -61,8 +61,8 @@ request again. The same job replays the corpus against the committed record (`ev
 which finds a change of behavior that a version number alone would not.
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
-latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions and
-model ids, the eval guard on pull requests, and the weekly live run below.
+latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions,
+model ids and switches, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
 
@@ -642,7 +642,31 @@ it) the gate also refuses (`stale_report`) a current report produced with other 
 or models than the code under test, so a prompt change cannot pass on an old committed
 `latest-<task>.json`. The pipeline version counts too (`pipeline X (code: Y)`): a report made
 by another version than the code's is refused whatever its prompts and models were, and a
-`--fake` report has no models to compare. Tolerances live in `data/eval/tolerances.json`; an entry with only
+`--fake` report has no models to compare.
+
+The switches count as well (`flag NAME X (code: Y)`). A setting or a constant can change what a
+model is asked or what a step accepts, sends to review or asks again without moving a prompt, a
+model or the version, so a report records the values it was made with (`flags`, one name and
+value each, sorted; `eval.gate.guarded_flags` makes the mapping and is its one definition).
+In it: the behavior settings of the production profile (`ops/production.profile.toml`) except
+those `UNGUARDED_SETTINGS` names with a reason (the model ids, which `models` records; the
+colors and the spoken reading in the output page; which file kinds the upload takes in; sharing
+and packaging), so a setting added to the profile is guarded from the start; and the module
+constants of `GUARDED_CONSTANTS`: the confidence bars and rules that accept, review or escalate
+an answer (`equation_step.SKIP_ESCALATION_FROM`, `ACCEPT_SINGLE_READING`, `figure_step`,
+`heading_step.ACCEPT_AT`, `flag_policy.THRESHOLD`), and what a request holds (output room,
+effort, the crop's padding and resolution, the text sent with it). Not in it: where a line or a
+table sits on the page, language and outline rules, parser safety limits, spend, retries,
+timeouts, and a number written inside a function; those are what the pipeline version and the
+replay of the corpus (`eval burden`) are for. A run uses the settings of its environment (the
+code's defaults) unless it is given `--profile production`; the gate compares a report with the
+code's defaults, or with the profile's values when the report says it ran under the profile, so a
+report made with a setting changed in the environment is refused. Without `--require-current`
+the differences are listed under the table, and so are the settings of the report that
+production does not use. A report of a run that called no model that has no `flags` is refused
+(re-make it with `eval pipeline`; the two commands are in `eval/reproduce.py`); a report of a model run made before the field
+existed is not refused for that, since its pipeline version already is. Add a switch of either
+kind to the list when a change makes it decide what is asked or accepted. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -2763,7 +2787,7 @@ exam, handwriting and scans) all read MIT OpenCourseWare files, so they run only
 that file is. The recorded cost of the 1,713 answers one full replay reads is $5.10; a
 replay pays nothing.
 
-**Answers still owed.** 29 files ask for 1,260 answers that are not in the recording
+**Answers still owed.** 29 files ask for 1,286 answers that are not in the recording
 (2026-11-19). Until wave 1a it was ten files and 126 answers (pictures that changed since the
 first recording, and files added after it). Wave 1a changed what a conversion asks on 18
 files (words with their styles, kept line ends, new boxes) and paid for no recording, so one
@@ -3317,18 +3341,21 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.12 by
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.13 by
 `eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 58 decisions,
 0.496 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
 capitals, equation numbers and kept line ends) make the pipeline ask questions the
-recording does not hold, so 30 uploads are left out for 1,298 answers missing, among them the
-equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 74,
-`w_solutions_1802` 50). The decisions a page of the records are not comparable: the dense
+recording does not hold, so 30 uploads are left out for 1,326 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 76,
+`w_solutions_1802` 64). The decisions a page of the records are not comparable: the dense
 mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
 0.5.11 record (2026-11-18, 45 uploads, 70 decisions), the 42 uploads in both ask the same;
 `r15_openstax_chem_ch3`, `r19_poster_codesign` and `r20_newsletter_drp` left the record (2, 4
-and 2 answers missing) and `w_mixed_slides+image_pages` came back. **A paid recording of the
+and 2 answers missing) and `w_mixed_slides+image_pages` came back. Against the 0.5.12 record the same 43 uploads are
+measured and each asks the same decisions: the list, block-start and page-join changes of
+0.5.13 moved elements only on uploads that were already left out (28 more answers missing on
+seven of them). **A paid recording of the
 answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
 the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.

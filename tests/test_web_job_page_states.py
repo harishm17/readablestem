@@ -377,6 +377,13 @@ def source_unread(result: DocumentResult) -> None:
     result.source_report = SourceReport(unread_words=14, unread_start="Note")
 
 
+def source_equations(result: DocumentResult) -> None:
+    """A Word file with 3 equations the reader could not turn into MathML: the student file
+    writes their LaTeX, so no picture of them exists to be called a picture."""
+    equations(result, 3)
+    result.origin = "docx"
+
+
 def statement_of(web, job_id: str) -> dict[str, object]:
     """What each surface says about the job: the student page (its notice and its note),
     the job page, the EPUB's accessibility metadata and the record's CSV."""
@@ -463,6 +470,24 @@ def statement_of(web, job_id: str) -> dict[str, object]:
             id="14-source-words-not-read",
         ),
         pytest.param(
+            source_equations,
+            {
+                "state": "Ready",
+                "job": "3 equations are shown as LaTeX text, not written so that screen readers "
+                "can read them aloud.",
+                "note": "3 parts could not be converted and are shown as they were written in "
+                "the Word file",
+                "notice": "Part 1 not converted: equation",
+                "summary": "0 of 3 equations are MathML.",
+                "csv": {
+                    "Shown as pictures of the original": "0",
+                    "Shown as LaTeX text, not converted": "3",
+                },
+                "no_picture": True,
+            },
+            id="3-word-equations-shown-as-latex-text",
+        ),
+        pytest.param(
             clean,
             {
                 "state": "Ready to share",
@@ -498,6 +523,10 @@ def test_every_surface_says_what_was_converted_and_reviewed(web, make, expected)
         assert said["csv"][label] == value
     for words in ("Everything was converted", "checked the parts", "Your instructor checked"):
         assert words not in said["job"] + said["note"] + said["summary"]
+    if expected.get("no_picture"):  # the file has no picture of the part: the words must not
+        assert "shown as images" not in said["job"]  # claim one (honesty claim)
+        assert not re.search(r"picture|image", said["note"] + said["summary"] + said["notice"])
+        assert "page 1" not in said["notice"]  # nor a page: a Word file has none to name
 
 
 # --------------------------------------------------------------------------- progress

@@ -31,6 +31,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import re
 import struct
 import threading
 from collections import defaultdict
@@ -223,10 +224,12 @@ class AnswerSet:
                 self.stats.misses.append(f"verify {check} {key[:12]}")
         return row
 
-    def axe(self, key: str) -> list[dict[str, Any]] | None:
+    def axe(self, key: str, older_key: str | None = None) -> list[dict[str, Any]] | None:
         with self._lock:
             self.stats.axe_requests += 1
             checks = self._axe.get(key)
+            if checks is None and older_key is not None:
+                checks = self._axe.get(older_key)
             if checks is None:
                 self.stats.misses.append(f"axe {key[:12]}")
             return checks
@@ -378,8 +381,13 @@ class ReplayClient:
 # ----------------------------------------------------------------------------- axe
 
 
+# The page head names the pipeline version (`<meta name="generator">`), which axe-core does not
+# read: a replay on a checkout of another version (`--allow-drift`) finds the recorded result.
+_GENERATOR_META = re.compile(r'<meta name="generator" content="[^"]*">\n?')
+
+
 def axe_key(html: str) -> str:
-    return _sha(html)
+    return _sha(_GENERATOR_META.sub("", html, count=1))
 
 
 class AxeRecorder:
@@ -404,7 +412,8 @@ class AxeReplay:
         self._answers = answers
 
     def __call__(self, html: str) -> list[Check]:
-        rows = self._answers.axe(axe_key(html))
+        # A recording made before the key left the generator tag out is keyed by the whole page.
+        rows = self._answers.axe(axe_key(html), _sha(html))
         if rows is None:
             return [html_checks.AXE_SKIPPED]
         return [Check.model_validate(r) for r in rows]

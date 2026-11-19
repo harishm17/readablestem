@@ -356,9 +356,12 @@ def _placeholder_alts() -> list[re.Pattern[str]]:
     templates = [alt for alt, *_ in assemble.KEPT_IMAGE_WORDS.values()]
     patterns = [re.compile(re.escape(alt) + r"\.?") for alt in fixed]
     # An equation kept as an image: its number ("Equation (2.4), not converted"), or the
-    # PDF's own text for it with a marker after ("v = d / t, as written in the PDF"). That
-    # text comes from the PDF, not from a model, and is no content of ours.
+    # PDF's own text for it with a marker after ("v = d / t, as written in the PDF"), or after
+    # the warning that opens a flattened one ("Equation (2.2), not converted. The characters
+    # the PDF has for it, with fractions and exponents run together: d = 12gt2"). That text
+    # comes from the PDF, not from a model, and is no content of ours.
     patterns.append(re.compile(r"Equation \([^()]{1,50}\), not converted\.?"))
+    patterns.append(re.compile(assemble.flat_alt_lead() + r"[^\n]{1,500}"))
     for suffix in assemble.EQUATION_TEXT_ALT_SUFFIXES:
         patterns.append(
             re.compile(r"(?:Equation \([^()]{1,50}\): )?[^\n]{1,500}?" + re.escape(suffix) + r"\.?")

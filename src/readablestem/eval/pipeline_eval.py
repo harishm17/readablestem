@@ -77,9 +77,9 @@ from readablestem.core.types import (
 from readablestem.eval import equations_chem as chem_score
 from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
+from readablestem.eval import gate, prose_classes, prose_wer, table_maths
 from readablestem.eval import image_pages as image_pages_eval
 from readablestem.eval import judge as judge_mod
-from readablestem.eval import prose_classes, prose_wer, table_maths
 from readablestem.eval import verifier_metrics as vm
 from readablestem.eval.equations import (
     EquationScore,
@@ -2376,6 +2376,8 @@ def build_report(
         "pipeline_version": run.PIPELINE_VERSION,
         # The production profile, or "development settings" (ops/profile.py, WS0.9).
         "profile": run_profile.stamp(cfg.settings),
+        # The values of the switches that decide what is asked and accepted (`eval.gate`).
+        "flags": gate.guarded_flags(cfg.settings),
         "prompt_versions": _prompt_versions(task, items),
         "models": models,
         "models_used": used,

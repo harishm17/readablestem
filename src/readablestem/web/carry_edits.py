@@ -53,6 +53,8 @@ Unchanged = Callable[[int, "Box | None"], bool]
 # What a carried edit is called in the report and on the record (`ReviewEdit.after`).
 TEXT = "text"
 HEADING = "heading"
+ROLE = "role"
+BLOCK_LEFT_OUT = "block_left_out"
 PICTURE = "picture"
 EQUATION = "equation"
 PAGE_LEFT_OUT = "page_left_out"
@@ -60,7 +62,7 @@ NOT_EQUATION = "not_equation"
 # A page operation that is never made again (a try-again or a revision starts from the
 # pipeline's reading): an equation read again. It is listed, by name and page, as not re-applied.
 READ_AGAIN = "read_again"
-KINDS = (TEXT, HEADING, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
+KINDS = (TEXT, HEADING, ROLE, BLOCK_LEFT_OUT, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
 CARRIED_KEY = "carried_edit"
 
 # `ReviewEdit.action` values of the edits that change the text or the kind of an element.
@@ -111,11 +113,15 @@ class EditsCarried:
 def with_omitted_back(result: DocumentResult) -> DocumentResult:
     """A copy of `result` with the elements and fixes of the pages left out in its own lists,
     so decisions and edits made before a page was left out are found like any other. The
-    copy knows which pages were out (`omitted_pages`)."""
+    copy knows which pages were out (`omitted_pages`) and which paragraphs (`left_out_blocks`;
+    the paragraphs are in the lists too, so what was decided or edited on one is found)."""
     copy = result.model_copy(deep=True)
     for held in copy.omitted:
         copy.elements.extend(held.elements)
         copy.fixes.extend(held.fixes)
+    for block in copy.left_out_blocks:
+        copy.elements.append(block.element)
+        copy.fixes.extend(block.fixes)
     return copy
 
 
@@ -171,6 +177,29 @@ def origin_of(element: Element, rows: list[EditRow]) -> Origin | None:
     if not ops:
         return None
     return Origin(current[0], current[1], tuple(reversed(ops)))
+
+
+def _role_in(snapshot: dict[str, Any] | None, element_id: str) -> tuple[bool, str | None]:
+    """(found, role) of an element as a structural snapshot held it."""
+    structure = (snapshot or {}).get(STRUCTURE_KEY)
+    held = ((structure or {}).get("elements") or {}).get(element_id) if structure else None
+    if not isinstance(held, dict):
+        return False, None
+    role = held.get("role")
+    return True, role if isinstance(role, str) else None
+
+
+def role_edit(element: Element, rows: list[EditRow]) -> tuple[bool, str | None]:
+    """Did a person set or clear this paragraph's role, and does the result as it stands show
+    it? (True, the role, None for "neither") when the latest `set_role` row of the element
+    left the role it has now; (False, None) otherwise (no such row, or it was undone). The rows
+    are in the order they were made."""
+    for row in reversed([r for r in rows if r.element_id == element.id and r.action == "set_role"]):
+        had_before, before = _role_in(row.before, element.id)
+        had_after, after = _role_in(row.after, element.id)
+        if had_before and had_after and before != after and after == element.role:
+            return True, after
+    return False, None
 
 
 def _said(element: Element, origin: Origin | None = None) -> str:
@@ -235,9 +264,17 @@ def _carry_words(
 ) -> EditsCarried:
     out = EditsCarried()
     edited: dict[str, Origin] = {}
+    roles: dict[str, str | None] = {}
+    gone = {b.element.id for b in old.left_out_blocks}
     for element in old.elements:
-        if element.kind in page_edits.TEXT_KINDS and (origin := origin_of(element, rows)):
-            edited[element.id] = origin
+        if element.kind not in page_edits.TEXT_KINDS:
+            continue
+        origin = origin_of(element, rows)
+        has_role, role = role_edit(element, rows)
+        if has_role:
+            roles[element.id] = role
+        if origin or has_role or element.id in gone:
+            edited[element.id] = origin or Origin(element.kind.value, element.text or "", ())
     if not edited:
         return out
     # How often each content (kind and words) was said in the earlier file, counting an edited
@@ -274,9 +311,9 @@ def _carry_words(
     old_fixes = {f.element_id: f for f in old.fixes}
     for old_id, origin in edited.items():
         new_id = matched.get(old_id)
-        kind = None
+        kinds = None
         if new_id is not None:
-            kind = _apply_words(
+            kinds = _apply_words(
                 old,
                 old_crops,
                 old_by[old_id],
@@ -285,11 +322,27 @@ def _carry_words(
                 new,
                 new_crops,
                 new_id,
+                set_role=old_id in roles,
+                role=roles.get(old_id),
+                leave_out=old_id in gone,
             )
-        if kind is None or new_id is None:
-            out.drop(HEADING if "make_heading" in origin.ops else TEXT, old_by[old_id].page)
+        if kinds is None or new_id is None:
+            # The edits of one paragraph are made together or not at all: each is a change
+            # the person made, so each is listed.
+            lost = [
+                kind
+                for kind, was_made in (
+                    (HEADING, "make_heading" in origin.ops),
+                    (TEXT, old_by[old_id].text != origin.text),
+                    (ROLE, old_id in roles),
+                    (BLOCK_LEFT_OUT, old_id in gone),
+                )
+                if was_made
+            ]
+            for kind in lost:
+                out.drop(kind, old_by[old_id].page)
         else:
-            out.items.append((kind, new_id))
+            out.items.extend((kind, new_id) for kind in kinds)
     return out
 
 
@@ -302,9 +355,16 @@ def _apply_words(
     new: DocumentResult,
     new_crops: dict[str, bytes],
     new_id: str,
-) -> str | None:
-    """The edits of one item on its counterpart; HEADING or TEXT when they were made, None
-    when not (the result is left as it was)."""
+    *,
+    set_role: bool = False,
+    role: str | None = None,
+    leave_out: bool = False,
+) -> list[str] | None:
+    """The edits of one item on its counterpart: the kind of each one made (HEADING, TEXT, ROLE,
+    BLOCK_LEFT_OUT, one per change the person made), None when they were not (the result is left
+    as it was). A paragraph left out is left out again last, and only where
+    `page_edits.leave_out_block` allows it: a new file that has a decision open on it, a link
+    to it or an equation in it keeps it, and the change is listed as not made again."""
     new_element = next(e for e in new.elements if e.id == new_id)
     typed = None
     if old_element.text != origin.text:
@@ -316,7 +376,9 @@ def _apply_words(
         if old_fix is None or old_fix.heading is None or old_element.kind is not Kind.HEADING:
             return None
         level = old_fix.heading.level
-    before = page_edits.capture(new, elements=[new_id], fixes=[new_id], orders=True)
+    before = page_edits.capture(
+        new, elements=[new_id], fixes=[new_id], orders=True, blocks=leave_out
+    )
     try:
         if level is not None:
             page_edits.make_heading(new, new_id, str(level))
@@ -327,10 +389,28 @@ def _apply_words(
                 # "Nothing changed": the new file already says it. Anything else is a refusal.
                 if not all(e.message == page_edits.NOTHING_CHANGED for e in exc.errors):
                     raise
+        if set_role:
+            try:
+                page_edits.set_role(new, new_id, role)
+            except ReviewInvalid as exc:
+                # The new file already has that role (or none), or says nothing to set one on.
+                if not all(e.message == page_edits.NOTHING_CHANGED for e in exc.errors):
+                    raise
+        if leave_out:
+            page_edits.leave_out_block(new, new_id)
     except (ReviewInvalid, LookupError):
         page_edits.restore(new, before)
         return None
-    return HEADING if level is not None else TEXT
+    return [
+        kind
+        for kind, made in (
+            (HEADING, level is not None),
+            (TEXT, typed is not None),
+            (ROLE, set_role),
+            (BLOCK_LEFT_OUT, leave_out),
+        )
+        if made
+    ]
 
 
 # --------------------------------------------------------------------------- added items

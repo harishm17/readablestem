@@ -125,7 +125,9 @@ rules above.
    a ruled two-column box of prose under a caption is data (`is_layout_grid` is decided after
    the captions are attached); columns of justified text, whose padding is narrower than a
    cell gap, come from the strips no word crosses (`_word_gutters`); a numbered equation or
-   reaction at the top or bottom of a box is cut off it (`_without_captions`); and a box made
+   reaction at the top or bottom of a box is cut off it, and so is a numbered question that goes
+   on the page's run of numbered items just beside the box ("8. Explain ...  (4 points)" under
+   the three rows of question 7: `_without_captions`); and a box made
    here is dropped as a chart (curves, scatter dots, bars, small lettering; a filled square no
    bigger than a rule's thickness that lies on a drawn rule is the corner of the rules, which
    Word fills at every crossing, and is not counted: 12 of them made a ruled table a "chart"), page text (two
@@ -1054,7 +1056,12 @@ a figure of 35,000 drawn items, over `MAX_DETECTOR_ITEMS`, so the detector was n
   authors and addresses, matrices, callout boxes (an outline that holds a smaller table yields to it;
   a paragraph in a box is not a row), and a bold-term list stays a list (LaTeX `description`).
   The reaction or equation above a table ("2NO + Cl2 -> 2NOCl  17.39", OpenStax numbers its
-  equations with no brackets) is cut off the table's box (`_without_captions`).
+  equations with no brackets) is cut off the table's box (`_without_captions`), and so is the
+  next (or the one before) numbered question of the page: a first or last line that opens with
+  the number after (before) the item just above (below) the box, at that item's left edge, and
+  with no numbered row of the table's own at that edge, is the page's item, not a row. The rows
+  left may be too few to be a table of their own (an unruled grid needs four lines of cells);
+  then they are text.
 
 ### Numbers
 

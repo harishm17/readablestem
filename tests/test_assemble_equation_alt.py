@@ -17,11 +17,11 @@ from readablestem.core.types import Element, Fix, Kind, Status
 from readablestem.eval.invented.read import _placeholder_alts
 from readablestem.pipeline.assemble import (
     CHECKER,
-    EQUATION_FLAT_ALT_SUFFIX,
     EQUATION_NOT_CONVERTED_ALT,
     EQUATION_TEXT_ALT_SUFFIX,
     STUDENT,
     equation_alt,
+    equation_alt_text,
     render_html,
 )
 
@@ -76,9 +76,17 @@ def test_equation_alt(text, label, alt):
     "reason", ["superscript", "fraction bar", "radical sign", "2 lines merged", "7 lines merged"]
 )
 def test_text_that_may_have_lost_its_fractions_and_exponents_says_so(reason):
-    alt = equation_alt(equation("v2 = v20 + 2ad", reasons=["relation symbol", reason]))
-    assert alt == f"v2 = v20 + 2ad{EQUATION_FLAT_ALT_SUFFIX}"
-    assert "fractions and exponents may run together" in alt
+    flat = equation("v2 = v20 + 2ad", reasons=["relation symbol", reason])
+    warning = "not converted. The characters the PDF has for it, with fractions and exponents run"
+    alt = equation_alt(flat)
+    # The warning comes before the characters, so a listener who stops early has not heard a
+    # wrong formula as the equation.
+    assert alt == f"Equation {warning} together: v2 = v20 + 2ad"
+    numbered = equation_alt(equation("d = 12gt2", "(2.2)", reasons=[reason]))
+    assert numbered == f"Equation (2.2), {warning} together: d = 12gt2"
+    assert equation_alt(flat, CHECKER).startswith(f"Equation {warning} together, and not compared")
+    for audience in (STUDENT, CHECKER):
+        assert equation_alt_text(equation_alt(flat, audience)) == "v2 = v20 + 2ad"
     plain = equation_alt(equation("v = 5", reasons=["relation symbol", "math font"]))
     assert plain == f"v = 5{EQUATION_TEXT_ALT_SUFFIX}"
 
@@ -95,6 +103,15 @@ def test_a_numbered_equation_with_no_text_says_so_in_its_alt():
         crops={"p1-e1": crop()},
     )  # fmt: skip
     assert alts(html) == ["Equation (5), not converted"]
+    # That alt text says "not converted", so the label beside it is for the eye only. An alt
+    # text that gives the PDF's characters does not say it: the label is then read too.
+    assert '<span class="flag-label" aria-hidden="true">Not converted.</span>' in html
+    with_text = render_html(
+        title="T", lang="en", elements=[equation("v = d / t")], fixes=[failed()],
+        crops={"p1-e1": crop()},
+    )  # fmt: skip
+    assert alts(with_text) == [f"v = d / t{EQUATION_TEXT_ALT_SUFFIX}"]
+    assert '<span class="flag-label">Not converted.</span>' in with_text
 
 
 def test_text_that_looks_like_markup_is_escaped_in_the_attribute():
@@ -113,8 +130,8 @@ def test_only_a_draft_tells_the_checker_the_text_was_not_checked():
     for flat in ((), ("fraction bar",)):
         element = equation("v = d / t", "(2.4)", reasons=list(flat))
         student, checker = equation_alt(element), equation_alt(element, CHECKER)
-        assert "checked" not in student and student.startswith("Equation (2.4): v = d / t")
-        assert checker.endswith("not checked") and checker.startswith(student.split(", as ")[0])
+        assert "checked" not in student and "compared" not in student
+        assert "not checked" in checker or "not compared with the page" in checker
     pages = {
         audience: render_html(
             title="T",
@@ -135,7 +152,8 @@ def test_the_invented_content_reader_does_not_count_these_alts_as_content():
         "Equation (2.4), not converted",
         f"6.0 m/s{EQUATION_TEXT_ALT_SUFFIX}",
         f"Equation (2.4): v = d / t{EQUATION_TEXT_ALT_SUFFIX}",
-        f"v2 = v20{EQUATION_FLAT_ALT_SUFFIX}",
+        equation_alt(equation("v2 = v20", "(1)", reasons=["superscript"])),
+        equation_alt(equation("v2 = v20", reasons=["superscript"]), CHECKER),
         "6.0 m/s, read from the PDF text; not checked",
         EQUATION_NOT_CONVERTED_ALT,
     ):

@@ -12,6 +12,8 @@ those onto an item whose words, picture or page changed.
 
 from __future__ import annotations
 
+import pytest
+
 from fixtures.web.review_doc import review_output
 from readablestem.core.types import (
     DocumentResult,
@@ -159,6 +161,73 @@ def test_the_nearest_of_two_identical_paragraphs_gets_the_edit_when_the_counts_a
     assert element(new, PLAIN).text.endswith("the class.")
 
 
+# --------------------------------------------------------------------------- roles
+
+
+def test_a_role_set_or_cleared_by_a_person_is_carried_onto_the_unchanged_paragraph():
+    old, old_crops = fresh()
+    made = page_edits.set_role(old, PLAIN, "quote")
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [(carry_edits.ROLE, PLAIN)] and done.dropped == 0
+    assert element(new, PLAIN).role == "quote"
+    # Cleared: a role the new file's own reading gives is taken off again.
+    cleared = page_edits.set_role(old, PLAIN, None)
+    again, again_crops = fresh()
+    again.elements = [
+        e.model_copy(update={"role": "quote"}) if e.id == PLAIN else e for e in again.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, again, again_crops, rows_of(made, cleared))
+    assert done.items == [(carry_edits.ROLE, PLAIN)]
+    assert element(again, PLAIN).role is None
+
+
+def test_a_role_that_was_undone_or_sits_on_a_changed_paragraph_is_not_carried():
+    old, old_crops = fresh()
+    made = page_edits.set_role(old, PLAIN, "aside")
+    undone = page_edits.undo(old, PLAIN, made.before[review.STRUCTURE_KEY])
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made, undone))
+    assert done.items == [] and done.dropped == 0 and element(new, PLAIN).role is None
+    old, old_crops = fresh()
+    made = page_edits.set_role(old, PLAIN, "aside")
+    new, new_crops = fresh()
+    new.elements = [
+        e.model_copy(update={"text": "Another sentence entirely."}) if e.id == PLAIN else e
+        for e in new.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [] and done.dropped == 1
+    assert element(new, PLAIN).role is None
+
+
+# --------------------------------------------------------------------------- left out
+
+
+def test_a_paragraph_left_out_is_left_out_again_on_the_unchanged_paragraph_only():
+    old, old_crops = fresh()
+    made = page_edits.leave_out_block(old, PLAIN)
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [(carry_edits.BLOCK_LEFT_OUT, PLAIN)] and done.dropped == 0
+    assert [b.element.id for b in new.left_out_blocks] == [PLAIN]
+    assert all(e.id != PLAIN for e in new.elements)
+    # Put back, it is not carried; on a paragraph whose words changed it is listed, not made.
+    put_back = page_edits.put_back_block(old, PLAIN)
+    again, again_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, again, again_crops, rows_of(made, put_back))
+    assert done.items == [] and not again.left_out_blocks
+    old, old_crops = fresh()
+    made = page_edits.leave_out_block(old, PLAIN)
+    changed, changed_crops = fresh()
+    changed.elements = [
+        e.model_copy(update={"text": "Another sentence entirely."}) if e.id == PLAIN else e
+        for e in changed.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, changed, changed_crops, rows_of(made))
+    assert done.items == [] and done.dropped == 1 and not changed.left_out_blocks
+
+
 # --------------------------------------------------------------------------- headings
 
 
@@ -174,16 +243,47 @@ def test_a_paragraph_made_a_heading_is_one_again_with_its_level():
     assert fix.decided_by_reviewer
 
 
-def test_a_heading_made_and_reworded_carries_both_onto_the_unchanged_paragraph():
+def two_edits(old: DocumentResult, kinds: tuple[str, str]):
+    """A paragraph with two edits of two kinds made on it, and the paragraph's id."""
+    if kinds == (carry_edits.HEADING, carry_edits.TEXT):
+        made = page_edits.make_heading(old, SECOND_PAGE, "2")
+        return SECOND_PAGE, [made, page_edits.edit_text(old, SECOND_PAGE, "Average speed")]
+    words = page_edits.edit_text(old, PLAIN, "Discuss vectors with the class.")
+    if kinds == (carry_edits.TEXT, carry_edits.ROLE):
+        return PLAIN, [words, page_edits.set_role(old, PLAIN, "quote")]
+    return PLAIN, [words, page_edits.leave_out_block(old, PLAIN)]
+
+
+@pytest.mark.parametrize(
+    "kinds",
+    [
+        (carry_edits.HEADING, carry_edits.TEXT),
+        (carry_edits.TEXT, carry_edits.ROLE),
+        (carry_edits.TEXT, carry_edits.BLOCK_LEFT_OUT),
+    ],
+)
+def test_every_edit_made_on_one_paragraph_is_counted_when_carried_and_when_not(kinds):
+    """The summary of carried changes counts what the person did: two edits on one paragraph
+    are two carried changes, or two listed as not made again, never one."""
     old, old_crops = fresh()
-    made = page_edits.make_heading(old, SECOND_PAGE, "2")
-    reworded = page_edits.edit_text(old, SECOND_PAGE, "Average speed")
+    paragraph, changes = two_edits(old, kinds)
     new, new_crops = fresh()
-    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made, reworded))
-    assert done.items == [(carry_edits.HEADING, SECOND_PAGE)]
-    assert element(new, SECOND_PAGE).text == "Average speed"
-    fix = new.fix_for(SECOND_PAGE)
-    assert fix is not None and fix.heading is not None and fix.heading.text == "Average speed"
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(*changes))
+    assert sorted(done.items) == sorted((kind, paragraph) for kind in kinds) and done.dropped == 0
+    if kinds[0] == carry_edits.HEADING:
+        fix = new.fix_for(paragraph)
+        assert fix is not None and fix.heading is not None and fix.heading.text == "Average speed"
+    # On a paragraph whose words changed nothing is made, and each change is listed.
+    old, old_crops = fresh()
+    paragraph, changes = two_edits(old, kinds)
+    changed, changed_crops = fresh()
+    changed.elements = [
+        e.model_copy(update={"text": "Another sentence entirely."}) if e.id == paragraph else e
+        for e in changed.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, changed, changed_crops, rows_of(*changes))
+    assert done.items == [] and done.dropped == 2
+    assert sorted(kind for kind, _ in done.not_applied) == sorted(kinds)
 
 
 def test_no_heading_is_made_of_a_paragraph_that_changed():

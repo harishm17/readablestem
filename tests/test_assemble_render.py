@@ -168,7 +168,9 @@ def test_not_converted_items_keep_the_original_with_a_visible_note(
     assert 'src="data:image/png;base64,' in item
     assert f'alt="{alt}"' in item
     assert 'role="note"' in item
-    assert f'<span class="flag-label">{label}</span>' in item  # text, not colour alone
+    # Text, not colour alone, for the eye. The picture's alt text says it to a screen reader,
+    # so the label is not read a second time.
+    assert f'<span class="flag-label" aria-hidden="true">{label}</span>' in item
     assert "<math" not in item  # a rejected proposal is never shown
 
 
@@ -195,6 +197,30 @@ def test_headings_follow_fixes_and_rejected_ones_become_paragraphs(sample_html):
     assert '<h2 id="p2-e0">Instantaneous velocity</h2>' in sample_html  # needs_review: kept
     # A rejected bold heading is bold text, as in the PDF ("Make them bold text").
     assert '<p id="p2-e3"><strong>NOTE TO STUDENTS</strong></p>' in sample_html
+
+
+def test_a_paragraph_with_a_role_is_written_as_a_sidebar_or_a_quotation():
+    def para(i: int, text: str, role=None) -> Element:
+        return Element(
+            id=f"p1-e{i}", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 10, 10), order=i, text=text,
+            role=role,
+        )  # fmt: skip
+
+    elements = [
+        para(0, "Body one."),
+        para(1, "Side one.", "aside"),
+        para(2, "Side two.", "aside"),
+        para(3, "Said by someone else.", "quote"),
+        para(4, "Body two."),
+    ]
+    html = render(elements, [], {})
+    # Neighbours of one role are one sidebar; the sidebar has a name a screen reader says.
+    assert re.search(r'<aside aria-label="[^"]+"><p id="p1-e1">Side one.</p><p id="p1-e2">', html)
+    assert '<blockquote><p id="p1-e3">Said by someone else.</p></blockquote>' in html
+    assert '<p id="p1-e0">Body one.</p>' in html and '<p id="p1-e4">Body two.</p>' in html
+    # An element with no role is stored without the field.
+    assert "role" not in elements[0].model_dump(mode="json")
+    assert Element.model_validate(elements[1].model_dump(mode="json")).role == "aside"
 
 
 def heading(eid: str, order: int, level: int, status=Status.ACCEPTED) -> tuple[Element, Fix]:
@@ -427,6 +453,8 @@ def test_missing_crop_shows_extracted_text_and_says_so():
     assert '<p class="original-text">v = d / t</p>' in item
     assert "The original image is not available." in item
     assert "<img" not in item
+    # No picture, so no alt text: the label is what says it, and a screen reader hears it.
+    assert '<span class="flag-label">Not converted.</span>' in item
 
 
 def test_inline_equation_without_its_marker_is_rendered_at_its_own_position():

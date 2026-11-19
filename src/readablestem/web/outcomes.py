@@ -61,6 +61,9 @@ _EDITS = {"edit", "add_data_table", "describe", "relabel"}
 _STRUCTURE_OUTCOMES = {
     "edit_text": "edited",
     "make_heading": "edited",
+    "set_role": "edited",
+    "leave_out_block": "removed",
+    "restore_block": "removed",
     "omit_page": "removed",
     "restore_page": "removed",
     "add_figure": "added",
@@ -204,6 +207,9 @@ def _structure_outcome(
     if change.action in {"omit_page", "restore_page"}:
         count = -1 if change.action == "restore_page" else 1
         return _made("page", events.NO_REASON, outcome, origin, count)
+    if change.action in {"leave_out_block", "restore_block"}:
+        count = -1 if change.action == "restore_block" else 1
+        return _made("paragraph", events.NO_REASON, outcome, origin, count)
     if change.action == "add_figure":
         return _made("figure", events.NO_REASON, outcome, origin)
     if change.action == "add_equation":

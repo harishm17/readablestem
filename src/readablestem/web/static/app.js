@@ -724,6 +724,31 @@ document.addEventListener("htmx:beforeRequest", function (event) {
     if (asked && heading) heading.focus();
   }
 
+  // The list of keys names only what this card can do: a key the card cannot act on is
+  // left out (a table kept as an image has no Accept; the last decision has no next). The
+  // keys still answer in the status line if pressed. Read from the card itself, so a new
+  // kind of card needs no second list.
+  function listKeysTheCardCanUse(box) {
+    var panel = document.getElementById("decision");
+    if (!panel) return;
+    var accept = panel.getAttribute("data-card") === "page" ? null : panel.querySelector('[data-role="accept"]');
+    var can = {
+      n: !!panel.querySelector('.decision-nav a[rel="next"]'),
+      p: !!panel.querySelector('.decision-nav a[rel="prev"]'),
+      a: !!accept && !accept.disabled,
+      e: !!panel.querySelector("[data-edit-field], [data-edit-start]"),
+    };
+    Object.keys(can).forEach(function (key) {
+      var row = box.querySelector('[data-key="' + key + '"]');
+      if (row) row.hidden = !can[key];
+    });
+    // A on a button that goes against a check or a suggestion only moves focus to it.
+    var word = box.querySelector('[data-key="a"] dd');
+    if (word && accept && accept.hasAttribute("data-anyway")) {
+      word.textContent = "go to the accept button (it needs a press)";
+    }
+  }
+
   function shortcuts() {
     var box = document.getElementById("shortcuts");
     var toggle = document.getElementById("shortcuts-on");
@@ -737,6 +762,7 @@ document.addEventListener("htmx:beforeRequest", function (event) {
       on = true;
     }
     toggle.checked = on;
+    listKeysTheCardCanUse(box);
     toggle.addEventListener("change", function () {
       on = toggle.checked;
       try {

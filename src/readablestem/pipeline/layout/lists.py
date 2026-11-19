@@ -20,6 +20,12 @@ from readablestem.pipeline.layout.shared import _Block, _Context, _Marker, _Path
 # wrapped sentence can start a line with a dash.
 _LINE_START_BULLETS = frozenset("-\u2013\u2014*\u2217\u00b7\u2219\u22c5")
 
+# Word's second-level bullet is the letter "o" set in Courier New: a plain letter, so no font
+# table reads it as a bullet. It is one when the letter is monospaced and the text after it is
+# not (code that starts a line with "o" is monospaced all through), and, like a dash, it needs
+# a sibling.
+_HOLLOW_BULLET = "\u25e6"
+
 # Ordered list markers: "1.", "2)", "(3)", "a.", "b)", "(c)", "iv.", "(ii)", "A.", "IV)".
 _ORDERED_MARKER = re.compile(
     r"^(?:\((?P<inner>\d{1,3}|[A-Za-z]|[ivxlc]{2,6}|[IVXLC]{2,6})\)"
@@ -28,7 +34,13 @@ _ORDERED_MARKER = re.compile(
 
 
 MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its text
+# x font size: a bullet glyph at the start of a row is cut from the text it touches when that is
+# set in another font and this far from it, or this far from it whatever the font (`_tokens` asks
+# 0.3, and glyphs of one word are closer than 0.1: `glyph_math.NO_GAP`; `font_codes` asks 0.2).
+BULLET_APART_OWN_FONT = 0.1
+BULLET_APART = 0.2
 MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
+MARKER_INDENT = 0.5  # x font size: a marker of another series set this far right opens a level
 DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
 
 
@@ -94,6 +106,38 @@ def _ordered_marker(text: str) -> tuple[str, str] | None:
     return "{}" + match["sep"], match["plain"]
 
 
+def _bullet_apart(row: _Row, tokens: list[tuple[int, int]]) -> tuple[list[tuple[int, int]], bool]:
+    """`tokens` with a bullet glyph at the start of the row cut from the text it touches, and
+    whether it was set so close that only a sibling can tell it from a word that starts with
+    the sign. `_tokens` splits at 0.3 x the font size, and Word's Wingdings bullet, set as
+    large as the text, leaves 0.23 with no space character in the text layer: the line came
+    out as a paragraph that began with the bullet. A bullet with no gap at all ("\u25aaGrading")
+    is cut too, and is `glued`."""
+    if not tokens:
+        return tokens, False
+    start, end = tokens[0]
+    chars = row.chars
+    if end - start > 1 and chars[start].c in _BULLET_GLYPHS:
+        gap = (chars[start + 1].x0 - chars[start].x1) / row.size
+        own_font = chars[start].font != chars[start + 1].font
+        apart = BULLET_APART_OWN_FONT if own_font else BULLET_APART
+        if gap >= apart or (own_font and gap >= -apart):
+            return [(start, start + 1), (start + 1, end), *tokens[1:]], gap < apart
+    return tokens, False
+
+
+BLANK_RUN = 3  # underscores in a blank to fill in (a drawn blank is written as five)
+
+
+def lead_blank(row: _Row, tokens: list[tuple[int, int]]) -> bool:
+    """Does the row open with a blank to fill in, typed or drawn ("___ 1. Osmosis"), and go on
+    with at least a label and a word? (The blank is a run of underscores a token of its own.)"""
+    if len(tokens) < 3:
+        return False
+    start, end = tokens[0]
+    return end - start >= BLANK_RUN and all(c.c == "_" for c in row.chars[start:end])
+
+
 def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | None:
     """Does `row` start like a list item? A bullet glyph, an ordered marker ("a.", "(3)",
     "iv)", "3 ." as OpenStax prints it) or a drawn bullet just left of it, followed by
@@ -101,7 +145,7 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     if row.vertical:
         return None
     drawn = bullets.left_of(row)
-    tokens = _tokens(row)
+    tokens, glued = _bullet_apart(row, _tokens(row))
     if drawn is not None:
         if not tokens:
             return None
@@ -111,15 +155,21 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     if len(tokens) < 2:
         return None
     chars = row.chars
+    blank = lead_blank(row, tokens)
+    if blank:  # "___ 1. Osmosis": the label after the blank is the marker, the blank stays text
+        tokens = tokens[1:]
     (m0, m1), rest = tokens[0], tokens[1:]
     first = chars[m0].c
     if m1 - m0 == 1 and first in _DASHES and _signed_value(chars[m0], chars[rest[0][0] :]):
         return None  # "- 40 m/s", "\u2013 5 \u00b0C": a negative value, not a dash bullet
-    if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS):
-        glyph = _clean(first)
+    hollow = m1 - m0 == 1 and first == "o" and chars[m0].mono and not chars[rest[0][0]].mono
+    if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS or hollow):
+        if blank:
+            return None
+        glyph = _HOLLOW_BULLET if hollow else _clean(first)
         family: tuple[str, str] = ("bullet", glyph)
         readings: tuple[tuple[str, int], ...] = ()
-        sure = first in _BULLET_GLYPHS
+        sure = first in _BULLET_GLYPHS and not glued
         text = glyph
     else:
         text = "".join(c.c for c in chars[m0:m1])
@@ -140,9 +190,11 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     start = rest[0][0]
     if chars[start].x0 - chars[m1 - 1].x1 > MAX_MARKER_GAP * row.size:
         return None
-    if not any(c.c.isalnum() or c.math for c in chars[start:]):
-        return None
-    marker = _Marker(text, family[0] != "bullet", start, chars[start].x0)
+    if not any(
+        c.c.isalnum() or c.math or (sure and c.c not in _BULLET_GLYPHS) for c in chars[start:]
+    ):
+        return None  # a sure bullet may carry a lone operator ("◦ **"), nothing else is text
+    marker = _Marker(text, family[0] != "bullet", start, chars[start].x0, start=m0 if blank else 0)
     return _MarkerCandidate(row, marker, family, readings, chars[m0].x0, sure)
 
 
@@ -313,19 +365,72 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     page with another margin keeps its levels.
     """
     levels: dict[int, int] = {}
-    stack: list[float] = []
+    stack: list[tuple[float, str]] = []  # per open level: the x of its text, its marker series
+    options: float | None = None  # the x the options of the grid being read are placed at
+    before: tuple[str, float] | None = None  # (series, x of the marker) of the item before
     for block in blocks:
+        if block.joined:  # the rest of the item before it, on the next page: no element of its own
+            continue
         if block.marker is None:
             if block.kind != Kind.EQUATION:
                 stack = []
+                before = None
             continue
         x = block.marker.x - block.origin
-        while stack and x < stack[-1] - tolerance:
+        series, own = _series(block.marker), _marker_x(block)
+        # The marker of another series set right of the one above opens a level even where the
+        # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.
+        nested = (
+            before is not None
+            and own is not None
+            and block.marker.option is None
+            and series != before[0]
+            and own - before[1] > MARKER_INDENT * block.rows[0].size
+        )
+        before = (series, own) if own is not None else None
+        if block.marker.option is None:
+            options = None
+        elif options is None:
+            # The options of a grid are one list below the item they follow, whichever column
+            # each is set in (a row-major grid reads A, B across, C, D below), and all at one level.
+            options = max(x, stack[-1][0] + 2 * tolerance) if stack else x
+            x = options
+        else:
+            x = options
+        while stack and (
+            x < stack[-1][0] - tolerance
+            or (len(stack) > 1 and abs(x - stack[-2][0]) < abs(x - stack[-1][0]))
+        ):
             stack.pop()
-        if not stack or x > stack[-1] + tolerance:
-            stack.append(x)
+        if stack and not nested and block.marker.option is None and series != stack[-1][1]:
+            # Sub-bullets whose text starts on the text edge of their numbered parent (Word and
+            # Google Docs set them so): the x does not tell which open level "2)" goes back
+            # to, its series does.
+            for depth in range(len(stack) - 2, -1, -1):
+                if stack[depth][1] == series and abs(x - stack[depth][0]) <= tolerance:
+                    del stack[depth + 1 :]
+                    break
+        if not stack or x > stack[-1][0] + tolerance or nested:
+            stack.append((x, series))
         levels[id(block)] = len(stack)
     return levels
+
+
+def _series(marker: _Marker) -> str:
+    """What kind of marker this is, so that "1)" and "2)" are one series and "(a)", "o" or
+    "\u25aa" are others: a digit stands for any number, a letter for any letter."""
+    if not marker.ordered:
+        return marker.text
+    return "".join("0" if c.isdigit() else "a" if c.isalpha() else c for c in marker.text)
+
+
+def _marker_x(block: _Block) -> float | None:
+    """Left edge of the item's marker, from the left edge of its column; None when the marker
+    is drawn beside the row and not in it."""
+    marker = block.marker
+    if marker is None or marker.end <= marker.start:
+        return None
+    return block.rows[0].chars[marker.start].x0 - block.origin
 
 
 _ROMAN = {"i": 1, "v": 5, "x": 10}

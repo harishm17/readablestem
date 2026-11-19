@@ -973,10 +973,13 @@ class Finish:
         return checked_words.notes_line(self.summary)
 
 
-def draft_sentence(fixes: list[Fix]) -> str:
-    """What students get when a draft is downloaded with decisions open."""
+def draft_sentence(fixes: list[Fix], origin: str = "pdf") -> str:
+    """What students get when a draft is downloaded with decisions open. An equation of a Word
+    or LaTeX source has no picture: it is shown as its LaTeX."""
     proposals = [f for f in fixes if f.status is Status.NEEDS_REVIEW]
-    images = [f for f in fixes if f.pending and f.status is not Status.NEEDS_REVIEW]
+    left = [f for f in fixes if f.pending and f.status is not Status.NEEDS_REVIEW]
+    written = [f for f in left if f.kind is Kind.EQUATION and origin != "pdf"]
+    images = [f for f in left if not (f.kind is Kind.EQUATION and origin != "pdf")]
     sentences = []
     if proposals:
         kinds = kinds_phrase(dict(Counter(f.kind.value for f in proposals)))
@@ -985,6 +988,12 @@ def draft_sentence(fixes: list[Fix]) -> str:
         kinds = kinds_phrase(dict(Counter(word_kind(f) for f in images)))
         verb, shown = ("is", "an image") if len(images) == 1 else ("are", "images")
         sentences.append(f"{kinds[0].upper()}{kinds[1:]} {verb} {shown} marked “Not converted”.")
+    if written:
+        kinds = kinds_phrase(dict(Counter(word_kind(f) for f in written)))
+        verb = "is" if len(written) == 1 else "are"
+        sentences.append(
+            f"{kinds[0].upper()}{kinds[1:]} {verb} shown as LaTeX text marked “Not converted”."
+        )
     return " ".join(sentences)
 
 
@@ -1077,7 +1086,7 @@ def page_data(result: DocumentResult, last_decision: date | None, filename: str 
         language_choices=language_choices(result.lang),
         first_open=first.key if first is not None else None,
         finish=Finish(summary, not_handled=len(notices.not_handled)),
-        draft=draft_sentence(result.fixes),
+        draft=draft_sentence(result.fixes, result.origin),
         title_suggested=plan.text,
         title_source=TITLE_SOURCE_WORDS[plan.source].format(source=source_noun(result.origin)),
         has_pages=result.origin == "pdf",

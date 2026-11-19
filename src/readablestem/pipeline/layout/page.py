@@ -31,6 +31,7 @@ from readablestem.pipeline.layout.blocks import (
     _leave_out_teacher_tags,
     _merge_chapter_numbers,
     _merge_style_splits,
+    _option_order,
     _paragraph_pieces,
     _runs,
     _split_options,
@@ -139,19 +140,12 @@ PEN_MARK_COLOUR = 0.3  # a closed or filled mark differs from the text this much
 PEN_FILL_SHARE = 0.5  # a filled mark is a stroke's ribbon when it covers at most this of its box
 
 
-def _prepare_rows(
-    page: pymupdf.Page,
-    frags: list[_Row],
-    margins: _MarginFilter,
-    rules: Sequence[_Path] = (),
-    source: say_once.PageSource | None = None,
-    *,
-    document: _Document,
-) -> tuple[list[_Row], Gutter, list[_Row]]:
-    """The page's rows without its running headers, footers, page numbers and watermarks,
-    its column gutter, and the rows so dropped (a figure may claim some back as labels:
-    `_figure_labels`). `source` gets what the say-once measure counts: the words of the rows
-    kept, and the glyphs of the rows left out as `furniture`."""
+def _split_furniture(
+    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter
+) -> tuple[list[_Row], list[_Row], set[int], set[int]]:
+    """The page's fragments split into the ones kept, the ones dropped (running headers, footers,
+    page numbers, watermarks) and the ids of the ones gone and the ones placed elsewhere
+    (`_MarginFilter`)."""
     height = page.rect.height
     kept: list[_Row] = []
     dropped: list[_Row] = []
@@ -169,9 +163,65 @@ def _prepare_rows(
             dropped.append(frag)
         elif id(frag) not in placed:
             kept.append(frag)
+    return kept, dropped, gone, placed
+
+
+def _accepted(
+    page: pymupdf.Page,
+    proposals: list[tables.PageTable],
+    frags: list[_Row],
+    paths: Sequence[_Path],
+    margins: _MarginFilter,
+    refused: list[tuple[BBox, str]],
+    *,
+    document: _Document,
+) -> list[tables.PageTable]:
+    """The proposals of `tables.find` that the page's region tree accepts (WS15.2, `REGION_TREE`
+    on). The proposals are made on the raw page, before it has columns, so the tree is built
+    from every fragment of the page, the proposals' lines among them; `regions.table_refusal`
+    judges each proposal against it. A refused one stays in the page's text (nothing is taken
+    out for it, and the tree that reads the page is built after this, with the accepted tables
+    only) and is added to `refused` with its reason: a box and a code, no text."""
+    if not proposals:
+        return proposals
+    kept = _split_furniture(page, frags, margins)[0]
+    tree = regions._tree_of(page, kept, paths, (), document)
+    taken = {frags[i].bbox for table in proposals for i in table.lines if i < len(frags)}
+    accepted = []
+    for table in proposals:
+        lines = [(frags[i].bbox, frags[i].clean) for i in sorted(table.lines) if i < len(frags)]
+        why = regions.table_refusal(tree, lines, table.bbox, taken)
+        if why is None:
+            accepted.append(table)
+        else:
+            refused.append((table.bbox, why))
+    return accepted
+
+
+def _prepare_rows(
+    page: pymupdf.Page,
+    frags: list[_Row],
+    margins: _MarginFilter,
+    rules: Sequence[_Path] = (),
+    source: say_once.PageSource | None = None,
+    *,
+    tables: Sequence[BBox] = (),
+    document: _Document,
+) -> tuple[list[_Row], Gutter, list[_Row]]:
+    """The page's rows without its running headers, footers, page numbers and watermarks,
+    its column gutter, and the rows so dropped (a figure may claim some back as labels:
+    `_figure_labels`). `source` gets what the say-once measure counts: the words of the rows
+    kept, and the glyphs of the rows left out as `furniture`."""
+    height = page.rect.height
+    kept, dropped, gone, placed = _split_furniture(page, frags, margins)
     if document.region_tree:  # the page's regions, from the fragments (regions.py)
-        _mark_blanks(kept, rules)
-        rows, tree, rest = regions.prepare(page, kept, dropped, rules, document=document)
+        # No gutter orders the page here, but a rule at the head of one column must still not
+        # become the blank of a line in the other (it would reach across the channel).
+        body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
+        _mark_blanks(kept, rules, _find_gutter(body))
+        rows, tree, rest = regions.prepare(
+            page, kept, dropped, rules, tables=tables, document=document
+        )
         if source is not None:
             for row in rows:
                 source.add_row(row.chars)
@@ -512,7 +562,7 @@ def _page_blocks(
     # A caption held by its figure still fills its column: without it the column looks empty
     # beside the next line of the other column, which then reads as a heading across both.
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions, blocks=True)
-    final = _merge_column_continuations([blocks[i] for i in order])
+    final = _option_order(_merge_column_continuations([blocks[i] for i in order]))
     edges = _RightEdges(text_rows)
     _label_abstracts(final, text_rows, edges)
     for block in final:

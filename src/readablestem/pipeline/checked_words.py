@@ -100,6 +100,7 @@ MATHS_ALL = "Its equations are written so that screen readers can read them alou
 NOTICE_TITLE = "Before you read"
 NOTICE_ABOUT_LINK = "About this version"
 NOTICE_LEFT_OUT_LINK = "Which pages were left out"
+NOTICE_LEFT_OUT_BLOCKS_LINK = "What was left out"
 NOTICE_MAX_LINKS = 10  # links to pictures; the rest are counted
 
 
@@ -111,9 +112,11 @@ def maths_sentence(s: CheckedSummary) -> str:
     if c.equations_mathml == c.equations:
         return MATHS_ALL
     verb = "is" if c.equations_mathml == 1 else "are"
+    # A Word or LaTeX source has no picture of an equation: the page shows its LaTeX.
+    others = "pictures" if c.pictures_by_kind.get("equation") else "shown as LaTeX text"
     return (
         f"{c.equations_mathml} of its {c.equations} equations {verb} written so that screen "
-        "readers can read them aloud; the others are pictures."
+        f"readers can read them aloud; the others are {others}."
     )
 
 
@@ -169,7 +172,13 @@ def pictures_sentence(s: CheckedSummary) -> str:
 
 
 def left_out_sentence(s: CheckedSummary) -> str:
-    """ "Page 1 of the original PDF was left out of this file." ("" when none was)."""
+    """ "Page 1 of the original PDF was left out of this file." ("" when none was), then, when
+    a person left single paragraphs or list items out, "One paragraph or list item on page 3
+    of the original PDF was left out of this file." The one anchor of the note's link."""
+    return " ".join(p for p in (_pages_left_out(s), _blocks_left_out(s)) if p)
+
+
+def _pages_left_out(s: CheckedSummary) -> str:
     pages = s.converted.left_out_pages
     if not pages:
         return ""
@@ -178,6 +187,28 @@ def left_out_sentence(s: CheckedSummary) -> str:
     total = s.converted.pages
     of = f" ({len(pages)} of {total})" if total and total >= len(pages) else ""
     return f"Pages {_pages_list(pages)}{of} of the original PDF were left out of this file."
+
+
+def _blocks_left_out(s: CheckedSummary) -> str:
+    pages = s.converted.left_out_blocks
+    if not pages:
+        return ""
+    where = _pages_list(tuple(dict.fromkeys(pages)))
+    if len(pages) == 1:
+        return (
+            f"One paragraph or list item on page {where} of the original PDF was left out "
+            "of this file."
+        )
+    label = "page" if len(set(pages)) == 1 else "pages"
+    return (
+        f"{len(pages)} paragraphs or list items on {label} {where} of the original PDF were "
+        "left out of this file."
+    )
+
+
+def left_out_link(s: CheckedSummary) -> str:
+    """The words of the notice's link to the sentence above."""
+    return NOTICE_LEFT_OUT_LINK if s.left_out else NOTICE_LEFT_OUT_BLOCKS_LINK
 
 
 def page_range(pages: tuple[int, ...]) -> str:
@@ -240,10 +271,12 @@ def statement(s: CheckedSummary) -> list[str]:
     return [t for t in parts if t]
 
 
-def picture_link(number: int, kind: str, page: int) -> str:
-    """The words of the notice's link to one picture: numbered, so no two are the same."""
+def picture_link(number: int, kind: str, page: int, origin: str = "pdf") -> str:
+    """The words of the notice's link to one picture: numbered, so no two are the same. Its
+    page only for a PDF: a Word or LaTeX file has no pages to name."""
     one = STUDENT_KIND_WORDS.get(kind) or KIND_WORDS.get(kind, (kind, kind))[0]
-    return f"Part {number} not converted: {one}, page {page}"
+    where = f", page {page}" if origin == "pdf" else ""
+    return f"Part {number} not converted: {one}{where}"
 
 
 def more_pictures(n: int) -> str:
@@ -254,26 +287,46 @@ def more_pictures(n: int) -> str:
 # --------------------------------------------------------------------------- the owner
 
 READY_ALL = "Every part the tool found was converted."
+RECORD_NO_PICTURES = "No part is shown as a picture."
 NO_CHECKS = "No structure checks are stored for this file."
 CHECKS_SCOPE = "They check structure, not whether the content is right."
 
 
-def as_image_sentence(s: CheckedSummary) -> str:
-    """ "2 equations are shown as images that screen readers cannot read." ("" when none)."""
-    if not s.pictures:
-        return ""
-    verb = "is shown as an image" if s.pictures == 1 else "are shown as images"
-    return f"{kinds_phrase(s.converted.pictures_by_kind)} {verb} that screen readers cannot read."
+def not_converted_sentence(s: CheckedSummary) -> str:
+    """What stands between the file and "Ready to share" among its parts, said as each is
+    shown: "2 equations are shown as images that screen readers cannot read." for a picture;
+    "2 equations are shown as LaTeX text, not written so that screen readers can read them
+    aloud." for an equation of a Word or LaTeX file, which has no picture ("" when none)."""
+    c = s.converted
+    said = []
+    if s.images:
+        verb = "is shown as an image" if s.images == 1 else "are shown as images"
+        said.append(f"{kinds_phrase(c.pictures_by_kind)} {verb} that screen readers cannot read.")
+    if s.written:
+        verb, it = ("is", "it") if s.written == 1 else ("are", "them")
+        said.append(
+            f"{kinds_phrase(c.written_by_kind)} {verb} shown as LaTeX text, not written so that "
+            f"screen readers can read {it} aloud."
+        )
+    return " ".join(said)
 
 
 def left_out_owner(s: CheckedSummary) -> str:
     n = s.left_out
+    blocks = s.left_out_blocks
+    if blocks:
+        words = f"{plural(blocks, 'paragraph or list item', 'paragraphs or list items')}"
+        said = f"{words} {'was' if blocks == 1 else 'were'} left out."
+    else:
+        said = ""
     if not n:
-        return ""
+        return said
     total = s.converted.pages
     if total and total >= n:
-        return f"{n} of {plural(total, 'page')} {'was' if n == 1 else 'were'} left out."
-    return f"{plural(n, 'page')} {'was' if n == 1 else 'were'} left out."
+        pages = f"{n} of {plural(total, 'page')} {'was' if n == 1 else 'were'} left out."
+    else:
+        pages = f"{plural(n, 'page')} {'was' if n == 1 else 'were'} left out."
+    return f"{pages} {said}".strip()
 
 
 def cut_off_owner(s: CheckedSummary) -> str:
@@ -315,7 +368,7 @@ def remains(s: CheckedSummary) -> str:
     """What stands between a finished job with no open decision and "Ready to share" ("" when
     nothing does)."""
     parts = [
-        as_image_sentence(s),
+        not_converted_sentence(s),
         left_out_owner(s),
         cut_off_owner(s),
         unread_owner(s),
@@ -366,10 +419,13 @@ def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
 def card_equations(s: CheckedSummary) -> str:
     """The before/after card's equation row: how many of the equations found are MathML."""
     c = s.converted
-    images = c.pictures_by_kind.get("equation", 0)
     text = f"{c.equations_mathml} of {c.equations} are MathML, read with their structure"
-    if images:
-        return f"{text}; {images} {'is' if images == 1 else 'are'} shown as an image."
+    for n, shown in (
+        (c.pictures_by_kind.get("equation", 0), "an image"),
+        (c.written_by_kind.get("equation", 0), "LaTeX text"),
+    ):
+        if n:
+            text += f"; {n} {'is' if n == 1 else 'are'} shown as {shown}"
     return f"{text}."
 
 
@@ -404,10 +460,13 @@ def card_yes(s: CheckedSummary) -> str:
 
 
 def record_pictures(s: CheckedSummary) -> str:
-    """The record's line when no part is listed as a picture."""
+    """The record's line when no part is listed as a picture: the section is headed "Parts
+    shown as pictures", so what was left out, cut off or unread follows a sentence that says
+    no part is one."""
     if s.all_found_converted:
         return READY_ALL
-    return " ".join(p for p in (left_out_owner(s), cut_off_owner(s), unread_owner(s)) if p)
+    rest = (left_out_owner(s), cut_off_owner(s), unread_owner(s))
+    return " ".join(p for p in (RECORD_NO_PICTURES, *rest) if p)
 
 
 def record_checks(s: CheckedSummary) -> str:

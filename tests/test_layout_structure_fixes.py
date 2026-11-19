@@ -283,6 +283,8 @@ def split_pages(second_first: str, *, first_last: str = "and the cart continues 
     """Two pages; the first ends in an unfinished sentence, the second starts with
     `second_first`. A running header and a footnote sit around the break."""
 
+    margin = kw.get("margin", 0.0)  # the second page's text stands this far in (an even page)
+
     def fill(number, page):
         page.insert_text((72, 40), "Notes on motion", fontsize=9, fontname="helv")
         page.insert_text((300, 760), str(number + 1), fontsize=9, fontname="helv")
@@ -291,17 +293,29 @@ def split_pages(second_first: str, *, first_last: str = "and the cart continues 
             y = para(page, y)
             y = para(page, y, lines=2)
             y = para(page, y, lines=2)
-            page.insert_text((72, 640), SENTENCE, fontsize=BODY, fontname="helv")
-            page.insert_text((72, 654), first_last, fontsize=BODY, fontname="helv")
+            if kw.get("lone_line"):  # one line of the paragraph, in by its first-line indent
+                page.insert_text((90, 654), first_last, fontsize=BODY, fontname="helv")
+            else:
+                page.insert_text((72, 640), SENTENCE, fontsize=BODY, fontname="helv")
+                page.insert_text((72, 654), first_last, fontsize=BODY, fontname="helv")
             if kw.get("footnote"):
                 page.insert_text((72, 720), "1 A footnote.", fontsize=8, fontname="helv")
         else:
-            x = 72.0 + kw.get("indent", 0.0)
-            page.insert_text((x, 72), second_first, fontsize=kw.get("size", BODY), fontname="helv")
+            top = 72.0
+            if kw.get("figure"):  # a picture floats to the top of the page, above the text
+                pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 40, 30), False)
+                pixmap.clear_with(180)
+                page.insert_image(pymupdf.Rect(72, 60, 232, 180), pixmap=pixmap)
+                top = 210.0
+            x = 72.0 + margin + kw.get("indent", 0.0)
+            page.insert_text((x, top), second_first, fontsize=kw.get("size", BODY), fontname="helv")
             page.insert_text(
-                (72, 86), "ramp stays level for the whole trip.", fontsize=BODY, fontname="helv"
+                (72 + margin, top + 14),
+                "ramp stays level for the whole trip.",
+                fontsize=BODY,
+                fontname="helv",
             )
-            para(page, 120)
+            para(page, top + 48, x=72 + margin)
 
     return pdf_of(fill, pages=2)
 
@@ -319,6 +333,24 @@ def test_a_paragraph_cut_by_a_page_break_is_one_element():
     assert all(e.last_page is None for e in layout.elements if e is not joined[0])
     assert joined[0].text.endswith("stays level for the whole trip.")
     assert [e.page for e in paragraphs(layout)].count(1) == 1  # only the paragraph after it
+
+
+@pytest.mark.parametrize(
+    ("second_first", "kw", "joined"),
+    [
+        ("speed up while the", {"figure": True}, True),  # a picture on top is not the text
+        ("speed up while the", {"lone_line": True}, True),  # one indented line is a first line
+        ("speed up while the", {"lone_line": True, "margin": 14.0}, True),  # on an even page
+        ("speed up while the", {"indent": 14.0}, False),  # the second starts a paragraph
+        ("Speed up while the", {}, False),  # a capital: the sentence began there
+    ],
+)
+def test_a_paragraph_cut_by_a_page_break_is_joined_only_where_both_parts_agree(
+    second_first, kw, joined
+):
+    layout = analyze(split_pages(second_first, **kw))
+    spanning = [e for e in paragraphs(layout) if e.last_page is not None]
+    assert len(spanning) == int(joined)
 
 
 def column_break(tail_lines: int) -> bytes:
@@ -478,7 +510,8 @@ def test_where_inline_maths_may_wrap(first, connector, second, joined):
     assert _wraps_here(first, second, connector) is joined
 
 
-def test_a_list_item_at_a_page_foot_is_not_joined_to_the_next_page():
+@pytest.mark.parametrize(("x", "joined"), [(72, False), (86, True)])
+def test_a_list_item_at_a_page_foot_goes_on_only_at_its_text(x, joined):
     def fill(number, page):
         page.insert_text((300, 760), str(number + 1), fontsize=9, fontname="helv")
         if number == 0:
@@ -492,12 +525,13 @@ def test_a_list_item_at_a_page_foot_is_not_joined_to_the_next_page():
                 (72, 654), "2. Check that the cart continues to", fontsize=BODY, fontname="helv"
             )
         else:
-            page.insert_text((72, 72), "speed up until the end.", fontsize=BODY, fontname="helv")
+            page.insert_text((x, 72), "speed up until the end.", fontsize=BODY, fontname="helv")
             para(page, 120)
 
     layout = analyze(pdf_of(fill, pages=2))
-    assert not any("continues to speed up" in (e.text or "") for e in layout.elements)
-    assert all(e.last_page is None for e in layout.elements)
+    items = [e for e in layout.elements if e.kind == Kind.LIST_ITEM and e.last_page is not None]
+    assert len(items) == int(joined)
+    assert any("continues to speed up" in (e.text or "") for e in layout.elements) is joined
 
 
 def options_page(*lines: str) -> bytes:

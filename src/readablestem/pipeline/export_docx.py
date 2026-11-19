@@ -285,7 +285,8 @@ def _lines_of(pre: _Node) -> _Node:
 
 def _prepare(root: _Node) -> None:
     """The changes only the page's own markup can carry (pandoc drops the elements): a long
-    description's `<details>` as a bold line and paragraphs, `<main>` unwrapped, and a code
+    description's `<details>` as a bold line and paragraphs, a sidebar's `<aside>` as a div in
+    Word's "Sidebar" style, `<main>` unwrapped, and a code
     block that holds an equation as lines of a paragraph (`_lines_of`). Pandoc's
     HTML reader reads only what is inside `<main>` when there is one (3.7.0.2); the Contents
     and a draft's banner stand before it and are in the file. (The note "About this version"
@@ -299,7 +300,13 @@ def _prepare(root: _Node) -> None:
             # filter moves the note's words to the mark (`data/export_docx.lua`).
             del node.attrs["role"]
             node.attrs["data-rsnote"] = "1"
-        if node.tag == "main":
+        if node.tag == "aside":
+            # Pandoc drops `<aside>` and its label: the paragraphs would read as body text.
+            # A div with `custom-style` gives them Word's own style, named "Sidebar".
+            node.tag = "div"
+            node.attrs = {k: v for k, v in node.attrs.items() if k == "id"}
+            node.attrs["custom-style"] = assemble.ASIDE_LABEL
+        elif node.tag == "main":
             _replace(node, list(node.children))
         elif node.tag == "pre" and any(n.tag == "math" for n in node.walk()):
             _replace(node, [_lines_of(node)])

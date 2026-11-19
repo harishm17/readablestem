@@ -130,7 +130,7 @@ class Report:
     math_read: int = 0  # equations pandoc gave (the ones below are of these)
     math_converted: int = 0
     math_in_headings: int = 0  # written as TeX in the heading, a decision (nothing to speak)
-    math_failed: int = 0
+    math_failed: int = 0  # equations and table cells that failed the checks (`_table` reads it)
     math_failures: Counter[str] = field(default_factory=Counter)  # failing check -> equations
     failed_commands: Counter[str] = field(default_factory=Counter)  # command not allowed -> n
     math_flat: int = 0
@@ -199,8 +199,12 @@ class _Reader:
             self._heading(int(content[0]), content[2], str(content[1][0]))
         elif kind == "Div":
             self._div(content[0], content[1], depth)
-        elif kind == "BlockQuote":
+        elif kind == "BlockQuote":  # Word's "Quote" and "Block Text" styles
+            first = len(self.out.elements)
             self.blocks(content, depth + 1)
+            for element in self.out.elements[first:]:
+                if element.kind is Kind.PARAGRAPH and not element.preformatted:
+                    element.role = "quote"
         elif kind in ("BulletList", "OrderedList"):
             self._list(kind, content, 1, depth)
         elif kind == "Table":
@@ -555,7 +559,9 @@ class _Reader:
         rows.extend(foot[1])
         caption_text = _plain(_first_inlines(caption[1])) or None
         element = self._new(Kind.TABLE, text=None)
+        failed_before = self.report.math_failed
         grid = self._grid(rows, caption_text)
+        cell_formula_unread = self.report.math_failed > failed_before
         if grid is None:
             self._drop(element)
             self._flatten(rows)
@@ -599,6 +605,9 @@ class _Reader:
         pictures, self.loose = self.loose, []
         if pictures:
             fix = needs_decision(fix, TABLE_PICTURE)
+        if cell_formula_unread:  # its cell shows the formula as TeX, as a heading's does
+            self.out.unread_formulas.add(element.id)
+            fix = needs_decision(fix, FORMULA_UNREAD)
         self.out.fixes[element.id] = fix
         self.chars += sum(len(c.text) for c in grid.cells)
         for picture in pictures:

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 
 import pymupdf
 
@@ -48,6 +48,7 @@ def _claim_tables(
     previous: list[tables.PageTable] | None,
     *,
     document: _Document,
+    accept: Callable[[list[tables.PageTable]], list[tables.PageTable]] | None = None,
 ) -> list[tables.PageTable]:
     """Find the page's data tables (`pipeline.tables`) and take their lines (cells and
     "Table N" caption) and rules out of the page, before columns, rows, headings and
@@ -56,13 +57,17 @@ def _claim_tables(
     Only pages the probe passed get here (`analyze` probes every selected page first).
     `previous` is the page before's tables, when it was analysed: a table that goes on
     from its last one is marked, and the end of a row the page break split is joined to
-    that row (`tables.join_split_row`)."""
+    that row (`tables.join_split_row`). `accept` (with the region tree on) is asked about what
+    the detector proposes, before anything is taken out of the page: the tree is built from the
+    whole page, and a proposal it refuses (WS15.2) is left where it is."""
     if TABLE_PREFILTER and not tables.may_hold_table(page, frags[number], paths[number]):
         found = []  # nothing the detector could find would be kept (`may_hold_table`)
     else:
         found = tables.find(
             page, frags[number], paths[number], clean=_clean, budget=document.detector
         )
+        if accept is not None:
+            found = accept(found)
     if previous and not (found and tables.continues(previous[-1], found[0], page.rect.width)):
         # The rest of an unruled table has too few lines to be found on its own page.
         rest = tables.find_continued(
@@ -74,6 +79,8 @@ def _claim_tables(
             clean=_clean,
             budget=document.detector,
         )
+        if rest is not None and accept is not None:
+            rest = next(iter(accept([rest])), None)
         if rest is not None:
             found = [rest, *found]
     if found:
@@ -105,6 +112,23 @@ def _claim_tables(
         if tables.join_split_row(previous[-1], found[0]):
             found = found[1:]
     return found
+
+
+def _table_regions(found: Sequence[tables.PageTable], claimed: Sequence[_Row]) -> list[BBox]:
+    """Where each table stands on the page, caption included: its box and the boxes of the
+    lines it claimed (`claimed`: the page's fragments before `_claim_tables`)."""
+    out: list[BBox] = []
+    for table in found:
+        boxes = [table.bbox] + [claimed[i].bbox for i in table.lines if i < len(claimed)]
+        out.append(
+            (
+                min(b[0] for b in boxes),
+                min(b[1] for b in boxes),
+                max(b[2] for b in boxes),
+                max(b[3] for b in boxes),
+            )
+        )
+    return out
 
 
 CELL_MATHS_REASON = "table cell maths"

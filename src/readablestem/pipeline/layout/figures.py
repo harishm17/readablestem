@@ -1593,6 +1593,133 @@ class _RightEdges:
 
 INDENT_REACH = 4  # em: how far left of an indented first line the paragraph's next line may start
 _REFERENCE_NUMBER = re.compile(r"\[\d{1,3}\]")
+# The line that opens an abstract's keywords ("Keywords:", "Key words -", "Index Terms -").
+_KEYWORDS_LINE = re.compile(r"(?:key\s?words?|index\s+terms)\s*[:–—-]", re.IGNORECASE)  # noqa: RUF001
+# A theorem's label: "Definition 2.", "Theorem 1.1 (Name).", "Example 5:", "Proof.", or a
+# numbered one with no stop ("Remark 5.1 It ..."), which `_starts_block` takes in bold or italic.
+_THEOREM_LEAD = re.compile(
+    r"(?:Definition|Theorem|Lemma|Proposition|Corollary|Claim|Conjecture|Remark|Example|Proof)"
+    r"(?P<number>\s+\d+(?:\.\d+)*)?(?:\s*\([^)]{0,60}\))?(?P<stop>[.:](?!\d))?"
+)
+_LINE_NUMBER = re.compile(r"(\d{1,3})[:.]?\s+\S")
+# The signs of a note: * and the asterisk operator, dagger, double dagger, section, pilcrow.
+_NOTE_SIGNS = frozenset("*\u2217\u2020\u2021\u00a7\u00b6")
+NOTE_BODY_RATIO = 0.92  # a note, an affiliation: set in smaller type than the body text
+_MID_SENTENCE = frozenset(",;(-\u2013\u2014")
+
+
+def _starts_entry(prev: _Row, row: _Row, run: _Run, edges: _RightEdges) -> bool:
+    """Does `row` start an entry of a glossary or a list of terms: a lead term (`_lead_end`)
+    at the left edge of the paragraph `run`, after a line that does not end in that style. (An
+    italic title that starts a line inside an entry of a bibliography is indented with it; an
+    italic "et al." after a line that runs full and stops mid-sentence is part of it.)"""
+    found = _lead_end(row)
+    if found is None or row.marker is not None or row.x0 > run.box[0] + 0.5 * row.size:
+        return False
+    if prev.clean[-1:] not in '.:;?!)”"' and prev.x1 >= edges.of(prev) - 1.5 * prev.size:
+        return False
+    last = next((c for c in reversed(prev.chars) if not c.blank), None)
+    return last is not None and not found[1](last)
+
+
+def _runs_on(prev: _Row, edges: _RightEdges | None) -> bool:
+    """Does the sentence of `prev` go on in the next line: it ends in a lower-case letter, a
+    comma or a dash, and, where the page's line ends are known, runs to the right edge."""
+    end = prev.clean[-1:]
+    if not (end.islower() or end in _MID_SENTENCE):
+        return False
+    return edges is None or prev.x1 >= edges.of(prev) - 3 * prev.size
+
+
+# The words that start a line of an algorithm in lower case.
+_STEP_WORDS = frozenset(
+    {"if", "else", "elif", "for", "foreach", "while", "do", "repeat", "until", "end", "endif"}
+    | {"endfor", "endwhile", "return", "then", "break", "continue", "function", "procedure"}
+)
+
+
+def _margin_number(prev: _Row, row: _Row, number: re.Match[str]) -> bool:
+    """Is the number that starts `row` a line number of the margin, not a step: set apart
+    from its line (in smaller type, or more than 1.2 em from the text), and the sentence of
+    `prev` goes on in the words after it (they start in lower case, and are no step word)?"""
+    chars = [c for c in row.chars if not c.blank]
+    count = 0
+    while count < len(chars) and (chars[count].c.isdigit() or chars[count].c in ":."):
+        count += 1
+    if not 0 < count < len(chars):
+        return False
+    apart = row.is_script(chars[0]) or chars[count].x0 - chars[count - 1].x1 > 1.2 * row.size
+    word = re.match(r"[a-z]+", row.clean[number.end() - 1 :])
+    end = prev.clean[-1:]
+    last = re.search(r"[A-Za-z]+$", prev.clean)
+    return (
+        apart
+        and word is not None
+        and word.group(0) not in _STEP_WORDS
+        and (end.islower() or end in _MID_SENTENCE - {";", "("})
+        and (last is None or last.group(0) not in _STEP_WORDS)
+    )
+
+
+def _styled_lead(prev: _Row, row: _Row) -> bool:
+    """The line starts in bold or italic and the line above does not end in that style."""
+    first = next((c for c in row.chars if not c.blank), None)
+    last = next((c for c in reversed(prev.chars) if not c.blank), None)
+    if first is None or last is None:
+        return False
+    return (first.bold and not last.bold) or (
+        first.italic and not first.math and not last.italic and not last.bold
+    )
+
+
+def _starts_block(
+    prev: _Row, row: _Row, run: _Run, ctx: _Context, edges: _RightEdges | None = None
+) -> bool:
+    """Does `row` start a new block rather than go on with `run`, whose last row is `prev`,
+    though it sits at a line's distance in the same size and the same column?
+
+    The signals, each of a kind of start that the geometry of a paragraph's lines does not
+    show (SW34): an entry of a glossary or a list of terms (a lead term), the "Keywords:"
+    line, and with the region tree an entry of an index or an outline (`entries`); a note
+    or an affiliation (a raised digit or sign at the line start, in smaller type than the
+    body, after a line that does not go on); a theorem, definition, proof or example (its
+    label, at the end of a sentence or in another style than the line above; a numbered one
+    with no stop only in bold or italic); the next number of a column of numbers after a line
+    that ends short of the right edge (the steps of an algorithm, the lines of a listing; not
+    the line numbers of the margin of a passage, `_margin_number`). The signals that need the
+    page's line ends (`edges`) are not applied without them."""
+    text = row.clean
+    if ctx.region_tree and entries.starts_entry(prev, row, run):
+        return True
+    if _KEYWORDS_LINE.match(text) is not None:
+        return True
+    if edges is not None and _starts_entry(prev, row, run, edges):
+        return True
+    first = next((c for c in row.chars if not c.blank), None)
+    if (
+        first is not None
+        and (first.c.isdigit() or first.c in _NOTE_SIGNS)
+        and row.is_script(first)
+        and row.size < NOTE_BODY_RATIO * ctx.body
+        and not _runs_on(prev, edges)
+    ):
+        return True
+    label = _THEOREM_LEAD.match(text)
+    if label is not None and (
+        (label["stop"] and (not _runs_on(prev, edges) or _styled_lead(prev, row)))
+        or (label["number"] and _styled_lead(prev, row) and not _runs_on(prev, edges))
+    ):
+        return True
+    if edges is None:
+        return False
+    number, before = _LINE_NUMBER.match(text), _LINE_NUMBER.match(prev.clean)
+    return (
+        number is not None
+        and before is not None
+        and int(number.group(1)) == int(before.group(1)) + 1
+        and prev.x1 < edges.of(prev) - 3 * prev.size
+        and not _margin_number(prev, row, number)
+    )
 
 
 def _continues(
@@ -1606,8 +1733,6 @@ def _continues(
     first line is indented like a typewriter's tab (not two centred lines, not the next
     numbered reference). Without `edges` it is rejected."""
     size = prev.size
-    if ctx.region_tree and entries.starts_entry(prev, row, run):
-        return False
     if abs(row.size - size) > max(1.0, 0.12 * size):
         return False
     pitch = row.baseline - prev.baseline
@@ -1643,7 +1768,11 @@ def _continues(
         right = max(right, edges.of(prev))  # an entry of one line: its line ends short of the edge
     if row.x0 - run.margin >= 0.8 * size and prev.x1 < right - 1.5 * size:
         return False  # first-line indent after a short line: a new paragraph
-    return row.marker is None and not CAPTION.match(row.clean)
+    return (
+        row.marker is None
+        and not CAPTION.match(row.clean)
+        and not _starts_block(prev, row, run, ctx, edges)
+    )
 
 
 def _gap(box: BBox, other: BBox) -> float:

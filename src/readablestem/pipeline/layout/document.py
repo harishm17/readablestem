@@ -77,6 +77,7 @@ from readablestem.pipeline.layout.notices import (
 )
 from readablestem.pipeline.layout.order import Gutter
 from readablestem.pipeline.layout.page import (
+    _accepted,
     _covered_points,
     _label_keys,
     _loose_strokes,
@@ -92,7 +93,7 @@ from readablestem.pipeline.layout.rows import (
     take_form_fields,
 )
 from readablestem.pipeline.layout.shared import _Display, _PageBlocks, _Path, _Row
-from readablestem.pipeline.layout.tables import _claim_tables
+from readablestem.pipeline.layout.tables import _claim_tables, _table_regions
 
 HEADING_LEVEL_TOLERANCE = 0.05  # heading sizes within 5 % of each other share a level
 
@@ -318,6 +319,7 @@ def _analyze_document(
     found: dict[int, list[tables.PageTable]] = {}
     prepared: dict[int, tuple[list[_Row], Gutter, list[_Row]]] = {}
     sources: dict[int, say_once.PageSource] = {}
+    refused: dict[int, list[tuple[BBox, str]]] = {}  # table proposals the region tree refused
     for number in selected:
         with guard(number):
             rows, drawn, kind = _read_page(doc[number], document, producer)
@@ -404,6 +406,19 @@ def _analyze_document(
                     paths,
                     found.get(number - 1) if guard.ok(number - 1) else None,
                     document=document,
+                    accept=(
+                        partial(
+                            _accepted,
+                            doc[number],
+                            frags=frags[number],
+                            paths=paths[number],
+                            margins=margins,
+                            refused=refused.setdefault(number, []),
+                            document=document,
+                        )
+                        if document.region_tree
+                        else None
+                    ),
                 )
             )
             sources[number] = say_once.PageSource()
@@ -418,6 +433,7 @@ def _analyze_document(
                 margins,
                 paths[number],
                 sources[number],
+                tables=_table_regions(found[number], unclaimed),
                 document=document,
             )
             # Axes with tick labels, an axis title or a curve from their corner are a plot's:
@@ -541,6 +557,7 @@ def _analyze_document(
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
         sources=sources,
+        table_refusals={n: r for n, r in sorted(refused.items()) if r},
     )
 
 

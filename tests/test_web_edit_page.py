@@ -38,6 +38,8 @@ PARAGRAPH = "p1-e1"  # "A rigid body turning with angular velocity ⟦p1-e2⟧ m
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."
 CODE = "p1-e8"
 ENTRY = "p1-e9"
+NEXT = "p1-e10"  # a plain paragraph, then another: the two sit side by side
+AFTER = "p1-e11"
 
 EQUATION_ANSWER = {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
 
@@ -53,6 +55,12 @@ def edit_output() -> ConversionOutput:
         Element(id=ENTRY, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, 650.0, 540.0, 670.0), order=51,
                 text="Vector a quantity with size and direction", term_end=6)
     )  # fmt: skip
+    for number, eid in enumerate((NEXT, AFTER)):
+        top = 680.0 + 20 * number
+        result.elements.append(
+            Element(id=eid, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, top, 540.0, top + 15.0),
+                    order=52 + number, text=f"A paragraph beside it, number {number + 1}.")
+        )  # fmt: skip
     return output
 
 
@@ -221,6 +229,7 @@ def test_a_kept_line_end_is_written_as_br_and_moves_with_its_words(tmp_path):
     output = edit_output()
     paragraph = next(e for e in output.result.elements if e.id == PLAIN)
     paragraph.text = "Discuss vectors and scalars with the class"
+    paragraph.role = "aside"  # a text edit keeps what the block is
     first = paragraph.text.index(" vectors")
     second = paragraph.text.index(" with")
     paragraph.runs = [
@@ -244,6 +253,7 @@ def test_a_kept_line_end_is_written_as_br_and_moves_with_its_words(tmp_path):
         done = edit_post(env, PLAIN, action="text", text=paragraph.text.replace("Discuss", "Talk"))
         assert done.status_code == 303
         kept = element(env, PLAIN)
+        assert kept.role == "aside" and "<aside" in (with_file(env).html or "")
         assert [(kept.text or "")[r.start : r.end] for r in kept.runs if r.kind == "break"] == [
             " ",
             " ",
@@ -331,6 +341,122 @@ def test_code_and_entries_and_long_paragraphs_are_not_headings(edits):
     long = "Words " * 80
     edit_post(edits, PLAIN, action="text", text=long)
     assert edit_post(edits, PLAIN, action="heading", level="2").status_code == 422
+
+
+# --------------------------------------------------------------------------- sidebar, quotation
+
+
+def test_a_paragraph_is_made_a_sidebar_or_a_quotation_and_the_page_has_the_wrapper(edits):
+    page = f"/jobs/{edits.job_id}/review?page=1&tools=1&change={PLAIN}"
+    assert "Make it a sidebar" in edits.browser.get(page).text
+    assert edit_post(edits, PLAIN, action="role", role="aside").status_code == 303
+    assert element(edits, PLAIN).role == "aside"
+    html = with_file(edits).html or ""
+    assert re.search(
+        r'<aside aria-label="Sidebar"><p[^>]*>Discuss vectors and scalars with the class\.</p>'
+        r"</aside>",
+        html,
+    )
+    shown = unescape(edits.browser.get(page).text)
+    assert "This paragraph is a sidebar" in shown and "Not a sidebar" in shown
+    # The other role replaces it; neighbors of one role share one wrapper.
+    assert edit_post(edits, PLAIN, action="role", role="quote").status_code == 303
+    assert edit_post(edits, NEXT, action="role", role="quote").status_code == 303
+    assert edit_post(edits, AFTER, action="role", role="quote").status_code == 303
+    html = with_file(edits).html or ""
+    assert "<aside" not in html and html.count("<blockquote>") == 2
+    quoted = html.split("<blockquote>")[2].split("</blockquote>")[0]
+    assert "number 1." in quoted and "number 2." in quoted
+    # The same role again, or a word that is neither, changes nothing.
+    assert edit_post(edits, PLAIN, action="role", role="quote").status_code == 422
+    assert edit_post(edits, PLAIN, action="role", role="verse").status_code == 422
+    assert element(edits, PLAIN).role == "quote"
+
+
+def test_a_role_is_cleared_and_undone(edits):
+    edit_post(edits, PLAIN, action="role", role="aside")
+    assert edit_post(edits, PLAIN, action="role", role="").status_code == 303
+    assert element(edits, PLAIN).role is None
+    assert "<aside" not in (with_file(edits).html or "")
+    assert edit_post(edits, PLAIN, action="role", role="").status_code == 422  # already none
+    path = f"/jobs/{edits.job_id}/review"
+    undo = edits.browser.post(
+        f"/jobs/{edits.job_id}/undo",
+        data={"csrf_token": token(edits.browser, path), "version": version(edits)},
+    )
+    assert undo.status_code == 303
+    assert element(edits, PLAIN).role == "aside"
+
+
+def test_only_a_plain_paragraph_can_be_a_sidebar_or_a_quotation(edits):
+    page = unescape(
+        edits.browser.get(f"/jobs/{edits.job_id}/review?page=1&tools=1&change={CODE}").text
+    )
+    assert "Make it a sidebar" not in page
+    for target in (CODE, ENTRY, "p1-e0", "p1-e2"):  # code, entry, heading, equation
+        response = edit_post(edits, target, action="role", role="aside")
+        assert response.status_code == 422, target
+        assert element(edits, target).role is None
+
+
+# --------------------------------------------------------------------------- one paragraph left out
+
+
+def test_a_paragraph_left_out_is_listed_to_put_back_named_in_the_record_and_not_in_the_file(edits):
+    page = f"/jobs/{edits.job_id}/review?page=1&tools=1&change={PLAIN}"
+    assert "Leave it out" in edits.browser.get(page).text
+    assert edit_post(edits, PLAIN, action="leave_out").status_code == 303
+    html = with_file(edits).html or ""
+    assert "Discuss vectors and scalars" not in html
+    assert "One paragraph or list item on page 1 of the original PDF was left out" in text_of(html)
+    # Not deleted: the page's card still lists it, as left out, with a way back.
+    shown = unescape(edits.browser.get(page.replace(f"&change={PLAIN}", "")).text)
+    assert "left out of the student file" in shown and "Put it back" in shown
+    assert "Discuss vectors and scalars" in shown
+    # The record says which words were taken out.
+    record = text_of(edits.browser.get(f"/jobs/{edits.job_id}/record").text)
+    assert "Left a paragraph out of the student file" in record
+    assert "Discuss vectors and scalars with the class." in record
+    # The summary holds the words from the stored paragraph itself, so one left out by a
+    # carried change (whose row has no words) is named too.
+    assert "Page 1: “Discuss vectors and scalars with the class.”" in record
+    # Back, and the file is whole again.
+    assert edit_post(edits, PLAIN, action="put_back").status_code == 303
+    assert "Discuss vectors and scalars" in (with_file(edits).html or "")
+    assert not stored(edits).left_out_blocks
+    assert edit_post(edits, PLAIN, action="put_back").status_code == 422  # not left out now
+
+
+def test_a_paragraph_left_out_is_undone(edits):
+    edit_post(edits, PLAIN, action="leave_out")
+    path = f"/jobs/{edits.job_id}/review"
+    done = edits.browser.post(
+        f"/jobs/{edits.job_id}/undo",
+        data={"csrf_token": token(edits.browser, path), "version": version(edits)},
+    )
+    assert done.status_code == 303
+    assert element(edits, PLAIN).text == "Discuss vectors and scalars with the class."
+    assert not stored(edits).left_out_blocks and not [
+        n for n in stored(edits).notices if n.code == "block_omitted"
+    ]
+
+
+def test_only_a_paragraph_or_list_item_nothing_points_at_is_left_out(edits):
+    # A heading, an equation, a figure, a paragraph with an equation in it, and a paragraph
+    # a decision waits on are each refused, and nothing changes.
+    for target in ("p1-e0", "p1-e2", "p1-e6", PARAGRAPH):
+        assert edit_post(edits, target, action="leave_out").status_code == 422, target
+    assert not stored(edits).left_out_blocks
+    # Nor is text left out of a Word or LaTeX file, whose note would name a page of "the
+    # original PDF"; and a paragraph is not put back onto a page that is itself left out.
+    word = stored(edits).model_copy(update={"origin": "docx"})
+    with pytest.raises(page_edits.ReviewInvalid):
+        page_edits.leave_out_block(word, PLAIN)
+    result = stored(edits)
+    page_edits.leave_out_block(result, PLAIN)
+    page_edits.omit_page(result, 0, pages=page_edits.page_count(result))
+    with pytest.raises(page_edits.ReviewInvalid):
+        page_edits.put_back_block(result, PLAIN)
 
 
 # --------------------------------------------------------------------------- pictures

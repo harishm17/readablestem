@@ -43,12 +43,14 @@
     <li>{{ c.accepted }} accepted by the tool after its own automatic checks, with no decision from a person.</li>
     <li>{{ record.count_line }} Each is listed below.</li>
     <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
-    {% if record.checked.pictures %}<li>{{ checked_words.as_image_sentence(record.checked) }}</li>
+    {% if record.checked.pictures %}<li>{{ checked_words.not_converted_sentence(record.checked) }}</li>
     {% elif record.checked.all_found_converted %}<li>{{ checked_words.READY_ALL }}</li>{% endif %}
     {% for name, n in record.by_hand.items() %}<li>{{ name }}: {{ n }}.</li>{% endfor %}
     {% for title, text in record.gaps %}<li>{{ title }}: {{ text }}</li>{% endfor %}
     {% if record.checked.cut_off %}<li>{{ checked_words.cut_off_owner(record.checked) }}</li>{% endif %}
     {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
+    {% if record.left_out_blocks %}<li>{{ record.left_out_blocks|length }} {{ "paragraph or list item" if record.left_out_blocks|length == 1 else "paragraphs or list items" }} left out of the student file:
+      <ul>{% for page, words in record.left_out_blocks %}<li>Page {{ page }}{% if words %}: “{{ words }}”{% endif %}</li>{% endfor %}</ul></li>{% endif %}
   </ul>
 </section>
 
@@ -87,9 +89,10 @@
 </section>
 
 <section aria-labelledby="record-images">
-  <h2 id="record-images">Parts shown as pictures</h2>
+  <h2 id="record-images">{{ "Parts not converted" if record.checked.written else "Parts shown as pictures" }}</h2>
   {% if record.kept_as_images %}
-  <p>These parts could not be converted to text. Screen readers cannot read them.</p>
+  {# A Word or LaTeX source has no picture of an equation: its LaTeX is shown. #}
+  <p>{{ checked_words.not_converted_sentence(record.checked) if record.checked.written else "These parts could not be converted to text. Screen readers cannot read them." }}</p>
   <ul>
     {% for i in record.kept_as_images %}<li>{{ item_ref(i.ref) }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
   </ul>

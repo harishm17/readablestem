@@ -111,7 +111,12 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # written to the person who checks it ("Check it against the original.", "not checked",
 # "Needs a description.", "Check it before students use it."), and the image-page note and the
 # equation alt text are said to a student; a draft is made in the checker's words.
-RENDER_VERSION = 8
+# 9: a paragraph with a role is written in `<aside aria-label="Sidebar">` or `<blockquote>`
+# (WS16.3); a paragraph left out is counted in the note; a part that was not converted is
+# said once (the visible label is hidden from a screen reader when the alt text says it); an
+# equation of a Word or LaTeX file shown as its LaTeX is not called a picture, and its link
+# names no page; the speech rules for scripts and accents changed.
+RENDER_VERSION = 9
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -197,21 +202,47 @@ EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 EQUATION_TEXT_ALT_SUFFIX = ", as written in the PDF"
 EQUATION_TEXT_ALT_CHECK_SUFFIX = ", read from the PDF text; not checked"
 # ... and when the region has fractions, roots, exponents or several lines, whose order and
-# size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad):
-EQUATION_FLAT_ALT_SUFFIX = ", as written in the PDF, where fractions and exponents may run together"
-EQUATION_FLAT_ALT_CHECK_SUFFIX = (
-    ", read from the PDF text, where fractions and exponents may run together; not checked"
+# size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad), the
+# warning comes FIRST, so a listener who stops early has not heard a wrong formula as the
+# equation: "Equation (2.2), not converted. The characters the PDF has for it, with fractions
+# and exponents run together: d = 12gt2". The equation's own not-converted words, then these.
+EQUATION_FLAT_ALT_TAIL = Words(
+    ". The characters the PDF has for it, with fractions and exponents run together: ",
+    ". The characters the PDF has for it, with fractions and exponents run together, and not "
+    "compared with the page: ",
 )
-EQUATION_TEXT_ALT_WORDS = Words(EQUATION_TEXT_ALT_SUFFIX, EQUATION_TEXT_ALT_CHECK_SUFFIX)
-EQUATION_FLAT_ALT_WORDS = Words(EQUATION_FLAT_ALT_SUFFIX, EQUATION_FLAT_ALT_CHECK_SUFFIX)
 # Every suffix a page can carry (the student's and the checker's): what marks the tool's own
 # words in an alt text (`_FIXED_ALT_IMG`) and what the evaluations strip to get the PDF's text.
-EQUATION_TEXT_ALT_SUFFIXES = (
-    EQUATION_TEXT_ALT_SUFFIX,
-    EQUATION_FLAT_ALT_SUFFIX,
-    EQUATION_TEXT_ALT_CHECK_SUFFIX,
-    EQUATION_FLAT_ALT_CHECK_SUFFIX,
-)
+EQUATION_TEXT_ALT_SUFFIXES = (EQUATION_TEXT_ALT_SUFFIX, EQUATION_TEXT_ALT_CHECK_SUFFIX)
+_NOT_CONVERTED_LEAD = r"Equation(?: \({char}{{1,50}}\),)? not converted"
+
+
+def flat_alt_lead(char: str = ".") -> str:
+    """The pattern of the warning that opens a flattened equation's alt text (both
+    audiences); `char` is what the equation's number may be made of. The words have no
+    character that the page writes as an entity, so one pattern reads the alt text as the
+    page has it and as a parser gives it."""
+    tails = (EQUATION_FLAT_ALT_TAIL.student, EQUATION_FLAT_ALT_TAIL.checker or "")
+    said = "|".join(re.escape(tail) for tail in tails)
+    return _NOT_CONVERTED_LEAD.format(char=char) + f"(?:{said})"
+
+
+_FLAT_ALT_LEAD = re.compile(flat_alt_lead())
+
+
+def equation_alt_text(alt: str) -> str:
+    """The PDF's own text of an equation kept as a picture: its alt text without the words
+    the tool put before it (the warning of a flattened equation) or after it (where the
+    text is from); "" for any other picture."""
+    lead = _FLAT_ALT_LEAD.match(alt)
+    if lead:
+        return alt[lead.end() :]
+    for mark in EQUATION_TEXT_ALT_SUFFIXES:
+        if alt.endswith(mark):
+            return alt[: -len(mark)]
+    return ""
+
+
 # Layout's reasons that say the text layer of an equation is not in reading order.
 _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
@@ -286,7 +317,8 @@ FIGURE_NOTE = "This figure has no text description yet."
 # in the statement of the same notice.
 NOT_CONVERTED_WHY = Words(
     "A screen reader cannot read what a picture shows, so it says only that each of these "
-    "parts is there. Each one is marked where it stands, with what it is."
+    "parts is there; for an equation it also reads the characters the PDF holds, and says "
+    "where they are from. Each one is marked where it stands, with what it is."
 )
 NOT_CONVERTED_WHY_WRITTEN = Words(
     "A screen reader may not read these parts well. Each one is marked where it stands, with "
@@ -631,20 +663,24 @@ def equation_alt(element: Element, audience: str = STUDENT) -> str:
     is written that the PDF does not hold. Text that is empty, has no letter or digit, holds
     a character that is not text (a symbol font's glyph with no letter, `output_chars`), or
     is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
-    exponents or several lines in the region, the marker says the text may run them
-    together (EQUATION_FLAT_ALT_SUFFIX). The checker's marker says the words were not
-    compared with the page; the student's says only where they are from (`audience`).
+    exponents or several lines in the region, the alt text says first that the equation is
+    not converted and that the characters that follow run them together
+    (EQUATION_FLAT_ALT_TAIL), and only then gives them. The checker's words also say the
+    characters were not compared with the page; the student's say only where they are from
+    (`audience`).
     """
     number = equation_number(element.equation_label)
     named = f"Equation ({number})" if number else "Equation"
+    unconverted = f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
     text = " ".join(_ALT_CONTROL.sub(" ", element.text or "").split())
     usable = any(c.isalnum() for c in text) and not output_chars.count(text)
     if text and len(text) <= EQUATION_ALT_MAX_CHARS and usable:
+        if any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS):
+            return f"{unconverted}{say(EQUATION_FLAT_ALT_TAIL, audience)}{text}"
         lead = f"{named}: " if number else ""
-        flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
-        suffix = say(EQUATION_FLAT_ALT_WORDS if flat else EQUATION_TEXT_ALT_WORDS, audience)
+        suffix = EQUATION_TEXT_ALT_CHECK_SUFFIX if audience == CHECKER else EQUATION_TEXT_ALT_SUFFIX
         return f"{lead}{text}{suffix}"
-    return f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
+    return unconverted
 
 
 # Control and invisible characters a text layer can carry (they would end up in an attribute
@@ -817,6 +853,35 @@ def _list_levels(items: list[Element]) -> list[int]:
 
 
 # --------------------------------------------------------------------------- headings
+
+
+ASIDE_LABEL = "Sidebar"
+# How a paragraph with a role is wrapped (`Element.role`): an aside is a landmark with a label
+# (a screen reader says what it is), a quote a `<blockquote>`.
+_ROLE_WRAP: dict[str, tuple[str, str]] = {
+    "aside": (f'<aside aria-label="{ASIDE_LABEL}">', "</aside>"),
+    "quote": ("<blockquote>", "</blockquote>"),
+}
+
+
+def _one_wrapper_each(chunks: list[str]) -> list[str]:
+    """Paragraphs of one role that follow each other with nothing written between them (no
+    page marker) go in one wrapper: one sidebar, one quotation."""
+    out: list[str] = []
+    for chunk in chunks:
+        for opening, closing in _ROLE_WRAP.values():
+            if (
+                out
+                and out[-1].startswith(opening)
+                and out[-1].endswith(closing)
+                and chunk.startswith(opening)
+                and chunk.endswith(closing)
+            ):
+                out[-1] = out[-1][: -len(closing)] + chunk[len(opening) :]
+                break
+        else:
+            out.append(chunk)
+    return out
 
 
 def is_entry(element: Element) -> bool:
@@ -1225,7 +1290,7 @@ class _Renderer:
                 if after := self.marks_after(ordered[i]):
                     chunks.append(after)
             i += 1
-        return chunks
+        return _one_wrapper_each(chunks)
 
     def list_goes_on(self, ordered: list[Element], start: int) -> bool:
         """Is the next element after the equations from `start` on a list item?"""
@@ -1257,7 +1322,13 @@ class _Renderer:
         if element.id in self.footnote_ids:
             return self.footnote(element, text)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
-        return f"<p{attrs}>{self.rich(text, element)}</p>"
+        written = f"<p{attrs}>{self.rich(text, element)}</p>"
+        if element.role is None or element.term_end is not None or element.list_marker:
+            return written
+        if element.role == "aside":
+            self.add_style("aside", student_sheet.ASIDE)
+        opening, closing = _ROLE_WRAP[element.role]
+        return f"{opening}{written}{closing}"
 
     def footnote(self, element: Element, text: str) -> str:
         """A footnote, left where it falls in the text, as a `doc-footnote` with a
@@ -1468,7 +1539,10 @@ class _Renderer:
             alt = _escape(self.image_alt(element, equation_alt(element, self.audience)))
             size = self.picture_size(element, self.crops.get(element.id))
             image = f'<img src="{src}" alt="{alt}"{size}>'
-            label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
+            # Read unless the alt text already says it (alt text that gives the PDF's
+            # characters does not).
+            hidden = ' aria-hidden="true"' if "not converted" in alt.lower() else ""
+            label = f'<span class="flag-label {AUTHORED_CLASS}"{hidden}>'
         else:
             image = _escape(element.text or "")
             label = f'<span class="flag-label {AUTHORED_CLASS}">'
@@ -1618,14 +1692,40 @@ class _Renderer:
         attrs = self.id_attr(element.id) + _fix_attrs(fix, reason)
         link = self.instructor_link(element, reason)
         said = "".join(f" {part}" for part in (note, link) if part)
+        # A picture's alt text already says "not converted" (or "not described"): the label
+        # beside it is for the eye, as an unconverted inline equation's is (`inline_equation`).
+        # Without a picture (the original's text, or none) the label is what says it.
+        hidden = ' aria-hidden="true"' if _alt_says_label(body, label) else ""
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'
-            f'<span class="flag-label">{label}</span>{said}</p></div>'
+            f'<span class="flag-label"{hidden}>{label}</span>{said}</p></div>'
         )
 
 
 # --------------------------------------------------------------------------- document
+
+# The labels that only repeat what the alt text of the picture beside them can say, with the
+# words the alt text must hold for that to be so: "Not converted." for an equation, table,
+# page or picture, and a figure's "No description." for a student (the checker's "Needs a
+# description." tells what to do, so it is always read). An alt text that gives the PDF's
+# characters or a person's description does not say the part was not converted: the label
+# is then the only thing that does, and it is read.
+_LABELS_IN_ALT = {
+    KEPT_IMAGE_LABEL: "not converted",
+    KEPT_PICTURE_LABEL: "not converted",
+    assemble_tables.TABLE_FLAG_LABEL: "not converted",
+    FIGURE_LABEL.student: "not described",
+}
+_PICTURE_ALT = re.compile(r'<img\b[^>]*?\salt="([^"]*)"')
+
+
+def _alt_says_label(body: str, label: str) -> bool:
+    """Does the picture of a flagged block (not one in its caption, which are inline
+    equations) carry alt text that says what `label` says?"""
+    words = _LABELS_IN_ALT.get(label)
+    alt = _PICTURE_ALT.search(body.split("<figcaption>")[0])
+    return words is not None and alt is not None and words in alt.group(1).lower()
 
 
 def _placed_equations(
@@ -1750,13 +1850,13 @@ def _checked_notice(
     links = [f'<li><a href="#{ABOUT_ID}">{words.NOTICE_ABOUT_LINK}</a></li>']
     shown = [p for p in summary.converted.pictures if p.element_id in places]
     for number, picture in enumerate(shown[: words.NOTICE_MAX_LINKS], 1):
-        name = _escape(words.picture_link(number, picture.kind, picture.page))
+        name = _escape(words.picture_link(number, picture.kind, picture.page, summary.origin))
         links.append(f'<li><a href="#{_escape(picture.element_id)}">{name}</a></li>')
     if len(shown) > words.NOTICE_MAX_LINKS:
         rest = words.more_pictures(len(shown) - words.NOTICE_MAX_LINKS)
         links.append(f"<li>{_escape(rest)}</li>")
-    if summary.left_out:
-        links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.NOTICE_LEFT_OUT_LINK}</a></li>')
+    if summary.left_out or summary.left_out_blocks:
+        links.append(f'<li><a href="#{LEFT_OUT_ID}">{words.left_out_link(summary)}</a></li>')
     why = ""
     if summary.pictures:  # the explanation each not-converted box used to repeat (F-114)
         said = NOT_CONVERTED_WHY if summary.origin == "pdf" else NOT_CONVERTED_WHY_WRITTEN
@@ -1893,6 +1993,7 @@ _FIXED_ALT_IMG = re.compile(
             r"[^\"<>]{1,500}(?:"
             + "|".join(re.escape(_escape(suffix)) for suffix in EQUATION_TEXT_ALT_SUFFIXES)
             + ")",
+            flat_alt_lead(r'[^"<>]') + r'[^"<>]{1,500}',
             # A kept page's alt names its page: any number in its place.
             *(
                 re.escape(alt).replace(re.escape("{page}"), r"\d+")
@@ -1990,6 +2091,7 @@ def render_html(
     contact: str | None = None,
     math_alttext: bool | None = None,
     omitted_pages: list[int] | None = None,
+    left_out_blocks: list[int] | None = None,
     page_labels: Mapping[int, str] | None = None,
     pdf_pages: Mapping[int, int] | None = None,
     footnote_ids: Collection[str] = (),
@@ -2000,6 +2102,7 @@ def render_html(
     filename: str = "",
     audience: str = STUDENT,
     stamp: Stamp | None = None,
+    pipeline_version: str | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -2007,6 +2110,11 @@ def render_html(
     file, the only one that is stored and that every export is made from. `CHECKER` is the
     draft's page, made fresh for the person who checks it and never stored: it adds what a
     student must not be told ("Check it against the original.").
+
+    `pipeline_version` is the version of the pipeline that converted the result the page is
+    made from (`DocumentResult.pipeline_version`), which the generator tag names beside the
+    version of this code, since the two differ when a stored result is rendered again; None
+    (a page made from several results) names only this code.
 
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
@@ -2026,7 +2134,9 @@ def render_html(
     stored speech as the `alttext` of its <math> (None: `Settings.mathml_alttext`, off by
     default).
     `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
-    here, and the student note says so. `page_labels`: the printed label of each 0-based page
+    here, and the student note says so. `left_out_blocks`: the 0-based page of each paragraph
+    or list item the instructor left out; they are not here either, and the note counts them.
+    `page_labels`: the printed label of each 0-based page
     that has one (`DocumentResult.page_labels`), for the page markers. A page without one says its
     position in the PDF ("PDF page 5") when any page has a printed label, so two pages never
     both read "Page 5", and "Page 5" when none has. `pdf_pages` maps a page of this document to
@@ -2087,6 +2197,7 @@ def render_html(
         elements=elements,
         fixes=fixes,
         left_out_pages=omitted_pages or (),
+        left_out_blocks=left_out_blocks or (),
         pages=pages,
         reviewed_on=checked_on,
         origin=origin,
@@ -2137,7 +2248,8 @@ def render_html(
             "<head>",
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
-            f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
+            f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}'
+            f'{f", pipeline {_escape(pipeline_version)}" if pipeline_version else ""}">',
             f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
             *(
                 [

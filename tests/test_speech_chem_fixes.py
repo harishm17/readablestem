@@ -39,7 +39,7 @@ def say_mathml(inner: str) -> str:
         ),
         (
             r"E^\circ_{\text{cell}} = E^\circ(\text{Cu}^{2+}/\text{Cu}) - E^\circ(\text{Zn}^{2+}/\text{Zn})",
-            "cap E sub cell degrees equals cap E degrees open parenthesis C u 2 plus "
+            "cap E sub cell end sub degrees equals cap E degrees open parenthesis C u 2 plus "
             "slash C u close parenthesis minus cap E degrees open parenthesis Z n 2 plus "
             "slash Z n close parenthesis",
         ),
@@ -67,7 +67,7 @@ def test_openstax_couple_shape() -> None:
         ),
         (r"\text{mol/L}", "mol/L"),
         # italic letters are variables, not species: no evidence of a couple
-        (r"Cu^{2+}/Cu", "cap C u to the power 2 plus divided by cap C u"),
+        (r"Cu^{2+}/Cu", "cap C u to the power 2 plus end power divided by cap C u"),
     ],
 )
 def test_division_still_reads_as_division(latex: str, speech: str) -> None:
@@ -211,7 +211,7 @@ def test_whole_number_before_an_element_symbol_stays_a_coefficient() -> None:
         (r"8.314\ \text{J}\ \text{mol}^{-1}\ \text{K}^{-1}", "8.314 joules per mole kelvin"),
         (
             r"k = 5.75 \times 10^4\ \text{mol}^{-1}\ \text{L}\ \text{s}^{-1}",
-            "k equals 5.75 times 10 to the power 4 liters per mole second",
+            "k equals 5.75 times 10 to the power 4 end power liters per mole second",
         ),
     ],
 )

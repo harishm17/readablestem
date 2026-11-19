@@ -277,7 +277,22 @@ log = logging.getLogger(__name__)
 # value its closed lists do not have (a link of kind "typed", a new notice code, the origin
 # "docx"), so a deploy of this version is not rolled back past it once a document has been
 # converted (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.12"
+# 0.5.13 (2026-11-19): what a PDF's result holds moves again (CHANGELOG.md has each change).
+# Lists: a bullet is told by how it behaves (a sign repeated at one edge), a bullet glued to
+# its text is an item when a sibling has it, sub-bullets under a numbered item are a level
+# down, a grid of options and the two series of a matching exercise are lists under their
+# question, and a style change inside an item no longer cuts it. Blocks: one function decides
+# where a block starts (a note, a theorem label, the next number of a numbered column), and a
+# paragraph or list item cut by a page break is one element (`joins._goes_on`). A table's box
+# no longer takes the next question; the region tree is not applied to the wrong pages. A
+# paragraph can hold a role (`Element.role`: a sidebar, a quotation), which the Word and LaTeX
+# readers set for a block quotation and a reviewer sets by hand, and a reviewer can leave one
+# paragraph out (`DocumentResult.left_out_blocks`). Results from 0.5.10 to 0.5.12 load unchanged
+# and their page is made again (`assemble.RENDER_VERSION` 9). An older release ignores a role
+# (the paragraph is plain again) and refuses a result that holds the notice code
+# `block_omitted` (a paragraph left out), so the roll-back limit of 0.5.12 stands
+# (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.13"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -2109,6 +2124,7 @@ def _convert(
                 page_labels=labels,
                 footnote_ids=footnotes,
                 cut_off_pages=cut_off,
+                pipeline_version=PIPELINE_VERSION,
             )
             _send(stage_progress, "checks")
             watch.stage("checks")

@@ -549,6 +549,89 @@ def test_a_file_that_names_its_footnotes_decides_which_blocks_are_footnotes():
     assert terms == ["absolute pressure", "gauge pressure", "pascal"]
 
 
+# ------------------------------------------------------------------ where a block starts
+
+
+def note_lines(page):
+    """Two notes at the foot of the page, each starting with its raised mark."""
+    y = column(page, 100, LONG)
+    for number, text in (("1", "The first note is short."), ("2", "The second note follows it.")):
+        y = 700.0 if number == "1" else y
+        page.insert_text((72, y - 3), number, fontsize=5.5, fontname="helv")
+        page.insert_text((77, y), text, fontsize=8, fontname="helv")
+        y += 10
+
+
+def theorem_lines(page):
+    y = column(page, 100, LONG)
+    lines_at(
+        page,
+        y - 10,
+        ["Definition 2. A graph is connected when any two", "of its vertices are linked."],
+    )
+    page.insert_text((72, y + 14), "Proof. Take two vertices and follow the path.", fontsize=BODY)
+
+
+def step_lines(page):
+    y = column(page, 100, LONG)
+    lines_at(page, y, ["1 Read the line", "2 Count the words", "3 Print the sum"])
+
+
+def test_a_note_a_theorem_and_a_numbered_step_each_start_a_block():
+    starts = {
+        note_lines: [
+            "The poem works",
+            "1The first note is short.",
+            "2The second note follows it.",
+        ],
+        theorem_lines: ["The poem works", "Definition 2.", "Proof."],
+        step_lines: ["The poem works", "1 Read the line", "2 Count the words", "3 Print the sum"],
+    }
+    for fill, expected in starts.items():
+        paragraphs = [e.text for e in analyze(page_of(fill)).elements if e.kind is Kind.PARAGRAPH]
+        assert [p[: len(want)] for p, want in zip(paragraphs, expected, strict=False)] == expected
+        assert len(paragraphs) == len(expected), fill.__name__
+
+
+def test_a_reference_to_a_theorem_or_a_raised_digit_inside_a_sentence_goes_on():
+    def fill(page):
+        y = column(page, 100, LONG)
+        # lines that run to the right edge and end in the middle of a sentence
+        for first, rest in (
+            (
+                "The result follows from the argument of the second section and from",
+                "Theorem 1.1. It",
+            ),
+            ("The proof of the sharper bound in the third section compares it with", "14"),
+        ):
+            words = first.split()
+            while pymupdf.get_text_length(" ".join(words), fontname="helv", fontsize=BODY) < 456:
+                words.append("and")
+            page.insert_text((72, y), " ".join(words), fontsize=BODY, fontname="helv")
+            if rest[0].isdigit():
+                page.insert_text((72, y + 11), rest, fontsize=6, fontname="helv")
+                page.insert_text((82, y + 14), "C, which decays slowly.", fontsize=BODY)
+            else:
+                page.insert_text((72, y + 14), rest + " is sharp.", fontsize=BODY, fontname="helv")
+            y += 40
+
+    paragraphs = [e.text for e in analyze(page_of(fill)).elements if e.kind is Kind.PARAGRAPH]
+    assert len(paragraphs) == 3  # the poem paragraph, and two sentences of two lines each
+
+
+def test_the_numbers_in_the_margin_of_every_line_do_not_start_blocks():
+    def fill(page):
+        words = LONG.split()
+        for line in range(8):  # ragged lines, each with the next number set in the margin
+            y = 100 + 20 * line
+            start = (line * 5) % 12
+            page.insert_text((96, y), " ".join(words[start : start + 9 + line % 3]), fontsize=BODY)
+            page.insert_text((60, y), str(1 + line), fontsize=8)
+
+    paragraphs = [e.text for e in analyze(page_of(fill)).elements if e.kind is Kind.PARAGRAPH]
+    assert len(paragraphs) == 1
+
+
 # ------------------------------------------------------------------------- contents
 
 

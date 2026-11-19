@@ -58,6 +58,7 @@ from readablestem.web.review import (
     GROUP_KINDS,
     INVENTORY_KEY,
     MODEL_READ_KEY,
+    STRUCTURE_KEY,
     UNDO_ACTION,
     WITNESS_KEY,
     WRITE_KEY,
@@ -84,6 +85,9 @@ ACTION_WORDS = {
     "describe": "Described the image in words",
     "edit_text": "Changed the words of the text",
     "make_heading": "Made a heading of a paragraph",
+    "set_role": "Made a paragraph a sidebar or a quotation, or took that off",
+    "leave_out_block": "Left a paragraph out of the student file",
+    "restore_block": "Put a paragraph left out back into the student file",
     "add_figure": "Added a picture the tool missed, with the person's own alt text",
     "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
     "omit_page": "Left the page out of the student file and of the review",
@@ -114,6 +118,8 @@ MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, t
 CARRIED_EDIT_WORDS = {
     "text": "change to the words of the text",
     "heading": "paragraph made a heading",
+    "role": "paragraph made a sidebar or a quotation, or given back as neither",
+    "block_left_out": "paragraph left out of the student file",
     "picture": "picture added by hand",
     "equation": "equation marked by hand",
     "page_left_out": "page left out",
@@ -124,6 +130,9 @@ PAGE_CHANGES = frozenset(
     {
         "edit_text",
         "make_heading",
+        "set_role",
+        "leave_out_block",
+        "restore_block",
         "add_figure",
         "add_equation",
         "omit_page",
@@ -136,6 +145,9 @@ PAGE_CHANGES = frozenset(
 STRUCTURE_TOOL_HAD = {
     "edit_text": "Text as read from the PDF",
     "make_heading": "A paragraph",
+    "set_role": "A paragraph",
+    "leave_out_block": "A paragraph in the file",
+    "restore_block": "A paragraph left out",
     "add_figure": "Not found by the tool",
     "add_equation": "Not found by the tool",
     "omit_page": "A page of the file",
@@ -239,6 +251,9 @@ class Record:
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
     left_out_pages: list[int] = field(default_factory=list)  # 1-based
+    # Each paragraph left out, in reading order: its 1-based page and its words (the stored
+    # words, so they are here whichever way it was left out: by hand or carried over).
+    left_out_blocks: list[tuple[int, str]] = field(default_factory=list)
     # The file types downloaded so far, in words; None when the app is not recording
     # downloads (EVENTS_ENABLED off), so the record does not say "none" when it cannot know.
     downloaded: list[str] | None = None
@@ -283,7 +298,42 @@ def _decision_words(edit: Any) -> str:
         return WITNESS_WORDS
     if action == "carried" and after.get("carried_edit") in CARRIED_EDIT_WORDS:
         return f"Carried over from the earlier version: {CARRIED_EDIT_WORDS[after['carried_edit']]}"
+    if action in LEFT_OUT_ACTIONS:
+        words = _left_out_words(edit)
+        return f"{ACTION_WORDS[action]}: “{words}”" if words else ACTION_WORDS[action]
     return ACTION_WORDS.get(action, "Changed")
+
+
+# The record says which words were taken out of the student file, so a left-out paragraph never
+# disappears without a trace; this much of them (the stored words are whole).
+LEFT_OUT_ACTIONS = frozenset({"leave_out_block", "restore_block"})
+MAX_LEFT_OUT_CHARS = 400
+
+
+def _left_out_words(edit: Any) -> str:
+    """The words of the paragraph a `leave_out_block` or `restore_block` edit is about, from
+    the snapshot the edit kept of it."""
+    structure = (edit.before or {}).get(STRUCTURE_KEY)
+    structure = structure if isinstance(structure, dict) else {}
+    held = (structure.get("elements") or {}).get(edit.element_id)
+    if not isinstance(held, dict):
+        blocks = [b for b in structure.get("left_out") or [] if isinstance(b, dict)]
+        held = next(
+            (
+                b["element"]
+                for b in blocks
+                if isinstance(b.get("element"), dict) and b["element"].get("id") == edit.element_id
+            ),
+            None,
+        )
+    return _clipped((held or {}).get("text"))
+
+
+def _clipped(words: object) -> str:
+    text = " ".join(str(words or "").split())
+    if len(text) > MAX_LEFT_OUT_CHARS:
+        text = text[:MAX_LEFT_OUT_CHARS].rsplit(" ", 1)[0] + "…"
+    return text
 
 
 def _relabel_mark(edit: Any) -> dict[str, Any] | None:
@@ -346,6 +396,8 @@ def _item_ref(result: DocumentResult, review_url: str | None) -> Callable[[str, 
     that is not in the document any more (a page tool or a re-read took it out) is named with
     a note and no link."""
     pages = {e.id: e.page + 1 for e in result.elements}
+    # A paragraph left out is still listed on its page's tools, to put back.
+    pages |= {b.element.id: b.element.page + 1 for b in result.left_out_blocks}
     decided = {f.element_id for f in result.fixes if f.kind in GROUP_KINDS}
     held = {e.id for o in result.omitted for e in o.elements}
 
@@ -395,7 +447,7 @@ def not_checked_list(result: DocumentResult, summary: CheckedSummary) -> list[st
             "The file has the tool's proposals for them."
         )
     if summary.pictures:
-        out.append(checked_words.as_image_sentence(summary))
+        out.append(checked_words.not_converted_sentence(summary))
     out.extend(checked_words.record_not_reviewed(summary))
     for line in by_hand_not_checked(result):
         out.append(line)
@@ -465,6 +517,13 @@ def by_hand_not_checked(result: DocumentResult) -> list[str]:
             f"Page {pages} {'was' if len(result.omitted) == 1 else 'were'} left out by the "
             "person: not reviewed, and not in the student file."
         )
+    if result.left_out_blocks:
+        n = len(result.left_out_blocks)
+        lines.append(
+            f"{n} {'paragraph or list item was' if n == 1 else 'paragraphs or list items were'} "
+            "left out by the person: not reviewed, and not in the student file. The words are "
+            "in the summary of this record."
+        )
     return lines
 
 
@@ -505,6 +564,8 @@ def build(
             elements.setdefault(e.id, e)
         for f in held.fixes:
             fixes.setdefault(f.element_id, f)
+    for block in result.left_out_blocks:
+        elements.setdefault(block.element.id, block.element)
     labels = item_labels(result)
     ref = _item_ref(result, review_url)
     counts = job_page.breakdown(result.fixes, result.notices)
@@ -535,12 +596,13 @@ def build(
         )
     decisions.extend(_relabel_rows(relabeled, labels, who, file_who, owner, ref))
     decisions.sort(key=lambda d: d.when)
-    # The parts shown as pictures, as the summary counts them (an element with no fix too).
+    # The parts not converted (a picture, or an equation's LaTeX), as the summary counts them
+    # (an element with no fix too).
     images = [
         ImageRow(
             item=labels.get(p.element_id)
             or KIND_LABELS.get(elements[p.element_id].kind, p.kind.title()),
-            page=p.page,
+            page=p.page if summary.origin == "pdf" else None,  # a source has no pages
             why=explain_reason(fix.reason).text
             if (fix := fixes.get(p.element_id)) is not None and fix.reason
             else "",
@@ -586,6 +648,10 @@ def build(
         not_checked=not_checked_list(result, summary),
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
+        left_out_blocks=[
+            (b.element.page + 1, _clipped(b.element.text))
+            for b in sorted(result.left_out_blocks, key=lambda b: (b.element.page, b.element.order))
+        ],
         downloaded=(
             None
             if downloaded_formats is None
@@ -669,7 +735,9 @@ def to_csv(record: Record) -> str:
     # What people did, per decision (`core.triage.review_load`), the open ones first.
     for action, label in checked_words.ACTION_ROWS.items():
         row("summary", label, detail=s.load.actions[action])
-    row("summary", "Shown as pictures of the original", detail=s.pictures)
+    row("summary", "Shown as pictures of the original", detail=s.images)
+    if s.written:  # a Word or LaTeX source has no picture of an equation
+        row("summary", "Shown as LaTeX text, not converted", detail=s.written)
     row("summary", checked_words.READY_ALL, detail="Yes" if s.all_found_converted else "No")
     for name, n in record.by_hand.items():
         row("summary", name, detail=n)
@@ -682,6 +750,8 @@ def to_csv(record: Record) -> str:
     if record.left_out_pages:
         pages = " ".join(str(n) for n in record.left_out_pages)
         row("summary", "Pages left out of the student file", detail=pages)
+    for page, words in record.left_out_blocks:
+        row("summary", "Paragraph left out of the student file", page=page, detail=words)
     for title, text in record.gaps:
         row("summary", title, detail=text)
     for d in record.decisions:

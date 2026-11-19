@@ -9,7 +9,7 @@
  "client": "none",
  "profile": {
   "name": "production",
-  "sha256": "213535ac0803b65f153e0c81abfef42b3c9e26cdf742fe7299335b6eb7c7998c",
+  "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -17,8 +17,8 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.11",
- "commit": "f559fb0ab629e8397adcec1a43561e2c3b433871",
+ "pipeline_version": "0.5.13",
+ "commit": "3b177567bc222a402f17531b3c4d469d46c23606",
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
   "cores": 16
@@ -40,61 +40,60 @@
   "page_types": {
    "scan_ocr": 72,
    "scan_no_text": 60,
-   "born_digital": 601,
-   "vector_no_text": 4,
+   "born_digital": 604,
+   "vector_no_text": 3,
    "mixed_ink": 5,
-   "mixed_hidden_text": 3,
-   "blank": 2
+   "mixed_hidden_text": 3
   },
   "kinds": {
-   "scan": 157,
-   "table": 145,
-   "figure": 204,
-   "typical": 183,
-   "dense_math": 54,
+   "scan": 158,
+   "table": 176,
+   "figure": 179,
+   "typical": 181,
+   "dense_math": 49,
    "slide": 4
   },
-  "pages_that_asked_a_model": 603,
+  "pages_that_asked_a_model": 599,
   "requests_refused_by_step": {
-   "equation": 3038,
-   "figure": 1266,
-   "image_page": 132,
-   "table": 434
+   "equation": 2862,
+   "figure": 1172,
+   "image_page": 264,
+   "table": 530
   },
   "stopped_early": 0,
-  "seconds_median": 3.59
+  "seconds_median": 2.79
  },
  "metrics": {
   "multi_column": {
    "checks": 884,
-   "run": 705,
-   "passed": 485,
-   "score": 68.8,
-   "score_if_dropped_failed": 54.9,
+   "run": 708,
+   "passed": 490,
+   "score": 69.2,
+   "score_if_dropped_failed": 55.4,
    "dropped": {
-    "scan read from its picture (an OCR layer, if any, is not used)": 136,
+    "scan read from its picture (an OCR layer, if any, is not used)": 133,
     "scan with no text layer": 43
    },
-   "run_no_request": 204,
-   "score_no_request": 77.0,
+   "run_no_request": 216,
+   "score_no_request": 77.3,
    "pdfs": 231,
-   "pdfs_run": 185,
+   "pdfs_run": 186,
    "column": "MultCol"
   },
   "headers_footers": {
    "checks": 753,
-   "run": 636,
-   "passed": 207,
-   "score": 32.5,
-   "score_if_dropped_failed": 27.5,
+   "run": 632,
+   "passed": 218,
+   "score": 34.5,
+   "score_if_dropped_failed": 29.0,
    "dropped": {
-    "scan read from its picture (an OCR layer, if any, is not used)": 82,
+    "scan read from its picture (an OCR layer, if any, is not used)": 86,
     "scan with no text layer": 35
    },
-   "run_no_request": 206,
-   "score_no_request": 21.8,
+   "run_no_request": 218,
+   "score_no_request": 25.7,
    "pdfs": 266,
-   "pdfs_run": 228,
+   "pdfs_run": 227,
    "column": "Hdr/Ftr"
   },
   "long_tiny_text": {
@@ -116,14 +115,14 @@
   "table_tests": {
    "checks": 1020,
    "run": 857,
-   "passed": 444,
-   "score": 51.8,
-   "score_if_dropped_failed": 43.5,
+   "passed": 571,
+   "score": 66.6,
+   "score_if_dropped_failed": 56.0,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 89,
     "scan with no text layer": 74
    },
-   "run_no_request": 39,
+   "run_no_request": 38,
    "score_no_request": 0.0,
    "pdfs": 188,
    "pdfs_run": 160,
@@ -132,15 +131,15 @@
   "baseline": {
    "checks": 747,
    "run": 586,
-   "passed": 580,
-   "score": 99.0,
-   "score_if_dropped_failed": 77.6,
+   "passed": 586,
+   "score": 100.0,
+   "score_if_dropped_failed": 78.4,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 101,
     "scan with no text layer": 60
    },
-   "run_no_request": 142,
-   "score_no_request": 97.9,
+   "run_no_request": 147,
+   "score_no_request": 100.0,
    "pdfs": 747,
    "pdfs_run": 586,
    "column": "Base"

@@ -247,6 +247,47 @@ def test_extension_stops_before_running_text_and_captions():
     assert box is not None and judgement.bbox[3] == pytest.approx(box[3], abs=2.0)
 
 
+def test_a_numbered_question_beside_a_grid_is_not_a_row_of_it():
+    terms = [
+        ("Osmosis", "Movement of water"),
+        ("Diffusion", "Spreading of particles"),
+        ("Active transport", "Movement using energy"),
+        ("Mitosis", "Division of a cell"),
+    ]
+
+    def rows(page, y0: float) -> None:
+        for i, (term, meaning) in enumerate(terms):
+            write(page, 82, y0 + 15 * i, f"___ {i + 1}. {term}")
+            write(page, 230, y0 + 15 * i, "ABCD"[i] + ". " + meaning)
+
+    def question_below(page):  # the grid, then item 8 with its answer space
+        write(page, 64, 100, "7. Match each term with its definition.")
+        rows(page, 120)
+        write(page, 64, 192, "8. Explain why cells are small.")
+        write(page, 500, 192, "(4 points)")
+        page.draw_rect(pymupdf.Rect(82, 210, 380, 258), width=0.75)
+        write(page, 64, 280, "9. Name the stages of mitosis.")
+
+    def question_above(page):  # item 7 with its points over the grid, then item 8
+        write(page, 64, 80, "6. Name the gases in air.")
+        write(page, 64, 105, "7. Match each term with its definition.")
+        write(page, 500, 105, "(4 points)")
+        rows(page, 123)
+        write(page, 64, 205, "8. Explain why cells are small.")
+
+    # What stays out of the table, and what the table keeps (the rows alone are too few lines
+    # to be a table of their own, but with the question over them taken out they are four).
+    for fill, question, kept in (
+        (question_below, "Explain", ""),
+        (question_above, "Match each", "Osmosis"),
+    ):
+        for region_tree in (False, True):
+            elements = analyze(pdf(fill), region_tree=region_tree).elements
+            in_table = " ".join((e.text or "") for e in elements if e.kind == Kind.TABLE)
+            assert question not in in_table and kept in in_table
+            assert any(e.kind == Kind.LIST_ITEM and question in (e.text or "") for e in elements)
+
+
 # ---------------------------------------------------------------- structure and fill
 
 

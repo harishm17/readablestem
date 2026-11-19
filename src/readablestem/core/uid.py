@@ -151,9 +151,11 @@ def is_uid(ref: str) -> bool:
 
 
 def _all_elements(result: DocumentResult) -> list[Element]:
-    """The result's elements with those of the pages left out (`DocumentResult.omitted`):
-    leaving a page out and putting it back renames nothing."""
+    """The result's elements with those of the pages left out (`DocumentResult.omitted`) and
+    the paragraphs left out (`left_out_blocks`): leaving one out and putting it back renames
+    nothing."""
     held = [e for page in result.omitted for e in page.elements]
+    held += [b.element for b in result.left_out_blocks]
     return sorted([*result.elements, *held], key=lambda e: (e.page, e.order))
 
 

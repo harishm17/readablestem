@@ -65,7 +65,7 @@ def test_matrices_read_with_their_size(latex, expected):
         ),
         (
             r"|x| = \begin{cases} x & \text{if } x \geq 0 \\ -x & \text{if } x < 0 \end{cases}",
-            "vertical bar x vertical bar equals cases: case 1: x, if x greater than or equal "
+            "the absolute value of x equals cases: case 1: x, if x greater than or equal "
             "to 0; case 2: minus x, if x less than 0; end cases",
         ),
     ],
@@ -111,7 +111,7 @@ def test_nuclide_notation_reads_as_the_element(latex, expected):
         (r"50\,\text{Hz}", "50 hertz"),
         (r"300\,\text{K}", "300 kelvin"),
         (r"101\,\text{kPa}", "101 kilopascals"),
-        (r"3\times10^8\,\text{m/s}", "3 times 10 to the power 8 meters per second"),
+        (r"3\times10^8\,\text{m/s}", "3 times 10 to the power 8 end power meters per second"),
         (r"5\,\mathrm{J/(kg\cdot K)}", "5 joules per kilogram kelvin"),
         (r"25^\circ\mathrm{C}", "25 degrees Celsius"),
         (r"25\,\text{°C}", "25 degrees Celsius"),

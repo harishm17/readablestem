@@ -2021,7 +2021,55 @@ def _without_captions(view: _PageView, box: BBox) -> BBox:
     while bottom > top + 1 and numbered(bottom) and bottoms[bottom] <= y1 + 1:
         bottom -= 1
         y1 = min(y1, (bottoms[bottom] + tops[bottom + 1]) / 2)
+    # A numbered question that goes on the page's own run ("8. Explain ...  (4 points)" under
+    # the rows of question 7): the box was cut at the rows' end by a text block, or by the
+    # detector, and took the next item in as a row.
+    items = [_item_number(text, line) for text, line in zip(texts, lines, strict=True)]
+    for at_bottom in (True, False):
+        i = bottom if at_bottom else top
+        item = items[i]
+        if bottom - top < 2 or item is None:
+            continue
+        number, left = item
+        if any(
+            other is not None and abs(other[1] - left) <= ALIGN_TOL
+            for k, other in enumerate(items)
+            if k != i
+        ):
+            continue  # numbered rows at that edge: the table's own run
+        beside = _item_beside(view, (x0, y0, x1, y1), above=at_bottom)
+        if beside and abs(beside[1] - left) <= ALIGN_TOL:
+            if at_bottom and beside[0] == number - 1:
+                bottom -= 1
+                y1 = min(y1, (bottoms[bottom] + tops[bottom + 1]) / 2)
+            elif not at_bottom and beside[0] == number + 1:
+                top += 1
+                y0 = max(y0, (bottoms[top - 1] + tops[top]) / 2)
     return (x0, y0, x1, y1)
+
+
+_ITEM_NUMBER = re.compile(r"^\(?(\d{1,3})[.)]\s")
+
+
+def _item_number(text: str, chars: Sequence[GlyphLike]) -> tuple[int, float] | None:
+    """The number a line opens with as a list item ("8. Explain") and its left edge."""
+    found = _ITEM_NUMBER.match(text)
+    ink = [c.x0 for c in chars if not c.blank]
+    return (int(found.group(1)), min(ink)) if found and ink else None
+
+
+def _item_beside(view: _PageView, box: BBox, *, above: bool) -> tuple[int, float] | None:
+    """The item number of the line of the page just above (or below) the box, within
+    `CAPTION_MAX_GAP` and across some of its width, with its left edge."""
+    nearest: tuple[float, LineLike] | None = None
+    for line in view.lines:
+        lx0, ly0, lx1, ly1 = line.bbox
+        if line.vertical or min(lx1, box[2]) - max(lx0, box[0]) <= 0:
+            continue
+        gap = box[1] - ly1 if above else ly0 - box[3]
+        if -1 <= gap <= CAPTION_MAX_GAP and (nearest is None or gap < nearest[0]):
+            nearest = (gap, line)
+    return _item_number(_line_text(nearest[1]).strip(), nearest[1].chars) if nearest else None
 
 
 def _median_size(view: _PageView, box: BBox) -> float:

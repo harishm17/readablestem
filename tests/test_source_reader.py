@@ -520,7 +520,7 @@ def word(body: str, rels: str = "") -> bytes:
     )
     named = "".join(
         f'<w:style w:type="paragraph" w:styleId="{i}"><w:name w:val="{n}"/></w:style>'
-        for i, n in (("Title", "Title"), ("ListParagraph", "List Paragraph"))
+        for i, n in (("Title", "Title"), ("ListParagraph", "List Paragraph"), ("Quote", "Quote"))
     )
     styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + "</w:styles>")
     W = office.W_NS
@@ -579,6 +579,13 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
         )
         + _cells("Name|Value", "g|9.8", marked=True)
         + _cells("Name|Value", "c|3.0", marked=False)
+        # a cell whose formula the checks refuse (`\phantom` is not a command they allow)
+        + _cells("Name|Law", "first|PHANT", marked=True).replace(
+            "<w:r><w:t>PHANT</w:t></w:r>",
+            "<m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant></m:oMath>",
+        )
+        + '<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>'
+        + "<w:r><w:t>Words of another.</w:t></w:r></w:p>"
     )
     reading = read_word(word(body))
     assert kinds(reading) == [
@@ -590,6 +597,8 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
         "list_item",
         "table",
         "table",
+        "table",
+        "paragraph",
     ]
     assert reading.title == "Kinematics notes" and reading.unread_words == 0
     text = " ".join(e.text or "" for e in reading.elements)
@@ -600,7 +609,8 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
     assert "frac" in fix.equation.latex and "<mfrac" in (fix.equation.mathml or "")
     items = reading.elements[4:6]  # a list item keeps its words under a styled paragraph
     assert [(i.text, i.list_marker) for i in items] == [("First step", "1."), ("Second step", "2.")]
-    first, second = reading.elements[6:]
+    first, second, unread, quoted = reading.elements[6:]
+    assert quoted.role == "quote" and reading.elements[2].role is None  # Word's Quote style
     # the author's header row is exact; the first-row look pandoc reads as a header is only a
     # proposal, and says so in a check
     assert first.table is not None and first.table.header_rows == 1
@@ -608,6 +618,12 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
     assert docx_reader.HEADER_CHECK not in flagged[first.id]
     assert docx_reader.HEADER_CHECK in flagged[second.id]
     assert {n.code for n in reading.notices} >= {"word_hidden_text"}
+    # a formula in a cell the checks refuse stays in the cell as TeX, so the table is a
+    # required decision for the owner, as a LaTeX source's table is (and a heading's here)
+    held = reading.fixes[unread.id]
+    assert (held.status, held.review) == (Status.NEEDS_REVIEW, "required")
+    assert any(c.code == docx_reader.FORMULA_UNREAD for c in held.checks if not c.passed)
+    assert unread.table is not None and "\\phantom" in unread.table.cells[-1].text
 
 
 @needs_pandoc

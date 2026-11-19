@@ -228,6 +228,7 @@ class _Reader:
         self.done: set[int] = set()
         self.skipped: set[int] = set()
         self.loose: list[Node] = []
+        self.in_verse = False  # inside `\\begin{verse}`: its line ends are kept (a "break" run)
         self.pictured: set[str] = set()  # figure elements made from a picture
         # LaTeXML's id of a node -> the element it became (or the first one made inside it), and
         # the links of the file to such an id (`\ref`, `\eqref`, `\cite`, a contents entry):
@@ -394,6 +395,25 @@ class _Reader:
         if "ltx_authors" in classes:
             self._authors(node)
             return True
+        if tag == "blockquote" and "ltx_quote" in classes:
+            # \begin{quote} and \begin{quotation}: the plain paragraphs in it are a block quotation
+            # (verse, which LaTeXML marks `ltx_role_verse`, stays as it was read)
+            first = len(self.out.elements)
+            verse = "ltx_role_verse" in classes
+            kept, self.in_verse = self.in_verse, verse or self.in_verse
+            try:
+                self._walk_children(node, depth)
+            finally:
+                self.in_verse = kept
+            if not verse:
+                for element in self.out.elements[first:]:
+                    if (
+                        element.kind is Kind.PARAGRAPH
+                        and not element.preformatted
+                        and element.term_end is None
+                    ):
+                        element.role = "quote"
+            return False
         if tag in ("span", "a", "em", "strong", "b", "i") and not _children_blocks(node):
             # loose inline text directly inside a container: a paragraph of its own, whose
             # formulas are equations like any paragraph's
@@ -557,9 +577,34 @@ class _Reader:
         length = [0]
         self.read.add(id(node))
 
+        after_break = [False]  # a kept line end was just written: no space follows it
+
         def emit(text: str) -> None:
+            if after_break[0]:
+                text = text.lstrip(" ")
+                if not text:
+                    return
+                after_break[0] = False
             parts.append(text)
             length[0] += len(text)
+
+        def line_end() -> None:
+            """The end of a line LaTeX broke (`\\\\`): a space, which in a verse is also a kept line
+            end (`Run` "break", as the PDF reader's), never beside another space."""
+            if not self.in_verse:
+                emit(" ")
+                return
+            while parts and not parts[-1].strip(" "):
+                length[0] -= len(parts.pop())
+            if parts and parts[-1].endswith(" "):
+                trimmed = parts[-1].rstrip(" ")
+                length[0] -= len(parts[-1]) - len(trimmed)
+                parts[-1] = trimmed
+            if not parts:
+                return  # a break before any words ends no line
+            spans.append(("break", length[0], length[0] + 1, None))
+            emit(" ")
+            after_break[0] = True
 
         def visit(item: Node, depth: int) -> None:
             if depth > MAX_DEPTH:
@@ -590,7 +635,7 @@ class _Reader:
                         if "ltx_ERROR" in _classes(inner):
                             self._mark(inner)
             elif tag == "br":
-                emit(" ")
+                line_end()
             elif "ltx_ERROR" in classes:
                 self.errors += 1
                 self._mark(item, owner)
@@ -665,6 +710,8 @@ class _Reader:
                     inline.add(element, ScriptRun(start=start, end=end, kind=kind))
                 elif kind == "deleted":
                     inline.add(element, Run(start=start, end=end, kind="deleted"))
+                elif kind == "break":
+                    inline.add(element, Run(start=start, end=end, kind="break"))
                 elif kind == "colour":
                     _add_colour(element, start, end, extra)
             except ValueError:

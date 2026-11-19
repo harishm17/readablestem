@@ -42,7 +42,14 @@ from readablestem.pipeline.layout.inline_runs import (
     _script_glyphs,
     _script_kinds,
 )
-from readablestem.pipeline.layout.lists import _ROMAN, _ordered_marker, marker_readings
+from readablestem.pipeline.layout.lists import (
+    _ROMAN,
+    MARKER_ALIGN,
+    MAX_MARKER_GAP,
+    _ordered_marker,
+    lead_blank,
+    marker_readings,
+)
 from readablestem.pipeline.layout.rows import _join_rows
 from readablestem.pipeline.layout.shared import (
     _MATH_WORDS,
@@ -54,7 +61,6 @@ from readablestem.pipeline.layout.shared import (
     _Context,
     _Figure,
     _Inline,
-    _lead_end,
     _Marker,
     _Row,
     _Run,
@@ -290,20 +296,6 @@ HANGING_ENTRIES = 3  # entries in a row that make a hanging indent a list of ent
 HANGING_REACH = (1.0, 4.0)  # em: how far right of an entry's first line its other lines start
 LEAD_ENTRIES = 3  # paragraphs in a row that start with a lead term, to make a list of entries
 LETTER_SEQUENCE = 3  # letters in a row that make capitals alone on a line the sections of an index
-
-
-def _starts_entry(prev: _Row, row: _Row, run: _Run, edges: _RightEdges) -> bool:
-    """Does `row` start an entry of a glossary or a list of terms: a lead term (`_lead_end`)
-    at the left edge of the paragraph `run`, after a line that does not end in that style. (An
-    italic title that starts a line inside an entry of a bibliography is indented with it; an
-    italic "et al." after a line that runs full and stops mid-sentence is part of it.)"""
-    found = _lead_end(row)
-    if found is None or row.marker is not None or row.x0 > run.box[0] + 0.5 * row.size:
-        return False
-    if prev.clean[-1:] not in '.:;?!)”"' and prev.x1 >= edges.of(prev) - 1.5 * prev.size:
-        return False
-    last = next((c for c in reversed(prev.chars) if not c.blank), None)
-    return last is not None and not found[1](last)
 
 
 def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
@@ -955,8 +947,6 @@ ALGORITHM_MAX_DEPTH = 12
 
 
 _ABSTRACT_LABEL = re.compile(r"abstract[.:]?", re.IGNORECASE)
-# The line that opens an abstract's keywords ("Keywords:", "Key words -", "Index Terms -").
-_KEYWORDS_LINE = re.compile(r"(?:key\s?words?|index\s+terms)\s*[:–—-]", re.IGNORECASE)  # noqa: RUF001
 ABSTRACT_CENTRE = 1.0  # em: how far from the middle of its column a centered label may be
 
 
@@ -1076,6 +1066,440 @@ def _later_labels(rows: Sequence[_Row]) -> list[tuple[int, int]]:
     return found
 
 
+POINTS_LABEL = re.compile(
+    r"^[(\[]\s*\d+(?:[.,]\d+)?\s*(?:points?|pts?\.?|marks?)\s*[)\]]$", re.IGNORECASE
+)
+OPTION_QUESTION_LINES = 12  # the most lines of a question's text that an option grid can follow
+OPTION_WRAP_REACH = 1.6  # x the line pitch: the most a wrapped line of an option is below the last
+
+
+def _points_label(row: _Row, prev: _Row) -> bool:
+    """A label like "(2 points)" set at the right margin on the baseline of `prev`, the line it
+    scores: the gap is too wide for `_merge_baselines`, so it arrives as a row of its own."""
+    return (
+        row.kind == "text"
+        and row.marker is None
+        and POINTS_LABEL.match(row.clean) is not None
+        and prev.kind == "text"
+        and not prev.vertical
+        and abs(row.baseline - prev.baseline) <= 0.3 * max(row.size, prev.size)
+        and row.x0 >= prev.x1
+    )
+
+
+@dataclass(eq=False)
+class _OptionCell:
+    """One option of a grid: its label row and the wrapped lines under it."""
+
+    rows: list[_Row]
+    form: str
+    readings: tuple[tuple[str, int], ...]
+
+    @property
+    def x(self) -> float:
+        return self.rows[0].x0
+
+
+def _option_label(row: _Row) -> tuple[str, tuple[tuple[str, int], ...]] | None:
+    """(form, readings) of the label a row starts with ("(B)", "C.", "3)"), None when it
+    starts with no ordered marker followed closely by its text."""
+    tokens = _tokens(row)
+    if len(tokens) < 2:
+        return None
+    (start, end), (text_start, _) = tokens[0], tokens[1]
+    parsed = _ordered_marker("".join(c.c for c in row.chars[start:end]))
+    if (
+        parsed is None
+        or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size
+    ):
+        return None
+    readings = marker_readings(parsed[1])
+    return (parsed[0], readings) if readings else None
+
+
+def _option_row(row: _Row) -> bool:
+    """A row that is plain text, with no part in another rule's block."""
+    return (
+        row.kind == "text"
+        and row.region is None
+        and not (
+            row.vertical
+            or row.diagonal
+            or row.absorbed
+            or row.note
+            or row.letter
+            or row.contents_level
+            or row.exercise_number
+            or row.case_row
+        )
+    )
+
+
+def _stray_label(row: _Row, form: str) -> bool:
+    """Does the row hold a label of `form` set apart in its middle, which no cut took out
+    ("(C) seven metres   (E) nine metres": the labels are not in sequence)?"""
+    tokens = _tokens(row)
+    for k in range(1, len(tokens) - 1):
+        parsed = _ordered_marker("".join(c.c for c in row.chars[slice(*tokens[k])]))
+        gap = row.chars[tokens[k][0]].x0 - row.chars[tokens[k - 1][1] - 1].x1
+        if parsed is not None and parsed[0] == form and gap >= OPTION_GAP * row.size:
+            return True
+    return False
+
+
+def _runs_on(piece: _Row) -> bool:
+    """Does the piece end the way a clause of a sentence does ("(c) X," "(d) Y, and")? Labels
+    cut out of a line like that list things in prose; they are not options."""
+    words = piece.clean.split()
+    return bool(words) and (words[-1].endswith((",", ";")) or words[-1].lower() in {"and", "or"})
+
+
+def _asks(
+    rows: list[_Row], start: int, opening: tuple[str, tuple[tuple[str, int], ...]], ctx: _Context
+) -> bool:
+    """Does the grid at `rows[start]` follow a question: a line that asks or introduces
+    ("...?", "...:"), or the lines of a list item of another marker family ("4." over "A.")
+    that run on to the grid? Subfigure captions "(a) ... (b) ...", runs of numbered blanks and
+    the like follow neither, so they are not options. A grid of capital letters with nothing
+    above it in its column carries on a question from the page or column before."""
+    form, readings = opening
+    below = rows[start]
+    if not any(row.column == below.column for row in rows[:start]):
+        return ("upper-alpha", 1) in readings
+    for row in reversed(rows[max(0, start - OPTION_QUESTION_LINES) : start]):
+        pitch = below.baseline - row.baseline
+        limit = max(OPTION_WRAP_REACH * ctx.pitch * below.size / ctx.body, 1.25 * below.size)
+        same_line = abs(pitch) <= 0.3 * below.size  # the points label at the right margin
+        if row.column != below.column or not (same_line or 0 < pitch <= limit):
+            return False
+        if row.marker is not None:
+            parsed = _ordered_marker(row.marker.text)
+            return parsed is None or parsed[0] != form
+        if row.kind != "text":
+            return False
+        if not same_line:
+            if row.clean.rstrip().endswith(("?", ":")):
+                return True
+            below = row
+    return False
+
+
+def _option_pieces(row: _Row, *, document: _Document) -> list[_Row]:
+    """The row cut at each later option label (`_later_labels`): one row per option, each text.
+    [row] when it holds one label, or when a piece would not be text."""
+    cuts = [start for _, start in _later_labels([row])]
+    if not cuts:
+        return [row]
+    pieces = []
+    for begin, end in pairwise([0, *cuts, len(row.chars)]):
+        chars = row.chars[begin:end]
+        while chars and chars[-1].blank:
+            chars = chars[:-1]
+        piece = _Row(chars, column=row.column)
+        _classify_row(piece, document=document)
+        if piece.kind != "text" or _option_label(piece) is None:
+            return [row]
+        pieces.append(piece)
+    return pieces
+
+
+def _option_column(cells: list[_OptionCell], row: _Row) -> list[_OptionCell] | None:
+    """The cells of the grid column a line without a label of its own belongs under: it starts
+    at the column's left edge or inside it, and stops before the next column."""
+    xs = sorted({round(c.x) for c in cells})
+    at = [x for x in xs if x <= row.x0 + MARKER_ALIGN]
+    if not at:
+        return None
+    after = [x for x in xs if x > at[-1]]
+    if after and row.x1 > after[0] + MARKER_ALIGN:
+        return None
+    return [c for c in cells if round(c.x) == at[-1]]
+
+
+def _option_grids(
+    rows: list[_Row], ctx: _Context, skip: dict[int, int], *, document: _Document
+) -> list[_Row]:
+    """Options set side by side are read as one list in label order: (A) (B) / (C) (D) and
+    (A) (C) / (B) (D) both come out A B C D, each option with the lines it wraps onto.
+
+    A grid starts at a row with an option label and takes the rows after it that start with
+    a label of the same form (a row holding several labels set apart is cut at each: reading
+    order merged the options of a line, RC-18) or are lines wrapped under one of its columns.
+    It is a grid when its labels are a full run of letters or numbers and at least one line
+    holds two options. Each option then gets the marker of a list item, flagged `option`
+    (`_list_levels`: one list below the question, whatever the x of its column). Any other
+    row stays as it is, and so does any other block that holds a later label
+    (`_flag_text`)."""
+    out: list[_Row] = []
+    i = 0
+    while i < len(rows):
+        found = _option_grid(rows, i, ctx, skip, document=document) or _matching_series(
+            rows, i, ctx, skip, document=document
+        )
+        if found is None:
+            out.append(rows[i])
+            i += 1
+        else:
+            used, ordered = found
+            out += ordered
+            i += used
+    return out
+
+
+def _option_grid(
+    rows: list[_Row], start: int, ctx: _Context, skip: dict[int, int], *, document: _Document
+) -> tuple[int, list[_Row]] | None:
+    first = rows[start]
+    opening = _option_label(first)
+    if id(first) in skip or not _option_row(first) or opening is None:
+        return None
+    form = opening[0]
+    if not _asks(rows, start, opening, ctx):
+        return None
+    cells: list[_OptionCell] = []
+    at = start
+    while at < len(rows):
+        row = rows[at]
+        if id(row) in skip or not _option_row(row):
+            break
+        label = _option_label(row)
+        if label is not None and label[0] == form:
+            pieces = _option_pieces(row, document=document)
+            if any(_runs_on(piece) for piece in pieces[:-1]):
+                return None
+            for piece in pieces:
+                piece_label = _option_label(piece)
+                if piece_label is None or _stray_label(piece, form):
+                    return None
+                cells.append(_OptionCell([piece], piece_label[0], piece_label[1]))
+        elif label is None and row.marker is None:
+            column = _option_column(cells, row)
+            if column is None:
+                break
+            cell = max(column, key=lambda c: c.rows[-1].baseline)
+            above = cell.rows[-1]
+            pitch = row.baseline - above.baseline
+            limit = max(OPTION_WRAP_REACH * ctx.pitch * row.size / ctx.body, 1.25 * row.size)
+            if abs(row.size - above.size) > max(1.0, 0.12 * row.size) or not (
+                0.5 * row.size <= pitch <= limit
+            ):
+                break
+            cell.rows.append(row)
+        else:
+            break
+        at += 1
+    if not _full_sequence(cells) or not _side_by_side(cells):
+        return None
+    ordered: list[_Row] = []
+    for place, cell in enumerate(sorted(cells, key=lambda c: _value(c))):
+        label_row = cell.rows[0]
+        text_start = _tokens(label_row)[1][0]
+        label_text = "".join(c.c for c in label_row.chars[slice(*_tokens(label_row)[0])])
+        label_row.marker = _Marker(
+            label_text, True, text_start, label_row.chars[text_start].x0, (id(first), place)
+        )
+        ordered += cell.rows
+    return at - start, ordered
+
+
+def _series_label(
+    row: _Row, tokens: list[tuple[int, int]], k: int
+) -> tuple[int, int, str, str, tuple[tuple[str, int], ...]] | None:
+    """The label that starts at token `k` of the row, after a blank to fill in if the token is
+    one: (index of its first character, index where the text after it starts, its text, its
+    form, its readings), None when the tokens there are no label with a word after it."""
+    if lead_blank(row, tokens[k:]):
+        k += 1
+    if k + 1 >= len(tokens):
+        return None
+    (start, end), (text_start, _) = tokens[k], tokens[k + 1]
+    text = "".join(c.c for c in row.chars[start:end])
+    parsed = _ordered_marker(text)
+    if (
+        parsed is None
+        or row.chars[text_start].x0 - row.chars[end - 1].x1 > MAX_MARKER_GAP * row.size
+    ):
+        return None
+    readings = marker_readings(parsed[1])
+    return (start, text_start, text, parsed[0], readings) if readings else None
+
+
+def _series_pieces(row: _Row, *, document: _Document) -> list[_Row] | None:
+    """The row cut where a label stands set apart from the text before it, one row per piece,
+    each starting with a label: a line that holds two series side by side ("___ 3. Active
+    transport  C. Movement ..."). [row] when it starts with a label and holds no other, None
+    when it does not start with one or a piece would not be text."""
+    tokens = _tokens(row)
+    starts = []
+    for k in range(len(tokens)):
+        at = tokens[k][0]
+        if _series_label(row, tokens, k) is None or (
+            starts and tokens[k][0] <= tokens[starts[-1]][1]
+        ):
+            continue
+        if k and row.chars[at].x0 - row.chars[tokens[k - 1][1] - 1].x1 < OPTION_GAP * row.size:
+            continue
+        starts.append(k)
+    if not starts or starts[0] != 0:
+        return None
+    if len(starts) == 1:
+        return [row]
+    pieces = []
+    bounds = [tokens[k][0] for k in starts]
+    for begin, end in pairwise([*bounds, len(row.chars)]):
+        chars = row.chars[begin:end]
+        while chars and chars[-1].blank:
+            chars = chars[:-1]
+        piece = _Row(chars, column=row.column)
+        _classify_row(piece, document=document)
+        if piece.kind != "text" or _series_label(piece, _tokens(piece), 0) is None:
+            return None
+        pieces.append(piece)
+    return pieces
+
+
+def _matching_series(
+    rows: list[_Row], start: int, ctx: _Context, skip: dict[int, int], *, document: _Document
+) -> tuple[int, list[_Row]] | None:
+    """Two series of labels set side by side are read column by column, one list each: the
+    terms "___ 1. ... ___ 2. ..." beside the definitions "A. ... B. ..." of a matching exercise
+    read row by row ran the two together. It is a matching exercise when the labels of each
+    series are a full run (1, 2, 3 and A, B, C), the two are not of one style, each series
+    stands at an edge of its own in one column, and two labels share a line. The options of the
+    two lists are set a level below the question above, like those of a grid of options
+    (`_list_levels`)."""
+    first = rows[start]
+    if (
+        id(first) in skip
+        or not _option_row(first)
+        or _series_pieces(first, document=document) is None
+    ):
+        return None
+    cells: list[_OptionCell] = []
+    edges: list[float] = []  # the left edges of the series
+    at = start
+    while at < len(rows):
+        row = rows[at]
+        if id(row) in skip or not _option_row(row) or row.column != first.column:
+            break
+        pieces = _series_pieces(row, document=document)
+        if pieces is not None:
+            fresh: list[float] = []
+            for piece in pieces:
+                if not any(abs(piece.x0 - e) <= MARKER_ALIGN for e in (*edges, *fresh)):
+                    fresh.append(piece.x0)
+            if len(edges) + len(fresh) > 2:
+                if len(pieces) > 1:
+                    return None
+                break  # a third edge: the next question's number, not a series
+            edges += fresh
+            for piece in pieces:
+                label = _series_label(piece, _tokens(piece), 0)
+                assert label is not None
+                cells.append(_OptionCell([piece], label[3], label[4]))
+        elif row.marker is None and cells:
+            column = _option_column(cells, row)
+            if column is None:
+                break
+            cell = max(column, key=lambda c: c.rows[-1].baseline)
+            above = cell.rows[-1]
+            pitch = row.baseline - above.baseline
+            limit = max(OPTION_WRAP_REACH * ctx.pitch * row.size / ctx.body, 1.25 * row.size)
+            if abs(row.size - above.size) > max(1.0, 0.12 * row.size) or not (
+                0.5 * row.size <= pitch <= limit
+            ):
+                break
+            cell.rows.append(row)
+        else:
+            break
+        at += 1
+    if len(edges) != 2:
+        return None
+    series = [[c for c in cells if abs(c.x - edge) <= MARKER_ALIGN] for edge in edges]
+    if not all(_full_sequence(part) for part in series) or not _side_by_side(cells):
+        return None
+    if series[0][0].readings[0][0] == series[1][0].readings[0][0]:
+        return None
+    ordered: list[_Row] = []
+    place = 0
+    for part in series:
+        for cell in sorted(part, key=_value):
+            label_row = cell.rows[0]
+            label_start, text_start, text, _, _ = _series_label(
+                label_row, _tokens(label_row), 0
+            ) or (0, 0, "", "", ())
+            label_row.marker = _Marker(
+                text,
+                True,
+                text_start,
+                label_row.chars[text_start].x0,
+                (id(first), place),
+                start=label_start,
+            )
+            ordered += cell.rows
+            place += 1
+    return at - start, ordered
+
+
+def _option_place(block: _Block) -> tuple[int, int] | None:
+    """(grid, place in label order) of an option block, None for any other block."""
+    return block.marker.option if block.marker is not None else None
+
+
+def _option_order(blocks: list[_Block]) -> list[_Block]:
+    """The options of a grid next to each other in the reading order of the page's blocks, which
+    follows their boxes (A, C / B, D), are put back in label order (`_option_grids`)."""
+    out: list[_Block] = []
+    at = 0
+    while at < len(blocks):
+        place = _option_place(blocks[at])
+        end = at + 1
+        if place is None:
+            out.append(blocks[at])
+        else:
+            while (
+                end < len(blocks) and (other := _option_place(blocks[end])) and other[0] == place[0]
+            ):
+                end += 1
+            out += sorted(blocks[at:end], key=lambda b: (_option_place(b) or place)[1])
+        at = end
+    return out
+
+
+def _value(cell: _OptionCell) -> int:
+    return cell.readings[0][1]
+
+
+def _full_sequence(cells: list[_OptionCell]) -> bool:
+    """Do the labels count up from the first one by one, each once, in one style ("A".."D",
+    "1".."4")? A run that starts later ("B".."D": the "A" is set in the prose above) is not
+    a full sequence."""
+    if len(cells) < 2:
+        return False
+    for style in sorted({s for s, _ in cells[0].readings}):
+        values = []
+        for cell in cells:
+            found = [v for s, v in cell.readings if s == style]
+            if not found:
+                break
+            values.append(found[0])
+        else:
+            if sorted(values) == list(range(1, len(values) + 1)):
+                for cell in cells:
+                    cell.readings = tuple((s, v) for s, v in cell.readings if s == style)
+                return True
+    return False
+
+
+def _side_by_side(cells: list[_OptionCell]) -> bool:
+    """Do two options of the grid share a line?"""
+    return any(
+        abs(a.rows[0].baseline - b.rows[0].baseline) <= 0.3 * a.rows[0].size
+        and abs(a.x - b.x) > MARKER_ALIGN
+        for a, b in pairwise(sorted(cells, key=lambda c: (round(c.rows[0].baseline), c.x)))
+    )
+
+
 def _split_options(runs: list[_Run], *, document: _Document) -> list[_Run]:
     """A line of options that reading order merged ("(A) 3 m (B) 5 m (C) 7 m") is cut at each
     later label into one run per option, the first keeping its list marker and the others
@@ -1138,12 +1562,17 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
     code = _code_groups(rows)
     steps = {k: v for k, v in _algorithm_groups(rows).items() if k not in code}
     code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
+    rows = _option_grids(rows, ctx, code, document=document)
+    scored: dict[int, list[_Row]] = {}  # a points label, by the run of the line it scores
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
     for row in rows:
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
+            if run.kind == "text" and not (run.code or run.contents) and _points_label(row, prev):
+                scored.setdefault(id(run), []).append(row)  # joins its text at the end below
+                continue
             if row.note:  # a footnote the file names: a block of its own, text whatever it holds
                 row.kind, row.region = "text", None
                 run.block_end = True
@@ -1198,20 +1627,16 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
-            # A lead term, or the "Keywords:" line under an abstract: its own entry.
-            led = geometric and (
-                _starts_entry(prev, row, run, edges) or _KEYWORDS_LINE.match(row.clean) is not None
-            )
-            if geometric and not led and _same_style(prev, row, ctx):
+            if geometric and _same_style(prev, row, ctx):
                 run.add(row)
                 continue
-            run.block_end = not geometric or led
+            run.block_end = not geometric
             ends_sentence = prev.clean[-1:] in ".:?!"
             short = row.x1 < run.box[2] - 3 * row.size
             # Two bold lines that differ in size or typeface are two headings (or labels),
             # not a heading and the paragraph it leads: the second one starts a block.
             restyled = geometric and prev.bold and row.bold
-            starts = not geometric or restyled or led or (ends_sentence and short)
+            starts = not geometric or restyled or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
             if row.note:
@@ -1227,6 +1652,9 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                     note=bool(row.note),
                 )
             )
+    for run in runs:
+        for label in scored.get(id(run), ()):
+            run.add(label)
     return runs
 
 
@@ -1556,14 +1984,20 @@ def _unspaced(c: str) -> bool:
 
 
 def _merge_style_splits(blocks: list[_Block], runs: list[_Run]) -> list[_Block]:
-    """Re-join paragraphs that were split only by a bold line that did not become a heading."""
+    """Re-join a paragraph or list item and the lines that a change of style cut off it (a bold
+    line that did not become a heading: the bold phrase "instruction in order" that goes on
+    over the end of an item's line). A list item set all in bold is a heading that read as an
+    item ("A. Detailed implementation"): the text under it is a paragraph of its own."""
     out: list[_Block] = []
     out_runs: list[_Run] = []
     for block, run in zip(blocks, runs, strict=True):
         if (
             out
             and block.kind == Kind.PARAGRAPH
-            and out[-1].kind == Kind.PARAGRAPH
+            and (
+                out[-1].kind == Kind.PARAGRAPH
+                or (out[-1].kind == Kind.LIST_ITEM and not out[-1].bold)
+            )
             and not run.block_start
             and not block.code
             and not out[-1].code
@@ -1652,11 +2086,21 @@ PAGE_SPAN_REASON = "page pass span"
 PAGE_LAYOUT_ONLY_REASON = "page pass did not confirm"
 
 
-def _carry_page_math(old: _Row, new: _Row, offset: int) -> None:
-    """The page math marks of `old` on `new`, a row made of `old.chars[offset:]`."""
+def _carry_page_math(old: _Row, new: _Row, offset: int, keep: int = 0) -> None:
+    """The page math marks of `old` on `new`, a row made of `old.chars[:keep]` and
+    `old.chars[offset:]`."""
     new.page_checked = old.page_checked
-    new.page_inline = [(a - offset, b - offset, t) for a, b, t in old.page_inline if a >= offset]
-    new.page_nonmath = [(a - offset, b - offset) for a, b in old.page_nonmath if a >= offset]
+    cut = offset - keep
+    new.page_inline = [
+        (a - cut if a >= offset else a, b - cut, t)
+        for a, b, t in old.page_inline
+        if a >= offset or b <= keep
+    ]
+    new.page_nonmath = [
+        (a - cut if a >= offset else a, b - cut)
+        for a, b in old.page_nonmath
+        if a >= offset or b <= keep
+    ]
 
 
 def _with_page_spans(
@@ -1714,9 +2158,9 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
     pieces: list[str | _Inline] = []
     rows = list(block.rows)
     if block.marker is not None and block.marker.end:
-        first = rows[0]
-        rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
-        _carry_page_math(first, rows[0], block.marker.end)
+        first, marker = rows[0], block.marker
+        rows[0] = _Row(first.chars[: marker.start] + first.chars[marker.end :], column=first.column)
+        _carry_page_math(first, rows[0], marker.end, marker.start)
     letters = _BoldLetters.start()
     steps: list[list[str | _Inline]] = []
     for row in rows:

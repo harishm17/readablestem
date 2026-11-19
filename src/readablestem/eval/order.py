@@ -221,13 +221,10 @@ _UNSEEN = str.maketrans("", "", "\u2062\u2063\u2064")
 
 def _own_text(alt: str) -> str:
     """The PDF's own text of an equation kept as a picture, which is that picture's alt
-    text before the writer's mark that it was not checked; "" for any other picture."""
+    text without the writer's words around it; "" for any other picture."""
     from readablestem.pipeline import assemble
 
-    for mark in assemble.EQUATION_TEXT_ALT_SUFFIXES:
-        if alt.endswith(mark):
-            return alt[: -len(mark)]
-    return ""
+    return assemble.equation_alt_text(alt)
 
 
 def _is_writers(tag: str, given: dict) -> bool:

@@ -37,8 +37,10 @@ from readablestem.core.types import (
     Fix,
     HeadingFix,
     Kind,
+    LeftOutBlock,
     Notice,
     OmittedPage,
+    Role,
     Status,
     inline_marker,
 )
@@ -52,6 +54,7 @@ from readablestem.web.review import (
 )
 
 PAGE_OMITTED = "page_omitted"
+BLOCK_OMITTED = "block_omitted"
 
 
 def page_key(page: int) -> str:
@@ -93,6 +96,7 @@ def capture(
     fixes: Iterable[str] = (),
     orders: bool = False,
     pages: bool = False,
+    blocks: bool = False,
     page: int | None = None,
 ) -> dict[str, Any]:
     """The state of what a change is about to touch, as JSON (`restore` puts it back).
@@ -100,6 +104,7 @@ def capture(
     `elements` and `fixes`: ids whose element or fix is saved as it is now (None when there
     is none, so undoing the creation of one removes it). `orders`: every element's place in
     the reading order. `pages`: the omitted pages and the notices (an omission moves both).
+    `blocks`: the paragraphs left out and the notices (leaving one out moves both).
     """
     by_element = {e.id: e for e in result.elements}
     by_fix = {f.element_id: f for f in result.fixes}
@@ -121,6 +126,9 @@ def capture(
         state["omitted"] = [o.model_dump(mode="json") for o in result.omitted]
         state["notices"] = [n.model_dump(mode="json") for n in result.notices]
         state["image_only"] = list(result.image_only_pages)
+    if blocks:
+        state["left_out"] = [b.model_dump(mode="json") for b in result.left_out_blocks]
+        state["notices"] = [n.model_dump(mode="json") for n in result.notices]
     return state
 
 
@@ -134,6 +142,9 @@ def restore(result: DocumentResult, state: dict[str, Any]) -> list[str]:
         [OmittedPage.model_validate(d) for d in state["omitted"]] if "omitted" in state else None
     )
     notices = [Notice.model_validate(d) for d in state["notices"]] if "notices" in state else None
+    left_out = (
+        [LeftOutBlock.model_validate(d) for d in state["left_out"]] if "left_out" in state else None
+    )
     removed: list[str] = []
     for element_id, element in elements.items():
         position = next((n for n, e in enumerate(result.elements) if e.id == element_id), None)
@@ -159,6 +170,8 @@ def restore(result: DocumentResult, state: dict[str, Any]) -> list[str]:
         result.omitted = omitted
     if notices is not None:
         result.notices = notices
+    if left_out is not None:
+        result.left_out_blocks = left_out
     if "image_only" in state:
         result.image_only_pages = [int(p) for p in state["image_only"]]
     _recount(result)
@@ -175,6 +188,7 @@ def undo(result: DocumentResult, element_id: str, state: dict[str, Any]) -> Stru
         fixes=state["fixes"],
         orders="orders" in state,
         pages="omitted" in state,
+        blocks="left_out" in state,
     )
     removed = restore(result, state)
     page = state.get("page")
@@ -512,7 +526,7 @@ def make_heading(result: DocumentResult, element_id: str, level_text: str) -> St
     before = capture(result, elements=[element_id], fixes=[element_id], page=element.page)
     for index, current in enumerate(result.elements):
         if current.id == element_id:
-            result.elements[index] = current.model_copy(update={"kind": Kind.HEADING})
+            result.elements[index] = current.model_copy(update={"kind": Kind.HEADING, "role": None})
     result.fixes.append(
         Fix(
             element_id=element_id,
@@ -538,6 +552,197 @@ def make_heading(result: DocumentResult, element_id: str, level_text: str) -> St
         before={STRUCTURE_KEY: before},
         after={STRUCTURE_KEY: capture(result, elements=[element_id], fixes=[element_id])},
         message=message,
+    )
+
+
+# --------------------------------------------------------------------------- a paragraph's role
+
+ROLE_WORDS = {"aside": "sidebar", "quote": "quotation"}
+NOT_A_ROLE_PARAGRAPH = "Only a paragraph can be a sidebar or a quotation."
+ROLE_CODE = "Code, glossary entries, footnotes and list items cannot be a sidebar or a quotation."
+CHOOSE_ROLE = "Choose a sidebar or a quotation."
+
+
+def role_blocked(result: DocumentResult, element: Element) -> str:
+    """Why a block cannot carry a role, or "" when it can. The student page writes a role
+    only around a plain paragraph (`pipeline.assemble.Writer.paragraph`): not around code, a
+    glossary entry, a footnote or a list item, so none of those is offered one."""
+    if element.kind is not Kind.PARAGRAPH:
+        return NOT_A_ROLE_PARAGRAPH
+    if (
+        element.preformatted
+        or element.term_end is not None
+        or element.list_marker
+        or any(n.code == "footnote" and n.element_id == element.id for n in result.notices)
+    ):
+        return ROLE_CODE
+    return ""
+
+
+def set_role(result: DocumentResult, element_id: str, role: str | None) -> StructureChange:
+    """Make a paragraph a sidebar (`aside`) or a quotation (`quote`), or give it neither again
+    (`role` None or ""). Refused for what cannot carry a role (`role_blocked`), for a word that
+    is neither role, and for a paragraph that already is as asked. Raises ReviewInvalid and
+    LookupError; nothing is changed then. The student page, the Word file, the EPUB and Listen
+    all read the stored role, so each shows it with no change of its own."""
+    element = text_element(result, element_id)
+    fid = _fid("role", element_id)
+    values = {"role": role or ""}
+    if role and role not in ROLE_WORDS:
+        raise ReviewInvalid([FieldError(fid, CHOOSE_ROLE)], values)
+    if blocked := role_blocked(result, element):
+        raise ReviewInvalid([FieldError(fid, blocked)], values)
+    new_role: Role | None = "aside" if role == "aside" else "quote" if role == "quote" else None
+    if new_role == element.role:
+        raise ReviewInvalid([FieldError(fid, NOTHING_CHANGED)], values)
+    before = capture(result, elements=[element_id], page=element.page)
+    for index, current in enumerate(result.elements):
+        if current.id == element_id:
+            result.elements[index] = current.model_copy(update={"role": new_role})
+    message = (
+        f"It is now a {ROLE_WORDS[new_role]}."
+        if new_role
+        else f"It is no longer a {ROLE_WORDS[element.role or 'aside']}."
+    )
+    return StructureChange(
+        element_id=element_id,
+        action="set_role",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=[element_id])},
+        message=message,
+    )
+
+
+# --------------------------------------------------------------------------- one block left out
+
+NOT_A_TEXT_BLOCK = (
+    "Only a paragraph or a list item can be left out. An equation, a figure or a table is "
+    "changed in its own decision, and a heading is made plain text first, in its own decision "
+    "(the outline would change)."
+)
+BLOCK_DECISION = "A decision is still waiting on this text. Decide it first."
+BLOCK_FOOTNOTE = "A mark in the text above links to this footnote, so it stays."
+BLOCK_LINKED = "Another part of the page links to this text, so it stays."
+BLOCK_EQUATION = "It holds an equation, which has its own decision. Decide that first."
+BLOCK_LAST = "At least one paragraph has to stay in the file."
+BLOCK_ALREADY_OUT = "That text is already left out."
+BLOCK_NOT_OUT = "That text is not left out."
+BLOCK_PAGE_OUT = "Its page is left out of the file. Put the page back first."
+BLOCK_NOT_PDF = "Text can be left out of a file converted from a PDF only."
+
+
+def left_out_blocked(result: DocumentResult, element: Element) -> str:
+    """Why a paragraph or list item cannot be left out, or "" when it can. What something
+    else points at by id would dangle (a footnote its mark links to, a cross-reference or
+    link to it, an inline equation inside it) and a decision that is open would be buried:
+    each of those is refused, so nothing a student might need goes without the reviewer
+    seeing why. Equations, figures, tables and headings have their own decisions."""
+    if element.kind not in (Kind.PARAGRAPH, Kind.LIST_ITEM):
+        return NOT_A_TEXT_BLOCK
+    if result.origin != "pdf":  # the file's note names a page "of the original PDF"
+        return BLOCK_NOT_PDF
+    if any(f.element_id == element.id and f.pending for f in result.fixes):
+        return BLOCK_DECISION
+    if any(n.code == "footnote" and n.element_id == element.id for n in result.notices):
+        return BLOCK_FOOTNOTE
+    if any(e.parent_id == element.id for e in result.elements) or INLINE_MARKER_RE.search(
+        element.text or ""
+    ):
+        return BLOCK_EQUATION
+    if any(
+        link.target_id == element.id
+        for e in result.elements
+        if e.id != element.id
+        for link in e.links
+    ):
+        return BLOCK_LINKED
+    return ""
+
+
+def _block_notice(result: DocumentResult, page: int, step: int) -> None:
+    """One `block_omitted` notice per page, counting the paragraphs left out of it (`step`
+    +1 or -1); it goes when the count reaches 0."""
+    held = next((n for n in result.notices if n.code == BLOCK_OMITTED and n.page == page), None)
+    count = (held.count if held else 0) + step
+    others = [n for n in result.notices if n is not held]
+    result.notices = [*others, make(BLOCK_OMITTED, page=page, count=count)] if count > 0 else others
+
+
+def leave_out_block(result: DocumentResult, element_id: str) -> StructureChange:
+    """Leave one paragraph or list item out of the student file (a running head or stamp that
+    got into the body, a printer's mark, a line a scan repeated). The element, its fixes and its
+    own notices move into `result.left_out_blocks`, so no writer sees them, and the file's note
+    says how many are out and on which pages. The words are kept, listed on the page's card with
+    "Put it back" and named in the record. Refused as `left_out_blocked` says, and for the last
+    paragraph of the document. Raises ReviewInvalid and LookupError; nothing is changed then."""
+    fid = _fid("leave_out", element_id)
+    if any(b.element.id == element_id for b in result.left_out_blocks):
+        raise ReviewInvalid([FieldError(fid, BLOCK_ALREADY_OUT)])
+    element = next((e for e in result.elements if e.id == element_id), None)
+    if element is None:
+        raise LookupError(element_id)
+    if blocked := left_out_blocked(result, element):
+        raise ReviewInvalid([FieldError(fid, blocked)])
+    if not any(
+        e.id != element_id and e.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM) for e in result.elements
+    ):
+        raise ReviewInvalid([FieldError(fid, BLOCK_LAST)])
+    before = capture(
+        result, elements=[element_id], fixes=[element_id], blocks=True, page=element.page
+    )
+    own = [n for n in result.notices if n.element_id == element_id]
+    result.left_out_blocks.append(
+        LeftOutBlock(
+            element=element,
+            fixes=[f for f in result.fixes if f.element_id == element_id],
+            notices=own,
+        )
+    )
+    result.elements = [e for e in result.elements if e.id != element_id]
+    result.fixes = [f for f in result.fixes if f.element_id != element_id]
+    result.notices = [n for n in result.notices if n.element_id != element_id]
+    _block_notice(result, element.page, +1)
+    _recount(result)
+    return StructureChange(
+        element_id=element_id,
+        action="leave_out_block",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, blocks=True)},
+        message=(
+            "That text is left out of the student file, and the file says so. It is still "
+            "listed on this page, with “Put it back”."
+        ),
+        page=element.page,
+    )
+
+
+def put_back_block(result: DocumentResult, element_id: str) -> StructureChange:
+    """Put a paragraph or list item left out back (`leave_out_block`): the element, its fixes
+    and its notices return, in their reading order. Raises ReviewInvalid."""
+    fid = _fid("leave_out", element_id)
+    held = next((b for b in result.left_out_blocks if b.element.id == element_id), None)
+    if held is None:
+        raise ReviewInvalid([FieldError(fid, BLOCK_NOT_OUT)])
+    if held.element.page in result.omitted_pages:
+        # Its paragraph would be in the file while the note says the page is out, and the
+        # page's count of paragraphs left out (kept with the page) would stay as it was.
+        raise ReviewInvalid([FieldError(fid, BLOCK_PAGE_OUT)])
+    before = capture(
+        result, elements=[element_id], fixes=[element_id], blocks=True, page=held.element.page
+    )
+    result.left_out_blocks = [b for b in result.left_out_blocks if b is not held]
+    result.elements.append(held.element)
+    result.fixes.extend(held.fixes)
+    result.notices.extend(held.notices)
+    _block_notice(result, held.element.page, -1)
+    _recount(result)
+    return StructureChange(
+        element_id=element_id,
+        action="restore_block",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=[element_id], blocks=True)},
+        message="That text is back in the student file.",
+        page=held.element.page,
     )
 
 

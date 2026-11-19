@@ -247,6 +247,7 @@ class TextLine:
     preview: str
     href: str
     current: bool = False
+    left_out: bool = False  # left out of the student file: listed to put back, not to change
 
 
 @dataclass
@@ -263,7 +264,12 @@ class TextEditor:
     levels: int = 6  # levels 1 to this fit after the heading before it
     level: str = "2"
     item_href: str | None = None  # a heading's own panel (its level, bold text)
-    errors: dict[str, str] = field(default_factory=dict)  # "text", "level" -> message
+    role: str | None = None  # "aside" or "quote" when it is one now
+    can_set_role: bool = False  # a plain paragraph: it can be a sidebar or a quotation
+    can_leave_out: bool = False  # a paragraph or list item nothing else points at
+    leave_out_why_not: str = ""  # why a paragraph or list item cannot be left out
+    # "text", "level", "role", "leave_out" -> message
+    errors: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -1225,9 +1231,17 @@ class SplitBuilder:
         if tools.omitted:
             return tools
         texts = self.page_texts(index)
-        for element in texts[:MAX_TEXT_LINES]:
-            tools.lines.append(self.text_line(element, current=element.id == change))
-        tools.lines_cut = max(0, len(texts) - MAX_TEXT_LINES)
+        held = [b.element for b in self.result.left_out_blocks if b.element.page == index]
+        listed = sorted([*texts, *held], key=lambda e: e.order)
+        left_out = {e.id for e in held}
+        # A line left out is listed however far down its page it is: the list is its way back.
+        shown = listed[:MAX_TEXT_LINES]
+        shown += [e for e in listed[MAX_TEXT_LINES:] if e.id in left_out]
+        for element in shown:
+            line = self.text_line(element, current=element.id == change)
+            line.left_out = element.id in left_out
+            tools.lines.append(line)
+        tools.lines_cut = len(listed) - len(shown)
         editing = next((e for e in self.result.elements if e.id == change), None)
         if editing is not None and editing.kind in TEXT_KINDS and editing.page == index:
             tools.editor = self.text_editor(editing)
@@ -1285,7 +1299,12 @@ class SplitBuilder:
             label=line.label,
             text=friendly_text(self.result, element, fix),
             code=element.preformatted,
+            role=element.role,
+            can_set_role=not page_edits.role_blocked(self.result, element),
         )
+        if element.kind is not Kind.HEADING:
+            editor.leave_out_why_not = page_edits.left_out_blocked(self.result, element)
+            editor.can_leave_out = not editor.leave_out_why_not
         if element.kind is Kind.HEADING:
             if fix is not None and fix.heading is not None:
                 editor.heading_level = fix.heading.level
