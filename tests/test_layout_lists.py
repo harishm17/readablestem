@@ -170,3 +170,73 @@ def test_a_spaced_minus_before_a_number_is_not_a_dash_bullet(dash):
     assert not any(e.kind == Kind.LIST_ITEM for e in elements)
     text = " ".join(e.text or "" for e in elements)
     assert f"{dash} 40 m/s" in text and f"{dash} 20 m/s" in text
+
+
+def word_list_page(rows: list[tuple[int, str]]) -> bytes:
+    """A page as Word prints a bulleted list: the first-level bullet is a Wingdings square
+    ("\\247" is U+F0A7) set as large as its text and cut off from it by a move of the pen, the
+    second-level bullet the letter "o" in Courier New. `rows` are (level, text)."""
+    size = 22
+    stream = f"BT /F1 {size} Tf 72 700 Td\n"
+    y = 700
+    for level, text in rows:
+        if level == 1:
+            stream += (
+                f"1 0 0 1 72 {y} Tm /F1 {size} Tf (\\247) Tj /F3 {size} Tf 14 0 Td ({text}) Tj\n"
+            )
+        else:
+            stream += f"1 0 0 1 120 {y} Tm /F2 {size} Tf (o) Tj /F3 {size} Tf 24 0 Td ({text}) Tj\n"
+        y -= 40
+    stream += "ET"
+    fonts = [
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Wingdings /Encoding /WinAnsiEncoding >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>",
+        "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>",
+    ]
+    objects = [
+        "<< /Type /Catalog /Pages 2 0 R >>",
+        "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R"
+        " /Resources << /Font << /F1 5 0 R /F2 6 0 R /F3 7 0 R >> >> >>",
+        f"<< /Length {len(stream)} >>\nstream\n{stream}\nendstream",
+        *fonts,
+    ]
+    out = b"%PDF-1.4\n"
+    offsets = []
+    for number, body in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += f"{number} 0 obj\n{body}\nendobj\n".encode("latin-1")
+    xref = len(out)
+    out += f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode()
+    out += "".join(f"{offset:010d} 00000 n \n" for offset in offsets).encode()
+    out += f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref}\n%%EOF".encode()
+    return out
+
+
+def test_word_bullets_with_no_space_after_them_and_o_bullets_are_nested_list_items():
+    """Word's first-level bullet touches its text in the text layer (no space character) and
+    its second-level bullet is a Courier "o": both came out as paragraphs."""
+    page = word_list_page(
+        [
+            (1, "First topic of the lecture"),
+            (2, "a detail that belongs under it"),
+            (2, "another detail under it"),
+            (1, "Second topic of the lecture"),
+        ]
+    )
+    got = [(m, lvl, t) for m, _, lvl, t in items(analyze(page).elements)]
+    assert got == [
+        ("\u25aa", 1, "First topic of the lecture"),
+        ("\u25e6", 2, "a detail that belongs under it"),
+        ("\u25e6", 2, "another detail under it"),
+        ("\u25aa", 1, "Second topic of the lecture"),
+    ]
+
+
+def test_a_lone_o_set_in_a_monospaced_font_before_monospaced_text_is_not_a_bullet():
+    def fill(page):
+        for i, y in enumerate((100, 140, 180)):
+            page.insert_text((72, y), "o", fontsize=11, fontname="cour")
+            page.insert_text((90, y), f"value{i} = compute(x)", fontsize=11, fontname="cour")
+
+    assert not [e for e in analyze(one_page(fill)).elements if e.kind == Kind.LIST_ITEM]

@@ -20,6 +20,12 @@ from readablestem.pipeline.layout.shared import _Block, _Context, _Marker, _Path
 # wrapped sentence can start a line with a dash.
 _LINE_START_BULLETS = frozenset("-\u2013\u2014*\u2217\u00b7\u2219\u22c5")
 
+# Word's second-level bullet is the letter "o" set in Courier New: a plain letter, so no font
+# table reads it as a bullet. It is one when the letter is monospaced and the text after it is
+# not (code that starts a line with "o" is monospaced all through), and, like a dash, it needs
+# a sibling.
+_HOLLOW_BULLET = "\u25e6"
+
 # Ordered list markers: "1.", "2)", "(3)", "a.", "b)", "(c)", "iv.", "(ii)", "A.", "IV)".
 _ORDERED_MARKER = re.compile(
     r"^(?:\((?P<inner>\d{1,3}|[A-Za-z]|[ivxlc]{2,6}|[IVXLC]{2,6})\)"
@@ -28,6 +34,7 @@ _ORDERED_MARKER = re.compile(
 
 
 MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its text
+BULLET_APART = 0.1  # x font size: a bullet glyph this far from text in another font is apart
 MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
 DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
 
@@ -94,6 +101,27 @@ def _ordered_marker(text: str) -> tuple[str, str] | None:
     return "{}" + match["sep"], match["plain"]
 
 
+def _bullet_apart(row: _Row, tokens: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    """`tokens` with a bullet glyph at the start of the row cut from the text it touches.
+    `_tokens` splits at 0.3 x the font size, and Word's Wingdings bullet, set as large as the
+    text, leaves 0.23 with no space character in the text layer: the line came out as a
+    paragraph that began with the bullet. A bullet is a glyph of its own font, so one that
+    stands clear of text set in another font (as far as glyphs of one word are not, `NO_GAP`
+    in `glyph_math`) is a marker."""
+    if not tokens:
+        return tokens
+    start, end = tokens[0]
+    chars = row.chars
+    if (
+        end - start > 1
+        and chars[start].c in _BULLET_GLYPHS
+        and chars[start].font != chars[start + 1].font
+        and chars[start + 1].x0 - chars[start].x1 >= BULLET_APART * row.size
+    ):
+        return [(start, start + 1), (start + 1, end), *tokens[1:]]
+    return tokens
+
+
 def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | None:
     """Does `row` start like a list item? A bullet glyph, an ordered marker ("a.", "(3)",
     "iv)", "3 ." as OpenStax prints it) or a drawn bullet just left of it, followed by
@@ -101,7 +129,7 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     if row.vertical:
         return None
     drawn = bullets.left_of(row)
-    tokens = _tokens(row)
+    tokens = _bullet_apart(row, _tokens(row))
     if drawn is not None:
         if not tokens:
             return None
@@ -115,8 +143,9 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     first = chars[m0].c
     if m1 - m0 == 1 and first in _DASHES and _signed_value(chars[m0], chars[rest[0][0] :]):
         return None  # "- 40 m/s", "\u2013 5 \u00b0C": a negative value, not a dash bullet
-    if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS):
-        glyph = _clean(first)
+    hollow = m1 - m0 == 1 and first == "o" and chars[m0].mono and not chars[rest[0][0]].mono
+    if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS or hollow):
+        glyph = _HOLLOW_BULLET if hollow else _clean(first)
         family: tuple[str, str] = ("bullet", glyph)
         readings: tuple[tuple[str, int], ...] = ()
         sure = first in _BULLET_GLYPHS
