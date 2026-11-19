@@ -73,7 +73,7 @@
 
   <h3 id="add-heading">Add a symbol</h3>
   {% call form("course.add_entry", "/courses/" ~ course.id ~ "/entries", {"novalidate": true, "aria-labelledby": "add-heading"}) %}
-    {% call(aria) field("symbol", "Symbol", error=field_errors.get("symbol"), hint="For example “bold d” or “\mathbf{d}”.") %}
+    {% call(aria) field("symbol", "Symbol", error=field_errors.get("symbol"), hint="For example “bold d” or “\\mathbf{d}”.") %}
       <input type="text" id="symbol" name="symbol" maxlength="64" autocomplete="off" spellcheck="false" value="{{ values.get('symbol', '') }}"{{ aria }}>
     {% endcall %}
     {% call(aria) field("meaning", "What it means", error=field_errors.get("meaning")) %}
