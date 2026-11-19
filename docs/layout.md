@@ -1382,8 +1382,25 @@ Not built: the page record, the document card, and the per-source switch.
   starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
   its text, set off by a gap wider than half an em, is a grid of options that reading order
   merged. A line of text that stands alone is cut at each later label, one run per option;
-  any other block is kept whole and flagged. Where a table is detected over the grid, the
-  table keeps it (WS2.4b).
+  any other block that `_option_grids` does not resolve is kept whole and flagged. Where a
+  table is detected over the grid, the table keeps it.
+- **Option grids** (`_option_grids`, WS2.4b; default path, tree on or off): options set two or
+  four across are one list in label order, whether the page sets them row by row ((A) (B) over
+  (C) (D)) or column by column ((A) (C) over (B) (D)). A grid starts at a row with an option label
+  and takes the rows after it that start with a label of the same form (a row that holds
+  several labels set apart is cut at each) and the lines wrapped under one of its columns. It
+  is a grid when its labels are a full run of letters or numbers, each once, and two options
+  share a line; then each option is a list item (flagged `_Marker.option`), the cells are read
+  in label order (`_option_order` keeps that order when the page's blocks are put in reading
+  order by their boxes), and the options are one list a level below the question they follow,
+  whatever the x of their column (`_list_levels`). Anything that is not a full run (a label
+  missing, a label twice) is left as it was, and a block that holds a later label is flagged
+  as above. A right-margin points label ("(2 points)", "[4 pts]") on the baseline of a line is
+  too far from it for `_merge_baselines`; `_runs` puts it at the end of that line's text. The
+  region tree's grid rule (8) does what the default path cannot know: where a grid ends above the
+  number of the next question that stands in the same two columns (`_Build._grid_above`).
+  Not done: labeled parts inside one display equation ("(a) 2x + 3 = 11 (b) ...": the row is
+  an equation, and `_split_labels` cuts only an equation number off its end).
 - **Right-to-left text** (`rtl_text`, `_rtl_words`): a block with two or more words that
   have a strong right-to-left letter (bidi class R or AL) is flagged, because the order of
   the words in the row is the PDF's, which is not always the reading order (the reorder,

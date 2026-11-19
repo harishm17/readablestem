@@ -87,6 +87,19 @@
   inline formula are no gutter). Five regression tests, one generated page per cause. With the
   setting off nothing changes. The setting is still off; turning it on needs a `PIPELINE_VERSION`
   bump and a recorded re-measurement.
+## Unreleased: option grids are lists in label order (branch feat/option-grids)
+
+- WS2.4b. The commonest exam layout, the options of a question set two or four across, came out
+  at levels taken from x, in row order, with half the options paragraphs, the options of a
+  wrapped grid merged in pairs and flagged `option_labels`, and every "(2 points)" at the right
+  margin a paragraph of its own (which also ended the list, so numbering started again after
+  each question). Now each option is a list item, the options of a question are one list below it
+  in label order (A, B, C, D) whether the page sets them across or down, a points label joins
+  the text of its question, and the list goes on in one numbering. A grid is only made of a full
+  run of labels with two options on a line; any other block that holds a later label is still
+  flagged. Region tree on or off give the same pages (its grid rule now stops above the next
+  question's number). Not done: labeled parts inside one display equation. No migration, no model
+  request changed; a stored document keeps its elements until it is converted again.
 
 ## Unreleased: a capital that is not in the text does not make the next small letter bold
 
