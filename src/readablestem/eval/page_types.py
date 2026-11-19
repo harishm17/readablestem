@@ -78,7 +78,8 @@ def classify_file(path: Path, pages: list[int]) -> Classified:
         for number in pages:
             page = doc[number - 1]
             started = time.perf_counter()
-            raw = page.get_text("rawdict", flags=page_type.TEXT_FLAGS)["blocks"]
+            flags = page_type.TEXT_FLAGS | page_type.actualtext_flag(page)
+            raw = page.get_text("rawdict", flags=flags)["blocks"]
             drawings = page.get_cdrawings()
             result = page_type.classify(page, raw, drawings, budget=budget, producer=hint)
             out[number] = (result, (time.perf_counter() - started) * 1000)

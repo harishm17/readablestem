@@ -57,6 +57,7 @@ import math
 import re
 import statistics
 import time
+import unicodedata
 from collections import Counter
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -390,6 +391,101 @@ def turn_page(page: pymupdf.Page) -> int:
     if turn:
         page.set_rotation(turn)
     return turn
+
+
+# ActualText: a file can replace the characters a span draws by the text it says they mean
+# (Chrome writes it for Hindi conjuncts and CJK, tagged PDFs for a figure's label or a scan's
+# hidden layer). MuPDF applies it to every span it covers; the plain reading
+# (`pymupdf.TEXT_IGNORE_ACTUALTEXT`: each glyph's own character) keeps the labels a replacement
+# drops but turns the script ActualText exists for into U+FFFD, Kangxi radicals or private-use
+# codes. `actualtext_flag` chooses once per page.
+MAX_XREF_SCAN = 200_000  # objects looked at for "/ActualText"; a file with more reads as today
+
+
+def _undecoded(char: str) -> bool:
+    """U+FFFD, a Kangxi radical (U+2F00 to U+2FDF) or a private-use character: what the
+    glyphs of a script come out as when its text is not decoded."""
+    return char == "\ufffd" or "\u2f00" <= char <= "\u2fdf" or unicodedata.category(char) == "Co"
+
+
+def _printed(text: str) -> str:
+    """A reading without what ActualText may change at no loss: spaces, hyphens (a file marks a
+    hyphen at a line end as a soft one), format characters, and composed against decomposed
+    forms. Two readings equal in this say the same words."""
+    return "".join(
+        c
+        for c in unicodedata.normalize("NFKC", text)
+        if not c.isspace() and c not in "-\u2010\u2011" and unicodedata.category(c) != "Cf"
+    )
+
+
+class _ActualTextFacts:
+    """What is known of one open document's ActualText, kept on the document object (PyMuPDF
+    documents take attributes, and nothing else is shared between the steps that read a
+    page: the text pass, the equation readers and the probe open the file on their own), so
+    that each reader of a page finds the choice made for it."""
+
+    def __init__(self) -> None:
+        self.carries: bool | None = None  # an object or a form says "/ActualText" somewhere
+        self.flags: dict[int, int] = {}  # page number -> the flag its readers add
+
+
+def _carries_actualtext(doc: pymupdf.Document) -> bool:
+    """Whether some object (a structure element, a property list) or form XObject of the
+    document holds ActualText. It can sit in any of them, so the objects are read once; a
+    page's own content is read by `actualtext_flag`."""
+    try:
+        for xref in range(1, min(doc.xref_length(), MAX_XREF_SCAN)):
+            text = doc.xref_object(xref, compressed=False)
+            if "/ActualText" in text:
+                return True
+            if (
+                "/Form" in text
+                and doc.xref_is_stream(xref)
+                and b"ActualText" in (doc.xref_stream(xref) or b"")
+            ):
+                return True
+    except (RuntimeError, ValueError):  # a damaged object: read as today
+        return False
+    return False
+
+
+def actualtext_flag(page: pymupdf.Page) -> int:
+    """`pymupdf.TEXT_IGNORE_ACTUALTEXT` where the page is to be read without ActualText, else 0.
+    Every reader of a page's characters adds it to the flags it reads with, so that no two
+    steps disagree about what the page says.
+
+    A page that carries ActualText is read both ways. It keeps ActualText where the two
+    readings say the same words (`_printed`: what differs is then a soft hyphen or a space the
+    file knows better), and where the plain reading holds more U+FFFD, Kangxi radicals and
+    private-use characters than the reading with it (the script ActualText exists for); any
+    other page reads without it, so the labels a replacement dropped come back. No choice is
+    made per span. A page with no ActualText is not read twice, and its flag is 0. Made once
+    a page and kept on the document."""
+    doc = page.parent
+    if doc is None:  # a page whose document is gone cannot be read twice
+        return 0
+    facts = vars(doc).setdefault("_actualtext_facts", _ActualTextFacts())
+    if page.number not in facts.flags:
+        if facts.carries is None:
+            facts.carries = _carries_actualtext(doc)
+        facts.flags[page.number] = _choose(page, facts.carries)
+    return facts.flags[page.number]
+
+
+def _choose(page: pymupdf.Page, carries: bool) -> int:
+    try:
+        if not carries and b"ActualText" not in page.read_contents():
+            return 0
+        with_text = page.get_text("text", flags=TEXT_FLAGS)
+        plain = page.get_text("text", flags=TEXT_FLAGS | pymupdf.TEXT_IGNORE_ACTUALTEXT)
+    except (RuntimeError, ValueError):  # a page that cannot be read twice reads as today
+        return 0
+    if _printed(plain) == _printed(with_text):
+        return 0
+    if sum(map(_undecoded, plain)) > sum(map(_undecoded, with_text)):
+        return 0
+    return pymupdf.TEXT_IGNORE_ACTUALTEXT
 
 
 def origin_key(origin: Sequence[float]) -> tuple[int, int]:
@@ -2345,7 +2441,7 @@ def probe_pages(
     typed = False
     for number in range(doc.page_count):
         page = doc[number]
-        raw = page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
+        raw = page.get_text("rawdict", flags=TEXT_FLAGS | actualtext_flag(page))["blocks"]
         images, coverage = image_boxes(page)
         stats = text_stats(page, raw, images, None)
         if clearly_convertible(stats, coverage):

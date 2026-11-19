@@ -304,7 +304,9 @@ def _outline_glyphs(
     the document only: it is never saved)."""
     import pymupdf
 
-    flags = pymupdf.TEXT_ACCURATE_BBOXES | pymupdf.TEXT_MEDIABOX_CLIP
+    from readablestem.pipeline.page_type import actualtext_flag
+
+    flags = pymupdf.TEXT_ACCURATE_BBOXES | pymupdf.TEXT_MEDIABOX_CLIP | actualtext_flag(page)
     slack = MARK_SLACK_PT
     area = pymupdf.Rect(region.x0 - slack, region.y0 - slack, region.x1 + slack, region.y1 + slack)
     found = []
@@ -520,6 +522,8 @@ def region_text(data: bytes, *, page: int, clip: tuple[float, float, float, floa
     Raises ProbeRejected."""
     import pymupdf
 
+    from readablestem.pipeline.page_type import actualtext_flag
+
     doc = _open(data)
     try:
         if not 0 <= page < doc.page_count:
@@ -531,7 +535,7 @@ def region_text(data: bytes, *, page: int, clip: tuple[float, float, float, floa
         area = pymupdf.Rect(clip) & current.rect
         found = []
         for x0, y0, x1, y1, word, block, line, number in current.get_text(
-            "words", flags=pymupdf.TEXT_MEDIABOX_CLIP
+            "words", flags=pymupdf.TEXT_MEDIABOX_CLIP | actualtext_flag(current)
         ):
             if area.x0 <= (x0 + x1) / 2 <= area.x1 and area.y0 <= (y0 + y1) / 2 <= area.y1:
                 found.append((block, line, number, word))

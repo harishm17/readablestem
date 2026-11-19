@@ -96,7 +96,9 @@ def _margin_number(page: pymupdf.Page) -> tuple[str, int] | None:
     """("arabic" | "roman", value) of the number printed alone in the top or bottom margin."""
     height = page.rect.height
     found: list[tuple[str, int]] = []
-    for _x0, y0, _x1, y1, text, *_ in page.get_text("blocks"):
+    for _x0, y0, _x1, y1, text, *_ in page.get_text(
+        "blocks", flags=pymupdf.TEXTFLAGS_BLOCKS | page_type.actualtext_flag(page)
+    ):
         if not (y1 <= BAND * height or y0 >= (1 - BAND) * height):
             continue
         for line in str(text).splitlines():

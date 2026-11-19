@@ -107,7 +107,11 @@ def _struct_headings(page: pymupdf.Page, number: int) -> list[TaggedHeading]:
             else:
                 walk(block.get("blocks", ()), depth + 1)
 
-    flags = pymupdf.TEXT_COLLECT_STRUCTURE | pymupdf.TEXT_PRESERVE_WHITESPACE
+    flags = (
+        pymupdf.TEXT_COLLECT_STRUCTURE
+        | pymupdf.TEXT_PRESERVE_WHITESPACE
+        | page_type.actualtext_flag(page)
+    )
     walk(page.get_text("dict", flags=flags).get("blocks", ()), 0)
     return out
 

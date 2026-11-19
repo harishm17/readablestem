@@ -44,6 +44,7 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
 
+import pymupdf
 from pydantic import BaseModel, Field
 
 from readablestem.core.budget import BudgetExceeded
@@ -58,10 +59,9 @@ from readablestem.models import pricing
 from readablestem.models.base import VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.models.question import question_key
+from readablestem.pipeline import page_type
 
 if TYPE_CHECKING:
-    import pymupdf
-
     from readablestem.config import Settings
 
 STEP = "page_audit"
@@ -168,6 +168,11 @@ def _tokens(text: str | None) -> list[str]:
     return re.findall(r"[a-z0-9]+", (text or "").lower())
 
 
+def _page_tokens(page: pymupdf.Page) -> list[str]:
+    flags = pymupdf.TEXTFLAGS_TEXT | page_type.actualtext_flag(page)  # as the page was read
+    return _tokens(page.get_text(flags=flags))
+
+
 def page_words(doc: pymupdf.Document) -> Callable[[int], Sequence[str]]:
     """The words printed on each page of `doc` (0-based; none for a page it does not have),
     read once a page. Words are runs of letters and digits in lower case; this is the
@@ -177,7 +182,7 @@ def page_words(doc: pymupdf.Document) -> Callable[[int], Sequence[str]]:
     def words(page: int) -> Sequence[str]:
         if page not in kept:
             inside = 0 <= page < doc.page_count
-            kept[page] = _tokens(doc[page].get_text()) if inside else []
+            kept[page] = _page_tokens(doc[page]) if inside else []
         return kept[page]
 
     return words
