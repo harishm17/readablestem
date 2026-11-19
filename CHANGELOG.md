@@ -11,7 +11,8 @@
   smaller than its largest are small capitals. `_Row.is_script` and the three tests that called a
   glyph a script from its size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip
   them. In a word that has a full-size capital the small ones are lower-cased ("Lotka", not
-  "LOTKA"; "LongMemEval"); an all-small-caps word of two letters or more keeps its case. TeX's
+  "LOTKA"; "LongMemEval"); a word of small capitals only is left as it was (read as text, a
+  function name in a formula cut the formula in three). TeX's
   `\textsc` in a font of its own was never affected; TeX with a scaled Times font (`times`,
   Nimbus) was, and is fixed. Not built: the stored
   `small_caps` run (WS16.2). A version bump is owed at the next pull request and covers this

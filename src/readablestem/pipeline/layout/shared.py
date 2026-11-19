@@ -239,11 +239,11 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
     (`SMALL_CAP_BASELINE`: a script is off it), set off from what is round it by anything but a
     letter or digit. A letter of it smaller than the word's largest (`SCRIPT_RATIO`) is a small
     capital, and a small capital is a lower-case letter of the source: the word is lower-cased
-    there ("Lotka", "LongMemEval" set as `LONGmEMeVAL`), and none of it is a script. A word with
-    no full-size capital in it, two letters or more and smaller than the line's text (an
-    all-small-caps "OTKA", or an acronym) keeps its case, which the file does not give
-    (the source was "nasa" or "NASA"), and is no script either. A capital next to a lower-case
-    letter or a digit makes no such word: its glyphs are left alone."""
+    there ("Lotka", "LongMemEval" set as `L ONG M EM E VAL`), and none of it is a script. A word
+    with no full-size capital in it is left alone, as is a capital next to a lower-case letter or
+    a digit: an all-small-caps "OTKA" does not say whether it is a name, an acronym or the name of
+    a function in a formula (`OPT(x)` in a set, measured: read as text it cut that formula in
+    three), so it stays what the size rule made of it before."""
     sizes = {round(c.size * 2) / 2 for c in chars if not c.blank}
     if len(sizes) < 2:
         return chars
@@ -268,12 +268,8 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
             continue
         largest = max(c.size for c in chars[start:j])
         small = [k for k in range(start, j) if chars[k].size < SCRIPT_RATIO * largest]
-        if small:
-            for k in small:
-                out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
-        elif j - start >= 2 and largest < SCRIPT_RATIO * size:
-            for k in range(start, j):
-                out[k] = replace(chars[k], small_cap=True)
+        for k in small:
+            out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
     return out
 
 
