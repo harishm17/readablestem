@@ -240,10 +240,12 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
     letter or digit. A letter of it smaller than the word's largest (`SCRIPT_RATIO`) is a small
     capital, and a small capital is a lower-case letter of the source: the word is lower-cased
     there ("Lotka", "LongMemEval" set as `L ONG M EM E VAL`), and none of it is a script. A word
-    with no full-size capital in it is left alone, as is a capital next to a lower-case letter or
-    a digit: an all-small-caps "OTKA" does not say whether it is a name, an acronym or the name of
-    a function in a formula (`OPT(x)` in a set, measured: read as text it cut that formula in
-    three), so it stays what the size rule made of it before."""
+    of small capitals only is lower-cased too when the line shows what it is: its font and size
+    are those of a small capital found on the same line ("and" in `P OLICIES AND P ROCEDURES`).
+    On a line with no such word it is left alone, as is a capital next to a lower-case letter or
+    a digit: an all-small-caps "OTKA" by itself does not say whether it is a name, an acronym or
+    the name of a function in a formula (`OPT(x)` in a set, measured: read as text it cut that
+    formula in three), so it stays what the size rule made of it before."""
     sizes = {round(c.size * 2) / 2 for c in chars if not c.blank}
     if len(sizes) < 2:
         return chars
@@ -254,7 +256,11 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
     def capital(c: _Char) -> bool:
         return c.c.isalpha() and c.c.isupper() and not c.math and abs(c.baseline - base) <= reach
 
+    def face(c: _Char) -> tuple[str, float]:
+        return c.font, round(c.size * 2) / 2
+
     out = list(chars)
+    words: list[tuple[int, int]] = []
     n, i = len(chars), 0
     while i < n:
         if not capital(chars[i]):
@@ -266,10 +272,16 @@ def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
         start, i = i, j
         if (start and chars[start - 1].c.isalnum()) or (j < n and chars[j].c.isalnum()):
             continue
+        words.append((start, j))
         largest = max(c.size for c in chars[start:j])
         small = [k for k in range(start, j) if chars[k].size < SCRIPT_RATIO * largest]
         for k in small:
             out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
+    faces = {face(c) for c in out if c.small_cap}
+    for start, j in words if faces else ():
+        if all(face(chars[k]) in faces for k in range(start, j)):
+            for k in range(start, j):
+                out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
     return out
 
 

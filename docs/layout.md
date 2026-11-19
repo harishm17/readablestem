@@ -807,10 +807,13 @@ Modern Sans):
   or digit next to it. A letter smaller than the word's largest (`SCRIPT_RATIO`) is a small
   capital, and that is a lower-case letter of the source: the word is lower-cased there ("Lotka",
   "Volterra", "LongMemEval" printed as `L ONG M EM E VAL`), so search and speech get the word. A
-  word with no full-size capital in it is left to the size rule, as is a capital next to a
-  lower-case letter or a digit: an all-small-caps "OTKA" does not say whether it is a name, an
-  acronym or the name of a function in a formula (`OPT(x)` in a set: read as text it cut that
-  formula in three, measured on a corpus upload), so it reads as before.
+  word of small capitals only is lower-cased as well when its font and size are those of a small
+  capital found on the same line ("and" in `P OLICIES AND P ROCEDURES`: 68 such words in 10 of
+  the 19 corpus PDFs the rule touches). On a line with no such word it is left to the size rule,
+  as is a capital next to a lower-case letter or a digit: an all-small-caps "OTKA" by itself does
+  not say whether it is a name, an acronym or the name of a function in a formula (`OPT(x)` in a
+  set: read as text it cut that formula in three, measured on a corpus upload), so it reads as
+  before.
   `_Row.is_script` and the tests of a glyph's size against its row's that decide "script" from
   size alone (`_equation_block`, `_leading_script`, `_stacked_tail`) skip `small_cap` glyphs; the
   tests that also look at the baseline (`_script_glyphs`, `_Row.size`, `_stack_position`,
