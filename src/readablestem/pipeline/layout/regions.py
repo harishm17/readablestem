@@ -133,16 +133,28 @@ def _intersect(
     return out
 
 
+def _over_shorter(items: Sequence[Item], band: Sequence[int], y0: float, y1: float) -> bool:
+    """Does the item from `y0` to `y1` overlap a shorter member of `band` by a fifth of that
+    member's height?"""
+    for j in band:
+        top, bottom = items[j][0][1], items[j][0][3]
+        if bottom - top < y1 - y0 and min(bottom, y1) - y0 > 0.2 * (bottom - top):
+            return True
+    return False
+
+
 def _bands(items: Sequence[Item]) -> list[list[int]]:
     """Indexes of `items` grouped in bands: items that overlap vertically (all but a fifth of
-    their height) are one band."""
+    their height) are one band. An item that stands over a shorter one's whole height, but
+    starts a little below it (a picture beside the first line of a column), overlaps it by a
+    fifth of the shorter one's height."""
     order = sorted(range(len(items)), key=lambda i: items[i][0][1])
     bands: list[list[int]] = []
     bottom = 0.0
     for i in order:
         y0, y1 = items[i][0][1], items[i][0][3]
         shrink = 0.2 * (y1 - y0)
-        if bands and y0 + shrink < bottom:
+        if bands and (y0 + shrink < bottom or _over_shorter(items, bands[-1], y0, y1)):
             bands[-1].append(i)
             bottom = max(bottom, y1 - shrink)
         else:
