@@ -1614,6 +1614,8 @@ def _page_math_pass(
             grouping: dict[str, Any] = (
                 {"display_grouping": True} if settings.layout_display_grouping else {}
             )
+            if settings.region_tree == "on":
+                grouping["region_tree"] = True
             try:
                 doc = layout.analyze(
                     pdf_bytes,
@@ -1873,6 +1875,8 @@ def _convert(
             extra: dict[str, Any] = {} if collector is None else {"page_math": collector}
             if settings.layout_display_grouping:
                 extra["display_grouping"] = True
+            if settings.region_tree == "on":
+                extra["region_tree"] = True
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,

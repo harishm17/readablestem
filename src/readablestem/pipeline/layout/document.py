@@ -74,6 +74,7 @@ from readablestem.pipeline.layout.notices import (
     _layout_notices,
     _turned_notices,
 )
+from readablestem.pipeline.layout.order import Gutter
 from readablestem.pipeline.layout.page import (
     _covered_points,
     _label_keys,
@@ -122,6 +123,7 @@ def analyze(
     max_pages: int | None = None,
     page_math: Any = None,
     display_grouping: bool = False,
+    region_tree: bool = False,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -140,6 +142,10 @@ def analyze(
 
     `display_grouping` (`LAYOUT_DISPLAY_GROUPING`, off): the rules of "One printed display, one
     element" in docs/layout.md. Off, the output is what it was before they existed.
+
+    `region_tree` (`REGION_TREE`, off): the page's columns are found by a tree of regions built
+    from the unmerged lines ("The region tree" in docs/layout.md). Off, the output is what it
+    was before the tree existed.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -151,7 +157,10 @@ def analyze(
                 _check_content(lambda: content_budget.check(doc, selected))
                 _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
                 return _analyze_document(
-                    doc, selected, page_math, _Document(grouping=display_grouping)
+                    doc,
+                    selected,
+                    page_math,
+                    _Document(grouping=display_grouping, region_tree=region_tree),
                 )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
@@ -304,7 +313,7 @@ def _analyze_document(
                 kept[number] = page_type.PAGE_READ_FAILED
 
     found: dict[int, list[tables.PageTable]] = {}
-    prepared: dict[int, tuple[list[_Row], tuple[float, float] | None, list[_Row]]] = {}
+    prepared: dict[int, tuple[list[_Row], Gutter, list[_Row]]] = {}
     sources: dict[int, say_once.PageSource] = {}
     for number in selected:
         with guard(number):
@@ -418,6 +427,7 @@ def _analyze_document(
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     ctx.notes = named_links.read(doc, list(selected)) or None
+    ctx.region_tree = document.region_tree
     document.compounds, document.whole_words = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
     )

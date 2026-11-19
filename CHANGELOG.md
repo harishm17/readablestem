@@ -170,6 +170,21 @@
   compared) under "not checked", so the record no longer says only "every part was converted".
 - Jobs stored before this have none of the new lines and read as before. No migration;
   `PIPELINE_VERSION` and `RENDER_VERSION` unchanged.
+## Unreleased: the region tree, off (branch feat/region-tree)
+
+- WS15.1 (SW30, SW31): the page is cut into regions before its lines are made (`REGION_TREE`,
+  `off` or `on`, `off` by default in code and in `ops/production.profile.toml`). The reader is
+  unchanged by default: with the setting off none of the new code runs, and `layout.analyze`
+  over every PDF of the corpus hash run (996 file-and-variant pairs) gives the same output
+  as before (0 differences). On, the tree reads three columns, a notes column read after its
+  body, text on both sides of a picture, a section break between two column pairs, a boxed
+  region, an option grid in label order, index pages and entry lists. On the development set
+  `layout-dev-1` 154 of 267 pages are right instead of 141 (22 made right, 9 made wrong); on the
+  corpus gold pages 82 of 91 instead of 69 (13 made right, none wrong); `layout.analyze` takes
+  0.578 s a page instead of 0.575. Rules 4, 7 and 11 were built and taken out (no page changed).
+  New: `pipeline/layout/regions.py`, `entries.py`, `Settings.region_tree`,
+  `layout.analyze(region_tree=)`, `docs/layout.md` "The region tree", `tests/test_region_tree.py`.
+  Turning it on needs a `PIPELINE_VERSION` bump; no migration, no model request changed.
 
 ## Unreleased: every form is answered once (branch feat/forms-stage-2)
 

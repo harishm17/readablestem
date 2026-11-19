@@ -48,6 +48,8 @@ def _convert(entry: str, image_pages: bool, exam: bool) -> dict[str, Any]:
         grouping: dict[str, Any] = (
             {"display_grouping": True} if settings.layout_display_grouping else {}
         )
+        if settings.region_tree == "on":
+            grouping["region_tree"] = True
         doc = layout.analyze(pdf, max_pages=settings.max_pages_per_job, **grouping)
     except Exception as exc:
         from readablestem.web.worker import error_code_for

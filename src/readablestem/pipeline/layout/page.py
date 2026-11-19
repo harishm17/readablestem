@@ -16,6 +16,7 @@ import pymupdf
 
 from readablestem.core.types import BBox, Kind
 from readablestem.pipeline import baseline_rules, page_type, say_once, tables
+from readablestem.pipeline.layout import regions
 from readablestem.pipeline.layout.blocks import (
     _TEXT_BLOCKS,
     EQUATION_IMAGE_REASON,
@@ -78,7 +79,12 @@ from readablestem.pipeline.layout.furniture import (
 )
 from readablestem.pipeline.layout.glyphs import _MATH_SYMBOL_FONT, _Char, _union
 from readablestem.pipeline.layout.inline_runs import _classify_row, _equation_pictures
-from readablestem.pipeline.layout.order import _find_gutter, _reading_order, _words_both_sides
+from readablestem.pipeline.layout.order import (
+    Gutter,
+    _find_gutter,
+    _reading_order,
+    _words_both_sides,
+)
 from readablestem.pipeline.layout.rows import _merge_baselines
 from readablestem.pipeline.layout.shared import (
     _Block,
@@ -138,7 +144,7 @@ def _prepare_rows(
     source: say_once.PageSource | None = None,
     *,
     document: _Document,
-) -> tuple[list[_Row], tuple[float, float] | None, list[_Row]]:
+) -> tuple[list[_Row], Gutter, list[_Row]]:
     """The page's rows without its running headers, footers, page numbers and watermarks,
     its column gutter, and the rows so dropped (a figure may claim some back as labels:
     `_figure_labels`). `source` gets what the say-once measure counts: the words of the rows
@@ -160,6 +166,15 @@ def _prepare_rows(
             dropped.append(frag)
         elif id(frag) not in placed:
             kept.append(frag)
+    if document.region_tree:  # the page's regions, from the fragments (regions.py)
+        _mark_blanks(kept, rules)
+        rows, tree, rest = regions.prepare(page, kept, dropped, rules, document=document)
+        if source is not None:
+            for row in rows:
+                source.add_row(row.chars)
+            out = [f for f in frags if id(f) in gone or id(f) in placed]
+            source.leave_out("furniture", sum(1 for f in out for c in f.chars if not c.blank))
+        return rows, tree, rest
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
@@ -330,7 +345,7 @@ def _page_blocks(
     page: pymupdf.Page,
     number: int,
     rows: list[_Row],
-    gutter: tuple[float, float] | None,
+    gutter: Gutter,
     ctx: _Context,
     paths: list[_Path],
     margins: _MarginFilter,
@@ -493,7 +508,7 @@ def _page_blocks(
     blocks.extend(_ink_blocks(ink, page_rect))
     # A caption held by its figure still fills its column: without it the column looks empty
     # beside the next line of the other column, which then reads as a heading across both.
-    order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions)
+    order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions, blocks=True)
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
         if block.kind in _TEXT_BLOCKS:
@@ -653,7 +668,7 @@ def _label_key(row: _Row, height: float) -> tuple:
 def _label_keys(
     doc: pymupdf.Document,
     numbers: Sequence[int],
-    prepared: dict[int, tuple[list[_Row], tuple[float, float] | None, list[_Row]]],
+    prepared: dict[int, tuple[list[_Row], Gutter, list[_Row]]],
     paths: dict[int, list[_Path]],
     ctx: _Context,
     margins: _MarginFilter,

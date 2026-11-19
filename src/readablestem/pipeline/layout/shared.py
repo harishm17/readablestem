@@ -663,6 +663,9 @@ class _Context:
     # The footnotes the file names, when it names any (`named_links`); None: it names none,
     # and a footnote is decided by its mark and its place (`_footnote`).
     notes: named_links.NamedNotes | None = None
+    # The document is read with the region tree (`regions.py`): the rules that start an entry
+    # (`entries.starts_entry`) are asked.
+    region_tree: bool = False
 
 
 @dataclass(eq=False)
