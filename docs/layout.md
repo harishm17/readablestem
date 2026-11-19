@@ -825,7 +825,7 @@ matches; an indent within that tolerance of both of the two innermost open level
 the nearer one (a slide's 26 pt body makes the tolerance 16 pt). Where the item texts agree
 within that tolerance, the marker still opens a level when it is of another series than the
 one of the item above (bullet or number, "1)" or "(a)", another bullet glyph) and stands more
-than 0.4 x font size right of it (`MARKER_INDENT`; slides set the sub-bullets under "1)" 13 to
+than half the font size right of it (`MARKER_INDENT`; slides set the sub-bullets under "1)" 13 to
 15 pt in while their text is 5 to 14 pt right of the text above). Items of one series (a
 wrapped list of names that start with initials) and the options of a grid are not moved by
 it. The indent is measured from the left edge of the item's column on its page (the

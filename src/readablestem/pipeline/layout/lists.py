@@ -40,7 +40,7 @@ MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its te
 BULLET_APART_OWN_FONT = 0.1
 BULLET_APART = 0.2
 MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
-MARKER_INDENT = 0.4  # x font size: a marker of another series set this far right opens a level
+MARKER_INDENT = 0.5  # x font size: a marker of another series set this far right opens a level
 DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
 
 
