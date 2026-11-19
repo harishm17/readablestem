@@ -2682,6 +2682,9 @@ From top to bottom:
    (`assemble.contact_link`, which checks it again). The `mailto:` subject is the document's
    title and the item by kind and page ("Equation on page 3"), never its content; the body is
    empty. The link text says what it does ("Email your instructor about this equation").
+   The draft a reviewer downloads has no such link: the person who checks it is not the
+   student, so each note there says where the student's file has the link
+   (`assemble.DRAFT_CONTACT_NOTE`).
    Nothing is sent or stored by the app. Both are CSRF-checked, owner
    only, finished jobs only; an unusable line shows the job page again, status 400, with
    the error under the field and the typed text kept. Neither is logged.

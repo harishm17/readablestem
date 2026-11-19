@@ -300,6 +300,8 @@ def with_medium(html: str, medium: str) -> str:
 
 
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
+# In a draft, where the student's file links to the instructor's contact line (`instructor_link`).
+DRAFT_CONTACT_NOTE = "In the student's file, a link here writes to your contact line."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.
 DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'
@@ -1225,7 +1227,8 @@ class _Renderer:
 
     def instructor_link(self, element: Element, reason: str) -> str:
         """A link that writes to the instructor about one thing not converted, or "" when the
-        owner gave no contact line (the note then says only "Ask your instructor"). The subject
+        owner gave no contact line (the note then says only "Ask your instructor"). In a draft
+        (`CHECKER`) it is a sentence saying where the student's file has the link. The subject
         names the document and the thing by kind and page ("Equation on page 3"); nothing of
         its content is in the link, and the message body is empty (`contact_link`)."""
         if element.kind is Kind.EQUATION:
@@ -1244,7 +1247,12 @@ class _Renderer:
         else:
             what = f"{noun.capitalize()} on {where.lower()}" if where else noun.capitalize()
         text = "{verb} your instructor about this " + noun
-        return contact_link(self.contact, self.titles.text, what, text) or ""
+        link = contact_link(self.contact, self.titles.text, what, text)
+        if link is not None and self.audience == CHECKER:
+            # The person who checks the draft is not the student, and "your instructor" may be
+            # themself: no link to write with; they are told what the student's file has here.
+            return DRAFT_CONTACT_NOTE
+        return link or ""
 
     def link_attrs(self, link: Link) -> str:
         """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
