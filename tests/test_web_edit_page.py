@@ -417,6 +417,9 @@ def test_a_paragraph_left_out_is_listed_to_put_back_named_in_the_record_and_not_
     record = text_of(edits.browser.get(f"/jobs/{edits.job_id}/record").text)
     assert "Left a paragraph out of the student file" in record
     assert "Discuss vectors and scalars with the class." in record
+    # The summary holds the words from the stored paragraph itself, so one left out by a
+    # carried change (whose row has no words) is named too.
+    assert "Page 1: “Discuss vectors and scalars with the class.”" in record
     # Back, and the file is whole again.
     assert edit_post(edits, PLAIN, action="put_back").status_code == 303
     assert "Discuss vectors and scalars" in (with_file(edits).html or "")

@@ -251,7 +251,9 @@ class Record:
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
     left_out_pages: list[int] = field(default_factory=list)  # 1-based
-    left_out_blocks: list[int] = field(default_factory=list)  # 1-based page of each paragraph
+    # Each paragraph left out, in reading order: its 1-based page and its words (the stored
+    # words, so they are here whichever way it was left out: by hand or carried over).
+    left_out_blocks: list[tuple[int, str]] = field(default_factory=list)
     # The file types downloaded so far, in words; None when the app is not recording
     # downloads (EVENTS_ENABLED off), so the record does not say "none" when it cannot know.
     downloaded: list[str] | None = None
@@ -324,7 +326,11 @@ def _left_out_words(edit: Any) -> str:
             ),
             None,
         )
-    text = " ".join(str((held or {}).get("text") or "").split())
+    return _clipped((held or {}).get("text"))
+
+
+def _clipped(words: object) -> str:
+    text = " ".join(str(words or "").split())
     if len(text) > MAX_LEFT_OUT_CHARS:
         text = text[:MAX_LEFT_OUT_CHARS].rsplit(" ", 1)[0] + "…"
     return text
@@ -516,7 +522,7 @@ def by_hand_not_checked(result: DocumentResult) -> list[str]:
         lines.append(
             f"{n} {'paragraph or list item was' if n == 1 else 'paragraphs or list items were'} "
             "left out by the person: not reviewed, and not in the student file. The words are "
-            "in the record of changes."
+            "in the summary of this record."
         )
     return lines
 
@@ -642,7 +648,10 @@ def build(
         not_checked=not_checked_list(result, summary),
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
-        left_out_blocks=[n + 1 for n in result.left_out_block_pages],
+        left_out_blocks=[
+            (b.element.page + 1, _clipped(b.element.text))
+            for b in sorted(result.left_out_blocks, key=lambda b: (b.element.page, b.element.order))
+        ],
         downloaded=(
             None
             if downloaded_formats is None
@@ -741,9 +750,8 @@ def to_csv(record: Record) -> str:
     if record.left_out_pages:
         pages = " ".join(str(n) for n in record.left_out_pages)
         row("summary", "Pages left out of the student file", detail=pages)
-    if record.left_out_blocks:
-        pages = " ".join(str(n) for n in record.left_out_blocks)
-        row("summary", "Paragraphs left out of the student file, by page", detail=pages)
+    for page, words in record.left_out_blocks:
+        row("summary", "Paragraph left out of the student file", page=page, detail=words)
     for title, text in record.gaps:
         row("summary", title, detail=text)
     for d in record.decisions:

@@ -30,6 +30,12 @@
   bars around one capital letter, or around a row with a set sign (union, intersection, set
   minus) or a colon, keeps "vertical bar" as it did before this batch
   (`speech._size_or_determinant`). `|x|`, `|x - y|` and `|a| + |b|` are still absolute values.
+- Review record: it said the words of a left-out paragraph "are in the changes below", but a
+  paragraph left out by a change carried over from an earlier version has a row with no words.
+  The summary now lists each left-out paragraph with its page and its words, read from the
+  stored paragraph (`record.Record.left_out_blocks`), and the CSV has one summary row for each
+  ("Paragraph left out of the student file", with the page and the words) in place of the one
+  row of page numbers. Two paragraphs on two pages no longer read "(page 1, 3)".
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 
