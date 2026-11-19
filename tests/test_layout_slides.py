@@ -101,6 +101,7 @@ def test_a_selection_of_pages_is_read_as_a_deck_of_those_pages():
 
 SLIDE = (720.0, 540.0)
 WIDE = (720.0, 405.0)  # 16:9
+LETTER = (792.0, 612.0)  # a letter sheet on its side
 
 
 def title_slide(text: str, size: float = 66.0, size_of_page=SLIDE) -> tuple:
@@ -136,18 +137,20 @@ def test_a_powerpoint_style_deck_loses_its_earlier_steps_and_only_when_it_has_ti
     one = ["Wave one rises"]
     two = [*one, "Wave two follows"]
     three = [*two, "Wave three ends"]
-    pages = [
-        slide("Waves", *one),
-        slide("Waves", *two),
-        slide("Waves", *three),
-        slide("Energy", "Energy is conserved"),
-    ]
-    result = analyze(deck_pdf(pages))
-    assert result.pages == [2, 3]  # the first two pages are steps of the third
-    assert [e.text for e in result.elements if e.kind == Kind.HEADING] == ["Waves", "Energy"]
-    # the same pages with no title on any of them are not slides: nothing is dropped
-    plain = [(size, [(t, y, 20) for t, y, _ in lines[1:]]) for size, lines in pages]
-    assert analyze(deck_pdf(plain)).pages == [0, 1, 2, 3]
+    # A deck printed to PDF is on a letter sheet turned on its side: its titles make it a deck.
+    for sheet in (SLIDE, LETTER):
+        pages = [
+            slide("Waves", *one, size_of_page=sheet),
+            slide("Waves", *two, size_of_page=sheet),
+            slide("Waves", *three, size_of_page=sheet),
+            slide("Energy", "Energy is conserved", size_of_page=sheet),
+        ]
+        result = analyze(deck_pdf(pages))
+        assert result.pages == [2, 3]  # the first two pages are steps of the third
+        assert [e.text for e in result.elements if e.kind == Kind.HEADING] == ["Waves", "Energy"]
+        # the same pages with no title on any of them are not slides: nothing is dropped
+        plain = [(size, [(t, y, 20) for t, y, _ in lines[1:]]) for size, lines in pages]
+        assert analyze(deck_pdf(plain)).pages == [0, 1, 2, 3]
 
 
 def test_a_second_title_slide_or_a_new_page_size_starts_a_second_deck_at_the_same_level():

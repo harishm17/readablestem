@@ -16,8 +16,9 @@ back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, 
    that share a page label (an overlay's pages have one, `hyperref`'s), or (c) has a title on
    most of its pages: the page's largest text in the top third (`_title`), or a title slide's
    title (`_title_slide`), on at least `TITLED_SHARE` of the pages. (c) needs neither Beamer
-   nor labels: a PowerPoint or Keynote deck exported as PDF has neither. A file that is none
-   of these is not a deck and is read as before.
+   nor labels: a PowerPoint or Keynote deck exported as PDF has neither. For (c) a letter or
+   A4 sheet on its side counts as well: a deck printed to PDF is on one, and its titles say
+   it is a deck. A file that is none of these is not a deck and is read as before.
 2. Decks: a file may hold several. A deck ends where the page size changes, and where a title
    slide comes (a page with a title-sized line, at least `TITLE_SLIDE_RATIO` x an ordinary
    slide title, and at most `MAX_SUBTITLE_ROWS` other lines in its body) when the file's first
@@ -179,15 +180,19 @@ def deck_number(reasons: Iterable[str]) -> int | None:
 
 def slide_shaped(width: float, height: float) -> bool:
     """Landscape, 4:3 / 16:9 / 16:10, and not a sheet of paper turned on its side."""
-    if width <= 0 or height <= 0 or width <= height:
-        return False
-    if any(
-        abs(width - w) <= PAPER_TOLERANCE and abs(height - h) <= PAPER_TOLERANCE
-        for w, h in PAPER_SIZES
-    ):
+    if width <= 0 or height <= 0 or width <= height or _sheet_on_its_side(width, height):
         return False
     aspect = width / height
     return any(abs(aspect / a - 1) <= ASPECT_TOLERANCE for a in SLIDE_ASPECTS)
+
+
+def _sheet_on_its_side(width: float, height: float) -> bool:
+    """A sheet of paper turned on its side (`PAPER_SIZES`): what a deck printed to PDF from
+    PowerPoint, Keynote or a browser is. Only titles make such a file a deck (`detect`)."""
+    return any(
+        abs(width - w) <= PAPER_TOLERANCE and abs(height - h) <= PAPER_TOLERANCE
+        for w, h in PAPER_SIZES
+    )
 
 
 def _norm(text: str) -> str:
@@ -337,7 +342,12 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     slides. Never raises."""
     if len(views) < 2:
         return None
-    shaped = [slide_shaped(v.width, v.height) for v in views]
+    slide = [slide_shaped(v.width, v.height) for v in views]
+    # A sheet of paper on its side counts for (c) only: Beamer and page labels are not what
+    # says a printed deck is one, its titles are.
+    shaped = [
+        ok or _sheet_on_its_side(v.width, v.height) for v, ok in zip(views, slide, strict=True)
+    ]
     if sum(shaped) < 0.8 * len(views):
         return None
     beamer = bool(creator and _BEAMER.search(creator))
@@ -354,7 +364,7 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     # Not Beamer: the pages must have at least two different labels, and the labels must group
     # some pages and not all (a label tree with a prefix and no numbers labels every page alike).
     labelled = len({v.label for v in views if v.label}) >= 2 and len(frames) >= 2
-    by_label = beamer or (overlaid and labelled)
+    by_label = (beamer or (overlaid and labelled)) and sum(slide) >= 0.8 * len(views)
     titled = sum(v.number in titles or v.number in title_slides for v in views)
     if not by_label and titled < TITLED_SHARE * len(views):
         return None

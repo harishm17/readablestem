@@ -3,7 +3,8 @@
 ## Unreleased: decks are found by shape, and a file of several decks reads as several (branch feat/decks-by-shape)
 
 - SW6 (F-254, F-526). `slides.detect` now also takes a deck from the pages alone: every page
-  slide-shaped (landscape 4:3, 16:9 or 16:10, not a Letter or A4 sheet) and a title on at least
+  slide-shaped (landscape 4:3, 16:9 or 16:10, or a Letter or A4 sheet on its side, which is what
+  a deck printed to PDF is on) and a title on at least
   70% of them, with or without page labels or a Beamer creator. The share was chosen from
   measured files: real decks had a title on 91-100% of their pages and files that are not decks
   on 0-33%. Overlay steps of such a deck are found by content (`_repeats`: every row and mark of
@@ -14,7 +15,8 @@
   below that; heading sizes are judged per deck (`heading_levels` groups by the `slide_deck N`
   reason). A title of several lines is read as one heading. `assemble.title_plan` is unchanged.
 - Elements of a deck carry the new reasons `slide_deck N` and `slide_deck_title`.
-- Not changed: the slide shape test, scanned or image-only decks, .pptx uploads.
+- Not changed: the slide shape test for Beamer and labeled decks, scanned or image-only decks,
+  .pptx uploads.
 - No migration; no model request or `RENDER_VERSION` changed. A `PIPELINE_VERSION` bump is owed
   at the next PR, because a stored document's pages and headings can change on a re-run.
 

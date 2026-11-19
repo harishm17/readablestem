@@ -817,9 +817,13 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   or Keynote deck exported as PDF has. 70 % is chosen from the files measured: the decks have a
   title on 91 to 100 % of their pages and the slide-shaped files that are not decks (photographed
   and pictured slides, a template page) on 0 to 33 %, so any share in between separates them;
-  70 % keeps a deck with a third of its pages untitled (a picture slide, a credits page). A
-  landscape file with no titles, a portrait document, a landscape table and a landscape Letter or
-  A4 sheet are not decks and are read as before (`_SLIDE_DECK` False: no rule below applies). A
+  70 % keeps a deck with a third of its pages untitled (a picture slide, a credits page). For
+  the titles route a Letter or A4 sheet on its side counts as a slide page too: a deck printed to
+  PDF is on one (the one such file among the corpus uploads, 39 pages, has a title on 97 % of
+  them; the corpus holds no landscape sheet that is not a deck, so the titles are the only guard
+  measured). Beamer and page labels still need the slide shape. A landscape file with no titles,
+  a portrait document and a landscape table are not decks and are read as before (`_SLIDE_DECK`
+  False: no rule below applies). A
   page kept whole as its image (a photographed slide) has no text, is never dropped, never makes
   the pages beside it a frame, and is untitled.
 - **Several decks in one file** (`slides._decks`). A deck ends where the page size changes, and
