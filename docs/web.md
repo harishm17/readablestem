@@ -1489,8 +1489,9 @@ Every sentence about what was converted, checked or reviewed is made from one mo
 writes such a sentence. The summary is computed from the stored result (`checked.of_result`:
 its elements, fixes, pages left out and the page's structure checks) and is never stored. It
 holds what was converted by kind (equations in MathML, figures described or marked as
-decoration, tables rebuilt or written as text, the parts shown as pictures with their kind and
-page, the pages left out), the structure checks (how many ran, which failed), what people did
+decoration, tables rebuilt or written as text, the parts not converted with their kind and page,
+each shown as a picture of the original or, for an equation of a Word or LaTeX file, which has no
+picture, as its LaTeX text (`Picture.as_text`), the pages left out), the structure checks (how many ran, which failed), what people did
 per decision (`core.triage.review_load`: open, accepted, accepted with a check failing,
 edited, kept as a picture, marked as decoration, optional notes never opened), what is never
 checked, the day of the last decision and the version.
@@ -1501,7 +1502,10 @@ checked, the day of the last decision and the version.
 - The state table reads it: with no gap note and nothing open, `ready` only when nothing is a
   picture, nothing is left out and no structure check failed; otherwise `ready_remains`,
   "Ready", whose message says what remains ("2 equations are shown as images that screen
-  readers cannot read. 7 of 8 pages were left out."). With no summary (a caller that passes
+  readers cannot read. 7 of 8 pages were left out."; for a Word or LaTeX file, "2 equations
+  are shown as LaTeX text, not written so that screen readers can read them aloud."). The
+  gate is the same either way: an equation a screen reader gets as raw LaTeX is not converted.
+  With no summary (a caller that passes
   none) the job is never "Ready to share". The documents list reads the result of every
   finished job with no decision open to get this label; a job with decisions open needs only
   its stored count.
@@ -1953,11 +1957,13 @@ both under "Record for your accessibility office".
 It lists, in this order: the document (title, file name, pages, when and by whom it was
 converted, the tool and pipeline version, the language, when the record was made, a short
 reference); what the tool did (parts found by kind, accepted by the tool with no decision
-from a person, decided by a person, still open, shown as pictures); every review decision
+from a person, decided by a person, still open, shown as pictures or, for a Word or LaTeX
+file's equations, as LaTeX text); every review decision
 (`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom:
 "you" for the reader, a name for another person, never an address beyond the one "Converted
 by" line the owner sees); the decisions still open; the
-parts shown as pictures and why; the structure checks (how many ran, which did not pass);
+parts shown as pictures and why (headed "Parts not converted" when they are shown as LaTeX
+text); the structure checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
 lines for the office to sign. Every kind of change a person can make is a row with who and
 when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a paragraph made a sidebar or a quotation (or given

@@ -441,7 +441,7 @@ def not_checked_list(result: DocumentResult, summary: CheckedSummary) -> list[st
             "The file has the tool's proposals for them."
         )
     if summary.pictures:
-        out.append(checked_words.as_image_sentence(summary))
+        out.append(checked_words.not_converted_sentence(summary))
     out.extend(checked_words.record_not_reviewed(summary))
     for line in by_hand_not_checked(result):
         out.append(line)
@@ -590,7 +590,8 @@ def build(
         )
     decisions.extend(_relabel_rows(relabeled, labels, who, file_who, owner, ref))
     decisions.sort(key=lambda d: d.when)
-    # The parts shown as pictures, as the summary counts them (an element with no fix too).
+    # The parts not converted (a picture, or an equation's LaTeX), as the summary counts them
+    # (an element with no fix too).
     images = [
         ImageRow(
             item=labels.get(p.element_id)
@@ -725,7 +726,9 @@ def to_csv(record: Record) -> str:
     # What people did, per decision (`core.triage.review_load`), the open ones first.
     for action, label in checked_words.ACTION_ROWS.items():
         row("summary", label, detail=s.load.actions[action])
-    row("summary", "Shown as pictures of the original", detail=s.pictures)
+    row("summary", "Shown as pictures of the original", detail=s.images)
+    if s.written:  # a Word or LaTeX source has no picture of an equation
+        row("summary", "Shown as LaTeX text, not converted", detail=s.written)
     row("summary", checked_words.READY_ALL, detail="Yes" if s.all_found_converted else "No")
     for name, n in record.by_hand.items():
         row("summary", name, detail=n)

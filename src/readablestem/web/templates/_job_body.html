@@ -151,7 +151,7 @@
   </details>
   {# Said by the status box when the job is ready (web/states.py); here in every other
      state. Every sentence is the summary's (pipeline/checked_words.py). #}
-  {% set pictures = checked_words.as_image_sentence(s.checked) %}
+  {% set pictures = checked_words.not_converted_sentence(s.checked) %}
   {% if pictures and state.key not in ["ready", "ready_remains"] %}<p id="items-count">{{ pictures }}</p>{% endif %}
   {% set notes = checked_words.notes_line(s.checked) %}
   {% if notes %}

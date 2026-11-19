@@ -112,9 +112,11 @@ def maths_sentence(s: CheckedSummary) -> str:
     if c.equations_mathml == c.equations:
         return MATHS_ALL
     verb = "is" if c.equations_mathml == 1 else "are"
+    # A Word or LaTeX source has no picture of an equation: the page shows its LaTeX.
+    others = "pictures" if c.pictures_by_kind.get("equation") else "shown as LaTeX text"
     return (
         f"{c.equations_mathml} of its {c.equations} equations {verb} written so that screen "
-        "readers can read them aloud; the others are pictures."
+        f"readers can read them aloud; the others are {others}."
     )
 
 
@@ -288,12 +290,23 @@ NO_CHECKS = "No structure checks are stored for this file."
 CHECKS_SCOPE = "They check structure, not whether the content is right."
 
 
-def as_image_sentence(s: CheckedSummary) -> str:
-    """ "2 equations are shown as images that screen readers cannot read." ("" when none)."""
-    if not s.pictures:
-        return ""
-    verb = "is shown as an image" if s.pictures == 1 else "are shown as images"
-    return f"{kinds_phrase(s.converted.pictures_by_kind)} {verb} that screen readers cannot read."
+def not_converted_sentence(s: CheckedSummary) -> str:
+    """What stands between the file and "Ready to share" among its parts, said as each is
+    shown: "2 equations are shown as images that screen readers cannot read." for a picture;
+    "2 equations are shown as LaTeX text, not written so that screen readers can read them
+    aloud." for an equation of a Word or LaTeX file, which has no picture ("" when none)."""
+    c = s.converted
+    said = []
+    if s.images:
+        verb = "is shown as an image" if s.images == 1 else "are shown as images"
+        said.append(f"{kinds_phrase(c.pictures_by_kind)} {verb} that screen readers cannot read.")
+    if s.written:
+        verb, it = ("is", "it") if s.written == 1 else ("are", "them")
+        said.append(
+            f"{kinds_phrase(c.written_by_kind)} {verb} shown as LaTeX text, not written so that "
+            f"screen readers can read {it} aloud."
+        )
+    return " ".join(said)
 
 
 def left_out_owner(s: CheckedSummary) -> str:
@@ -353,7 +366,7 @@ def remains(s: CheckedSummary) -> str:
     """What stands between a finished job with no open decision and "Ready to share" ("" when
     nothing does)."""
     parts = [
-        as_image_sentence(s),
+        not_converted_sentence(s),
         left_out_owner(s),
         cut_off_owner(s),
         unread_owner(s),
@@ -404,10 +417,13 @@ def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
 def card_equations(s: CheckedSummary) -> str:
     """The before/after card's equation row: how many of the equations found are MathML."""
     c = s.converted
-    images = c.pictures_by_kind.get("equation", 0)
     text = f"{c.equations_mathml} of {c.equations} are MathML, read with their structure"
-    if images:
-        return f"{text}; {images} {'is' if images == 1 else 'are'} shown as an image."
+    for n, shown in (
+        (c.pictures_by_kind.get("equation", 0), "an image"),
+        (c.written_by_kind.get("equation", 0), "LaTeX text"),
+    ):
+        if n:
+            text += f"; {n} {'is' if n == 1 else 'are'} shown as {shown}"
     return f"{text}."
 
 

@@ -1510,7 +1510,9 @@ so it says no more than was done. It has no review screen's words ("needs review
 - when something is a picture of the original, how many: "4 parts could not be converted
   and are shown as pictures of the original, marked "Not converted" or "Needs a
   description": ask your instructor for a version you can read." (for a LaTeX source,
-  "shown as they were written in LaTeX"); when whole pages are kept as images, which ones
+  "shown as they were written in LaTeX"); an equation of a Word or LaTeX file has no picture,
+  so the sentence about equations the reader cannot make into MathML ("the others are shown
+  as LaTeX text") never says picture; when whole pages are kept as images, which ones
   (`assemble.kept_pages_note`);
 - when pages were left out, which: "Pages 2, 3 and 4 (3 of 8) of the original PDF were left
   out of this file.";

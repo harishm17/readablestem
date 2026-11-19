@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: a Word or LaTeX equation shown as its LaTeX is not called an image (branch fix/source-equation-words)
+
+- An equation of a Word or LaTeX file that could not be made into MathML is written on the student
+  page as its LaTeX; there is no picture of it. The owner was still told "2 equations are shown as
+  images that screen readers cannot read" (the job page, the record), the job page's equation row
+  said "shown as an image", the student file's note said "the others are pictures", and a draft
+  download said "an image". `checked.Picture` now says whether the part is shown as text
+  (`as_text`, set from the file's origin in `checked.converted`), and each sentence reads it:
+  `checked_words.not_converted_sentence` (was `as_image_sentence`), `maths_sentence`,
+  `card_equations`, the record's section ("Parts not converted") and CSV row ("Shown as LaTeX
+  text, not converted"), and `job_page.draft_sentence`. The count that holds the job at "Ready"
+  and lists the part for the owner is unchanged: an equation a screen reader gets as raw LaTeX is
+  not converted. PDFs read the same as before. This changes the student note (`maths_sentence`) of
+  every Word or LaTeX document that has an equation without MathML, so it owes a `RENDER_VERSION`
+  raise (not raised on this branch).
+
 ## Unreleased: a reviewer leaves one paragraph out of the student file (branch fix/review-small-items, WS19.9 in part)
 
 - The page editor has "Leave it out" on a paragraph or list item, and the page's list shows a
