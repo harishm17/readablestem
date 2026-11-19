@@ -483,7 +483,9 @@ document in another language marks it `lang="en"`).
 - **Block roles (WS16.3).** `Element.role` (`"aside"` or `"quote"`, left out of the JSON when
   empty, so a stored result reads unchanged) says what a paragraph is to the document. A
   paragraph with a role is written inside `<aside aria-label="Sidebar">` (a pull quote, a
-  sidebar, a margin note; it is not in the outline and screen readers list it as a
+  sidebar, a margin note; a page with more than one is named "Sidebar 1 of 3", "Sidebar 2 of 3",
+  and so on, so a screen reader's list of regions tells them apart; a sidebar holds only
+  paragraphs, so it has no heading of its own to be named by; it is not in the outline and screen readers list it as a
   complementary landmark) or `<blockquote>` (a block quote); neighbors of one role share one
   wrapper. A list item or a defined term never takes a wrapper. A footnote is not a role (it is
   the notice `footnote`, above) and code is `Element.preformatted`. The Word reader
@@ -504,7 +506,9 @@ document in another language marks it `lang="en"`).
   (pandoc drops `<aside>`, so the export wraps it in a styled `div`; Word has no landmark for
   it, so the role is the style's name); the EPUB keeps `<aside aria-label>` and `<blockquote>`;
   Canvas and the cartridge keep both elements and the `aria-label` but not the bar (Canvas has
-  no stylesheet; the margin and padding stay inline); Listen says "Side notes, Sidebar" before
+  no stylesheet; the margin and padding stay inline); Word has styles and no region names, so
+  every sidebar keeps the one style "Sidebar"; Listen says "Side notes, Sidebar" (or "Side notes,
+  Sidebar 2 of 3") before
   an aside and "Quote" and "End quote" around a quotation.
 
 The tab order is the skip link, then the contents list's links, then the file.
@@ -1124,6 +1128,13 @@ The text itself is unchanged (`H2O`), so search and copy read as before. A run i
 when it would start inside an inline equation's marker or overlap another. What cannot be
 carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
 written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+
+The page, Word and the EPUB keep the raised or lowered run as `<sup>`, `<sub>` or Word's own
+superscript and subscript, which a screen reader reads as plain characters ("g/cm3"). Listen
+says which it is, so a listener can tell "cm3" from "cm cubed" and a footnote's mark from a
+number: "19.3 g/cm superscript 3", "x subscript 1 end subscript y". "End superscript" and "end
+subscript" are said only when text goes on right behind the run (not before a space, a
+punctuation mark or the end); the ending of an ordinal ("10th", "2nd") adds no words.
 
 ## Chemistry
 

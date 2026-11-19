@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
+
+- Speech: `\{x | |x|<1\}` (a plain bar before an absolute value in set braces) read "vertical
+  bar" three times; the first is now "such that" and the others an absolute value. `\|A\|_F`
+  (a norm with a subscript, whose second bar is a script's base) read both bars literally; it is
+  now "the norm of cap A end norm sub cap F". `|A \times B|` read "the absolute value of cap A
+  times cap B": bars around a cross of two things that are not numbers can be a size, a
+  magnitude or a determinant-like value, so they keep "vertical bar" and the cross is named
+  (`|3 \times 10^{-5}|` is still an absolute value). `SPEECH_VERSION` is 4, so a stored reading
+  is said again from its MathML where it is shown (no model call). `RENDER_VERSION` is owed a
+  raise: the stored page's sayings and sidebar names changed.
+- Listen: raised and lowered text outside maths (`g/cm<sup>3</sup>`, `x<sub>1</sub>y`, a
+  footnote's mark) is said with "superscript" or "subscript" before it, and "end superscript" or
+  "end subscript" after it when text goes on right behind it; the ending of an ordinal ("10th")
+  adds no words. The page, Word and the EPUB are unchanged.
+- A student page with more than one sidebar names them "Sidebar 1 of 3", "Sidebar 2 of 3" and so
+  on (`aria-label`), so a screen reader's list of regions tells them apart; one sidebar is still
+  "Sidebar". The EPUB, Canvas, the cartridge, the combined file and Listen carry the name from
+  the page; Word keeps the one style "Sidebar".
+
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"

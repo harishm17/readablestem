@@ -226,7 +226,32 @@ _BREAKS = re.compile(rf"(?:\s*{BREAK})+\s*")
 _PAUSE = re.compile(rf"([.,;:!?])?{BREAK}")
 
 
+# Raised and lowered text (`<sup>`, `<sub>`) inside text: the start and end of each, kept in the
+# text until `_words` has the whole of it, because whether "end superscript" is said depends on
+# what follows ("cm3 and", "cm3." need none, "x2y" does). A page reads "cm3" and "H2O" as
+# written; Listen says which digits are raised or lowered.
+_SCRIPT_WORDS = {"\ue001": "superscript", "\ue003": "subscript"}
+_SCRIPT_END = {"\ue002": "end superscript", "\ue004": "end subscript"}
+_ORDINAL = re.compile(r"(\d)\ue001(st|nd|rd|th)\ue002")
+_SCRIPT_MARK = re.compile("[\ue001-\ue004]")
+_SCRIPT_ENDS_TEXT = re.compile(r"[\ue002\ue004](?=[\s.,;:!?)\]\ue001\ue003]|$)")
+_SCRIPT_END_MARK = re.compile("[\ue002\ue004]")
+
+
+def _script_words(text: str) -> str:
+    """The words for the raised and lowered runs of `text`: none for the ending of an ordinal
+    ("10th"), "superscript" or "subscript" before the run, and "end superscript" or "end
+    subscript" after it when text goes on right behind it."""
+    if "\ue001" not in text and "\ue003" not in text:
+        return text
+    text = _ORDINAL.sub(r"\1\2", text)
+    text = _SCRIPT_ENDS_TEXT.sub("", text)
+    text = _SCRIPT_END_MARK.sub(lambda m: f" {_SCRIPT_END[m.group(0)]} ", text)
+    return _SCRIPT_MARK.sub(lambda m: f" {_SCRIPT_WORDS[m.group(0)]} ", text)
+
+
 def _words(text: str) -> str:
+    text = _script_words(text)
     text = _BREAKS.sub(BREAK, _SPACE.sub(" ", text)).strip(f" {BREAK}")
     text = _PAUSE.sub(lambda m: f"{m.group(1) or ','} ", text)
     return _BEFORE_PUNCT.sub(r"\1", _SPACE.sub(" ", text).strip())
@@ -387,6 +412,9 @@ class _Transcript:
         if tag == "hr":
             return ""
         inner = self._children_text(node, depth)
+        if tag in ("sup", "sub"):
+            opening, closing = ("\ue001", "\ue002") if tag == "sup" else ("\ue003", "\ue004")
+            return f"{opening}{inner}{closing}"
         if node.has_class("flagged-inline"):
             self._held.add("not-converted")
             return f" {_words(inner)}, not converted "
