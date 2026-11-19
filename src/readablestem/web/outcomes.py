@@ -61,6 +61,7 @@ _EDITS = {"edit", "add_data_table", "describe", "relabel"}
 _STRUCTURE_OUTCOMES = {
     "edit_text": "edited",
     "make_heading": "edited",
+    "set_role": "edited",
     "omit_page": "removed",
     "restore_page": "removed",
     "add_figure": "added",

@@ -1974,7 +1974,15 @@ def _already_saved(
 # one item's words, level or reading. Every other action (a page left out or put back, a
 # region added, "Not an equation", an Undo) moves or renumbers other elements.
 ITEM_ACTIONS = frozenset(
-    {*STATUS_FOR_ACTION, ADD_DATA_TABLE, DESCRIBE, "read_again", "edit_text", "make_heading"}
+    {
+        *STATUS_FOR_ACTION,
+        ADD_DATA_TABLE,
+        DESCRIBE,
+        "read_again",
+        "edit_text",
+        "make_heading",
+        "set_role",
+    }
 )
 
 

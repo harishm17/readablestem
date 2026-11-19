@@ -263,7 +263,9 @@ class TextEditor:
     levels: int = 6  # levels 1 to this fit after the heading before it
     level: str = "2"
     item_href: str | None = None  # a heading's own panel (its level, bold text)
-    errors: dict[str, str] = field(default_factory=dict)  # "text", "level" -> message
+    role: str | None = None  # "aside" or "quote" when it is one now
+    can_set_role: bool = False  # a plain paragraph: it can be a sidebar or a quotation
+    errors: dict[str, str] = field(default_factory=dict)  # "text", "level", "role" -> message
 
 
 @dataclass
@@ -1285,6 +1287,8 @@ class SplitBuilder:
             label=line.label,
             text=friendly_text(self.result, element, fix),
             code=element.preformatted,
+            role=element.role,
+            can_set_role=not page_edits.role_blocked(self.result, element),
         )
         if element.kind is Kind.HEADING:
             if fix is not None and fix.heading is not None:

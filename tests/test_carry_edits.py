@@ -159,6 +159,46 @@ def test_the_nearest_of_two_identical_paragraphs_gets_the_edit_when_the_counts_a
     assert element(new, PLAIN).text.endswith("the class.")
 
 
+# --------------------------------------------------------------------------- roles
+
+
+def test_a_role_set_or_cleared_by_a_person_is_carried_onto_the_unchanged_paragraph():
+    old, old_crops = fresh()
+    made = page_edits.set_role(old, PLAIN, "quote")
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [(carry_edits.ROLE, PLAIN)] and done.dropped == 0
+    assert element(new, PLAIN).role == "quote"
+    # Cleared: a role the new file's own reading gives is taken off again.
+    cleared = page_edits.set_role(old, PLAIN, None)
+    again, again_crops = fresh()
+    again.elements = [
+        e.model_copy(update={"role": "quote"}) if e.id == PLAIN else e for e in again.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, again, again_crops, rows_of(made, cleared))
+    assert done.items == [(carry_edits.ROLE, PLAIN)]
+    assert element(again, PLAIN).role is None
+
+
+def test_a_role_that_was_undone_or_sits_on_a_changed_paragraph_is_not_carried():
+    old, old_crops = fresh()
+    made = page_edits.set_role(old, PLAIN, "aside")
+    undone = page_edits.undo(old, PLAIN, made.before[review.STRUCTURE_KEY])
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made, undone))
+    assert done.items == [] and done.dropped == 0 and element(new, PLAIN).role is None
+    old, old_crops = fresh()
+    made = page_edits.set_role(old, PLAIN, "aside")
+    new, new_crops = fresh()
+    new.elements = [
+        e.model_copy(update={"text": "Another sentence entirely."}) if e.id == PLAIN else e
+        for e in new.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [] and done.dropped == 1
+    assert element(new, PLAIN).role is None
+
+
 # --------------------------------------------------------------------------- headings
 
 

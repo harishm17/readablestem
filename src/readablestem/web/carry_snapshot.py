@@ -52,6 +52,7 @@ STRUCTURE_ACTIONS = frozenset(
     {
         "edit_text",
         "make_heading",
+        "set_role",
         "add_figure",
         "add_equation",
         "omit_page",

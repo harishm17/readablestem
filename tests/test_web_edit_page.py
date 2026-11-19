@@ -38,6 +38,8 @@ PARAGRAPH = "p1-e1"  # "A rigid body turning with angular velocity ⟦p1-e2⟧ m
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."
 CODE = "p1-e8"
 ENTRY = "p1-e9"
+NEXT = "p1-e10"  # a plain paragraph, then another: the two sit side by side
+AFTER = "p1-e11"
 
 EQUATION_ANSWER = {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
 
@@ -53,6 +55,11 @@ def edit_output() -> ConversionOutput:
         Element(id=ENTRY, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, 650.0, 540.0, 670.0), order=51,
                 text="Vector a quantity with size and direction", term_end=6)
     )  # fmt: skip
+    for number, eid in enumerate((NEXT, AFTER)):
+        result.elements.append(
+            Element(id=eid, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, 680.0 + 20 * number, 540.0, 695.0 + 20 * number),
+                    order=52 + number, text=f"A paragraph beside it, number {number + 1}.")
+        )  # fmt: skip
     return output
 
 
@@ -333,6 +340,61 @@ def test_code_and_entries_and_long_paragraphs_are_not_headings(edits):
     long = "Words " * 80
     edit_post(edits, PLAIN, action="text", text=long)
     assert edit_post(edits, PLAIN, action="heading", level="2").status_code == 422
+
+
+# --------------------------------------------------------------------------- a sidebar or a quotation
+
+
+def test_a_paragraph_is_made_a_sidebar_or_a_quotation_and_the_page_has_the_wrapper(edits):
+    page = f"/jobs/{edits.job_id}/review?page=1&tools=1&change={PLAIN}"
+    assert "Make it a sidebar" in edits.browser.get(page).text
+    assert edit_post(edits, PLAIN, action="role", role="aside").status_code == 303
+    assert element(edits, PLAIN).role == "aside"
+    html = with_file(edits).html or ""
+    assert re.search(
+        r'<aside aria-label="Sidebar"><p[^>]*>Discuss vectors and scalars with the class\.</p></aside>',
+        html,
+    )
+    shown = unescape(edits.browser.get(page).text)
+    assert "This paragraph is a sidebar" in shown and "Not a sidebar" in shown
+    # The other role replaces it; neighbors of one role share one wrapper.
+    assert edit_post(edits, PLAIN, action="role", role="quote").status_code == 303
+    assert edit_post(edits, NEXT, action="role", role="quote").status_code == 303
+    assert edit_post(edits, AFTER, action="role", role="quote").status_code == 303
+    html = with_file(edits).html or ""
+    assert "<aside" not in html and html.count("<blockquote>") == 2
+    quoted = html.split("<blockquote>")[2].split("</blockquote>")[0]
+    assert "number 1." in quoted and "number 2." in quoted
+    # The same role again, or a word that is neither, changes nothing.
+    assert edit_post(edits, PLAIN, action="role", role="quote").status_code == 422
+    assert edit_post(edits, PLAIN, action="role", role="verse").status_code == 422
+    assert element(edits, PLAIN).role == "quote"
+
+
+def test_a_role_is_cleared_and_undone(edits):
+    edit_post(edits, PLAIN, action="role", role="aside")
+    assert edit_post(edits, PLAIN, action="role", role="").status_code == 303
+    assert element(edits, PLAIN).role is None
+    assert "<aside" not in (with_file(edits).html or "")
+    assert edit_post(edits, PLAIN, action="role", role="").status_code == 422  # already none
+    path = f"/jobs/{edits.job_id}/review"
+    undo = edits.browser.post(
+        f"/jobs/{edits.job_id}/undo",
+        data={"csrf_token": token(edits.browser, path), "version": version(edits)},
+    )
+    assert undo.status_code == 303
+    assert element(edits, PLAIN).role == "aside"
+
+
+def test_only_a_plain_paragraph_can_be_a_sidebar_or_a_quotation(edits):
+    page = unescape(
+        edits.browser.get(f"/jobs/{edits.job_id}/review?page=1&tools=1&change={CODE}").text
+    )
+    assert "Make it a sidebar" not in page
+    for target in (CODE, ENTRY, "p1-e0", "p1-e2"):  # code, entry, heading, equation
+        response = edit_post(edits, target, action="role", role="aside")
+        assert response.status_code == 422, target
+        assert element(edits, target).role is None
 
 
 # --------------------------------------------------------------------------- pictures

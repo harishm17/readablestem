@@ -324,17 +324,21 @@ def edit_element(
     action: Annotated[str, Form()] = "",
     text: Annotated[str, Form()] = "",
     level: Annotated[str, Form()] = "",
+    role: Annotated[str, Form()] = "",
     version: Annotated[str, Form()] = "",
 ) -> Response:
     """Change what the tool did not propose: the words of a paragraph, list item or heading
-    (`action=text`), or make a paragraph a heading (`action=heading`, with its `level`)."""
-    if not ELEMENT_ID.match(element_id) or action not in {"text", "heading"}:
+    (`action=text`), make a paragraph a heading (`action=heading`, with its `level`), or make it
+    a sidebar or a quotation, or neither (`action=role`, with `role` `aside`, `quote` or empty)."""
+    if not ELEMENT_ID.match(element_id) or action not in {"text", "heading", "role"}:
         raise PageError(404, *NOT_FOUND)
     page, element_id = _page_of(request, job_id, user, element_id)
 
     def make(result: DocumentResult, job: Job, session: Session) -> StructureChange:
         if action == "text":
             return page_edits.edit_text(result, element_id, text)
+        if action == "role":
+            return page_edits.set_role(result, element_id, role)
         return page_edits.make_heading(result, element_id, level)
 
     try:

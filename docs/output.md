@@ -1843,6 +1843,6 @@ Keep the two in step when a limit changes.
   "Page 1 of the original PDF was left out of this file." (`assemble.omitted_pages_note`), and an
   internal link or cross-reference to an element on such a page is taken off at render
   (`assemble._without_dead_links`).
-- **Edited words, a paragraph made a heading, an added picture or equation** are ordinary
-  elements and fixes in the stored result (a picture added by hand has the id `p3-x1` and a fix
+- **Edited words, a paragraph made a heading, a sidebar or a quotation, an added picture or
+  equation** are ordinary elements and fixes in the stored result (a picture added by hand has the id `p3-x1` and a fix
   the reviewer made); the assembler writes them like any other.

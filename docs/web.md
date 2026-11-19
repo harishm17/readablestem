@@ -1867,14 +1867,14 @@ it goes with the job too. A job that fails keeps it until the job is deleted. It
 person's stored bytes like any blob.
 
 **Edits that are not decisions (`web/carry_edits.py`).** The review screen also changes what no
-fix covers: the words of a paragraph, a paragraph made a heading, a picture or an equation
-added by hand, an image described in words, a page left out. They are carried by the same rule,
+fix covers: the words of a paragraph, a paragraph made a heading, a paragraph made a sidebar
+or a quotation, a picture or an equation added by hand, an image described in words, a page left out. They are carried by the same rule,
 onto an item that is **unchanged**, and never onto changed content; the worker does it in this
 order (`Worker._carry_decisions`): words, headings and added items, then the decisions, then
 the pages left out. The earlier version is read with its omitted pages put back, so a decision
 made before a page was left out is found.
 
-- **Words and headings** are found by what the item said before the edits: the earlier
+- **Words, headings and roles** are found by what the item said before the edits: the earlier
   version's `ReviewEdit` rows (`edit_text`, `make_heading`) are walked back from the result as it
   stands, so an edit that was undone is not carried and two edits in a row are one. The new
   file's item must say the same words (case and spacing aside, the content fingerprint of
@@ -1884,7 +1884,11 @@ made before a page was left out is found.
   The inline equations in the text must be the same pictures in the same order, or the words
   are left alone. The edit is made by the review's own functions (`page_edits.edit_text`,
   `make_heading`), so a level the outline would now change is refused and nothing is left half
-  done.
+  done. A role is carried the same way (`set_role` rows, `carry_edits.role_edit`): the latest
+  one whose result is the role the paragraph has now, which is also how a cleared role ("Not a
+  quotation" on what a Word file had as one) is carried, and the new file's paragraph must say
+  the same words. A role that was undone is not carried. If the new file already has that role
+  nothing is changed and it counts as carried.
 - **Pictures and equations added by hand** come back only on the same page, where the region
   looks exactly as it did (both PDFs drawn the same way and compared; a file that is the same
   bytes needs no drawing), and where the tool has not found something new in that place (a
@@ -1899,7 +1903,7 @@ What was not carried is counted (`edits_dropped`, the card says "N changes you m
 were not made again, because the part of the page it was made on is not the same any
 more") and listed by name and page under it (`edits_not_applied` in `carried_json`, the words
 in `carry.NOT_REAPPLIED_WORDS`: "Page 2: words you changed"). An equation read again and a
-page operation that has no carry (a paragraph made a heading, a picture added, an equation
+page operation that has no carry (a picture added, an equation
 marked or given back to the text) are listed there when they are not made again, so nothing a
 person did disappears silently; an equation read again is never made again (the new file has
 the tool's own reading) and one that was undone is not listed. What was carried is a `carried` `ReviewEdit` with the kind in its `after`
@@ -1955,8 +1959,8 @@ by" line the owner sees); the decisions still open; the
 parts shown as pictures and why; the structure checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
 lines for the office to sign. Every kind of change a person can make is a row with who and
-when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a
-picture added, an equation marked (the tool read it, a person checked), an image described in
+when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a paragraph made a sidebar or a quotation (or given
+back as neither), a picture added, an equation marked (the tool read it, a person checked), an image described in
 words, a page left out or put back; clean tables accepted together in one action and a table
 cell read by the AI service at the person's request (marks in the `ReviewEdit`'s `after`,
 `review.BULK_KEY` and `MODEL_READ_KEY`); and what was carried over from an earlier version. The
@@ -3408,7 +3412,7 @@ and figures".
 `templates/_page_tools.html`). Under the optional checks, a folded "Change page N" (open after
 an edit or an error, and when `tools=1`) with, in this order:
 
-- *Change the words, or make a line a heading.* Every paragraph, list item and heading of the
+- *Change the words, make a line a heading, or set a paragraph apart.* Every paragraph, list item and heading of the
   page by its first words, each a link that opens it. The box holds the words as they read, an
   inline equation as "[equation 3]" (the review's own number for it): the mark the tool keeps in
   the stored text cannot be typed, so it is named and put back when the text is saved. Every
@@ -3424,7 +3428,18 @@ an edit or an error, and when `tools=1`) with, in this order:
   their place in the outline are named (`heading_levels_that_fit`) and another is refused as for
   any heading; the element becomes a heading with a fix the reviewer made (`edited`), so
   "Make plain text" and Undo take it back, and later headings are repaired in the outline as
-  always (the notice says how many moved).
+  always (the notice says how many moved). *Make it a sidebar* and *Make it a quotation* (the
+  same `edit/{element}` route, `action=role`, `role=aside|quote`; `page_edits.set_role`) set
+  `Element.role` on a plain paragraph; on a paragraph that has a role the buttons read *Not a
+  sidebar* / *Not a quotation* (`role=` empty) and the card says in words which it is. They are
+  offered only where the student page writes a role (`page_edits.role_blocked`): not on a list
+  item, a heading, program code, a glossary entry or a footnote, and the route refuses those with
+  the same words. The change is one `ReviewEdit` (`set_role`, an Undo snapshot of the element,
+  counted among the changes to pages), the page's HTML is made again when asked for, and it then
+  has the paragraph in its `<aside aria-label="Sidebar">` or `<blockquote>`, neighbors of one
+  role in one wrapper. There is no keyboard shortcut for it: the list of keys on the review
+  screen (N, P, A, E) is for decisions, and "Make it a heading" has none either. A paragraph made
+  a heading loses its role.
 - *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
   the proposal read aloud in its place (the sentence before and after for one on its own line),
   and both readings, as speech and as LaTeX, where the page witness read it differently; a

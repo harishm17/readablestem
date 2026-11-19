@@ -39,6 +39,7 @@ from readablestem.core.types import (
     Kind,
     Notice,
     OmittedPage,
+    Role,
     Status,
     inline_marker,
 )
@@ -537,6 +538,64 @@ def make_heading(result: DocumentResult, element_id: str, level_text: str) -> St
         action="make_heading",
         before={STRUCTURE_KEY: before},
         after={STRUCTURE_KEY: capture(result, elements=[element_id], fixes=[element_id])},
+        message=message,
+    )
+
+
+# --------------------------------------------------------------------------- a paragraph's role
+
+ROLE_WORDS = {"aside": "sidebar", "quote": "quotation"}
+NOT_A_ROLE_PARAGRAPH = "Only a paragraph can be a sidebar or a quotation."
+ROLE_CODE = "Code, glossary entries, footnotes and list items cannot be a sidebar or a quotation."
+CHOOSE_ROLE = "Choose a sidebar or a quotation."
+
+
+def role_blocked(result: DocumentResult, element: Element) -> str:
+    """Why a block cannot carry a role, or "" when it can. The student page writes a role
+    only around a plain paragraph (`pipeline.assemble.Writer.paragraph`): not around code, a
+    glossary entry, a footnote or a list item, so none of those is offered one."""
+    if element.kind is not Kind.PARAGRAPH:
+        return NOT_A_ROLE_PARAGRAPH
+    if (
+        element.preformatted
+        or element.term_end is not None
+        or element.list_marker
+        or any(n.code == "footnote" and n.element_id == element.id for n in result.notices)
+    ):
+        return ROLE_CODE
+    return ""
+
+
+def set_role(result: DocumentResult, element_id: str, role: str | None) -> StructureChange:
+    """Make a paragraph a sidebar (`aside`) or a quotation (`quote`), or give it neither again
+    (`role` None or ""). Refused for what cannot carry a role (`role_blocked`), for a word that
+    is neither role, and for a paragraph that already is as asked. Raises ReviewInvalid and
+    LookupError; nothing is changed then. The student page, the Word file, the EPUB and Listen
+    all read the stored role, so each shows it with no change of its own."""
+    element = text_element(result, element_id)
+    fid = _fid("role", element_id)
+    values = {"role": role or ""}
+    if role and role not in ROLE_WORDS:
+        raise ReviewInvalid([FieldError(fid, CHOOSE_ROLE)], values)
+    if blocked := role_blocked(result, element):
+        raise ReviewInvalid([FieldError(fid, blocked)], values)
+    new_role: Role | None = "aside" if role == "aside" else "quote" if role == "quote" else None
+    if new_role == element.role:
+        raise ReviewInvalid([FieldError(fid, NOTHING_CHANGED)], values)
+    before = capture(result, elements=[element_id], page=element.page)
+    for index, current in enumerate(result.elements):
+        if current.id == element_id:
+            result.elements[index] = current.model_copy(update={"role": new_role})
+    message = (
+        f"It is now a {ROLE_WORDS[new_role]}."
+        if new_role
+        else f"It is no longer a {ROLE_WORDS[element.role or 'aside']}."
+    )
+    return StructureChange(
+        element_id=element_id,
+        action="set_role",
+        before={STRUCTURE_KEY: before},
+        after={STRUCTURE_KEY: capture(result, elements=[element_id])},
         message=message,
     )
 

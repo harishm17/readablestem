@@ -53,6 +53,7 @@ Unchanged = Callable[[int, "Box | None"], bool]
 # What a carried edit is called in the report and on the record (`ReviewEdit.after`).
 TEXT = "text"
 HEADING = "heading"
+ROLE = "role"
 PICTURE = "picture"
 EQUATION = "equation"
 PAGE_LEFT_OUT = "page_left_out"
@@ -60,7 +61,7 @@ NOT_EQUATION = "not_equation"
 # A page operation that is never made again (a try-again or a revision starts from the
 # pipeline's reading): an equation read again. It is listed, by name and page, as not re-applied.
 READ_AGAIN = "read_again"
-KINDS = (TEXT, HEADING, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
+KINDS = (TEXT, HEADING, ROLE, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
 CARRIED_KEY = "carried_edit"
 
 # `ReviewEdit.action` values of the edits that change the text or the kind of an element.
@@ -173,6 +174,29 @@ def origin_of(element: Element, rows: list[EditRow]) -> Origin | None:
     return Origin(current[0], current[1], tuple(reversed(ops)))
 
 
+def _role_in(snapshot: dict[str, Any] | None, element_id: str) -> tuple[bool, str | None]:
+    """(found, role) of an element as a structural snapshot held it."""
+    structure = (snapshot or {}).get(STRUCTURE_KEY)
+    held = ((structure or {}).get("elements") or {}).get(element_id) if structure else None
+    if not isinstance(held, dict):
+        return False, None
+    role = held.get("role")
+    return True, role if isinstance(role, str) else None
+
+
+def role_edit(element: Element, rows: list[EditRow]) -> tuple[bool, str | None]:
+    """Did a person set or clear this paragraph's role, and does the result as it stands show
+    it? (True, the role, None for "neither") when the latest `set_role` row of the element
+    left the role it has now; (False, None) otherwise (no such row, or it was undone). The rows
+    are in the order they were made."""
+    for row in reversed([r for r in rows if r.element_id == element.id and r.action == "set_role"]):
+        had_before, before = _role_in(row.before, element.id)
+        had_after, after = _role_in(row.after, element.id)
+        if had_before and had_after and before != after and after == element.role:
+            return True, after
+    return False, None
+
+
 def _said(element: Element, origin: Origin | None = None) -> str:
     """The content of a text item as stable ids see it (`core.uid.fingerprint`), or of what
     it said before the edits (`origin`). Inline equations count by place, not by id, so a
@@ -235,9 +259,16 @@ def _carry_words(
 ) -> EditsCarried:
     out = EditsCarried()
     edited: dict[str, Origin] = {}
+    roles: dict[str, str | None] = {}
     for element in old.elements:
-        if element.kind in page_edits.TEXT_KINDS and (origin := origin_of(element, rows)):
-            edited[element.id] = origin
+        if element.kind not in page_edits.TEXT_KINDS:
+            continue
+        origin = origin_of(element, rows)
+        has_role, role = role_edit(element, rows)
+        if has_role:
+            roles[element.id] = role
+        if origin or has_role:
+            edited[element.id] = origin or Origin(element.kind.value, element.text or "", ())
     if not edited:
         return out
     # How often each content (kind and words) was said in the earlier file, counting an edited
@@ -285,9 +316,12 @@ def _carry_words(
                 new,
                 new_crops,
                 new_id,
+                set_role=old_id in roles,
+                role=roles.get(old_id),
             )
         if kind is None or new_id is None:
-            out.drop(HEADING if "make_heading" in origin.ops else TEXT, old_by[old_id].page)
+            lost = HEADING if "make_heading" in origin.ops else TEXT if origin.ops else ROLE
+            out.drop(lost, old_by[old_id].page)
         else:
             out.items.append((kind, new_id))
     return out
@@ -302,9 +336,12 @@ def _apply_words(
     new: DocumentResult,
     new_crops: dict[str, bytes],
     new_id: str,
+    *,
+    set_role: bool = False,
+    role: str | None = None,
 ) -> str | None:
-    """The edits of one item on its counterpart; HEADING or TEXT when they were made, None
-    when not (the result is left as it was)."""
+    """The edits of one item on its counterpart; HEADING, TEXT or ROLE (only the role was
+    set) when they were made, None when not (the result is left as it was)."""
     new_element = next(e for e in new.elements if e.id == new_id)
     typed = None
     if old_element.text != origin.text:
@@ -327,10 +364,19 @@ def _apply_words(
                 # "Nothing changed": the new file already says it. Anything else is a refusal.
                 if not all(e.message == page_edits.NOTHING_CHANGED for e in exc.errors):
                     raise
+        if set_role:
+            try:
+                page_edits.set_role(new, new_id, role)
+            except ReviewInvalid as exc:
+                # The new file already has that role (or none), or says nothing to set one on.
+                if not all(e.message == page_edits.NOTHING_CHANGED for e in exc.errors):
+                    raise
     except (ReviewInvalid, LookupError):
         page_edits.restore(new, before)
         return None
-    return HEADING if level is not None else TEXT
+    if level is not None:
+        return HEADING
+    return TEXT if typed is not None else ROLE
 
 
 # --------------------------------------------------------------------------- added items

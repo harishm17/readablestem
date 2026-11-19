@@ -22,7 +22,7 @@
   {% else %}
 
   <section class="tool-section" id="page-tools-edit" aria-labelledby="edit-title" tabindex="-1">
-    <h3 id="edit-title" class="part-label">Change the words, or make a line a heading</h3>
+    <h3 id="edit-title" class="part-label">Change the words, make a line a heading, or set a paragraph apart</h3>
     {% if tools.lines %}
     <p class="hint" id="edit-hint">Choose a paragraph, a list item or a heading on this page. The tool's own mistakes are changed here; an equation, a figure or a table is changed in its own decision.</p>
     <ul class="text-lines" aria-describedby="edit-hint">
@@ -69,6 +69,26 @@
       <p class="hint">{{ ed.why_not }}</p>
       {% elif ed.heading_level %}
       <p class="hint">This is a heading, level {{ ed.heading_level }}.{% if ed.item_href %} To change its level, or to make it plain text, <a href="{{ ed.item_href }}">open it as an item</a>.{% endif %}</p>
+      {% endif %}
+      {% if ed.can_set_role %}
+      {% set role_words = {"aside": "sidebar", "quote": "quotation"} %}
+      {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ eid, {"class": "decide-form role-set"}) %}
+        {{ tool_fields() }}<input type="hidden" name="action" value="role">
+        <div class="{{ field_classes(ed.errors.get("role")) }}">
+          <p id="role-label-{{ eid }}">{% if ed.role %}This paragraph is a {{ role_words[ed.role] }}. The student page sets it apart.{% else %}Is this paragraph a sidebar or a quotation?{% endif %}</p>
+          <p class="hint" id="role-hint-{{ eid }}">A sidebar or a quotation is set apart on the student page and in the Word and EPUB files. The paragraphs beside it with the same role go in one box.</p>
+          {{ field_error("role-error-" ~ eid, ed.errors.get("role")) }}
+          <div class="inline-controls" role="group" aria-labelledby="role-label-{{ eid }}" aria-describedby="role-hint-{{ eid }}">
+            {% for value, word in role_words.items() %}
+            {% if ed.role == value %}
+            <button type="submit" name="role" value="" class="button-secondary" data-role="clear-role">Not a {{ word }}<span class="visually-hidden">: {{ ed.label|lower }}</span></button>
+            {% else %}
+            <button type="submit" name="role" value="{{ value }}" class="button-secondary" data-role="set-{{ value }}">Make it a {{ word }}<span class="visually-hidden">: {{ ed.label|lower }}</span></button>
+            {% endif %}
+            {% endfor %}
+          </div>
+        </div>
+      {% endcall %}
       {% endif %}
     </div>
     {% endif %}

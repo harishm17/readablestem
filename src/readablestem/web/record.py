@@ -84,6 +84,7 @@ ACTION_WORDS = {
     "describe": "Described the image in words",
     "edit_text": "Changed the words of the text",
     "make_heading": "Made a heading of a paragraph",
+    "set_role": "Made a paragraph a sidebar or a quotation, or took that off",
     "add_figure": "Added a picture the tool missed, with the person's own alt text",
     "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
     "omit_page": "Left the page out of the student file and of the review",
@@ -114,6 +115,7 @@ MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, t
 CARRIED_EDIT_WORDS = {
     "text": "change to the words of the text",
     "heading": "paragraph made a heading",
+    "role": "paragraph made a sidebar or a quotation, or given back as neither",
     "picture": "picture added by hand",
     "equation": "equation marked by hand",
     "page_left_out": "page left out",
@@ -124,6 +126,7 @@ PAGE_CHANGES = frozenset(
     {
         "edit_text",
         "make_heading",
+        "set_role",
         "add_figure",
         "add_equation",
         "omit_page",
@@ -136,6 +139,7 @@ PAGE_CHANGES = frozenset(
 STRUCTURE_TOOL_HAD = {
     "edit_text": "Text as read from the PDF",
     "make_heading": "A paragraph",
+    "set_role": "A paragraph",
     "add_figure": "Not found by the tool",
     "add_equation": "Not found by the tool",
     "omit_page": "A page of the file",
