@@ -38,10 +38,13 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
    caption within reach is attached.
 7. Text is document content: the inline-marker brackets are replaced by look-alikes
    wherever they occur in it, so only real inline equations have markers.
-8. Slide decks (`pipeline/slides.py`): a Beamer file, or slide-shaped pages that share page
-   labels, is read frame by frame: overlay steps that a frame's last page repeats are not
-   read, frame titles are headings, the headline and slide numbers are dropped, and short
-   two-column frames are read left then right (docs/layout.md "Slide decks").
+8. Slide decks (`pipeline/slides.py`): a Beamer file, slide-shaped pages that share page
+   labels, or slide-shaped pages with a title on most of them (a PowerPoint or Keynote deck
+   exported as PDF) is read frame by frame: overlay steps that a frame's last page repeats are
+   not read, frame titles are headings, the headline and slide numbers are dropped, and short
+   two-column frames are read left then right. A file may hold several decks (a new one starts
+   at a title slide or a new page size) and each is leveled on its own (docs/layout.md "Slide
+   decks").
 
 Untrusted input: MuPDF is C code parsing bytes from the internet, and some damaged files
 make it abort the whole process (a glibc double free while rendering). Before a page is

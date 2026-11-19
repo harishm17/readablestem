@@ -834,14 +834,44 @@ after the page rows are read, before the margin filter) shows `slides.detect` ev
 page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
 
 - **Detect.** At least 80 % of the pages are slide-shaped (landscape 4:3, 16:9 or 16:10, within
-  2 %; a landscape Letter or A4 sheet is not), and either `/Creator` says Beamer or, for any other
-  file, the pages have at least two different labels and the labels group some pages and not all
-  (a label tree with a prefix and no numbers labels every page alike and is not evidence). Anything
-  else is read as before (`_SLIDE_DECK` False: no rule below applies). A page kept whole as its
-  image (a photographed slide) has no text, is never dropped, and never makes the pages beside it a
-  frame.
+  2 %; a landscape Letter or A4 sheet is not), and the file is one of: `/Creator` says Beamer; the
+  pages have at least two different labels and the labels group some pages and not all (a label
+  tree with a prefix and no numbers labels every page alike and is not evidence); or at least
+  70 % of the pages have a title (`slides.TITLED_SHARE`): the largest text in the top third, or a
+  title slide's title (below). The last needs no Beamer and no labels, which is what a PowerPoint
+  or Keynote deck exported as PDF has. 70 % is chosen from the files measured: the decks have a
+  title on 91 to 100 % of their pages and the slide-shaped files that are not decks (photographed
+  and pictured slides, a template page) on 0 to 33 %, so any share in between separates them;
+  70 % keeps a deck with a third of its pages untitled (a picture slide, a credits page). For
+  the titles route a Letter or A4 sheet on its side counts as a slide page too: a deck printed to
+  PDF is on one (the one such file among the corpus uploads, 39 pages, has a title on 97 % of
+  them; the corpus holds no landscape sheet that is not a deck, so the titles are the only guard
+  measured). Beamer and page labels still need the slide shape. A landscape file with no titles,
+  a portrait document and a landscape table are not decks and are read as before (`_SLIDE_DECK`
+  False: no rule below applies). A
+  page kept whole as its image (a photographed slide) has no text, is never dropped, never makes
+  the pages beside it a frame, and is untitled.
+- **Several decks in one file** (`slides._decks`). A deck ends where the page size changes, and
+  where a title slide comes when the file's first page is one too. A title slide is a page whose
+  largest line is at least 1.25 x an ordinary slide's title (the median title size of the file)
+  and which has at most three other lines in its body (the top and bottom 12 % are headline and
+  footline): a title, a subtitle, an author, a date. Its title may be anywhere on the page. A deck
+  that starts on a title slide has that slide's title as its title (`Deck.starts`); the title's
+  lines are one title when they follow each other in one size. When the file has more than one
+  deck, or a deck has a title, every heading on a deck's pages gets the reason `slide_deck N`
+  (`slides.DECK_REASON`) and a deck title also `slide_deck_title`. `layout.heading_levels` then
+  judges heading sizes deck by deck: a deck's title is level 1, the other headings of the deck
+  are clustered by size from level 2, and a heading with no deck (the pages of a portrait part
+  between two decks) is judged on its own. So two lectures in one file have titles at one level
+  and slide titles one level below, whatever sizes each uses; `assemble.title_plan` (the one H1,
+  SW6c) then writes the document's title above the deck titles, or makes the only deck title the
+  H1. A file with one deck and no title slide gets no reasons and the levels it had.
 - **Frames.** Consecutive pages with the same label are one frame (hyperref gives every overlay
-  step of a Beamer frame its number); without labels, the same title text. The labels are read
+  step of a Beamer frame its number); without labels, the same title text. In a deck found by its
+  titles alone (no Beamer, no labels) a frame is a run of pages each of which extends the page
+  before it: every line and every picture or drawing of the earlier page is on the later one
+  (`slides._repeats`, the same test as below), at the same size. Two slides that share a title
+  and differ in content ("Example", "Example, continued") are two frames. The labels are read
   by `page_labels.pdf_label`, which decodes the UTF-16 form PyMuPDF returns for xdvipdfmx files
   (`<FEFF0031>`): `clean_label` refused it, so no Tectonic deck's own labels were used before
   (the page markers fell back to the number printed in the footline).
@@ -861,7 +891,8 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   pages of the frame are numbered: the title heading says "(step 1 of 2)". Measured on the
   fixtures: `beamer_overlay` 6 pages to 2 (67 % fewer), `slides_steps` 13 to 6 (54 % fewer).
 - **Frame titles.** A page's title is its largest text in the top third, at least 1.15 x the
-  deck's body size. It is always a heading (reason `slide_title`, plus `larger font` so the
+  deck's body size (the lines that follow it in the same size, each within half a line of the one
+  before, are part of it). It is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
   title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
   Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a
