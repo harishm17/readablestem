@@ -3312,11 +3312,11 @@ request fails its element, and that decision would be the recording's, not the
 conversion's. A record kept before decisions were measured is "not measured", not a
 document that asks nothing.
 
-**Equations and table maths not compared.** The record also says how many equations (and how
-many tables with maths in a cell) the check against the page could not compare, by cause
+**Equations and table math not compared.** The record also says how many equations (and how
+many tables with math in a cell) the check against the page could not compare, by cause
 (`not_compared` in the record, a table in the printed report): `no_characters`,
 `no_usable_characters`, `unmapped_characters`, `bold_letter`. The check is a passed one, so it
-never shows as a decision; this is where it can be counted. A table cell of maths writes the
+never shows as a decision; this is where it can be counted. A table cell of math writes the
 same passed check (`table.math_not_compared`) with the same causes (and `no_local_grid` or
 `grid_not_aligned` when the page's own text has no grid to hold the cell against), and no card.
 

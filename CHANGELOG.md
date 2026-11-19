@@ -8,10 +8,10 @@
   `eval tables`, the measured records, the ledger, the page audit and the calibrate probes).
   `eval gate` prints who made the current report; a report made before has no `provenance`
   and is still read, as "not stamped". No kept record was made again.
-- The burden record counts the equations and tables with maths that the check against the page
+- The burden record counts the equations and tables with math that the check against the page
   could not compare, by cause (`no_characters`, `no_usable_characters`, `unmapped_characters`,
   `bold_letter`), and `eval burden --same` also compares how many answers each upload lacks.
-- A maths cell of a table that is held against nothing writes the same passed check an
+- A math cell of a table that is held against nothing writes the same passed check an
   equation does (`table.math_not_compared`), with the cause. No card, no second reading.
 - The proof replay's code identity takes its settings from the gate's list
   (`gate.guarded_settings`), so the two cannot differ. A bundle recorded with a shorter
