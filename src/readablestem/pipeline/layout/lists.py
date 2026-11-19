@@ -40,6 +40,7 @@ MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its te
 BULLET_APART_OWN_FONT = 0.1
 BULLET_APART = 0.2
 MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
+MARKER_INDENT = 0.4  # x font size: a marker of another series set this far right opens a level
 DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
 
 
@@ -366,14 +367,27 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     levels: dict[int, int] = {}
     stack: list[float] = []
     options: float | None = None  # the x the options of the grid being read are placed at
+    before: tuple[str, float] | None = None  # (series, x of the marker) of the item before
     for block in blocks:
         if block.joined:  # the rest of the item before it, on the next page: no element of its own
             continue
         if block.marker is None:
             if block.kind != Kind.EQUATION:
                 stack = []
+                before = None
             continue
         x = block.marker.x - block.origin
+        series, own = _series(block.marker), _marker_x(block)
+        # The marker of another series set right of the one above opens a level even where the
+        # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.
+        nested = (
+            before is not None
+            and own is not None
+            and block.marker.option is None
+            and series != before[0]
+            and own - before[1] > MARKER_INDENT * block.rows[0].size
+        )
+        before = (series, own) if own is not None else None
         if block.marker.option is None:
             options = None
         elif options is None:
@@ -388,10 +402,27 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             or (len(stack) > 1 and abs(x - stack[-2]) < abs(x - stack[-1]))
         ):
             stack.pop()
-        if not stack or x > stack[-1] + tolerance:
+        if not stack or x > stack[-1] + tolerance or nested:
             stack.append(x)
         levels[id(block)] = len(stack)
     return levels
+
+
+def _series(marker: _Marker) -> str:
+    """What kind of marker this is, so that "1)" and "2)" are one series and "(a)", "o" or
+    "\u25aa" are others: a digit stands for any number, a letter for any letter."""
+    if not marker.ordered:
+        return marker.text
+    return "".join("0" if c.isdigit() else "a" if c.isalpha() else c for c in marker.text)
+
+
+def _marker_x(block: _Block) -> float | None:
+    """Left edge of the item's marker, from the left edge of its column; None when the marker
+    is drawn beside the row and not in it."""
+    marker = block.marker
+    if marker is None or marker.end <= marker.start:
+        return None
+    return block.rows[0].chars[marker.start].x0 - block.origin
 
 
 _ROMAN = {"i": 1, "v": 5, "x": 10}

@@ -290,6 +290,22 @@ def test_word_bullets_with_no_space_after_them_and_o_bullets_are_nested_list_ite
     ]
 
 
+def test_a_bullet_of_another_series_set_right_of_a_number_is_one_level_below_it():
+    """Slides: the sub-bullets sit under "1)" with their text almost where its text starts
+    (inside the nesting tolerance of a large font), but their markers are set further in."""
+
+    def fill(page):
+        rows = [("1)", 72, 110, "Lecture review"), ("•", 90, 112, "if you missed the lecture")]
+        rows += [("•", 90, 112, "if you need another take"), ("2)", 72, 110, "Problem solving")]
+        rows += [("•", 90, 112, "a couple of harder questions")]
+        for i, (marker, mx, tx, text) in enumerate(rows):
+            page.insert_text((mx, 100 + 40 * i), marker, fontsize=20)
+            page.insert_text((tx, 100 + 40 * i), text, fontsize=20)
+
+    got = [(m, lvl) for m, _, lvl, _ in items(analyze(one_page(fill)).elements)]
+    assert got == [("1)", 1), ("·", 2), ("·", 2), ("2)", 1), ("·", 2)]
+
+
 def test_a_lone_o_set_in_a_monospaced_font_before_monospaced_text_is_not_a_bullet():
     def fill(page):
         for i, y in enumerate((100, 140, 180)):
