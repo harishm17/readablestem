@@ -271,10 +271,12 @@ def statement(s: CheckedSummary) -> list[str]:
     return [t for t in parts if t]
 
 
-def picture_link(number: int, kind: str, page: int) -> str:
-    """The words of the notice's link to one picture: numbered, so no two are the same."""
+def picture_link(number: int, kind: str, page: int, origin: str = "pdf") -> str:
+    """The words of the notice's link to one picture: numbered, so no two are the same. Its
+    page only for a PDF: a Word or LaTeX file has no pages to name."""
     one = STUDENT_KIND_WORDS.get(kind) or KIND_WORDS.get(kind, (kind, kind))[0]
-    return f"Part {number} not converted: {one}, page {page}"
+    where = f", page {page}" if origin == "pdf" else ""
+    return f"Part {number} not converted: {one}{where}"
 
 
 def more_pictures(n: int) -> str:

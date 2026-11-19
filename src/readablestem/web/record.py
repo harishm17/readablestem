@@ -596,7 +596,7 @@ def build(
         ImageRow(
             item=labels.get(p.element_id)
             or KIND_LABELS.get(elements[p.element_id].kind, p.kind.title()),
-            page=p.page,
+            page=p.page if summary.origin == "pdf" else None,  # a source has no pages
             why=explain_reason(fix.reason).text
             if (fix := fixes.get(p.element_id)) is not None and fix.reason
             else "",

@@ -526,6 +526,7 @@ def test_every_surface_says_what_was_converted_and_reviewed(web, make, expected)
     if expected.get("no_picture"):  # the file has no picture of the part: the words must not
         assert "shown as images" not in said["job"]  # claim one (honesty claim)
         assert not re.search(r"picture|image", said["note"] + said["summary"] + said["notice"])
+        assert "page 1" not in said["notice"]  # nor a page: a Word file has none to name
 
 
 # --------------------------------------------------------------------------- progress

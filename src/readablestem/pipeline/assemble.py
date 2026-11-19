@@ -1833,7 +1833,7 @@ def _checked_notice(
     links = [f'<li><a href="#{ABOUT_ID}">{words.NOTICE_ABOUT_LINK}</a></li>']
     shown = [p for p in summary.converted.pictures if p.element_id in places]
     for number, picture in enumerate(shown[: words.NOTICE_MAX_LINKS], 1):
-        name = _escape(words.picture_link(number, picture.kind, picture.page))
+        name = _escape(words.picture_link(number, picture.kind, picture.page, summary.origin))
         links.append(f'<li><a href="#{_escape(picture.element_id)}">{name}</a></li>')
     if len(shown) > words.NOTICE_MAX_LINKS:
         rest = words.more_pictures(len(shown) - words.NOTICE_MAX_LINKS)
