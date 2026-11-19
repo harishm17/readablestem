@@ -92,6 +92,8 @@ def test_a_quote_or_quotation_environment_is_a_block_quotation_and_verse_is_not(
     assert roles["A short quotation"] == "quote" and roles["Its second paragraph"] == "quote"
     assert roles["Text that goes on after it"] is None
     assert roles["A line of verse and its second line"] is None
+    # A verse keeps its line end: on the page it is a line break, not a space between words.
+    assert '<p id="p1-e7">A line of verse<br>and its second line</p>' in result.html
     # The student page writes the two paragraphs of the quotation in one `blockquote`.
     quoted = result.html.split("<blockquote>")[2].split("</blockquote>")[0]
     assert "longer quotation" in quoted and "Its second paragraph" in quoted

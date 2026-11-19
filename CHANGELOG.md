@@ -28,6 +28,12 @@
   read. This changes the written page of every document that has such a picture, so it owes a
   `RENDER_VERSION` raise (not raised on this branch). The two flagged goldens
   (`flags_off_kinematics_slides`, `flags_off_problem_set`) changed by that attribute only.
+- LaTeX: a `verse` environment keeps its line ends. Each `\\` in a verse was a plain space
+  ("A line of verse and its second line"); it is now the space with a "break" run over it, the
+  way a PDF's kept line end is stored, so the page writes `<br>` and Listen, Word and EPUB take it
+  from the same run. No new role, and the verse is still plain paragraphs (`ltx_reader.in_verse`).
+  A LaTeX source with a verse converts differently, so a `PIPELINE_VERSION` raise is owed (not
+  raised here); stored documents keep the space until converted again. No migration.
 
 ## Unreleased: a reviewer sets a block's role; LaTeX quotations (branch feat/set-block-role, WS19.9 in part)
 

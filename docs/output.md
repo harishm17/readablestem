@@ -488,7 +488,9 @@ document in another language marks it `lang="en"`).
   (`source/docx_reader.py`) sets `quote` on the paragraphs of a quotation, so a quotation in a
   Word source comes out as a `<blockquote>`; so does the LaTeX reader (`source/ltx_reader.py`)
   for the paragraphs of a `quote` or `quotation` environment (LaTeXML's `blockquote.ltx_quote`;
-  a `verse` environment, which LaTeXML marks `ltx_role_verse`, stays plain paragraphs;
+  a `verse` environment, which LaTeXML marks `ltx_role_verse`, stays plain paragraphs whose line
+  ends are kept: each `\\` is a space with a "break" run over it, written `<br>`, as a kept line end of
+  a PDF is (`_inline_text`, `in_verse`);
   `displayquote` needs `csquotes`, which is refused at upload). Layout sets no role on a PDF (no
   detector passes the "at least 2 real cases and no false one" bar, docs/layout.md): there the
   reviewer sets it, in the page editor's "Change page N" ("Make it a sidebar", "Make it a
