@@ -187,6 +187,16 @@ def test_the_page_image_is_a_named_focusable_region_that_scrolls_on_a_phone(site
     assert loaded > 1000  # rendered from the upload
     # The selected mark was scrolled into view inside the region (app.js).
     assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
+    # A heading's band is shown whole, not cut to a strip, in a named box that scrolls.
+    page.goto(f"{site.base}/jobs/{job}/review?item={GROUP}")
+    wait_images(page)
+    band = page.locator(".region-image").first
+    natural, shown = band.evaluate("i => [[i.naturalWidth, i.naturalHeight], [i.width, i.height]]")
+    assert shown[0] >= natural[0] - 2 and abs(shown[1] / shown[0] - natural[1] / natural[0]) < 0.01
+    box = band.locator("xpath=ancestor::*[@role='group'][1]")
+    assert box.get_attribute("tabindex") == "0" and box.get_attribute("aria-label")
+    assert box.evaluate("e => e.scrollWidth > e.clientWidth")
+    assert not sideways_overflow(page)
     context.close()
 
 
