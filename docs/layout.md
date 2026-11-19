@@ -739,7 +739,13 @@ within 3 x font size:
 
 - a bullet glyph (`•` `◦` `▪` `▫` `■` `□` `●` `○` `‣` `⁃` `➢` `✓` `►` `▸` `▶` `▹` `◆`,
   Word's Symbol and Wingdings bullets (private-use codes, mapped by `font_codes` before this
-  step), beamer's AMS triangle `▶`);
+  step), beamer's AMS triangle `▶`). A bullet glyph at the start of a row counts as a marker
+  when it stands at least 0.1 x font size from text set in another font (0.2 from text in the
+  same font), though no space character separates them (Word's Wingdings bullet leaves 0.23 x
+  font size and no blank in the text layer; the usual split of a row's tokens is 0.3);
+- Word's second-level bullet, the letter `o` set in Courier New: a monospaced `o` followed by
+  text that is not monospaced, with a sibling like a dash (so code that starts a line with
+  `o` in one monospaced face is not a list). It is reported as `◦` and nests by its indent;
 - a bullet drawn as a small shape (at most 0.6 x font size) just left of the row at its
   height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
   filled squares "▪";

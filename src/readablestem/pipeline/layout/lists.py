@@ -34,7 +34,11 @@ _ORDERED_MARKER = re.compile(
 
 
 MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its text
-BULLET_APART = 0.1  # x font size: a bullet glyph this far from text in another font is apart
+# x font size: a bullet glyph at the start of a row is cut from the text it touches when that is
+# set in another font and this far from it, or this far from it whatever the font (`_tokens` asks
+# 0.3, and glyphs of one word are closer than 0.1: `glyph_math.NO_GAP`; `font_codes` asks 0.2).
+BULLET_APART_OWN_FONT = 0.1
+BULLET_APART = 0.2
 MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
 DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
 
@@ -105,20 +109,16 @@ def _bullet_apart(row: _Row, tokens: list[tuple[int, int]]) -> list[tuple[int, i
     """`tokens` with a bullet glyph at the start of the row cut from the text it touches.
     `_tokens` splits at 0.3 x the font size, and Word's Wingdings bullet, set as large as the
     text, leaves 0.23 with no space character in the text layer: the line came out as a
-    paragraph that began with the bullet. A bullet is a glyph of its own font, so one that
-    stands clear of text set in another font (as far as glyphs of one word are not, `NO_GAP`
-    in `glyph_math`) is a marker."""
+    paragraph that began with the bullet."""
     if not tokens:
         return tokens
     start, end = tokens[0]
     chars = row.chars
-    if (
-        end - start > 1
-        and chars[start].c in _BULLET_GLYPHS
-        and chars[start].font != chars[start + 1].font
-        and chars[start + 1].x0 - chars[start].x1 >= BULLET_APART * row.size
-    ):
-        return [(start, start + 1), (start + 1, end), *tokens[1:]]
+    if end - start > 1 and chars[start].c in _BULLET_GLYPHS:
+        gap = (chars[start + 1].x0 - chars[start].x1) / row.size
+        own_font = chars[start].font != chars[start + 1].font
+        if gap >= (BULLET_APART_OWN_FONT if own_font else BULLET_APART):
+            return [(start, start + 1), (start + 1, end), *tokens[1:]]
     return tokens
 
 

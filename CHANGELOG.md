@@ -99,6 +99,11 @@
   their last "end ..." words. A stored reading from older rules is made again where it is shown
   (no model call); `RENDER_VERSION` and `PIPELINE_VERSION` are not changed here. The spoken-equal
   score credits fewer pairs that were only said alike (the strict count does not move).
+- Lists: a first-level bullet that Word sets as large as its text, with no space character
+  after it in the text layer, starts a list item (it came out as a paragraph that began with
+  the bullet), and Word's second-level bullet, the letter "o" in Courier New, is a nested list
+  item marked `◦` (it came out as a paragraph, or ended in the item above). Two cases of one
+  regression test. Stored documents with such lists change when they are converted again.
 - Migrations: `8b1d5f3a9e04` (the step facts, the head of the release of 2026-11-18) is back
   where that release has it, after `c2f4a8d61e57`. `7b1d3e9a4c28` (`jobs.html_version`) and
   `8b3d5f0e2a71` (`request_tokens`) had been put under it, so a database already at the
