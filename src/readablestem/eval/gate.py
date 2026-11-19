@@ -498,7 +498,7 @@ UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
         "RECOVERY_MARGIN": "NOT YET GUARDED: how far the picture of a left-out stretch is grown",
     },
     "readablestem.pipeline.image_page_check": {
-        "CROP_MARGIN_PX": "NOT YET GUARDED: the cut-out sent with a request is grown by this",
+        "CROP_MARGIN_PX": "NOT YET GUARDED: how far a cut-out sent with a request is grown",
         "MIN_CROP_HEIGHT_PX": "NOT YET GUARDED: the least height of the cut-out sent with a request",
     },
 }
