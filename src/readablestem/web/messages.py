@@ -118,7 +118,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "the PDF (a minus missing or added, ± read as +, =, <, ≤ or ≈ mixed up, a vector arrow "
     "dropped), so check the minus signs, plus/minus, relations and arrows.",
     ("equation.text_layer_accents", "accent_mismatch"): "An accent differs from the PDF (a hat "
-    "dropped, a hat or tilde added, or a tilde for a hat, a check for a breve), so look at "
+    "or tilde dropped or added, or a tilde for a hat, a check for a breve), so look at "
     "the marks over the letters in the image.",
     ("equation.text_layer_species", "species_mismatch"): "A formula, charge, state or arrow "
     "differs from the PDF (a count, element or minus sign changed, a reaction cut short, or "

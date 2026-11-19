@@ -263,7 +263,7 @@ of 481 digit swaps and 1,438 of 1,438 case flips are found.
 
 `equation_step.accent_check` (check `equation.text_layer_accents`, code `accent_mismatch`).
 The symbol bags above leave accents out (a hat or a tilde is a modifier character, not a
-letter), so a reading that dropped a hat, added a hat or tilde, or put a tilde for a hat had
+letter), so a reading that dropped or added a hat or tilde, or put a tilde for a hat had
 every letter check passing, and it sits on the single-reading path (`SKIP_ESCALATION_FROM`,
 `ACCEPT_SINGLE_READING`).
 
@@ -272,8 +272,8 @@ What it compares: the accents of the PDF's text and of the glyphs under the box
 the glyphs as a name layout turns into the accent character) against the accents of the MathML
 (`mover` with an accent character over a base that is no operator). Every kind is counted (hat,
 tilde, bar, vector arrow, dot, double dot, breve, check, acute, grave), so a kind in the place of
-another is seen. Only these kinds and ways are reported (`COMPARED_ACCENTS`): a hat the reading
-dropped, a hat or a tilde it added, and one kind in the place of another for a hat, tilde, breve
+another is seen. Only these kinds and ways are reported (`COMPARED_ACCENTS`): a hat or a tilde
+the reading dropped, one it added, and one kind in the place of another for a hat, tilde, breve
 or check (a tilde for a hat, a check for a breve). Nothing is checked when the PDF has no text
 for the equation.
 
@@ -287,9 +287,12 @@ flags are real, over the development parts and the public corpus files together.
   3 false and 1 not decided. A prime read from a layer that agrees with itself and is not
   extended past the box would have kept 3 flags (2 real, 1 false) and no corpus flag; that is
   too little to stand on, so primes are not compared.
-- Script ℓ read as a plain l (1 flag), a tilde the PDF shows that the reading dropped (1 flag),
-  a bar or a vector arrow (drawn, not characters; 1 flag), a dot or double dot (1 flag, not
-  decided), acute and grave accents (none).
+- Script ℓ read as a plain l (1 flag), a bar or a vector arrow (drawn, not characters; 1 flag),
+  a dot or double dot (1 flag, not decided), acute and grave accents (none).
+
+One way is kept on less than the rule asks: a tilde the reading dropped has 1 flag, a real one.
+A hat and a tilde are the same glyphs of the same fonts read the same way, and the dropped hat
+has 2 of 2 real, so the two are taken as one case.
 
 The glyphs exist only with `EQUATION_GLYPH_CHECKS` (on in production's profile); without them
 the check reads the text alone, which misses the wide accents and so flags fewer and falsely

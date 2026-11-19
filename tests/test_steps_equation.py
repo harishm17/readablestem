@@ -385,6 +385,7 @@ def test_any_symbol_difference_needs_a_decision(text_layer, latex):
     ("text_layer", "latex"),
     [
         pytest.param("\U0001d44a\u02c6= 2", "W = 2", id="dropped-hat"),
+        pytest.param("\u02dc\U0001d44a= 2", "W = 2", id="dropped-tilde"),
         pytest.param("\U0001d44a= 2", r"\widetilde{W} = 2", id="added-tilde"),
         pytest.param("\U0001d465\u02c6= 2", r"\widetilde{x} = 2", id="tilde-for-hat"),
     ],
@@ -427,10 +428,9 @@ def test_a_reading_the_file_has_nothing_to_hold_against_is_accepted_and_says_why
         ("\u00afv = \u2206x \u2206t", r"\bar{v} = \frac{\Delta x}{\Delta t}"),
         ("x =", "x ="),  # one symbol is enough to compare
         # Accents the reading has too: a tilde, and a bar of a drawn rule (no glyph); and the
-        # kinds the check leaves alone: a prime added, a tilde dropped.
+        # kind the check leaves alone: a prime added.
         ("\u02dc\U0001d44a= 2", r"\widetilde{W} = 2"),
         ("\U0001d458= 2", "k' = 2"),
-        ("\u02dc\U0001d44a= 2", "W = 2"),
         ("\u00afv = 2", r"\overline{v} = 2"),
         ("v = 2", r"\overline{v} = 2"),
     ],

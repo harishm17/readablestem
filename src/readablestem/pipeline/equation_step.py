@@ -55,11 +55,10 @@ letter layout found in running text gets its fix without a model call.
 Accents are checked last (`accent_check`, check `equation.text_layer_accents`, code
 `accent_mismatch`), after the second-reading decision and on every acceptance path, so a failed
 one asks no model for anything: the letter comparison leaves a hat or tilde out, and a model
-reading that drops a hat, adds a hat or tilde, or puts a tilde for a hat or a check for a breve
+reading that drops or adds a hat or tilde, or puts a tilde for a hat or a check for a breve
 is accepted unseen otherwise. The PDF's accents are the modifier characters in the text and in
 the glyphs under the box. Primes, script l, bars, vector arrows, dots, acute and grave accents
-are not compared, nor is a tilde the reading dropped (`COMPARED_ACCENTS` says why). Meaning-level,
-so the fix needs a decision.
+are not compared (`COMPARED_ACCENTS` says why). Meaning-level, so the fix needs a decision.
 
 A picture of an equation (`equation_images`, `Element.reasons`) has no text layer, so
 nothing can confirm the reading: it gets the failed check `equation.no_text_layer`, not
@@ -849,15 +848,17 @@ def text_layer_number_case_checks(text_layer: str | None, mathml: str) -> list[C
 ACCENT_CHECK = "equation.text_layer_accents"
 ACCENT_CODE = "accent_mismatch"
 # What is compared, by kind and way, is what the measured flags backed up (development parts and
-# public corpus files together): the PDF shows a hat the reading dropped (`DROPPED`), the reading
-# has a hat or tilde the PDF does not (`ADDED`), or one kind stands in the place of another
-# (`SWAPPED`: tilde for hat, check for breve). Every other kind and way left the check: primes
+# public corpus files together): the PDF shows a hat or tilde the reading dropped (`DROPPED`), the
+# reading has a hat or tilde the PDF does not (`ADDED`), or one kind stands in the place of
+# another (`SWAPPED`: tilde for hat, check for breve). A hat and a tilde are one case (the same
+# glyphs of the same fonts, read the same way), so the dropped tilde, with one measured flag, a
+# real one, stays with the dropped hat's two. Every other kind and way left the check: primes
 # (the box does not hold a line's primes), a script l, bars and vector arrows (drawn, not
-# characters), dots, acute and grave accents (too few flags, or none), and a tilde dropped.
+# characters), dots, acute and grave accents (too few flags, or none).
 DROPPED, ADDED, SWAPPED = "dropped", "added", "swapped"
 COMPARED_ACCENTS: dict[str, frozenset[str]] = {
     "hat": frozenset({DROPPED, ADDED, SWAPPED}),
-    "tilde": frozenset({ADDED, SWAPPED}),
+    "tilde": frozenset({DROPPED, ADDED, SWAPPED}),
     "breve": frozenset({SWAPPED}),
     "check": frozenset({SWAPPED}),
 }

@@ -45,13 +45,13 @@
   changed.
 ## Unreleased: an accent the reading dropped or added is a decision (branch fix/accent-agreement)
 
-- Equations. The letter checks leave accents out, so a reading that dropped a hat, added a hat
+- Equations. The letter checks leave accents out, so a reading that dropped or added a hat
   or tilde, or put a tilde for a hat passed every check and was accepted with no card
   (`equation.text_layer_accents`, code `accent_mismatch`, `equation_step.accent_check`). The
   accents of the PDF's text and glyphs under the box are compared with the reading's MathML,
-  only for what measured well (`COMPARED_ACCENTS`): a hat dropped, a hat or tilde added, and a
+  only for what measured well (`COMPARED_ACCENTS`): a hat or tilde dropped or added, and a
   tilde for a hat or a check for a breve (one kind in the place of another). Not compared:
-  primes, script ℓ, bars, vector arrows, dots, acute and grave accents, a tilde dropped. A
+  primes, script ℓ, bars, vector arrows, dots, acute and grave accents. A
   first version compared all of them and raised 8 flags on two public MIT OCW files (5 of them
   primes; none was a certain real catch and 4 were certain false alarms: a neighboring
   line's primes in the box, or a last prime outside it), so those kinds left. It runs after the second-reading decision and before
