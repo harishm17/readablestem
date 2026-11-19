@@ -368,7 +368,7 @@ def _label(text: str) -> tuple[str, int] | None:
 def _cells(
     items: Sequence[Item], side: Sequence[int]
 ) -> list[tuple[tuple[str, int] | None, list[int]]]:
-    """A column's lines in cells: a labelled line and the unlabelled lines under it."""
+    """A column's lines in cells: a labeled line and the unlabeled lines under it."""
     out: list[tuple[tuple[str, int] | None, list[int]]] = []
     for i in sorted(side, key=lambda i: items[i][0][1]):
         lab = _label(items[i][1])
