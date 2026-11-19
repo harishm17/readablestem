@@ -455,8 +455,9 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             and stack[-1].number is not None
             and stack[-1].number.key != number.key
         )
-        # Sub-bullets whose text starts on the text edge of their numbered parent (Word and Google
-        # Docs set them so): the x does not tell which open level "2)" goes back to, its series does.
+        # Sub-bullets whose text starts on the text edge of their numbered parent (Word and
+        # Google Docs set them so): the x does not tell which open level "2)" goes back to, its
+        # series does.
         if (
             stack
             and not nested
