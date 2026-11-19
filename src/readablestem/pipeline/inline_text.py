@@ -24,8 +24,9 @@ cross-references", "Language", "Coloured text"):
   it and "end deleted" after it, visually hidden, so a listener hears that the words are
   struck whether or not the screen reader announces `<del>` (most do not by default), and
   a format that keeps text but not the tag (Word keeps both) still says so.
-  Bold, italic and fixed-pitch words (`Element.runs`, kinds "strong", "emphasis" and "code")
-  are written as `<strong>`, `<em>` and `<code>`, in that order from the outside, inside
+  Highlighted, bold, italic and fixed-pitch words (`Element.runs`, kinds "highlight",
+  "strong", "emphasis" and "code") are written as `<mark>`, `<strong>`, `<em>` and `<code>`,
+  in that order from the outside, inside
   colour and outside raised and lowered text, so every combination nests: the text is cut at
   each edge of each run, and a piece is wrapped in the tags of the runs that cover it. The
   kinds may overlap each other (bold and italic on the same words); two runs of one kind
@@ -103,8 +104,9 @@ FILLED_WORDS = "blank, filled in: "  # a form field that has a value (SW39)
 CHECKBOX_WORDS = {"not checked": "Checkbox, not checked: ", "checked": "Checkbox, checked: "}
 CHECKED_BOXES = frozenset("\u2611\u2612")  # ballot box with check, ballot box with X
 # The runs that mark words by how they are set, with the tag each is written as (outermost first).
-STYLE_TAGS = {"strong": "strong", "emphasis": "em", "code": "code"}
+STYLE_TAGS = {"highlight": "mark", "strong": "strong", "emphasis": "em", "code": "code"}
 INLINE_CODE_CLASS = "inline-code"
+HIGHLIGHT_CLASS = "highlight-run"
 # An element id a link may point at ("p3-e12"), as the assembler writes ids.
 LINK_TARGET = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
 
@@ -210,6 +212,8 @@ def render_inline_text(
         add_style(DELETED_CLASS, student_sheet.DELETED)
     if add_style is not None and any("code" in s.styles for s in segments):
         add_style(INLINE_CODE_CLASS, student_sheet.INLINE_CODE)
+    if add_style is not None and any("highlight" in s.styles for s in segments):
+        add_style(HIGHLIGHT_CLASS, student_sheet.HIGHLIGHT)
     return _write(
         text, segments, [href for _, href in links], [k for k, _ in links], link_attrs, tokens
     )

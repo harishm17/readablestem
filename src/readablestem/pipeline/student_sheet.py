@@ -176,6 +176,19 @@ pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, mono
 INLINE_CODE = """\
 code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.9em; }
 """
+# Highlighted words (`<mark>`, from a highlight annotation or a coloured band behind the words):
+# a pale band in the light page and a deep one in the dark page, each at 4.5:1 or more with the
+# text on it, and a line under the words (3:1 against the page) so they show where colours are
+# replaced, in forced colors, and on paper that prints no backgrounds.
+HIGHLIGHT = """\
+mark { background: #fff0a0; color: #1b1b1b; padding: 0 0.1em; border-bottom: 2px solid #7a5c00; }
+@media screen and (prefers-color-scheme: dark) {
+  mark { background: #5c4a00; color: #f5f5f5; border-bottom-color: #ffd34d; }
+}
+@media (forced-colors: active) {
+  mark { background: Mark; color: MarkText; border-bottom-color: CanvasText; }
+}
+"""
 DEFINITIONS = """\
 dl { margin: 0 0 1em; }
 dt { margin-top: 0.75em; }

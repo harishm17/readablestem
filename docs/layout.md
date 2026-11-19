@@ -15,7 +15,7 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
 | `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space), span color and size, and its face's weight, slant and pitch, for the text pass |
-| `page_strikes(page) -> list[Strike]` | thin horizontal rules and bars, and StrikeOut annotation quads, of an open page (display space), for the text pass |
+| `page_paint(page) -> (list[Strike], list[Highlight])` | thin horizontal rules and bars, and StrikeOut annotation quads, of an open page, with its Highlight annotation quads and filled rectangles within 36 × 600 pt (display space), from one read of its drawings, for the text pass |
 | `heading_step.heading_fixes(elements) -> list[Fix]` | one `HeadingFix` per heading, outline repaired, with checks and confidence |
 | `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour, runs) -> TextPassResult` | the elements with links, color runs, struck runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
 
@@ -73,7 +73,7 @@ tests import), so `from readablestem.pipeline import layout` and `layout.analyze
 | `access` | opening the PDF under the one lock, the document cache, the probe process (see "Untrusted PDFs"), the content budget, `crop`, `crop_line`, `render_page`, `page_ink`, `release` |
 | `glyphs` | `_Char`, font classes and styles, character classes, text cleaning, `glyph_style` |
 | `shared` | the types the stages hand to each other (`_Row`, `_Block`, `_Run`, `_Figure`, `_Region`, `_Path`, ...) and the few helpers more than one stage needs |
-| `rows` | lines merged into rows, form fields, ligatures, right-to-left text, stacked fractions, scripts, big operators, reaction arrows; `line_glyphs`, `page_glyphs`, `page_strikes` |
+| `rows` | lines merged into rows, form fields, ligatures, right-to-left text, stacked fractions, scripts, big operators, reaction arrows; `line_glyphs`, `page_glyphs`, `page_paint` |
 | `drawings` | the vector paths of a page: lines, turns, boxes, radicals, rules, axes |
 | `figures` | raster images and their budgets, vector clusters, diagrams, plots, labels and their owners, page furniture bands |
 | `furniture` | margins: running heads, page numbers, margin notes |
@@ -2565,7 +2565,15 @@ A light grey is a run (it is a contrast problem: the output darkens it); so is a
 color. Headings get no color runs. Running text that names a color ("in red", "shown
 in blue", "highlighted in yellow", "the green curve", "red arrows") on or within two
 paragraphs of colored text on the same page gets the optional notice
-`colour_reference`. With the flag off there are no runs and no such notices.
+`colour_reference`.
+
+With the flag off the color runs are still found (the same rules, from the glyphs already
+read) and counted (`colour_runs` in the trace), but not stored or written: the text is in the
+body color, and the job gets one notice for the whole document, `colour_used`, with the number
+of colored passages as its count and no text of the document. It tells the instructor that the
+converted file does not keep color, so a meaning that only color carried (answers in red) has
+to be said in words. No color is named: the pass has no table of color names. `colour_reference`
+is made only with the flag on.
 
 ### Bold, italic and fixed-pitch words (F-510, `CONTENT_RUNS`)
 
@@ -2590,11 +2598,35 @@ inventing emphasis:
 Headings, program code (`preformatted`) and glossary entries get none; `Element.bold` stays the
 whole-line evidence heading detection uses. Corpus counts (996 files) are in the changelog.
 
+### Highlighted words (SW51c, `CONTENT_RUNS`)
+
+A highlight is a run of kind `highlight`, written as `<mark>`, on a paragraph or list item.
+Two marks make one, both read with the strikes in `layout.page_paint` (one read of the page's
+drawings and annotations, no second pass):
+
+- the quads of a Highlight annotation: every glyph whose middle is inside one is highlighted;
+- a filled rectangle behind the glyphs (a visible fill, at most 36 pt tall and 600 pt wide, a
+  single rectangle) whose color is a color of its own and whose shape is one line of text
+  (`text_pass.highlighted_glyphs`). The color is lighter than 0.5 (OKLCH; a darker fill is a
+  bar or reversed text), not near white (0.96 or more: the page's own or a faint tint) and not a
+  grey (chroma below 0.035: the shade of a table header, a code block or a boxed theorem). The
+  height is 0.6 to 1.5 times the size of the glyphs it holds, so a box with padding round a line
+  or round several lines is not a highlight. Three or more rectangles of one color, top and
+  bottom on a page are shading (a table's header row, a heat map) and none is a highlight
+  (`text_pass.highlight_marks`).
+
+The glyphs map onto the text the way struck glyphs do (`labelled_runs`, `across_markers=False`:
+a run stops at an inline equation), trimmed of spaces and kept only with a letter or a digit in
+them. Table cells, headings, program code and glossary entries get none, because only
+paragraphs and list items take runs. The color of the mark is not kept: the page's own
+stylesheet writes every `<mark>` the same way (docs/output.md "Highlighted text"). `CONTENT_RUNS`
+off finds and counts them (`highlight_runs` in the trace) and writes none.
+
 ### Struck text (F-509, `CONTENT_RUNS`)
 
 Text struck through on the page is kept and marked as a `deleted` run (`Element.runs`), so
 "October 3 October 10" with the first date struck is not read as two live dates. The marks
-come from `layout.page_strikes`: every visible horizontal stroked line and every filled bar
+come from `layout.page_paint`: every visible horizontal stroked line and every filled bar
 no thicker than 3 pt (curves are skipped; a page too complex to read its drawings gives its
 annotations only), and the quads of each StrikeOut annotation. A glyph is struck
 (`text_pass.struck_glyphs`) when:
@@ -2618,8 +2650,8 @@ sample in its drawings that its clip hides, and a reader who sees no line sees n
 text. Only marks that cross glyphs are rendered. And an inline equation the page strikes
 through (a majority of its glyphs struck) is a run that is its marker alone (`deleted_runs`).
 What is not found, named: a struck table cell (cells carry no runs) and a struck display
-equation (equation elements carry no runs). `layout.page_strikes` still lists marks that the
-page clips away or covers (`layout.py`, `page_strikes`: it reads `get_cdrawings()` without the
+equation (equation elements carry no runs). `layout.page_paint` still lists marks that the
+page clips away or covers (`layout.py`, `page_paint`: it reads `get_cdrawings()` without the
 clip entries), which is why the text pass renders the ones that matter.
 
 With `CONTENT_RUNS` off (the shadow rollout, the default until 2026-11-18) the runs are found and counted

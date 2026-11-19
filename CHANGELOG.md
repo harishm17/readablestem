@@ -1,5 +1,37 @@
 # Changelog
 
+## Unreleased: color is said, highlight is kept (branch feat/styled-runs)
+
+- SW51c (reduced). Color runs are now always found (`text_pass.colour_runs`, from the glyphs
+  already read), so a document converted with FEATURE_COLOUR off no longer loses its color
+  without a word: the runs are counted (`colour_runs` in the trace, now the number found, not the
+  number written), not stored or written, and the job gets one notice for the whole document,
+  `colour_used`, with the number of colored passages as its count and no document text. Its
+  sentence (`web/messages.py`) says that the converted file does not keep color and that a
+  meaning only color carried (answers in red) has to be said in words. With the flag on nothing
+  changes (and `colour_reference` is still made only then). No color is named and the flag is
+  not turned on.
+- Highlighted words are a new run kind, `highlight` (`RunKind`), on paragraphs and list items,
+  written as `<mark>`: the quads of a Highlight annotation, or a filled rectangle behind the
+  glyphs in a color of its own (lighter than 0.5 and not near white or grey in OKLCH) and one line
+  high (0.6 to 1.5 times the size of the glyphs it holds), so table header shading, a code
+  block's background, a boxed theorem, a padded callout and a row of three or more rectangles of
+  one color and height (shaded cells) are not highlights.
+  `layout.page_strikes` became `layout.page_paint` and returns the highlight marks with the
+  strikes from the same read of the page's drawings (no extra pass over the page).
+- The page's stylesheet gets a `<mark>` rule only when it has one: a pale band with 4.5:1 text
+  in the light page, a deep band in the dark page, and a 2 px line under the words (3:1 against
+  the page) that shows on paper and in forced colors. `<mark>` nests inside color and outside
+  `<strong>`; Word writes Word's yellow highlight, EPUB keeps `<mark>`. `CONTENT_RUNS` off finds
+  and counts them (`highlight_runs`) and writes none. A stored result with a `highlight` run does
+  not load in the release before this one (same as the SW51b kinds).
+- Corpus (the 73 replayed uploads, no model call): 13 documents say `colour_used`, 514 colored
+  passages in all, and none has a highlight run: the two Highlight annotations in the corpus
+  are in a redaction fixture that is not an upload, and the filled rectangles that fit a
+  highlight in the PDFs are rows of shaded cells (159 of 196, now dropped) and 37 thin strips
+  in one paper (4 pt tall, at a small text size). The 996 layout results are unchanged.
+- No migration; no model request, `PIPELINE_VERSION` or `RENDER_VERSION` changed.
+
 ## Unreleased: bold, italic and fixed-pitch words are carried (branch feat/styled-runs)
 
 - SW51b (reduced), F-510. Bold, italic and fixed-pitch words in a paragraph or list item were
@@ -23,6 +55,11 @@
   not load in the release before this one (`RunKind` is a closed list there: a validation
   error), so the release that reads them runs everywhere before one is stored; a result
   without them is unchanged.
+- Corpus (the 73 replayed uploads, no model call): 469 `strong` runs in 26 documents, 141
+  `emphasis` in 14 and 96 `code` in 3 (79 of them in two slide decks). 33 documents change
+  (these runs, and the `colour_used` notice of the entry above); with those removed every part
+  of all 73 results but the page's html is the base commit's, and the 996 layout results are
+  unchanged.
 - No migration; no model request, `PIPELINE_VERSION` or `RENDER_VERSION` changed (a stored
   document shows the runs after its next conversion or its next render with a raised version).
 

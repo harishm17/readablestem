@@ -512,6 +512,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "to it where the mark could be found.",
     "colour_reference": "The text refers to a color (for example, shown in red), so add "
     "a cue that does not depend on seeing the color.",
+    "colour_used": "Some text is printed in color ({count}), and the converted file does not "
+    "keep color. If a color carries a meaning here (for example, answers in red), say that "
+    "meaning in words.",
     "colour_only": "A figure tells things apart by color alone, so add labels or patterns "
     "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "

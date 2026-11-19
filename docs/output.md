@@ -1157,17 +1157,20 @@ text itself keeps the link color.
 Color alone tells a screen reader nothing, so text that refers to color near colored
 text ("shown in red") gets the optional notice `colour_reference`: the instructor may want
 to add a cue that does not depend on seeing it. With the flag off, colored text is
-written in the body color, as in pipeline 0.3.0.
+written in the body color, and the job gets one notice for the whole document, `colour_used`
+("Some text is printed in color (3), and the converted file does not keep color. If a color
+carries a meaning here (for example, answers in red), say that meaning in words."): its count
+is the number of colored passages the PDF has, and it holds no text of the document.
 
 ## Struck, bold and other marked text
 
 Text whose look changes its meaning is kept as a run of the element's text
 (`Element.runs`, `core/types.Run`), offsets into the stored text like links and color
-runs. Six kinds exist: `deleted`, text struck through on the page ("The midterm is
+runs. Seven kinds exist: `deleted`, text struck through on the page ("The midterm is
 on ~~October 3~~ October 10"), `blank` and `checkbox`, a blank to fill in and a printed
-or form check box (below), and `strong`, `emphasis` and `code`, bold, italic and fixed-pitch
-words inside a paragraph or list item (below). Highlighted text is not a run yet; it is
-written as plain text.
+or form check box (below), `strong`, `emphasis` and `code`, bold, italic and fixed-pitch
+words inside a paragraph or list item (below), and `highlight`, words the page highlights
+(below).
 
 A struck run is kept, never removed, and written as `<del>` with the words said around it:
 
@@ -1222,7 +1225,7 @@ are runs of kind `strong`, `emphasis` and `code`, written as `<strong>`, `<em>` 
 
 They add markup and no words, so a screen reader that announces emphasis says it and one that
 does not says the same words as before; the output audit and the say-once check count the
-same words. Nesting, outermost first: link, struck, color, `<strong>`, `<em>`, `<code>`, raised
+same words. Nesting, outermost first: link, struck, color, `<mark>`, `<strong>`, `<em>`, `<code>`, raised
 or lowered. The text is cut at every edge of every run and each piece is wrapped in the tags of
 the runs that cover it, so any mix of links, color, struck text, raised text and bold and
 italic nests: a run that crosses a link's edge is two tags, one in the link and one outside. Bold
@@ -1236,6 +1239,30 @@ not change and takes off those whose words did, without a message (it is only th
 the words). Runs come from the text pass (docs/layout.md "Bold, italic and fixed-pitch
 words"); a Word or LaTeX source has none yet. `CONTENT_RUNS` off finds and counts them
 (`strong_runs`, `emphasis_runs`, `code_runs` in the trace) and writes none.
+
+### Highlighted text (SW51c)
+
+Words a Highlight annotation covers, or a colored band printed behind them, are a `highlight`
+run, written as `<mark>`: `<p>Read <mark>chapter 4 before the lab</mark> twice.</p>`. A table's
+header shading, a code block's background and a boxed theorem are not highlights (docs/layout.md
+"Highlighted words"). The `<mark>` rule is added only to a document that has one, in the
+page's own stylesheet:
+
+```css
+mark { background: #fff0a0; color: #1b1b1b; padding: 0 0.1em; border-bottom: 2px solid #7a5c00; }
+@media screen and (prefers-color-scheme: dark) {
+  mark { background: #5c4a00; color: #f5f5f5; border-bottom-color: #ffd34d; }
+}
+@media (forced-colors: active) {
+  mark { background: Mark; color: MarkText; border-bottom-color: CanvasText; }
+}
+```
+
+The text on the band reaches 4.5:1 in both schemes, and the line under the words (3:1 against
+the page) shows where the band does not: paper that prints no backgrounds, and forced colors.
+Nesting, outermost first: link, struck, color, `<mark>`, `<strong>`, `<em>`, `<code>`, raised
+or lowered. Word writes the words with Word's own yellow highlight; EPUB, Canvas and Listen keep `<mark>`
+(the book's stylesheet drops the page's colors, so the reading system draws the band).
 
 ### What the reviewers wrote on the page (F-541)
 

@@ -95,6 +95,17 @@ def test_code_and_table_rules_have_a_dark_version_that_reaches_contrast():
     assert ratio(declared(table_dark, "th, td", "border-color"), contrast.DARK_BACKGROUND) >= 3
 
 
+def test_highlighted_words_reach_contrast_in_both_schemes_and_show_in_forced_colors():
+    light, dark = split_dark_css(student_sheet.HIGHLIGHT)
+    for css, page in ((light, contrast.OUTPUT_BACKGROUND), (dark, contrast.DARK_BACKGROUND)):
+        band = declared(css, "mark", "background")
+        assert ratio(declared(css, "mark", "color"), band) >= 4.5
+        # The line under the words is what shows where the band does not (paper, forced colors).
+        edge = declared(css, "mark", "border-bottom" if css is light else "border-bottom-color")
+        assert ratio(edge, page) >= 3
+    assert "forced-colors: active" in light and "border-bottom-color: CanvasText" in light
+
+
 @pytest.mark.parametrize(
     "printed",
     [(255, 0, 0), (0, 0, 255), (255, 235, 59), (210, 210, 210), (0, 100, 0), (128, 0, 128)],

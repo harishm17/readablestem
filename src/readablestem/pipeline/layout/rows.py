@@ -1109,26 +1109,59 @@ class Strike:
     annotation: bool = False
 
 
-def page_strikes(page: pymupdf.Page) -> list[Strike]:
-    """The marks on `page` that may strike text through, for the text pass: every visible
-    horizontal line (its box is the stroke's width around it) or filled bar no thicker than
-    `STRIKE_MAX_PT`, and the quads of every StrikeOut annotation. A page too complex to read
-    its drawings (`page_type.too_complex`) gives its annotations only. The caller holds
-    `_LOCK`."""
+# A filled rectangle that may be a highlight behind text (`page_paint`): at most this tall and
+# wide, so a shaded box around a block never is one. The text pass decides, from the glyphs it
+# holds, whether it hugs one line of text (`text_pass.highlighted_glyphs`).
+HIGHLIGHT_MAX_PT = (36.0, 600.0)
+
+
+@dataclass(frozen=True, slots=True)
+class Highlight:
+    """The area of a Highlight annotation (`rgb` None: its box holds the marked glyphs), or a
+    filled rectangle that may sit behind text, with its fill colour. Display coordinates."""
+
+    bbox: BBox
+    rgb: tuple[int, int, int] | None = None
+
+
+def _quads(annot: pymupdf.Annot, display: _Display) -> list[BBox]:
+    """The boxes of an annotation's quads, in display coordinates."""
+    points = list(annot.vertices or ())
+    boxes: list[BBox] = []
+    for i in range(0, len(points) - 3, 4):  # four points per quad, unrotated page space
+        xs = [float(x) for x, _ in points[i : i + 4]]
+        ys = [float(y) for _, y in points[i : i + 4]]
+        boxes.append(display.box((min(xs), min(ys), max(xs), max(ys))))
+    return boxes
+
+
+def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
+    """The marks on `page` that may strike text through and the ones that may highlight it,
+    for the text pass, from one read of the page's drawings and annotations.
+
+    Strikes: every visible horizontal line (its box is the stroke's width around it) or filled
+    bar no thicker than `STRIKE_MAX_PT`, and the quads of every StrikeOut annotation.
+    Highlights: the quads of every Highlight annotation, and every visible filled rectangle
+    within `HIGHLIGHT_MAX_PT`, with its colour. A page too complex to read its drawings
+    (`page_type.too_complex`) gives its annotations only. The caller holds `_LOCK`."""
     display = _Display.of(page)
     marks: list[Strike] = []
+    lit: list[Highlight] = []
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_STRIKE_OUT]) or ():
-        points = list(annot.vertices or ())
-        for i in range(0, len(points) - 3, 4):  # four points per quad, unrotated page space
-            xs = [float(x) for x, _ in points[i : i + 4]]
-            ys = [float(y) for _, y in points[i : i + 4]]
-            marks.append(Strike(display.box((min(xs), min(ys), max(xs), max(ys))), True))
+        marks.extend(Strike(box, True) for box in _quads(annot, display))
+    for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_HIGHLIGHT]) or ():
+        lit.extend(Highlight(box) for box in _quads(annot, display))
     drawings = page.get_cdrawings()
     if page_type.too_complex(drawings):
-        return marks
+        return marks, lit
     seen = page_type.paint_visibility(drawings)
     for drawing, (filled, stroked) in zip(drawings, seen, strict=True):
         items = drawing.get("items") or []
+        if filled and drawing.get("fill") and _filled_rectangle(drawing):
+            x0, y0, x1, y1 = (float(v) for v in drawing["rect"])
+            if y1 - y0 <= HIGHLIGHT_MAX_PT[0] and x1 - x0 <= HIGHLIGHT_MAX_PT[1]:
+                r, g, b = (round(float(v) * 255) for v in drawing["fill"][:3])
+                lit.append(Highlight(display.box((x0, y0, x1, y1)), (r, g, b)))
         if any(item[0] == "c" for item in items):
             continue  # a curve: not a rule
         x0, y0, x1, y1 = (float(v) for v in drawing["rect"])
@@ -1148,4 +1181,12 @@ def page_strikes(page: pymupdf.Page) -> list[Strike]:
                 y = (py + qy) / 2
                 box = (min(px, qx), y - half, max(px, qx), y + half)
                 marks.append(Strike(display.box(box)))
-    return marks
+    return marks, lit
+
+
+def _filled_rectangle(drawing: dict[str, Any]) -> bool:
+    """The drawing is one axis-aligned rectangle (a `re` item, or four straight lines)."""
+    items = drawing.get("items") or []
+    if len(items) == 1:
+        return items[0][0] == "re"
+    return len(items) == 4 and all(item[0] == "l" for item in items)

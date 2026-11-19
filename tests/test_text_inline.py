@@ -250,7 +250,15 @@ AFTER_MARKER = MIXED.index(MARKER) + len(MARKER)
     "spans",
     [
         pytest.param(
-            dict(runs=[("strong", 0, 16), ("emphasis", 6, 26), ("code", 20, 34)]), id="overlapping"
+            dict(
+                runs=[
+                    ("strong", 0, 16),
+                    ("emphasis", 6, 26),
+                    ("code", 20, 34),
+                    ("highlight", 3, 30),
+                ]
+            ),
+            id="overlapping",
         ),
         pytest.param(
             dict(
@@ -263,7 +271,12 @@ AFTER_MARKER = MIXED.index(MARKER) + len(MARKER)
         pytest.param(
             dict(
                 script_runs=[script(3, 4, "sup")],
-                runs=[("deleted", 12, 22), ("strong", 15, AFTER_MARKER + 9), ("emphasis", 0, END)],
+                runs=[
+                    ("deleted", 12, 22),
+                    ("strong", 15, AFTER_MARKER + 9),
+                    ("emphasis", 0, END),
+                    ("highlight", 8, AFTER_MARKER + 14),
+                ],
                 colour_runs=[ColourRun(start=18, end=AFTER_MARKER + 20, rgb=RED)],
             ),
             id="round a struck run, maths and a raised letter",
@@ -277,6 +290,7 @@ AFTER_MARKER = MIXED.index(MARKER) + len(MARKER)
 def test_every_mix_of_runs_nests_and_adds_no_words(spans):
     # F-510: bold, italic and code are carried, whatever else covers the same words.
     runs = [Run(start=a, end=b, kind=k) for k, a, b in spans.pop("runs")]
+    kinds = {r.kind for r in runs}
     element = paragraph(MIXED, runs=runs, **spans)
     out = html(element)
     check = Nesting()
@@ -284,4 +298,6 @@ def test_every_mix_of_runs_nests_and_adds_no_words(spans):
     assert check.ok and not check.stack, out
     said = "".join(check.words).replace("deleted: ", "").replace(" end deleted", "")
     assert said == MIXED.replace(MARKER, "")
-    assert "<strong>" in out and f"<strong>{MATHS}" not in out and f"<em>{MATHS}" not in out
+    assert "<strong>" in out and ("<mark>" in out) == ("highlight" in kinds)
+    for tag in ("strong", "em", "mark"):
+        assert f"<{tag}>{MATHS}" not in out

@@ -520,8 +520,10 @@ class ScriptRun(_Span):
 # (U+2610 and its checked forms); both are written with words that say what they are.
 # "strong", "emphasis" and "code": words the page sets in bold, in italic or in a fixed-pitch
 # face inside a paragraph or list item (`<strong>`, `<em>`, `<code>`; `text_pass.style_runs`).
+# "highlight": words the page marks with a highlight annotation or a filled rectangle behind
+# them in a colour of their own (`<mark>`; `text_pass.highlight_runs`).
 # Later kinds are new values here, not new fields.
-RunKind = Literal["deleted", "blank", "checkbox", "strong", "emphasis", "code"]
+RunKind = Literal["deleted", "blank", "checkbox", "strong", "emphasis", "code", "highlight"]
 
 
 class Run(_Span):
@@ -894,6 +896,7 @@ NOTICE_CODES = frozenset(
         "code_block",  # program code, kept as plain text
         "footnote",  # a footnote, left where it falls in the text
         "colour_reference",  # the text refers to colour ("shown in red")
+        "colour_used",  # text printed in colour that the converted file does not keep
         "colour_only",  # a figure tells things apart by colour alone
         "link_scheme_dropped",  # a PDF link that is not http, https or mailto: text only
         "link_text_unclear",  # link text that says nothing on its own ("click here")
