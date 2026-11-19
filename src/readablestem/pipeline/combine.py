@@ -91,6 +91,9 @@ class Joined:
     omitted_pages: list[int]
     left_out_blocks: list[int]  # the page of the source of each paragraph left out
     lang: str
+    # The pipeline versions that converted the parts, each once, in page order, as the
+    # generator tag names them ("0.5.11, 0.5.12" when the parts were converted at two).
+    pipeline_version: str
 
 
 def unconfirmed(codes: Iterable[str]) -> bool:
@@ -258,6 +261,7 @@ def join(parts: Sequence[Part]) -> Joined:
         omitted_pages=sorted(omitted),
         left_out_blocks=sorted(blocks),
         lang=tag,
+        pipeline_version=", ".join(dict.fromkeys(p.result.pipeline_version for p in ordered)),
     )
 
 
@@ -284,4 +288,5 @@ def combine(
         left_out_blocks=joined.left_out_blocks or None,
         page_labels=joined.page_labels,
         footnote_ids=joined.footnote_ids,
+        pipeline_version=joined.pipeline_version,
     )

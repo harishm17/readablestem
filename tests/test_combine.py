@@ -126,6 +126,18 @@ def ids_of(html: str) -> list[str]:
     return re.findall(r'\bid="([^"]+)"', html)
 
 
+def test_the_generator_tag_names_the_pipeline_versions_the_parts_were_converted_at():
+    def converted_at(*versions: str) -> list[Part]:
+        return [
+            Part(part.result.model_copy(update={"pipeline_version": v}), part.crops, part.pages)
+            for part, v in zip(three(), versions, strict=True)
+        ]
+
+    html = combine_html(converted_at("0.5.11", "0.5.12", "0.5.11"), title="Chapter")
+    assert ', pipeline 0.5.11, 0.5.12"' in html
+    assert ', pipeline 0.5.12"' in combine_html(converted_at(*["0.5.12"] * 3), title="Chapter")
+
+
 def test_parts_given_out_of_order_are_joined_in_page_order():
     first, second, third = three()
     html = combine_html([third, first, second], title="Chapter")
