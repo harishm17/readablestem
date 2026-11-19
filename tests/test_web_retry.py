@@ -28,6 +28,7 @@ from fixtures.web.support import (
 from image_page_support import block, scan_pdf, text
 from readablestem.config import ConfigError
 from readablestem.core.types import (
+    ConversionOptions,
     DocumentResult,
     Element,
     Fix,
@@ -280,6 +281,20 @@ def test_a_cache_gives_back_finished_steps_and_the_model_is_not_asked_again(site
     )
     assert site.state["asked"] == [] and Cache.hits == len(kept)
     assert fixes_json(second.result) == fixes_json(first.result)
+    # Exam mode is read by the figure step alone: a document converted again as an exam
+    # keeps its equation and table answers and asks again only about its figures.
+    kinds = {f.element_id: f.kind for f in first.result.fixes}
+    figures = sum(kinds.get(element_id) is Kind.FIGURE for element_id in kept)
+    Cache.hits = 0
+    pipeline_run.convert_pdf(
+        PDF.read_bytes(),
+        settings=settings,
+        client=client(),
+        concurrency=1,
+        step_cache=Cache(),
+        options=ConversionOptions(exam_mode=True),
+    )
+    assert Cache.hits == len(kept) - figures
 
 
 # --------------------------------------------------------------------------- a run that dies
