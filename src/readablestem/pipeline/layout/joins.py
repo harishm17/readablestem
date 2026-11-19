@@ -293,15 +293,15 @@ def _page_number(block: _Block, page: _PageBlocks) -> bool:
 def _flow_tail(page: _PageBlocks, ctx: _Context) -> _Block | None:
     """The last block of the body flow of a page: below it may be pictures and tables that
     float to the foot, footnotes (smaller type) and the page's number, none of which a
-    paragraph goes on after."""
-    return next(
-        (
-            b
-            for b in reversed(page.blocks)
-            if b.kind not in _FLOATS and _body_sized(b, ctx) and not _page_number(b, page)
-        ),
-        None,
-    )
+    paragraph goes on after. A display equation or a heading is the tail itself (small or
+    not), so nothing joins across it."""
+
+    def below_the_flow(b: _Block) -> bool:
+        if b.kind in _FLOATS or _page_number(b, page):
+            return True
+        return b.kind in _TEXT_BLOCKS and not _body_sized(b, ctx)
+
+    return next((b for b in reversed(page.blocks) if not below_the_flow(b)), None)
 
 
 def _flow_head(page: _PageBlocks) -> _Block | None:
@@ -367,6 +367,12 @@ def _same_edge(
     tail, head = last.rows[-1], first.rows[0]
     item = last.marker is not None
     x = last.marker.x if last.marker is not None else tail.x0
+    if not item and len(last.rows) >= 2:
+        before = last.rows[-2]
+        if before.column == tail.column and 0 < tail.x0 - before.x0 <= MAX_INDENT * (
+            last.font_size or 0.0
+        ):
+            x = before.x0  # the last line is the first of a paragraph, in by its indent
     if abs(x - head.x0) <= EDGE_TOLERANCE:
         return True
     tail_edge = last.origin if item else tail_edges.get(tail.column)
