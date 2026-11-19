@@ -933,6 +933,7 @@ NOTICE_CODES = frozenset(
         "lang_mixed",  # no one language holds most of the text: the largest is the document's
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
+        "table_header_missing",  # a continued table with no header row, none to carry over
         "struck_text",  # text the page shows struck through, kept and marked as deleted
         "form_fields",  # a fillable PDF form: its fields are read as text, not as live inputs
         "annotations_read",  # comments in the PDF's annotations, included as paragraphs

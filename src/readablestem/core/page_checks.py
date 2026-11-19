@@ -100,6 +100,11 @@ ROWS: tuple[CheckLine, ...] = (
     _page("code_block", "none", "layout: program code kept as plain text", "handled"),
     # --- derived from the fixes and the text as they stand now (`pipeline.notices.current`)
     _page("table_not_rebuilt", "required", "a table fix kept as the image of the original"),
+    _page(
+        "table_header_missing",
+        "optional",
+        "a table that goes on from the page before, with no header row to carry over",
+    ),
     _page("colour_only", "optional", "a figure that tells things apart by color alone"),
     _page("long_description_missing", "optional", "a chart or diagram without a long description"),
     _page("struck_text", "optional", "words the page strikes through, kept and marked"),

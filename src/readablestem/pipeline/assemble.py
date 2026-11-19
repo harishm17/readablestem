@@ -67,6 +67,7 @@ from readablestem.core.types import (
     Kind,
     Link,
     Status,
+    TableGrid,
 )
 from readablestem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from readablestem.pipeline import (
@@ -1078,6 +1079,8 @@ class _Renderer:
         default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID, NOTICE_ID, NOTICE_TITLE_ID, LEFT_OUT_ID}
     )
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
+    # A table that goes on from the page before, with that table's header rows on top.
+    carried: dict[str, TableGrid] = field(default_factory=dict)
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
     outline: Outline = field(default_factory=Outline)
     # CSS a feature added for this document (`add_style`), by name.
@@ -1330,7 +1333,9 @@ class _Renderer:
         if element.kind is Kind.FIGURE:
             return self.figure(element)
         if element.kind is Kind.TABLE:
-            return assemble_tables.render_table_element(element, self.fixes.get(element.id), self)
+            return assemble_tables.render_table_element(
+                element, self.fixes.get(element.id), self, self.carried.get(element.id)
+            )
         return ""
 
     def paragraph(self, element: Element, text: str) -> str:
@@ -2202,6 +2207,7 @@ def render_html(
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
     )
     renderer.unread_parts = _unread_parts(ordered, first_fix, renderer.placed)
+    renderer.carried = assemble_tables.carry_headers(ordered, first_fix)[0]
     body = _name_sidebars(renderer.fill_backlinks(renderer.render_all(ordered)))
     kept_pages = [
         e.page

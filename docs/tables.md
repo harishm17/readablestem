@@ -256,6 +256,16 @@ rules above.
    cell, and the work counts against the document's detector budget. The one row left under a repeated header is too
    few lines for the aligned-text test, so before this the header, the split row and the
    next row were read as headings and paragraphs.
+   **The header of a continued table.** A part that goes on from the page before is written
+   with the header rows of the part before it when it has none of its own and the table
+   step's grid has the same number of columns (`assemble_tables.carry_headers`, at the time
+   the page is written: the stored grids and the table step's request are not changed). All
+   the header rows are carried, merged cells included, or none; a table of three pages carries
+   its header to the third from the second. A part that printed its header again keeps it and
+   gets no second one. Where the columns do not agree, or the part's first rows repeat the
+   header without being marked as one, nothing is carried and the notice
+   `table_header_missing` ("Worth checking") says the part has no header row. A table whose
+   first part has no header row gets neither.
 
 What layout does with the result: the table's lines, rules and caption lines leave the
 page, and a TABLE element is placed in reading order like a figure (a grid of terms:

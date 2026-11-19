@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: the header of a table that runs onto the next page (branch fix/across-a-page-break)
+
+- A table that goes on from the page before was two tables, and the second had no header row, so
+  a screen reader read its cells with no column names. The page now writes each such part with
+  the header rows of the part before it (all of them, merged cells included) when the part has
+  no header of its own and the same columns; a part that printed its header again keeps its own,
+  with no second one. Where the columns do not agree the part stays as it was and the new notice
+  `table_header_missing` ("Worth checking") says it has no header row. The stored tables and the
+  table step's request are unchanged, so recorded answers still match. `RENDER_VERSION` is owed a
+  raise: a stored page with a continued table is written differently.
+
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
 - Speech: `\{x | |x|<1\}` (a plain bar before an absolute value in set braces) read "vertical
