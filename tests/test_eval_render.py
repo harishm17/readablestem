@@ -116,6 +116,21 @@ def test_image_cache_refuses_other_hosts(tmp_path):
     assert images.served == []  # type: ignore[attr-defined]
 
 
+def test_a_picture_over_the_pixel_budget_is_refused_before_it_is_decoded():
+    import io
+
+    from PIL import Image
+
+    from readablestem.core.images import MAX_IMAGE_PIXELS
+
+    side = int(MAX_IMAGE_PIXELS**0.5) + 1
+    big = io.BytesIO()
+    Image.new("1", (side, side)).save(big, "PNG")  # a few KB of file, 40 million pixels
+    with pytest.raises(RenderError, match="pixel budget"):
+        render.png_bytes(big.getvalue())
+    assert render.png_bytes(tiny_png())  # an ordinary picture is still turned into a PNG
+
+
 # ------------------------------------------------------------------ page sources
 
 

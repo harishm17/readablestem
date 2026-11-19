@@ -467,7 +467,17 @@ def png_bytes(data: bytes, *, max_side_px: int = 2048) -> bytes:
     `layout.crop` sends, so a figure costs the same in the eval as in a real document.
     """
     import pymupdf
+    from PIL import Image as pil
 
+    from readablestem.core.images import ImageTooLarge, open_within_budget
+
+    # The size is read from the header first: a small file can hold a huge picture.
+    try:
+        open_within_budget(data).close()
+    except (ImageTooLarge, pil.DecompressionBombError) as exc:
+        raise RenderError("image is over the pixel budget") from exc
+    except OSError:
+        pass  # a format PIL does not read: PyMuPDF decides below
     try:
         pix = pymupdf.Pixmap(data)
     except Exception as exc:  # PyMuPDF raises its own types for unreadable images
