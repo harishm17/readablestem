@@ -343,18 +343,24 @@ because merging happens only inside one leaf). A `stack` is horizontal cuts: its
 read from the top. `cols` is one vertical cut: its children are read left to right, with a notes
 column last. A `grid` is a set of labeled cells read in label order. The items cut are the
 unmerged line fragments, the page's raster pictures (they occupy space), the rectangles drawn
-round text, and nothing else; tables are claimed before the rows are made (`_claim_tables`), so
-their cells are not items.
+round text, and the tables found on the page (`_claim_tables` takes their cells and captions out
+of the fragments before the rows are made, so a table is one item with the box of its cells and
+its caption, like a picture). A vector figure is not an item: its drawings are read later.
 
 **The cuts.**
 
-- *Horizontal.* Items are grouped in bands (items that overlap vertically). A run of bands that
+- *Horizontal.* Items are grouped in bands (items that overlap vertically; an item that stands
+  over a shorter one's whole height overlaps it by a fifth of the shorter one's height, so a
+  picture that starts a little below the first line beside it is in that line's band). A run of bands that
   keep one set of white channels is a segment. A band that does not (a line that spans the
   region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
   only when the band below is side by side (rule 6).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
-  lines each side (two on a slide) and a line of three words or more cuts it in two. Each side is
-  cut again, so a page has at most three columns. A column at most 0.35 of its neighbor's width
+  lines each side (two on a slide) that have a line of the other side at their height (the pieces
+  a formula cuts a line into are one line), and a line of three words or more, cuts it in two.
+  Only the channels that count are counted: the numbers in a margin are a channel with no
+  words, and a segment with more than two channels that count is not cut. Each side is cut again,
+  so a page has at most three columns. A column at most 0.35 of its neighbor's width
   and at most 0.6 filled is a notes column: it is read after the body block it stands beside (at
   block level) or after the whole body (at row level).
 - *Boxes (rule 2).* A rectangle drawn at least 40 x 18 pt and less than 0.8 of the page, holding
@@ -393,16 +399,41 @@ adding it changed none. Rule 13 was not ported, and rule 12's page check was not
 on the final block-level order of `_page_blocks`). Row `column` names are the tree's
 (`L`, `R`, `LL`, a `#k` suffix for a box, `~index` on an index page). The setting is
 `Settings.region_tree` (`off` or `on`), passed by `run.py` and the say-once report as
-`layout.analyze(region_tree=True)`.
+`layout.analyze(region_tree=True)`. The blanks (`_mark_blanks`) are marked with the page's
+gutter as with the tree off, so a rule that heads one column is never the blank of a line in the
+other; the tables found on the page (`_claim_tables`) are handed to the tree as boxes.
 
 **Measured** (`eval order --set layout-dev-1` and the corpus gold pages, no model, scored on
-the elements): 267 development pages, 141 right off, 154 on (22 made right, 9 made wrong);
-91 corpus gold pages, 69 right off, 82 on (13 made right, none made wrong). Added alone on top
+the elements): 267 development pages, 141 right off, 163 on (22 made right, none made wrong; 154
+on, 9 made wrong, before the five fixes below); 91 corpus gold pages, 70 right off, 82 on (12
+made right, none made wrong). Added alone on top
 of rules 1 to 8: rule 9 made 1 page right, rule 10 made 8, rule 12 made 1, none made one wrong.
 Leaving one of rules 1 to 8 out (pages that stop being right / pages that become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4 and 7 0/0. Speed: 0.575
-(off) and 0.578 s per page (on).
+(off) and 0.578 s per page (on) on a quiet box; in the runs after the five fixes, with the box
+busy, on took 0.90 of off's time (0.91 before them).
 
-**Why it is off.** It makes 9 development pages wrong while making 22 right, and the 9 are mostly pages with a table, an algorithm box or a figure at the top of one column (the other column's first lines are read first or the table is read after the text below it), two pages where a paragraph is joined across the columns or an inline formula line is read into its paragraph, and a page with line numbers in the margin, where every line becomes its own element. Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION` bump and a recorded re-measurement first.
+**The nine pages the first measurement made wrong** (154 right on, 9 right off and wrong on) are
+right again (163 right on, 22 made right, none made wrong; the corpus gold pages are unchanged at
+82 right, none made wrong). Five causes, each in the tree and none of them per page:
+
+- A table, with its caption, was not an item, so the lines beside it were read as a column of
+  their own and the cut fell inside a paragraph, or a footnote zone took a figure's labels
+  (4 pages: two tables at the top of a column, two tables with captions in both columns).
+- A picture that starts a little below the first line beside it was a band of its own, so that
+  line was cut off as a segment (1 page).
+- A rule drawn at the head of one column was taken as the blank of a line in the other, because
+  the blanks were marked without the page's gutter, which reached that line across the channel
+  (1 page: a boxed algorithm at the top of a column).
+- Three channels (the numbers in the margins and the gutter) were more than three columns, so
+  the page was one leaf and its lines were merged across the gutter (1 page).
+- The gaps that inline formulas leave in two lines were counted as a channel with three lines on
+  each side, which they are in pieces and not in lines (2 pages).
+
+Still not an item: a vector figure (its drawings are read after the rows are made), so a figure
+drawn as vectors at the top of a column beside text is placed by its labels only.
+
+**Why it is off.** Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION`
+bump and a recorded re-measurement first.
 
 ### Headings
 

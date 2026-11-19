@@ -73,6 +73,20 @@
 - The replay record `data/eval/burden-corpus.json` was re-made: 43 of the 73 uploads, 117
   pages, 58 decisions. The 42 uploads in both records ask the same; three left for answers the
   recording lacks and one came back (docs/eval.md, `eval burden`). No model call, no migration.
+## Unreleased: the region tree makes none of the development pages wrong (branch fix/region-tree-wrong-pages)
+
+- WS15.1, the nine pages the tree made wrong. With `REGION_TREE` on, `layout-dev-1` goes from 141
+  to 163 pages right of 267 (it was 154 with 9 made wrong; now 22 made right, none wrong), and
+  the corpus gold pages stay at 82 right with none made wrong. Five causes, each fixed in the
+  tree or in what it is given: a table and its caption are items of the tree (they were not,
+  so the lines beside one were cut off or a footnote zone took a figure's labels); a picture
+  that starts a little below the first line beside it is in that line's band; the blanks are
+  marked with the page's gutter, so a rule that heads one column is no blank of a line in the
+  other; a channel counts as a cut only where lines stand beside lines across it, and only the
+  channels that count are counted (line numbers in the margins are no column, the gaps of an
+  inline formula are no gutter). Five regression tests, one generated page per cause. With the
+  setting off nothing changes. The setting is still off; turning it on needs a `PIPELINE_VERSION`
+  bump and a recorded re-measurement.
 
 ## Unreleased: a capital that is not in the text does not make the next small letter bold
 
