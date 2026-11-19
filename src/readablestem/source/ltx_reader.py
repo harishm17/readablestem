@@ -394,6 +394,20 @@ class _Reader:
         if "ltx_authors" in classes:
             self._authors(node)
             return True
+        if tag == "blockquote" and "ltx_quote" in classes:
+            # \begin{quote} and \begin{quotation}: the plain paragraphs in it are a block quotation
+            # (verse, which LaTeXML marks `ltx_role_verse`, stays as it was read)
+            first = len(self.out.elements)
+            self._walk_children(node, depth)
+            if "ltx_role_verse" not in classes:
+                for element in self.out.elements[first:]:
+                    if (
+                        element.kind is Kind.PARAGRAPH
+                        and not element.preformatted
+                        and element.term_end is None
+                    ):
+                        element.role = "quote"
+            return False
         if tag in ("span", "a", "em", "strong", "b", "i") and not _children_blocks(node):
             # loose inline text directly inside a container: a paragraph of its own, whose
             # formulas are equations like any paragraph's

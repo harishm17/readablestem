@@ -478,9 +478,15 @@ document in another language marks it `lang="en"`).
   wrapper. A list item or a defined term never takes a wrapper. A footnote is not a role (it is
   the notice `footnote`, above) and code is `Element.preformatted`. The Word reader
   (`source/docx_reader.py`) sets `quote` on the paragraphs of a quotation, so a quotation in a
-  Word source comes out as a `<blockquote>`; layout sets no role on a PDF yet (no detector
-  passes the "at least 2 real cases and no false one" bar, docs/layout.md), so a PDF's page is
-  written as before. A text edit and carry-over keep the role; "make heading" clears it.
+  Word source comes out as a `<blockquote>`; so does the LaTeX reader (`source/ltx_reader.py`)
+  for the paragraphs of a `quote` or `quotation` environment (LaTeXML's `blockquote.ltx_quote`;
+  a `verse` environment, which LaTeXML marks `ltx_role_verse`, stays plain paragraphs;
+  `displayquote` needs `csquotes`, which is refused at upload). Layout sets no role on a PDF (no
+  detector passes the "at least 2 real cases and no false one" bar, docs/layout.md): there the
+  reviewer sets it, in the page editor's "Change page N" ("Make it a sidebar", "Make it a
+  quotation", "Not a sidebar", "Not a quotation": docs/web.md, `web/page_edits.set_role`). A text
+  edit and carry-over keep the role, a role set by hand is carried to the new conversion of the
+  same words, and "make heading" clears it.
   Each output: the web page draws an aside with a bar at its left in the text color; Word
   writes the quote as the paragraph style "Block Text" and an aside as the style "Sidebar"
   (pandoc drops `<aside>`, so the export wraps it in a styled `div`; Word has no landmark for

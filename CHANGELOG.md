@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: a reviewer sets a block's role; LaTeX quotations (branch feat/set-block-role, WS19.9 in part)
+
+- The page editor ("Change page N", under "Change the words, make a line a heading, or set a
+  paragraph apart") has buttons on a plain paragraph: "Make it a sidebar", "Make it a
+  quotation", and, on a paragraph that has a role, "Not a sidebar" / "Not a quotation". The card
+  says in words which role a paragraph has. It is the route `POST /jobs/{id}/edit/{element}` with
+  `action=role` (`page_edits.set_role`), recorded as the change `set_role` (undoable, counted
+  among the changes to pages, shown on the record). It is offered only where the student page
+  writes a role: not on a list item, a heading, program code, a glossary entry or a footnote,
+  and the route refuses those. A document converted again carries the role over to the
+  paragraph that says the same words, as it does "make heading"; one that cannot be carried is
+  listed as a change that was not made again. No keyboard shortcut (the review screen's keys are
+  for decisions). Verse, turn, code and lines are not built.
+- LaTeX: the paragraphs of a `quote` or `quotation` environment are read with `role="quote"`
+  (they were plain paragraphs), so the student page has a `<blockquote>`. `verse` is read as
+  before.
+- No request to a model, prompt, model id or migration changed. A LaTeX source with a quotation
+  converts differently; the batch's `PIPELINE_VERSION` raise covers it.
+
 ## Unreleased: block roles, a sidebar and a quotation (branch feat/block-roles, WS16.3)
 
 - One stored field, `Element.role` (`"aside"` or `"quote"`; left out of the JSON when empty, so

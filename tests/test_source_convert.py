@@ -85,6 +85,18 @@ def test_a_bibliography_becomes_a_list_with_no_repeats():
     assert result.html.count("Newton") == 1
 
 
+def test_a_quote_or_quotation_environment_is_a_block_quotation_and_verse_is_not():
+    result = convert("quotes")
+    roles = {e.text.split(",")[0].split(".")[0]: e.role for e in result.elements if e.text}
+    assert roles["A plain paragraph before the quotations"] is None
+    assert roles["A short quotation"] == "quote" and roles["Its second paragraph"] == "quote"
+    assert roles["Text that goes on after it"] is None
+    assert roles["A line of verse and its second line"] is None
+    # The student page writes the two paragraphs of the quotation in one `blockquote`.
+    quoted = result.html.split("<blockquote>")[2].split("</blockquote>")[0]
+    assert "longer quotation" in quoted and "Its second paragraph" in quoted
+
+
 def test_a_broken_macro_is_a_required_decision_showing_the_tex():
     result = convert("broken_macro")
     statuses = by_status(result, Kind.EQUATION)

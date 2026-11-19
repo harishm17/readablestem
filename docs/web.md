@@ -939,7 +939,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   since the cell reads as empty. A float reads its tables or pictures, the first with the
   caption, then everything else in it in order (the words beside a picture, a note under a
   table, subfigures); a `\captionof` caption goes to the picture just before it. `\intertext`
-  is a paragraph between the equations, `\date` is a line of its own, and a block that holds its
+  is a paragraph between the equations, the paragraphs of a `quote` or `quotation` environment
+  are a block quotation (`role="quote"`; `verse` stays plain paragraphs), `\date` is a line of its own, and a block that holds its
   words with no paragraph inside (a Beamer `\framesubtitle`) is a paragraph. A formula LaTeX could
   not read that a table, a heading or a caption shows as LaTeX code makes that item a required
   decision (`source.read` / `source_formula_unread`). After the walk the reader counts what no
