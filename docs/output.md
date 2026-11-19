@@ -1131,10 +1131,11 @@ written flat, and the notice `scripts_flattened` ("Worth checking") says where.
 
 The page, Word and the EPUB keep the raised or lowered run as `<sup>`, `<sub>` or Word's own
 superscript and subscript, which a screen reader reads as plain characters ("g/cm3"). Listen
-says which it is, so a listener can tell "cm3" from "cm cubed" and a footnote's mark from a
-number: "19.3 g/cm superscript 3", "x subscript 1 end subscript y". "End superscript" and "end
-subscript" are said only when text goes on right behind the run (not before a space, a
-punctuation mark or the end); the ending of an ordinal ("10th", "2nd") adds no words.
+says which it is, so a listener can tell "cm3" from "cm cubed": "19.3 g/cm superscript 3",
+"x subscript 1 end subscript y". "End superscript" and "end subscript" are said only when text
+goes on right behind the run (not before a space, a punctuation mark or the end); the ending
+of an ordinal ("10th", "2nd") adds no words, and neither does a footnote's mark, which is said
+as its link ("link 1").
 
 ## Chemistry
 
