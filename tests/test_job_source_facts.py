@@ -20,6 +20,7 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import source_facts
 from readablestem.pipeline.source_facts import flattened_parts, measure, structure_parts
+from test_layout_analyze import font_page
 
 MATH = "http://www.w3.org/1998/Math/MathML"
 
@@ -122,6 +123,16 @@ def test_a_script_the_text_layer_keeps_is_not_lost():
 
 
 # --------------------------------------------------------------------------- the PDF
+
+
+@pytest.mark.parametrize(("font", "lost"), [("CMBX10", 2), ("Symbol-Bold", 0)])
+def test_a_bold_symbol_font_code_is_not_a_bold_plain_letter(font, lost):
+    # TeX's bold a and b are plain letters in the text layer; in a bold Symbol font the same
+    # codes are an alpha and a beta, which keep their bold.
+    equation_box = equation("p1-e1", bbox=(60, 70, 140, 100))
+    pdf = font_page(font, ["a b"])
+    facts = measure(pdf, pages=[0], elements=[equation_box], fixes=[])
+    assert facts.bold_maths_letters == lost
 
 
 def test_too_many_objects_leave_alt_text_unknown(monkeypatch):

@@ -48,7 +48,7 @@ from readablestem.core.types import (
     Notice,
     SourceFacts,
 )
-from readablestem.pipeline import layout, page_type, text_pass
+from readablestem.pipeline import font_codes, layout, page_type, text_pass
 from readablestem.pipeline.notices import CUT_OFF, REPAIRED
 
 log = logging.getLogger(__name__)
@@ -250,9 +250,13 @@ def _bold_letters(page) -> list[tuple[float, float]]:
     """Where a bold font draws a plain letter on the page, read once for all the page's
     equations: the centre (x, y) of each letter."""
     letters = []
-    for block in page.get_text(
+    blocks = page.get_text(
         "rawdict", flags=pymupdf.TEXTFLAGS_RAWDICT | page_type.actualtext_flag(page)
-    )["blocks"]:
+    )["blocks"]
+    # The codes of a symbol or TeX font read as what the font draws, as layout reads them:
+    # Symbol's bold "a" is an alpha, not a plain letter the text layer lost the bold of.
+    font_codes.remap(blocks)
+    for block in blocks:
         for line in block.get("lines", ()):
             for span in line.get("spans", ()):
                 if not _bold_span(span):

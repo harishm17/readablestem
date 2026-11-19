@@ -32,7 +32,7 @@ from dataclasses import dataclass, field
 import pymupdf
 
 from readablestem.core.types import BBox, Element, Kind
-from readablestem.pipeline import layout, page_type, validate
+from readablestem.pipeline import font_codes, layout, page_type, validate
 from readablestem.pipeline.layout import REASON_TAGGED
 
 log = logging.getLogger(__name__)
@@ -85,9 +85,10 @@ def _struct_headings(page: pymupdf.Page, number: int) -> list[TaggedHeading]:
         for block in blocks:
             if block.get("type") == 0:
                 parts.extend(
-                    span.get("text", "")
+                    char.get("c", "")
                     for line in block.get("lines", ())
                     for span in line.get("spans", ())
+                    for char in span.get("chars", ())
                 )
             elif block.get("type") == 2:
                 parts.append(text_of(block.get("blocks", ())))
@@ -112,8 +113,23 @@ def _struct_headings(page: pymupdf.Page, number: int) -> list[TaggedHeading]:
         | pymupdf.TEXT_PRESERVE_WHITESPACE
         | page_type.actualtext_flag(page)
     )
-    walk(page.get_text("dict", flags=flags).get("blocks", ()), 0)
+    blocks = page.get_text("rawdict", flags=flags).get("blocks", ())
+    # The characters as layout reads them (`font_codes`): a heading set with a ligature code
+    # or a symbol font must read as the layout's text of the same line, or no element matches.
+    font_codes.remap(_text_blocks(blocks))
+    walk(blocks, 0)
     return out
+
+
+def _text_blocks(blocks: Iterable[dict], depth: int = 0) -> list[dict]:
+    """The text blocks inside a structure tree's blocks, in order."""
+    found: list[dict] = []
+    for block in blocks:
+        if block.get("type") == 0:
+            found.append(block)
+        elif block.get("type") == 2 and depth <= 64:
+            found.extend(_text_blocks(block.get("blocks", ()), depth + 1))
+    return found
 
 
 def _key_of(doc: pymupdf.Document, xref: int, key: str) -> tuple[str, str]:

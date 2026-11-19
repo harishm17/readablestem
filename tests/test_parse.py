@@ -56,3 +56,12 @@ def test_parse_finds_text_image_and_equation_candidate(tiny_pdf):
     assert (image.width_px, image.height_px) == (40, 20)
     x0, _, x1, _ = image.bbox
     assert x0 == pytest.approx(72, abs=1) and x1 == pytest.approx(272, abs=1)
+
+
+def test_parse_reads_a_symbol_font_code_as_the_letter_it_draws(tmp_path: Path):
+    from test_layout_analyze import font_page
+
+    path = tmp_path / "symbol.pdf"
+    path.write_bytes(font_page("Symbol", ["The angle \\001 is small."], "1 /uniF071"))
+    text = " ".join(e.text or "" for e in parse_pdf(path))
+    assert "θ" in text
