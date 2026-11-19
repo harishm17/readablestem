@@ -41,6 +41,7 @@ from readablestem.pipeline.layout.blocks import (
     REASON_ABSTRACT,
     REASON_LARGER_FONT,
     REASON_LETTER,
+    REASON_LETTERED,
     _letter_rows,
     section_number,
 )
@@ -232,7 +233,7 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
         levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
     section = None  # the level of the last heading that is not a letter of an index
     for e in sorted(headings, key=lambda e: e.order):
-        if REASON_LETTER not in e.reasons:
+        if REASON_LETTER not in e.reasons and REASON_LETTERED not in e.reasons:
             section = levels[e.id]
         elif section is not None:
             levels[e.id] = min(6, section + 1)  # one level under the section it heads

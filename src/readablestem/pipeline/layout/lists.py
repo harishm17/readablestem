@@ -309,6 +309,7 @@ def _list_markers(
     together; the rows of a page that failed get no marker.
     """
     candidates: list[_MarkerCandidate] = []
+    page_of: dict[int, int] = {}
     for number, rows in rows_by_page.items():
         with guard(number):
             bullets = _DrawnBullets(paths.get(number, []), ctx.body)
@@ -322,6 +323,7 @@ def _list_markers(
                     for c in found
                 ]
             candidates.extend(found)
+            page_of.update((id(c), number) for c in found)
     index: dict[tuple, tuple[list[float], list[float]]] = {}
     for candidate in candidates:
         for reading in candidate.readings or (("bullet", 0),):
@@ -345,7 +347,10 @@ def _list_markers(
     # A capital letter and a full stop starts a line of an author list as readily as an item
     # ("A. Smith, B. Jones"), and some line of a long document has the next letter: the sibling
     # of such a marker is the item just before or just after it.
-    capitals = [c for c in candidates if _capital_letter(c)]
+    capitals = sorted(
+        (c for c in candidates if _capital_letter(c)),
+        key=lambda c: (page_of[id(c)], c.row.column == "R", c.row.baseline),
+    )  # in reading order: a page's left column, then its right
     around = {
         id(c): (capitals[k - 1] if k else None, capitals[k + 1] if k + 1 < len(capitals) else None)
         for k, c in enumerate(capitals)
@@ -357,7 +362,8 @@ def _list_markers(
             other is not None
             and _capital_letter(other) == value + step
             and (
-                abs(other.x0 - candidate.x0) <= MARKER_ALIGN
+                other.row.column != candidate.row.column
+                or abs(other.x0 - candidate.x0) <= MARKER_ALIGN
                 or abs(other.marker.x - candidate.marker.x) <= MARKER_ALIGN
             )
             for other, step in zip(around[id(candidate)], (-1, 1), strict=True)
