@@ -3217,7 +3217,12 @@ with Accept (the proposal as it is now) or Keep as image. After one the reviewer
 now, with "Go on to decision N" when it was the last change; Accept and Keep as image
 move on as for other kinds. The rules (`web.review`, "tables"):
 
-- *Headers.* Checking a box makes the first row's cells column headers (`header_rows`
+- *Headers.* A table in which no cell is a header and nothing else is wrong is a choice
+  (`TableCard.only_headers_missing`, WS5.2): the decision bar has **Use the first row as
+  headers**, **Use the first column as headers** (not for a one-column table), **Use the first row
+  and column as headers** and **This grid is not a table**, in place of Accept and "Accept without
+  headers". The first three send the same `headers` edit as the two boxes below, and any such edit
+  stores `header_source` "reviewer" ("none" again when it leaves no header cell). Checking a box makes the first row's cells column headers (`header_rows`
   1), or the first column's body cells row headers (`header_cols` 1); unchecking makes
   them data cells again (a full-width section heading stays one). A model may mark the
   first column's cells without the count; the box is then checked. The same boxes as
@@ -3284,7 +3289,7 @@ what it read goes through the cell's edit checks as if typed: saved when it pass
 in the cell's box with what differs from the PDF (and "Use my edit anyway").
 
 With keyboard shortcuts on (they are on by default), A accepts a proposed table (or, when
-only the headers are missing, moves to "Accept without headers": see "Review screen") and E
+only the headers are missing, says there is nothing to accept: the card is a choice of headers, WS5.2) and E
 opens "Change the table" at the cell list. In the list view a table card shows its crop, the proposal (or the grid
 read from the PDF) and Accept, Keep as image, Use the grid read from the PDF;
 headers and cells are changed on the review screen ("open it on the review screen").
@@ -3319,7 +3324,7 @@ with Ctrl, Alt, Meta or Shift held, while an input method is composing, behind a
 dialog, or while focus is in a text field, text area, select, or editable region. A key with
 nothing to act on says so in the status line (`#decision-notice`, `role="status"`, the one
 the saved notice uses; it is on the page empty when nothing was saved). A never presses
-"Accept anyway" (or "Accept without headers", both marked `data-anyway`): it moves focus to
+"Accept anyway" (marked `data-anyway`): it moves focus to
 that button and says why. On a page card (`data-card="page"`) A does nothing and says the
 choice needs a Tab and a press. After N or P, focus goes to the new decision's heading (a
 flag in `sessionStorage`), as it does after a saved decision. On each card the choices come
