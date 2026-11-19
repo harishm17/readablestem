@@ -276,6 +276,7 @@ def _body_sized(block: _Block, ctx: _Context) -> bool:
 _FLOATS = (Kind.FIGURE, Kind.TABLE, "caption")
 EDGE_TOLERANCE = 3.0  # pt: two left edges that are one
 MAX_INDENT = 3.0  # x font size: how far a one-line tail's first line may stand in
+FAR_COLUMN = 12.0  # x font size: a text edge this far in is the other column's, not an indent
 LOW_PAGE_NUMBER = 0.8  # of the page height: a number below this is a page's own number
 
 
@@ -366,14 +367,14 @@ def _same_edge(
     """The place test of `_goes_on`."""
     tail, head = last.rows[-1], first.rows[0]
     item = last.marker is not None
+    size = last.font_size or 0.0
     x = last.marker.x if last.marker is not None else tail.x0
+    xs = [x]
     if not item and len(last.rows) >= 2:
         before = last.rows[-2]
-        if before.column == tail.column and 0 < tail.x0 - before.x0 <= MAX_INDENT * (
-            last.font_size or 0.0
-        ):
-            x = before.x0  # the last line is the first of a paragraph, in by its indent
-    if abs(x - head.x0) <= EDGE_TOLERANCE:
+        if before.column == tail.column and 0 < tail.x0 - before.x0 <= MAX_INDENT * size:
+            xs.append(before.x0)  # the last line may be the first of a paragraph, in by its indent
+    if any(abs(c - head.x0) <= EDGE_TOLERANCE for c in xs):
         return True
     tail_edge = last.origin if item else tail_edges.get(tail.column)
     head_edge = head_edges.get(head.column)
@@ -382,11 +383,17 @@ def _same_edge(
     across = tail.column != head.column
     if across and len(last.rows) < 2:
         return False
-    inset = x - tail_edge  # a paragraph's lines stand at its edge; an item's text stands in
-    first_line = len(last.rows) == 1 and not item and not across
-    if first_line and 0 < inset <= MAX_INDENT * (last.font_size or 0.0):
-        inset = 0.0  # the one line is the first of its paragraph, in by the first-line indent
-    return abs(head.x0 - head_edge - inset) <= EDGE_TOLERANCE
+    for c in xs:
+        inset = c - tail_edge  # a paragraph's lines stand at its edge; an item's text stands in
+        if len(last.rows) == 1 and not item and not across and 0 < inset <= MAX_INDENT * size:
+            inset = 0.0  # the one line is the first of its paragraph, in by the first-line indent
+        if not item and len(last.rows) >= 2 and inset > FAR_COLUMN * size:
+            inset = (
+                0.0  # so far in that it is another column, on a page whose columns are unlabeled
+            )
+        if abs(head.x0 - head_edge - inset) <= EDGE_TOLERANCE:
+            return True
+    return False
 
 
 def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
