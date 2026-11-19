@@ -283,6 +283,7 @@ def more_pictures(n: int) -> str:
 # --------------------------------------------------------------------------- the owner
 
 READY_ALL = "Every part the tool found was converted."
+RECORD_NO_PICTURES = "No part is shown as a picture."
 NO_CHECKS = "No structure checks are stored for this file."
 CHECKS_SCOPE = "They check structure, not whether the content is right."
 
@@ -441,10 +442,13 @@ def card_yes(s: CheckedSummary) -> str:
 
 
 def record_pictures(s: CheckedSummary) -> str:
-    """The record's line when no part is listed as a picture."""
+    """The record's line when no part is listed as a picture: the section is headed "Parts
+    shown as pictures", so what was left out, cut off or unread follows a sentence that says
+    no part is one."""
     if s.all_found_converted:
         return READY_ALL
-    return " ".join(p for p in (left_out_owner(s), cut_off_owner(s), unread_owner(s)) if p)
+    rest = (left_out_owner(s), cut_off_owner(s), unread_owner(s))
+    return " ".join(p for p in (RECORD_NO_PICTURES, *rest) if p)
 
 
 def record_checks(s: CheckedSummary) -> str:
