@@ -507,6 +507,31 @@ mark an identifying first column as row headers. Both are valid; the rules are:
 - **Caption:** the "Table N" caption layout found beside the table (`Element.caption`),
   never the model's: a caption is never invented. No caption, no `<caption>`.
 
+### Where the header meaning came from (`TableGrid.header_source`, WS5.2)
+
+A first row is never made a header only because it is first. Each table says where its
+header rows and columns came from, and a table with no evidence for one is a choice for a
+person:
+
+| `header_source` | Set by | Meaning |
+|---|---|---|
+| `model` | `table_step` (the header policy) | the model marked the header cells; the policy kept them |
+| `layout` | `table_step.layout_headers`, "Use this grid instead" | the reader of the PDF found the header rows itself (a ruled line under the row, a gap, a header the table reader marked: `TableGrid.header_rows` of the grid read from the PDF) |
+| `source` | `source/ltx_reader`, `source/docx_reader` | the Word or LaTeX file marks them (a `thead` or `th`, a header row Word repeats, or the table style's first-row flag, which also has the warning check) |
+| `reviewer` | the card's header choice, "Save headers" | a person chose them; Undo puts the earlier grid back whole |
+| `none` | all of the above | no header cell and no evidence for one |
+
+A grid read from the PDF with no header row found (`none`) has no header cell, so
+`table.headers` `no_headers` fails and the table is required: the card offers **Use the first
+row as headers**, **Use the first column as headers**, **Use the first row and column as
+headers** and **This grid is not a table**, and no accept (accepting a table with no headers
+was the fault: F-091). The first three are the same `headers` edit "Change the table" makes.
+The field is left out of the stored JSON when it is None, so a result stored before it
+existed loads and is written exactly as before. Word and LaTeX tables with no header mark
+are still accepted (`none`, no decision asked): the repository's own files have 3 of 31
+unmarked, a real LaTeX project more, and turning each into a decision is a review load that
+is a person's call (WS5.2 report).
+
 ### Checks
 
 All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
@@ -575,10 +600,10 @@ First matching rule wins:
 | # | Condition | Status | `reason` | Tier |
 |---|---|---|---|---|
 | 1 | rebuilding off | FAILED | `table_not_rebuilt` | required (image kept) |
-| 2a | the answer kept says it is not a data table, but the grid read from the PDF is a grid of numbers (`numeric_grid`: half its cells below the first row hold a digit) | NEEDS_REVIEW, the local grid with first-row headers | (check `table.kind` `numbers_not_a_table`) | required |
+| 2a | the answer kept says it is not a data table, but the grid read from the PDF is a grid of numbers (`numeric_grid`: half its cells below the first row hold a digit) | NEEDS_REVIEW, the local grid with the header rows layout found | (check `table.kind` `numbers_not_a_table`) | required |
 | 2 | the answer kept says it is not a data table | ACCEPTED, the grid read from the PDF (`is_data` False) written as its text in reading order | (check `table.kind` `written_as_text`) | optional |
 | 2b | ... and there is no grid read from the PDF to write (none, no text, flattened math) | ABSTAINED | `not_data_table` | required (image kept) |
-| 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with first-row headers | (check `local_grid`) | required |
+| 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with the header rows layout found | (check `local_grid`) | required |
 | 3b | no usable answer, no local grid | FAILED | `model_<outcome>` or `invalid_table` | required (image kept) |
 | 4 | every check passed | ACCEPTED | | none |
 | 5 | only notes failed (`whitespace_differs`, `style_cosmetic`, `row_headers_dropped`, `written_as_text`) | ACCEPTED | | optional |

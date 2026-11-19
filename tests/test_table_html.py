@@ -348,6 +348,17 @@ def assert_rectangular(html: str, rows: int, cols: int) -> None:
 # --------------------------------------------------------------------------- the patterns
 
 
+def test_a_stored_table_without_a_header_source_loads_writes_the_same_and_keeps_none():
+    stored = simple_grid().model_dump(mode="json")
+    assert "header_source" not in stored  # an older record has no such key
+    again = TableGrid.model_validate(stored)
+    assert again.header_source is None and again == simple_grid()
+    assert render_table(again, id_prefix="t") == render_table(simple_grid(), id_prefix="t")
+    assert "header_source" not in again.model_dump(mode="json")
+    chosen = again.model_copy(update={"header_source": "reviewer"})
+    assert TableGrid.model_validate(chosen.model_dump(mode="json")).header_source == "reviewer"
+
+
 def test_one_header_row_is_a_thead_with_column_scopes():
     html = render_table(simple_grid(), id_prefix="p1-e3")
     assert html.startswith('<table><caption id="p1-e3-caption">Table 1 Free fall.</caption>')

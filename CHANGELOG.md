@@ -95,6 +95,26 @@
   .pptx uploads.
 - No migration; no model request or `RENDER_VERSION` changed. A `PIPELINE_VERSION` bump is owed
   at the next PR, because a stored document's pages and headings can change on a re-run.
+## Unreleased: header meaning is evidence or a choice (branch feat/table-header-evidence)
+
+- WS5.2 (F-250, F-091). `TableGrid.header_source` says where a table's header rows and columns
+  came from: `model` (the model marked the header cells), `layout` (the header rows the reader of
+  the PDF found itself), `source` (the Word or LaTeX file marks them), `reviewer` (a person chose
+  them on the card) or `none` (no header cell and no evidence). It is left out of the stored
+  JSON when it is not set, so a result stored before it loads and renders as before.
+- When no model answer can be used, the grid read from the PDF is proposed with the header rows
+  layout found, not with its first row made a header by default. Where layout found none, the
+  table has no header cell and is a required choice. The card for a table where no cell is a
+  header offers the first row, the first column, both, or "This grid is not a table", and no
+  longer "Accept without headers"; the choice is stored with `header_source` `reviewer`. The
+  choice replaces Accept whenever a data table of two or more rows has no header cell, whatever
+  else was found about it (a grid read from the PDF carries a second finding), and the server
+  refuses an Accept of such a table (`review.headers_required`).
+- The Word and LaTeX readers record `source` when the file marks a header and `none` when it does
+  not. Those tables are still accepted without a decision: see the review-load numbers in the
+  branch report.
+- No migration. No model request changed, so every recorded answer still matches.
+  `PIPELINE_VERSION` is not bumped here (see the report).
 
 ## Unreleased: every form is answered once (branch feat/forms-stage-2)
 

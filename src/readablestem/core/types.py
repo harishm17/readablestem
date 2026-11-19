@@ -284,6 +284,10 @@ class TableCell(BaseModel):
         return not (self.text.strip() or (self.latex or "").strip())
 
 
+# Where a table's header meaning came from (`TableGrid.header_source`).
+HeaderSource = Literal["model", "layout", "source", "reviewer", "none"]
+
+
 class TableGrid(BaseModel):
     """A table as a grid of `rows` x `cols` slots and the cells that cover them.
 
@@ -297,6 +301,13 @@ class TableGrid(BaseModel):
     table (text arranged in boxes), which is not written as a data table. `source`:
     "local" when built from the PDF's own words and drawn lines, "model" when the table
     step's model answer was used.
+
+    `header_source` says where the header rows and columns came from: "model" (the table
+    step's model marked the header cells), "layout" (the header rows the reader of the PDF
+    found itself: a ruled line under the row, a gap, a header the table reader marked),
+    "source" (the Word or LaTeX file marks them), "reviewer" (a person chose them on the
+    table card) or "none" (no header cell and no evidence for one: a person decides). None in
+    a result stored before the field existed, which is read as it always was.
     """
 
     rows: int = Field(ge=1, le=MAX_TABLE_ROWS)
@@ -311,6 +322,7 @@ class TableGrid(BaseModel):
     # sideways on an upright page (`pipeline.tables._page_turn`), 0 otherwise. Boxes stay in
     # the page frame.
     turned: Literal[0, 90, 270] = 0
+    header_source: HeaderSource | None = Field(default=None, exclude_if=lambda v: v is None)
 
 
 # Codes `grid_problems` can return, in the order it returns them.

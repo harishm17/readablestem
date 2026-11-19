@@ -13,6 +13,8 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
 - A table is a grid with spans. Its header rows are exact only when the rows are marked "repeat as
   header row"; a table with only the style's first-row flag gets one header row as a proposal
   (a warning check, `source.header_unmarked`), and a table whose rows are all headers gets one.
+  The grid's `header_source` is "source" for those and "none" for a table with no header row at all
+  (accepted as before: turning that into a decision is a review load this item left to a person).
 - A footnote or endnote is written where its mark is, as the LaTeX path writes a note. A link is
   a link when it is a web or mail address; a link to a bookmark on a heading is an internal link
   to that heading (pandoc keeps a bookmark only on a heading, and the words of a `REF` field
@@ -570,7 +572,11 @@ class _Reader:
                 c.model_copy(update={"header": "col"}) if c.row < header_rows else c
                 for c in grid.cells
             ]
-            grid = grid.model_copy(update={"cells": cells, "header_rows": header_rows})
+            grid = grid.model_copy(
+                update={"cells": cells, "header_rows": header_rows, "header_source": "source"}
+            )
+        else:
+            grid = grid.model_copy(update={"header_source": "none"})
         element.table = grid
         fix = Fix(
             element_id=element.id,

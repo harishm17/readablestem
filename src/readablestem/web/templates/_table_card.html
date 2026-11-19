@@ -29,6 +29,24 @@
 {% endif %}
 {% endmacro %}
 
+{# The choice of a table no cell of which is a header (web/table_card.py `needs_headers`):
+   the first row, the first column, or both, as the same `headers` edit "Change the table" makes
+   (the reviewer's choice is stored as the headers' source), and "not a table" beside them. #}
+{% macro header_choice(item, view) %}
+{% set t = item.table %}
+{% set eid = item.element_id %}
+{% set name = item.label|lower %}
+{% for role, row, col, label in [("headers", true, false, "Use the first row as headers"), ("headers-col", false, true, "Use the first column as headers"), ("headers-both", true, true, "Use the first row and column as headers")] %}
+{% if row or t.can_header_col %}
+{% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
+  {{ table_fields(view) }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers">{% if row %}<input type="hidden" name="header_row" value="on">{% endif %}{% if col %}<input type="hidden" name="header_col" value="on">{% endif %}
+  <button type="submit" class="{{ 'button' if loop.first else 'button-secondary' }}" data-role="{{ role }}"{% if loop.first and view == "split" %} aria-describedby="headers-note-{{ eid }}"{% endif %}>{{ label }}<span class="visually-hidden"> in {{ name }}</span></button>
+{% endcall %}
+{% endif %}
+{% endfor %}
+{{ not_a_table(item, view) }}
+{% endmacro %}
+
 {# "Accept all N clean tables" (T3-11): the tables that wait although nothing was found wrong
    with them. One write; Undo takes them all back. #}
 {% macro accept_clean(count, view) %}
@@ -81,7 +99,7 @@
     <li class="finding">
       <span class="finding-text">{{ f.text }}</span>
       {{ cell_differences(f, eid, loop.index) }}
-      {% if f.fix == "headers" and not t.only_headers_missing %}
+      {% if f.fix == "headers" and not t.needs_headers %}
       {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form finding-action"}) %}
         {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
         <button type="submit" class="button-secondary button-small" data-role="finding-headers">{{ f.label }}<span class="visually-hidden"> in {{ name }}</span></button>
@@ -213,7 +231,7 @@
     {% endcall %}
     <p class="hint" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.consequence }}{% else %}The image stays, marked “not converted”; screen readers cannot read its cells.{% endif %}</p>
   </div>
-  {{ not_a_table(item, "split") }}
+  {% if not (t.proposal and t.needs_headers) %}{{ not_a_table(item, "split") }}{% endif %}
 </div>
 {% endmacro %}
 
@@ -223,26 +241,21 @@
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
 {{ error_line(item, "actions") }}
-{% if t.proposal and (item.can_accept or t.only_headers_missing) %}
+{% if t.proposal and (item.can_accept or t.needs_headers) %}
 <div class="decision-bar" role="group" aria-label="Choices for {{ name }}">
   <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
-    {% if t.only_headers_missing %}
-    {# T1-19: the only finding is that no cell is a header, so the main action sets the first
-       row as the headers (an edit, which re-checks the table and settles it). #}
-    {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
-      {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
-      <button type="submit" class="button" data-role="headers" aria-describedby="headers-note-{{ eid }}">Use the first row as headers<span class="visually-hidden"> in {{ name }}</span></button>
-    {% endcall %}
-    {% endif %}
-    {% if item.can_accept %}
+    {% if t.needs_headers %}
+    {# No cell is a header: a person chooses (WS5.2): the first row, the first column, both, or
+       not a table. Accepting without headers is not one of the answers. #}
+    {{ header_choice(item, "split") }}
+    {% elif item.can_accept %}
     {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
       {{ table_fields("split") }}
-      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept"{% if t.only_headers_missing %} data-anyway aria-describedby="accept-note-{{ eid }}"{% endif %}>{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
+      <button type="submit" name="action" value="accept" class="button" data-role="accept">Accept<span class="visually-hidden"> {{ name }}</span></button>
     {% endcall %}
     {% endif %}
   </div>
-  {% if t.only_headers_missing %}<p class="hint decide-note" id="headers-note-{{ eid }}">Screen readers read each header with its cells.</p>{% endif %}
-  {% if item.can_accept and t.only_headers_missing %}<p class="hint decide-note" id="accept-note-{{ eid }}">Without headers, screen readers cannot say what each value means.</p>{% endif %}
+  {% if t.needs_headers %}<p class="hint decide-note" id="headers-note-{{ eid }}">Screen readers read each header with its cells.</p>{% endif %}
 </div>
 {% elif t.local and not t.proposal %}
 <div class="decision-bar" role="group" aria-labelledby="bar-lead-{{ eid }}">
@@ -304,7 +317,7 @@
 {% if t.findings %}
 <p class="part-label">What the checks found</p>
 <ul class="finding-list">
-  {% for f in t.findings %}<li class="finding"><span class="finding-text">{{ f.text }}</span>{{ cell_differences(f, item.element_id, loop.index) }}{% if f.fix == "edit" or (f.fix == "headers" and not t.only_headers_missing) %} <a class="finding-action" href="/jobs/{{ job.id }}/review?item={{ item.element_id }}#table-correct-{{ item.element_id }}">Change the table<span class="visually-hidden"> {{ name }} on the review screen</span></a>{% endif %}</li>{% endfor %}
+  {% for f in t.findings %}<li class="finding"><span class="finding-text">{{ f.text }}</span>{{ cell_differences(f, item.element_id, loop.index) }}{% if f.fix == "edit" or (f.fix == "headers" and not t.needs_headers) %} <a class="finding-action" href="/jobs/{{ job.id }}/review?item={{ item.element_id }}#table-correct-{{ item.element_id }}">Change the table<span class="visually-hidden"> {{ name }} on the review screen</span></a>{% endif %}</li>{% endfor %}
 </ul>
 {% endif %}
 {% endmacro %}
@@ -318,16 +331,12 @@
 <div class="review-form">
   {{ error_line(item, "actions") }}
   <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
-    {% if t.proposal and t.only_headers_missing %}
-    {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
-      {{ table_fields("list") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
-      <button type="submit" class="button">Use the first row as headers<span class="visually-hidden"> in {{ name }}</span></button>
-    {% endcall %}
-    {% endif %}
-    {% if t.proposal and item.can_accept %}
+    {% if t.proposal and t.needs_headers %}
+    {{ header_choice(item, "list") }}
+    {% elif t.proposal and item.can_accept %}
     {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
       {{ table_fields("list") }}
-      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}">{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
+      <button type="submit" name="action" value="accept" class="button">Accept<span class="visually-hidden"> {{ name }}</span></button>
     {% endcall %}
     {% endif %}
     {# Also for a grid written as text (the model said it is not a data table): the
@@ -351,7 +360,7 @@
       {% endcall %}
       <p class="hint" id="reject-note-{{ eid }}">{{ item.reject.consequence }}</p>
     </div>
-    {{ not_a_table(item, "list") }}
+    {% if not (t.proposal and t.needs_headers) %}{{ not_a_table(item, "list") }}{% endif %}
   </div>
 </div>
 {% endmacro %}

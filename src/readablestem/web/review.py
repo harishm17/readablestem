@@ -603,6 +603,8 @@ def apply_review(
         message = "This proposal failed a required check, so it cannot be accepted as it is. "
         message += "Edit it, or reject it to keep the original."
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    if action == "accept" and headers_required(fix):
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), NO_HEADERS_TO_ACCEPT)])
     if action == "accept" and fix.heading is not None:
         _refuse_moved_level(result, element_id, fix.heading.level, then="then Save edit")
     if action == "accept":
@@ -1388,6 +1390,24 @@ NO_TABLE_TO_ACCEPT = (
     "There is no rebuilt table to accept. Use the grid read from the PDF, if there is one, "
     "or keep the image."
 )
+NO_HEADERS_TO_ACCEPT = (
+    "No cell of this table is a header, so it cannot be accepted as it is. Choose the first "
+    "row, the first column or both as headers, or say that the grid is not a table."
+)
+
+
+def headers_required(fix: Fix) -> bool:
+    """A data table of at least two rows in which no cell is a header (WS5.2): it is never
+    accepted as it is, whatever else the checks found. A person chooses the header row, the
+    header column or both, or says the grid is not a table."""
+    grid = fix.table.grid if fix.table is not None else None
+    return (
+        grid is not None
+        and grid.is_data
+        and grid.rows >= 2
+        and any(c.code == "no_headers" for c in fix.failed_checks)
+    )
+
 
 # What each `core.types.grid_problems` code means, for the table card and for an edit
 # that is refused. Positions and fixed words only.
@@ -1516,7 +1536,9 @@ def edit_table(
         if grid is None:
             message = "There is no grid read from the PDF that could be used for this table."
             raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
-        fix.table = TableFix(grid=grid.model_copy(deep=True))
+        found = any(c.header for c in grid.cells)
+        source = "layout" if found else "none"
+        fix.table = TableFix(grid=grid.model_copy(deep=True, update={"header_source": source}))
         fix.checks = table_checks(fix.table.grid, element)
         failed = [c for c in fix.checks if not c.passed]
         return failed, USE_LOCAL_NOTE
@@ -1648,6 +1670,8 @@ def _edit_headers(
         raise ReviewInvalid([FieldError(fid, message)], values)
     edited = with_header_col(with_header_row(grid, row), col)
     _refuse_new_problems(grid, edited, fid, "The headers were", values)
+    chosen = any(c.header for c in edited.cells)  # a person unticking both leaves no header
+    edited = edited.model_copy(update={"header_source": "reviewer" if chosen else "none"})
     fix.table = TableFix(grid=edited)
     fix.checks = table_checks(edited, element)
     first_row = "The first row is a header" if row else "The first row is not a header"
