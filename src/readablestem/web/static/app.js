@@ -339,6 +339,17 @@
     var form = event.detail && event.detail.elt;
     if (form instanceof HTMLFormElement && form.hasAttribute("data-submit-once")) ready(form);
   });
+
+  // A list that refreshes by itself (web/poll.py) leaves a form that is on its way alone: the
+  // answer would put a fresh, unpressed button where the busy one is. Nothing is lost: the
+  // list still holds the version it had, so the next poll brings the same news.
+  document.addEventListener("htmx:beforeSwap", function (event) {
+    var detail = event.detail || {};
+    var trigger = detail.elt && detail.elt.getAttribute ? detail.elt.getAttribute("hx-trigger") : "";
+    var target = detail.target;
+    if (!trigger || trigger.indexOf("every") !== 0 || !target || !target.querySelector) return;
+    if (target.querySelector("form[data-submitting]")) detail.shouldSwap = false;
+  });
 })();
 
 /* Upload form option groups (_upload_form.html). Each group is a <details> whose summary
