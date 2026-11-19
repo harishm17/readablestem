@@ -178,14 +178,14 @@ def test_an_equation_whose_accent_differs_from_the_pdf_is_never_accepted_in_bulk
     from readablestem.pipeline.equation_step import transcribe
     from test_steps_support import equation_element, make_settings, use_fallback_router
 
-    # The reading drops the tilde the PDF shows; the model is sure, the letters agree.
+    # The reading drops the hat the PDF shows; the model is sure, the letters agree.
     answer = {"is_equation": True, "latex": "W = 2", "confidence": 0.99}
     client = FakeVisionClient(responders={"equation": lambda req: answer})
     settings = make_settings()
     with pytest.MonkeyPatch.context() as patch:
         use_fallback_router(patch)
         step = transcribe(
-            equation_element(display="inline", text="\u02dc\U0001d44a= 2", element_id="p2-e30"),
+            equation_element(display="inline", text="\U0001d44a\u02c6= 2", element_id="p2-e30"),
             b"\x89PNG",
             client=client,
             settings=settings,

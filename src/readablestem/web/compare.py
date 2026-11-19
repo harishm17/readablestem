@@ -331,8 +331,8 @@ def _accents(
     other: str,
 ) -> None:
     """The rows and sentences for `accent_mismatch` (the step's `accent_differences`): a hat the
-    PDF shows that the reading dropped, one it added, a tilde where the PDF has a hat. A dropped
-    accent is paired with an added one of another kind, the way a person would say it."""
+    PDF shows that the reading dropped, a hat or tilde it added, a tilde where the PDF has a hat.
+    A dropped accent is paired with an added one of another kind, the way a person would say it."""
     dropped = [d for d in differences if d.pdf > d.reading]
     added = [d for d in differences if d.reading > d.pdf]
     for d in differences:

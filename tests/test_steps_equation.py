@@ -384,10 +384,9 @@ def test_any_symbol_difference_needs_a_decision(text_layer, latex):
 @pytest.mark.parametrize(
     ("text_layer", "latex"),
     [
-        pytest.param("\u02dc\U0001d44a= 2", "W = 2", id="dropped-tilde"),
+        pytest.param("\U0001d44a\u02c6= 2", "W = 2", id="dropped-hat"),
+        pytest.param("\U0001d44a= 2", r"\widetilde{W} = 2", id="added-tilde"),
         pytest.param("\U0001d465\u02c6= 2", r"\widetilde{x} = 2", id="tilde-for-hat"),
-        pytest.param("\U0001d466\u2032= 2", "y = 2", id="dropped-prime"),
-        pytest.param("\U0001d458= 2", "k' = 2", id="added-prime"),
     ],
 )
 def test_an_accent_the_reading_dropped_or_changed_is_a_decision_with_no_second_reading(
@@ -427,9 +426,11 @@ def test_a_reading_the_file_has_nothing_to_hold_against_is_accepted_and_says_why
         # pdfTeX's \Delta is U+2206 INCREMENT (the glyph list's "Delta"); \bar a macron.
         ("\u00afv = \u2206x \u2206t", r"\bar{v} = \frac{\Delta x}{\Delta t}"),
         ("x =", "x ="),  # one symbol is enough to compare
-        # Accents the reading has too: a tilde, a prime, and a bar of a drawn rule (no glyph).
+        # Accents the reading has too: a tilde, and a bar of a drawn rule (no glyph); and the
+        # kinds the check leaves alone: a prime added, a tilde dropped.
         ("\u02dc\U0001d44a= 2", r"\widetilde{W} = 2"),
-        ("\U0001d466\u2032= 2", "y' = 2"),
+        ("\U0001d458= 2", "k' = 2"),
+        ("\u02dc\U0001d44a= 2", "W = 2"),
         ("\u00afv = 2", r"\overline{v} = 2"),
         ("v = 2", r"\overline{v} = 2"),
     ],

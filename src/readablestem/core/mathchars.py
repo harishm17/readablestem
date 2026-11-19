@@ -117,8 +117,7 @@ def base_char(ch: str) -> str:
 
 
 # Accents. The characters a PDF's text layer gives an accent as (the spacing mark, or the
-# combining mark after NFD), by the kind of accent. Primes are counted by their weight, and
-# script l is kept with them because the letter bag reads it as a plain l.
+# combining mark after NFD), by the kind of accent.
 ACCENT_CHARS: dict[str, str] = {
     **dict.fromkeys("ˆ̂", "hat"),
     **dict.fromkeys("˜̃", "tilde"),
@@ -131,8 +130,6 @@ ACCENT_CHARS: dict[str, str] = {
     **dict.fromkeys("´́", "acute"),
     "̀": "grave",
 }
-PRIME_WEIGHT = {"′": 1, "″": 2, "‴": 3, "⁗": 4}
-SCRIPT_L = "ℓ"
 # The over-script of a MathML accent (`mover`), by the kind of accent it is.
 OVER_ACCENT: dict[str, str] = {
     **dict.fromkeys("^ˆ̂", "hat"),
