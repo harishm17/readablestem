@@ -76,6 +76,7 @@ def test_no_print_stamp_is_in_the_text(student: lxml.html.HtmlElement) -> None:
     assert "“mcs” —" not in harness.words(student.xpath("//main")[0])
 
 
+@harness.waits_for("w_notes_6042_ch2")
 @harness.finding("F-226")
 def test_no_character_is_left_unreadable(student: lxml.html.HtmlElement) -> None:
     text = harness.words(student.xpath("//main")[0])
@@ -83,6 +84,7 @@ def test_no_character_is_left_unreadable(student: lxml.html.HtmlElement) -> None
     assert lost == []
 
 
+@harness.waits_for("w_notes_6042_ch2")
 @harness.finding("F-226")
 def test_an_equation_in_a_sentence_is_not_read_as_stray_letters(
     student: lxml.html.HtmlElement,
@@ -105,6 +107,7 @@ def test_the_student_file_says_it_has_not_been_checked(student: lxml.html.HtmlEl
     assert "has not been reviewed by a person" in harness.words(about)
 
 
+@harness.waits_for("w_notes_6042_ch2")
 def test_listen_speaks_what_is_raised_and_lowered(site: harness.ReplaySite, notes: str) -> None:
     spoken = harness.words(site.page(f"/jobs/{notes}/listen").xpath("//main")[0])
     assert "m sub 0" in spoken

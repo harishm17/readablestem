@@ -41,7 +41,6 @@ def top_heading(student: lxml.html.HtmlElement) -> str:
     return harness.words(heading)
 
 
-@harness.finding("F-125")
 def test_the_document_is_named_by_its_first_slide(
     site: harness.ReplaySite, deck: str, student: lxml.html.HtmlElement
 ) -> None:
@@ -50,7 +49,6 @@ def test_the_document_is_named_by_its_first_slide(
     assert harness.words(name).casefold() == top_heading(student).casefold()
 
 
-@harness.finding("F-125")
 def test_the_title_a_screen_reader_announces_is_the_top_heading(
     student: lxml.html.HtmlElement,
 ) -> None:
@@ -64,6 +62,7 @@ def test_no_slide_footer_is_in_the_text(student: lxml.html.HtmlElement) -> None:
     assert not re.search(r"6\.0001 LECTURE \d", harness.words(student.xpath("//main")[0]))
 
 
+@harness.waits_for("w_slides_60001_lec1")
 @harness.finding("F-227")
 def test_no_bullet_is_an_unreadable_character(student: lxml.html.HtmlElement) -> None:
     text = harness.words(student.xpath("//main")[0])
@@ -71,5 +70,6 @@ def test_no_bullet_is_an_unreadable_character(student: lxml.html.HtmlElement) ->
     assert lost == []
 
 
+@harness.waits_for("w_slides_60001_lec10")
 def test_every_table_has_header_cells(student: lxml.html.HtmlElement) -> None:
     assert [table.get("id") for table in student.xpath("//table") if not table.xpath(".//th")] == []

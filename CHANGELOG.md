@@ -40,6 +40,15 @@
 - Workflow replay: `harness.OWED` lists the 18 more files whose conversions ask for answers
   the recording does not hold since this wave (29 files and 1,260 answers in all; no recording
   was paid for). The cost test replays `s18_exam_twocol`, which still has every answer.
+- Tests, no product change. The Postgres job ran past its 15 minutes: the job-cap test with 20
+  threads settles no call, so every refused one waited the two minutes a call waits for
+  another to settle; the test sets that wait to nothing (2 seconds on Postgres 18). The
+  workflow tests of four files whose answers are owed: the marks of F-034, F-125, F-275 and
+  F-303 come off (fixed by SW7, SW14, the paged list and WS5.8, read on the output), and five
+  tests that read what an owed answer gives wait for the refresh (`harness.waits_for`, refused
+  once the file owes nothing). A file of mostly scans uploaded with no box ticked waits for
+  the choice (WS7.8); the replay answers it as offered. The answer to a file that looks cut
+  off has a route test in the default suite.
 - Not changed, recorded as open: the job page does not yet say how many equations a Word file
   holds in words (the route logs the count, `docx_equations_as_words`); a page read without its
   ActualText raises no notice when the two readings differ. No model request changed.

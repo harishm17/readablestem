@@ -217,9 +217,12 @@ def test_two_worker_loops_convert_every_job_exactly_once(factory, tmp_path):
     assert sorted(rows) == [("done", 1)] * len(ids)
 
 
-def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_path):
+def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_path, monkeypatch):
     """Every reservation adds its hold to the job's row in one conditional UPDATE, so 20
     step threads (or a dead attempt plus a retry) cannot pass the job's cap together."""
+    # No call settles here, so a refused one would wait its whole two minutes before it asks
+    # again (`JobBudget.reserve`): 20 threads of them ran past the Postgres job's 15 minutes.
+    monkeypatch.setattr("readablestem.core.budget.SETTLE_WAIT_S", 0.0)
     [job_id] = queue_jobs(factory, 1)
     worker = make_worker(factory, tmp_path)
     worker.guard = DbSpendGuard(factory, 100.0)

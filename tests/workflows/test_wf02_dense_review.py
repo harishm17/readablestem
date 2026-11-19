@@ -24,7 +24,6 @@ def solutions(site: harness.ReplaySite) -> str:
     return site.convert("w_solutions_1802")
 
 
-@harness.finding("F-034")
 def test_the_document_page_does_not_say_every_check_passed_with_decisions_open(
     site: harness.ReplaySite, solutions: str
 ) -> None:
@@ -49,7 +48,6 @@ def test_an_equation_with_no_reading_offers_more_than_typing_it(
     assert ways - {"edit", "reject"}
 
 
-@harness.finding("F-275")
 def test_the_list_of_every_item_is_small_enough_to_open(
     site: harness.ReplaySite, solutions: str
 ) -> None:

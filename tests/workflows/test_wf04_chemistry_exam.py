@@ -35,7 +35,6 @@ def test_the_document_page_says_the_exam_box_was_ticked(
     assert with_box.count("exam") > without.count("exam")
 
 
-@harness.finding("F-303")
 def test_no_table_header_is_hidden_from_a_screen_reader(student: lxml.html.HtmlElement) -> None:
     headers = student.xpath("//th")
     assert headers

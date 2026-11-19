@@ -54,7 +54,17 @@ from readablestem.web.auth import set_allowed
 from readablestem.web.db import Job, session_scope
 from readablestem.web.worker import Worker, default_client_factory
 
-__all__ = ["OWED", "UPLOADS", "Ran", "ReplaySite", "document", "fetch", "finding", "words"]
+__all__ = [
+    "OWED",
+    "UPLOADS",
+    "Ran",
+    "ReplaySite",
+    "document",
+    "fetch",
+    "finding",
+    "waits_for",
+    "words",
+]
 
 OWNER = "owner@example.org"
 MODE = os.environ.get("CORPUS_ANSWERS_MODE", "offline")
@@ -121,6 +131,16 @@ def finding(ident: str) -> pytest.MarkDecorator:
     if not (re.fullmatch(r"F-\d{3}", ident) and 1 <= int(ident[2:]) <= LAST_FINDING):
         raise ValueError(f"{ident!r} is not a finding (F-001 to F-{LAST_FINDING})")
     return pytest.mark.xfail(strict=True, reason=ident)
+
+
+def waits_for(entry_id: str) -> pytest.MarkDecorator:
+    """Marks a test that reads what a model's answers give, on a file whose recording lacks
+    them (`OWED`): the parts it reads are left for the reviewer, as when a model is
+    unavailable, so the test says nothing about the product until the refresh. The mark is
+    refused once the file is off the list, so it is removed with the refresh."""
+    if entry_id not in OWED:
+        raise ValueError(f"{entry_id} owes no answers (harness.OWED): take the mark off")
+    return pytest.mark.skip(reason=f"{entry_id}: {OWED[entry_id]} answers owed (harness.OWED)")
 
 
 def words(node: lxml.html.HtmlElement) -> str:
@@ -302,6 +322,13 @@ class ReplaySite:
             said = " ".join(sent.text.split())
             pytest.fail(f"{entry_id}: the upload was refused ({sent.status_code}): {said[-600:]}")
         replayable(entry_id)
+        held = sent.headers["location"]
+        if held.startswith("/uploads/"):
+            # Mostly scans, and the box not ticked: the file waits for the choice (WS7.8). A
+            # person who ticked nothing leaves the choice as offered: the scans stay pictures.
+            answer = {"csrf_token": token(self.browser, held), "whole": "1", "images": "pictures"}
+            sent = self.browser.post(held, data=answer)
+            assert sent.status_code == 303, sent.text[-300:]
         job_id = job_id_from(sent)
         clients, missed = self._run_queued(job_id, before)
         if LOG:

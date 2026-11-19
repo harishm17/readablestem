@@ -462,3 +462,25 @@ def test_every_state_reads_the_same_on_every_surface_from_the_one_table(web):
     with session_scope(web.ctx.factory) as session:
         session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))  # the day's cap
     check("waiting", states.TABLE["waiting_reset"].label.format(time="00:00 UTC"))
+
+
+def test_the_owner_of_a_file_that_looks_cut_off_continues_and_is_asked_once(web):
+    """WS14.5: the answer "continue with the pages before the empty ones" stops the notice
+    holding the document back, and there is nothing to answer a second time."""
+    send_zip(web.alice, make_zip({"cut.pdf": make_pdf(1)}))
+    run_all(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.scalars(select(Job)).one()
+        _set_state(job, "file_cut_off")
+        page = f"/jobs/{job.id}"
+    asked = states.TABLE["file_cut_off"].label
+
+    def title() -> str:
+        return text_of(re.search(r"<title>(.*?)</title>", web.alice.get(page).text, re.S)[1])
+
+    assert title().startswith(asked + ":")
+    answer = {"csrf_token": csrf_from(web.alice.get(page).text)}
+    sent = web.alice.post(page + "/cut-off", data=answer)
+    assert (sent.status_code, sent.headers["location"]) == (303, page)
+    assert title().startswith(states.TABLE["ready_remains"].label + ":")
+    assert web.alice.post(page + "/cut-off", data=answer).status_code == 409
