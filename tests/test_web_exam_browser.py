@@ -11,7 +11,9 @@ import pytest
 
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
-from test_web_review_split_browser import open_page
+from test_web_browser import describe
+from test_web_review_split_browser import job as job  # fixture, re-exported for pytest
+from test_web_review_split_browser import open_page, strict_axe
 from test_web_review_split_browser import site as site  # fixture, re-exported for pytest
 
 pytestmark = pytest.mark.browser
@@ -57,4 +59,26 @@ def test_a_chosen_file_named_like_an_exam_gets_one_line_until_the_box_is_ticked(
     expect(hint).to_contain_text("midterm")
     choose("Lecture_Notes_FINAL.pdf")
     expect(hint).to_be_empty()
+    context.close()
+
+
+@SIZES
+def test_the_upload_form_and_the_job_page_pass_axe_with_the_exam_choice(
+    site, browser, axe_source, job, viewport
+):
+    """The form with its hint showing (a file named like an exam is chosen) and the job page
+    of a document converted normally, at both widths."""
+    context, page = open_page(browser, site, viewport=viewport)
+    page.goto(f"{site.base}/app")
+    page.set_input_files(
+        "#pdf", [{"name": "Midterm2.pdf", "mimeType": "application/pdf", "buffer": b"%PDF-1.4"}]
+    )
+    expect(page.locator("#exam-hint")).to_contain_text("says “midterm”")
+    for what in ("upload form with the exam hint", "job page"):
+        if what == "job page":
+            page.goto(f"{site.base}/jobs/{job}")
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("#job-exam")).to_contain_text("Not an exam or quiz")
+        violations = strict_axe(page, axe_source)
+        assert not violations, f"{what}: {describe(violations)}"
     context.close()

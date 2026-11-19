@@ -21,6 +21,7 @@ arrived at; read them by question, not front to back.
 | Can scanned and handwritten pages be converted, how well, and at what cost? | [eval-image-pages.md](eval-image-pages.md); [decisions/0007-image-pages.md](decisions/0007-image-pages.md) |
 | Why does LaTeX source upload run LaTeXML in a sandbox, and what does it accept? | [decisions/0008-latex-source.md](decisions/0008-latex-source.md); [web.md](web.md), "LaTeX source"; [security.md](security.md), "Running uploaded TeX" |
 | Why is there no tagged PDF, audio file, braille file or LMS tool? | [decisions/0009-formats-not-offered.md](decisions/0009-formats-not-offered.md) |
+| Why is reading order found by rules, with no learned layout reader? | [decisions/0010-reading-order-rules-first.md](decisions/0010-reading-order-rules-first.md); [layout.md](layout.md) |
 | How well does it read real human handwriting (an answer key of ink with known LaTeX), and may the app advertise it? | [eval-handwriting.md](eval-handwriting.md) |
 | How are volunteers' hand copies of OpenStax examples collected, with answer keys from the source, and published only with consent? | [data/handwriting-copy/README.md](../data/handwriting-copy/README.md) |
 | What is reader B (a second reading of a handwritten expression), what does it cost, and what must change before one is turned on? | [math-readers.md](math-readers.md) |
@@ -58,7 +59,7 @@ arrived at; read them by question, not front to back.
 ## If you want to know why a choice was made
 
 The decision records are in [decisions/](decisions/): 0001 scope, 0002 models, 0003 PDF
-library and the AGPL, 0004 web stack, 0005 the OpenAI Decisions API as a second automated check, 0006 the page math pass (a proposal, off by default), 0007 converting scanned and handwritten pages, 0008 LaTeX source uploads converted by LaTeXML in a sandbox. Each ends with its
+library and the AGPL, 0004 web stack, 0005 the OpenAI Decisions API as a second automated check, 0006 the page math pass (a proposal, off by default), 0007 converting scanned and handwritten pages, 0008 LaTeX source uploads converted by LaTeXML in a sandbox, 0009 the formats that are not offered, 0010 reading order found by rules and no learned layout reader. Each ends with its
 consequences.
 
 ## If you want to run it as a service

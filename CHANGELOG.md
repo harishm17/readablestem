@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: small wording faults, one date and one decision record (branch fix/small-words-and-records)
+
+- The privacy notice dates the review-screen row 2026-11-19, the day the release that carries
+  its sentence went live, not 2026-11-11, the day it was written.
+- `readablestem convert` takes no `--out`: the file is named for the input, and a draft (decisions
+  still open) ends in `-draft` as a web download does. With `--out` the name is kept and a line
+  says the file is a draft. A command-line draft is worded for the person who checks it, as the
+  web draft is.
+- The Symbols screen, the reason on a page kept as a picture and the record say what reading
+  scanned or handwritten pages uses, in the words of the upload form.
+- A Word or LaTeX source says nothing of the exam or quiz choice on its job page or its record.
+- Comments in the style sheets say "color"; `docs/deploy.md` says which reservation applies when;
+  the upload form and job page of the exam choice are scanned by axe at 1280 and 375;
+  `docs/decisions/0010-reading-order-rules-first.md` records why order is found by rules.
+- No `PIPELINE_VERSION` or `RENDER_VERSION` change: the student file and its stored HTML are as
+  they were.
+
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"

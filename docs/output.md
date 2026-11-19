@@ -1769,9 +1769,15 @@ file is written and 2 when the input cannot be read or turned into that file typ
 output cannot be written (a message on stderr, no traceback).
 
 ```
-readablestem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
-                  [--report OUT.json] [--axe]
+readablestem convert FILE.pdf [--out OUT.html] (--max-usd X | --fake) [--pages 1,3]
+                  [--concurrency 4] [--report OUT.json] [--axe]
 ```
+
+Without `--out` the file is written beside the input with its name and `.html` (`notes.pdf`
+gives `notes.html`). A file with decisions still open is a draft, as in the web app: it opens
+with the draft line, its notes are in the words for the person who checks it, and without
+`--out` its name ends in `-draft` (`notes-draft.html`). With `--out` the name is kept and one
+line under "Draft:" says the file is a draft because decisions are still open.
 
 `--max-usd` caps this run with an in-memory spend guard; `MAX_USD_PER_JOB` and
 `MAX_MODEL_CALLS_PER_JOB` cap it too. Before converting, a real run checks that
