@@ -400,6 +400,7 @@ def _analyze_document(
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     ctx.notes = named_links.read(doc, list(selected)) or None
+    ctx.region_tree = document.region_tree
     document.compounds, document.whole_words = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
     )

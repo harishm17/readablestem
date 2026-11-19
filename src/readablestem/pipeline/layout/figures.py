@@ -20,6 +20,7 @@ import pymupdf
 from readablestem.core import images as pixel_budget
 from readablestem.core.types import BBox
 from readablestem.pipeline import equation_images
+from readablestem.pipeline.layout import entries
 from readablestem.pipeline.layout.context import LayoutError, _Document
 from readablestem.pipeline.layout.drawings import JOIN_PT, MIN_IMAGE_PT
 from readablestem.pipeline.layout.glyphs import _union
@@ -1613,6 +1614,8 @@ def _continues(
     first line is indented like a typewriter's tab (not two centred lines, not the next
     numbered reference). Without `edges` it is rejected."""
     size = prev.size
+    if ctx.region_tree and entries.starts_entry(prev, row, run):
+        return False
     if abs(row.size - size) > max(1.0, 0.12 * size):
         return False
     pitch = row.baseline - prev.baseline

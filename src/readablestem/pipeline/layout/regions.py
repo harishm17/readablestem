@@ -25,6 +25,7 @@ Nothing here is read with `REGION_TREE` off.
 from __future__ import annotations
 
 import bisect
+import itertools
 import re
 import statistics
 from collections.abc import Sequence
@@ -33,6 +34,7 @@ from dataclasses import dataclass, field
 import pymupdf
 
 from readablestem.core.types import BBox
+from readablestem.pipeline.layout import entries
 from readablestem.pipeline.layout import figures as _figures
 from readablestem.pipeline.layout.context import _Document
 from readablestem.pipeline.layout.furniture import _box_zone, _margin_zone
@@ -43,11 +45,11 @@ from readablestem.pipeline.layout.order import (
     _top_down,
 )
 from readablestem.pipeline.layout.rows import _merge_baselines
-from readablestem.pipeline.layout.shared import _Display, _Path, _Row
+from readablestem.pipeline.layout.shared import _Context, _Display, _Figure, _Path, _Row
 
 # The rules of the first round (plan WS15.1, rules 1 to 8), by number. Each is a switch so the
 # one-rule-off table can be made; `RULES` is what the reader runs.
-RULES: frozenset[int] = frozenset(range(1, 9))
+RULES: frozenset[int] = frozenset({1, 2, 3, 4, 5, 6, 7, 8, 11, 12})  # 9 and 10: entries.RULES
 
 CHANNEL_PT = 7.0  # narrowest white channel that cuts a segment into columns
 MAX_COLUMNS = 3
@@ -515,6 +517,8 @@ class RegionTree:
         seq = walker.order(self.root, members) + tail
         if _on(8):
             seq = _options(seq, boxes, self)
+        if _on(12):
+            seq = _numbered_runs(seq, boxes, self)
         return seq
 
 
@@ -1009,7 +1013,137 @@ def prepare(
     vertical = [f for f in kept if f.vertical]
     if vertical:
         rows.extend(_merge_baselines(vertical, None, rules))
+    index = entries.INDEX_PAGE if _is_index(kept, page.rect.height) else ""
     for row in rows:
         if not row.vertical:
-            row.column = tree.column_of(row.bbox)
+            row.column = tree.column_of(row.bbox) + index
     return rows, tree, _merge_baselines(dropped, None)
+
+
+# -- rule 11: labels given back ----------------------------------------------------------------
+
+
+def claim_labels(
+    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
+) -> None:
+    """`figures._claim_labels`, then (rule 11) two kinds of row it took are given back to the
+    text: a heading-sized line outside the picture, and the last line of text that stands above
+    the picture (or the first under it): the second line of a two-line title is not a label of
+    the photo below it."""
+    had = {id(r) for f in figures for r in f.labels}
+    _figures._claim_labels(figures, rows, ctx, document=document)
+    if 11 not in RULES:
+        return
+    for figure in figures:
+        back = [
+            r
+            for r in figure.labels
+            if id(r) not in had and _belongs_to_text(r, rows, figure.drawing, ctx)
+        ]
+        if not back:
+            continue
+        for r in back:
+            r.absorbed = False
+        figure.labels[:] = [r for r in figure.labels if r not in back]
+        figure.bbox = _union([figure.drawing, *(r.bbox for r in figure.labels)])
+
+
+def _belongs_to_text(row: _Row, rows: Sequence[_Row], picture: BBox, ctx: _Context) -> bool:
+    """Is a row a figure took a line of the text round it, not a label?"""
+    x0, y0, x1, y1 = picture
+    if row.vertical or row.kind != "text":
+        return False
+    rx0, ry0, rx1, ry1 = row.bbox
+    area = max(1e-6, (rx1 - rx0) * (ry1 - ry0))
+    cut = max(0.0, min(rx1, x1) - max(rx0, x0)) * max(0.0, min(ry1, y1) - max(ry0, y0))
+    if cut >= 0.6 * area or not re.search(r"[A-Za-z]{3,}", row.clean):
+        return False  # on the picture, or no words
+    if row.size >= _figures.HEADING_SIZE_RATIO * ctx.body:
+        return True
+    above, below = ry1 <= y0 + 1, ry0 >= y1 - 1
+    for a in rows:
+        if a is row or a.vertical or a.kind != "text" or len(a.clean.split()) < 2:
+            continue
+        if abs(a.size - row.size) > 0.5 or a.bold != row.bold:
+            continue
+        ax0, ay0, ax1, ay1 = a.bbox
+        if min(ax1, x1) - max(ax0, x0) > 0 and min(ay1, y1) - max(ay0, y0) > 0:
+            continue  # a row on the picture is no witness
+        pitch = row.baseline - a.baseline
+        lined = abs(a.x0 - rx0) <= row.size or abs((ax0 + ax1) / 2 - (rx0 + rx1) / 2) <= row.size
+        if lined and (
+            (above and 0.5 * row.size <= pitch <= 1.6 * row.size)
+            or (below and 0.5 * row.size <= -pitch <= 1.6 * row.size)
+        ):
+            return True
+    return False
+
+
+# -- rule 12: numbered runs --------------------------------------------------------------------
+
+_NUMBER_LABEL = re.compile(r"^\s*\(?(\d{1,3})[.)]?(?:\s|$)")
+NUMBER_RUN_MIN = 6
+
+
+def _numbered_runs(seq: list[int], boxes: Sequence[BBox], tree: RegionTree) -> list[int]:
+    """Rule 12. Where a run of six or more numbered labels is read out of sequence, the
+    column-by-column reading is used if it makes the run consecutive."""
+
+    def number(text: str) -> int | None:
+        m = _NUMBER_LABEL.match(text)
+        return int(m.group(1)) if m and len(text.strip()) <= 40 else None
+
+    nums = [number(tree.text_of(boxes[i])) for i in seq]
+    out: list[int] = []
+    k = 0
+    while k < len(seq):
+        if nums[k] is None:
+            out.append(seq[k])
+            k += 1
+            continue
+        j = k
+        while j < len(seq) and nums[j] is not None:
+            j += 1
+        run, ns = seq[k:j], nums[k:j]
+        if len(run) >= NUMBER_RUN_MIN and any(
+            a is None or b is None or b != a + 1 for a, b in itertools.pairwise(ns)
+        ):
+            columns: list[list[int]] = []  # left edges that agree to a text-line height
+            for i in sorted(run, key=lambda i: boxes[i][0]):
+                if columns and boxes[i][0] - boxes[columns[-1][-1]][0] <= tree.pitch:
+                    columns[-1].append(i)
+                else:
+                    columns.append([i])
+            by_column = [i for c in columns for i in sorted(c, key=lambda i: boxes[i][1])]
+            seen = [nums[k + run.index(i)] for i in by_column]
+            if len(columns) >= 2 and all(
+                b is not None and a is not None and b == a + 1 for a, b in itertools.pairwise(seen)
+            ):
+                run = by_column
+        out.extend(run)
+        k = j
+    return out
+
+
+# -- rule 9: index pages ---------------------------------------------------------------------
+
+INDEX_MIN_LINES = 20
+INDEX_MAX_WORDS = 7
+
+
+def _is_index(fragments: Sequence[_Row], height: float) -> bool:
+    """Is the page an index: most of its lines end in a page number and are short?"""
+    lines = [
+        f
+        for f in fragments
+        if not f.vertical and _margin_zone(f, height) is None and f.clean.strip()
+    ]
+    if len(lines) < INDEX_MIN_LINES:
+        return False
+    ends = sum(
+        1
+        for f in lines
+        if entries.PAGE_NUMBER_END.search(f.clean) and re.search(r"[A-Za-z]", f.clean)
+    )
+    words = statistics.median(len(f.clean.split()) for f in lines)
+    return ends >= 0.5 * len(lines) and words <= INDEX_MAX_WORDS
