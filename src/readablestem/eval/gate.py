@@ -469,6 +469,19 @@ def _recorded(value: Any) -> Any:
     return str(value)
 
 
+def guarded_settings(settings: Any) -> dict[str, Any]:
+    """The behavior settings of the production profile that are not in `UNGUARDED_SETTINGS`,
+    by setting name, with the value `settings` holds. The one list of what decides what the
+    pipeline asks and accepts: a report's flags and a proof's recorded identity read it."""
+    from readablestem.ops import profile
+
+    return {
+        name: _recorded(getattr(settings, name))
+        for name in profile.load().settings
+        if name.upper() not in UNGUARDED_SETTINGS
+    }
+
+
 def guarded_flags(settings: Any) -> dict[str, Any]:
     """The values of every guarded switch, by name, sorted: the behavior settings of the
     production profile that are not in `UNGUARDED_SETTINGS`, read from `settings` (env names,
@@ -477,12 +490,9 @@ def guarded_flags(settings: Any) -> dict[str, Any]:
     value: a report made now holds what the code reads now."""
     import importlib
 
-    from readablestem.ops import profile
-
-    flags: dict[str, Any] = {}
-    for name in profile.load().settings:
-        if name.upper() not in UNGUARDED_SETTINGS:
-            flags[name.upper()] = _recorded(getattr(settings, name))
+    flags: dict[str, Any] = {
+        name.upper(): value for name, value in guarded_settings(settings).items()
+    }
     for module, names in GUARDED_CONSTANTS.items():
         loaded = importlib.import_module(module)
         for name in names:
