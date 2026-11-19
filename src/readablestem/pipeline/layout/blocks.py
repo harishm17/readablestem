@@ -82,6 +82,8 @@ REASON_LARGER_FONT = "larger font"
 REASON_BOLD_BODY = "bold body-size line"
 REASON_NUMBERED = "numbered section"
 REASON_NUMBERED_LINE = "standalone numbered line"
+# The word "Abstract" alone on a line, bold or centered: the heading of the abstract.
+REASON_ABSTRACT = "abstract label"
 
 # A capital letter alone on a line in the sequence of an index or a glossary (`_letter_rows`):
 # a heading one level under the section it is in (`heading_levels`).
@@ -850,6 +852,65 @@ def _code_text(rows: Sequence[_Row]) -> str:
     return "\n".join(lines)
 
 
+_ABSTRACT_LABEL = re.compile(r"abstract[.:]?", re.IGNORECASE)
+# The line that opens an abstract's keywords ("Keywords:", "Key words -", "Index Terms -").
+_KEYWORDS_LINE = re.compile(r"(?:key\s?words?|index\s+terms)\s*[:–—-]", re.IGNORECASE)  # noqa: RUF001
+ABSTRACT_CENTRE = 1.0  # em: how far from the middle of its column a centered label may be
+
+
+def _label_abstracts(blocks: Sequence[_Block], rows: Sequence[_Row], edges: _RightEdges) -> None:
+    """The word "Abstract" alone on a line, in bold or centered in its column, is a heading
+    (`REASON_ABSTRACT`; it stays a paragraph when set run-in before its text)."""
+    for block in blocks:
+        if block.kind != Kind.PARAGRAPH or len(block.rows) != 1 or block.code:
+            continue
+        row = block.rows[0]
+        if block.marker is not None or not _ABSTRACT_LABEL.fullmatch(row.clean):
+            continue
+        left = min((r.x0 for r in rows if r.column == row.column), default=row.x0)
+        middle = (left + edges.of(row)) / 2
+        centered = (
+            row.x0 - left >= 2 * row.size
+            and abs((row.x0 + row.x1) / 2 - middle) <= ABSTRACT_CENTRE * row.size
+        )
+        if row.bold or centered:
+            block.kind = Kind.HEADING
+            block.text = row.clean
+            block.reasons = [REASON_ABSTRACT, *(["bold"] if row.bold else [])]
+
+
+KEPT_MIN_LINES = 3  # a block of at least this many lines can keep its line ends
+KEPT_SHORT_BY = 8.0  # em: a line that stops this far short of its column's right edge is short
+KEPT_LEFT_SPREAD = 1.0  # em: the lines of a poem or an address start at one left edge
+
+
+def _keeps_lines(block: _Block, edges: _RightEdges, *, document: _Document) -> bool:
+    """Does this paragraph keep its line ends (a poem, an address, a list of short statements)?
+
+    Three or more lines that all start at one left edge and, but for the last, stop at least
+    `KEPT_SHORT_BY` em short of the right edge their column's text reaches, none of them ending
+    in a broken word. A paragraph that wraps runs to the edge in every line but the last, a
+    centered title starts each line elsewhere, and a slide's text box is not measured by its
+    page's edge, so none of them is one."""
+    rows = block.rows
+    if (
+        block.kind != Kind.PARAGRAPH
+        or block.code
+        or block.marker is not None
+        or block.parts
+        or document.slide_deck
+        or len(rows) < KEPT_MIN_LINES
+    ):
+        return False
+    size = _dominant_size(rows)
+    if max(r.x0 for r in rows) - min(r.x0 for r in rows) > KEPT_LEFT_SPREAD * size:
+        return False
+    return all(
+        r.x1 <= edges.of(r) - KEPT_SHORT_BY * size and r.clean[-1:] not in hyphens.HYPHENS
+        for r in rows[:-1]
+    )
+
+
 # The text decisions layout raises on a paragraph or list item (`Element.reasons`; the
 # pipeline turns them into a decision, `notices.text_decisions`). WS2.4a, SW54a.
 REASON_OPTION_LABELS = notice_rules.OPTION_LABELS
@@ -1007,7 +1068,10 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
-            led = geometric and _starts_entry(prev, row, run, edges)  # a lead term: its own entry
+            # A lead term, or the "Keywords:" line under an abstract: its own entry.
+            led = geometric and (
+                _starts_entry(prev, row, run, edges) or _KEYWORDS_LINE.match(row.clean) is not None
+            )
             if geometric and not led and _same_style(prev, row, ctx):
                 run.add(row)
                 continue
@@ -1568,7 +1632,7 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
             if _gap_after(row.chars, start, end):
                 row_pieces.append(" ")
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
-        _append_row(pieces, row_pieces, document=document)
+        _append_row(pieces, row_pieces, document=document, keep_line=block.lines)
     return _strip_teacher_tags(_tidy(pieces))
 
 
@@ -1712,23 +1776,29 @@ def _wrapped_inline(pieces: list[str | _Inline], row_pieces: list[str | _Inline]
 
 
 def _append_row(
-    pieces: list[str | _Inline], row_pieces: list[str | _Inline], *, document: _Document
+    pieces: list[str | _Inline],
+    row_pieces: list[str | _Inline],
+    *,
+    document: _Document,
+    keep_line: bool = False,
 ) -> None:
     """Join the next row of a paragraph, repairing end-of-line hyphenation and inline maths
-    that wraps from one row to the next (`_wrapped_inline`)."""
+    that wraps from one row to the next (`_wrapped_inline`). With `keep_line`, the space
+    that joins the two rows has a `script_marks.LINE_END` before it."""
     if not pieces:
         pieces.extend(row_pieces)
         return
     if _wrapped_inline(pieces, row_pieces):
         return
     last, first = pieces[-1], row_pieces[0] if row_pieces else ""
+    end = script_marks.LINE_END if keep_line else ""
     if isinstance(last, str) and isinstance(first, str):
         tail, separator = _line_break(last.rstrip(), first.lstrip(), document=document)
-        pieces[-1] = tail + separator
+        pieces[-1] = tail + (end if separator else "") + separator
         if not separator:
             row_pieces[0] = first.lstrip()
     else:
-        pieces.append(" ")
+        pieces.append(end + " ")
     pieces.extend(row_pieces)
 
 

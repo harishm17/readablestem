@@ -9,7 +9,7 @@ import unicodedata
 from dataclasses import replace
 from itertools import count
 
-from readablestem.core.types import Element, Kind, Link, inline_marker
+from readablestem.core.types import Element, Kind, Link, Run, inline_marker
 from readablestem.pipeline import script_marks
 from readablestem.pipeline.layout.blocks import (
     _TEXT_BLOCKS,
@@ -233,10 +233,11 @@ def _page_elements(
                     term_length = len(script_marks.strip_marks("".join(parts)))
             joined = "".join(parts)
             plain = script_marks.strip_marks(joined)
+            line_ends: list[int] = []
             if block.code:  # indentation is kept; code carries no raised or lowered runs
                 text, script_runs = plain.strip("\n"), []
             else:
-                text, script_runs = script_marks.split(joined)
+                text, script_runs, line_ends = script_marks.split_lines(joined)
             term_end = None
             if block.term_pieces is not None:
                 term_end = max(0, term_length - (len(plain) - len(plain.lstrip())))
@@ -266,6 +267,7 @@ def _page_elements(
                         *(r for r in block.reasons if r in TEXT_DECISIONS),
                     ],
                     script_runs=script_runs,
+                    runs=[Run(start=at, end=at + 1, kind="break") for at in line_ends],
                     last_page=block.parts[-1][0] if block.parts else None,
                 )
             )

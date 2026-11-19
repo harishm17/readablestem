@@ -655,6 +655,9 @@ class _Block:
     # tables: the cells that are one formula, as inline equations of the table (`_cell_maths`)
     cell_inlines: dict[tuple[int, int], _Inline] = field(default_factory=dict)
     code: bool = False  # paragraphs: program code, lines and indentation kept (`_code_text`)
+    # paragraphs: every line end is kept (a poem, an address: `_keeps_lines`), written as a
+    # `break` run on the space that joins two lines.
+    lines: bool = False
     term_pieces: int | None = None  # glossary entries: how many of `pieces` are the term
     contents_level: int = 0  # list items: an entry of a table of contents, at this level
     # Raised or lowered text this block's element cannot carry (`Element.script_runs`): it is

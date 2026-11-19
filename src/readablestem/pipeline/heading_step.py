@@ -75,6 +75,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline.layout import (
+    REASON_ABSTRACT,
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
     REASON_NUMBERED,
@@ -244,10 +245,11 @@ class _Evidence:
     all_caps: bool
     very_short: bool
     tagged: bool = False  # the PDF's own tags call it a heading (`pipeline.tagged`)
+    named: bool = False  # the word "Abstract" alone on its line (`REASON_ABSTRACT`)
 
     @property
     def strong(self) -> bool:
-        return self.larger_font or self.numbered or self.tagged
+        return self.larger_font or self.numbered or self.tagged or self.named
 
     @property
     def maybe_list_item(self) -> bool:
@@ -259,7 +261,7 @@ class _Evidence:
         if self.larger_font or self.tagged:
             value = 0.95 if self.numbered else 0.90
         else:
-            value = 0.88 if self.numbered else 0.60
+            value = 0.88 if self.numbered or self.named else 0.60
         value -= 0.15 * self.all_caps + 0.20 * self.very_short + 0.15 * self.maybe_list_item
         value -= 0.03 * repaired
         return round(min(0.99, max(0.05, value)), 2)
@@ -276,6 +278,7 @@ def _evidence(element: Element, text: str) -> _Evidence:
         all_caps=len(letters) >= MIN_LETTERS and all(c.isupper() for c in letters),
         very_short=len(letters) < MIN_LETTERS,
         tagged=tagged_level(element) is not None,
+        named=REASON_ABSTRACT in reasons,
     )
 
 

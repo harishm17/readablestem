@@ -73,6 +73,7 @@ from readablestem.pipeline.layout.access import (
     render_page,
 )
 from readablestem.pipeline.layout.blocks import (
+    REASON_ABSTRACT,
     REASON_BOLD_BODY,
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
@@ -169,6 +170,7 @@ from readablestem.pipeline.layout.tables import (
 __all__ = [
     "CROP_PAD",
     "MIN_IMAGE_PT",
+    "REASON_ABSTRACT",
     "REASON_BOLD_BODY",
     "REASON_DRAWING_FRAGMENTS",
     "REASON_HALF_FRACTION",
