@@ -147,6 +147,70 @@ def test_a_number_at_the_right_edge_is_never_a_paragraph_of_its_own():
     assert not [e for e in elements if e.kind != Kind.EQUATION and "(" in (e.text or "")]
 
 
+FULL_LINES = [
+    "The two bounds that the argument needs are stated in the next display, and the reader should keep in",
+    "mind that every constant in them comes from the setting of the second section, where the sample size",
+    "and the number of the parameters were fixed once and for all before any of the estimates were made:",
+]
+
+
+def number_beside_a_word(page):
+    """A limit set under "argmin" splits the word in x order ("argm", k, "in")."""
+    prose(page, 100, "The estimate is the minimiser of the empirical risk over the parameters:")
+    page.insert_text((200, 140), "x = ", fontsize=12, fontname="Times-Italic")
+    page.insert_text((222, 140), "argmin", fontsize=12)
+    page.insert_text((228, 150), "k", fontsize=8, fontname="Times-Italic")
+    page.insert_text((262, 140), "f ( k )", fontsize=12, fontname="Times-Italic")
+    page.insert_text((520, 140), "(106)", fontsize=12)
+
+
+def number_after_prose_words(page):
+    """A line with a few words ("for every n greater than zero") reads as text."""
+    prose(page, 100, "The recursion is defined for every sample as follows,")
+    line = "h[n] = x[n] + 0.5 h[n-1] for every n greater than zero"
+    page.insert_text((150, 140), line, fontsize=12, fontname="Times-Italic")
+    page.insert_text((520, 140), "(106)", fontsize=12)
+
+
+def number_set_close_at_the_edge(page):
+    """A display that fills its column leaves under a font size before its number."""
+    for i, line in enumerate(FULL_LINES):
+        page.insert_text((72, 70 + 14 * i), line, fontsize=BODY)
+    maths = "a + b <= c + d + e + f + g + h + k"
+    width = pymupdf.get_text_length(maths, fontname="Times-Italic", fontsize=12)
+    page.insert_text((566 - 33 - width, 140), maths, fontsize=12, fontname="Times-Italic")
+    page.insert_text((566 - 28, 140), "(106)", fontsize=12)
+
+
+def number_under_the_display(page):
+    """A number set right-aligned on the line below its equation."""
+    prose(page, 100, "The bound on the difference of the two means is written as")
+    maths = "d(x, y) <= c * |x - y| + e"
+    page.insert_text((200, 140), maths, fontsize=12, fontname="Times-Italic")
+    page.insert_text((290, 156), "(106)", fontsize=12)
+
+
+@pytest.mark.parametrize(
+    "fill",
+    [
+        number_beside_a_word,
+        number_after_prose_words,
+        number_set_close_at_the_edge,
+        number_under_the_display,
+    ],
+)
+def test_a_number_that_the_row_around_it_hides_is_still_the_equations_label(fill):
+    """Four ways the number stayed in the equation's text or became a paragraph: a word of
+    the maths split by its limit, words in the line, a number set closer than a font size,
+    and a number set under the display."""
+    elements = analyze(one_page(lambda page: (prose(page, 190, "and that is all."), fill(page)))).elements
+    [equation] = equations(elements)
+    assert equation.display == "block"
+    assert equation.equation_label == "(106)"
+    assert "(106)" not in (equation.text or "")
+    assert not [e for e in elements if e.kind == Kind.PARAGRAPH and "(106)" in (e.text or "")]
+
+
 # ---------------------------------------------------------------- rows of a table
 
 
