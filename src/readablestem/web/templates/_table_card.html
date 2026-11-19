@@ -170,7 +170,7 @@
       <legend>Headers</legend>
       {{ error_line(item, "header") }}
       <div class="checkbox-field">
-        <input type="checkbox" id="header-row-{{ eid }}" name="header_row" value="on" data-edit-field{% if row_on %} checked{% endif %}{% if header_err %} aria-invalid="true"{% endif %}>
+        <input type="checkbox" id="header-row-{{ eid }}" name="header_row" value="on" data-edit-field{% if row_on %} checked{% endif %}{{ field_aria("header-error-" ~ eid, header_err) }}>
         <label for="header-row-{{ eid }}">The first row is a header</label>
       </div>
       <div class="checkbox-field">

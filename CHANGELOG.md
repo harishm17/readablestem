@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased: one field, one notice, one disclosure look (branch feat/field-notice-macros)
+
+- SW44, WS24.2 (notice part), WS24.3 (reduced) and WS24.5, as far as their triage lines.
+  `templates/components/fields.html` is now the only place the classes `field-error` and
+  `error-message` are written: `field(...)` for the ordinary field, and `field_classes`,
+  `field_error` and `field_aria` for a radio group, a file input or a field inside a card. The five
+  local copies (`error_line` in three templates, `tool_error`, `table_error`) are gone or one line.
+  Every id, `name` and `aria-describedby` target a route, a test, `app.js` or an error-summary link
+  uses is kept. A field in error is now found without color: a thicker start border and a circled
+  exclamation mark before the message (CSS, so the upload form's browser-built line has it too); in
+  forced colors both are CanvasText and the border is 3px. This also fixes a frame that never showed:
+  fieldset errors lost their border to a later `border: 0`.
+- `templates/components/notices.html` is the only place `class="notice`, `notice-success`,
+  `notice-warning` and `error-summary` are written: `notice_box(kind, ...)` with `info`, `success`,
+  `warning` and `error`. The error summary and the stale-page notice call it with `error` (named in
+  the component's header). A success notice has the ok tint, a circled check and `role="status"`.
+  `web.deps.flash(..., kind=)` stores each flash's true kind (saved or done is success; a refusal or
+  a thing left as it was is warning; a repeat that changed nothing is info), and the base template
+  and the review page pass it on, so a "Nothing changed" note is no longer shown like a success. No
+  words changed. `.job-status` now has a 1px subtle border in every mode, not only in forced colors.
+- Disclosures: about twenty rules that each gave a `summary` its own weight, color, marker, padding
+  and height are one block in `app.css` with two looks, plain (bold, a 44px target, accent marker)
+  and boxed (inside a frame). The header menu keeps its own rules. Some quiet disclosures ("More
+  detail", "Technical details", the delete-account line) are now bold like the rest, and every
+  summary is at least 44px high. No `disclosure()` macro, no markup change.
+- `/style` draws fields and notices with the macros in every kind and state; DESIGN.md has a short
+  section on each.
+
 ## Unreleased: the icons are drawn from one SVG (branch fix/brand-icons-one-source)
 
 - WS24.9 (F-424), as far as its triage line. The favicon, the 192 and 512 px icons and the touch
