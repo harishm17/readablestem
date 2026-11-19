@@ -289,6 +289,11 @@ def test_the_shortcuts_reach_the_table_card(site, browser, job):
     page.keyboard.press("a")
     page.wait_for_url(f"{url}?item=p1-e3")
     assert "Table 1: Accepted." in page.get_by_role("status").inner_text()
+    # A card with no Accept button (a table kept as an image) does not list A.
+    page.goto(f"{url}?item=p2-e0")
+    assert page.locator('[data-role="accept"]').count() == 0
+    assert page.locator('#shortcuts [data-key="a"]').is_hidden()
+    assert page.locator('#shortcuts [data-key="n"]').is_visible()
     context.close()
 
 

@@ -782,6 +782,7 @@ button[data-tone="quiet"]:hover { background: var(--surface); color: var(--ink);
 .shortcuts .part-label { margin: 0 0 var(--space-1); }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: var(--space-1) var(--space-3); margin: var(--space-2) 0; }
 .keys div { display: contents; }
+.keys div[hidden] { display: none; }
 .keys dd { margin: 0; }
 kbd { border: 1px solid var(--border-control); border-bottom-width: 2px; border-radius: 4px; padding: 0 var(--space-1); background: var(--bg); }
 

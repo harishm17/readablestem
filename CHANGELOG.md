@@ -16,6 +16,11 @@
   Undo, the outcome counts, the stale-form rule and carry-over to a document converted again
   work as for "make heading" and the role. `RENDER_VERSION` is not raised by this item; the
   student note changes only for a document that has a paragraph left out.
+- The review screen's "Keyboard shortcuts" list names only the keys the open decision can use:
+  a table kept as a picture has no Accept, so A is no longer listed there (a decision with no
+  next or previous one drops N or P, one with nothing to edit drops E, and a choice for a whole
+  page drops A). The script reads the card itself (`listKeysTheCardCanUse` in `app.js`), so
+  every kind of card is covered. No stored data changes.
 
 ## Unreleased: a reviewer sets a block's role; LaTeX quotations (branch feat/set-block-role, WS19.9 in part)
 
