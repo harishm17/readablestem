@@ -826,7 +826,10 @@ the nearer one (a slide's 26 pt body makes the tolerance 16 pt). Where the item 
 within that tolerance, the marker still opens a level when it is of another series than the
 one of the item above (bullet or number, "1)" or "(a)", another bullet glyph) and stands more
 than half the font size right of it (`MARKER_INDENT`; slides set the sub-bullets under "1)" 13 to
-15 pt in while their text is 5 to 14 pt right of the text above). Items of one series (a
+15 pt in while their text is 5 to 14 pt right of the text above). Each open level keeps the
+series that opened it: when the sub-bullets' text starts exactly on the text edge of their
+numbered parent, the x does not tell which level "2)" goes back to, so it goes back to the open
+level of its own series at that x. Items of one series (a
 wrapped list of names that start with initials) and the options of a grid are not moved by
 it. The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or

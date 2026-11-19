@@ -20,6 +20,11 @@
   was not converted. The label is now hidden only when the alt text itself says "not converted"
   (or "not described"), for a block and for an inline equation (`assemble._alt_says_label`,
   `inline_equation`). Two golden pages change by that attribute.
+- Sub-bullets whose text starts exactly on the text edge of their numbered parent made each
+  numbered step one level deeper than the one before ("1)" level 1, "2)" level 2, "3)" level
+  3). `lists._list_levels` now keeps the marker series of each open level and sends an item of
+  another series than the innermost level back to the open level of its own series at the same
+  x. Sub-bullets 3 pt or more to the right were already right.
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 

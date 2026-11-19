@@ -365,7 +365,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     page with another margin keeps its levels.
     """
     levels: dict[int, int] = {}
-    stack: list[float] = []
+    stack: list[tuple[float, str]] = []  # per open level: the x of its text, its marker series
     options: float | None = None  # the x the options of the grid being read are placed at
     before: tuple[str, float] | None = None  # (series, x of the marker) of the item before
     for block in blocks:
@@ -393,17 +393,25 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
         elif options is None:
             # The options of a grid are one list below the item they follow, whichever column
             # each is set in (a row-major grid reads A, B across, C, D below), and all at one level.
-            options = max(x, stack[-1] + 2 * tolerance) if stack else x
+            options = max(x, stack[-1][0] + 2 * tolerance) if stack else x
             x = options
         else:
             x = options
         while stack and (
-            x < stack[-1] - tolerance
-            or (len(stack) > 1 and abs(x - stack[-2]) < abs(x - stack[-1]))
+            x < stack[-1][0] - tolerance
+            or (len(stack) > 1 and abs(x - stack[-2][0]) < abs(x - stack[-1][0]))
         ):
             stack.pop()
-        if not stack or x > stack[-1] + tolerance or nested:
-            stack.append(x)
+        if stack and not nested and block.marker.option is None and series != stack[-1][1]:
+            # Sub-bullets whose text starts on the text edge of their numbered parent (Word and
+            # Google Docs set them so): the x does not tell which open level "2)" goes back
+            # to, its series does.
+            for depth in range(len(stack) - 2, -1, -1):
+                if stack[depth][1] == series and abs(x - stack[depth][0]) <= tolerance:
+                    del stack[depth + 1 :]
+                    break
+        if not stack or x > stack[-1][0] + tolerance or nested:
+            stack.append((x, series))
         levels[id(block)] = len(stack)
     return levels
 
