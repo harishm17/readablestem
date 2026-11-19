@@ -155,12 +155,12 @@ LOSSES: dict[str, Loss] = {
         None,
         "ZQintertext",
     ),
-    # Struck text (`\sout`, a deleted run unless CONTENT_RUNS is off, then plain text) is read, not
+    # Struck text (`\sout`: a deleted run, or plain text when CONTENT_RUNS is off) is read, not
     # counted as unread (SW51a meets SW42.4).
     "struck_text": Loss(
         _article("The quiz is on \\sout{ZQstruck Monday} Friday.", "\\usepackage[normalem]{ulem}"),
         None,
-        "ZQstruck Monday Friday",
+        "ZQstruck Monday",
     ),
     # ...a formula LaTeX could not read that is shown as written in a table, a caption or a
     # heading, which is a decision on that item...
