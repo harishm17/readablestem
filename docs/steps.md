@@ -259,6 +259,44 @@ the compare table says them as "Number" and "Case" rows. Table cells are not cov
 case flags on 1,748 gold equations compared with their own print; on synthetic errors, 457
 of 481 digit swaps and 1,438 of 1,438 case flips are found.
 
+## Accent check (equations)
+
+`equation_step.accent_check` (check `equation.text_layer_accents`, code `accent_mismatch`).
+The symbol bags above leave accents out (a hat or a tilde is a modifier character, not a
+letter), so a reading that dropped a `\tilde`, put a hat for a tilde, added a prime or read a
+script ℓ as a plain l had every letter check passing. Measured on the accepted equations of
+the five development parts, such errors were most of the real mistakes that no check or card
+caught, and they sit on the single-reading path (`SKIP_ESCALATION_FROM`, `ACCEPT_SINGLE_READING`).
+
+What it compares, kind by kind (hat, tilde, dot, double dot, breve, check, acute, grave,
+prime counted by its weight, script ℓ): the accents of the PDF's text and of the glyphs under
+the box (`reading_layer`; the larger count of the two, since a wide hat or tilde of a TeX font
+reaches the glyphs as a name layout turns into the accent character) against the accents of the
+MathML (`mover` with an accent character over a base that is no operator, primes in any token
+element, `mo` or `mi`). A difference in either direction, or one kind in place of another, fails
+the check; nothing is checked when the PDF has no text for the equation. Two kinds are drawn
+and not glyphs, so the PDF cannot show that they are not there: a bar (an overline is a drawn
+rule, TeX's `\overline`) and a vector arrow (layout finds only some). They are only a difference
+when the PDF shows more of them than the reading has, or when another kind of accent is
+missing from the reading at the same time. Overlines stay out as a result.
+
+The glyphs exist only with `EQUATION_GLYPH_CHECKS` (on in production's profile); without them
+the check reads the text alone, which misses the wide accents and so flags fewer (the text alone
+found 6 of the 15 labelled accent errors) and falsely flags the wide tildes and hats that only
+the glyphs show. An accent the PDF draws just outside the box (a prime of a superscript, the
+tilde of the line above) is not counted: the box cannot tell the two apart, and counting them
+added one false alarm for one removed.
+
+It runs in `transcribe` after the second-reading decision and before `_fix`, beside
+`no_text_layer` and `half_fraction`, so it adds no model request and applies on every
+acceptance path (a sure cheap answer, a single reading, a second reading, a page-witness
+settlement). It is a failed warning with a meaning-level code: the fix needs a decision
+(`NEEDS_REVIEW`, review "required"), it is never accepted in bulk (`web.bulk_accept` takes only a
+fix with no failed check), and a reviewer's edit gets the same check (`web.edit_check`, a
+table cell does not: its text has no glyphs). The review card says what differs ("The PDF shows a
+tilde here; the reading has a hat.", "The reading has a prime the PDF does not show.", the compare
+table's "Accent" rows). The confidence is not changed.
+
 ## Chemistry species check (equations)
 
 `pipeline/chem_check.py`, check `equation.text_layer_species`, code `species_mismatch`. The

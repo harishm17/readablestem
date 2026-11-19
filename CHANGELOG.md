@@ -43,6 +43,26 @@
 - A stored page says this only after it is made again: `RENDER_VERSION` is owed a raise for this
   batch (not raised here). No stored field changes, no migration, no model request or prompt
   changed.
+## Unreleased: an accent the reading dropped or added is a decision (branch fix/accent-agreement)
+
+- Equations. The letter checks leave accents out, so a reading that dropped a `\tilde`, put a
+  hat for a tilde, added a prime or read a script ℓ as a plain l passed every check and was
+  accepted with no card (`equation.text_layer_accents`, code `accent_mismatch`,
+  `equation_step.accent_check`). The accents of the PDF's text and glyphs under the box, by
+  kind (hat, tilde, dot, double dot, breve, check, acute, grave, primes by weight, script ℓ), are
+  compared with the reading's MathML. It runs after the second-reading decision and before
+  `_fix`, beside `no_text_layer` and `half_fraction`: no model request is added or changed, it
+  applies on every acceptance path, the fix becomes a required decision, and bulk accept leaves
+  it out. A bar (an overline is a drawn rule, no glyph) and a vector arrow (layout finds only
+  some) are only a difference where the PDF shows more of them than the reading has or another
+  kind is missing at the same time. The review card says what differs ("The PDF shows a tilde
+  here; the proposal has a hat.", "The proposal has a prime the PDF does not show.") and a
+  reviewer's edit gets the same check; a table cell does not. Measured on the recorded readings
+  of the development parts (offline, no model call): 19 flags in 7,069 accepted-or-reviewed
+  readings that match the current layout, 17 of them real errors (the PDF and the page's LaTeX
+  show the accent the reading dropped, added or changed), 2 false (a prime outside the box).
+  Regression tests: a dropped, changed, added accent each (one test), and bulk accept leaving
+  it out. No migration; a stored document keeps its checks until it is converted again.
 
 ## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
 

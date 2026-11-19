@@ -172,6 +172,35 @@ def test_only_undecided_items_with_nothing_failed_are_candidates():
     assert [f.element_id for f in bulk_accept.candidates(result, "equations")] == ["p1-e2"]
 
 
+def test_an_equation_whose_accent_differs_from_the_pdf_is_never_accepted_in_bulk():
+    from readablestem.config import CHEAP_MODEL
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline.equation_step import transcribe
+    from test_steps_support import equation_element, make_settings, use_fallback_router
+
+    # The reading drops the tilde the PDF shows; the model is sure, the letters agree.
+    answer = {"is_equation": True, "latex": "W = 2", "confidence": 0.99}
+    client = FakeVisionClient(responders={"equation": lambda req: answer})
+    settings = make_settings()
+    with pytest.MonkeyPatch.context() as patch:
+        use_fallback_router(patch)
+        step = transcribe(
+            equation_element(display="inline", text="\u02dc\U0001d44a= 2", element_id="p2-e30"),
+            b"\x89PNG",
+            client=client,
+            settings=settings,
+        )
+    assert CHEAP_MODEL in [r.model for r in client.requests]
+    assert [c.code for c in step.failed_checks] == ["accent_mismatch"]
+    result = scaled_output().result
+    element = Element(id="p2-e30", kind=Kind.EQUATION, page=1, bbox=BOX, order=90, display="block")
+    result.elements.append(element)
+    result.fixes.append(step)
+    assert step.pending and not bulk_accept.is_bulk_candidate(step, "equations", element)
+    assert "p2-e30" not in [f.element_id for f in bulk_accept.candidates(result, "equations")]
+    assert "p2-e30" not in [c.element_id for c in bulk_accept.accept_all(result, "equations")]
+
+
 def test_a_heading_group_or_kept_page_is_never_a_candidate():
     result = scaled_output().result
     kinds = {
