@@ -366,7 +366,8 @@ def _convert(args: argparse.Namespace) -> int:
     # Without --out the file is named for the input; a draft's name ends in -draft, as a draft
     # downloaded from the web app does, and whether it is one is known after the conversion.
     default_out = args.pdf.with_suffix(".html")
-    for target in (args.out, args.report, default_out, _draft_name(default_out)):
+    named = (args.out,) if args.out is not None else (default_out, _draft_name(default_out))
+    for target in (*named, args.report):
         if target is None:
             continue
         if target.is_dir():
