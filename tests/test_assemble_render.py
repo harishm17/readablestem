@@ -168,7 +168,9 @@ def test_not_converted_items_keep_the_original_with_a_visible_note(
     assert 'src="data:image/png;base64,' in item
     assert f'alt="{alt}"' in item
     assert 'role="note"' in item
-    assert f'<span class="flag-label">{label}</span>' in item  # text, not colour alone
+    # Text, not colour alone, for the eye. The picture's alt text says it to a screen reader,
+    # so the label is not read a second time.
+    assert f'<span class="flag-label" aria-hidden="true">{label}</span>' in item
     assert "<math" not in item  # a rejected proposal is never shown
 
 
@@ -451,6 +453,8 @@ def test_missing_crop_shows_extracted_text_and_says_so():
     assert '<p class="original-text">v = d / t</p>' in item
     assert "The original image is not available." in item
     assert "<img" not in item
+    # No picture, so no alt text: the label is what says it, and a screen reader hears it.
+    assert '<span class="flag-label">Not converted.</span>' in item
 
 
 def test_inline_equation_without_its_marker_is_rendered_at_its_own_position():

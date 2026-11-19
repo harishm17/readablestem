@@ -108,7 +108,7 @@ def test_a_table_not_rebuilt_keeps_its_image_flagged():
     )
     assert f'alt="{TABLE_NOT_CONVERTED_ALT}"' in html and 'width="304" height="133"' in html
     assert "<figcaption>Table 1 Free fall.</figcaption>" in html
-    assert f'<span class="flag-label">Not converted.</span> {TABLE_NOTE}' in html
+    assert f'<span class="flag-label" aria-hidden="true">Not converted.</span> {TABLE_NOTE}' in html
     assert "<table>" not in html and TABLE_CSS not in html
     assert all(c.passed for c in static_checks(html))
     # The student note says how many parts are pictures.

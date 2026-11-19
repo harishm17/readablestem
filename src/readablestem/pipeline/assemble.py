@@ -1684,14 +1684,31 @@ class _Renderer:
         attrs = self.id_attr(element.id) + _fix_attrs(fix, reason)
         link = self.instructor_link(element, reason)
         said = "".join(f" {part}" for part in (note, link) if part)
+        # A picture's alt text already says "not converted" (or "not described"): the label
+        # beside it is for the eye, as an unconverted inline equation's is (`inline_equation`).
+        # Without a picture (the original's text, or none) the label is what says it.
+        hidden = ' aria-hidden="true"' if _alt_says_label(body, label) else ""
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'
-            f'<span class="flag-label">{label}</span>{said}</p></div>'
+            f'<span class="flag-label"{hidden}>{label}</span>{said}</p></div>'
         )
 
 
 # --------------------------------------------------------------------------- document
+
+# The labels that only repeat what the alt text of the picture beside them says: "Not
+# converted." for an equation, table, page or picture, and a figure's "No description." for a
+# student (the checker's "Needs a description." tells what to do, so it is always read).
+_LABELS_IN_ALT = frozenset(
+    {KEPT_IMAGE_LABEL, KEPT_PICTURE_LABEL, assemble_tables.TABLE_FLAG_LABEL, FIGURE_LABEL.student}
+)
+
+
+def _alt_says_label(body: str, label: str) -> bool:
+    """Does the picture of a flagged block (not one in its caption, which are inline
+    equations) carry alt text that says what `label` says?"""
+    return label in _LABELS_IN_ALT and "<img " in body.split("<figcaption>")[0]
 
 
 def _placed_equations(

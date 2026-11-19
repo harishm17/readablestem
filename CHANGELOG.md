@@ -21,6 +21,13 @@
   next or previous one drops N or P, one with nothing to edit drops E, and a choice for a whole
   page drops A). The script reads the card itself (`listKeysTheCardCanUse` in `app.js`), so
   every kind of card is covered. No stored data changes.
+- A picture that was not converted no longer says so twice to a screen reader. The label beside
+  an equation, table, page or picture shown as an image ("Not converted.", a figure's "No
+  description.") is `aria-hidden` when the picture's alt text already says it
+  (`assemble._alt_says_label`); sighted readers still see it. Without a picture the label is
+  read. This changes the written page of every document that has such a picture, so it owes a
+  `RENDER_VERSION` raise (not raised on this branch). The two flagged goldens
+  (`flags_off_kinematics_slides`, `flags_off_problem_set`) changed by that attribute only.
 
 ## Unreleased: a reviewer sets a block's role; LaTeX quotations (branch feat/set-block-role, WS19.9 in part)
 

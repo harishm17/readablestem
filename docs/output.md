@@ -381,12 +381,20 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
 <div class="equation" id="p1-e4"><math display="block">...</math></div>
 <div class="flagged" id="p1-e5" data-status="failed" data-reason="budget_job_usd">
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
-  <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span>
+  <p class="flag-note readablestem" role="note"><span class="flag-label" aria-hidden="true">Not converted.</span>
   Shown as an image of the original.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
+
+A picture that was not converted is told once to a screen reader: its alt text says "not
+converted" (or "not described"), so the label beside it ("Not converted.", a figure's "No
+description.") carries `aria-hidden="true"` and stays for the eye, as the label of an inline
+equation does. The note's own sentence and the link to the instructor are read. Without a picture
+(the original's text, or none) the label has no alt text to repeat it, so it is read. The checker's
+"Needs a description." is an instruction, so it is always read. Listen and EPUB skip the hidden
+label; Word, which does not read `aria-hidden`, shows and reads both (`assemble._alt_says_label`).
 
 ## Navigation (skip link, contents list, page markers, footnotes)
 
