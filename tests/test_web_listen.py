@@ -288,3 +288,18 @@ def test_a_line_break_is_a_pause_and_a_quotation_ends():
     spoken = said(items)
     assert "Line one, line two, three." in spoken
     assert spoken[-3:] == ["Quote", "To be.", "End quote"]
+
+
+def test_raised_and_lowered_text_says_which_it_is_except_an_ordinal():
+    items = listen.build_transcript(
+        doc(
+            "<main><p>On the 10<sup>th</sup> it was 19.3 g/cm<sup>3</sup> and SO"
+            "<sub>4</sub><sup>2-</sup>; read x<sub>1</sub>y"
+            '<sup><a role="doc-noteref" href="#fn1">1</a></sup>.</p></main>'
+        )
+    )
+    # a footnote's mark is a link and says no more than that
+    assert (
+        "On the 10th it was 19.3 g/cm superscript 3 and SO subscript 4 superscript 2-; "
+        "read x subscript 1 end subscript y link 1." in said(items)
+    )

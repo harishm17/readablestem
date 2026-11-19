@@ -86,7 +86,10 @@ MAX_DEPTH = 64
 # 3: scope ends: a power, a subscript, a root, an accent or a fraction that holds more than one
 #    thing and is followed by something says where it ends; paired bars read "the absolute
 #    value of".
-SPEECH_VERSION = 3
+# 4: a bar before an absolute value in set braces is "such that"; a double bar with a script
+#    (`\\|A\\|_F`) is a norm; bars around a cross of two things that are not numbers keep
+#    "vertical bar".
+SPEECH_VERSION = 4
 
 
 class SpeechError(ValueError):
@@ -1185,7 +1188,8 @@ def _mark_bars(kids: list[ET.Element]) -> None:
         if word is None:
             continue
         depth, bars = 0, []
-        for inner in kids[i + 1 : end]:
+        for j in range(i + 1, end):
+            inner = kids[j]
             text = _mo_text(inner)
             if text in _OPENERS:
                 depth += 1
@@ -1197,6 +1201,22 @@ def _mark_bars(kids: list[ET.Element]) -> None:
         for bar in bars[:1] if opener == "{" else bars:
             if _mo_text(bar) == "∣" or len(bars) == 1:
                 bar.set(_MARK, word)
+        if opener == "{" and len(bars) % 2 and len(bars) > 1:
+            _mark_set_builder_bar(kids, bars, word)
+
+
+def _mark_set_builder_bar(kids: list[ET.Element], bars: list[ET.Element], word: str) -> None:
+    """`\\{x | |x|<1\\}`: an odd number of plain bars in set braces. The bar that is "such that"
+    stands after something it can end and has an even number of bars before it, so the bars on
+    both sides of it pair among themselves (`\\{|x| | x \\in S\\}` takes the third, which follows
+    a closing bar)."""
+    if any(_mo_text(bar) != "|" for bar in bars):
+        return
+    for n, bar in enumerate(bars):
+        j = kids.index(bar)
+        if n % 2 == 0 and j > 0 and (_bar_operand(kids[j - 1]) or kids[j - 1] is bars[n - 1]):
+            bar.set(_MARK, word)
+            return
 
 
 def _is_nabla(node: ET.Element) -> bool:
@@ -1322,6 +1342,29 @@ def _size_or_determinant(inside: list[ET.Element]) -> bool:
     return any(_mo_text(kid) in _SET_SIGNS for kid in inside)
 
 
+def _bar_of(node: ET.Element) -> ET.Element:
+    """The bar a double bar with a script is made of (`\\|A\\|_F` writes its second bar as a
+    subscript of the bar); any other node is itself."""
+    if node.tag in _SCRIPTED and len(node) and _mo_text(node[0]) == "‖":
+        return node[0]
+    return node
+
+
+def _number_like(node: ET.Element) -> bool:
+    return (node[0] if node.tag in _SCRIPTED and len(node) else node).tag == "mn"
+
+
+def _cross_of_names(inside: list[ET.Element]) -> bool:
+    """A cross between two things that are not numbers (`|A \\times B|`): a size, a magnitude or
+    a determinant-like value, and the notation does not say which. A cross between numbers
+    (`|3 \\times 10^{-5}|`) is a product."""
+    return any(
+        _mo_text(kid) == "×" and not _number_like(inside[k - 1]) and not _number_like(inside[k + 1])
+        for k, kid in enumerate(inside)
+        if 0 < k < len(inside) - 1
+    )
+
+
 def _pair_bars(kids: list[ET.Element]) -> None:
     """Pair the bars of a row that enclose something, and say so on them (`_BAR_ROLE`, the opening
     words in `_MARK`). A bar closes when something it can enclose stands before it (a letter, a
@@ -1336,21 +1379,24 @@ def _pair_bars(kids: list[ET.Element]) -> None:
     pairs: list[tuple[int, int]] = []
     operand = False
     for i, kid in enumerate(kids):
-        text = _mo_text(kid)
-        if text in _ABSOLUTE and not kid.get(_MARK):
+        bar = _bar_of(kid)
+        text = _mo_text(bar)
+        if text in _ABSOLUTE and not bar.get(_MARK):
             if operand and stack and _mo_text(kids[stack[-1]]) == text:
                 pairs.append((stack.pop(), i))
-            else:
+            elif bar is kid:
                 stack.append(i)
                 operand = False
+            else:  # a script on a bar that closes nothing: it stays as it is
+                operand = True
         else:
             operand = _bar_operand(kid)
     if stack or not all(_encloses(kids, start, end) for start, end in pairs):
         return
     for start, end in pairs:
         inside = kids[start + 1 : end]
-        opener, closer = kids[start], kids[end]
-        if _mo_text(opener) == "|" and _size_or_determinant(inside):
+        opener, closer = kids[start], _bar_of(kids[end])
+        if _mo_text(opener) == "|" and (_size_or_determinant(inside) or _cross_of_names(inside)):
             continue
         opener.set(_BAR_ROLE, "open")
         opener.set(_MARK, _ABSOLUTE[_mo_text(opener) or ""][0])

@@ -884,6 +884,25 @@ def _one_wrapper_each(chunks: list[str]) -> list[str]:
     return out
 
 
+def _name_sidebars(chunks: list[str]) -> list[str]:
+    """Sidebars are told apart by a screen reader's list of regions: when a page has more than
+    one, each is "Sidebar 2 of 3" and not the same "Sidebar". A sidebar holds only paragraphs
+    (only a paragraph takes the role), so there is no heading of its own to name it by."""
+    opening = _ROLE_WRAP["aside"][0]
+    total = sum(chunk.startswith(opening) for chunk in chunks)
+    if total < 2:
+        return chunks
+    out: list[str] = []
+    seen = 0
+    for chunk in chunks:
+        if chunk.startswith(opening):
+            seen += 1
+            named = f'<aside aria-label="{ASIDE_LABEL} {seen} of {total}">'
+            chunk = named + chunk[len(opening) :]
+        out.append(chunk)
+    return out
+
+
 def is_entry(element: Element) -> bool:
     """A glossary entry that is written as a term and its definition."""
     text = element.text or ""
@@ -2183,7 +2202,7 @@ def render_html(
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
     )
     renderer.unread_parts = _unread_parts(ordered, first_fix, renderer.placed)
-    body = renderer.fill_backlinks(renderer.render_all(ordered))
+    body = _name_sidebars(renderer.fill_backlinks(renderer.render_all(ordered)))
     kept_pages = [
         e.page
         for e in ordered

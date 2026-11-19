@@ -72,6 +72,28 @@ def test_every_gold_equation_has_speech(record):
         ),
         (r"\det A = |A|", "determinant cap A equals vertical bar cap A vertical bar"),
         (r"\|x\|", "the norm of x"),
+        # a norm with a subscript is still a norm (its second bar is a script's base), and an
+        # evaluation bar with a script is not one
+        (r"\|A\|_F", "the norm of cap A end norm sub cap F"),
+        (r"f|_a + g|_b", "f vertical bar sub a end sub plus g vertical bar sub b"),
+        # a bar before an absolute value in set braces is "such that"; with its own pair first
+        # the third bar is
+        (
+            r"\{x | |x|<1\}",
+            "open brace x such that the absolute value of x less than 1 close brace",
+        ),
+        (
+            r"\{|x| | x \in S\}",
+            "open brace the absolute value of x such that x is an element of cap S close brace",
+        ),
+        # a cross between things that are not numbers says what is written; between numbers
+        # it is a product
+        (r"|A \times B|", "vertical bar cap A times cap B vertical bar"),
+        (r"|\vec{a}\times\vec{b}|", "vertical bar vector a cross vector b vertical bar"),
+        (
+            r"|3 \times 10^{-5}|",
+            "the absolute value of 3 times 10 to the power minus 5 end power end absolute value",
+        ),
         (r"\bar{a+b}", "the quantity a plus b end quantity bar"),
         # ions: the charge needs no "end power"; a nuclide is read as the element (the data
         # of `speech_nuclides`), and one that is not known keeps its numbers before its symbol

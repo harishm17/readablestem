@@ -3449,7 +3449,7 @@ an edit or an error, and when `tools=1`) with, in this order:
   item, a heading, program code, a glossary entry or a footnote, and the route refuses those with
   the same words. The change is one `ReviewEdit` (`set_role`, an Undo snapshot of the element,
   counted among the changes to pages), the page's HTML is made again when asked for, and it then
-  has the paragraph in its `<aside aria-label="Sidebar">` or `<blockquote>`, neighbors of one
+  has the paragraph in its `<aside aria-label="Sidebar">` (numbered when the page has several) or `<blockquote>`, neighbors of one
   role in one wrapper. There is no keyboard shortcut for it: the list of keys on the review
   screen (N, P, A, E) is for decisions, and "Make it a heading" has none either. A paragraph made
   a heading loses its role.
