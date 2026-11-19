@@ -240,7 +240,8 @@ our own would be a second MathML reader to keep right.
     leaves out, or an id the page does not have) is written as its words, not as a link that
     leads nowhere, and counted (`DocxExport.links_unlinked`, printed by the CLI).
 - **What the file has.** Headings as Heading 1 to 6; lists as Word lists; links as hyperlinks
-  (inside the document by bookmark); tables with their caption; alt text on each picture; the
+  (inside the document by bookmark); a quotation as "Block Text" and an aside as "Sidebar"
+  (WS16.3); tables with their caption; alt text on each picture; the
   document language and title; equations as `m:oMath`, or, where one could not be written, its
   words (above; `DocxExport.not_word` lists their element ids, `readablestem export docx`
   prints them, the route logs the count). The export fails (`equations`) rather than hand over
@@ -469,6 +470,24 @@ document in another language marks it `lang="en"`).
   because the notes are not collected at the end. The assembler is told which elements are
   footnotes by `render_html(footnote_ids=...)` (from the notices; `rerender_html` does the same).
   A link between two blocks that is not to a footnote is an ordinary link.
+- **Block roles (WS16.3).** `Element.role` (`"aside"` or `"quote"`, left out of the JSON when
+  empty, so a stored result reads unchanged) says what a paragraph is to the document. A
+  paragraph with a role is written inside `<aside aria-label="Sidebar">` (a pull quote, a
+  sidebar, a margin note; it is not in the outline and screen readers list it as a
+  complementary landmark) or `<blockquote>` (a block quote); neighbors of one role share one
+  wrapper. A list item or a defined term never takes a wrapper. A footnote is not a role (it is
+  the notice `footnote`, above) and code is `Element.preformatted`. The Word reader
+  (`source/docx_reader.py`) sets `quote` on the paragraphs of a quotation, so a quotation in a
+  Word source comes out as a `<blockquote>`; layout sets no role on a PDF yet (no detector
+  passes the "at least 2 real cases and no false one" bar, docs/layout.md), so a PDF's page is
+  written as before. A text edit and carry-over keep the role; "make heading" clears it.
+  Each output: the web page draws an aside with a bar at its left in the text color; Word
+  writes the quote as the paragraph style "Block Text" and an aside as the style "Sidebar"
+  (pandoc drops `<aside>`, so the export wraps it in a styled `div`; Word has no landmark for
+  it, so the role is the style's name); the EPUB keeps `<aside aria-label>` and `<blockquote>`;
+  Canvas and the cartridge keep both elements and the `aria-label` but not the bar (Canvas has
+  no stylesheet; the margin and padding stay inline); Listen says "Side notes, Sidebar" before
+  an aside and "Quote" and "End quote" around a quotation.
 
 The tab order is the skip link, then the contents list's links, then the file.
 

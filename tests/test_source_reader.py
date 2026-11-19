@@ -579,7 +579,8 @@ def test_a_word_file_gives_its_structure_its_equations_and_leaves_hidden_text_ou
         )
         + _cells("Name|Value", "g|9.8", marked=True)
         + _cells("Name|Value", "c|3.0", marked=False)
-        + '<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr><w:r><w:t>Words of another.</w:t></w:r></w:p>'
+        + '<w:p><w:pPr><w:pStyle w:val="Quote"/></w:pPr>'
+        + "<w:r><w:t>Words of another.</w:t></w:r></w:p>"
     )
     reading = read_word(word(body))
     assert kinds(reading) == [

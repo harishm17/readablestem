@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: block roles, a sidebar and a quotation (branch feat/block-roles, WS16.3)
+
+- One stored field, `Element.role` (`"aside"` or `"quote"`; left out of the JSON when empty, so
+  every stored result reads as before). Every writer follows it: the page writes a role's
+  paragraphs inside `<aside aria-label="Sidebar">` (with a bar at its left in the text color)
+  or `<blockquote>`, adjacent neighbors in one wrapper; the Word file has the paragraph styles
+  "Sidebar" and "Block Text"; the EPUB, Canvas and the cartridge keep the elements and the
+  label (Canvas loses the bar); Listen says "Side notes" and "Quote" / "End quote". A Word
+  source's quotation (a paragraph in the Quote style or a block quote) is read as `quote`. A
+  text edit and carry-over keep the role; making a block a heading clears it.
+- Not built: no layout detector sets a role on a PDF. A box rule for asides and a set-in rule
+  for quotes missed the "2 real cases and no false one" bar (counts in the report of this
+  item); a footnote stays a notice, code stays `preformatted`; `breaks`, `lead_end`, `dir` and
+  `notes` already exist as the run kind `break`, `term_end`, WS16.6 and WS14.4.
+- A document with no role writes the same page as before; no request to a model, prompt, model
+  id, pipeline version, render version or migration changed.
+
 ## Unreleased: the eval gate sees switches (branch fix/eval-guard-flags)
 
 - `eval gate --require-current` refused a report made with other prompts, other models or
