@@ -164,6 +164,11 @@ TEXT_NOT_COVERING = "text_not_covering_content"  # reason code (page record, not
 TEXT_MIN = 40  # visible chars for a page to "have a text layer" (about one line of type)
 OCR_MIN = 20  # untrusted chars that alone (no image, no ink) mean an OCR layer
 HIDDEN_FEW = 3  # untrusted chars that make a page "_ocr" or "mixed_hidden_text"
+# Left-out chars on a typed page from which the notice is one to check (`hidden_text_check`): a
+# paragraph or more. Measured on the 212 PDFs of the corpus and the real-world sets: the pages with
+# less than this were debris (a repeated stamp, a few labels, words also printed on the page); the
+# pages with more had a text layer of their own (484 to 2,767 chars) beside drawings.
+HIDDEN_BLOCK = 400
 
 # Ink strokes: a handwriting stroke is a small, curved, wiggly, one-off path. Where a
 # comment says "the reference lecture", it means one real iPad lecture that is kept

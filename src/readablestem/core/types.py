@@ -948,6 +948,8 @@ NOTICE_CODES = frozenset(
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
+        # ... and a paragraph or more of them (`page_type.HIDDEN_BLOCK`): the instructor looks
+        "hidden_text_check",
         # The page's drawings were not checked for handwriting: over a count of work, or the
         # clock guard fired (`page_type.InkBudget`, plan WS14.9). Its typed text was read.
         "drawings_not_analysed",

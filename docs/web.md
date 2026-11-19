@@ -1997,7 +1997,8 @@ or "compliance" (`tests/test_web_record.py` checks both). It goes when the docum
 first. CSV cells that start like a formula (`=`, `+`, `-`, `@`) get a quote in front; the file
 starts with a byte order mark so Excel reads non-English letters right. Its columns are
 `section, item, page, tool_had, decision, by, when_utc, detail`, with the sections `document`,
-`summary`, `decision`, `open`, `not_converted`, `check` and `not_checked`.
+`summary`, `decision`, `open`, `not_converted`, `check`, `not_checked` and `handled` (the job page's
+"Handled in this file" lines, made by `job_page.handled_lines`, one row each).
 `docs/vendor-information.md` is the matching one-page sheet for a procurement office: what the
 tool does, what happens to a document, and where it falls short. The site's own page for such an
 office is `/for-accessibility-offices`; change the sheet and that page together.

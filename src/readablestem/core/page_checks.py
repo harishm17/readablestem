@@ -89,6 +89,12 @@ ROWS: tuple[CheckLine, ...] = (
         "hidden or covered words on a typed page",
         not_checked=True,
     ),
+    _page(
+        "hidden_text_check",
+        "required",
+        "a paragraph or more of hidden or covered words on a typed page",
+        not_checked=True,
+    ),
     _page("scripts_flattened", "optional", "a block with raised or lowered text written flat"),
     _page("footnote", "none", "layout: a footnote kept where it falls", "handled"),
     _page("code_block", "none", "layout: program code kept as plain text", "handled"),

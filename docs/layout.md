@@ -2166,7 +2166,9 @@ the pass cannot read stays a kept image exactly as described here.
   `Element.text`, Listen, Word, EPUB and the other outputs at the row. They, and the spans
   under 2 pt, are painted text and not the mark of an OCR layer, so they do not count toward
   calling the page a scan under a text layer: a typed page with a long white sentence stays
-  a typed page. The glyph reads for
+  a typed page. The stored page type keeps their count (`unseen_chars`, written when above 0, 0 for
+a record stored before it), so the review screen counts the hidden text of a kept page as its
+notice does (`PageType.left_out_chars`). The glyph reads for
   an equation's line (`line_glyphs`) and the text pass (`page_glyphs`) do not look at the
   render: they skip only the spans of the first three kinds above, as they skip covered
   ones.
@@ -2188,7 +2190,19 @@ nothing. The turn is in the document the readers open, not in the PDF file: layo
 the page's `PageTypeResult.turn` (not in the stored page type) and says it with the notice
 `page_turned` (information, one per page, listed under "Handled in this file": "N pages saved
 sideways in the PDF and turned upright to be read"), so the pictures of the page, which show
-the turned page, are accounted for.
+the turned page, are accounted for. A job read before the notice existed has no such line, and
+nothing else differs: its elements are stored in the turned frame, and every later reader of the
+file turns the page again by itself, so the stored page type need not keep the turn.
+
+Which typed pages with hidden text are worth a look was measured on the corpus (212 PDFs: the
+uploads, the real-world sets and the layout gold; counts only): ten files had a typed page with 3 or
+more hidden characters, 38 pages in all. 32 pages had under 400 (a stamp repeated on every page,
+a few labels, words printed on the page as well, text under a picture), and the largest of them
+had 317. The other 6 pages, all in one file, had 484 to 2,767 each, mostly words that are not on
+the page, beside drawings made of hundreds of paths and, on four of them, almost no visible text:
+a text layer for words drawn as shapes. That is the case that holds the job; below 400 the line
+stays optional. The tool that would keep such a page's hidden words was not built (docs/layout.md
+"Not built", `CHANGELOG.md`).
 
 **Page types.** `page_type.classify` reads the rawdict and the drawings layout already
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
@@ -2199,7 +2213,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 | Kind | What it is | What the app does |
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
-| `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
+| `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count, or `hidden_text_check` (required) from `page_type.HIDDEN_BLOCK` (400) characters on |
 | `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
@@ -2413,7 +2427,8 @@ work, groups the kept images with one reason into one decision (`Fix.group_key`
 "pg-" + the first one's id: a 20-page handwritten file asks once), and stores the
 content-free records on `DocumentResult.page_types` (docs/output.md). Notices:
 `ocr_text_layer_ignored` (review "none") for the hidden characters of a kept page,
-`hidden_text_ignored` (optional) for those of a typed page, and one per kept image with
+`hidden_text_ignored` (optional) for those of a typed page, `hidden_text_check` (required, and
+held at "Ready" by `states._HOLDS`) when that page has 400 or more of them, and one per kept image with
 its reason (required: its decision is the image's fix).
 
 **At upload** (`page_type.document_refusal`, in the probe child): the text of every page
@@ -3080,8 +3095,9 @@ and lines, FreeText), and drops them. It is applied where the page's drawings ar
 `layout/document.py` `_read_page` (the one list that figure, handwriting and ink detection use), and
 the slide-mark pass of the same file. The hidden-text check still sees every drawing
 (`classify(covers=...)`): a box drawn over a line is a fake redaction. A pen stroke (Ink) is kept: it is
-handwriting. Known limits: a drawing of the page itself that was painted last and lies inside such a box is dropped
-with them; the budgeted ink probe (`page_type._probe_ink`) and `ink_strokes.extract_ink` read the unfiltered list.
+handwriting. The budgeted ink probe (`page_type._probe_ink`) and `ink_strokes.extract_ink` (the strokes sent to
+the reader of a handwritten page) read the list through the same function. Known limit: a drawing of
+the page itself that was painted last and lies inside such a box is dropped with them.
 
 ### Rules near a baseline, blanks, boxes and form fields (SW36, SW39)
 

@@ -97,6 +97,16 @@ def test_text_in_the_colour_of_its_background_or_too_small_to_see_is_left_out_an
         ("hidden_text_ignored", 0, hidden, "optional")
     ]
 
+    # A paragraph or more of it is one to check: the page may say its words only there.
+    page = doc.new_page()
+    page.insert_text((72, 100), "Visible black line about circuits", fontsize=12)
+    page.insert_text((72, 140), "word " * 100, fontsize=1)
+    out = layout.analyze(doc.tobytes())
+    assert [(n.code, n.page, n.count, n.review) for n in out.notices] == [
+        ("hidden_text_ignored", 0, hidden, "optional"),
+        ("hidden_text_check", 1, 400, "required"),
+    ]
+
 
 def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     doc = layout.analyze(data("typed_with_ink.pdf"))

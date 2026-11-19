@@ -506,6 +506,10 @@ NOTICE_MESSAGES: dict[str, str] = {
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",
+    "hidden_text_check": "This page has a lot of text ({count} characters) that cannot be seen "
+    "when the page is shown or printed, so it was left out. It may be words the page needs, "
+    "such as text drawn as shapes: compare the page with the original. If students need it, "
+    "add it to your source file and upload that again.",
     "file_cut_off": "This file looks cut off: its last pages are empty, so the rest is not in "
     "the converted file. Upload a fresh copy, or continue with the pages before them.",
     "file_repaired": "This PDF was damaged, and the tool had to repair it to open it. Check "
