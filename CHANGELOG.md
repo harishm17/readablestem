@@ -4,7 +4,7 @@
 
 - The privacy notice dates the review-screen row 2026-11-19, the day the release that carries
   its sentence went live, not 2026-11-11, the day it was written.
-- `readablestem convert` takes no `--out`: the file is named for the input, and a draft (decisions
+- `readablestem convert` no longer needs `--out`: the file is named for the input, and a draft (decisions
   still open) ends in `-draft` as a web download does. With `--out` the name is kept and a line
   says the file is a draft. A command-line draft is worded for the person who checks it, as the
   web draft is.
