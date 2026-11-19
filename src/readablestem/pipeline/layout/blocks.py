@@ -984,6 +984,8 @@ def _label_abstracts(blocks: Sequence[_Block], rows: Sequence[_Row], edges: _Rig
 KEPT_MIN_LINES = 3  # a block of at least this many lines can keep its line ends
 KEPT_SHORT_BY = 8.0  # em: a line that stops this far short of its column's right edge is short
 KEPT_LEFT_SPREAD = 1.0  # em: the lines of a poem or an address start at one left edge
+KEPT_SAME_END = 0.3  # em: lines that end this close to each other end at the same place
+KEPT_JUSTIFIED = 0.6  # share of the lines (two at least) ending at one place: justified text
 
 
 def _keeps_lines(block: _Block, edges: _RightEdges, *, document: _Document) -> bool:
@@ -991,9 +993,10 @@ def _keeps_lines(block: _Block, edges: _RightEdges, *, document: _Document) -> b
 
     Three or more lines that all start at one left edge and, but for the last, stop at least
     `KEPT_SHORT_BY` em short of the right edge their column's text reaches, none of them ending
-    in a broken word. A paragraph that wraps runs to the edge in every line but the last, a
-    centered title starts each line elsewhere, and a slide's text box is not measured by its
-    page's edge, so none of them is one."""
+    in a broken word, and not most of them ending at one place (justified text). A paragraph
+    that wraps runs to the edge in every line but the last, a centered title starts each line
+    elsewhere, and a slide's text box is not measured by its page's edge, so none of them is
+    one."""
     rows = block.rows
     if (
         block.kind != Kind.PARAGRAPH
@@ -1007,10 +1010,16 @@ def _keeps_lines(block: _Block, edges: _RightEdges, *, document: _Document) -> b
     size = _dominant_size(rows)
     if max(r.x0 for r in rows) - min(r.x0 for r in rows) > KEPT_LEFT_SPREAD * size:
         return False
-    return all(
+    if not all(
         r.x1 <= edges.of(r) - KEPT_SHORT_BY * size and r.clean[-1:] not in hyphens.HYPHENS
         for r in rows[:-1]
-    )
+    ):
+        return False
+    # Justified text in a column narrower than the edge measured (two columns, a text box
+    # beside a figure) has every line end at one place; lines of verse do not.
+    ends = sorted(r.x1 for r in rows[:-1])
+    alike = max(sum(abs(x - end) <= KEPT_SAME_END * size for x in ends) for end in ends)
+    return alike < max(2, KEPT_JUSTIFIED * len(ends))
 
 
 # The text decisions layout raises on a paragraph or list item (`Element.reasons`; the
