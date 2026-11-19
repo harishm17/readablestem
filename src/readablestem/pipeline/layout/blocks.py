@@ -1986,14 +1986,18 @@ def _unspaced(c: str) -> bool:
 def _merge_style_splits(blocks: list[_Block], runs: list[_Run]) -> list[_Block]:
     """Re-join a paragraph or list item and the lines that a change of style cut off it (a bold
     line that did not become a heading: the bold phrase "instruction in order" that goes on
-    over the end of an item's line)."""
+    over the end of an item's line). A list item set all in bold is a heading that read as an
+    item ("A. Detailed implementation"): the text under it is a paragraph of its own."""
     out: list[_Block] = []
     out_runs: list[_Run] = []
     for block, run in zip(blocks, runs, strict=True):
         if (
             out
             and block.kind == Kind.PARAGRAPH
-            and out[-1].kind in (Kind.PARAGRAPH, Kind.LIST_ITEM)
+            and (
+                out[-1].kind == Kind.PARAGRAPH
+                or (out[-1].kind == Kind.LIST_ITEM and not out[-1].bold)
+            )
             and not run.block_start
             and not block.code
             and not out[-1].code

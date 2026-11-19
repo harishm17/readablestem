@@ -240,7 +240,11 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    centered on one another (an author over an affiliation) and a line that opens with a
    reference number ("[20]") are not that. A
    two-line paragraph whose second line falls short of the first stays cut. A row continuing a list item never starts left of the item's
-   marker (so the paragraph after a list is not swallowed by its last item).
+   marker (so the paragraph after a list is not swallowed by its last item). Words set in
+another style that run on over the end of a line (a bold phrase that ends a list item's
+first line and goes on) are cut off the block by the style change and joined to the item
+again, as for a paragraph (`_merge_style_splits`; only a block that is a paragraph is joined,
+so a heading is not, and a line that starts a block is not).
    An entry of a glossary, an index or a bibliography is a block of its own (SW34b), by three
    signals that need no heading over them: a lead term (bold, italic or small capitals, at a
    line's start at the paragraph's left edge, ending in a period or a colon, after a line that
@@ -772,7 +776,10 @@ within 3 x font size:
   step), beamer's AMS triangle `▶`). A bullet glyph at the start of a row counts as a marker
   when it stands at least 0.1 x font size from text set in another font (0.2 from text in the
   same font), though no space character separates them (Word's Wingdings bullet leaves 0.23 x
-  font size and no blank in the text layer; the usual split of a row's tokens is 0.3);
+  font size and no blank in the text layer; the usual split of a row's tokens is 0.3). A
+  bullet that touches its text (a gap under that, "\u25aaGrading" set in a bullet font with no
+  space at all) is the same glyph a word could start with, so it is an item only when another
+  row in the document starts with the same glyph, like a dash; a lone one stays a paragraph;
 - Word's second-level bullet, the letter `o` set in Courier New: a monospaced `o` followed by
   text that is not monospaced, with a sibling like a dash (so code that starts a line with
   `o` in one monospaced face is not a list). It is reported as `◦` and nests by its indent.
@@ -786,7 +793,15 @@ within 3 x font size:
   decimal point (`- 40 m/s`, Word's `– 5 °C`), or set in a math font, is the sign of a
   value, not a bullet: the sign stays in the text;
 - an ordered marker: `1.` `2)` `(3)`, `a.` `b)` `(c)`, `A.`, `iv.` `(ii)` `IV)`. OpenStax's
-  "3 ." (number and full stop in separate spans) is read as "3.".
+  "3 ." (number and full stop in separate spans) is read as "3.". A blank to fill in before
+  the marker (three or more underscores, or a drawn rule that `_mark_blanks` writes as five)
+  does not hide it ("___ 1. Osmosis"): the marker is the label after the blank
+  (`_Marker.start` is its first character) and the blank stays in the item's text. A blank
+  before a bullet is no marker. Two series of labels set side by side under one question
+  (matching exercise: "___ 1." to "___ 3." in the left column, "A." to "C." in the right) are
+  read column by column as two lists one level below the question (`_matching_series`, the
+  option-grid machinery with two edges and two kinds of label), the left one first. They need
+  a full run in each, a line holding one label of each, and the question above.
 
 A bullet glyph, a drawn bullet, or a number before a capital letter ("3. Measure") is
 enough, except that the number needs a sibling too when its row reads as the next line of
@@ -807,7 +822,13 @@ for every item of one level even when the markers are right-aligned (LaTeX's "(i
 "(ii)", "(iii)"): consecutive items in reading order form one list, a deeper indent
 (more than 0.6 x body size) opens a level, a shallower one closes levels until one
 matches; an indent within that tolerance of both of the two innermost open levels takes
-the nearer one (a slide's 26 pt body makes the tolerance 16 pt). The indent is measured from the left edge of the item's column on its page (the
+the nearer one (a slide's 26 pt body makes the tolerance 16 pt). Where the item texts agree
+within that tolerance, the marker still opens a level when it is of another series than the
+one of the item above (bullet or number, "1)" or "(a)", another bullet glyph) and stands more
+than 0.4 x font size right of it (`MARKER_INDENT`; slides set the sub-bullets under "1)" 13 to
+15 pt in while their text is 5 to 14 pt right of the text above). Items of one series (a
+wrapped list of names that start with initials) and the options of a grid are not moved by
+it. The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or
 on a page with another margin keeps its levels. A display equation inside an item does
 not end the list; any other block does.
