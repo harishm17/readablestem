@@ -256,7 +256,21 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    line's first word no longer fits (`_hanging_entries`, `_flows`; a contents list nested by
    indent stops where each title does, so it is not one). An entry of one line between such
    entries, at their left edge and short of the right edge, is an entry too (`_one_line`). A one-line entry followed by an indented paragraph starts a paragraph of its own
-   (`_continues`). A change
+   (`_continues`). Every such start is one question, `_starts_block`, asked last by `_continues`
+   (SW34): the entry and the "Keywords:" line above, and three more that the line geometry does
+   not show. A raised digit or sign (`*`, `∗`, `†`, `‡`, `§`, `¶`) at the line start, in type
+   smaller than the body, after a line that does not go on in mid-sentence, is a note or an
+   affiliation of its own (an isotope's mass number in running text is set in body size and is
+   not one). A theorem's label ("Definition 2.", "Example 5:", "Proof.") starts a block after a
+   line that does not go on in mid-sentence, or when it is bold or italic over a line that is
+   not; a numbered label with no stop ("Remark 5.1 It ...") starts one only in bold or italic.
+   "Theorem 3.6 we show" and "see Example 5 and" go on. (A speaker label such as "TEACHER:" is
+   not a signal: in the development material every speaker turn that joined was already cut by
+   the lead-term rule.) The next number of
+   a column of numbers ("4 Receive ...", "5: while ...") starts one after a line that stops
+   short of the right edge, the steps of an algorithm or the lines of a listing; a line number
+   in the margin of a manuscript, on a line that runs full, does not. Without the page's line
+   ends (`edges`) only the first group and the note and theorem signals are asked. A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
    pitch is the last line of the sentence above (`... exactly one solution,` / `x =

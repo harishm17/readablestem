@@ -60,7 +60,6 @@ from readablestem.pipeline.layout.shared import (
     _Context,
     _Figure,
     _Inline,
-    _lead_end,
     _Marker,
     _Row,
     _Run,
@@ -296,20 +295,6 @@ HANGING_ENTRIES = 3  # entries in a row that make a hanging indent a list of ent
 HANGING_REACH = (1.0, 4.0)  # em: how far right of an entry's first line its other lines start
 LEAD_ENTRIES = 3  # paragraphs in a row that start with a lead term, to make a list of entries
 LETTER_SEQUENCE = 3  # letters in a row that make capitals alone on a line the sections of an index
-
-
-def _starts_entry(prev: _Row, row: _Row, run: _Run, edges: _RightEdges) -> bool:
-    """Does `row` start an entry of a glossary or a list of terms: a lead term (`_lead_end`)
-    at the left edge of the paragraph `run`, after a line that does not end in that style. (An
-    italic title that starts a line inside an entry of a bibliography is indented with it; an
-    italic "et al." after a line that runs full and stops mid-sentence is part of it.)"""
-    found = _lead_end(row)
-    if found is None or row.marker is not None or row.x0 > run.box[0] + 0.5 * row.size:
-        return False
-    if prev.clean[-1:] not in '.:;?!)”"' and prev.x1 >= edges.of(prev) - 1.5 * prev.size:
-        return False
-    last = next((c for c in reversed(prev.chars) if not c.blank), None)
-    return last is not None and not found[1](last)
 
 
 def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
@@ -961,8 +946,6 @@ ALGORITHM_MAX_DEPTH = 12
 
 
 _ABSTRACT_LABEL = re.compile(r"abstract[.:]?", re.IGNORECASE)
-# The line that opens an abstract's keywords ("Keywords:", "Key words -", "Index Terms -").
-_KEYWORDS_LINE = re.compile(r"(?:key\s?words?|index\s+terms)\s*[:–—-]", re.IGNORECASE)  # noqa: RUF001
 ABSTRACT_CENTRE = 1.0  # em: how far from the middle of its column a centered label may be
 
 
@@ -1502,20 +1485,16 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
-            # A lead term, or the "Keywords:" line under an abstract: its own entry.
-            led = geometric and (
-                _starts_entry(prev, row, run, edges) or _KEYWORDS_LINE.match(row.clean) is not None
-            )
-            if geometric and not led and _same_style(prev, row, ctx):
+            if geometric and _same_style(prev, row, ctx):
                 run.add(row)
                 continue
-            run.block_end = not geometric or led
+            run.block_end = not geometric
             ends_sentence = prev.clean[-1:] in ".:?!"
             short = row.x1 < run.box[2] - 3 * row.size
             # Two bold lines that differ in size or typeface are two headings (or labels),
             # not a heading and the paragraph it leads: the second one starts a block.
             restyled = geometric and prev.bold and row.bold
-            starts = not geometric or restyled or led or (ends_sentence and short)
+            starts = not geometric or restyled or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
             if row.note:

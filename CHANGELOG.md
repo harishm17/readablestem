@@ -76,6 +76,29 @@
   the question made it a table. One regression test.
 - A table whose box changes is sent to the table step with another picture, so its recorded
   answer no longer matches (rule 10); the count is in the branch report.
+## Unreleased: one rule for where a block starts (SW34, feat/starts-a-block)
+
+- One function, `figures._starts_block`, answers whether a line starts a block though it sits
+  a line's distance below the one above (`_continues` asks it last). It holds the entry
+  (lead-term) and "Keywords:" starts that were spread over `blocks._runs` and `_continues`,
+  and the region tree's index entries, and adds three more that the line geometry does not
+  show: a note or an affiliation (a raised digit or sign at the line start, in type smaller
+  than the body, after a line that does not go on in mid-sentence); a theorem, definition,
+  proof or example label (after the end of a sentence, or in bold or italic over a line that
+  is not; "Remark 5.1 It ..." with no stop only in bold or italic; "Theorem 3.6 we show" and
+  "See Example 5 and" go on); and the next number of a column of numbers after a line that
+  stops short of the right edge (the steps of an algorithm, the lines of a code listing).
+  On the 333 development PDFs: 22,254 paragraphs become 22,430; the joins that these
+  signals name fall from 255 to 88 raised starts (the 88 left are all in body size, line
+  numbers and isotopes), from 21 to 9 theorem labels (the 9 left are references inside a
+  sentence), and from 316 to 212 number starts; the cuts in mid-sentence on one page go from
+  3,107 to 3,104. 30 files change; every change read is a start that was missing or neutral.
+- Not built, as no case was measured: a speaker's turn ("TEACHER:") as a signal (the 11
+  joins found in the development material were 3 real ones, all already cut by the lead-term
+  rule), and the paragraph-end rule. Footnotes that run together are cut by the raised-mark
+  signal; WS2.8 is not built. Nothing here depends on the region tree.
+- Pipeline output changes for pages with notes, labelled theorems or numbered steps, so a
+  PIPELINE_VERSION bump is owed when this merges. No migration.
 
 ## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
 
