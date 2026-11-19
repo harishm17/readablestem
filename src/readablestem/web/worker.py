@@ -1445,14 +1445,17 @@ class Worker:
                     )
                 )
             for kind, element_id in edits.items:
+                # What changed the new result keeps the snapshots a person's own edit keeps, so
+                # the next revision reads the edit back (`carry_edits.edit_row`).
+                change = edits.changes.get((kind, element_id))
                 session.add(
                     ReviewEdit(
                         job_id=job.id,
                         user_id=job.user_id,
                         element_id=element_id,
                         action=carry.CARRIED_ACTION,
-                        before=None,
-                        after={carry_edits.CARRIED_KEY: kind},
+                        before=change.before if change else None,
+                        after=(change.after if change else {}) | {carry_edits.CARRIED_KEY: kind},
                     )
                 )
             job.carried_json = report.to_json() | {"from_name": earlier.name}

@@ -93,7 +93,7 @@ def pdf_with(change) -> bytes:
     return data
 
 
-def revise(env, first: str, data: bytes, delete_first: bool = False) -> str:
+def revise(env, first: str, data: bytes, delete_first: bool = False, output=None) -> str:
     response = env.browser.post(
         "/jobs",
         data={"csrf_token": token(env.browser), "revises": first},
@@ -105,7 +105,7 @@ def revise(env, first: str, data: bytes, delete_first: bool = False) -> str:
             f"/jobs/{first}/delete",
             data={"csrf_token": token(env.browser, "/app"), "confirm": "yes"},
         )
-    env.converter.output = review_output()
+    env.converter.output = output or review_output()
     env.run_worker()
     return second
 
@@ -121,7 +121,7 @@ def carried_rows(env, job_id: str) -> dict[str, dict]:
                 ReviewEdit.job_id == job_id, ReviewEdit.action == carry.CARRIED_ACTION
             )
         )
-        return {r.element_id: dict(r.after or {}) for r in rows}
+        return {r.element_id: {"carried_edit": (r.after or {}).get("carried_edit")} for r in rows}
 
 
 # --------------------------------------------------------------------------- a revised PDF
@@ -230,6 +230,44 @@ def test_not_an_equation_comes_back_on_a_revised_pdf_for_the_same_picture(web):
     assert "𝛚" in (element(result, "p1-e1").text or "")
     report = carry.CarryReport.from_json(env_job(web, second).carried_json)
     assert report.edits == [inline] and report.edits_dropped == 0
+
+
+def test_edits_by_hand_are_carried_again_on_a_second_revision_and_a_lost_one_is_told(web):
+    """O-151: a revised document is itself revised. What was carried onto the second version
+    comes onto the third, and what the third cannot take is named, as the second named it."""
+    inline = "p1-e2"
+    make_edits(web, web.first)
+    decide(web, web.first, inline, action="not_equation")
+    second = revise(web, web.first, pdf_with(lambda doc: None))
+    third = revise(web, second, pdf_with(lambda doc: doc.set_metadata({"title": "Third"})))
+    result = stored(web, third)
+    assert element(result, PLAIN).text == "Discuss vectors and scalars with your class."
+    heading = element(result, LATER)
+    assert heading and heading.kind is Kind.HEADING
+    assert result.fix_for(inline) is None and element(result, inline) is None
+    report = carry.CarryReport.from_json(env_job(web, third).carried_json)
+    assert set(report.edits) == {PLAIN, LATER, "p1-x1", inline} and report.edits_dropped == 0
+
+    # The text of the second version differs where the first edit was made: the third file
+    # cannot take it, and says so.
+    changed = review_output()
+    for found in changed.result.elements:
+        if found.id == PLAIN:
+            found.text = "Discuss vectors, scalars and tensors with the class."
+    fourth = revise(web, third, pdf_with(lambda doc: None), output=changed)
+    report = carry.CarryReport.from_json(env_job(web, fourth).carried_json)
+    assert ("text", 1) in report.edits_not_applied
+    assert element(stored(web, fourth), LATER).kind is Kind.HEADING
+
+    # A version carried before this release kept no snapshot of what it carried: its next
+    # revision cannot make that edit again and says so rather than losing it unseen.
+    with session_scope(web.ctx.factory) as session:
+        for row in session.scalars(select(ReviewEdit).where(ReviewEdit.job_id == third)):
+            if row.action == carry.CARRIED_ACTION and row.element_id == PLAIN:
+                row.before, row.after = None, {"carried_edit": "text"}
+    fifth = revise(web, third, pdf_with(lambda doc: None))
+    report = carry.CarryReport.from_json(env_job(web, fifth).carried_json)
+    assert ("text", 1) in report.edits_not_applied and LATER in report.edits
 
 
 def test_a_revision_lists_each_change_it_could_not_make_again_by_name_and_page(web):

@@ -109,10 +109,17 @@ def read(session: Session, source: Job, *, own: bool) -> Earlier | None:
             crops[element_id] = bytes(png) if hand_made else carry.crop_digest(png)
     rows = session.scalars(
         select(ReviewEdit)
-        .where(ReviewEdit.job_id == source.id, ReviewEdit.action.in_(STRUCTURE_ACTIONS))
+        .where(
+            ReviewEdit.job_id == source.id,
+            ReviewEdit.action.in_(STRUCTURE_ACTIONS | {carry.CARRIED_ACTION}),
+        )
         .order_by(ReviewEdit.created_at, ReviewEdit.id)
     )
-    edits = [carry_edits.EditRow(r.element_id, r.action, r.before, r.after) for r in rows]
+    edits = [
+        row
+        for r in rows
+        if (row := carry_edits.edit_row(r.element_id, r.action, r.before, r.after)) is not None
+    ]
     return Earlier(result, crops, source.filename, own, source.id, edits)
 
 
