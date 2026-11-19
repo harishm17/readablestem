@@ -802,6 +802,17 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
         }
 
 
+def _list_page(ctx: AppContext, user: CurrentUser, course_id: str | None) -> str:
+    """The page that holds a documents list: the person's own course's, else "My documents".
+    A course's address is built from the stored row's id, not from the address asked for."""
+    if course_id:
+        with session_scope(ctx.factory) as session:
+            owned = notation.owned_course(session, course_id, user.id)
+            if owned is not None:
+                return f"/courses/{owned.id}"
+    return "/app"
+
+
 @router.get("/app/documents")
 def app_documents(request: Request, user: UserDep, v: str = "", course: str = "") -> Response:
     """The documents list alone, polled by htmx while a document is waiting or
@@ -809,11 +820,9 @@ def app_documents(request: Request, user: UserDep, v: str = "", course: str = ""
     query every few seconds; when something did, the whole list, with a `<title>` that
     htmx moves into the tab title ("My documents (4 of 6 finished)")."""
     course_id = course if JOB_ID.match(course) else None
-    if redirect := poll.fragment_or_redirect(
-        request, f"/courses/{course_id}" if course_id else "/app"
-    ):
-        return redirect
     ctx = get_ctx(request)
+    if not poll.is_htmx(request):  # opened as a page: the page that holds the list
+        return RedirectResponse(_list_page(ctx, user, course_id), status_code=303)
     spend_closed = conversions_closed(ctx, user) is not None
     now = utcnow()
     # The list of one course's documents (the course page, T3-4) polls with its own id.
@@ -1908,7 +1917,7 @@ def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Res
     says the new state once. Without scripts the page's "Refresh the status" link reloads it.
     """
     job = load_job_status(request, job_id, user)
-    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job.id}"):  # the stored id
         return redirect
     context = status_context(request, job)
     if v and v == context["status_version"]:
@@ -1935,7 +1944,7 @@ def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> R
     with session_scope(ctx.factory) as session:
         row = job_access(session, job_id, user, VIEW)
         job = job_view(session, row, role=shares.role_of(session, row, user) or VIEW)
-    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job_id}"):
+    if redirect := poll.fragment_or_redirect(request, f"/jobs/{job.id}"):  # the stored id
         return redirect
     if v and v == job.progress_version:
         return Response(status_code=204)

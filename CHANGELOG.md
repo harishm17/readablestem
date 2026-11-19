@@ -23,6 +23,13 @@
   and nothing of the equation. An equation with a reading that fits is still written in words.
 - A blank or checkbox cut by the edge of a link or of struck text is written, and said, once.
 - docs/deploy.md and docs/deploy-railway.md "Roll back" state the 0.5.12 limit.
+- Code scanning (five alerts on the pull request): the addresses a person is sent on to after a
+  problem report, a new reading of an item, a page of bulk accepts, and a fragment opened as a
+  page are built from the stored job's, upload's, course's and element's ids, not from the
+  address or form that was sent. All were paths on this site already; a report about an item
+  the document does not have now leads back to the job page. The contact line's two patterns
+  are anchored and match a text in one way only; a host with an empty label
+  (`example..edu`, `example.edu./x`) is now refused.
 - Not changed, recorded as open: the job page does not yet say how many equations a Word file
   holds in words (the route logs the count, `docx_equations_as_words`); a page read without its
   ActualText raises no notice when the two readings differ. No model request changed.

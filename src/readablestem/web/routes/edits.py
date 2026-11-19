@@ -592,14 +592,17 @@ def _after_item(
     owned_id: str, result: DocumentResult, element_id: str, view: str, flt: str
 ) -> Response:
     """Where the reviewer lands after a new reading on an item's card: the item, to check
-    what was read."""
+    what was read. The address holds the stored element's id, not the one the form sent."""
     from readablestem.web.routes.review import keep_filter, list_url
     from readablestem.web.routes.split import review_url
 
+    stored = next((e.id for e in result.elements if e.id == element_id), None)
+    if stored is None:  # the write took it out: the screen, at its first item
+        return RedirectResponse(review_url(owned_id), status_code=303)
     if view == "list":
-        where = list_url(owned_id, review_anchor(result, element_id))
+        where = list_url(owned_id, review_anchor(result, stored))
         return keep_filter(RedirectResponse(where, status_code=303), flt)
-    where = review_url(owned_id, item=element_id, anchor="decision-title")
+    where = review_url(owned_id, item=stored, anchor="decision-title")
     return RedirectResponse(where, status_code=303)
 
 

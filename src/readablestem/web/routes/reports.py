@@ -38,9 +38,12 @@ router = APIRouter()
 TEXT_FIELD = "report-text"
 
 
-def _back(job_id: str, item: str | None) -> str:
-    """Where the person was, built from ids that passed `reports.clean_item`."""
-    return f"/jobs/{job_id}/review?item={item}" if item else f"/jobs/{job_id}"
+def _back(where: reports.Where) -> str:
+    """Where the person was, built from the stored job's and the stored element's ids
+    (`reports.where_of`), not from what the form sent."""
+    if where.card:
+        return f"/jobs/{where.job_id}/review?item={where.card}"
+    return f"/jobs/{where.job_id}"
 
 
 def _page(
@@ -61,7 +64,7 @@ def _page(
         "job_id": job_id,
         "doc_title": title,
         "where": where,
-        "back": _back(job_id, where.item_ref),
+        "back": _back(where),
         "text": text,
         "max_text": reports.MAX_TEXT,
         "closed_days": reports.CLOSED_DAYS,
@@ -109,4 +112,4 @@ def send_report(
         undo=False,
         kind="success",
     )
-    return RedirectResponse(_back(job_id, where.item_ref), status_code=303)
+    return RedirectResponse(_back(where), status_code=303)

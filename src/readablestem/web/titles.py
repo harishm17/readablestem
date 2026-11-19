@@ -31,8 +31,10 @@ CONTACT_BAD = (
 )
 CONTACT_TOO_LONG = f"Use a contact line of {MAX_CONTACT} characters or fewer."
 
-_EMAIL = re.compile(r"[A-Za-z0-9.!#$%&*+=?^_{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+")
-_WEB = re.compile(r"https?://[^\s/<>\"']+\.[^\s/<>\"']+[^\s<>\"']*")
+# Anchored, and written so that a text matches in one way only: a long line that is neither
+# costs one pass over it.
+_EMAIL = re.compile(r"^[A-Za-z0-9.!#$%&*+=?^_{|}~-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+$")
+_WEB = re.compile(r"^https?://[^\s/?#<>\"'.]+(?:\.[^\s/?#<>\"'.]+)+(?:[/?#][^\s<>\"']*)?$")
 
 
 class Invalid(ValueError):

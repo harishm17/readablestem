@@ -102,6 +102,7 @@ def test_an_owner_and_a_reviewer_write_a_report_a_reader_and_a_stranger_cannot(s
         },
     )
     assert forged.status_code == 303 and stored(site)[-1].item_ref is None
+    assert forged.headers["location"] == f"/jobs/{site.job_id}"  # built from the stored job
 
 
 def test_only_an_admin_reads_the_reports_and_the_text_is_escaped(site):

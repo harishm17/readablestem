@@ -170,7 +170,9 @@ def accept(
         flash(
             request, f"{message} Undo is on the review screen. {rest}", undo=False, kind="success"
         )
-        return RedirectResponse(f"/jobs/{job_id}/accept/{slug}?view={view}", status_code=303)
+        # The stored job's id and the kind's own name, not the address asked for.
+        where = f"/jobs/{owned_id}/accept/{spec.slug}?view={view}"
+        return RedirectResponse(where, status_code=303)
     flash(request, message, element_id=GROUP_FLASH + slug, kind="success")
     if view == LIST_VIEW:
         return RedirectResponse(_landing(owned_id, result, changes[-1].element_id), status_code=303)

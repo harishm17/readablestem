@@ -55,6 +55,9 @@ class Where:
     page: int | None = None  # 1-based, as people count pages
     code: str | None = None
     pipeline_version: str | None = None
+    # The card's id as the stored document has it (for the way back); None when the document
+    # has no such card. Not stored with the report.
+    card: str | None = None
 
 
 def clean_item(raw: str | None) -> str | None:
@@ -83,8 +86,9 @@ def where_of(job: Job, item: str | None) -> Where:
         return where
     # A repeated-heading card ("hg-p1-e7") or a page card ("pg-p2-e0") is named by its first
     # element: it is a "group", on that element's page.
-    grouped = where.item_ref.startswith(GROUP_PREFIXES)
-    wanted = where.item_ref[3:] if grouped else where.item_ref
+    prefix = next((p for p in GROUP_PREFIXES if where.item_ref.startswith(p)), "")
+    grouped = bool(prefix)
+    wanted = where.item_ref[len(prefix) :]
     for element in result.get("elements") or []:
         if isinstance(element, dict) and element.get("id") == wanted:
             kind = element.get("kind")
@@ -93,6 +97,7 @@ def where_of(job: Job, item: str | None) -> Where:
                 where,
                 item_kind=GROUP_KIND if grouped else kind[:16] if isinstance(kind, str) else None,
                 page=page + 1 if isinstance(page, int) and page >= 0 else None,
+                card=prefix + str(element["id"]),
             )
     return replace(where, item_kind=GROUP_KIND if grouped else None)
 
