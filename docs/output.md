@@ -245,7 +245,8 @@ our own would be a second MathML reader to keep right.
   words (above; `DocxExport.not_word` lists their element ids, `readablestem export docx`
   prints them, the route logs the count). The export fails (`equations`) rather than hand over
   a file with fewer equations than the HTML has `<math>` and no words in place of the missing
-  ones. A stored document picks this up the next time it is downloaded: the file is made on
+  ones, or one where an equation Word cannot hold has a reading too long to write (over 400
+  characters: only the sentence would be in the file). A stored document picks this up the next time it is downloaded: the file is made on
   request from the stored page.
 - **What it does not have.** The page's stylesheet (the styles are pandoc's own), the colors
   of the flagged boxes (their words and each image's alt text stay), inline SVG, remote
@@ -1271,9 +1272,12 @@ not 25 mL.", after the text it marks, in every output: a paragraph in the HTML (
 Common Cartridge and EPUB too), a paragraph in Word, a sentence in Listen. A struck date and
 the caret that gives the new one read "October 3 ... deleted ... Note on the page: October 10"; a
 caret the file calls a replacement says "Note on the page: replace with October 10". The notice
-`annotations_read` (optional) counts them, and `attachments_not_converted` (optional) names the
-files attached to the PDF ("The files: “rubric.txt”") on the job page. Neither adds a decision;
-the note paragraph is an ordinary one and an instructor may edit or remove it.
+`annotations_read` (required) counts them and keeps a finished job at "Ready" (`web.states`
+`_HOLDS`): a comment may have been written for the instructor alone, and every one is in the
+student file. `attachments_not_converted` (optional) names the files attached to the PDF ("The
+files: “rubric.txt”") on the job page. Neither adds a decision; the note paragraph is an
+ordinary one, whose words an instructor may change. No tool takes one paragraph out: the
+page can be left out, or the PDF uploaded again without the comment.
 
 `CONTENT_RUNS` (on by default since 2026-11-18, and in the production profile) is the
 rollout switch. Off, struck runs are found and counted in the trace (`deleted_runs`,

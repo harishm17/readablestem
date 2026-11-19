@@ -336,6 +336,11 @@ def test_one_equation_pandoc_cannot_write_does_not_fail_the_file():
     assert xml.count('<w:rStyle w:val="NotConverted" />') == 3
     assert "quote. This equation could not be written" in xml
     assert "$" not in xml and "mathbf" not in xml
+    # A reading too long to write would leave nothing of the equation in the file: no file.
+    long_reading = html.replace('alttext="quote"', f'alttext="{"a plus b " * 60}"')
+    with pytest.raises(ed.DocxExportError) as error:
+        ed.export_docx(long_reading)
+    assert error.value.code == "equations"
 
 
 LINKS = (

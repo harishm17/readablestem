@@ -1,12 +1,40 @@
 # Changelog
 
+## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
+
+- Migrations: `8b1d5f3a9e04` (the step facts, the head of the release of 2026-11-18) is back
+  where that release has it, after `c2f4a8d61e57`. `7b1d3e9a4c28` (`jobs.html_version`) and
+  `8b3d5f0e2a71` (`request_tokens`) had been put under it, so a database already at the
+  released head would have skipped both and called itself current. They now follow it, and
+  `4e8a1c7d9b35` follows them. Every migration file the release has is unchanged from it. One
+  regression test (a database at the released head gets every later migration).
+- A web address that the end of a printed line cuts gets no link (`text_pass.typed_addresses`,
+  `_wraps`): the first part alone was linked, and led to another page. It stays plain text, as
+  before this wave. The cost: an address that ends a line whole, with the sentence going on
+  below, is not linked either (nothing on the page tells the two apart). A line end the page
+  keeps (an address block) is not a cut. One regression test.
+- Comments in a PDF (`annotations_read`) are a required notice and keep a finished document at
+  "Ready", with the sentence "Comments in the PDF are in this file as paragraphs, so read them
+  before you share it": a comment may be the instructor's own note (an answer, a co-author's
+  remark). The notice's words no longer say a comment can be taken out with the page tools:
+  no tool takes one paragraph out (the page can be left out, or the PDF uploaded again).
+- Word export: when Word cannot hold an equation and its reading is too long to write (over
+  400 characters), the file is refused as before this wave, since it would hold the sentence
+  and nothing of the equation. An equation with a reading that fits is still written in words.
+- A blank or checkbox cut by the edge of a link or of struck text is written, and said, once.
+- docs/deploy.md and docs/deploy-railway.md "Roll back" state the 0.5.12 limit.
+- Not changed, recorded as open: the job page does not yet say how many equations a Word file
+  holds in words (the route logs the count, `docx_equations_as_words`); a page read without its
+  ActualText raises no notice when the two readings differ. No model request changed.
+
 ## Unreleased: pipeline 0.5.12 (integration/wave-1a)
 
 - `PIPELINE_VERSION` 0.5.12: the rest of the wave 0.5.11 began, raised once more because reports
   and records were made at 0.5.11 before the later changes (its comment in `pipeline/run.py`
   lists what a PDF's result now holds). Results from 0.5.10 and 0.5.11 load unchanged and their
-  page is made again. A release at this version is not rolled back past it once a result with
-  the new run kinds or a table's `header_source` is stored.
+  page is made again. A release at this version is not rolled back past it once a document
+  has been converted: the release before it refuses a link of kind `typed`, the new notice
+  codes and the origin `docx` (docs/deploy.md "Roll back").
 - The two reports CI gates were re-made at 0.5.12 by command (`latest-headings.json` with the
   fake client, `latest-tables-local.json`); both pass `eval gate --require-current`.
 - The replay record `data/eval/burden-corpus.json` was re-made: 43 of the 73 uploads, 117
@@ -405,8 +433,9 @@
   struck text keeps its mark beside it. A highlight with no comment adds nothing. The drawings of
   annotations are left out of the page's art where the page's drawings are first read
   (`layout/document.py` `_read_page`, through `page_type.without_annotation_art`); the hidden-text
-  check still sees them (a box over a line is a fake redaction). Two optional notices:
-  `annotations_read` (a count) and `attachments_not_converted` (a count and the file names, shown
+  check still sees them (a box over a line is a fake redaction). Two notices:
+  `annotations_read` (a count; required since review 3, see the top entry) and
+  `attachments_not_converted` (optional: a count and the file names, shown
   to the owner and kept in the record, never logged: `Notice.names`). On the seven annotation test
   files the figures went from 4 to 1 (the pen mark stays a handwriting figure), the
   "30 mL" note and the replacement date are present, and the struck date keeps its mark. The 73

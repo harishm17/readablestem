@@ -2913,8 +2913,8 @@ words it replaces; any other caret is the text alone. A highlight or underline w
 adds nothing and no new kind of run exists. The paragraph is made by the text pass, after the
 passage languages, so no model request changes (the context texts were cut before). Ids are one past the
 highest on the page and only `order` is renumbered. Layout keeps no `notes` field (WS16.3), so a
-note is a paragraph that an edit can take out like any other. The notice `annotations_read` (optional,
-the whole document, a count) says how many were read.
+note is a paragraph whose words an edit can change like any other. The notice `annotations_read`
+(required, the whole document, a count) says how many were read, and holds the job at "Ready".
 
 An attached file (an annotation on a page or an entry of the file's embedded files) is not
 converted. The optional notice `attachments_not_converted` carries the count and, in

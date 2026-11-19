@@ -40,8 +40,10 @@ file: the filter tries each equation once and writes, where it cannot, the equat
 and the words "This equation could not be written as a Word equation; it is complete on the
 web page" in the "Not Converted" style (`DocxExport.not_word` lists their element ids; the
 failure is said in the file, never hidden). If the count still does not add up (an equation
-lost with nothing said) the export fails (`DocxExportError("equations")`) rather than hand
-over a file that silently lacks an equation; the HTML and EPUB stay available.
+lost with nothing said), or such an equation's reading is too long to write (`_READING_MAX`:
+the file would hold the sentence and nothing of the equation), the export fails
+(`DocxExportError("equations")`) rather than hand over a file that lacks an equation; the HTML
+and EPUB stay available.
 
 What is not carried: scripts and styles (the Word styles are pandoc's), inline SVG,
 remote pictures, the page markers, and the colours of the flagged boxes (the words of a flag
@@ -325,13 +327,15 @@ def _normal(text: str) -> str:
 _READING_MAX = 400
 
 
-def _mark_equations(root: _Node, token: str) -> list[str]:
+def _mark_equations(root: _Node, token: str) -> tuple[list[str], set[int]]:
     """Wrap every `<math>` in `<span data-eq="TOKEN-N" data-reading="...">`, so the filter
     can try each equation and write words where Word cannot hold it (`data/export_docx.lua`).
     The reading is the stored speech (`alttext`) or else the equation's own characters.
     Returns the element id of each equation (the nearest id on or above it, "" when none),
-    by N."""
+    by N, and the N of each equation whose reading is too long to write: the file would hold
+    nothing of such an equation if Word cannot hold it."""
     ids: list[str] = []
+    unsaid: set[int] = set()
     for node in [n for n in root.walk() if n.tag == "math"]:
         holder: _Node | None = node
         while holder is not None and not holder.attrs.get("id"):
@@ -341,10 +345,12 @@ def _mark_equations(root: _Node, token: str) -> list[str]:
         attrs = {"data-eq": f"{token}-{len(ids) - 1}"}
         if 0 < len(reading) <= _READING_MAX:
             attrs["data-reading"] = reading
+        elif reading:
+            unsaid.add(len(ids) - 1)
         span = _Node("span", attrs, [node])
         _replace(node, [span])
         node.parent = span
-    return ids
+    return ids, unsaid
 
 
 def _failed(said: str, token: str) -> set[int]:
@@ -589,7 +595,7 @@ def export_docx(
     _prepare(root)
     _webp_to_png(root)
     token = secrets.token_hex(6)
-    equation_ids = _mark_equations(body, token)
+    equation_ids, unsaid = _mark_equations(body, token)
     _land_links(body)
     n_math = len(equation_ids)
     n_headings = sum(1 for n in body.walk() if _HEADING.match(n.tag))
@@ -601,7 +607,7 @@ def export_docx(
     data, said = _run_pandoc(document, lang, program, timeout_s)
     data, (equations, pictures, tables, headers, unlinked) = _rebuild(data, title)
     not_word = sorted(_failed(said, token) & set(range(n_math)))
-    if equations + len(not_word) != n_math:
+    if equations + len(not_word) != n_math or unsaid & set(not_word):
         raise DocxExportError("equations")
     if output_chars.count_in_zip(data, skip=_STYLE_PARTS):
         raise DocxExportError("unreadable_character")

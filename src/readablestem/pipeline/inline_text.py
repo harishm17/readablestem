@@ -332,12 +332,11 @@ def _inner(text: str, segments: Sequence[_Segment], tokens: Sequence[Run] = ()) 
     while i < len(segments):
         seg = segments[i]
         if seg.token is not None:
-            j = i
-            while j + 1 < len(segments) and segments[j + 1].token == seg.token:
-                j += 1  # one run cut by a link or colour edge is written once
+            # One run cut by a link, colour or struck edge is written once, whole, where it
+            # starts: its later pieces may be in another group of the callers above.
             run = tokens[seg.token]
-            out.append(_token(run.kind, text[segments[i].start : segments[j].end]))
-            i = j
+            if seg.start == run.start:
+                out.append(_token(run.kind, text[run.start : run.end]))
         elif seg.maths:
             out.append(seg.maths)
         elif seg.line_end:

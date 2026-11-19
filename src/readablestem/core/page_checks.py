@@ -109,7 +109,7 @@ ROWS: tuple[CheckLine, ...] = (
     ),
     _page("link_scheme_dropped", "optional", "a link that is not http, https or mailto"),
     _page("link_text_unclear", "optional", "link text that says nothing on its own"),
-    _document("annotations_read", "optional", "comments in the PDF's annotations, included"),
+    _document("annotations_read", "required", "comments in the PDF's annotations, included"),
     _document(
         "attachments_not_converted", "optional", "files attached to the PDF", not_checked=True
     ),

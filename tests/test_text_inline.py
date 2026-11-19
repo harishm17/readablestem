@@ -207,6 +207,19 @@ def test_struck_text_is_written_as_del_and_said_as_deleted():
     assert unmarked.added == {}
 
 
+@pytest.mark.parametrize("edge", ["deleted", "link"])
+def test_a_blank_that_a_struck_or_link_edge_cuts_is_said_once(edge):
+    text = "Name: ______ here"
+    blank = Run(start=6, end=12, kind="blank")
+    cut = (
+        dict(runs=[blank, Run(start=9, end=17, kind="deleted")])
+        if edge == "deleted"
+        else dict(runs=[blank], links=[uri(9, 17)])
+    )
+    out = html(paragraph(text, **cut))
+    assert out.count(">blank<") == 1 and out.count("______") == 1
+
+
 # --------------------------------------------------------------------------- bold, italic, code
 
 

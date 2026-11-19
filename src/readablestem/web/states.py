@@ -695,6 +695,11 @@ _HOLDS = {
     "option_labels": (
         "Answer options may be run together, so check the notices before you share it."
     ),
+    # `text_pass.comment_notes`: a comment may have been written for the instructor alone (an
+    # answer, a co-author's remark), and every one is a paragraph of the student file
+    "annotations_read": (
+        "Comments in the PDF are in this file as paragraphs, so read them before you share it."
+    ),
 }
 
 

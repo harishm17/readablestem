@@ -368,6 +368,23 @@ def test_an_address_typed_in_the_text_becomes_a_link(text, expected):
     assert links_of(result, "p1-e0") == [("typed", shown, href) for shown, href in expected]
 
 
+@pytest.mark.parametrize(
+    ("first", "second", "expected"),
+    [
+        # The line cut the address: its first part alone would be a link to another page.
+        ("Hand in at https://example.org/courses/12/view?", "id=5678 by noon.", []),
+        ("Hand in at https://example.org/courses/12/sub", "missions/new today.", []),
+        # The whole address is on the second line.
+        ("Hand in your work", "at https://example.org/a today.", ["https://example.org/a"]),
+    ],
+)
+def test_an_address_that_the_line_end_cuts_gets_no_link(first, second, expected):
+    text = f"{first} {second}"
+    glyphs = [*line(first), *line(second, y=114.0)]
+    result = annotate([el("p1-e0", text=text, bbox=(72, 98, 572, 126))], pdf_with(glyphs))
+    assert [shown for _, shown, _ in links_of(result, "p1-e0")] == expected
+
+
 def test_an_address_the_file_already_links_gets_no_second_link():
     text = "Syllabus at https://example.org/s here."
     link = PdfLink(0, rect_of(text, "https://example.org/s"), "uri", uri="https://example.org/s")
@@ -777,7 +794,7 @@ def test_a_reviewers_comments_are_notes_after_the_text_they_mark_and_attached_fi
     struck = [(e.text or "")[r.start : r.end] for e in result.elements for r in e.runs]
     assert [s for s in struck if s != ""][:2] == ["May 1", "June 1"]
     (read,) = [n for n in result.notices if n.code == "annotations_read"]
-    assert read.count == 5 and read.review == "optional" and read.page is None
+    assert read.count == 5 and read.review == "required" and read.page is None
     (attached,) = [n for n in result.notices if n.code == "attachments_not_converted"]
     assert attached.count == 2 and sorted(attached.names) == ["datasheet.txt", "rubric.txt"]
     # The ids stay what layout gave them: only the notes are new, one past the highest.

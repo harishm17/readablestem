@@ -273,9 +273,10 @@ log = logging.getLogger(__name__)
 # a table with no header cell is a required choice (`header_source`); links come from typed
 # addresses, numbered references and a LaTeX or Word file's own references; the document's
 # language is settled once. Results from 0.5.10 and 0.5.11 load unchanged and their page is
-# made again (`assemble.RENDER_VERSION` 8). An older release cannot read a result that holds
-# the new run kinds or `header_source`, so a deploy of this version is not rolled back past it
-# once such a result is stored.
+# made again (`assemble.RENDER_VERSION` 8). An older release refuses a result that holds a
+# value its closed lists do not have (a link of kind "typed", a new notice code, the origin
+# "docx"), so a deploy of this version is not rolled back past it once a document has been
+# converted (docs/deploy.md "Roll back").
 PIPELINE_VERSION = "0.5.12"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)

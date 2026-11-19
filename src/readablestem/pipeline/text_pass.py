@@ -732,16 +732,23 @@ def _address_end(text: str, start: int, end: int) -> int:
     return end
 
 
-def typed_addresses(text: str, taken: Sequence[Link] = ()) -> list[Link]:
+def typed_addresses(
+    text: str, taken: Sequence[Link] = (), wraps: Callable[[int], bool] | None = None
+) -> list[Link]:
     """Links for the web and email addresses typed in one element's text that the file
     gives no link: "https://...", "http://...", "www...." and "name@host.tld". The text is
     as layout joined it, so an address broken across a line end is whole only where layout
-    joined it. Each passes `is_safe_href`; none overlaps a `taken` link or an inline marker."""
+    joined it without a space. `wraps(offset)`: does the page go to a new line there with
+    the text going on (`_wraps`)? A web address that stops there may be the first part of a
+    longer one, so it gets no link and stays the plain text it was. Each link passes
+    `is_safe_href`; none overlaps a `taken` link or an inline marker."""
     candidates: list[tuple[int, int, str]] = []
     for match in _URL_TEXT.finditer(text):
         start = match.start()
         if start and text[start - 1].isalnum():
             continue  # the end of a longer word, not an address
+        if wraps is not None and wraps(match.end()):
+            continue  # cut by the line: a link to the first part would go somewhere else
         end = _address_end(text, start, match.end())
         shown = text[start:end]
         href = shown if shown.lower().startswith("http") else f"https://{shown}"
@@ -1632,12 +1639,40 @@ class TextPassResult:
         }
 
 
-def _guessed_links(element: Element, own: list[Link], targets: _Targets) -> list[Link]:
+def _wraps(element: Element, aligner: _Aligner) -> Callable[[int], bool]:
+    """For `typed_addresses`: is the character before offset `at` of the element's text the
+    last of a printed line, with more of the text on a later line? Not at a line end the page
+    keeps (a "break" run: an address block, a list of links), where each line is whole; and
+    not where the glyphs of either side were not placed (nothing is known there)."""
+    text = element.text or ""
+
+    def wraps(at: int) -> bool:
+        after = next((i for i in range(at, len(text)) if not text[i].isspace()), None)
+        if not at or after is None:
+            return False
+        if any(r.kind == "break" and r.start < after and at < r.end for r in element.runs):
+            return False
+        glyphs, alignment = aligner.of(element)
+        last, first = alignment[at - 1], alignment[after]
+        if last is None or first is None:
+            return False
+        top, bottom = glyphs[last].bbox[1], glyphs[last].bbox[3]
+        return not top <= (glyphs[first].bbox[1] + glyphs[first].bbox[3]) / 2 <= bottom
+
+    return wraps
+
+
+def _guessed_links(
+    element: Element,
+    own: list[Link],
+    targets: _Targets,
+    wraps: Callable[[int], bool] | None = None,
+) -> list[Link]:
     """`own`, the links the file (or layout) gave `element`, with the addresses typed in its
     text with no link, then the references by number, added. The file's links keep their
-    words, and nothing is linked inside maths."""
+    words, and nothing is linked inside maths. `wraps`: see `typed_addresses`."""
     text = element.text or ""
-    links = sorted([*own, *typed_addresses(text, own)], key=lambda k: k.start)
+    links = sorted([*own, *typed_addresses(text, own, wraps)], key=lambda k: k.start)
     if element.kind in RUNNING_KINDS:
         links = sorted(
             [*links, *crossrefs(text, targets, links, element.id)], key=lambda k: k.start
@@ -1699,7 +1734,7 @@ def annotate(
             if unclear_link_text(shown, context_words(element.text, link.start, link.end)):
                 unclear[(element.page, element.id)] += 1
         # Neither is a link of the file, so neither is judged for its text above.
-        own = _guessed_links(element, own, targets)
+        own = _guessed_links(element, own, targets, _wraps(element, aligner))
         if own:
             links[element.id] = own
     coloured: dict[str, list[ColourRun]] = {}

@@ -9,7 +9,7 @@ NULL, which the app fills in the first time it looks at the row (`Job.has_html`)
 downgrade drops the column.
 
 Revision ID: 7b1d3e9a4c28
-Revises: c2f4a8d61e57
+Revises: 8b1d5f3a9e04
 Create Date: 2026-11-17 09:00:00.000000+00:00
 """
 
@@ -21,7 +21,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "7b1d3e9a4c28"
-down_revision: str | Sequence[str] | None = "c2f4a8d61e57"
+down_revision: str | Sequence[str] | None = "8b1d5f3a9e04"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

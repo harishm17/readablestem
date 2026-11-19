@@ -15,7 +15,7 @@ Document-derived: deleted with the job (`ondelete=CASCADE`, and `ops.retention`)
 Additive: an older release neither reads nor writes them. The downgrade drops all three.
 
 Revision ID: 8b1d5f3a9e04
-Revises: 8b3d5f0e2a71
+Revises: c2f4a8d61e57
 Create Date: 2026-11-11 16:00:00.000000+00:00
 """
 
@@ -27,7 +27,7 @@ import sqlalchemy as sa
 from alembic import op
 
 revision: str = "8b1d5f3a9e04"
-down_revision: str | Sequence[str] | None = "8b3d5f0e2a71"
+down_revision: str | Sequence[str] | None = "c2f4a8d61e57"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 

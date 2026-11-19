@@ -817,6 +817,14 @@ table returns 500 on its job page and review screens (the download still works) 
 traffic goes forward again; jobs without tables, and the schema, are fine. Roll back
 below 0.4.0 only for a short time, or not at all.
 
+The same limit stands at 0.5.12. A result it stores can hold values the release before
+it (0.5.10) refuses to load: a link of kind `typed` (an address typed in the text), the
+notice codes that are new (`colour_used`, `struck_text`, `annotations_read`,
+`source_not_compared` and others), the run kinds, and the origin `docx`. A rollback below
+0.5.12 is safe only until the first document is converted, or converted again, by the new
+release: after that each such document returns 500 on its job page and review screens
+until traffic goes forward again. Once anything has been converted, fix forward.
+
 If data has to come back, restore a backup (this overwrites the instance's current
 data):
 

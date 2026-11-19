@@ -4121,7 +4121,8 @@ test fails when a table with a user id is added without it.
   lower case, `role` `view` or `review`; unique per document and address). Additive: nothing else
   changes, and the downgrade drops the table (the shares are lost, the documents are not).
   `a6c2e9f4b713` and `e1a7c3b95d24` above are no longer the head.
-- `8b3d5f0e2a71` (the one submit rule, after `c2f4a8d61e57`): the table `request_tokens`
+- `8b3d5f0e2a71` (the one submit rule, after `7b1d3e9a4c28`, which is after the released
+  `8b1d5f3a9e04`): the table `request_tokens`
   (`user_id`, nullable for account deletion's own row; `token`; `route`, the form key;
   `outcome`, the status, redirect target and notices; `created_at`), unique on
   `(user_id, token)`. Content-free: a random token, the form and the answer. Additive; the

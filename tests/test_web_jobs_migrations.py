@@ -39,9 +39,9 @@ CHAIN = [
     (RETRY, REVISED, RETRY_COLUMNS, {"step_records"}),
     (PARTS, RETRY, PARTS_COLUMNS, {"pending_uploads"}),
     (SAMPLE, PARTS, SAMPLE_COLUMNS, set()),
-    (HTML_VERSION, OUTCOMES, HTML_VERSION_COLUMNS, set()),
+    (STEP_FACTS, OUTCOMES, set(), {"job_calls", "job_stages", "job_not_finished"}),
+    (HTML_VERSION, STEP_FACTS, HTML_VERSION_COLUMNS, set()),
     (REQUEST_TOKENS, HTML_VERSION, set(), {"request_tokens"}),
-    (STEP_FACTS, REQUEST_TOKENS, set(), {"job_calls", "job_stages", "job_not_finished"}),
     (OUTPUT_VERSION, STATE_FACTS, {"output_version", "output_changed_at"}, set()),
 ]
 
@@ -93,6 +93,27 @@ def test_each_migration_downgrades_and_upgrades_again(tmp_path, revision, before
         assert columns(engine) >= added
         with engine.connect() as conn:
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_a_database_at_a_released_head_gets_every_later_migration(tmp_path):
+    """`STEP_FACTS` was the head of the release of 2026-11-18. A migration written later is
+    put after it: one placed under it is skipped by a database already stamped there, which
+    then reports itself current with a column and a table missing."""
+    url = f"sqlite:///{tmp_path}/released.db"
+    migrate(url, STEP_FACTS)
+    engine = create_engine(url)
+    try:
+        assert not columns(engine) & HTML_VERSION_COLUMNS
+        assert "request_tokens" not in inspect(engine).get_table_names()
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        assert columns(engine) >= HTML_VERSION_COLUMNS
+        assert "request_tokens" in inspect(engine).get_table_names()
     finally:
         engine.dispose()
 

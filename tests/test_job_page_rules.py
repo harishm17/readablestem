@@ -102,6 +102,8 @@ def test_a_notice_no_decision_stands_behind_holds_back_ready_to_share():
     held = state("office_tracked_changes", "required")
     assert held.key == "ready_remains" and "tracked changes" in held.message
     assert state("rtl_text", "required").key == state("option_labels", "required").key == held.key
+    # a PDF's comments are in the student file, and one may be the instructor's own note
+    assert state("annotations_read", "required").key == held.key
 
 
 def test_a_text_decision_is_what_holds_the_job_not_its_notice():
