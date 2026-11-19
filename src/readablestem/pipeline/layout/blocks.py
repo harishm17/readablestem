@@ -795,10 +795,33 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
     found: dict[int, int] = {}
     for group in groups:
         glyphs = sum(len(r.ink) for r in group)
-        if glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT):
+        if (
+            glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)
+        ) and not _is_quotation(group):
             for row in group:
                 found[id(row)] = id(group[0])
     return found
+
+
+# What only code has: brackets, operators, an assignment, a call ("print("), an option
+# (" -x"), a comment marker, or a line that ends in ":" with its body further right.
+_CODE_PUNCTUATION = re.compile(r"[{}\[\]<>;=_#\\|&^~$@]|\w\(|\s-\w|//|->")
+QUOTATION_MIN_WORDS = 8  # words in a block of monospaced lines that can be a quotation
+
+
+def _is_quotation(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines prose (a quotation set in a typewriter face) and not
+    code? Only when it has none of the punctuation code has, has a run of words, and a
+    sentence in it ends with a full stop, comma or the like. A shell command, a name, a
+    data line or a short snippet stays code."""
+    lines = [r.clean for r in group]
+    text = " ".join(lines)
+    if _CODE_PUNCTUATION.search(text):
+        return False
+    spread = max(r.x0 for r in group) - min(r.x0 for r in group)
+    if spread > 0.5 * group[0].size and any(line.endswith(":") for line in lines):
+        return False  # a block: "else:" and its body
+    return len(text.split()) >= QUOTATION_MIN_WORDS and any(c in text for c in ".,?!")
 
 
 def _pitch(row: _Row) -> list[float]:
@@ -850,6 +873,82 @@ def _code_text(rows: Sequence[_Row]) -> str:
             before = c
         lines.append(line.rstrip())
     return "\n".join(lines)
+
+
+_ALGORITHM_CAPTION = re.compile(r"algorithm\s+\d+\b", re.IGNORECASE)
+_STEP_WORD = re.compile(
+    r"(?:\d+\s*[:.)]?\s*)?(?:for(?:\s?each|\s?all)?|if|else(?:\s?if)?|elif|while|repeat|until"
+    r"|end(?:\s\w+)?|return|input|output|require|ensure|procedure|function|do|then|loop|break"
+    r"|continue)\b",
+    re.IGNORECASE,
+)
+ALGORITHM_MIN_ROWS = 3  # steps under the caption that make an algorithm
+ALGORITHM_MIN_WORDS = 2  # of them, steps that begin with a step word ("for", "end if", "return")
+ALGORITHM_MAX_PITCH = 2.2  # x font size: step to step
+ALGORITHM_INDENT = 2  # spaces written for one indent level
+
+
+def _algorithm_groups(rows: Sequence[_Row]) -> dict[int, int]:
+    """The steps of an algorithm, by `id(row)`, with the number of the algorithm they are in.
+
+    The rows after a line that opens "Algorithm 3" (a caption; the line stays its own
+    block): in one column and one size, a line pitch apart, each one starting with a
+    step word (for, if, while, end, return, input, output ...), or a line of maths (a
+    step that is a formula: "c <- c + 1"), or further right than the first step (what a
+    loop or a branch holds, so a wrapped step stays with its step). The first line that
+    is none of these ends the group. Fewer than `ALGORITHM_MIN_ROWS` steps, or
+    `ALGORITHM_MIN_WORDS` of them with a step word, is a sentence that begins "Algorithm
+    1 ..." and not a caption. Its maths rows become text, so a formula stays a formula
+    inside its line (an inline equation)."""
+    found: dict[int, int] = {}
+    index = 0
+    while index < len(rows):
+        caption = rows[index]
+        index += 1
+        if caption.kind != "text" or not _ALGORITHM_CAPTION.match(caption.clean):
+            continue
+        group: list[_Row] = []
+        for row in rows[index:]:
+            prev = group[-1] if group else caption
+            if (
+                row.column != caption.column
+                or abs(row.size - caption.size) > 0.5
+                or not 0.5 * prev.size
+                <= row.baseline - prev.baseline
+                <= ALGORITHM_MAX_PITCH * prev.size
+            ):
+                break
+            region = row.region
+            maths = row.kind == "math" and (
+                region is None or not (region.forced or region.labels or len(region.rows) != 1)
+            )
+            word = row.kind == "text" and _STEP_WORD.match(row.clean) is not None
+            further = bool(group) and row.x0 > group[0].x0 + 0.5 * row.size
+            if not (maths or word or (further and row.kind == "text")):
+                break
+            group.append(row)
+        words = sum(r.kind == "text" and _STEP_WORD.match(r.clean) is not None for r in group)
+        if len(group) >= ALGORITHM_MIN_ROWS and words >= ALGORITHM_MIN_WORDS:
+            for row in group:
+                row.kind, row.region = "text", None
+                found[id(row)] = id(group[0])
+            index += len(group)
+    return found
+
+
+def _indents(rows: Sequence[_Row]) -> list[int]:
+    """The indent level of each row: its distance from the leftmost row, in steps of the
+    smallest distance between two different left edges."""
+    left = min(r.x0 for r in rows)
+    edges = sorted({round(r.x0 - left, 1) for r in rows})
+    steps = [b - a for a, b in pairwise(edges) if b - a >= 0.5 * rows[0].size]
+    unit = min(steps) if steps else 0.0
+    if unit <= 0:
+        return [0] * len(rows)
+    return [min(ALGORITHM_MAX_DEPTH, round((r.x0 - left) / unit)) for r in rows]
+
+
+ALGORITHM_MAX_DEPTH = 12
 
 
 _ABSTRACT_LABEL = re.compile(r"abstract[.:]?", re.IGNORECASE)
@@ -1016,6 +1115,8 @@ def _rtl_words(row: _Row) -> int:
 def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]:
     runs: list[_Run] = []
     code = _code_groups(rows)
+    steps = {k: v for k, v in _algorithm_groups(rows).items() if k not in code}
+    code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
     for row in rows:
@@ -1046,7 +1147,15 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                     run.add(row)
                     continue
                 run.block_end = True
-                runs.append(_Run([row], row.kind, block_start=True, code=id(row) in code))
+                runs.append(
+                    _Run(
+                        [row],
+                        row.kind,
+                        block_start=True,
+                        code=id(row) in code,
+                        algo=id(row) in steps,
+                    )
+                )
                 continue
             entry = hanging.get(id(row))
             if row.letter or prev.letter or (entry is not None and entry != hanging.get(id(prev))):
@@ -1092,6 +1201,7 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                     row.kind,
                     block_start=True,
                     code=id(row) in code and not row.note,
+                    algo=id(row) in steps and not row.note,
                     contents=bool(row.contents_level),
                     note=bool(row.note),
                 )
@@ -1221,6 +1331,17 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
             font_size=size,
             bold=all(r.bold for r in rows),
             contents_level=rows[0].contents_level,
+        )
+    if run.algo:
+        return _Block(
+            Kind.PARAGRAPH,
+            box,
+            rows,
+            font_size=size,
+            bold=False,
+            code=True,
+            algo=True,
+            indents=_indents(rows),
         )
     if run.code:
         return _Block(
@@ -1564,7 +1685,7 @@ def _gap_after(chars: list[_Char], start: int, end: int) -> bool:
 def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
-    if block.code:
+    if block.code and not block.algo:
         return [block.text or ""]  # kept as printed: lines, indentation, no inline maths
     pieces: list[str | _Inline] = []
     rows = list(block.rows)
@@ -1573,6 +1694,7 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
         rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
         _carry_page_math(first, rows[0], block.marker.end)
     letters = _BoldLetters.start()
+    steps: list[list[str | _Inline]] = []
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
@@ -1632,7 +1754,14 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
             if _gap_after(row.chars, start, end):
                 row_pieces.append(" ")
         row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
+        if block.algo:
+            steps.append(_tidy(row_pieces))
+            continue
         _append_row(pieces, row_pieces, document=document, keep_line=block.lines)
+    if block.algo:  # one line to a step, its level as leading spaces; its maths stays maths
+        for depth, step in zip(block.indents, steps, strict=True):
+            pieces.extend([*(["\n"] if pieces else []), " " * (ALGORITHM_INDENT * depth), *step])
+        return pieces
     return _strip_teacher_tags(_tidy(pieces))
 
 
