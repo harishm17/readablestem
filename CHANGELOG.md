@@ -19,8 +19,6 @@
 - "Combine parts": each part is settled for decoration as its own page is, and the file is built
   once for its parts and kept like the other exports (3 parts of 30 pages took 0.75 to 2.5 s each
   time); it goes with any part.
-- Not built: a note on the job page for equations Word wrote as words (none in 22 tracked
-  documents and 73 recorded uploads).
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
