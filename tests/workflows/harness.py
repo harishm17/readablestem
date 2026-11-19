@@ -94,8 +94,8 @@ def owed_answers() -> dict[str, int]:
     count stands."""
     record = json.loads((corpus.REPO / "data/eval/burden-corpus.json").read_text(encoding="utf-8"))
     owed: dict[str, int] = {}
-    for upload, count in record["metrics"]["uploads"]["answers_missing"].items():
-        entry = upload.split("+")[0]
+    for name, count in record["metrics"]["uploads"]["answers_missing"].items():
+        entry = name.split("+")[0]
         owed[entry] = max(owed.get(entry, 0), count)
     return dict(sorted(owed.items()))
 
