@@ -1516,7 +1516,9 @@ def edit_table(
         if grid is None:
             message = "There is no grid read from the PDF that could be used for this table."
             raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
-        fix.table = TableFix(grid=grid.model_copy(deep=True))
+        found = any(c.header for c in grid.cells)
+        source = "layout" if found else "none"
+        fix.table = TableFix(grid=grid.model_copy(deep=True, update={"header_source": source}))
         fix.checks = table_checks(fix.table.grid, element)
         failed = [c for c in fix.checks if not c.passed]
         return failed, USE_LOCAL_NOTE
@@ -1648,6 +1650,8 @@ def _edit_headers(
         raise ReviewInvalid([FieldError(fid, message)], values)
     edited = with_header_col(with_header_row(grid, row), col)
     _refuse_new_problems(grid, edited, fid, "The headers were", values)
+    chosen = any(c.header for c in edited.cells)  # a person unticking both leaves no header
+    edited = edited.model_copy(update={"header_source": "reviewer" if chosen else "none"})
     fix.table = TableFix(grid=edited)
     fix.checks = table_checks(edited, element)
     first_row = "The first row is a header" if row else "The first row is not a header"

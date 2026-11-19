@@ -177,7 +177,7 @@ def test_the_first_row_made_a_header_and_back(tables):
         "passed the required checks and was saved." in page
     )
     edited = grid(tables, "p1-e1")
-    assert edited.header_rows == 1
+    assert (edited.header_rows, edited.header_source) == (1, "reviewer")
     assert {c.header for c in edited.cells if c.row == 0} == {"col"}
     assert {c.header for c in edited.cells if c.row > 0} == {None}
     body = panel(page)
@@ -195,7 +195,7 @@ def test_the_first_row_made_a_header_and_back(tables):
     # Neither: back to the proposal's grid, which has no header cell at all, so the
     # decision is open again (a required check fails).
     page = follow(tables, post(tables, "p1-e1", action="edit", change="headers"))
-    assert grid(tables, "p1-e1") == table_1_proposal()
+    assert grid(tables, "p1-e1") == table_1_proposal().model_copy(update={"header_source": "none"})
     fix = fix_of(tables, "p1-e1")
     assert (fix.status, fix.reviewed) == (Status.NEEDS_REVIEW, False)
     assert "a required check still fails, so the table still waits for your decision" in page
@@ -452,7 +452,11 @@ def test_the_grid_read_from_the_pdf_is_only_used_when_it_has_no_problem():
     result = result_with(plain([["x"], ["y"]]), local=good)
     apply_review(result, "p1-e0", "edit", {"change": "use_local"})
     fix = result.fix_for("p1-e0")
-    assert fix is not None and fix.table is not None and fix.table.grid == good
+    assert (
+        fix is not None
+        and fix.table is not None
+        and fix.table.grid == good.model_copy(update={"header_source": "layout"})
+    )
     assert fix.table.grid is not good  # a copy: the element's grid stays as layout made it
 
 

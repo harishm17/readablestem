@@ -570,7 +570,9 @@ class _Reader:
                 c.model_copy(update={"header": "col"}) if c.row < header_rows else c
                 for c in grid.cells
             ]
-            grid = grid.model_copy(update={"cells": cells, "header_rows": header_rows})
+            grid = grid.model_copy(
+                update={"cells": cells, "header_rows": header_rows, "header_source": "source"}
+            )
         element.table = grid
         fix = Fix(
             element_id=element.id,

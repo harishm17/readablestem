@@ -564,6 +564,45 @@ def test_a_full_width_header_in_the_body_is_a_section_heading():
     )
 
 
+@pytest.mark.parametrize(
+    ("rows", "stored", "source", "status"),
+    [
+        # no header: a choice for a person
+        ([["1", "9.8"], ["2", "19.6"]], (0, 0), "none", Status.NEEDS_REVIEW),
+        # a header row
+        (
+            [[head("t (s)"), head("v (m/s)")], ["1", "9.8"], ["2", "19.6"]],
+            (1, 0),
+            "model",
+            Status.ACCEPTED,
+        ),
+        # a header column: labels with values, no header row
+        (
+            [[rowh("Earth"), "9.8"], [rowh("Moon"), "1.6"]],
+            (0, 1),
+            "model",
+            Status.ACCEPTED,
+        ),
+        # both: column labels over a column of row labels
+        (
+            [[head("Body"), head("g (m/s2)")], [rowh("Earth"), "9.8"], [rowh("Moon"), "1.6"]],
+            (1, 1),
+            "model",
+            Status.ACCEPTED,
+        ),
+    ],
+    ids=["none", "row", "column", "both"],
+)
+def test_the_header_rows_and_columns_are_stored_with_where_they_came_from(
+    rows, stored, source, status
+):
+    printed = [[c["text"] if isinstance(c, dict) else c for c in row] for row in rows]
+    fix = run(by_model(cheap=answer(rows), main=answer(rows)), element(local(printed)))
+    grid = fix.table.grid
+    assert (grid.header_rows, grid.header_cols, grid.header_source) == (*stored, source)
+    assert fix.status is status
+
+
 def test_a_table_without_any_header_needs_review():
     rows = [["1", "9.8"], ["2", "19.6"]]
     fix = run(
@@ -679,23 +718,32 @@ def test_an_outage_on_the_cheap_model_falls_back_to_the_main_model_once():
     assert fix.calls[1].is_fallback and fix.status is Status.ACCEPTED
 
 
-def test_api_unavailable_proposes_the_local_grid_with_first_row_headers():
+@pytest.mark.parametrize(("evidence", "header_rows", "source"), [(1, 1, "layout"), (0, 0, "none")])
+def test_api_unavailable_proposes_the_local_grid_with_the_headers_layout_found(
+    evidence, header_rows, source
+):
     client = by_model()
     client.fail_models = {CHEAP_MODEL: "api_error", MAIN_MODEL: "timeout"}
-    pdf = local(FREE_FALL).model_copy(update={"header_rows": 0})
+    pdf = local(FREE_FALL).model_copy(update={"header_rows": evidence})
+    if not evidence:
+        pdf = pdf.model_copy(
+            update={"cells": [c.model_copy(update={"header": None}) for c in pdf.cells]}
+        )
     fix = run(client, element(pdf))
     assert (fix.status, fix.review, fix.reason) == (Status.NEEDS_REVIEW, "required", None)
     assert [c.outcome for c in fix.calls] == ["api_error", "timeout"]
     grid = fix.table.grid
     assert (grid.source, grid.header_rows, grid.header_cols, grid.caption) == (
         "local",
-        1,
+        header_rows,
         0,
         CAPTION,
     )
-    assert [c.header for c in grid.cells if c.row == 0] == ["col"] * 3
-    assert {c.header for c in grid.cells if c.row > 0} == {None}
-    assert codes(fix) == {"local_grid"}
+    # A first row is a header only when layout found it to be one; otherwise nothing is
+    # promoted and the table is a choice for a person (no_headers).
+    assert grid.header_source == source
+    assert {c.header for c in grid.cells if c.row == 0} == ({"col"} if evidence else {None})
+    assert codes(fix) == {"local_grid"} | ({"no_headers"} if not evidence else set())
 
 
 def test_api_unavailable_without_a_local_grid_keeps_the_image():

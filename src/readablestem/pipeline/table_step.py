@@ -94,10 +94,10 @@ Status rules, in order:
    read from the PDF that can be written (none, no text, or maths its text gives flat)
    ABSTAINED "not_data_table" (required; the image is kept). A grid of numbers
    (`numeric_grid`) is not written as text: its values would lose their columns. The
-   grid read from the PDF with first-row headers is proposed instead, NEEDS_REVIEW
+   grid read from the PDF with the header rows it found itself is proposed instead, NEEDS_REVIEW
    (check `table.kind`, code `numbers_not_a_table`);
 3. no usable answer from any attempt (the API unavailable, or answers that cannot be a
-   grid) -> the local grid with first-row headers, NEEDS_REVIEW (check `table.source`,
+   grid) -> the local grid with the header rows it found itself, NEEDS_REVIEW (check `table.source`,
    code `local_grid`); without a local grid FAILED "model_<outcome>" or "invalid_table";
 4. every check passed -> ACCEPTED, review "none";
 5. only notes failed (`NOTE_CODES`: spacing, a cosmetic maths style, row headers
@@ -530,8 +530,14 @@ def _header_policy(grid: TableGrid) -> tuple[TableGrid, bool]:
         elif header == "row" and cell.col not in row_columns:
             header = None
         out.append(cell if header == cell.header else cell.model_copy(update={"header": header}))
+    marked = any(c.header for c in out)
     policy = grid.model_copy(
-        update={"cells": out, "header_rows": header_rows, "header_cols": header_cols}
+        update={
+            "cells": out,
+            "header_rows": header_rows,
+            "header_cols": header_cols,
+            "header_source": "model" if marked else "none",
+        }
     )
     return policy, dropped
 
@@ -564,22 +570,27 @@ def numeric_grid(local: TableGrid) -> bool:
     return sum(any(ch.isdigit() for ch in text) for text in body) >= NUMERIC_SHARE * len(body)
 
 
-def first_row_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
-    """The local grid as a proposal when no model answer is usable: its first row as the
-    column headers (what the source most often does), no row headers."""
-    header_rows = 1 if local.rows > 1 else 0
+def layout_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
+    """The local grid as a proposal when no model answer is usable: the header rows the
+    reader of the PDF found itself (`header_source` "layout": a ruled line under the row, a
+    gap, a header the table reader marked), no row headers. Where it found none the grid has
+    no header cell (`header_source` "none") and a person chooses: a first row is never made
+    a header only because it is first."""
+    header_rows = local.header_rows if local.rows > local.header_rows else 0
     cells = [
         c.model_copy(update={"header": "col" if c.row < header_rows and not c.is_empty else None})
         for c in local.cells
     ]
+    found = any(c.header for c in cells)
     return local.model_copy(
         update={
             "cells": cells,
-            "header_rows": header_rows,
+            "header_rows": header_rows if found else 0,
             "header_cols": 0,
             "caption": caption,
             "is_data": True,
             "source": "local",
+            "header_source": "layout" if found else "none",
         }
     )
 
@@ -1164,7 +1175,7 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
             # Numbers written as loose items lose which value is in which column, and the
             # local check called the grid data: the verdict is doubted. The PDF's own grid
             # is proposed as a table, for a person to check against the image.
-            grid = first_row_headers(local, caption=caption_of(element))
+            grid = layout_headers(local, caption=caption_of(element))
             doubt = Check(
                 name="table.kind", passed=False, severity="warning", code="numbers_not_a_table"
             )
@@ -1180,7 +1191,7 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
         if local is not None:
             # No model could read it: the PDF's own grid, for a person to check. Its words
             # are the PDF's, so only its structure is checked.
-            grid = first_row_headers(local, caption=caption_of(element))
+            grid = layout_headers(local, caption=caption_of(element))
             source = Check(name="table.source", passed=False, severity="warning", code="local_grid")
             checks = [source, *structure_checks(grid), *flattened_check(grid)]
             return make(Status.NEEDS_REVIEW, grid=grid, checks=checks)

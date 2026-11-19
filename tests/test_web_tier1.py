@@ -471,17 +471,28 @@ def tables(tmp_path):
         yield env
 
 
-def test_the_button_sets_the_first_row_as_headers_and_settles_the_table(tables):
+def test_a_table_with_no_header_cell_is_a_choice_of_four_and_a_choice_settles_it(tables):
+    page = tables.browser.get(f"/jobs/{tables.job_id}/review?item=p1-e1").text
+    for answer in (
+        "Use the first row as headers",
+        "Use the first column as headers",
+        "Use the first row and column as headers",
+        "This grid is not a table",
+    ):
+        assert answer in page
+    assert "Accept without headers" not in page
     version = tables.job(tables.job_id).result_version
     post(
         tables,
         "/review/p1-e1",
         action="edit",
         change="headers",
-        header_row="on",
+        header_col="on",
         version=str(version),
     )
     result = DocumentResult.model_validate(tables.job(tables.job_id).result_json)
     fix = result.fix_for("p1-e1")
     assert fix is not None and fix.table is not None
-    assert fix.table.grid.header_rows == 1 and not fix.pending
+    grid = fix.table.grid
+    assert (grid.header_rows, grid.header_cols, grid.header_source) == (0, 1, "reviewer")
+    assert not fix.pending
