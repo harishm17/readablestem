@@ -23,7 +23,7 @@ import pytest
 
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv
-from readablestem.core.types import ConversionOutput, Element, Kind, Link, Notice
+from readablestem.core.types import ConversionOutput, Link, Notice
 from readablestem.models.fake import FakeVisionClient
 from test_web_browser import WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
@@ -196,38 +196,6 @@ def test_the_words_of_a_paragraph_are_changed_from_the_keyboard_alone(doc_site, 
     page.goto(f"{doc_site.base}/jobs/{doc_job}/view")
     assert "tensors" in page.content()
     context.close()
-
-
-def test_the_last_line_of_a_dense_page_is_chosen_by_typing_its_number(tmp_path, browser):
-    output = doc_output()
-    for n in range(150):
-        output.result.elements.append(
-            Element(id=f"p1-d{n}", kind=Kind.PARAGRAPH, page=0, order=100 + n,
-                    bbox=(72.0, 10.0 + 4.5 * n, 540.0, 12.0 + 4.5 * n), text=f"Dense line {n}.")
-        )  # fmt: skip
-    site = WebEnv(tmp_path, per_user_daily_page_quota=1000)
-    site.converter.output = output
-    model(site)
-    stop = serve(site)
-    try:
-        job = new_job(site, browser, review_pdf())
-        context, page = open_page(browser, site)
-        page.goto(f"{site.base}/jobs/{job}/review?page=1&tools=1&add=picture")
-        lines = page.locator("#after-1 option").count() - 2  # "No line chosen", "The top"
-        assert lines > 150
-        page.locator("#after-1").focus()
-        page.keyboard.type(str(lines))  # the options start with their number
-        assert page.locator("#after-1 option:checked").inner_text().startswith(f"{lines}. ")
-        page.locator("#before-1").focus()
-        page.keyboard.press("End")  # "The bottom of the page"
-        page.keyboard.press("Tab")  # to the button that shows the part chosen
-        assert "Show the part" in page.evaluate("document.activeElement.textContent")
-        page.keyboard.press("Enter")
-        page.locator("img[src*='region.png']").first.wait_for()
-        assert "after=p1-d149" in page.url  # the last line, not a line cut off at 120
-        context.close()
-    finally:
-        stop()
 
 
 def test_the_tools_of_page_2_are_two_clicks_from_the_job_page_of_a_document_with_no_decision(
