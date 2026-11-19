@@ -64,6 +64,18 @@
   added or changed), 1 false; none on the public corpus files. Regression tests: a dropped,
   added and changed accent (one test), and bulk accept leaving it out. No migration; a stored
   document keeps its checks until it is converted again.
+## Unreleased: a table's box does not take the next numbered question (branch fix/table-box-takes-next-question)
+
+- A box drawn over the next question of a numbered run was read as a table with that question
+  as a row ("8. Explain why cells are small.  (4 points)" under a three-row matching grid,
+  split as "E xplain"; the ruled answer box under it then grew the table over it, "box
+  extended along rules"). `tables._without_captions` now cuts a first or last line off the box
+  when it opens with the number that follows (precedes) the item just above (below) the box, at
+  that item's left edge, and the table has no numbered rows of its own there. The question is a
+  list item again; an unruled grid left with fewer than four lines of cells is text, as before
+  the question made it a table. One regression test.
+- A table whose box changes is sent to the table step with another picture, so its recorded
+  answer no longer matches (rule 10); the count is in the branch report.
 
 ## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
 
