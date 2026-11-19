@@ -278,6 +278,10 @@ class TableCell(BaseModel):
     # like any inline equation, and the page writes what it read into the cell
     # (`pipeline.table_math`).
     equation_id: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Words of `text` the source sets in bold, italic or a fixed-pitch face (a Word or LaTeX
+    # table; `strong`, `emphasis`, `code`, `highlight` runs, offsets into `text`). A PDF's
+    # cells have none, and a cell with maths has none.
+    runs: list[Run] = Field(default_factory=list, exclude_if=lambda v: not v)
 
     @property
     def is_empty(self) -> bool:

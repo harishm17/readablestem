@@ -87,6 +87,7 @@ from readablestem.source.ltx_reader import (
     MAX_DEPTH,
     MAX_ELEMENTS,
     MAX_MATH_CHARS,
+    COLOUR_NOTICE,
     SOURCE_UNREAD_NOTICE,
     TABLE_PICTURE,
     UNKNOWN_FIGURE_REASON,
@@ -96,6 +97,7 @@ from readablestem.source.ltx_reader import (
     headers_to_choose,
     link_internal,
     needs_decision,
+    style_runs,
 )
 
 Display = Literal["block", "inline"]
@@ -390,7 +392,10 @@ class _Reader:
                     if note:
                         emit(f" (note: {note})")
                 elif kind == "Code":
+                    start = length
                     emit(content[1])
+                    if length > start:
+                        spans.append(("code", start, length, None))
                 elif kind == "Quoted":
                     left, right = _QUOTES.get(content[0].get("t", ""), ("", ""))
                     emit(left)
@@ -415,6 +420,12 @@ class _Reader:
                             spans.append(("sub", start, length, None))
                         elif kind == "Strikeout":
                             spans.append(("deleted", start, length, None))
+                        elif kind == "Strong":
+                            spans.append(("strong", start, length, None))
+                        elif kind == "Emph":
+                            spans.append(("emphasis", start, length, None))
+                        elif kind == "Span" and "mark" in content[0][1]:
+                            spans.append(("highlight", start, length, None))
 
         visit(inlines, depth)
         raw = "".join(parts)
@@ -434,6 +445,8 @@ class _Reader:
     def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
         text = element.text or ""
         markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
+        for run in style_runs(text, spans):
+            inline.add(element, run)
         for kind, start, end, extra in spans:
             if start >= end or end > len(text):
                 continue
@@ -632,11 +645,11 @@ class _Reader:
                 for dr in range(row_span):
                     for dc in range(col_span):
                         taken.add((r + dr, c + dc))
-                text, latex, mathml = self._cell(cell[4])
+                text, latex, mathml, runs = self._cell(cell[4])
                 cells.append(
                     TableCell(
                         row=r, col=c, row_span=row_span, col_span=col_span,
-                        text=text, latex=latex, mathml=mathml,
+                        text=text, latex=latex, mathml=mathml, runs=runs,
                     )
                 )  # fmt: skip
                 c += col_span
@@ -670,30 +683,37 @@ class _Reader:
                     bounded.append(TableCell(row=r, col=c))
         return TableGrid(rows=height, cols=width, cells=bounded, caption=caption, source="local")
 
-    def _cell(self, blocks: list[Any]) -> tuple[str, str | None, str | None]:
-        """(text, latex, mathml) of a cell: its paragraphs joined by a space. A cell that holds
-        maths is also written as LaTeX with its words in `\\text{}`, when that converts."""
+    def _cell(self, blocks: list[Any]) -> tuple[str, str | None, str | None, list[Run]]:
+        """(text, latex, mathml, runs) of a cell: its paragraphs joined by a space. A cell that
+        holds maths is also written as LaTeX with its words in `\\text{}`, when that
+        converts, and has no runs."""
         words: list[str] = []
         pieces: list[str] = []
+        styled: list[tuple[str, int, int, object]] = []
         has_math = False
+        shown = 0
         for inlines in _paragraph_inlines(blocks):
-            text, _, _ = self._inline_text(inlines, owner=None)
+            text, spans, _ = self._inline_text(inlines, owner=None)
+            if text:
+                shift = shown + 1 if shown else 0
+                styled += [(k, a + shift, b + shift, e) for k, a, b, e in spans]
+                shown = shift + len(text)
             words.append(text)
             for item in _flat(inlines):
                 if item.get("t") == "Math":
                     has_math = True
         text = " ".join(w for w in words if w)
         if not has_math:
-            return text, None, None
+            return text, None, None, style_runs(text, styled)
         for inlines in _paragraph_inlines(blocks):
             pieces.append(_latex_of(inlines))
         latex = " ".join(p for p in pieces if p).strip()
         cleaned, mathml, failed = self._convert(latex, "inline")
         if failed or not mathml:
             self.report.math_failed += 1
-            return text, None, None
+            return text, None, None, []
         self.report.math_converted += 1
-        return text, cleaned, mathml
+        return text, cleaned, mathml, []
 
     def _flatten(self, rows: list[Any]) -> None:
         """A table too large for a grid: one list item per row, its cells joined by " | ". A
@@ -1111,6 +1131,8 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
         out.notices.append(make(CHANGES_NOTICE, count=changes))
     if facts.hidden_runs:
         out.notices.append(make(HIDDEN_NOTICE, count=facts.hidden_runs))
+    if facts.coloured:  # pandoc keeps no colour, so the file's is counted from its package
+        out.notices.append(make(COLOUR_NOTICE, count=facts.coloured))
     if facts.text_boxes:
         out.notices.append(make(BOXES_NOTICE, count=facts.text_boxes))
     if facts.headers_footers:

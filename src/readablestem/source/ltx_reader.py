@@ -91,6 +91,7 @@ BOX = (0.0, 0.0, 1.0, 1.0)
 UNKNOWN_FIGURE_REASON = "source_figure_missing"
 SOURCE_ERROR_NOTICE = "source_error"
 SOURCE_UNREAD_NOTICE = "source_unread"
+COLOUR_NOTICE = "colour_used"  # optional: passages in colour the converted file does not keep
 # A failed check that makes an item a required decision because the reader could not write
 # all of it faithfully: a formula LaTeX could not read, shown as its TeX in a table, heading or
 # caption; a picture taken out of a table cell. A check, not a reason: review shows a table's
@@ -145,6 +146,105 @@ def _classes(node: Node) -> set[str]:
 
 def _squash(text: str) -> str:
     return _SPACE.sub(" ", text).strip()
+
+
+# What a source says about how words are set: bold, italic, fixed-pitch and highlighted. A
+# reader collects them as spans (kind, start, end, None) of the text it writes and
+# `style_runs` makes the runs the PDF path writes (`text_pass.style_runs`).
+STYLE_KINDS = ("strong", "emphasis", "code", "highlight")
+
+
+def squashed(
+    raw: str, spans: list[tuple[str, int, int, object]]
+) -> tuple[str, list[tuple[str, int, int, object]]]:
+    """`raw` with runs of white space made one space and trimmed, and `spans` (offsets into
+    `raw`) moved to the same words in that text; a span with no words left is dropped."""
+    text = _SPACE.sub(" ", raw)
+    lead = len(text) - len(text.lstrip(" "))
+    text = text.strip()
+    moved = [0] * (len(raw) + 1)
+    position, previous = 0, False
+    for i, ch in enumerate(raw):
+        moved[i] = position
+        space = _SPACE.fullmatch(ch) is not None
+        if not (space and previous):
+            position += 1
+        previous = space
+    moved[len(raw)] = position
+    kept = []
+    for kind, a, b, extra in spans:
+        a, b = max(0, moved[a] - lead), min(len(text), max(0, moved[b] - lead))
+        if b > a:
+            kept.append((kind, a, b, extra))
+    return text, kept
+
+
+def style_runs(text: str, spans: list[tuple[str, int, int, object]]) -> list[Run]:
+    """The runs (`strong`, `emphasis`, `code`, `highlight`) of the style spans in `spans`,
+    offsets into `text`: what the PDF path writes for the same words. Spans of one kind are
+    joined where they touch or overlap; a style that covers `STYLE_SHARE` of the block's
+    letters and digits or more is the block's own (a theorem set in italic, a bold line) and
+    makes no run, except a highlight and an `\\emph` that stands upright in italic text; a run never holds an inline-equation marker; a piece
+    is kept only when it has a letter or a digit."""
+    from readablestem.core.types import INLINE_MARKER_RE
+    from readablestem.pipeline.text_pass import STYLE_SHARE
+
+    markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
+    plain = [not c.isspace() for c in text]
+    for a, b in markers:
+        plain[a:b] = [False] * (b - a)
+    found: list[Run] = []
+
+    def joined_of(kind: str, upright: bool = False) -> list[list[int]]:
+        joined: list[list[int]] = []
+        for _, start, end, _extra in sorted(
+            (s for s in spans if s[0] == kind and (s[3] == "upright") == upright),
+            key=lambda s: s[:3],
+        ):
+            if joined and start <= joined[-1][1]:
+                joined[-1][1] = max(joined[-1][1], end)
+            else:
+                joined.append([start, end])
+        return joined
+
+    for kind in STYLE_KINDS:
+        joined = joined_of(kind)
+        covered = sum(sum(plain[a:b]) for a, b in joined)
+        if kind != "highlight" and covered and covered >= STYLE_SHARE * sum(plain):
+            joined = []  # the block's own style
+        if kind == "emphasis":  # an `\\emph` in italic text: set apart by being upright
+            joined = [*joined, *joined_of(kind, upright=True)]
+        for a, b in joined:
+            cuts = [a, *(x for m in markers if a <= m[0] and m[1] <= b for x in m), b]
+            for start, end in zip(cuts[::2], cuts[1::2], strict=True):
+                while start < end and text[start].isspace():
+                    start += 1
+                while end > start and text[end - 1].isspace():
+                    end -= 1
+                if any(c.isalnum() for c in text[start:end]):
+                    found.append(Run(start=start, end=end, kind=kind))
+    return sorted(found, key=lambda r: (r.start, r.end))
+
+
+def _upright(item: Node) -> str | None:
+    """ "upright" for an `\\emph` LaTeXML sets upright (it stands in italic text)."""
+    classes = _classes(item)
+    return "upright" if "ltx_emph" in classes and "ltx_font_upright" in classes else None
+
+
+def _style_of(item: Node) -> str | None:
+    """How LaTeXML says an inline element is set: `\\textbf` and `{\\bf}` give
+    `ltx_font_bold`, `\\textit` and `\\emph` `ltx_font_italic`, `\\texttt` and `\\verb`
+    `ltx_font_typewriter`. An `\\emph` set upright (inside italic text, a theorem's) is the
+    emphasis there."""
+    classes = _classes(item)
+    if "ltx_font_bold" in classes:
+        return "strong"
+    if "ltx_font_italic" in classes or ("ltx_emph" in classes and "ltx_font_upright" in classes):
+        return "emphasis"
+    if "ltx_font_typewriter" in classes and _local(item.tag) != "pre":
+        return "code"
+    return None
 
 
 def _children(node: Node) -> list[Node]:
@@ -691,6 +791,8 @@ class _Reader:
                     spans.append((tag, start, length[0], None))
                 if classes & STRUCK and length[0] > start:
                     spans.append(("deleted", start, length[0], None))
+                if (look := _style_of(item)) and length[0] > start:
+                    spans.append((look, start, length[0], _upright(item)))
                 if tag == "span" and length[0] > start and (rgb := _style_colour(item)):
                     spans.append(("colour", start, length[0], rgb))
 
@@ -713,6 +815,9 @@ class _Reader:
 
     def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
         text = element.text or ""
+        if not element.preformatted:
+            for run in style_runs(text, spans):
+                inline.add(element, run)
         for kind, start, end, extra in spans:
             if start >= end or end > len(text):
                 continue
@@ -1493,7 +1598,7 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                 col_span = max(1, min(int(cell.get("colspan", "1")), 50))
             except ValueError:
                 row_span = col_span = 1
-            text = _squash("".join(_cell_text(cell)))
+            text, styled = squashed(*_cell_text(cell))
             latex = mathml = None
             maths = [m for m in cell.iter() if _local(m.tag) == "math"]
             if len(maths) == 1 and not _squash(_text_without_math(cell)):
@@ -1508,6 +1613,7 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                 TableCell(
                     row=r, col=col, row_span=row_span, col_span=col_span, text=text,
                     latex=latex, mathml=mathml, header=header,
+                    runs=[] if latex else style_runs(text, styled),
                 )
             )  # fmt: skip
             for dr in range(row_span):
@@ -1569,16 +1675,33 @@ def _lenient(grid: TableGrid) -> TableGrid | None:
     return plain if not grid_problems(plain) else None
 
 
-def _cell_text(cell: Node):
-    if cell.text:
-        yield cell.text
-    for child in _children(cell):
-        if _local(child.tag) == "math":
-            yield child.get("alttext") or "".join(child.itertext())
-        else:
-            yield from _cell_text(child)
-        if child.tail:
-            yield child.tail
+def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
+    """The text of a cell as written and the spans of its styled words (offsets into it)."""
+    parts: list[str] = []
+    spans: list[tuple[str, int, int, object]] = []
+    length = 0
+
+    def visit(item: Node) -> None:
+        nonlocal length
+        if item.text:
+            parts.append(item.text)
+            length += len(item.text)
+        for child in _children(item):
+            start = length
+            if _local(child.tag) == "math":
+                shown = child.get("alttext") or "".join(child.itertext())
+                parts.append(shown)
+                length += len(shown)
+            else:
+                visit(child)
+                if (look := _style_of(child)) and length > start:
+                    spans.append((look, start, length, _upright(child)))
+            if child.tail:
+                parts.append(child.tail)
+                length += len(child.tail)
+
+    visit(cell)
+    return "".join(parts), spans
 
 
 _LATEX_TEXT = {
