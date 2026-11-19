@@ -129,6 +129,43 @@ def test_a_record_kept_up_to_date_fails_a_change_in_either_direction(tmp_path, c
     assert "3 in the record" in capsys.readouterr().out
 
 
+def test_a_decision_of_a_high_band_that_became_optional_fails_the_bar(tmp_path, capsys):
+    """A rule that moves a risky decision to a note lowers the count and passes it; the bar
+    names the element. A record made before bands were kept is compared by the counts and says
+    the band check was not made."""
+
+    def lecture(*, asks: list[tuple[str, int]], optional: list[str]) -> list[Converted]:
+        decisions = [asked(0, "equation") | {"element": e, "band": b} for e, b in asks]
+        return [
+            Converted(
+                "w_lecture_5111",
+                pages=PAGES,
+                kinds=["typical"] * PAGES,
+                decisions=decisions,
+                optional=optional,
+            )
+        ]
+
+    before, after = tmp_path / "before.json", tmp_path / "after.json"
+    two = lecture(asks=[("p1-e2", 2), ("p3-e1", 4)], optional=[])
+    assert burden("--from", records(tmp_path, "a", two), "--out", before) == 0
+    # Band 4 becomes optional: the count falls, and that is allowed.
+    low = lecture(asks=[("p1-e2", 2)], optional=["p3-e1"])
+    assert burden("--from", records(tmp_path, "b", low), "--against", before) == 0
+    capsys.readouterr()
+    # Band 2 becomes optional: named.
+    high = lecture(asks=[("p3-e1", 4)], optional=["p1-e2"])
+    assert burden("--from", records(tmp_path, "c", high), "--against", before) == 1
+    assert "w_lecture_5111 p1-e2: a decision of band 2 before, optional now" in (
+        capsys.readouterr().out
+    )
+    # An earlier record without bands: the counts only, and the output says so.
+    plain = tmp_path / "plain.json"
+    assert burden("--from", records(tmp_path, "d", measured()), "--out", plain) == 0
+    assert burden("--from", records(tmp_path, "e", measured()), "--against", plain) == 0
+    assert "band check was not made" in capsys.readouterr().out
+
+
 def test_a_formula_accepted_with_nothing_to_hold_it_against_is_counted_by_cause(tmp_path):
     run = measured()
     run[0] = replace(

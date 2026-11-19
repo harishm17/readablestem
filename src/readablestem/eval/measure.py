@@ -128,6 +128,9 @@ class Converted:
     # (0-based, None when no element holds it), kind, reasons and members. None in a record
     # made before this was kept, which is not the same as a document that asks nothing.
     decisions: list[dict[str, Any]] | None = None
+    # The elements whose fix is optional, not a decision (`core.triage.tier_for`): with the
+    # decisions' bands, what `eval burden` reads to see a decision of band 1 or 2 become one.
+    optional: list[str] | None = None
     # The audit of the files built from the result (`eval.outputs.audit_document`): each
     # wrong place, what each output held and the outputs that could not be built. None
     # when the replay was not asked to build them.
@@ -478,6 +481,7 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
         own_peak_mb=own_peak_mb,
         parts=parts(result),
         decisions=[asdict(decision) for decision in triage.decisions(result)],
+        optional=sorted(f.element_id for f in result.fixes if triage.tier_for(f) == "optional"),
         outputs=audit,
         order=order_rows(upload.entry, pdf, result),
         error=TABLE_SEARCH_STOPPED if _table_search_stopped(facts) else "",
