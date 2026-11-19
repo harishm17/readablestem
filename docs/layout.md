@@ -1757,6 +1757,14 @@ figures), used as proposals (`apply`):
   text is the proposal, NEEDS_REVIEW and required, with the warning `figure.source_alt` /
   `source_alt_unchecked`. It is never written into the output unchecked.
 
+Lists and table header cells are not read from the tags (WS14.11, measured 2026-11-18): the
+only tagged files in the measured sets are generated test files (21 of 332 PDFs; no real
+upload is tagged), and on them layout already calls every list item a list item where the
+tag's text equals one element (37 of 37), and no tagged table sits over a grid that has no
+header cells (0 of 7). Read them when a real tagged file shows a missed list item or header
+cell: the generated files write `Lbl` then `NonStruct` (not `LBody`), a list item can wrap a
+heading, and a tag's header cells belong on the table step's answer, never in its request.
+
 Fixture: `tests/fixtures/tagged/` (HTML exported by LibreOffice as a tagged PDF, two
 edits to look like Word's export; `make_tagged_pdf.py`). The eval documents are printed
 untagged on purpose (`eval/render.py`), so the dev-v2 numbers do not move with this.
