@@ -390,7 +390,8 @@ def _list_markers(
             other is not None
             and _capital_letter(other) == value + step
             and (
-                (other.row.column != candidate.row.column and _face(candidate.row) != "")
+                page_of[id(other)] != page_of[id(candidate)]  # a list goes on over a page break
+                or (other.row.column != candidate.row.column and _face(candidate.row) != "")
                 or abs(other.x0 - candidate.x0) <= MARKER_ALIGN
                 or abs(other.marker.x - candidate.marker.x) <= MARKER_ALIGN
             )
