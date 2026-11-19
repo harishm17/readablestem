@@ -499,7 +499,7 @@ UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
     },
     "readablestem.pipeline.image_page_check": {
         "CROP_MARGIN_PX": "NOT YET GUARDED: how far a request's cut-out is grown",
-        "MIN_CROP_HEIGHT_PX": "NOT YET GUARDED: the least height of the cut-out sent with a request",
+        "MIN_CROP_HEIGHT_PX": "NOT YET GUARDED: the least height of a request's cut-out",
     },
 }
 
