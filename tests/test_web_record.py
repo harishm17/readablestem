@@ -12,6 +12,7 @@ import pytest
 
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token
+from readablestem.core.types import Notice
 from readablestem.web import record as rec
 
 
@@ -24,6 +25,10 @@ def web(tmp_path):
         login(client, ALICE)
         env.browser = client
         env.converter.output = review_output()
+        env.converter.output.result.notices += [
+            Notice(code="footnote", page=0, count=2, review="none"),
+            Notice(code="page_turned", page=1, review="none"),
+        ]
         response = client.post(
             "/jobs",
             data={"csrf_token": token(client)},
@@ -95,6 +100,17 @@ def test_a_change_to_a_page_is_counted_apart_from_decisions_on_the_page_and_in_t
     assert summary["Decisions made by a person"] == "0"
     assert summary["Changes to pages made by a person"] == "1"
     assert sum(1 for r in rows if r["section"] == "decision") == 1
+
+
+def test_what_was_converted_is_handled_in_the_record_and_its_csv_as_on_the_job_page(web):
+    handled = "Handled in this file"
+    job_page = text_of(web.browser.get(f"/jobs/{web.job_id}").text)
+    record = text_of(web.browser.get(f"/jobs/{web.job_id}/record").text)
+    rows = table(web.browser.get(f"/jobs/{web.job_id}/record.csv").text)
+    lines = [r["detail"] for r in rows if r["section"] == "handled"]
+    assert len(lines) == 2 and handled in record
+    assert lines[0].startswith("2 footnotes") and lines[1].startswith("1 page: saved sideways")
+    assert all(line in job_page and line in record for line in lines)
 
 
 # --------------------------------------------------------------------------- the CSV

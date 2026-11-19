@@ -807,10 +807,9 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
     labels = item_labels(result)
     elements = {e.id: e for e in result.elements}
     lists = NoticeLists()
-    handled: Counter[str] = Counter()
-    for notice in notice_rules.current(result):
+    current = notice_rules.current(result)
+    for notice in current:
         if notice_rules.section(notice) == "handled":
-            handled[notice.code] += notice.count
             continue
         line = _line(notice, fixes, labels, elements)
         if notice.code == "source_error" and (names := _unknown_commands(result)):
@@ -844,10 +843,22 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
         else:
             lists.not_handled.append(line)
     lists.not_handled = _one_line_per_kept_page(lists.not_handled, fixes, labels)
+    lists.handled = handled_lines(current)
+    return lists
+
+
+def handled_lines(notices: Iterable[Notice]) -> list[HandledLine]:
+    """What was found and converted, one line for each kind with its total: the job page's
+    "Handled in this file" and the review record's. `notices` is `notice_rules.current(result)`."""
+    handled: Counter[str] = Counter()
+    for notice in notices:
+        if notice_rules.section(notice) == "handled":
+            handled[notice.code] += notice.count
+    lines = []
     for code, count in handled.items():
         one, many, done = HANDLED_MESSAGES[code]
-        lists.handled.append(HandledLine(code, count, f"{plural(count, one, many)}: {done}"))
-    return lists
+        lines.append(HandledLine(code, count, f"{plural(count, one, many)}: {done}"))
+    return lines
 
 
 def _unknown_commands(result: DocumentResult) -> tuple[str, ...]:
