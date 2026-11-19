@@ -491,6 +491,12 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
 
     marks = {note.id: layout_module._FootnoteMark(body.id, "no such text", "1")}
     assert layout_module._footnote_links([twice, note], marks)[0].links == []
+    # the glyphs an inline equation took from the line are a placeholder in the text
+    held = body.model_copy(update={"text": "so ⟦p1-e9⟧.1 Next", "links": []})
+    marks = {note.id: layout_module._FootnoteMark(body.id, "x + y.", "1")}
+    (link,) = layout_module._footnote_links([held, note], marks)[0].links
+    assert (held.text or "")[link.start : link.end] == "1"
+    assert link.start == (held.text or "").index(".1 Next") + 1
 
 
 def named_footnote_pdf() -> bytes:
@@ -557,24 +563,18 @@ def named_notes_pdf() -> bytes:
     doc = pymupdf.open()
     page = doc.new_page(width=612, height=792)
     for k in range(6):
-        page.insert_text(
-            (72, 100 + 14 * k), f"Left column line {k} of ordinary text here.", fontsize=BODY
-        )
-        page.insert_text(
-            (330, 100 + 14 * k), f"Right column line {k} of ordinary text here.", fontsize=BODY
-        )
+        left = f"Left column line {k} of ordinary text here."
+        page.insert_text((72, 100 + 14 * k), left, fontsize=BODY)
+        right = "where the right column goes on" if k == 0 else f"Right column line {k} is here."
+        page.insert_text((330, 100 + 14 * k), right, fontsize=BODY)
     page.insert_text((72, 60), "A line of the author block with a note", fontsize=BODY)
     page.insert_text((72 + 175, 56), "*", fontsize=7, fontname="helv")
-    page.insert_text((72, 190), "See the code at the project page", fontsize=BODY)
-    page.insert_text((72 + 175, 186), "1", fontsize=7, fontname="helv")
+    page.insert_text((72 + 205, 166), "1", fontsize=7, fontname="helv")
     page.draw_line((72, 700), (200, 700))
     page.insert_text((72, 712), "1", fontsize=5.5, fontname="helv")
     page.insert_text((77, 715), "https://example.org/linmix", fontsize=8, fontname="helv")
     page.insert_text((72, 735), "*", fontsize=5.5, fontname="helv")
-    page.insert_text((77, 738), "Corresponding author.", fontsize=8, fontname="helv")
-    page.insert_text(
-        (330, 250), "where the right column goes on after a break in the left one.", fontsize=BODY
-    )
+    page.insert_text((77, 738), "Corresponding author", fontsize=8, fontname="helv")
     names = doc.get_new_xref()
     # (72, 77) from the bottom is 715 from the top: under the one-line note, not above it
     doc.update_object(
@@ -587,7 +587,7 @@ def named_notes_pdf() -> bytes:
     doc.xref_set_key(doc.pdf_catalog(), "Names", f"{tree} 0 R")
     refs = []
     for x0, x1, top, bottom, name in (
-        (72 + 175, 72 + 179, 180, 188, "Hfootnote.1"),
+        (72 + 205, 72 + 209, 160, 168, "Hfootnote.1"),
         (72 + 175, 72 + 179, 50, 58, "Hfootnote.2"),
     ):
         annot = doc.get_new_xref()
