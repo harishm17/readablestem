@@ -719,7 +719,8 @@ def to_csv(record: Record) -> str:
         row("document", "Converted by", by=record.owner)
     row("document", "Tool", detail=record.tool)
     row("document", "Language", detail=record.language)
-    row("document", "Exam or quiz", detail=exam.words(record.exam_mode))
+    if record.checked.origin == "pdf":  # a source has no pictures to describe: no choice
+        row("document", "Exam or quiz", detail=exam.words(record.exam_mode))
     row("document", "Record made on", when=iso_when(record.made_at))
     row("document", "Reference", detail=record.job_ref)
     if record.state:
