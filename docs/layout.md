@@ -1805,8 +1805,11 @@ calls the same function on the pages it uses (the crop cache, the text pass, tag
 the source facts, the page labels and the review page image in `web/pdf_probe.py`). A table
 set sideways on an otherwise upright page is still turned by the table step alone
 (`tables._page_turn`); a short label set sideways (an axis title, an arXiv stamp) turns
-nothing. The turn is in the document the readers open, not in the PDF file: no output says it
-yet (the checks list line "Page N was turned to read it" is not built).
+nothing. The turn is in the document the readers open, not in the PDF file: layout keeps it on
+the page's `PageTypeResult.turn` (not in the stored page type) and says it with the notice
+`page_turned` (information, one per page, listed under "Handled in this file": "N pages saved
+sideways in the PDF and turned upright to be read"), so the pictures of the page, which show
+the turned page, are accounted for.
 
 **Page types.** `page_type.classify` reads the rawdict and the drawings layout already
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no

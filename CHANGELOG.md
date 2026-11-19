@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: one writer for the lines of a job page (branch feat/check-lines)
+
+- The lines a job page, its review record and exports can show are made in one place: the table in
+  `core/page_checks.py` (code, page or document, tier, what measures it) and `page_checks.make`,
+  which every creator of a `Notice` now calls and which refuses a code not in the table. The tier
+  and the section a line is listed under read the table (`notices.section`, `HANDLED_CODES`,
+  `LANGUAGE_CODES`). No stored result changes in this part. Sentences stay in `web/messages.py`.
+- New lines, each for a fact the code measures: `page_turned` (a page saved sideways was turned to
+  read it; information, per page, under "Handled in this file"); `source_unplaced` (LaTeX errors the
+  reader could not tie to a place, required, counted); `source_figure_missing` (pictures the source
+  names that are missing or unreadable, required, counted); `source_not_compared` (a source job was
+  not compiled here, so its text was not compared with a compiled copy). A source job is held at
+  "Ready" with that sentence instead of "Every part the tool found was converted."
+- The review record and its CSV list what the job page lists as not checked or left out (hidden
+  text, attached files, parts of a Word file, pages whose drawings were not analysed, a source never
+  compared) under "not checked", so the record no longer says only "every part was converted".
+- Jobs stored before this have none of the new lines and read as before. No migration;
+  `PIPELINE_VERSION` and `RENDER_VERSION` unchanged.
+
 ## Unreleased: every form is answered once (branch feat/forms-stage-2)
 
 - SW43, stage 2. The forms that were still plain tags now follow the one submit rule: the

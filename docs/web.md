@@ -929,6 +929,13 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   adds the required notice `source_unread`, whose line on the job page gives the counts and the
   first words, and the finished job has the gap note "Parts not read" (`states.gaps_of`), so
   it is "Partly converted" and never "Ready to share".
+  Three more lines go through `core.page_checks` (`convert._source_lines`): `source_unplaced`
+  (required: LaTeX reported errors the reader could not tie to a place, counted; the job is held
+  at "Ready" with its sentence), `source_figure_missing` (required: pictures the source names
+  that are not in the upload or cannot be read, counted) and `source_not_compared` (worth
+  checking): no compile witness runs for a job (`source.tex_compile` is called by none), so the
+  text was not compared with a compiled copy, and the job page says so instead of "Every part the
+  tool found was converted". A job stored before this has no such line and reads as before.
 - **Front matter and table heads** (SW18.3, WS18.10). The title is a heading with no `\thanks`
   in it; the `\thanks` of the title is a line of its own after it ("(note: ...)"). Each author
   is one line: the name, then the lines under it (where they work, an address, an email) after
@@ -2498,6 +2505,16 @@ From top to bottom:
    is feature-aware (`outcome.failed_message`): with "Convert scanned or handwritten pages"
    offered it says such pages are read only when asked for and gives that route, and does not
    say the tool cannot convert them; without the option it says it cannot.
+   **Every line is made in one place.** `core/page_checks.py` is the table of the lines a job can
+   show (code, page or document, tier, what measures it, where it is listed, whether the record
+   lists it as not checked), and `page_checks.make` is the only way a `Notice` is made: it takes
+   the tier from the table and refuses a code that is not in it, so a measured fact cannot be
+   left without a line, a tier or a sentence. `NOTICE_CODES` equals the table, and
+   `notices.section` and `HANDLED_CODES` read it. The sentences stay in `messages.py`.
+   The rows marked `not_checked` (hidden text, attached files, Word parts left out, drawings not
+   analysed, LaTeX errors with no place, a source not compared with a compiled copy) are also
+   listed by the review record and its CSV under what was not checked
+   (`record.notice_not_checked`).
 4. **Not handled in this file**, **Worth checking** and **Handled in this file**:
    `pipeline.notices.current(result)` (notices derived again from the fixes as they are now,
    plus the stored ones of other codes). "Not handled" holds only what the result records as
