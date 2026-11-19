@@ -18,6 +18,7 @@ from typing import Any, cast
 import pymupdf
 
 from readablestem.core import images as pixel_budget
+from readablestem.core.captions import FIGURE_CAPTION as CAPTION
 from readablestem.core.types import BBox
 from readablestem.pipeline import equation_images
 from readablestem.pipeline.layout.context import LayoutError, _Document
@@ -67,15 +68,6 @@ LABEL_SHORT = 25
 LABEL_SHORT_TURNED = 40
 LABEL_REACH = 1.0
 LABEL_TURNED = 2.5
-
-# "Figure 2.3 Velocity...", "Fig. 4: ...", but not "Figure 2 shows that ...". Beamer
-# captions have no number: "Figure: Velocity ...".
-CAPTION = re.compile(
-    r"^(?:Figure|FIGURE|Fig\.|FIG\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
-    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
-    r"|^(?:Figure|Fig\.):\s+(?=\S)"
-)
-
 
 _PROSE_TWO_LETTER = frozenset(
     (

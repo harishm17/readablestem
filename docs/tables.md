@@ -192,9 +192,13 @@ rules above.
    two columns of single words (`is_word_grid`), is not claimed and keeps the paragraph
    path (equations and headings in it are found as usual). Everything else is a data
    table.
-7. **Caption.** A `"Table N ..."` line just above or below the table (within 36 pt, the
-   same reach as figure captions; "Table 2 shows that ..." is not a caption) and its
-   continuation lines become `Element.caption` and `TableGrid.caption`. A caption is
+7. **Caption.** A `"Table N ..."` line just above or below the table and its continuation
+   lines become `Element.caption` and `TableGrid.caption`. N is Arabic or Roman ("Table IV");
+   "Table 2 shows that ..." is not a caption. The gap, 36 pt (the reach of figure captions), is
+   measured from the caption block's nearest edge: over the table, from the block's last line
+   (a caption of up to eight lines), not from its first; under it, from its first line. Where
+   two tables are stacked, a caption goes to the nearer table. The pattern is
+   `core/captions.py`, shared with the HTML check below and with figure captions. A caption is
    never invented.
 8. **Continued tables.** A table split across pages stays two tables. The second gets the
    reason `"continued from previous page"` when it has the same columns (left edges within
@@ -610,8 +614,8 @@ is never lost. Table CSS is added only to documents with a rebuilt table.
 otherwise): `html.table_headers` (a data table has a `<th>`), `html.table_header_scope`
 (every `<th>` has `scope`, or an id in a table that uses `headers`),
 `html.table_header_text` (no empty `<th>`), `html.table_caption` (a warning: a "Table N
-..." paragraph right beside a table without `<caption>`, by layout's caption pattern, so
-"Table 2 shows that ..." is not one) and `html.table_layout` (no `role="presentation"`
+..." paragraph right beside a table without `<caption>`, by the shared caption pattern
+(`core/captions.py`, Roman numerals included), so "Table 2 shows that ..." is not one) and `html.table_layout` (no `role="presentation"`
 table: the output never uses tables for layout). axe-core covers `th-has-data-cells`,
 `td-headers-attr` and `scope-attr-valid`; the browser suite runs it on tables of every
 shape the step writes.

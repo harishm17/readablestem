@@ -88,6 +88,7 @@ from importlib import resources
 from itertools import pairwise
 from typing import Any, Literal
 
+from readablestem.core.captions import TABLE_CAPTION
 from readablestem.core.types import Check, is_safe_href
 from readablestem.pipeline import contrast, output_chars
 from readablestem.pipeline.assemble import AUTHORED_CLASS, DECORATIVE_CLASS, UNREAD_PARTS_CLASS
@@ -367,12 +368,6 @@ def static_checks(html: str) -> list[Check]:
 
 # --------------------------------------------------------------------------- tables
 
-# "Table 2.1 Speeds of ...", "TABLE 3: ...", but not "Table 2 shows that ..." (layout's
-# "Figure N" caption rule, for tables).
-TABLE_CAPTION = re.compile(
-    r"^(?:Table|TABLE|Tab\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
-    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
-)
 PRESENTATIONAL_ROLES = frozenset({"presentation", "none"})
 # Blocks that can sit between a paragraph and a table (wrapper <div>s do not count: a
 # rebuilt table sits in one).

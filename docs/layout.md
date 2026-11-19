@@ -48,6 +48,9 @@ Element conventions:
   look-alikes `〚` `〛` (U+301A/U+301B) in every piece of document text, so a PDF cannot
   fake a marker: every marker in an element's `text` is a real inline child of it. Private-use
   codes of symbol fonts (Word's Symbol bullet U+F0B7 is `•`) are mapped by `font_codes`, by font name.
+- A `"Table N ..."` or `"Figure N ..."` line is a caption by one pattern, `core/captions.py`
+  (N Arabic or Roman; "Table 2 shows that ..." is not one), shared by the table step, the
+  figure step and the HTML check.
 - Figures carry the nearby `"Figure N ..."` text in `caption` and any labels drawn inside
   or right next to them (axis titles, tick labels) in `text`.
 - **Tables** (since pipeline 0.4.0) are `Kind.TABLE`: `table` is the grid built from the

@@ -175,6 +175,18 @@
   crashes did not change (0 and 0; 3 layout refusals, as before). HTML, Listen, Word, EPUB, Canvas and
   Common Cartridge carry the paragraph unchanged. No model request, prompt or migration changed;
   `PIPELINE_VERSION` not bumped: the one bump owed at the next PR covers it.
+## Unreleased: a long table caption is attached (branch fix/captions-by-block)
+
+- WS5.11 (F-398). A table's caption was matched from its first line within 36 pt of the table, so
+  a caption of several lines over a table (first line far off) stayed a paragraph and the table
+  had no `<caption>`, and a long caption could go to the wrong one of two stacked tables. The gap
+  is now measured from the caption block's nearest line, with the same 36 pt (a caption over a
+  table may run to eight lines; under it, four as before). One pattern, `core/captions.py`,
+  serves the table step, the HTML check and the figure step, with Roman numerals ("Table IV"):
+  the HTML check had no Roman numerals and could not flag one left in the text. The caption tag
+  of a tagged file is not read (its tag evidence is not built). A table that gains a caption gets
+  it in its model request ("Caption: ..."), so its recorded answer is read again. Stored documents
+  differ; `PIPELINE_VERSION` is not bumped (the one bump owed at the next PR covers it).
 ## Unreleased: a LaTeX file's own references are links (branch feat/source-internal-links)
 
 - WS18.9 (F-557). LaTeXML already wrote `\ref`, `\eqref`, `\autoref`, `\cite` and each contents
