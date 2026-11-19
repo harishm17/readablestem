@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: the page and the exports, leftovers (branch fix/output-leftovers)
+
+- The count of equations written as MathML (the student note, the job page, the record and its
+  CSV, the Canvas README, the EPUB metadata) is the page's own: an equation counts only when the
+  sanitizer that writes the page accepts its MathML, so a refusal that shows the picture is never
+  counted as MathML (`checked._page_accepts`). No stored document or recording in the corpus has
+  a refusal today, so no count moves; the rule is now one.
+- A kept picture's box that can scroll sideways under 40 em (a crop at least 240 CSS px wide) is a
+  named tab stop ("Original picture", `role="group"`), so a keyboard user can scroll it.
+  `RENDER_VERSION` is owed a raise: a stored page gets it when it is made again.
+- A script inside a script outside math (`sup` in `sup`, `sub` in `sub`, the mixed pairs) is as
+  large as the script it is in, not 12.5 px, in the student sheet and the app. The sizes of
+  scripts inside math are measured and written in `docs/output.md`, with the reason no floor
+  is set.
+- Word: a picture the page marks as decoration (empty alt) is marked decorative the way Word does
+  (`adec:decorative` on its `docPr`).
+- "Combine parts": each part is settled for decoration as its own page is, and the file is built
+  once for its parts and kept like the other exports (3 parts of 30 pages took 0.75 to 2.5 s each
+  time); it goes with any part.
+- Not built: a note on the job page for equations Word wrote as words (none in 22 tracked
+  documents and 73 recorded uploads).
+
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
 - Speech: `\{x | |x|<1\}` (a plain bar before an absolute value in set braces) read "vertical
@@ -11,7 +33,7 @@
   (`|3 \times 10^{-5}|` is still an absolute value). `SPEECH_VERSION` is 4, so a stored reading
   is said again from its MathML where it is shown (no model call). `RENDER_VERSION` is owed a
   raise: the stored page's sayings and sidebar names changed.
-- Listen: raised and lowered text outside maths (`g/cm<sup>3</sup>`, `x<sub>1</sub>y`, a
+- Listen: raised and lowered text outside math (`g/cm<sup>3</sup>`, `x<sub>1</sub>y`, a
   footnote's mark) is said with "superscript" or "subscript" before it, and "end superscript" or
   "end subscript" after it when text goes on right behind it; the ending of an ordinal ("10th")
   adds no words. The page, Word and the EPUB are unchanged.

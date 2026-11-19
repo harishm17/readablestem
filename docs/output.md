@@ -232,6 +232,10 @@ our own would be a second MathML reader to keep right.
 - **After pandoc**, in `word/document.xml`, whatever the pandoc version:
   - every picture's alt text is also written on the picture itself (pandoc writes the
     picture's address there, which a screen reader would read out);
+  - a picture the page writes with an empty alt (decoration, WS6.4) is marked as decorative
+    the way Word does it, `adec:decorative val="1"` in the extension list of its `wp:docPr`
+    (`_mark_decorative`), so Word's accessibility checker does not ask for alt text for it
+    and a screen reader leaves it out;
   - a table whose first row is a header gets `w:tblHeader`, so it repeats on each page and is
     read as a header;
   - pandoc's title paragraph is dropped when the first heading says the same thing (the
@@ -552,7 +556,16 @@ and each part's equations, figures and tables as in the part.
   says so.
 - **Like "Download all".** Each part that is in the file restarts its deletion clock
   (`retention.restart_clock`) and counts as downloaded (`events.record_download`); the file is
-  not stored.
+  kept, below.
+- **Kept.** The file is built once for these parts and kept on the first part like the other
+  exports (`web.combine.combined_file`, `web.export_store`, file type `combine-html`,
+  `combine-docx` or `combine-epub`). Its key holds the first part's version, `RENDER_VERSION`
+  and a digest of the title, the contact line, the alt-text setting and each part's id, version,
+  pages and stored result: a new decision, a release, a part added, deleted or made again each
+  build it once more. It goes with any part of the group (`ops.retention.delete_jobs`), so no
+  copy of a deleted part is left. Measured before it was kept (3 parts of 30 pages, 5 requests,
+  one process, box load about 20): 0.75 to 1.0 s for light pages (180 elements a page), 1.1 to
+  1.3 s for medium (360) and 2.0 to 2.5 s for dense (580); as EPUB 1.4 to 4.6 s.
 - **Gaps.** Source pages between the first and last part that no joined part holds are named
   in the student note ("Pages 5, 6, 7 and 8 of the original PDF were left out of this file.",
   the sentence for a page the instructor left out), so the file never reads as complete when
@@ -581,7 +594,7 @@ and each part's equations, figures and tables as in the part.
   yet confirmed) votes for nothing and is marked with nothing, since its tag is a guess: it
   is read in the file's language until its owner confirms it on the part's page
   (`text_pass.set_document_language`), and the next file made follows. The combined file is
-  made on request and stored nowhere, so it has no language control of its own. The combine
+  made from the parts and has no language control of its own. The combine
   page asks once for the whole (`web.combine.language_check`, `#combine-language`), however
   many parts are unconfirmed, and also when the parts disagree and no language is held by
   more than half of them. Tables, figures and equations carry no `lang` of their own, in a
@@ -675,7 +688,8 @@ alone. The evidence is one of:
 
 The rule is the same for a figure the model calls decorative and for one whose reading
 failed (`decoration.settle`, after every step in the PDF and LaTeX converters, and again
-before a stored result's page is made again, `review.rerender_html`). With evidence, the
+before a stored result's page is made again, `review.rerender_html`, and before each part of a
+combined file is joined, `web.combine.combined_html`). With evidence, the
 figure is decoration and the evidence is stored on its record (`FigureFix.decoration`, left
 out of the JSON when absent); a figure whose reading failed becomes decoration with an
 optional note (`figure.decoration`, `decoration_by_rule`). Without evidence, a figure the
@@ -683,8 +697,8 @@ model calls decorative is a required decision (`figure.decoration`, `decoration_
 and is written like any figure with no description: flagged, with alt "Figure not
 described", until a person decides. Decoration is written inside `class="decorative"`
 (`assemble.DECORATIVE_CLASS`), and the output check `html.img_alt_content` fails on any
-other empty alt text. The EPUB, Canvas and Word files keep the page's alt text (Word writes
-no description for decoration), and Listen skips decoration and says "Image, not converted:
+other empty alt text. The EPUB, Canvas and Word files keep the page's alt text (Word marks
+decoration as decorative, below), and Listen skips decoration and says "Image, not converted:
 Figure not described" for the rest.
 
 ## Figure images in the student file (UX review MF23)
@@ -814,10 +828,17 @@ the print build waits for WS21.1):
   instead of shrinking with the column. Wider than that, it fits the column as before.
 - An inline kept equation (`.flagged-inline`) is an inline block with its own line height: the
   line grows to hold the crop instead of the crop overlapping the lines next to it.
-- Left out (triage: reduce): the "Larger" switch, the box's name and focus on every scroll box
-  (browsers that make a scroller focusable by default do; Safari does not), moving an inline
-  crop wider than half the column to its own line, and the dark-mode inversion of crops. The
-  EPUB sheet already frames pictures and does not invert them.
+- The box that can scroll is a named tab stop, as a wide equation's is (`tabindex="0"`,
+  `role="group"`, `aria-label="Original picture"`, `assemble._picture_scroller_attrs`), so a
+  keyboard user can scroll it (axe `scrollable-region-focusable`). Only a box whose own child
+  is the picture, and a picture at least `WIDE_PICTURE_PX` (240 CSS px) wide or of no known
+  size, gets one: a figure's picture shrinks with the column, and a narrower one fits the
+  narrowest column. At 320 px axe reports the rule once on a 672 px kept equation without
+  the attributes and nothing with them. The EPUB, Word, Canvas and cartridge files carry or
+  drop the attributes like those of a wide equation; EPUBCheck finds nothing.
+- Left out (triage: reduce): the "Larger" switch, moving an inline crop wider than half the
+  column to its own line, and the dark-mode inversion of crops. The EPUB sheet already frames
+  pictures and does not invert them.
 - A figure's long description prints open (`details.figure-description`); where the browser
   has no `::details-content`, its summary says "open this description before printing".
 
@@ -1589,8 +1610,16 @@ beside them.
   apart from it and from each other by weight and style (h5 bold, h6 bold italic). Captions,
   the notes beside a kept picture, footnotes and page markers are one step smaller, 0.9 em
   (16.2 px), with more room above a caption. No text on the page is under 14 px; the
-  stacked scripts of a nuclide or an ion are 0.8 em (14.4 px). The exceptions are
-  the scripts inside math, which the browser sizes. The scale is the same
+  stacked scripts of a nuclide or an ion are 0.8 em (14.4 px), and a script inside a script
+  (`sup` in `sup`, `sub` in `sub`, and the mixed pairs) takes the size of the script it is in,
+  not another step down (`sub sub, sub sup, sup sub, sup sup { font-size: inherit }` in the
+  sheet and in `app.css`; the browser's `smaller` gave 12.5 px). The exception is the scripts
+  inside math, which the browser sizes by script level and no floor is set for: measured in
+  Chromium 156 with the student sheet at the default text size (18 px), the math is 19.8 px
+  (1.1 em), a first-level script 13.9 px and a second-level script 9.9 px (the same at 1280 and
+  390 px wide). A floor would make a second-level script as large as a first-level one, and the
+  size is how math says "this is a script of a script"; the reader's zoom and the text-size
+  setting scale all three together. The scale is the same
   in the EPUB (sizes are relative there, so it follows the reader's own text size) and in
   the standalone Canvas page; the Canvas page for pasting leaves heading sizes to Canvas's
   own theme (rules on bare `h1` to `h6` are not carried into it). The Word file is made by

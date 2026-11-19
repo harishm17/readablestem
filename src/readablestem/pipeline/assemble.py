@@ -724,6 +724,25 @@ def _scroller_attrs(mathml: str, label: str | None) -> str:
     return f' tabindex="0" role="group" aria-label="{_escape(name)}"'
 
 
+# A kept picture that is its box's own child keeps its size under 40 em and the box scrolls
+# sideways (`student_sheet.NARROW`). One narrower than this fits the narrowest column (320 px
+# less the page's and the box's padding), so it needs no tab stop, as a short equation has none.
+WIDE_PICTURE_PX = 240
+_IMG_WIDTH = re.compile(r'\swidth="(\d+)"')
+
+
+def _picture_scroller_attrs(body: str) -> str:
+    """The tab stop and name of a kept picture's box when its picture can be wider than the
+    box ("" otherwise). A keyboard user can only scroll a box that takes focus (axe
+    `scrollable-region-focusable`), as for equations (`_scroller_attrs`)."""
+    if not body.startswith("<img"):
+        return ""  # a figure's picture shrinks with the column, and text wraps
+    width = _IMG_WIDTH.search(body[: body.find(">") + 1])
+    if width and int(width.group(1)) < WIDE_PICTURE_PX:
+        return ""
+    return ' tabindex="0" role="group" aria-label="Original picture"'
+
+
 # An equation estimated at least this wide (em of the maths font) may not fit a sheet: at
 # Letter and 150% the text column is about 22 em of it. On paper it is scaled to fit the
 # column down to 70% of its size; wider than that it keeps 70% and the page prints a note
@@ -1715,6 +1734,7 @@ class _Renderer:
         # beside it is for the eye, as an unconverted inline equation's is (`inline_equation`).
         # Without a picture (the original's text, or none) the label is what says it.
         hidden = ' aria-hidden="true"' if _alt_says_label(body, label) else ""
+        attrs += _picture_scroller_attrs(body)
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'

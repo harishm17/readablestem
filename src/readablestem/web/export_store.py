@@ -36,6 +36,7 @@ from readablestem.pipeline.assemble import RENDER_VERSION
 from readablestem.web.db import Blob
 
 KIND = "export"
+COMBINED = "combine-"  # in front of the file type of a combined file ("Combine parts")
 MAX_PER_JOB = 6
 MAX_BYTES = 32 * 1024 * 1024
 MEDIA_TYPE = "application/octet-stream"

@@ -70,6 +70,7 @@ PAGE = (
     "<figcaption>Figure 1</figcaption></figure>"
     '<details class="figure-description"><summary>Description of Figure 1</summary>'
     "<p>A single dot where the axes cross.</p></details>"
+    f'<div class="decorative"><img src="{DATA_URI}" alt="" width="1" height="1"></div>'
     "<figure><p>A picture left out, in words.</p><figcaption>Figure 2</figcaption></figure>"
     '<img src="https://example.org/remote.png" alt="a remote picture">'
     "<ol><li>one</li><li>two<ul><li>nested</li></ul></li></ol>"
@@ -168,6 +169,16 @@ def test_every_picture_has_alt_text_and_never_its_address(made):
 
 
 # --------------------------------------------------------------------- one page with everything
+
+
+def test_a_decoration_is_marked_decorative_for_word_and_a_described_picture_is_not(page):
+    export, document = page
+    marks = {
+        pic.get("descr"): pic.find(f".//{{{ed.ADEC}}}decorative") is not None
+        for pic in (i.find(f"{WP}docPr") for i in drawings(document))
+    }
+    assert marks == {"A dot at the origin": False, "": True}
+    assert export.images == 1  # a decoration is not a picture with alt text
 
 
 def test_a_table_has_a_header_row_and_a_caption(page):

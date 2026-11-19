@@ -1490,7 +1490,7 @@ Every sentence about what was converted, checked or reviewed is made from one mo
 `pipeline.checked.CheckedSummary`, by one module, `pipeline/checked_words.py`; no template
 writes such a sentence. The summary is computed from the stored result (`checked.of_result`:
 its elements, fixes, pages left out and the page's structure checks) and is never stored. It
-holds what was converted by kind (equations in MathML, figures described or marked as
+holds what was converted by kind (equations in MathML, counted only when the page's sanitizer accepts the MathML, figures described or marked as
 decoration, tables rebuilt or written as text, the parts not converted with their kind and page,
 each shown as a picture of the original or, for an equation of a Word or LaTeX file, which has no
 picture, as its LaTeX text (`Picture.as_text`), the pages left out), the structure checks (how many ran, which failed), what people did

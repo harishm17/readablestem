@@ -7,10 +7,14 @@ from __future__ import annotations
 import re
 from datetime import timedelta
 
+from sqlalchemy import select
+
 from fixtures.web.support import fake_output
 from readablestem.core.types import ConversionOutput, Status
+from readablestem.ops.retention import delete_jobs
+from readablestem.pipeline.assemble import FIGURE_NOT_DESCRIBED_ALT
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobStatus, session_scope, utcnow
+from readablestem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from test_web_parts import choose, jobs_of, keep_big, text_of, web  # noqa: F401
 
 
@@ -69,6 +73,40 @@ def test_the_parts_are_joined_in_page_order_with_unique_ids_and_markers_that_con
     assert html.count("<math") == html.count("<math ") + html.count("<math>")  # all there
     assert html.count("<figure") == 3 or html.count("<img") >= 3  # each part's figure
     assert "left out of this file" not in html
+    with session_scope(web.ctx.factory) as session:  # a part stored before decorations were settled
+        row = session.get(Job, jobs[2].id)
+        result = dict(row.result_json)
+        figure = next(e for e in result["elements"] if e["kind"] == "figure")
+        fix = next(f for f in result["fixes"] if f["element_id"] == figure["id"])
+        fix["figure"] = dict(fix["figure"], alt="", decorative=True)  # no evidence stored
+        again = dict(figure, id="p1-e99", page=figure["page"] + 1)  # the same picture, a page on
+        result["elements"] = [*result["elements"], again]
+        result["fixes"] = [*result["fixes"], dict(fix, element_id="p1-e99")]
+        row.result_json = result
+        crop = session.scalars(
+            select(Blob).where(Blob.job_id == row.id, Blob.element_id == figure["id"])
+        ).one()
+        session.add(Blob(job_id=row.id, kind="crop", element_id="p1-e99",
+                         media_type=crop.media_type, content=crop.content))  # fmt: skip
+    html = combine(web, jobs[1]).text  # settled as its own page is: a repeat is decoration
+    assert FIGURE_NOT_DESCRIBED_ALT not in html and html.count('class="decorative"') == 2
+
+
+def combined_files(web) -> int:  # noqa: F811
+    with session_scope(web.ctx.factory) as session:
+        return len(session.scalars(select(Blob.id).where(Blob.kind == "export")).all())
+
+
+def test_the_combined_file_is_kept_once_and_goes_with_any_part(web):  # noqa: F811
+    _, jobs = three_finished_parts(web)
+    first = combine(web, jobs[1]).content
+    assert combined_files(web) == 1
+    assert combine(web, jobs[2]).content == first  # asked again, from another part
+    assert combined_files(web) == 1
+    with session_scope(web.ctx.factory) as session:  # the last part: not the one it is kept on
+        delete_jobs(session, [jobs[2].id])
+    assert combined_files(web) == 0  # no copy of a deleted part is left
+    assert "p9-e0" not in ids_of(combine(web, jobs[0]).text)  # and the next file leaves it out
 
 
 # ----------------------------------------------------------------------------- ownership
