@@ -82,6 +82,10 @@ ROOM: dict[str, Any] = {
 }
 # How long one upload's process may run before it is stopped and counted as failed.
 LIMIT_S = 1800.0
+# The error of a replay in which the table search stopped: a replay runs it with no time
+# limit (`replay_settings`), so a stop means the setting did not reach the conversion, and
+# the upload's figures would depend on the machine. It is counted as failed, not measured.
+TABLE_SEARCH_STOPPED = "table_search_stopped"
 # The fields of a result that say how long something took. Two conversions of one file
 # agree on everything else (`parts`).
 _TIMING = frozenset({"latency_ms", "seconds"})
@@ -249,6 +253,7 @@ def replay_settings(answers: Path) -> Settings:
         model_answers_offline=True,
         # A replay sends nothing, so any key will do.
         anthropic_api_key="sk-ant-replay-sends-nothing",
+        table_search_unlimited=True,
         **ROOM,
     )
     return profile.load().apply(base)
@@ -338,7 +343,14 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
 
         # A file the reader refuses or cannot finish ends as a job's does: with its code.
         return error_code_for(exc)
+    if _table_search_stopped(output.facts):
+        return TABLE_SEARCH_STOPPED
     return job.pdf, output.result
+
+
+def _table_search_stopped(facts: StepFacts | None) -> bool:
+    stops = facts.not_finished if facts is not None else []
+    return any(stop.step == step_facts.TABLE_SEARCH for stop in stops)
 
 
 def order_rows(entry_id: str, pdf: bytes, result: DocumentResult) -> dict[str, list] | None:
@@ -441,6 +453,7 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
         decisions=[asdict(decision) for decision in triage.decisions(result)],
         outputs=audit,
         order=order_rows(upload.entry, pdf, result),
+        error=TABLE_SEARCH_STOPPED if _table_search_stopped(facts) else "",
     )
 
 

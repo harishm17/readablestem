@@ -249,7 +249,10 @@ When a job ends `done`, the worker keeps what it took of the models and of the c
   (`work_budget` when a count of work ran out, the same on every machine; `time_limit` when
   the clock guard against a hang fired; such a page may be handwriting that was not seen as
   handwriting); `ink_strokes`, one row for each handwritten page whose strokes were not read
-  for its pictures, for the same two reasons.
+  for its pictures, for the same two reasons; `table_search`, one row for each page whose
+  search for tables was cut short because the document's CPU time for it had run out
+  (`time_limit`; a table there may be read as text, and the job page says which pages:
+  tables.md, "Which pages are looked at").
   `web.step_facts.not_finished(session, job_id)` is the one place a page or a count reads
   them, and each is also a `job_not_finished` log line.
 

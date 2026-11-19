@@ -1464,7 +1464,7 @@ def _document_item(cfg: TablesConfig, doc: TableDocument, pdf: bytes) -> dict:
         "pages_differ_from_reference": differ,
     }
     try:
-        found = layout.analyze(pdf)
+        found = layout.analyze(pdf, table_search_limited=False)
     except layout.LayoutError as exc:  # the pipeline could not read it: nothing found
         rows, false, extra = score_documents(golds, [])
         return (
@@ -1802,7 +1802,7 @@ def real_document_metrics(real_dir: Path) -> dict | None:
             continue
         pdf = path.read_bytes()
         try:
-            found = layout.analyze(pdf)
+            found = layout.analyze(pdf, table_search_limited=False)
         except layout.LayoutError as exc:
             errors[exc.code] += 1
             continue

@@ -951,6 +951,9 @@ NOTICE_CODES = frozenset(
         # The page's drawings were not checked for handwriting: over a count of work, or the
         # clock guard fired (`page_type.InkBudget`, plan WS14.9). Its typed text was read.
         "drawings_not_analysed",
+        # The table search's CPU time for the document ran out (tables.DetectorBudget): a table
+        # on this page may be read as text.
+        "tables_not_searched",
         # A PDF that had to be repaired when it was opened (`source_facts.repair_notices`):
         # "file_cut_off" when its last pages are empty (`page` the first of them, `count` how
         # many; required: the owner continues with the pages before them or uploads a fresh

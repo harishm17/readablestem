@@ -15,18 +15,20 @@ from __future__ import annotations
 import ast
 import json
 import os
+import time
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from readablestem.cli.main import main
 from readablestem.config import Settings
 from readablestem.core.budget import InMemorySpendGuard, JobBudget
-from readablestem.core.types import NotFinished, StepFacts
+from readablestem.core.types import Kind, NotFinished, StepFacts
 from readablestem.eval import corpus, measure
 from readablestem.eval.measure import Converted
 from readablestem.models.fake import FakeVisionClient
-from readablestem.pipeline import page_type, run
+from readablestem.pipeline import page_type, run, tables
 from readablestem.web.worker import default_client_factory
 
 PACKAGE = Path(run.__file__).parents[1]
@@ -43,8 +45,9 @@ ENDS_JOB = "limit: it ends the conversion with a failure code, so no document di
 # The ink analysis is bounded per page by counts of work (plan WS14.9); its clock is only a
 # guard against a hang, far above any honest page, and a page it stops writes a fact.
 INK = "hang guard: per page, 40 times the slowest corpus page; it writes a 'not finished' fact"
-# The one that decides what a page contains today, with the item of the plan that ends it.
-TABLE_SEARCH = "budget in seconds, to become thread CPU time with a fact (plan WS5.14)"
+# A clock all the same: a stop writes the fact, and only a slower core (not a busy machine)
+# reaches it sooner. Evals and replays run without it (`TABLE_SEARCH_UNLIMITED`).
+TABLE_SEARCH = "limit in the thread's CPU time: a stop writes a 'not finished' fact (WS5.14)"
 
 # Every place the conversion reads a clock: (file, the function or class it is in) and what
 # for. A new read fails the first test until it is named here, which is the
@@ -195,6 +198,56 @@ def test_a_page_typed_without_its_ink_because_the_guard_fired_says_so(
     assert output.facts.not_finished == [
         NotFinished(step="page_type", page=0, reason="time_limit", of=1)
     ]
+
+
+# Two slides of authored tables: the layout model's search finds the first one's table, and
+# nothing else on the page proposes it.
+SLIDES = PACKAGE.parents[1] / "data" / "authored" / "tables" / "slides" / "slides.pdf"
+
+
+def test_a_table_search_the_time_limit_stops_says_so_and_a_sleep_does_not_stop_it(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+
+    def convert(**update: bool):
+        output = run.convert_pdf(
+            SLIDES.read_bytes(),
+            settings=settings.model_copy(update=update),
+            client=FakeVisionClient(),
+        )
+        assert output.facts is not None
+        return output
+
+    unlimited = convert(table_search_unlimited=True)
+    assert any(e.kind is Kind.TABLE and e.page == 0 for e in unlimited.result.elements)
+    assert unlimited.facts is not None and unlimited.facts.not_finished == []
+
+    # The limit is CPU time: a search that sleeps 2 s spends none of it, so a limit a wall
+    # clock would pass on the first page (1.5 s, none of it free) changes nothing.
+    find_tables = pymupdf.Page.find_tables
+
+    def asleep(page: pymupdf.Page, *args, **kwargs):
+        time.sleep(2.0)
+        return find_tables(page, *args, **kwargs)
+
+    monkeypatch.setattr(pymupdf.Page, "find_tables", asleep)
+    monkeypatch.setattr(tables, "DETECTOR_FREE_S", 0.0)
+    monkeypatch.setattr(tables, "DETECTOR_EXCESS_S", 1.5)
+    slept = convert()
+    assert slept.facts is not None and slept.facts.not_finished == []
+    assert measure.parts(slept.result) == measure.parts(unlimited.result)
+
+    monkeypatch.setattr(tables, "DETECTOR_EXCESS_S", 0.0)  # none left: no page is searched
+    stopped = convert()
+
+    assert stopped.facts is not None
+    assert stopped.facts.not_finished == [
+        NotFinished(step="table_search", page=page, reason="time_limit", of=1) for page in (0, 1)
+    ]
+    said = [n.page for n in stopped.result.notices if n.code == "tables_not_searched"]
+    assert said == [0, 1]
+    assert not any(e.kind is Kind.TABLE and e.page == 0 for e in stopped.result.elements)
 
 
 # Uploads a slower machine converts differently today, with the plan item that ends it. One

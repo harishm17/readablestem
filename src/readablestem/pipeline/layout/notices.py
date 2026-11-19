@@ -23,6 +23,7 @@ from readablestem.pipeline.layout.page import (
 from readablestem.pipeline.layout.shared import CODE_MONO_SHARE, _Block, _Context, _PageBlocks
 
 NOT_ANALYSED = "drawings_not_analysed"
+TABLES_NOT_SEARCHED = "tables_not_searched"
 
 
 def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str]) -> list[Notice]:
@@ -34,6 +35,13 @@ def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str
         for number, kind in sorted(types.items())
         if not kind.ink.analysed and number not in kept
     ]
+
+
+def _not_searched_notices(pages: list[int]) -> list[Notice]:
+    """A page whose table search the document's time for it refused
+    (`tables.DetectorBudget`) may have a table read as text: "Worth checking", and it holds
+    the job back from "Ready" (`web.states`)."""
+    return [make(TABLES_NOT_SEARCHED, page=number) for number in pages]
 
 
 def _hidden_text_notices(

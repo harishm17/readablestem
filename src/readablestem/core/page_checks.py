@@ -84,6 +84,12 @@ ROWS: tuple[CheckLine, ...] = (
     _page("page_turned", "none", "a page saved sideways, turned to read it", "handled"),
     _page("ocr_text_layer_ignored", "none", "hidden text on a page kept as an image"),
     _page(
+        "tables_not_searched",
+        "optional",
+        "the table search stopped by its time limit",
+        not_checked=True,
+    ),
+    _page(
         "hidden_text_ignored",
         "optional",
         "hidden or covered words on a typed page",

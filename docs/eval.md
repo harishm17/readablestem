@@ -3780,8 +3780,23 @@ guard against a hang (`INK_GUARD_S`, 60 s a page), so which pages are read for h
 no longer depends on how fast the machine is. Measured again that day, that upload kept its
 page at a quarter of the speed under the old budget too, so the loss itself was not
 reproduced; what the test shows is that a clock ten times faster or slower gives the same
-document. The table search's time limit was not reached by any corpus upload at a quarter of
-the speed; it is listed in the clock table and gets its own fact with the table work.
+document.
+
+The table search (WS5.14) is the other clock that can change a page, and no count of work
+can replace it: its cost is inside PyMuPDF and its layout package, and nothing on the page
+before the search predicts it. Its limit is the CPU time of the thread that searches
+(`time.thread_time`), so a machine that is only busy does not reach it, and a stop writes
+`table_search` with `time_limit` for each page it cut short and the notice
+`tables_not_searched` on that page (tables.md, "Which pages are looked at", has the sizing).
+No corpus upload reached it at a quarter of the speed. The regression test in
+`tests/test_determinism.py` plants a sleep of two seconds in each search under a limit a wall
+clock would pass on the first page and the result does not change by a byte; the same file
+with no time left gets the facts and the notices and no table on its first page, and with
+`TABLE_SEARCH_UNLIMITED` it gets its table. Evals and replays run the search without the
+limit (`TABLE_SEARCH_UNLIMITED`, set by `measure.replay_settings` and by every
+`readablestem eval` command), so no score depends on the machine. A replay in which the
+search stopped anyway is not measured: its upload ends with the error `table_search_stopped`,
+which every report lists.
 
 Not covered: a document long enough to reach the limits by its size. The corpus's longest
 upload is short of that, so a 100-page math-heavy document converted under several CPU

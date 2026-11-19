@@ -695,6 +695,12 @@ _HOLDS = {
     "option_labels": (
         "Answer options may be run together, so check the notices before you share it."
     ),
+    # `layout._not_searched_notices`: the table search ran out of time before this page, so a
+    # table there may be plain text
+    "tables_not_searched": (
+        "The search for tables was cut short on some pages, so a table there may be read as "
+        "plain text: check the notices before you share it."
+    ),
     # `text_pass.comment_notes`: a comment may have been written for the instructor alone (an
     # answer, a co-author's remark), and every one is a paragraph of the student file
     "annotations_read": (
