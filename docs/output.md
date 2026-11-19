@@ -388,10 +388,12 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
 
-A picture that was not converted is told once to a screen reader: its alt text says "not
-converted" (or "not described"), so the label beside it ("Not converted.", a figure's "No
+A picture that was not converted is told once to a screen reader: when its alt text says "not
+converted" (or "not described"), the label beside it ("Not converted.", a figure's "No
 description.") carries `aria-hidden="true"` and stays for the eye, as the label of an inline
-equation does. The note's own sentence and the link to the instructor are read. Without a picture
+equation does. The note's own sentence and the link to the instructor are read. When the alt text
+gives the PDF's characters ("v = d / t, as written in the PDF") or a description a person wrote,
+it does not say the part was not converted, so the label is read. Without a picture
 (the original's text, or none) the label has no alt text to repeat it, so it is read. The checker's
 "Needs a description." is an instruction, so it is always read. Listen and EPUB skip the hidden
 label; Word, which does not read `aria-hidden`, shows and reads both (`assemble._alt_says_label`).
@@ -866,7 +868,7 @@ converted it; a page made from several results names only the code.
 - The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The
   border survives forced-colors mode and printing.
 - The note is a `<p role="note">`. On an inline equation the visible label is
-  `aria-hidden`, because the alt text already says the same thing.
+  `aria-hidden` when the alt text already says the same thing, and read when it does not.
 - `data-status` and `data-reason` carry content-free codes for tooling. Reasons come from
   the steps (e.g. `low_confidence`), from the run (`budget_daily`, `budget_job_usd`,
   `budget_job_calls`, `internal_error`, `crop_error`) or from assembly (`no_fix`,

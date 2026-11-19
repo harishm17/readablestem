@@ -12,6 +12,15 @@
   and `data/eval/burden-corpus.json` are re-made at 0.5.13; the golden pages and the stored
   demo page are written again at render 9. Roll back: docs/deploy.md.
 
+## Unreleased: fixes after the independent review of this batch (branch fix/review-5)
+
+- A part shown as a picture had its "Not converted." label hidden from a screen reader whenever
+  a picture was present. When the picture's alt text gave the PDF's characters ("v = d / t, as
+  written in the PDF") or a description a person wrote, nothing a listener heard said the part
+  was not converted. The label is now hidden only when the alt text itself says "not converted"
+  (or "not described"), for a block and for an inline equation (`assemble._alt_says_label`,
+  `inline_equation`). Two golden pages change by that attribute.
+
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 
 - When a document is converted again, a paragraph the reviewer both reworded (or made a heading)

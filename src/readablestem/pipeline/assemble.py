@@ -1539,7 +1539,10 @@ class _Renderer:
             alt = _escape(self.image_alt(element, equation_alt(element, self.audience)))
             size = self.picture_size(element, self.crops.get(element.id))
             image = f'<img src="{src}" alt="{alt}"{size}>'
-            label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
+            # Read unless the alt text already says it (alt text that gives the PDF's
+            # characters does not).
+            hidden = ' aria-hidden="true"' if "not converted" in alt.lower() else ""
+            label = f'<span class="flag-label {AUTHORED_CLASS}"{hidden}>'
         else:
             image = _escape(element.text or "")
             label = f'<span class="flag-label {AUTHORED_CLASS}">'
@@ -1702,18 +1705,27 @@ class _Renderer:
 
 # --------------------------------------------------------------------------- document
 
-# The labels that only repeat what the alt text of the picture beside them says: "Not
-# converted." for an equation, table, page or picture, and a figure's "No description." for a
-# student (the checker's "Needs a description." tells what to do, so it is always read).
-_LABELS_IN_ALT = frozenset(
-    {KEPT_IMAGE_LABEL, KEPT_PICTURE_LABEL, assemble_tables.TABLE_FLAG_LABEL, FIGURE_LABEL.student}
-)
+# The labels that only repeat what the alt text of the picture beside them can say, with the
+# words the alt text must hold for that to be so: "Not converted." for an equation, table,
+# page or picture, and a figure's "No description." for a student (the checker's "Needs a
+# description." tells what to do, so it is always read). An alt text that gives the PDF's
+# characters or a person's description does not say the part was not converted: the label
+# is then the only thing that does, and it is read.
+_LABELS_IN_ALT = {
+    KEPT_IMAGE_LABEL: "not converted",
+    KEPT_PICTURE_LABEL: "not converted",
+    assemble_tables.TABLE_FLAG_LABEL: "not converted",
+    FIGURE_LABEL.student: "not described",
+}
+_PICTURE_ALT = re.compile(r'<img\b[^>]*?\salt="([^"]*)"')
 
 
 def _alt_says_label(body: str, label: str) -> bool:
     """Does the picture of a flagged block (not one in its caption, which are inline
     equations) carry alt text that says what `label` says?"""
-    return label in _LABELS_IN_ALT and "<img " in body.split("<figcaption>")[0]
+    words = _LABELS_IN_ALT.get(label)
+    alt = _PICTURE_ALT.search(body.split("<figcaption>")[0])
+    return words is not None and alt is not None and words in alt.group(1).lower()
 
 
 def _placed_equations(

@@ -103,6 +103,15 @@ def test_a_numbered_equation_with_no_text_says_so_in_its_alt():
         crops={"p1-e1": crop()},
     )  # fmt: skip
     assert alts(html) == ["Equation (5), not converted"]
+    # That alt text says "not converted", so the label beside it is for the eye only. An alt
+    # text that gives the PDF's characters does not say it: the label is then read too.
+    assert '<span class="flag-label" aria-hidden="true">Not converted.</span>' in html
+    with_text = render_html(
+        title="T", lang="en", elements=[equation("v = d / t")], fixes=[failed()],
+        crops={"p1-e1": crop()},
+    )  # fmt: skip
+    assert alts(with_text) == [f"v = d / t{EQUATION_TEXT_ALT_SUFFIX}"]
+    assert '<span class="flag-label">Not converted.</span>' in with_text
 
 
 def test_text_that_looks_like_markup_is_escaped_in_the_attribute():
