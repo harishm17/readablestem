@@ -572,7 +572,25 @@ def test_what_a_word_file_leaves_a_person_to_decide_is_said_not_left_to_chance(
             f"/jobs/{job_id}/review/{table.element_id}",
             data={"csrf_token": csrf_from(listed), "action": "accept", "view": "list"},
         )
-        assert accept.status_code == 422
+        assert accept.status_code == 422 and "cannot be accepted as it is" in accept.text
+        # and the choice settles it, as it does for a PDF table
+        version = str(env.job(job_id).result_version)
+        chosen = client.post(
+            f"/jobs/{job_id}/review/{table.element_id}",
+            data={
+                "csrf_token": csrf_from(listed),
+                "action": "edit",
+                "change": "headers",
+                "header_row": "on",
+                "version": version,
+                "view": "list",
+            },
+        )
+        assert chosen.status_code == 303, chosen.text[:300]
+        settled = DocumentResult.model_validate(env.job(job_id).result_json)
+        headed = settled.fix_for(table.element_id)
+        assert headed is not None and headed.table is not None and not headed.pending
+        assert (headed.table.grid.header_rows, headed.table.grid.header_source) == (1, "reviewer")
         # the large table is a list whose formulas are equations of their row, and says so
         rows = [e for e in result.elements if e.kind is Kind.LIST_ITEM]
         assert len(rows) == 301 and not any("\\" in (r.text or "") for r in rows)
