@@ -6,6 +6,7 @@ the page picture a failed page is kept as, and the heading levels read from the 
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from collections.abc import Sequence
 from functools import partial
@@ -73,6 +74,7 @@ from readablestem.pipeline.layout.notices import (
     _hidden_text_notices,
     _ink_notices,
     _layout_notices,
+    _not_searched_notices,
     _turned_notices,
 )
 from readablestem.pipeline.layout.order import Gutter
@@ -126,6 +128,7 @@ def analyze(
     page_math: Any = None,
     display_grouping: bool = False,
     region_tree: bool = False,
+    table_search_limited: bool = True,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -148,6 +151,10 @@ def analyze(
     `region_tree` (`REGION_TREE`, off): the page's columns are found by a tree of regions built
     from the unmerged lines ("The region tree" in docs/layout.md). Off, the output is what it
     was before the tree existed.
+
+    `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
+    search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
+    machine.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -162,7 +169,11 @@ def analyze(
                     doc,
                     selected,
                     page_math,
-                    _Document(grouping=display_grouping, region_tree=region_tree),
+                    _Document(
+                        grouping=display_grouping,
+                        region_tree=region_tree,
+                        detector=tables.DetectorBudget(None if table_search_limited else math.inf),
+                    ),
                 )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
@@ -381,6 +392,7 @@ def _analyze_document(
         text_kept.discard(number)
     guard.on_purpose = {n for n in kept if n not in text_kept}
     guard.settle()
+    not_searched: list[int] = []  # pages the table search's time limit refused
     for number in guard.live(selected):
         with guard(number):
             if number in kept and number not in text_kept:
@@ -396,6 +408,7 @@ def _analyze_document(
             # `previous` is the page before's tables, unless that page failed: a page that is
             # now a picture takes no row the break split.
             unclaimed = frags[number]
+            refused_before = document.detector.refused
             found[number] = (
                 []
                 if number in text_kept
@@ -421,6 +434,8 @@ def _analyze_document(
                     ),
                 )
             )
+            if document.detector.refused > refused_before:
+                not_searched.append(number)
             sources[number] = say_once.PageSource()
             sources[number].leave_out("hidden", types[number].text.left_out)
             # the rows a table claimed are said by the table, or by the text it becomes
@@ -541,6 +556,8 @@ def _analyze_document(
     if title is None:
         levels = heading_levels(elements)
         title = next((e.text for e in elements if levels.get(e.id) == 1), None)
+    # (a failed page is its picture, not a search stop)
+    not_searched = guard.live(not_searched)
     return Layout(
         elements=elements,
         page_count=doc.page_count,
@@ -553,9 +570,11 @@ def _analyze_document(
             + _hidden_text_notices(types, kept)
             + _ink_notices(types, kept)
             + _turned_notices(types)
+            + _not_searched_notices(not_searched)
         ),
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
+        tables_not_searched=not_searched,
         sources=sources,
         table_refusals={n: r for n, r in sorted(refused.items()) if r},
     )

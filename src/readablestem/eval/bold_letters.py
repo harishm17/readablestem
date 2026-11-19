@@ -114,7 +114,7 @@ def found_in(
     from readablestem.pipeline.notation_memory import BOLD_LETTER_REASON
 
     with options.using(ConversionOptions(notation_memory=True, notation=list(notation))):
-        elements = layout.analyze(pdf).elements
+        elements = layout.analyze(pdf, table_search_limited=False).elements
     letters: Counter[str] = Counter()
     evidence: Counter[str] = Counter()
     for element in elements:

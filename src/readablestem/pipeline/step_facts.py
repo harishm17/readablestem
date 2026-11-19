@@ -53,6 +53,8 @@ SECOND_READER = "second_reader"
 # of a handwritten page for its pictures.
 PAGE_TYPE = "page_type"
 INK_STROKES = "ink_strokes"
+# The table search, which the document's CPU time for it can stop (tables.DetectorBudget).
+TABLE_SEARCH = "table_search"
 # The stage a caller adds for what its call of the conversion took outside the conversion's
 # own stages (`start_up`).
 START_UP = "start_up"

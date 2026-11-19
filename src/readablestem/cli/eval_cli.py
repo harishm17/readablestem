@@ -242,7 +242,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
 def _settings() -> Any:
     from readablestem.config import get_settings
 
-    return get_settings()
+    return get_settings().model_copy(update={"table_search_unlimited": True})
 
 
 def _settings_for(args: argparse.Namespace) -> Any:

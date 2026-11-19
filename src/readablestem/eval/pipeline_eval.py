@@ -1140,7 +1140,7 @@ def _eval_headings(
         fixes: list[Fix] = []
         pdf_pages = 0
         try:
-            analysed = layout.analyze(pdf)
+            analysed = layout.analyze(pdf, table_search_limited=False)
             fixes = heading_step.heading_fixes(analysed.elements)
             pdf_pages = analysed.page_count
             predicted = predicted_headings(fixes)

@@ -69,13 +69,42 @@ the largest that got through the detector at all):
   "Page cap") is not given to it;
 - a page with more than `tables.MAX_DETECTOR_ITEMS` (30,000) path items has no table
   proposed, and its lines are read as text;
-- a document has a time budget for slow detections (`tables.DetectorBudget`): a detection
-  longer than `DETECTOR_FREE_S` (3 s; a page with a table takes under 1 s) draws the time
-  beyond that from `DETECTOR_EXCESS_S` (60 s) for the whole document, and when it is used
-  up the document's remaining pages get no proposals (one content-free warning). A
-  document within the budget reads exactly as it would without one; one over it depends
-  on the machine's speed from there on (plan WS5.14; the ink analysis's budget is counted
-  in work since WS14.9).
+- a document has a time budget for slow detections (`tables.DetectorBudget`), counted in
+  the CPU time of the thread that searches (`time.thread_time`), so waiting for a core on a
+  busy machine costs it nothing. A search longer than `DETECTOR_FREE_S` (3 s; a page with a
+  table takes under 1 s) draws the time beyond that from `DETECTOR_EXCESS_S` (360 s) for
+  the whole document. When that is used up, the document's remaining pages get no
+  proposals from the layout model and no continued table (`find_continued`); their own
+  rules and aligned text still propose. Nothing countable on a page before the search
+  predicts its cost, which is why the limit is time and not a count of work.
+
+  A stop is said, not silent: the conversion writes the "not finished" fact `table_search`
+  with reason `time_limit` for each page cut short (`job_not_finished`, operations.md), each
+  such page carries the notice `tables_not_searched` ("Worth checking"), and the job is
+  not "Ready" with nothing to add until the owner has seen it. A document within the budget
+  reads exactly as it would without one. Evals and replays run without it
+  (`TABLE_SEARCH_UNLIMITED`, eval.md "The same file gives the same document"), so no score
+  depends on the machine.
+
+  The 360 s come from the recorded searches of the two sets of arXiv papers the table
+  work is measured on (`data/eval/table-search-seconds.json`: a short hash and the seconds of
+  each searched page per paper, 3,121 pages), replayed through the budget with every search
+  taking longer by a factor (`python -m readablestem.eval.table_search`). The seconds are
+  wall time on a quiet machine, where wall over thread CPU time was 1.02:
+
+  | Each search takes | Development, 70 papers | Held out, 91 papers |
+  |---|---|---|
+  | 1, 2 or 4 times as long | none stopped | none stopped |
+  | 8 times | 4 stopped, 19 pages cut short | 3 stopped, 16 pages cut short |
+  | 2 times, under the old 60 s of wall time | 2 stopped, 12 pages | 1 stopped, 2 pages |
+  | 4 times, under the old 60 s of wall time | 24 stopped, 201 pages | 24 stopped, 230 pages |
+
+  The first paper is stopped at 4.85 times its recorded cost; at 4 times the most any paper
+  uses is 289 of the 360 s. Four times is the share of a core a small hosting plan gives a
+  job. What the numbers do not show: the papers are arXiv papers, not course material (a
+  lecture of pen strokes costs far more a page, and most such pages are kept as images and
+  never searched), and the CPU time onnxruntime spends on its own threads, when it may use
+  more than one CPU, is not counted.
 
 The detector's time depends on what is drawn on the page, not on its tables, and is
 nearly all inside PyMuPDF: a lecture slide with 202 pen-stroke paths (11,000 curve items)

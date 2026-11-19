@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: the table search stops on CPU time (branch fix/table-search-cpu-time)
+
+- **The table search's limit is CPU time, and a stop says so.** The search for tables by the
+  layout model, four fifths of page-reading time on the slowest pages, had a limit of 60
+  seconds of wall time a document (after 3 free a search), so a busy machine stopped it where
+  a quiet one did not, and the pages after the stop read as if they had no tables with only a
+  log line to say so. The limit now counts the CPU time of the thread that searches, and it
+  is 360 seconds: replayed from the recorded searches of two sets of arXiv papers
+  (`python -m readablestem.eval.table_search`), no paper of 70 and of 91 is stopped at four
+  times its cost (the first at 4.85 times); the old limit stopped 2 and 1 at twice, 24 and 24
+  at four times. A stop writes the "not finished" fact `table_search` with `time_limit` for
+  each page it cut short, each such page gets the notice `tables_not_searched` ("Worth
+  checking": a table there may be read as plain text), and the job is not "Ready" with nothing
+  to add. Evals and replays run without the limit (`TABLE_SEARCH_UNLIMITED`), and a replay in
+  which the search stopped anyway is counted as failed (`table_search_stopped`), not measured.
+  A document within the limit converts as before: no version bump is owed.
+
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"

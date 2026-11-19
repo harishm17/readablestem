@@ -503,6 +503,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "guessed from the page ({count} characters) was not used.",
     "drawings_not_analysed": "The drawings on this page were not analyzed, so handwriting on "
     "it may be missing: compare the page with the original.",
+    "tables_not_searched": "The search for tables was cut short on this page, because the "
+    "time this document has for it ran out, so a table here may be read as plain text: compare "
+    "the page with the original.",
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",

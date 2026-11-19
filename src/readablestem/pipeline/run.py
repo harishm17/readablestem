@@ -1647,6 +1647,8 @@ def _page_math_pass(
             )
             if settings.region_tree == "on":
                 grouping["region_tree"] = True
+            if settings.table_search_unlimited:
+                grouping["table_search_limited"] = False
             try:
                 doc = layout.analyze(
                     pdf_bytes,
@@ -1888,6 +1890,8 @@ def _convert(
     # (`page_type.InkBudget`).
     ink_late: dict[int, str] = {}
     strokes_late: dict[int, str] = {}
+    # Pages the table search's CPU time for the document refused (tables.DetectorBudget).
+    tables_late: set[int] = set()
     # The page-level passes ask through the job's kept answers when it has any.
     page_client: VisionClient = (
         client if step_cache is None else _PageAnswers(client, step_cache, settings)
@@ -1908,6 +1912,8 @@ def _convert(
                 extra["display_grouping"] = True
             if settings.region_tree == "on":
                 extra["region_tree"] = True
+            if settings.table_search_unlimited:
+                extra["table_search_limited"] = False
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,
@@ -1915,6 +1921,7 @@ def _convert(
                 **extra,
             )
             ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
+            tables_late.update(getattr(doc, "tables_not_searched", None) or ())
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
@@ -1933,6 +1940,7 @@ def _convert(
                 )
                 # (the pass lays the plan over a second layout run, which types the pages again)
                 ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
+                tables_late.update(getattr(doc, "tables_not_searched", None) or ())
             if collector is not None and options.page_witness:
                 watch.stage("page_witness")
                 witnessed, witness_summary = _page_witness_pass(
@@ -2136,6 +2144,7 @@ def _convert(
             )
         stops += step_facts.ink_stopped(step_facts.PAGE_TYPE, ink_late)
         stops += step_facts.ink_stopped(step_facts.INK_STROKES, strokes_late)
+        stops += step_facts.pages_capped(step_facts.TABLE_SEARCH, sorted(tables_late), "time_limit")
         # The say-once measure, in shadow (SW60): a page whose words an element does not say
         # is noted, with its share, in the conversion's own record and nowhere a person sees.
         # A page kept whole as a picture, or read from one, has its own decision.

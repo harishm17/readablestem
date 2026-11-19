@@ -110,7 +110,7 @@ class FakeTableMedia:
 def fake_layout(found: dict[str, list[Element]]):
     """`layout.analyze` returning the given elements for a document (by PDF title)."""
 
-    def analyze(pdf_bytes: bytes, *, pages=None, max_pages=None) -> layout.Layout:
+    def analyze(pdf_bytes: bytes, *, pages=None, max_pages=None, **_) -> layout.Layout:
         with pymupdf.open(stream=pdf_bytes, filetype="pdf") as doc:
             title, count = doc.metadata.get("title", ""), doc.page_count
         key = next((k for k in found if k in title), None)
