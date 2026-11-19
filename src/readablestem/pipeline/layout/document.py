@@ -533,9 +533,7 @@ def _read_deck(
                     rect.height,
                     page_labels.pdf_label(page),
                     rows,
-                    slides.LazyMarks(
-                        partial(_marks_of, page, paths.get(number, []), guard, number)
-                    ),
+                    slides.LazyMarks(partial(_marks_of, doc, number, paths.get(number, []), guard)),
                 )
             )
     creator = doc.metadata.get("creator") if doc.metadata else None
@@ -548,13 +546,15 @@ def _read_deck(
 
 
 def _marks_of(
-    page: pymupdf.Page, paths: list[_Path], guard: _PageGuard, number: int
+    doc: pymupdf.Document, number: int, paths: list[_Path], guard: _PageGuard
 ) -> list[slides.Mark]:
     """The page's slide marks, read when `detect` first needs them (`slides.LazyMarks`); none
     when they cannot be read (`guard` has the page then, and `_read_deck` runs `detect` again
-    without it)."""
+    without it). The page is opened here, so a long file's pages are not all held open while
+    its views wait."""
     marks: list[slides.Mark] = []
     with guard(number):
+        page = doc[number]
         marks = _slide_marks(page, paths, page.rect.height)
     return marks
 
