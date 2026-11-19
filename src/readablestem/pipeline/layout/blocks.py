@@ -59,6 +59,7 @@ from readablestem.pipeline.layout.shared import (
     _Block,
     _CharInfo,
     _Context,
+    _face,
     _Figure,
     _Inline,
     _Marker,
@@ -504,12 +505,12 @@ def _lettered_title(row: _Row) -> bool:
     return _face(row) != ""
 
 
-def _face(row: _Row) -> str:
-    """ "bold" or "italic" when every letter of the row is, else ""."""
-    if row.bold:
-        return "bold"
-    letters = [c for c in row.ink if c.c.isalnum()]
-    return "italic" if letters and all(c.italic for c in letters) else ""
+def _opens_with_bullet(row: _Row) -> bool:
+    """Does the row's text open with a bullet glyph? A bold line that does is an item of a list
+    ("• E1 reaction"), not a title; a bullet drawn beside the row is not in its text, and a
+    label such as "Solution" set after one stays what it was."""
+    marker = row.marker
+    return marker is not None and not marker.ordered and marker.end > marker.start
 
 
 # `Element.reasons` of a table of contents' entry (a list item): the link step looks for
@@ -1886,7 +1887,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and len(text) <= MAX_BOLD_HEADING_CHARS
         and letters >= 2
         and _title_like(text)
-        and not (rows[0].marker is not None and not rows[0].marker.ordered)  # a bold bullet item
+        and not _opens_with_bullet(rows[0])
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif upright and len(rows) == 1 and _lettered_title(rows[0]):

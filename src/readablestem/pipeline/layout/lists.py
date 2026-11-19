@@ -12,7 +12,15 @@ from dataclasses import dataclass, replace
 from readablestem.core.types import Kind
 from readablestem.pipeline.layout.context import _PageGuard
 from readablestem.pipeline.layout.glyphs import _BULLET_GLYPHS, _Char, _clean
-from readablestem.pipeline.layout.shared import _Block, _Context, _Marker, _Path, _Row, _tokens
+from readablestem.pipeline.layout.shared import (
+    _Block,
+    _Context,
+    _face,
+    _Marker,
+    _Path,
+    _Row,
+    _tokens,
+)
 
 # Bullets only at the start of a line and followed by a space (LaTeX's second-level "\u2013",
 # third-level "\u2217", Markdown's "-" and "*"); maths or punctuation anywhere else. They
@@ -346,27 +354,47 @@ def _list_markers(
 
     # A capital letter and a full stop starts a line of an author list as readily as an item
     # ("A. Smith, B. Jones"), and some line of a long document has the next letter: the sibling
-    # of such a marker is the item just before or just after it.
+    # of such a marker is a neighbor, the item just before or just after it in reading order, or
+    # the one just above or below it at the same x (options set in two columns across the page
+    # are read A, C, B, D by the line).
     capitals = sorted(
         (c for c in candidates if _capital_letter(c)),
         key=lambda c: (page_of[id(c)], c.row.column == "R", c.row.baseline),
     )  # in reading order: a page's left column, then its right
-    around = {
-        id(c): (capitals[k - 1] if k else None, capitals[k + 1] if k + 1 < len(capitals) else None)
-        for k, c in enumerate(capitals)
-    }
+    in_column: dict[tuple[int, str], list[_MarkerCandidate]] = {}
+    for c in capitals:
+        in_column.setdefault((page_of[id(c)], c.row.column), []).append(c)
+
+    def stacked(candidate: _MarkerCandidate, step: int) -> _MarkerCandidate | None:
+        """The nearest capital letter above (-1) or below (1) at the same x."""
+        near = [
+            (gap, other)
+            for other in in_column[(page_of[id(candidate)], candidate.row.column)]
+            if abs(other.x0 - candidate.x0) <= MARKER_ALIGN
+            and (gap := (other.row.baseline - candidate.row.baseline) * step) > 0
+        ]
+        return min(near, key=lambda t: t[0])[1] if near else None
+
+    place = {id(c): k for k, c in enumerate(capitals)}
 
     def beside(candidate: _MarkerCandidate) -> bool:
         value = _capital_letter(candidate)
+        k = place[id(candidate)]
+        neighbors = (
+            (capitals[k - 1] if k else None, -1),
+            (capitals[k + 1] if k + 1 < len(capitals) else None, 1),
+            (stacked(candidate, -1), -1),
+            (stacked(candidate, 1), 1),
+        )
         return any(
             other is not None
             and _capital_letter(other) == value + step
             and (
-                other.row.column != candidate.row.column
+                (other.row.column != candidate.row.column and _face(candidate.row) != "")
                 or abs(other.x0 - candidate.x0) <= MARKER_ALIGN
                 or abs(other.marker.x - candidate.marker.x) <= MARKER_ALIGN
             )
-            for other, step in zip(around[id(candidate)], (-1, 1), strict=True)
+            for other, step in neighbors
         )
 
     for candidate in candidates:
