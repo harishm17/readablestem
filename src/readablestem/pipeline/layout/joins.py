@@ -383,14 +383,14 @@ def _same_edge(
     across = tail.column != head.column
     if across and len(last.rows) < 2:
         return False
+    lefts = [r.x0 for r in last.rows]
+    one_column = max(lefts) - min(lefts) <= MAX_INDENT * size  # not an index's columns of entries
     for c in xs:
         inset = c - tail_edge  # a paragraph's lines stand at its edge; an item's text stands in
         if len(last.rows) == 1 and not item and not across and 0 < inset <= MAX_INDENT * size:
             inset = 0.0  # the one line is the first of its paragraph, in by the first-line indent
-        if not item and len(last.rows) >= 2 and inset > FAR_COLUMN * size:
-            inset = (
-                0.0  # so far in that it is another column, on a page whose columns are unlabeled
-            )
+        if one_column and not item and len(last.rows) >= 2 and inset > FAR_COLUMN * size:
+            inset = 0.0  # in so far that it is another column, on a page with unlabeled columns
         if abs(head.x0 - head_edge - inset) <= EDGE_TOLERANCE:
             return True
     return False
