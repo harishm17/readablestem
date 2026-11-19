@@ -10,6 +10,11 @@
   `table_header_missing` ("Worth checking") says it has no header row. The stored tables and the
   table step's request are unchanged, so recorded answers still match. `RENDER_VERSION` is owed a
   raise: a stored page with a continued table is written differently.
+- Paragraphs cut at a page break: three more cases are joined, each on evidence that the sentence
+  cannot end there. A paragraph whose block began in the other column of its page and ends the
+  page in a column's body text; a paragraph that ends on a comma or a semicolon, whatever letter
+  the next page starts with; a next page that starts with a citation shut by punctuation
+  ("[12]."). `PIPELINE_VERSION` is owed a raise for a document that has one.
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
