@@ -1631,16 +1631,34 @@ def _runs_on(prev: _Row, edges: _RightEdges | None) -> bool:
     return edges is None or prev.x1 >= edges.of(prev) - 3 * prev.size
 
 
-def _margin_number(row: _Row) -> bool:
-    """Is the number that starts the line a line number of the margin, not a step: set in
-    smaller type than the line, or at more than 1.2 em from the text that follows it?"""
+# The words that start a line of an algorithm in lower case.
+_STEP_WORDS = frozenset(
+    {"if", "else", "elif", "for", "foreach", "while", "do", "repeat", "until", "end", "endif"}
+    | {"endfor", "endwhile", "return", "then", "break", "continue", "function", "procedure"}
+)
+
+
+def _margin_number(prev: _Row, row: _Row, number: re.Match[str]) -> bool:
+    """Is the number that starts `row` a line number of the margin, not a step: set apart
+    from its line (in smaller type, or more than 1.2 em from the text), and the sentence of
+    `prev` goes on in the words after it (they start in lower case, and are no step word)?"""
     chars = [c for c in row.chars if not c.blank]
     count = 0
     while count < len(chars) and (chars[count].c.isdigit() or chars[count].c in ":."):
         count += 1
     if not 0 < count < len(chars):
         return False
-    return row.is_script(chars[0]) or chars[count].x0 - chars[count - 1].x1 > 1.2 * row.size
+    apart = row.is_script(chars[0]) or chars[count].x0 - chars[count - 1].x1 > 1.2 * row.size
+    word = re.match(r"[a-z]+", row.clean[number.end() - 1 :])
+    end = prev.clean[-1:]
+    last = re.search(r"[A-Za-z]+$", prev.clean)
+    return (
+        apart
+        and word is not None
+        and word.group(0) not in _STEP_WORDS
+        and (end.islower() or end in _MID_SENTENCE - {";", "("})
+        and (last is None or last.group(0) not in _STEP_WORDS)
+    )
 
 
 def _styled_lead(prev: _Row, row: _Row) -> bool:
@@ -1668,8 +1686,8 @@ def _starts_block(
     label, at the end of a sentence or in another style than the line above; a numbered one
     with no stop only in bold or italic); the next number of a column of numbers after a line
     that ends short of the right edge (the steps of an algorithm, the lines of a listing; not
-    the line numbers of a margin, `_margin_number`). The signals that need the page's line
-    ends (`edges`) are not applied without them."""
+    the line numbers of the margin of a passage, `_margin_number`). The signals that need the
+    page's line ends (`edges`) are not applied without them."""
     text = row.clean
     if ctx.region_tree and entries.starts_entry(prev, row, run):
         return True
@@ -1700,7 +1718,7 @@ def _starts_block(
         and before is not None
         and int(number.group(1)) == int(before.group(1)) + 1
         and prev.x1 < edges.of(prev) - 3 * prev.size
-        and not _margin_number(row)
+        and not _margin_number(prev, row, number)
     )
 
 
