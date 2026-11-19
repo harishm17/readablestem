@@ -450,6 +450,8 @@ def actualtext_flag(page: pymupdf.Page) -> int:
     a replacement dropped come back. No choice is made per span. A page with no ActualText is
     not read twice, and its flag is 0. Made once a page and kept on the document."""
     doc = page.parent
+    if doc is None:  # a page whose document is gone cannot be read twice
+        return 0
     facts = vars(doc).setdefault("_actualtext_facts", _ActualTextFacts())
     if page.number not in facts.flags:
         if facts.carries is None:
