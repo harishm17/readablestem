@@ -7,6 +7,9 @@ no stored time-zone preference; a person's zone is not asked for or kept.
 
 - `format_when` is for text: `long` ("October 9, 2026, 14:03 UTC", the review record) and
   `short` ("Oct 9, 2026, 14:03 UTC", the fallback inside a `<time>` element and title text).
+- `format_day` is for a calendar day with no time ("October 9, 2026", or "Oct 9, 2026"): the
+  day a version was made, a policy's date, the last day of a link, a usage row. `format_time`
+  is the time of day alone ("00:00 UTC", when a quota day resets).
 - `machine_date` is for machines (`<time datetime>`, the record's CSV): ISO 8601, UTC.
 
 A quota day stays a UTC day (`web.quota`), and the pages that show it say "UTC" with it.
@@ -14,11 +17,12 @@ A quota day stays a UTC day (`web.quota`), and the pages that show it say "UTC" 
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from typing import Literal
 
 from markupsafe import Markup
 
+from readablestem.pipeline.checked_words import long_date
 from readablestem.web.database import as_utc
 
 Style = Literal["long", "short"]
@@ -29,8 +33,25 @@ def format_when(value: datetime | None, style: Style = "long") -> str:
     when = as_utc(value)
     if when is None:
         return ""
-    month = f"{when:%B}" if style == "long" else f"{when:%b}"
-    return f"{month} {when.day}, {when.year}, {when:%H:%M} UTC"
+    return f"{format_day(when, style)}, {format_time(when)}"
+
+
+def format_day(value: date | datetime | str | None, style: Style = "long") -> str:
+    """A calendar day with no time: "October 9, 2026" (`short`: "Oct 9, 2026"); "" for none.
+    A time is put in UTC first, and a string is an ISO date ("2026-10-09")."""
+    if isinstance(value, str):
+        value = date.fromisoformat(value) if value else None
+    if isinstance(value, datetime):
+        value = as_utc(value)
+    if value is None:
+        return ""
+    return long_date(value) if style == "long" else f"{value:%b} {value.day}, {value.year}"
+
+
+def format_time(value: datetime | None) -> str:
+    """The time of day in UTC, saying so ("14:03 UTC"); "" for none."""
+    when = as_utc(value)
+    return f"{when:%H:%M} UTC" if when is not None else ""
 
 
 def machine_date(value: datetime | None) -> str:

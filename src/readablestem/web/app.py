@@ -50,7 +50,7 @@ from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
 from readablestem.web.bundle import limit as zip_limit
 from readablestem.web.database import prepare_database
-from readablestem.web.dates import format_when, time_tag
+from readablestem.web.dates import format_day, format_when, time_tag
 from readablestem.web.db import make_engine, make_sessionmaker
 from readablestem.web.deps import (
     AppContext,
@@ -222,6 +222,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.filters["day"] = format_day
     env.globals["zip_limit"] = zip_limit  # ty: ignore[invalid-assignment]
     env.globals["allowance"] = _allowance  # ty: ignore[invalid-assignment]
     env.globals["PAGES_RULE"] = PAGES_RULE  # ty: ignore[invalid-assignment]

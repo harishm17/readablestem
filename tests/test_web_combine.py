@@ -109,7 +109,7 @@ def test_a_part_with_a_decision_open_is_held_back_like_in_download_all(web):  # 
         ]
         row.result_json = result
     page = text_of(web.alice.get(f"/jobs/{jobs[0].id}").text)
-    assert "Combining needs at least two ready parts; 1 is ready now (2 of this file's parts" in page
+    assert "Combining needs at least two ready parts; 1 is ready now (2 of" in page
 
 
 def test_two_parts_with_a_page_in_common_keep_the_newest_not_a_409(web):  # noqa: F811

@@ -151,7 +151,7 @@ class Stamp:
     @property
     def date_text(self) -> str:
         """The day written out in full, with no time ("November 10, 2026")."""
-        return f"{self.day:%B} {self.day.day}, {self.day.year}"
+        return checked_words.long_date(self.day)
 
     @property
     def line(self) -> str:

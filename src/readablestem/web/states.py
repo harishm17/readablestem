@@ -45,6 +45,7 @@ from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import job_page
 from readablestem.web import outcome as words
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_day, format_time
 from readablestem.web.db import Job, JobStatus, utcnow
 
 if TYPE_CHECKING:
@@ -411,7 +412,7 @@ def state_of(
             return _make("restarting", _restart_message())
         if ctx.budget_closed:
             reset = _next_reset(ctx.now)
-            return _make("waiting_reset", words.WAITING_BUDGET, time=f"{reset:%H:%M} UTC")
+            return _make("waiting_reset", words.WAITING_BUDGET, time=format_time(reset))
         return _make("waiting", ctx.waiting_line or "Waiting for its turn.")
     if job.status == JobStatus.RUNNING:
         if job.cancel_requested:
@@ -508,7 +509,7 @@ def _deleted(job: Facts) -> State:
         "This document was deleted.",
         (upload,),
         group=NEEDS,
-        date=f"{when:%b} {when.day}, {when.year}",
+        date=format_day(when, "short"),
     )
 
 

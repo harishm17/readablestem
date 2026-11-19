@@ -402,7 +402,7 @@ def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
             return "The tool flagged nothing in this file for review, and nobody has reviewed it."
         text = "Nobody has reviewed this file yet."
     else:
-        when = f", the last on {s.reviewed_on:%B} {s.reviewed_on.day}" if s.reviewed_on else ""
+        when = f", the last on {long_date(s.reviewed_on)}" if s.reviewed_on else ""
         flagged = plural(s.flagged, "flagged part")
         text = (
             f"You reviewed {s.load.decided} of {flagged}{when}."

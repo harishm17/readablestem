@@ -78,6 +78,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from readablestem.config import Settings
 from readablestem.core import triage
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_day
 from readablestem.web.db import Event, Job, JobStatus, User, session_scope, utcnow
 from readablestem.web.logsafe import log_exception
 
@@ -590,7 +591,7 @@ PERSON_COLUMNS = (
 
 @dataclass
 class UsageRow:
-    """One row of the admin tables: a UTC day ("2026-10-09") or a pseudonymous person
+    """One row of the admin tables: a UTC day ("Oct 9, 2026", `web.dates`) or a pseudonymous person
     ("u-1a2b3c4d", the start of their random id; never an email)."""
 
     label: str
@@ -646,7 +647,7 @@ def usage(
             reviewed.setdefault(who, set()).add(job_ref)
         active.setdefault(who, set()).add(day)
         if at.date() >= first_day:
-            by_day.setdefault(day, UsageRow(day)).counts.update(keys)
+            by_day.setdefault(day, UsageRow(format_day(day, "short"))).counts.update(keys)
     for who, person in by_person.items():
         person.counts["days"] = len(active[who])
         person.counts[DOCUMENTS_REVIEWED] = len(reviewed.get(who, ()))

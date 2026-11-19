@@ -16,6 +16,7 @@ from sqlalchemy import select
 from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, login, make_pdf, token
 from readablestem.ops import retention
 from readablestem.web import access, pending, storage
+from readablestem.web.dates import format_day
 from readablestem.web.db import Blob, Job, PendingUpload, User, session_scope, utcnow
 from readablestem.web.intake import store_job
 
@@ -283,7 +284,10 @@ def test_the_storage_shows_to_the_admin_and_goes_stale_while_full(web):
         "decisions": None,
         "claude": {"day": utcnow().date().isoformat(), "status": "drift"},
     }
-    assert "Claude second check: drift on" in admin.get("/admin").text
+    # A day on the admin page reads like every other date on the site ("November 19, 2026").
+    page = admin.get("/admin").text
+    assert f"Claude second check: drift on {format_day(utcnow())}" in page
+    assert f"drift on {utcnow().date().isoformat()}" not in page
     assert "canar" not in web.alice.get("/healthz/ops").text
 
 

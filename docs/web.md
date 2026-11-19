@@ -169,7 +169,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/download.epub` | view | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link in the EPUB route of "Where will you post it?" |
 | GET `/jobs/{id}/share` | owner | Who can open this document (G1, "Sharing a document" below): the people and their right, the form to add one, the document's address to copy. 404 for a sample or an unfinished document |
 | POST `/jobs/{id}/share` | owner | Give a person (`email`, in full) the right `role` (`view` or `review`), or change theirs; 422 with the reason beside the field for an address that is not one, your own, a right that does not exist, or an eleventh person. CSRF-checked, nothing is sent |
-| POST `/jobs/{id}/share/{share_id}/revoke` | owner | Remove one person's access; it stops on their next request. CSRF-checked |
+| POST `/jobs/{id}/share/{share_id}/revoke` | owner | Without `confirm=yes` the answer is the question "Remove <address> from <title>?" (`share_remove_confirm.html`; no address is in a URL, and nothing is written); with it, remove the person's access, effective on their next request. A second click on a person already gone gets the same notice as the first. CSRF-checked, one-submit form `share.revoke` |
 | GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
@@ -191,7 +191,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/pages/{n}/omit`, `/restore` | review | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
 | POST `/jobs/{id}/tables/accept-clean` | review | Accept every table that waits with nothing wrong found in it (T3-11), one write |
 | POST `/jobs/{id}/tables/{element_id}/read-cell` | review | Read a table's math cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
-| GET, POST `/jobs/{id}/delete` | owner | A "Delete “<title>”?" confirmation page (the file, its upload time, the decisions made on it; the button is named `Delete “<title>”`, cut at 48 characters, and "No, keep it" is a button of the same size); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list. The account, course and upload-discard confirmations follow the same pattern (`page-confirm` body class, compact footer) |
+| GET, POST `/jobs/{id}/delete` | owner | A "Delete “<title>”?" confirmation page (the file, its upload time, the decisions made on it; the button is named `Delete “<title>”`, cut at 48 characters, and "No, keep it" is a button of the same size); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list. The account, course and upload-discard confirmations follow the same pattern (`page-confirm` body class, compact footer), and so do the questions for removing a person (a course's People section, the share page, the Admin page), a symbol and a class link: one heading that is the question, a short paragraph of what is lost, and two choices of the same size, the destructive button named for the thing and "No, keep it". `_delete_notes.html` ("Not reached by deleting": backups, what was already sent to the AI providers) is added to the pages that delete stored documents, files, a course or the account, since only those leave copies behind; removing access deletes nothing, so those pages do not carry it. The older delete pages and the newer ones are the one shape (WS24.6, O-108) |
 | GET, POST `/jobs/{id}/feedback` | view | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
 | GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all"); `?format=` as for `/app/download` |
@@ -1242,12 +1242,11 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
 - **The owner's side.** The job page's "Share this document" opens `/jobs/{id}/share`: a
   one-line "add a person, copy the link, send it yourself", a form (email address; View or
   Review as whole-row choices, each with what it allows; the Share button has when access ends
-  beside it), the people with access with "Change ... to" and "Remove ..." (a danger button)
-  per person, the document's address to copy: a selectable read-only box that wraps, so the
+  beside it), the people with access with "Change ... to" and "Remove ..." (an outlined danger
+  button that opens the question first, as every other Remove does) per person, the document's address to copy: a selectable read-only box that wraps, so the
   whole address shows at any width (the class link's address is the same), plus a "Copy link"
   button that `static/copy-link.js` shows (with a polite confirmation; without script the box is
-  copied by hand). In forced colors "Remove ..." keeps a thick double edge, so it does not
-  look like the "Change ... to" button. Beside the address the page says when the document is deleted (every share
+  copied by hand). Beside the address the page says when the document is deleted (every share
   ends then) and links to the job page's keep controls. The sign-in wording names only the
   providers this server has (`routes.sharing.sign_in_words`); the exact-address rule is under
   "Help with sharing", and an error summary sits directly above the form. Nothing is emailed; the
@@ -1717,6 +1716,15 @@ in the reader's time zone with how far away it is ("Fri, Oct 9, 6:32 PM CDT (in 
 hours)"), also in lists swapped in by htmx (a mutation observer looks only at the nodes that
 were inserted, not at the whole page again). Without JavaScript the UTC text stays (UX
 review MF16). The `utc_text` filter is the plain text, for titles and attributes.
+
+A day with no time of day is written by one function, `web.dates.format_day` (the `day` template
+filter): "October 9, 2026", or "Oct 9, 2026" with `'short'`, from a date, a time (put in UTC
+first) or an ISO date. It is used for the day a version was made, a policy's date, the last day
+of a class link, the offices summary's "Facts as they were on ...", the admin page's day columns
+and canary days, and a quota's reset time (`format_time`, "00:00 UTC"). The pipeline's
+About-this-document date uses the same words (`checked_words.long_date`). Left as they were on
+purpose: the operator console and `ops` reports (ISO days, for sorting and pasting), machine
+`datetime` attributes and `<input type="date">` limits.
 
 ## Courses and notation (`web/routes/courses.py`, `web/notation.py`)
 

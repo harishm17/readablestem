@@ -398,9 +398,10 @@ def _apply_words(
 ) -> tuple[list[str], dict[str, page_edits.StructureChange]] | None:
     """The edits of one item on its counterpart: the kind of each one made (HEADING, TEXT, ROLE,
     BLOCK_LEFT_OUT, one per change the person made) and the structural change of each that
-    made one, None when they were not (the result is left as it was). A paragraph left out is left out again last, and only where
-    `page_edits.leave_out_block` allows it: a new file that has a decision open on it, a link
-    to it or an equation in it keeps it, and the change is listed as not made again."""
+    made one, None when they were not (the result is left as it was). A paragraph left out is
+    left out again last, and only where `page_edits.leave_out_block` allows it: a new file that
+    has a decision open on it, a link to it or an equation in it keeps it, and the change is
+    listed as not made again."""
     new_element = next(e for e in new.elements if e.id == new_id)
     typed = None
     if old_element.text != origin.text:

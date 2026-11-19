@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 
 from fixtures.web.support import WebEnv
+from readablestem.web.dates import format_day
+from readablestem.web.db import utcnow
 from readablestem.web.recipients import recipients
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -84,6 +86,11 @@ def test_the_page_makes_no_conformance_claim_and_says_what_it_does_not_do(page):
     assert "no data agreement is offered" in text
     assert "student records" in text and "never sign in" in text
     assert "not legal advice" in text
+
+
+def test_the_summary_dates_its_facts_in_words_with_the_year(tmp_path):
+    html = get(tmp_path, SUMMARY).text
+    assert f"Facts as they were on {format_day(utcnow())}." in text_of(html)
 
 
 # --------------------------------------------------------------------------- wording rules

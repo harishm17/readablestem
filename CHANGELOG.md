@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased: deletes and removals ask first, the draft token, carried edits, dates (branch fix/deletes-carry-dates)
+
+- The share page's Remove acted at once: one click took a person's access away, from a filled
+  red button, with no way back. It now opens the question "Remove <address> from <title>?" as
+  the answer to the same POST, as a course's People section and the Admin page do, and removes
+  only with `confirm=yes`; the button is the outlined kind of every other asking button and its
+  busy label says "Opening…" (`routes/sharing.revoke_share`, `share_remove_confirm.html`). A
+  second click on a person already gone gets the first click's notice. Access cannot be
+  undone with a notice because the person would have to be shared with again, so the question
+  is the better fix.
+- The job, upload and course deletes were listed as keeping an older opener. They already
+  ask first on one shape of page (the question as the heading, one short paragraph of what is
+  lost, two choices of the same size, "No, keep it"); `_delete_notes.html` is the "Not reached
+  by deleting" note that the account deletion page uses too, and it belongs only where stored
+  copies are deleted. No code changed; docs/web.md says so.
+- The draft confirmation was tied to `Job.result_version`, which every review write raises. A
+  write that left the file alone (answering the cut-off question) voided it, and the token
+  could not tell a change a student would get from one they would not. It now names
+  `Job.output_version` (raised by `output_changed`) and is signed over it (`output._signature`).
+- A hand edit carried to a revision was carried once and then lost on the next revision: a
+  carried edit left no snapshot, so a second revision found nothing to carry. The carried row
+  now keeps the change's before and after (`worker._carry_decisions`,
+  `carry_snapshot.read`), so it is carried again, and an edit that an older release carried
+  without a snapshot is named as not made again instead of dropped silently.
+- A revision that was canceled or failed kept its carry snapshot, and the storage report did not
+  count it. A failure that offers no "Try again" now drops the snapshot (`worker._end_snapshot`);
+  a canceled one keeps it, because "Convert it" and "Try again" still need it after the earlier
+  document is deleted. `JobBytes.carry` counts it in `total`, in `ops storage-report`.
+- The job page's Combine line said "the N finished parts" without the parts held back. It now
+  reads "Combine the N ready parts (leaves out M)" and links to the combine page, and says how
+  many parts are ready when fewer than two are (`JobView.combine_left_out`).
+- Dates were written by hand in a dozen places (a month array in `guide_compare.html`, `%B %d`
+  strings, ISO days on the Admin page and in the offices summary). `web.dates.format_day` and
+  `format_time` now write them ("November 4, 2026", "00:00 UTC"), the `day` template filter
+  uses them, and the pipeline's About version date and finish sentence use
+  `checked_words.long_date`: "the last on <date>" now carries the year. A render bump is owed
+  for the finish sentence; this branch does not raise `RENDER_VERSION`.
+
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"

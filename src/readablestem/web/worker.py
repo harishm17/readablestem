@@ -1126,9 +1126,12 @@ class Worker:
         job = session.get(Job, job_id)
         if job is None or not job.revises_job_id:
             return
-        if retry_rules.offer(
-            status=JobStatus.FAILED, error_code=code, result_json=None, retries=job.retries or 0
-        ) is None:
+        if (
+            retry_rules.offer(
+                status=JobStatus.FAILED, error_code=code, result_json=None, retries=job.retries or 0
+            )
+            is None
+        ):
             carry_snapshot.drop(session, job_id)
 
     def _give_back_pages(self, session: Session, job_id: str) -> None:

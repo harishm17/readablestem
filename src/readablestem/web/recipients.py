@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 import jinja2
 
 from readablestem.web import office_convert, reports
+from readablestem.web.dates import format_day
 from readablestem.web.events import (
     EVENT_RETENTION_DAYS,
     MAX_SHARE,
@@ -116,7 +117,7 @@ class Material:
 
     @property
     def stated_text(self) -> str:
-        return f"{self.stated:%B} {self.stated.day}, {self.stated.year}" if self.stated else ""
+        return format_day(self.stated)
 
 
 # Every kind of material a conversion or a review sends to a model, in the order the lists
