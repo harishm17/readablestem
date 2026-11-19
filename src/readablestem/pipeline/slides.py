@@ -357,9 +357,8 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     deck = Deck(beamer=beamer, labels={v.number: v.label for v in views if v.label})
     # A run that is mostly slide-shaped is a deck (the rest of a file, say the portrait pages
     # between two decks, is not numbered).
-    decks = [
-        run for run in runs if 2 * sum(slide_shaped(v.width, v.height) for v in run) > len(run)
-    ]
+    slid = {v.number for v, ok in zip(views, shaped, strict=True) if ok}
+    decks = [run for run in runs if 2 * sum(v.number in slid for v in run) > len(run)]
     for run in decks:
         if run[0].number in title_slides:
             deck.starts[run[0].number] = title_slides[run[0].number]
@@ -370,10 +369,6 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
             deck.frames.append(tuple(v.number for v in frame))
             _read_frame(deck, frame, titles)
     return deck
-
-
-def _shaped(view: PageView) -> bool:
-    return slide_shaped(view.width, view.height)
 
 
 def _decks(views: Sequence[PageView], starts: Iterable[int]) -> list[list[PageView]]:
