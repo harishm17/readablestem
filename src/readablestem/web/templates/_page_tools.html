@@ -75,8 +75,8 @@
       {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ eid, {"class": "decide-form role-set"}) %}
         {{ tool_fields() }}<input type="hidden" name="action" value="role">
         <div class="{{ field_classes(ed.errors.get("role")) }}">
-          <p id="role-label-{{ eid }}">{% if ed.role %}This paragraph is a {{ role_words[ed.role] }}. The student page sets it apart.{% else %}Is this paragraph a sidebar or a quotation?{% endif %}</p>
-          <p class="hint" id="role-hint-{{ eid }}">A sidebar or a quotation is set apart on the student page and in the Word and EPUB files. The paragraphs beside it with the same role go in one box.</p>
+          <p id="role-label-{{ eid }}"><strong>{% if ed.role %}This paragraph is a {{ role_words[ed.role] }}{% else %}Set this paragraph apart{% endif %}</strong></p>
+          <p class="hint" id="role-hint-{{ eid }}">A sidebar or a quotation is set apart from the body text on the student page and in the Word and EPUB files. Paragraphs of the same kind that follow each other go in one box.</p>
           {{ field_error("role-error-" ~ eid, ed.errors.get("role")) }}
           <div class="inline-controls" role="group" aria-labelledby="role-label-{{ eid }}" aria-describedby="role-hint-{{ eid }}">
             {% for value, word in role_words.items() %}
