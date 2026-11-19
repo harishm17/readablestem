@@ -51,6 +51,7 @@ from readablestem.pipeline.layout.shared import (
     _Path,
     _Row,
     _RowIndex,
+    mark_small_capitals,
 )
 from readablestem.pipeline.parse import is_math_alphanumeric
 
@@ -369,9 +370,13 @@ def _page_rows(
                     )
             if any(not c.blank for c in chars):
                 vertical = abs(dy) > 0.2 or dx < 0
+                diagonal = abs(dx) > 0.2 and abs(dy) > 0.2
+                chars = mark_greek_words(chars)
                 rows.append(
                     _Row(
-                        mark_greek_words(chars), vertical, diagonal=abs(dx) > 0.2 and abs(dy) > 0.2
+                        chars if vertical or diagonal else mark_small_capitals(chars),
+                        vertical,
+                        diagonal=diagonal,
                     )
                 )
     return rows

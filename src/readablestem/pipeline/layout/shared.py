@@ -10,7 +10,7 @@ import bisect
 import statistics
 from collections import Counter
 from collections.abc import Callable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property
 
 import pymupdf
@@ -27,6 +27,9 @@ SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/super
 # glyph carrying MuPDF's superscript flag when it is raised this far. Word and LibreOffice
 # lower a subscript by 8 % of its size, TeX by 15 %, a raised mark by 33 % or more.
 SCRIPT_OFFSET = 0.04
+# A small capital sits on the baseline, to within this much (x the row size): Word and TeX
+# set it at 0, the least a script is lowered is about 0.1 (`mark_small_capitals`).
+SMALL_CAP_BASELINE = 0.05
 SCRIPT_MIN_RATIO = 0.62  # the smallest a script is, beside the text it belongs to
 SCRIPT_MAX_LIFT = 0.7  # the furthest off the baseline a script is (x the text size)
 _DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
@@ -215,13 +218,65 @@ class _Row:
 
         Smaller than the row's text, or raised with MuPDF's superscript flag. The flag
         alone is not trusted: MuPDF sets it on any span that starts above the previous
-        one, which in TeX output is most of a line after an inline fraction.
+        one, which in TeX output is most of a line after an inline fraction. A small
+        capital (`_Char.small_cap`, set by `mark_small_capitals`) is small and on the
+        baseline: text, never a script. Any test of a glyph's size against its line's that
+        means "a script" skips `small_cap` glyphs the same way.
         """
-        if c.blank:
+        if c.blank or c.small_cap:
             return False
         if c.size < SCRIPT_RATIO * self.size:
             return True
         return bool(c.flags & _SUPERSCRIPT_FLAG) and c.baseline < self.baseline - 0.2 * self.size
+
+
+def mark_small_capitals(chars: list[_Char]) -> list[_Char]:
+    """`chars` with `small_cap` set on the small capitals of a line, and the letters that
+    follow a full-size capital lower-cased: "L" and "OTKA" (Word and LibreOffice print the
+    lower-case letters of "Lotka" as capitals at 80 %) read "Lotka".
+
+    A small capital is a capital letter in a text font, smaller than the line's text
+    (`SCRIPT_RATIO`) and on its baseline (`SMALL_CAP_BASELINE`): a script is off it. A run of
+    them, in one font, that ends a word is one of two shapes. After a full-size capital of the
+    same font on the baseline (the word "Lotka") its letters are lower-cased: that is what the
+    source had. At the start of a word, two letters or more (an all-small-caps "OTKA", or an
+    acronym) it keeps its case: whether the source was "nasa" or "NASA" is not in the file.
+    Anywhere else (a capital after a lower-case letter or a digit) the glyphs are left alone."""
+    sizes = {round(c.size * 2) / 2 for c in chars if not c.blank}
+    if len(sizes) < 2:
+        return chars
+    row = _Row(chars)
+    size, base = row.size, row.baseline
+    limit, reach = SCRIPT_RATIO * size, SMALL_CAP_BASELINE * size
+
+    def capital(c: _Char) -> bool:
+        return c.c.isalpha() and c.c.isupper() and not c.math and abs(c.baseline - base) <= reach
+
+    out = list(chars)
+    n, i = len(chars), 0
+    while i < n:
+        if not (capital(chars[i]) and chars[i].size < limit):
+            i += 1
+            continue
+        j = i + 1
+        while j < n and capital(chars[j]) and chars[j].size < limit and chars[j].font == chars[i].font:
+            j += 1
+        i, start = j, i
+        if j < n and chars[j].c.isalnum():
+            continue  # the run goes on in a full-size letter: not a word of small capitals
+        lead = chars[start - 1] if start else None
+        if (
+            lead is not None
+            and capital(lead)
+            and lead.size >= limit
+            and lead.font == chars[start].font
+        ):
+            for k in range(start, j):
+                out[k] = replace(chars[k], c=chars[k].c.lower(), small_cap=True)
+        elif j - start >= 2 and (lead is None or not lead.c.isalnum()):
+            for k in range(start, j):
+                out[k] = replace(chars[k], small_cap=True)
+    return out
 
 
 @dataclass(frozen=True)
