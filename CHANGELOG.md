@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: the eval gate sees switches (branch fix/eval-guard-flags)
+
+- `eval gate --require-current` refused a report made with other prompts, other models or
+  another pipeline version, but not one made with other switches: a setting or a constant that
+  decides what a model is asked or what a step accepts (`REGION_TREE`, `AUTO_ACCEPT_CONFIDENCE`,
+  `equation_step.SKIP_ESCALATION_FROM`, `ACCEPT_SINGLE_READING`) could move and every committed
+  report still passed as current although it measured other behavior. A report now records the
+  values of 137 guarded switches (`flags`, from `eval.gate.guarded_flags`: the behavior
+  settings of the production profile that are not named as left out, and a list of module
+  constants, each read from its module), and the gate names each one that differs from the
+  code, with both values. Without `--require-current` a difference is listed under the table
+  like a changed prompt, with the settings of the report that production does not use.
+- A report of a run that called no model (headings, tables local) that has no `flags` is
+  refused; a report of a model run made before they were recorded is left as it was (its
+  pipeline version already refuses it). `latest-headings.json` and `latest-tables-local.json`
+  were made again at no cost with the same scores and now hold the flags. The two baselines
+  (2026-10-14, pipeline 0.5.0) are not re-made: that would move the numbers they anchor.
+- No prompt, model setting, pipeline version, render version, migration or recording changed.
+
 ## Unreleased: an unconverted equation's alt text warns before it gives the characters (branch fix/alt-warning-first)
 
 - An equation kept as an image whose text layer layout saw as flattened (a fraction bar, a

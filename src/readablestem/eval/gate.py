@@ -7,8 +7,8 @@
 - 2 when the two reports cannot be compared fairly: different task, different gold
   manifest, different item selection, a partial run on either side, a different judge
   (prompt or model: the measuring instrument changed), or, with `--require-current`, a
-  current report produced with other prompts, models or another pipeline version than the
-  code under test has.
+  current report produced with other prompts, models, switches (`guarded_flags`) or another
+  pipeline version than the code under test has.
 
 Why refuse instead of comparing anyway: a score on a different gold set, or on the 12 of
 30 equations a run reached before its budget ran out, is a different measurement. So is
@@ -17,7 +17,9 @@ the rate went from 0.46 to 0.92 with the same alt texts. A gate that compared th
 pass or fail for reasons unrelated to the change under test. And a committed
 `latest-<task>.json` that no longer matches the prompts in the code would let a prompt
 change through without anyone re-running the eval; `--require-current` (used in CI)
-refuses it.
+refuses it. The same goes for a switch: a setting or a constant that decides what a model is
+asked or what a step accepts moves what a report measures without moving a prompt or a model,
+so a report records the values (`flags`) and a changed one is named.
 
 Tolerances are absolute drops for rates (0.02 = two percentage points), a relative
 increase for cost, and an absolute increase for counts (axe violations).
@@ -36,8 +38,10 @@ tolerances file can move them (`{"floors": [{"name": ..., "minimum": ...}]}`).
 
 from __future__ import annotations
 
+import hashlib
 import json
 import sys
+from collections.abc import Mapping
 from contextlib import suppress
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -317,17 +321,221 @@ def code_versions() -> dict[str, str]:
     return versions
 
 
+# --------------------------------------------------------------------------- switches
+#
+# What a report must say about the switches it was made with. A prompt version and a model id
+# are not the only things that decide what a model is asked or what a step accepts: a setting
+# (`Settings`, whose behavior values the production profile lists) or a module constant moves
+# a request or a bar without touching either, and a report made before the move would still
+# pass `--require-current`. The rule for what is in: changing it changes what is asked or what
+# is accepted, rejected or sent to review. What is out is named here with its reason, so a
+# switch is guarded unless someone wrote down why not.
+
+# Behavior settings of the production profile (`ops/production.profile.toml`, [settings]) that
+# are not guarded. Every other behavior setting is, so a new one is guarded from the day it is
+# added to the profile (`tests/test_profile.py` fails for a setting that is in neither list).
+UNGUARDED_SETTINGS: dict[str, str] = {
+    "MODEL_PROVIDER": "a report's `client` and `models` say which model answered",
+    "MAIN_MODEL": "a report's `models` records it and the gate compares it",
+    "CHEAP_MODEL": "a report's `models` records it and the gate compares it",
+    "ANTHROPIC_MAIN_MODEL": "a report's `models` records it and the gate compares it",
+    "ANTHROPIC_CHEAP_MODEL": "a report's `models` records it and the gate compares it",
+    "PAGE_IMAGE_CACHE_MB": "the size of a cache of page pictures for the review screen",
+    "FEATURE_COLOUR": "text colors in the output page: presentation",
+    "MATHML_ALTTEXT": "the spoken reading as an attribute of the output math: presentation",
+    "FEATURE_BATCH_ZIP": "whether the upload page takes a zip: packaging, no request, no bar",
+    "FEATURE_CLASS_LINK": "sharing with a class: access, no request, no bar",
+    "FEATURE_COURSE_GRANTS": "who may bring course notation: access, no request, no bar",
+    "FEATURE_LATEX_SOURCE": "which file kinds the upload takes in (an eval converts PDFs)",
+    "FEATURE_BEAMER_SOURCE": "which file kinds the upload takes in (an eval converts PDFs)",
+    "FEATURE_WORD_SOURCE": "which file kinds the upload takes in (an eval converts PDFs)",
+    "OFFICE_INPUT_ENABLED": "which file kinds the upload takes in (an eval converts PDFs)",
+}
+
+# Module constants that are in: the bars where an answer is accepted, sent to review or asked
+# again, and what a request holds (its output room, the text and pictures sent with it, its
+# effort). Left out on purpose: where a line, column or table sits on the page (the geometry
+# of `pipeline/layout` and `pipeline/tables.py`, the page types), language and outline
+# heuristics, the safety limits of a parser (`validate.MAX_MATHML_*`), spend and price
+# figures, retries, timeouts and concurrency. A change to those is a change of code that
+# `PIPELINE_VERSION` and the replay of the corpus (`eval burden`) are for. A literal inside a
+# function (the crop's default `dpi`) is not a module constant and is not here.
+GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
+    "readablestem.pipeline.equation_step": (
+        "SKIP_ESCALATION_FROM",
+        "ACCEPT_SINGLE_READING",
+        "PAGE_AGREE_CONFIDENCE",
+        "FLAG_MAIN_DISAGREES",
+        "SHORT_INLINE_CHARS",
+        "MAX_OUTPUT_TOKENS",
+        "ANSWER_ONLY_MAX_OUTPUT_TOKENS",
+        "TEXT_LAYER_MIN_SYMBOLS",
+        "TEXT_LAYER_MISMATCH_BELOW",
+        "MEANING_MISMATCH_FACTOR",
+        "NOTE_CODES",
+    ),
+    "readablestem.pipeline.figure_step": (
+        "TINY_FIGURE_MAX_SIDE_PT",
+        "DECORATIVE_ACCEPT_CONFIDENCE",
+        "MAX_OUTPUT_TOKENS",
+        "LONG_MAX_OUTPUT_TOKENS",
+        "MAX_LABEL_CHARS",
+        "NOTE_CODES",
+    ),
+    "readablestem.pipeline.table_step": (
+        "BASE_OUTPUT_TOKENS",
+        "OUTPUT_TOKENS_PER_SLOT",
+        "MIN_OUTPUT_TOKENS",
+        "MAX_OUTPUT_TOKENS",
+        "NOTE_CODES",
+    ),
+    "readablestem.pipeline.heading_step": (
+        "ACCEPT_AT",
+        "MIN_LETTERS",
+        "MIN_GROUP",
+        "MIN_SENTENCE_WORDS",
+    ),
+    "readablestem.pipeline.run": ("CONTEXT_CHARS",),
+    "readablestem.pipeline.flag_policy": ("BIAS", "WEIGHTS", "THRESHOLD"),
+    "readablestem.pipeline.notation_memory": (
+        "BOLD_LETTER_CONFIDENCE",
+        "MAX_CONTEXT_ENTRIES",
+        "MAX_CONTEXT_CHARS",
+    ),
+    "readablestem.pipeline.page_math": ("CONTEXT_CHARS", "DEFAULT_EFFORT"),
+    "readablestem.pipeline.page_math_reconcile": ("CONSISTENT_FROM",),
+    "readablestem.pipeline.page_witness": (
+        "DEFAULT_EFFORT",
+        "IMAGE_DPI",
+        "IMAGE_MAX_SIDE_PX",
+        "MAX_WINDOWS",
+        "MIN_MATH_GLYPHS",
+    ),
+    "readablestem.pipeline.witness_reconcile": ("MATH_SHARE", "OVERLAP_SHARE", "TIE_BELOW"),
+    "readablestem.pipeline.image_page": (
+        "MAX_SIDE_PX",
+        "MAX_OUTPUT_TOKENS",
+        "DEFAULT_EFFORT",
+        "AGREED_CONFIDENCE",
+        "CONFIDENCE_VALUE",
+    ),
+    "readablestem.pipeline.image_page_check": (
+        "CROPS_PER_REQUEST",
+        "MAX_CROPS_PER_PAGE",
+        "MAX_OUTPUT_TOKENS",
+    ),
+    "readablestem.pipeline.validate": ("MAX_LATEX_CHARS", "ALT_WARN_CHARS", "ALT_MAX_CHARS"),
+    "readablestem.pipeline.tables": ("CROP_DPI", "CROP_PAD"),
+    "readablestem.pipeline.layout.access": ("CROP_PAD", "LINE_BAND", "LINE_SIDE", "LINE_MARK"),
+    "readablestem.models.base": ("UNTRUSTED_NOTICE",),
+    "readablestem.models.pricing": ("THINKING_ALLOWANCE_TOKENS",),
+    "readablestem.models.anthropic_client": ("FALLBACK_MODELS", "FALLBACK_BETA"),
+    "readablestem.models.verifier": (
+        "FIGURE_VERSION",
+        "EQUATION_VERSION",
+        "CAPTION_LIMIT",
+        "ALT_LIMIT",
+        "LATEX_LIMIT",
+    ),
+    "readablestem.models.claude_verifier": (
+        "MAX_OUTPUT_TOKENS",
+        "CAPTION_LIMIT",
+        "ALT_LIMIT",
+        "LATEX_LIMIT",
+    ),
+}
+
+# A text longer than this is recorded as its digest: a report holds a sentence's identity, not
+# the sentence (`models.base.UNTRUSTED_NOTICE` goes to the model with every request).
+_TEXT_RECORDED_UP_TO = 40
+# Runs that call no model: a report of one is the code's own measurement with nothing to
+# re-record at a cost, so a report of one that lacks the flags is refused.
+NO_MODEL_CLIENTS = ("fake", "none")
+
+
+def _recorded(value: Any) -> Any:
+    """A value as a report holds it: JSON types, sets and tuples as sorted lists, a long
+    text as `sha256:<12 hex>`."""
+    if isinstance(value, str) and len(value) > _TEXT_RECORDED_UP_TO:
+        return "sha256:" + hashlib.sha256(value.encode()).hexdigest()[:12]
+    if isinstance(value, Mapping):
+        return {str(k): _recorded(v) for k, v in sorted(value.items(), key=lambda kv: str(kv[0]))}
+    if isinstance(value, (set, frozenset)):
+        return sorted(_recorded(v) for v in value)
+    if isinstance(value, (list, tuple)):
+        return [_recorded(v) for v in value]
+    if value is None or isinstance(value, (bool, int, float, str)):
+        return value
+    return str(value)
+
+
+def guarded_flags(settings: Any) -> dict[str, Any]:
+    """The values of every guarded switch, by name, sorted: the behavior settings of the
+    production profile that are not in `UNGUARDED_SETTINGS`, read from `settings` (env names,
+    like the profile's `differs`), and the module constants of `GUARDED_CONSTANTS`, read from
+    their module (`pipeline.equation_step.SKIP_ESCALATION_FROM`). Nothing here is a copy of a
+    value: a report made now holds what the code reads now."""
+    import importlib
+
+    from readablestem.ops import profile
+
+    flags: dict[str, Any] = {}
+    for name in profile.load().settings:
+        if name.upper() not in UNGUARDED_SETTINGS:
+            flags[name.upper()] = _recorded(getattr(settings, name))
+    for module, names in GUARDED_CONSTANTS.items():
+        loaded = importlib.import_module(module)
+        for name in names:
+            key = f"{module.removeprefix('readablestem.')}.{name}"
+            flags[key] = _recorded(getattr(loaded, name))
+    return dict(sorted(flags.items()))
+
+
+def code_flags(report: dict) -> dict[str, Any]:
+    """The flags of the code under test, on the settings the report was made on: the code's
+    defaults for a run on the environment's settings, the production profile's values for a
+    run under it (`--profile production`, the report's `profile.name`)."""
+    from readablestem.config import Settings
+    from readablestem.ops import profile
+
+    production = profile.load()
+    values: dict[str, Any] = {}
+    if (report.get("profile") or {}).get("name") == production.name:
+        values = {
+            name: None if value == profile.UNSET else value
+            for name, value in production.settings.items()
+        }
+    return guarded_flags(Settings.model_construct(**values))
+
+
+def _flag_differences(recorded: dict[str, Any], current: dict[str, Any]) -> list[str]:
+    """One phrase per flag whose recorded value is not the code's, both values named."""
+    out = []
+    for name in sorted(set(recorded) | set(current)):
+        was = recorded.get(name, "not recorded")
+        now = current.get(name, "not in the code")
+        if name not in recorded or name not in current or was != now:
+            out.append(f"flag {name} {was!r} (code: {now!r})")
+    return out
+
+
 def check_current(
     report: dict,
     versions: dict[str, str],
     models: dict[str, str],
     pipeline_version: str | None = None,
+    flags: dict[str, Any] | None = None,
 ) -> None:
     """Raise GateRefused("stale_report") when `report` was produced with other prompts,
-    other models or another pipeline version than the code under test (`versions`, `models`,
-    `pipeline_version`). A rule or a constant of the pipeline changes what a report measures
-    without moving a prompt or a model, so the version is what tells a number of this code
-    from a number of an older one."""
+    other models, other switches or another pipeline version than the code under test
+    (`versions`, `models`, `flags`, `pipeline_version`). A rule or a constant of the
+    pipeline changes what a report measures without moving a prompt or a model, so the
+    version is what tells a number of this code from a number of an older one, and the
+    flags name the switches that moved without it.
+
+    A report that records no flags is refused when it called no model (`NO_MODEL_CLIENTS`:
+    it is re-made at no cost); one that did is left as it was before flags were recorded,
+    and is refused by its pipeline version until a paid run replaces it."""
     stale = []
     if pipeline_version is not None and report.get("pipeline_version") != pipeline_version:
         stale.append(f"pipeline {report.get('pipeline_version')} (code: {pipeline_version})")
@@ -337,6 +545,12 @@ def check_current(
     for key, model in sorted((report.get("models") or {}).items()):
         if key in models and model != models[key]:
             stale.append(f"{key} model {model} (code: {models[key]})")
+    if flags is not None:
+        recorded = report.get("flags")
+        if isinstance(recorded, dict):
+            stale += _flag_differences(recorded, flags)
+        elif report.get("client") in NO_MODEL_CLIENTS:
+            stale.append("flags not recorded (a report made before they were)")
     if stale:
         raise GateRefused(
             "stale_report",
@@ -404,7 +618,51 @@ def _notes(current: dict, baseline: dict) -> list[str]:
     for key in ("pipeline_version", "prompt_versions", "models", "client"):
         if current.get(key) != baseline.get(key):
             notes.append(f"{key} changed: {baseline.get(key)} -> {current.get(key)}")
+    notes += _flag_notes(current.get("flags"), baseline.get("flags"))
     return notes
+
+
+def _flag_notes(current: Any, baseline: Any) -> list[str]:
+    """Lines naming each switch that differs between the baseline and the current report. A
+    report made before flags were recorded has none to name: that is one line, not a list."""
+    if not isinstance(current, dict) or not isinstance(baseline, dict):
+        if isinstance(current, dict) or isinstance(baseline, dict):
+            side = "baseline" if isinstance(current, dict) else "current report"
+            return [f"flags not recorded in the {side}, so the switches cannot be compared"]
+        return []
+    return [
+        f"flag {name} changed: {baseline.get(name, 'not recorded')!r} -> "
+        f"{current.get(name, 'not recorded')!r}"
+        for name in sorted(set(current) | set(baseline))
+        if current.get(name, "not recorded") != baseline.get(name, "not recorded")
+    ]
+
+
+def _production_note(report: dict) -> list[str]:
+    """One line naming each guarded setting whose recorded value is not the production
+    profile's (`ops/production.profile.toml`): an eval runs on the code's defaults unless it
+    was given `--profile production`, and production runs on something else. Nothing is
+    refused for it; it says what the number was not measured under."""
+    from readablestem.ops import profile
+
+    recorded = report.get("flags")
+    if not isinstance(recorded, dict) or (report.get("profile") or {}).get("name") not in (
+        None,
+        profile.DEVELOPMENT,
+    ):
+        return []
+    production = {
+        name.upper(): None if value == profile.UNSET else value
+        for name, value in profile.load().settings.items()
+    }
+    differing = [
+        f"{name} ({_recorded(value)!r}, production {_recorded(production[name])!r})"
+        for name, value in sorted(recorded.items())
+        if name in production and value != _recorded(production[name])
+    ]
+    if not differing:
+        return []
+    return ["settings of this report that production does not use: " + ", ".join(differing)]
 
 
 def compare(current: dict, baseline: dict, tolerances: list[Tolerance]) -> GateResult:
@@ -467,6 +725,7 @@ def gate(
     else:
         result = compare(current, baseline, tolerances)
     result.floors = floor_rows(current, floors)
+    result.notes += _production_note(current)
     if any(r.status == "skipped" for r in result.floors):
         result.notes.append(
             "real-document gate skipped: the report measured no private real documents "
@@ -536,8 +795,8 @@ def run_gate(
     below its floor, 2 refused).
 
     Without a baseline only the floors are checked (tasks that have them: tables).
-    `require_current`: also refuse a current report whose prompts or models differ from
-    the code under test (CI sets it; see the module docstring).
+    `require_current`: also refuse a current report whose prompts, models or switches differ
+    from the code under test (CI sets it; see the module docstring).
     """
     current = json.loads(current_path.read_text(encoding="utf-8"))
     baseline = json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path else None
@@ -560,7 +819,7 @@ def run_gate(
                 current.get("client") == "fake"
             ):  # a run that called no model has no model to be stale
                 models = {}
-            check_current(current, code_versions(), models, PIPELINE_VERSION)
+            check_current(current, code_versions(), models, PIPELINE_VERSION, code_flags(current))
         result = gate(
             current, baseline, load_tolerances(tolerance_path), load_floors(tolerance_path)
         )

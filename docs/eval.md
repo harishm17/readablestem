@@ -61,8 +61,8 @@ request again. The same job replays the corpus against the committed record (`ev
 which finds a change of behavior that a version number alone would not.
 
 The dates are when the runs were made, not when the code was last changed: what keeps a
-latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions and
-model ids, the eval guard on pull requests, and the weekly live run below.
+latest report from going stale is the gate's `--require-current` check on the pipeline version, prompt versions,
+model ids and switches, the eval guard on pull requests, and the weekly live run below.
 
 ## The idea
 
@@ -642,7 +642,31 @@ it) the gate also refuses (`stale_report`) a current report produced with other 
 or models than the code under test, so a prompt change cannot pass on an old committed
 `latest-<task>.json`. The pipeline version counts too (`pipeline X (code: Y)`): a report made
 by another version than the code's is refused whatever its prompts and models were, and a
-`--fake` report has no models to compare. Tolerances live in `data/eval/tolerances.json`; an entry with only
+`--fake` report has no models to compare.
+
+The switches count as well (`flag NAME X (code: Y)`). A setting or a constant can change what a
+model is asked or what a step accepts, sends to review or asks again without moving a prompt, a
+model or the version, so a report records the values it was made with (`flags`, one name and
+value each, sorted; `eval.gate.guarded_flags` makes the mapping and is its one definition).
+In it: the behavior settings of the production profile (`ops/production.profile.toml`) except
+those `UNGUARDED_SETTINGS` names with a reason (the model ids, which `models` records; the
+colors and the spoken reading in the output page; which file kinds the upload takes in; sharing
+and packaging), so a setting added to the profile is guarded from the start; and the module
+constants of `GUARDED_CONSTANTS`: the confidence bars and rules that accept, review or escalate
+an answer (`equation_step.SKIP_ESCALATION_FROM`, `ACCEPT_SINGLE_READING`, `figure_step`,
+`heading_step.ACCEPT_AT`, `flag_policy.THRESHOLD`), and what a request holds (output room,
+effort, the crop's padding and resolution, the text sent with it). Not in it: where a line or a
+table sits on the page, language and outline rules, parser safety limits, spend, retries,
+timeouts, and a number written inside a function; those are what the pipeline version and the
+replay of the corpus (`eval burden`) are for. A run uses the settings of its environment (the
+code's defaults) unless it is given `--profile production`; the gate compares a report with the
+code's defaults, or with the profile's values when the report says it ran under the profile, so a
+report made with a setting changed in the environment is refused. Without `--require-current`
+the differences are listed under the table, and so are the settings of the report that
+production does not use. A report of a run that called no model that has no `flags` is refused
+(re-make it with `eval pipeline`; the two commands are in `eval/reproduce.py`); a report of a model run made before the field
+existed is not refused for that, since its pipeline version already is. Add a switch of either
+kind to the list when a change makes it decide what is asked or accepted. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 

@@ -171,3 +171,42 @@ def test_require_current_refuses_a_report_made_with_other_prompts(tmp_path, caps
     # Without the flag (comparing two historical runs) it is only a note.
     plain = ["eval", "gate", "--baseline", str(baseline), "--current"]
     assert main([*plain, str(tmp_path / "stale.json")]) == 0
+
+
+def test_require_current_refuses_a_report_made_with_other_switches(tmp_path, capsys):
+    """A switch that decides what a model is asked or what a step accepts moves what a report
+    measures without moving a prompt, a model or the pipeline version: the report records the
+    switches' values and the gate names the one that differs. A no-model report without them is
+    refused; a report of a model run made before they were recorded is left as it was."""
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    fresh = report()
+    fresh["prompt_versions"] = {"equation": gate.code_versions()["equation"]}
+    fresh["pipeline_version"] = PIPELINE_VERSION
+    fresh["flags"] = gate.code_flags(fresh)
+    moved = {
+        **fresh,
+        "flags": {**fresh["flags"], "pipeline.equation_step.SKIP_ESCALATION_FROM": 0.7},
+    }
+    unrecorded = {k: v for k, v in fresh.items() if k != "flags"}
+    baseline = write(tmp_path, "base.json", fresh)
+    args = ["eval", "gate", "--require-current", "--baseline", str(baseline), "--current"]
+    assert main([*args, str(write(tmp_path, "fresh.json", fresh))]) == 0
+    capsys.readouterr()
+    assert main([*args, str(write(tmp_path, "moved.json", moved))]) == 2
+    err = capsys.readouterr().err
+    assert "stale_report" in err and "pipeline.equation_step.SKIP_ESCALATION_FROM 0.7" in err
+    assert "(code: 0.8)" in err
+    # A model run made before flags were recorded is refused only for its other differences.
+    assert main([*args, str(write(tmp_path, "old.json", unrecorded))]) == 0
+    # A run that called no model has nothing to wait for: it must carry them.
+    assert (
+        main([*args, str(write(tmp_path, "nomodel.json", {**unrecorded, "client": "fake"}))]) == 2
+    )
+    assert "flags not recorded" in capsys.readouterr().err
+    # Without the flag a difference is listed, with what production runs for each setting.
+    settings = {**fresh["flags"], "REGION_TREE": "on"}
+    plain = ["eval", "gate", "--baseline", str(baseline), "--current"]
+    assert main([*plain, str(write(tmp_path, "dev.json", {**fresh, "flags": settings}))]) == 0
+    out = capsys.readouterr().out
+    assert "flag REGION_TREE changed" in out and "production 'off'" in out

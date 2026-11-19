@@ -75,8 +75,8 @@ import pymupdf
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget
 from readablestem.core.types import ConversionOptions, Element, Fix, Kind, TableGrid
+from readablestem.eval import gate, ted
 from readablestem.eval import pipeline_eval as pe
-from readablestem.eval import ted
 from readablestem.eval.equations import MathMLError, canonical, normalize
 from readablestem.models.base import VisionClient
 from readablestem.models.fake import FakeVisionClient
@@ -1677,6 +1677,7 @@ def build_report(
         "date": cfg.date,
         "pipeline_version": run.PIPELINE_VERSION,
         "profile": run_profile.stamp(cfg.settings),
+        "flags": gate.guarded_flags(cfg.settings),
         "prompt_versions": _prompt_versions(items),
         "models": {"main": cfg.settings.main_model, "cheap": cfg.settings.cheap_model},
         "models_used": sorted({m for i in items for m in i.get("models", [])}),
