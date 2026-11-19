@@ -3,7 +3,7 @@
   "task": "tables",
   "mode": "local",
   "date": "2026-11-19",
-  "pipeline_version": "0.5.12",
+  "pipeline_version": "0.5.13",
   "profile": {
     "name": "development settings",
     "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
@@ -457,8 +457,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 6127.0,
-    "p95": 16383.599999999975,
+    "p50": 3711.0,
+    "p95": 9630.199999999984,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }

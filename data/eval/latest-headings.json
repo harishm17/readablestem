@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task": "headings",
   "date": "2026-11-19",
-  "pipeline_version": "0.5.12",
+  "pipeline_version": "0.5.13",
   "profile": {
     "name": "development settings",
     "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
