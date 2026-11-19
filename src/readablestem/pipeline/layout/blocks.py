@@ -897,10 +897,10 @@ def _algorithm_groups(rows: Sequence[_Row]) -> dict[int, int]:
     step word (for, if, while, end, return, input, output ...), or an assignment ("count =
     0"), or a line of maths (a step that is a formula: "c <- c + 1"), or further right
     than the first step (what a loop or a branch holds, so a wrapped step stays with its
-    step). The first line that is none of these ends the group. Fewer than `ALGORITHM_MIN_ROWS` steps, or
-    `ALGORITHM_MIN_WORDS` of them with a step word, is a sentence that begins "Algorithm
-    1 ..." and not a caption. Its maths rows become text, so a formula stays a formula
-    inside its line (an inline equation)."""
+    step). The first line that is none of these ends the group. Fewer than
+    `ALGORITHM_MIN_ROWS` steps, or `ALGORITHM_MIN_WORDS` of them with a step word, is a
+    sentence that begins "Algorithm 1 ..." and not a caption. Its maths rows become text,
+    so a formula stays a formula inside its line (an inline equation)."""
     found: dict[int, int] = {}
     index = 0
     while index < len(rows):
