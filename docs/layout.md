@@ -1389,8 +1389,13 @@ Not built: the page record, the document card, and the per-source switch.
   (C) (D)) or column by column ((A) (C) over (B) (D)). A grid starts at a row with an option label
   and takes the rows after it that start with a label of the same form (a row that holds
   several labels set apart is cut at each) and the lines wrapped under one of its columns. It
-  is a grid when its labels are a full run of letters or numbers, each once, and two options
-  share a line; then each option is a list item (flagged `_Marker.option`), the cells are read
+  is a grid when its labels are a full run of letters or numbers from the first (A, B, C or
+  1, 2, 3), each once, two options share a line, no option ends the way a clause of a
+  sentence does ("(c) X," "(d) Y, and": a list in prose), and it follows a question (`_asks`:
+  a line ending in "?" or ":", or the lines of a list item of another marker family such as
+  "4." over "A."; a grid of capital letters that nothing above it in its column leads into
+  carries on a question from the page before). Subfigure captions "(a) ... (b) ..." and
+  runs of numbered blanks follow no question and are left as they were. Then each option is a list item (flagged `_Marker.option`), the cells are read
   in label order (`_option_order` keeps that order when the page's blocks are put in reading
   order by their boxes), and the options are one list a level below the question they follow,
   whatever the x of their column (`_list_levels`). Anything that is not a full run (a label

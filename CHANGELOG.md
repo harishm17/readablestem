@@ -96,7 +96,8 @@
   each question). Now each option is a list item, the options of a question are one list below it
   in label order (A, B, C, D) whether the page sets them across or down, a points label joins
   the text of its question, and the list goes on in one numbering. A grid is only made of a full
-  run of labels with two options on a line; any other block that holds a later label is still
+  run of labels from the first, with two options on a line, that follows a question (subfigure
+  captions, numbered blanks and enumerations in a sentence are left as they were); any other block that holds a later label is still
   flagged. Region tree on or off give the same pages (its grid rule now stops above the next
   question's number). Not done: labeled parts inside one display equation. No migration, no model
   request changed; a stored document keeps its elements until it is converted again.
