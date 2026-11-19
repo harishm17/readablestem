@@ -360,9 +360,6 @@ class PageTable:
     column_edges: list[float] = field(default_factory=list)  # for continued tables
     caption_above: bool = False  # its caption is printed above it (`_attach_captions`)
     layout_grid: bool = False  # text set out in boxes (`is_layout_grid`): data only if captioned
-    # Share of its cells that line up in their column (`Judgement.alignment`); layout asks it
-    # of a table that crosses a gutter of the region tree. 1.0 where no box was judged.
-    alignment: float = 1.0
     # Cells whose whole content layout read as one formula from its glyphs, by (row, col)
     # (`layout._cell_maths`); each value is layout's inline-equation record of the cell.
     cell_maths: dict[tuple[int, int], Any] = field(default_factory=dict)
@@ -3219,7 +3216,6 @@ def _build(
         column_edges=_column_edges(best[2]),
         layout_grid=is_layout_grid(best[2])
         and (proposal.source != SOURCE_TEXT or _bold_terms(text)),
-        alignment=judgement.alignment,
     )
 
 

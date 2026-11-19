@@ -1027,10 +1027,6 @@ def prepare(
 # -- table proposals (WS15.2) -----------------------------------------------------------------
 
 REFUSED_PROSE = "prose on both sides of a gutter"
-REFUSED_ALIGNMENT = "rows do not line up across a gutter"
-REFUSED_MATCHING = "two labeled lists side by side"
-MIN_ALIGNMENT = 0.6  # a proposal that crosses a gutter needs at least this share of cells in line
-MATCHING_CELLS = 3  # a labeled list of at least this many cells
 
 
 def _between(node: _Node, lines: list[Item], rest: Sequence[BBox]) -> list[list[list[Item]]]:
@@ -1098,27 +1094,14 @@ def _others(box: BBox, rest: Sequence[BBox]) -> bool:
     return any(_centre_in(b, box) for b in rest)
 
 
-def _matching(sides: Sequence[list[Item]]) -> bool:
-    """Every side is a list of labeled cells (1. 2. 3., A. B. C.), as the tree reads an exercise
-    that matches terms with definitions (rule 8)."""
-    for side in sides:
-        cells = _cells(side, range(len(side)))
-        if len(cells) < MATCHING_CELLS or any(lab is None for lab, _ in cells):
-            return False
-        if len({lab[0] for lab, _ in cells if lab is not None}) != 1:
-            return False
-    return True
-
-
 def table_refusal(
-    tree: RegionTree, lines: Sequence[Item], box: BBox, alignment: float, taken: set[BBox]
+    tree: RegionTree, lines: Sequence[Item], box: BBox, taken: set[BBox]
 ) -> str | None:
     """Why a table proposal is not accepted, as the reason (`REFUSED_*`), or None. The proposal
     is made on the raw page, before the page has columns; here the page has its tree. A proposal
     in one region is accepted, and so is a ruled table that spans the columns on purpose (it is
     a cut of its own: nothing else of the page stands beside it). One that stands across a
-    gutter is refused only when it has prose on both sides of it, or its rows do not line up
-    (`MIN_ALIGNMENT`), or its sides are two labeled lists (an exercise). `lines` are the lines
+    gutter is refused only when it has prose on both sides of it. `lines` are the lines
     the proposal takes (cells and caption), `box` the box of its cells and `taken` the boxes of
     the lines every proposal of the page takes: the page's own lines are the others."""
     frame = (box[0] - 1, box[1] - 1, box[2] + 1, box[3] + 1)
@@ -1129,10 +1112,6 @@ def table_refusal(
         return None
     if any(sum(_prose(side, range(len(side))) for side in sides) >= 2 for sides in across):
         return REFUSED_PROSE
-    if alignment < MIN_ALIGNMENT:
-        return REFUSED_ALIGNMENT
-    if any(_matching(sides) for sides in across):
-        return REFUSED_MATCHING
     return None
 
 

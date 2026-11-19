@@ -190,7 +190,7 @@ def _accepted(
     accepted = []
     for table in proposals:
         lines = [(frags[i].bbox, frags[i].clean) for i in sorted(table.lines) if i < len(frags)]
-        why = regions.table_refusal(tree, lines, table.bbox, table.alignment, taken)
+        why = regions.table_refusal(tree, lines, table.bbox, taken)
         if why is None:
             accepted.append(table)
         else:

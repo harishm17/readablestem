@@ -78,8 +78,9 @@
 - WS15.2. With `REGION_TREE` on, the table finder still proposes first, but each proposal is now
   accepted only once the page's region tree exists. A proposal inside one region is accepted. A
   proposal that crosses a gutter, with lines the table does not take standing on two sides of
-  it, is refused only on narrow grounds: a line of prose on each side, rows that do not line up
-  across the gutter (under 0.6), or two labeled lists side by side. A ruled table that spans
+  it, is refused on one ground: a line of prose on each side. (The plan's two other grounds,
+  rows that do not line up across the gutter and two labeled lists side by side, had no case
+  on the development files and are not built.) A ruled table that spans
   columns passes, and so does a real matching table. A refused proposal stays in the page as
   text and its lines go to the reading tree, and the refusal and its reason are kept on the
   layout (`Layout.table_refusals`: page, box, reason; no text). Over the 332 development files,

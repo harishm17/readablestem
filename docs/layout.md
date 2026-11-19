@@ -447,12 +447,10 @@ table is an item yet) and `regions.table_refusal` judges each proposal against i
   table that spans the columns on purpose, and a table with nothing else in the cut, are
   therefore accepted, and so is `s04_worksheet`'s matching table (its lists have no line of the
   page's beside them).
-- A proposal across such a gutter is refused when (a) a line of three words or more stands on
-  each of two sides (`REFUSED_PROSE`), or (b) its alignment, the share of its cells that line up
-  in their column (`Judgement.alignment`, now kept on `PageTable.alignment`), is under 0.6
-  (`REFUSED_ALIGNMENT`), or (c) every side is a list of three or more labeled cells, as the tree
-  reads an exercise that matches terms with definitions (`REFUSED_MATCHING`). Nothing else
-  refuses it. On the development files only (a) has fired.
+- A proposal across such a gutter is refused when a line of three words or more stands on each
+  of two sides (`REFUSED_PROSE`). Nothing else refuses it. The plan names two more grounds (rows
+  that do not line up across the gutter, and two labeled lists side by side); neither had a
+  case on the 332 development files, so neither is built.
 - A refused proposal is left where it is: its lines and rules stay in the page, and are read
   by the tree like any other line. The tree that reads the page is built after the judging,
   from the accepted tables only, so the tree a proposal was judged against is not the tree that
