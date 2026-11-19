@@ -602,7 +602,8 @@ math[intent] mi { text-transform: none; }
 .compare .part-label { margin: 0 0 var(--space-2); }
 .cmp-frame { container-type: inline-size; width: 100%; }
 .cmp-label { margin: var(--space-1) 0 var(--space-1); font-size: var(--step--1); font-weight: 700; color: var(--ink-muted); }
-.cmp-image { display: block; width: 100%; height: auto; background: var(--paper); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
+.cmp-image:not(.table-crop) { width: 100%; }
+.cmp-image { display: block; height: auto; background: var(--paper); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); }
 .cmp-row { background: var(--paper); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); overflow-x: auto; padding: 0.15em 0; }
 /* The proposal is drawn in the family LaTeX PDFs are set in (Computer Modern; Latin
    Modern Math is its OpenType math font, served from here as a WOFF2: static/vendor/fonts,
@@ -717,13 +718,10 @@ p.draft-failed { border-color: var(--warn); background: var(--warn-tint); }
 .redo-lead + .decide-row { margin-top: var(--space-2); }
 .region-image { display: block; max-width: 100%; height: auto; margin: var(--space-2) 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--paper); }
 @media (max-width: 40rem) {
-  /* A heading's band is half a page wide: on a phone, keep its start (where the heading
-     is) at a readable size and let the right-hand end go. */
-  .region-image {
-    width: 100%; height: 7.5rem; object-fit: cover; object-position: left center;
-    -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
-    mask-image: linear-gradient(to right, #000 78%, transparent);
-  }
+  /* On a phone a region picture is shown whole, at its own size, in the box a crop is shown
+     in (templates/_crop.html): it scrolls sideways, and nothing of what the person has to judge
+     is cut off. Without its size on the tag it keeps shrinking to the column. */
+  .region-box .region-image[width] { max-width: none; }
 }
 .figure-view { margin: var(--space-2) 0 var(--space-3); }
 .figure-view img { display: block; max-width: 100%; max-height: 22rem; height: auto; border: 1px solid var(--border-subtle); background: var(--paper); }
@@ -990,7 +988,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
    wider than the card (the page itself never does). Its cells keep whole words: the card
    breaks long words anywhere, which would squeeze a wide table into one-letter columns.
    Every cell has a rule round it, so a cell spanning the wrong rows or columns shows. */
-.table-crop { width: auto; max-width: 100%; }
+.table-crop { max-width: 100%; } /* its own size, from the width and height on the tag */
 /* On a phone the picture of the table from the PDF takes the whole width (T1-19). */
 @media (max-width: 40rem) { .table-compare .table-crop { width: 100%; max-width: none; } }
 .table-view { background: var(--paper); border: 1px solid var(--border-subtle); border-radius: 4px; overflow-wrap: normal; margin: 0 0 var(--space-2); }
@@ -1094,7 +1092,8 @@ input[type="number"].input-short { width: 6rem; }
 .group-crops { list-style: none; padding: 0; margin: var(--space-3) 0; display: grid; gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
 .group-crops figure { margin: 0; }
-.group-crops img { display: block; width: 100%; height: auto; border: 1px solid var(--border-subtle); }
+.group-crops img { display: block; height: auto; border: 1px solid var(--border-subtle); }
+@media (min-width: 40.0625rem) { .group-crops img { width: 100%; } }
 .group-crops figcaption { color: var(--ink-muted); font-size: var(--step-0); margin-top: var(--space-1); }
 
 .jump-links { margin: var(--space-4) 0 var(--space-2); border-top: 1px solid var(--border-subtle); border-bottom: 1px solid var(--border-subtle); }

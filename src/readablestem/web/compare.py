@@ -629,6 +629,53 @@ def band_clip(element: Element, page_size: tuple[float, float] | None) -> BBox:
     return _clamp((left, y0 - 1.6 * font, right, y1 + 3.0 * font), page_size)
 
 
+# How a picture of an item with the page round it is cut (`routes.split._render_region`), kept
+# here so the page can say a picture's size before the picture is made.
+HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
+FIGURE_REGION_ZOOM = 2.0
+TABLE_REGION_ZOOM = 2.0
+TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
+FIGURE_REGION_MARGIN = 4.0
+
+
+def region_clip(element: Element, kind: Kind, page_size: tuple[float, float] | None) -> BBox:
+    """The part of the page a region picture of this item is cut from."""
+    if kind is Kind.EQUATION:
+        return context_clip(element, page_size)
+    if kind is Kind.HEADING:
+        return band_clip(element, page_size)
+    x0, y0, x1, y1 = element.bbox
+    m = TABLE_REGION_MARGIN if kind is Kind.TABLE else FIGURE_REGION_MARGIN
+    return (x0 - m, y0 - m, x1 + m, y1 + m)
+
+
+def region_pixels(
+    element: Element,
+    kind: Kind,
+    page_size: tuple[float, float] | None,
+    *,
+    max_side_px: int,
+) -> tuple[int, int] | None:
+    """The size in pixels the picture of `region_clip` has: its zoom, held to `max_side_px`
+    on its long side, as `pdf_probe.render` does. Close, not exact: a heading's or a table's
+    edges move to whole lines when it is cut, a crop of a clipped page edge is smaller. None
+    when the clip has no area."""
+    clip = region_clip(element, kind, page_size)
+    width, height = clip[2] - clip[0], clip[3] - clip[1]
+    if width <= 0 or height <= 0:
+        return None
+    if kind is Kind.EQUATION:
+        zoom = compare_geometry(element, clip, max_side_px=max_side_px).zoom
+    elif kind is Kind.HEADING:
+        zoom = HEADING_REGION_ZOOM
+    elif kind is Kind.TABLE:
+        zoom = TABLE_REGION_ZOOM
+    else:
+        zoom = FIGURE_REGION_ZOOM
+    scale = min(zoom, (max_side_px - 1) / max(width, height))
+    return max(1, round(width * scale)), max(1, round(height * scale))
+
+
 @dataclass(frozen=True)
 class CompareGeometry:
     """Where the proposal goes under the crop, in units of the crop's width (CSS `cqw`):

@@ -67,13 +67,17 @@ from readablestem.web import (
 from readablestem.web.assets import asked_for
 from readablestem.web.compare import (
     COMPARE_PX_PER_PT,
+    FIGURE_REGION_ZOOM,
+    HEADING_REGION_ZOOM,
+    TABLE_REGION_ZOOM,
     CompareGeometry,
     EquationCompare,
     Suggestion,
-    band_clip,
     compare_equation,
     compare_geometry,
     context_clip,
+    region_clip,
+    region_pixels,
     suggest_fix,
 )
 from readablestem.web.db import Blob, session_scope
@@ -116,6 +120,7 @@ from readablestem.web.review import (
     item_labels,
     item_numbers,
 )
+from readablestem.web.routes.edits import region_crop_pixels
 from readablestem.web.routes.jobs import NOT_FOUND, element_ref, job_access, require_done
 from readablestem.web.routes.review import (
     GROUP_FLASH,
@@ -144,10 +149,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
-HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
-FIGURE_REGION_ZOOM = 2.0
-TABLE_REGION_ZOOM = 2.0
-TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
 # A notice about text, as the `note` of an address: "link_text_unclear:p3-e4".
 NOTE_KEY = re.compile(r"^[a-z_]{1,40}:[A-Za-z0-9_-]{1,64}$")
 EXCERPT_CHARS = 400  # of a paragraph a notice is about, shown in its panel
@@ -283,6 +284,7 @@ class AddTool:
     kind: str = ""  # "picture" or "equation" once chosen
     values: dict[str, str] = field(default_factory=dict)  # left, top, right, bottom, alt
     preview_url: str | None = None  # step 2: the region as it would be cut
+    preview_size: tuple[int, int] | None = None  # its size in pixels (width, height)
     errors: dict[str, str] = field(default_factory=dict)  # "region", "addalt", "add"
     change_href: str | None = None  # back to step 1 with the same numbers
     open: bool = False
@@ -415,6 +417,7 @@ class Panel:
     other: OtherReading | None = None
     region_url: str | None = None  # the item with the page around it
     region_alt: str = ""
+    region_size: tuple[int, int] | None = None  # its size in pixels (width, height), about
     # Text read from an image of a page: the page tools with this paragraph open to change.
     change_href: str | None = None
     show_on_page: str | None = None
@@ -666,6 +669,16 @@ class SplitBuilder:
         ]
 
     # ------------------------------------------------------------------ helpers
+
+    def region_size(self, element: Element, kind: Kind) -> tuple[int, int] | None:
+        """About how big the region picture of this item is, in pixels, so its place is kept
+        while it loads (`compare.region_pixels`)."""
+        return region_pixels(
+            element,
+            kind,
+            self.sizes.get(element.page),
+            max_side_px=page_images.REGION_MAX_SIDE_PX,
+        )
 
     def item(self, fix: Fix) -> ReviewItem:
         if fix.element_id not in self.items:
@@ -925,15 +938,18 @@ class SplitBuilder:
                 round((clip[3] - clip[1]) * COMPARE_PX_PER_PT, 1),
             )
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_size = self.region_size(element, fix.kind)
             outlined = ", the symbol to check outlined" if compare.pdf_marks else ""
             panel.region_alt = f"{item.label} in the PDF, with the words around it{outlined}."
         elif fix.kind is Kind.FIGURE and element is not None:
             panel.evidence = self.evidence(fix, element, item, panel)
         elif fix.kind is Kind.HEADING and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_size = self.region_size(element, fix.kind)
             panel.region_alt = f"{item.label} in the PDF, with the lines around it."
         elif fix.kind in TEXT_FIX_KINDS and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_size = self.region_size(element, fix.kind)
             panel.region_alt = f"{item.label} in the PDF, as it is on the page."
             if page:
                 panel.change_href = review_url(
@@ -946,6 +962,7 @@ class SplitBuilder:
         elif fix.kind is Kind.TABLE:
             if element is not None:
                 panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+                panel.region_size = self.region_size(element, fix.kind)
                 panel.region_alt = f"{item.label} in the PDF, outlined, with the lines around it."
             # The card lists every finding itself; the line above it says only why there
             # is no rebuilt table (not once the reviewer gave it one: the grid read from
@@ -1081,8 +1098,9 @@ class SplitBuilder:
             if page
             else None
         )
-        if self.elements.get(lead.element_id) is not None:
+        if (lead_element := self.elements.get(lead.element_id)) is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{lead.element_id}.png"
+            panel.region_size = self.region_size(lead_element, lead.kind)
             where = f" on page {page}" if page else ""
             panel.region_alt = f"The first one{where}, with the lines around it."
         pages = sorted({p for f in decision.fixes if (p := self.page_of(f))})
@@ -1110,6 +1128,7 @@ class SplitBuilder:
         crop = self.item(lead).crop_url
         if crop is not None:
             panel.region_url = crop
+            panel.region_size = self.crop_ids.get(lead.element_id)
             name = self.labels.get(lead.element_id, "The first one")
             panel.region_alt = f"{name} as it is in the PDF."
         panel.group_pages = [
@@ -1393,12 +1412,13 @@ class SplitBuilder:
         edges = [tool.values[k] for k in ("left", "top", "right", "bottom")]
         if tool.kind and any(edges) and size is not None and "region" not in tool.errors:
             try:
-                page_edits.region_box(
+                box = page_edits.region_box(
                     size, edges[0], edges[1], edges[2], edges[3], field_id("region", str(number))
                 )
             except ReviewInvalid as exc:
                 tool.errors["region"] = exc.errors[0].message
             else:
+                tool.preview_size = region_crop_pixels(box)
                 query = urlencode({k: tool.values[k] for k in ("left", "top", "right", "bottom")})
                 tool.preview_url = f"/jobs/{self.job_id}/pages/{number}/region.png?{query}"
         if tool.preview_url is not None:
@@ -2126,8 +2146,8 @@ def _render_region(
     size: tuple[float, float] | None,
     kept: tuple[str, str] | None = None,
 ) -> bytes:
+    clip = region_clip(element, fix.kind, size)
     if fix.kind is Kind.EQUATION:
-        clip = context_clip(element, size)
         geometry: CompareGeometry = compare_geometry(
             element, clip, max_side_px=page_images.REGION_MAX_SIDE_PX
         )
@@ -2148,22 +2168,20 @@ def _render_region(
             element.page,
             zoom=HEADING_REGION_ZOOM,
             max_side=page_images.REGION_MAX_SIDE_PX,
-            clip=band_clip(element, size),
+            clip=clip,
             box=element.bbox,
             snap=True,
             cache_as=kept,
         )
-    x0, y0, x1, y1 = element.bbox
     if fix.kind is Kind.TABLE:
         # The table outlined, with a little page round it snapped to whole lines: its
         # caption above comes in whole, and no line of text is cut at an edge.
-        m = TABLE_REGION_MARGIN
         return page_images.render_region(
             pdf,
             element.page,
             zoom=TABLE_REGION_ZOOM,
             max_side=page_images.REGION_MAX_SIDE_PX,
-            clip=(x0 - m, y0 - m, x1 + m, y1 + m),
+            clip=clip,
             box=element.bbox,
             snap=True,
             cache_as=kept,
@@ -2173,6 +2191,6 @@ def _render_region(
         element.page,
         zoom=FIGURE_REGION_ZOOM,
         max_side=page_images.REGION_MAX_SIDE_PX,
-        clip=(x0 - 4, y0 - 4, x1 + 4, y1 + 4),
+        clip=clip,
         cache_as=kept,
     )

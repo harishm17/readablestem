@@ -7,7 +7,7 @@
 {% from "_leave_out.html" import leave_out_forms with context %}
 {% from "_hear.html" import hear_button %}
 {% from "components/notices.html" import notice_box %}
-{% from "_crop.html" import crop_image %}
+{% from "_crop.html" import crop_image, region_image %}
 {% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 
 {% macro saved_notice(n) %}
@@ -235,7 +235,7 @@
     <ul class="group-crops" aria-label="Some of the copies in the PDF">
       {% for c in hg.crops %}
       <li><figure>
-        <img class="region-image" loading="lazy" src="/jobs/{{ job.id }}/regions/{{ c.element_id }}.png" alt="“{{ hg.text }}” on page {{ c.page }} of the PDF, with the lines around it.">
+        {{ region_image("/jobs/" ~ job.id ~ "/regions/" ~ c.element_id ~ ".png", "“" ~ hg.text ~ "” on page " ~ c.page ~ " of the PDF, with the lines around it.", hg.region_sizes.get(c.element_id), "the copy on page " ~ c.page, lazy=true) }}
         <figcaption>Page {{ c.page }}</figcaption>
       </figure></li>
       {% endfor %}

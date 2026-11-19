@@ -394,8 +394,33 @@ def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site
     assert (fix["status"], fix["equation"]["latex"]) == ("edited", r"\boldsymbol{\omega}")
 
 
+@pytest.fixture
+def advised_bold_job(site, browser) -> str:
+    """A fresh finished job whose heading group is "Solution", a run-in label of a worked
+    example: the page advises bold text for it, so "Keep as headings" is the other choice."""
+    output = review_output()
+    for fix in output.result.fixes:
+        if fix.group_key == GROUP and fix.heading is not None:
+            fix.heading.text = "Solution"
+    site.converter.output = output
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/app")
+    page.locator("#pdf").set_input_files(
+        files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": review_pdf()}]
+    )
+    page.get_by_role("button", name="Upload and convert").click()
+    page.wait_for_url(f"{site.base}/jobs/*")
+    job_id = page.url.rsplit("/", 1)[-1]
+    context.close()
+    assert site.run_worker() == job_id
+    site.converter.output = review_output()
+    return job_id
+
+
 def test_keyboard_shortcuts_are_on_by_default_listed_in_view_and_never_fire_while_typing(
-    site, browser, job
+    site, browser, job, advised_bold_job
 ):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"
@@ -439,6 +464,19 @@ def test_keyboard_shortcuts_are_on_by_default_listed_in_view_and_never_fire_whil
     page.keyboard.press("n")
     page.wait_for_timeout(300)
     assert "item=p1-e6" not in page.url
+    # A on a group the page advises as bold does not press "Keep as headings": focus goes to
+    # the button and the status line says why.
+    page.get_by_label("Use keyboard shortcuts").check()
+    group_url = f"{site.base}/jobs/{advised_bold_job}/review?item={GROUP}"
+    page.goto(group_url)
+    keep = page.get_by_role("button", name=re.compile("^Keep as headings"))
+    page.locator("#decision-title").focus()
+    page.keyboard.press("a")
+    page.wait_for_function(
+        "() => document.querySelector('#decision-notice').textContent.includes('the other choice')"
+    )
+    assert page.url == group_url
+    assert keep.evaluate("e => e === document.activeElement")
     context.close()
 
 
