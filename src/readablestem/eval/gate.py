@@ -445,6 +445,64 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
     ),
 }
 
+# The numeric module constants of the step modules and of the modules that hold a bar or a
+# request's content, that are not guarded, each with why. `tests/test_eval_gate.py` reads every
+# one of those modules and fails for a numeric constant that is in neither this table nor
+# `GUARDED_CONSTANTS`, so a new bar is a decision made when it is added. It sees a module
+# constant, not a literal inside a function (the crop's default `dpi`), and not a bar kept in a
+# dict or a tuple: a parser of the source would be needed for those.
+_DEFAULT_OF_A_SETTING = "the default of a guarded setting, and the setting is what a report holds"
+_SAFETY_LIMIT = "a size limit that refuses an input; the gate leaves safety limits out"
+_VERSION_NUMBER = "a version number of the spoken reading, not a bar or a request's content"
+_AS_ITS_SETTING = "borrowed from a module that guards it"
+UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
+    "readablestem.pipeline.equation_step": {"SPEECH_VERSION": _VERSION_NUMBER},
+    "readablestem.pipeline.table_step": {
+        "MAX_TABLE_CELLS": _SAFETY_LIMIT,
+        "MAX_TABLE_COLS": _SAFETY_LIMIT,
+        "MAX_TABLE_ROWS": _SAFETY_LIMIT,
+        "TEXT_LAYER_MISMATCH_BELOW": "imported from `equation_step`, where it is guarded",
+        "NUMERIC_SHARE": "NOT YET GUARDED: which grids count as a grid of numbers; guard it "
+        "when the two no-model reports are made again",
+    },
+    "readablestem.pipeline.page_math": {
+        "MAX_OUTPUT_TOKENS": _DEFAULT_OF_A_SETTING,
+        "MIN_PAGE_CHARS": "NOT YET GUARDED: a page with less text is not sent; guard it when "
+        "the two no-model reports are made again",
+        "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
+    },
+    "readablestem.pipeline.page_math_reconcile": {
+        "RULE_MARGIN": "NOT YET GUARDED: geometry of which rules belong to a placed region",
+        "ATTACHED_LETTERS": "NOT YET GUARDED: how many glued letters count as part of a span",
+    },
+    "readablestem.pipeline.page_witness": {
+        "CONTEXT_CHARS": _AS_ITS_SETTING,
+        "MIN_PAGE_CHARS": _AS_ITS_SETTING,
+        "SPLIT_MIN_ROWS": "NOT YET GUARDED: when a window that ran out is split again",
+        "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
+    },
+    "readablestem.pipeline.witness_reconcile": {
+        "MIN_GLYPH": "NOT YET GUARDED: the least a glyph's size can be when a tolerance is taken",
+    },
+    "readablestem.pipeline.image_page": {
+        "SPEECH_VERSION": _VERSION_NUMBER,
+        "DPI": _DEFAULT_OF_A_SETTING,
+        "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
+        "MAX_BLOCKS": _SAFETY_LIMIT,
+        "MAX_RUNS": _SAFETY_LIMIT,
+        "MAX_TEXT_CHARS": _SAFETY_LIMIT,
+        "BOX_PAD": "geometry of a block's box on the page picture",
+        "INK_PAD_PX": "geometry of a block's box on the page picture",
+        "MARKER_WIDTH": "geometry of a list marker beside a formula",
+        "MARKER_GAP": "geometry of a list marker beside a formula",
+        "RECOVERY_MARGIN": "NOT YET GUARDED: how far the picture of a left-out stretch is grown",
+    },
+    "readablestem.pipeline.image_page_check": {
+        "CROP_MARGIN_PX": "NOT YET GUARDED: the cut-out sent with a request is grown by this",
+        "MIN_CROP_HEIGHT_PX": "NOT YET GUARDED: the least height of the cut-out sent with a request",
+    },
+}
+
 # A text longer than this is recorded as its digest: a report holds a sentence's identity, not
 # the sentence (`models.base.UNTRUSTED_NOTICE` goes to the model with every request).
 _TEXT_RECORDED_UP_TO = 40

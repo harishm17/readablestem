@@ -210,3 +210,50 @@ def test_require_current_refuses_a_report_made_with_other_switches(tmp_path, cap
     assert main([*plain, str(write(tmp_path, "dev.json", {**fresh, "flags": settings}))]) == 0
     out = capsys.readouterr().out
     assert "flag REGION_TREE changed" in out and "production 'off'" in out
+
+
+# A numeric constant of a module that holds a bar, or what a request holds, is guarded
+# (`GUARDED_CONSTANTS`) or left out with its reason (`UNGUARDED_CONSTANTS`): a new bar is a
+# decision when it is added, not a report that silently stops meaning what it did. (The three
+# modules named here hold the page's geometry and the parsers' safety limits; the gate's
+# comment on `GUARDED_CONSTANTS` leaves them out.)
+_NOT_SCANNED = {
+    "readablestem.pipeline.tables",
+    "readablestem.pipeline.validate",
+    "readablestem.pipeline.layout.access",
+}
+
+
+def _unlisted_numeric_constants() -> list[str]:
+    import importlib
+
+    steps = {
+        f"readablestem.pipeline.{path.stem}"
+        for path in (REPO / "src/readablestem/pipeline").glob("*_step.py")
+    }
+    guarded = {m for m in gate.GUARDED_CONSTANTS if m.startswith("readablestem.pipeline.")}
+    found = []
+    for name in sorted((steps | guarded) - _NOT_SCANNED):
+        module = importlib.import_module(name)
+        listed = set(gate.GUARDED_CONSTANTS.get(name, ())) | set(
+            gate.UNGUARDED_CONSTANTS.get(name, {})
+        )
+        found += [
+            f"{name}.{const}"
+            for const, value in vars(module).items()
+            if const.isupper()
+            and not const.startswith("_")
+            and isinstance(value, int | float)
+            and not isinstance(value, bool)
+            and const not in listed
+        ]
+    return found
+
+
+def test_every_numeric_constant_of_a_step_is_guarded_or_left_out_with_a_reason(monkeypatch):
+    from readablestem.pipeline import heading_step
+
+    assert _unlisted_numeric_constants() == []
+    monkeypatch.setattr(heading_step, "ACCEPT_AT_NEW_BAR", 0.8, raising=False)
+    assert _unlisted_numeric_constants() == ["readablestem.pipeline.heading_step.ACCEPT_AT_NEW_BAR"]
+    assert all(reason for names in gate.UNGUARDED_CONSTANTS.values() for reason in names.values())

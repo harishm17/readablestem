@@ -986,9 +986,7 @@ def table_checks(grid: TableGrid, element: Element) -> list[Check]:
         )
     )
     if local is None or not _aligned(grid, local):
-        checks.append(
-            _math_not_compared("no_local_grid" if local is None else "grid_not_aligned")
-        )
+        checks.append(_math_not_compared("no_local_grid" if local is None else "grid_not_aligned"))
         return checks
     verdict = maths_verdict(grid, local)
     if not verdict.compared:
