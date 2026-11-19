@@ -169,6 +169,20 @@ def test_a_second_title_slide_or_a_new_page_size_starts_a_second_deck_at_the_sam
         assert {levels[t] for t in ("Alpha", "Beta", "Gamma", "Delta")} == {2}
 
 
+def test_a_formula_larger_than_the_slide_title_does_not_make_a_title_slide():
+    def formula(title: str) -> tuple:
+        return SLIDE, [
+            (title, 80, 36),
+            ("x = -b / 2a", 270, 50),
+            ("The roots of the polynomial follow from this formula", 480, 20),
+        ]
+
+    pages = [title_slide("First Lecture"), formula("Alpha"), formula("Beta"), formula("Gamma")]
+    levels = heading_levels_of(analyze(deck_pdf(pages)))
+    assert levels["First Lecture"] == 1
+    assert {levels[t] for t in ("Alpha", "Beta", "Gamma")} == {2}
+
+
 # ------------------------------------------------------------------ non-slide files
 
 

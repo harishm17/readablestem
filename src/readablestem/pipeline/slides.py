@@ -295,16 +295,18 @@ def _with_lines(rows: Sequence[RowView], first: RowView) -> Title:
     return Title(" ".join(text), first.bbox, first.size, last.bbox[3])
 
 
-def _title_slide(view: PageView, ordinary: float) -> Title | None:
+def _title_slide(view: PageView, ordinary: float, own: Title | None) -> Title | None:
     """The title of a title slide: a page whose largest line is at least TITLE_SLIDE_RATIO x
     `ordinary` (the size of an ordinary slide's title) and which has at most MAX_SUBTITLE_ROWS
     other lines in its body (the top and bottom NUMBER_BAND are the headline and footline).
-    The title may be anywhere on the page: a title slide's is often in the middle."""
+    The title may be anywhere on the page: a title slide's is often in the middle. A page with
+    a title of its own (`own`, found in the top of the page) that is smaller than its largest
+    line is an ordinary slide with a big formula or picture caption, not a title slide."""
     rows = [r for r in view.rows if not r.vertical and r.text.strip()]
     if not rows or ordinary <= 0:
         return None
     largest = max(r.size for r in rows)
-    if largest < TITLE_SLIDE_RATIO * ordinary:
+    if largest < TITLE_SLIDE_RATIO * ordinary or (own is not None and own.size < largest / 1.05):
         return None
     first = min((r for r in rows if r.size >= largest / 1.05), key=lambda r: (r.bbox[1], r.bbox[0]))
     title = _with_lines(rows, first)
@@ -342,7 +344,11 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     body = _body_size(views)
     titles = {v.number: t for v in views if (t := _title(v, body)) is not None}
     ordinary = statistics.median(t.size for t in titles.values()) if titles else 0.0
-    title_slides = {v.number: t for v in views if (t := _title_slide(v, ordinary)) is not None}
+    title_slides = {
+        v.number: t
+        for v in views
+        if (t := _title_slide(v, ordinary, titles.get(v.number))) is not None
+    }
     frames = _frames(views, titles)
     overlaid = any(len(frame) > 1 for frame in frames)
     # Not Beamer: the pages must have at least two different labels, and the labels must group
