@@ -27,6 +27,23 @@
 
 ## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
 
+- Speech says where a scope ends (`speech.py`, `SPEECH_VERSION` 3). Two different formulas shared
+  every word up to a trailing "end X": `e^{-x}+1` and `e^{-x+1}`, `\sqrt{a}+b` and `\sqrt{a+b}`,
+  `a+\frac{b}{c}` and `\frac{a+b}{c}`; a pair of bars was read "vertical bar x vertical bar".
+  A power, subscript, root, accent or fraction that holds more than one thing, or that something
+  follows, now says where it ends ("e to the power minus x end power plus 1", "the square root of a
+  end root plus b", "x sub i end sub plus 1", "the quantity a plus b end quantity bar"); a fraction
+  that follows something says where it starts ("a plus the fraction b over c end fraction"); what
+  stands last in another scope closes too; paired bars read "the absolute value of x" ("the norm of
+  x" for double bars), closed when more follows, and a single bar keeps "such that", "divides" and
+  "given". Simple things stay short ("x squared", "x sub 0", "the square root of 2"). The pair
+  search over every formula of up to six signs (56,796 prints) finds 3,765 groups of different
+  prints said alike and 3,120 said alike up to trailing end words before, 15 and 0 after (the 15
+  are the mixed number `1\frac{1}{a}` against a numerator `1 1`, left as it is). One parametrized
+  pair list in `tests/test_steps_speech.py` now also fails a pair whose sayings differ only in
+  their last "end ..." words. A stored reading from older rules is made again where it is shown
+  (no model call); `RENDER_VERSION` and `PIPELINE_VERSION` are not changed here. The spoken-equal
+  score credits fewer pairs that were only said alike (the strict count does not move).
 - Migrations: `8b1d5f3a9e04` (the step facts, the head of the release of 2026-11-18) is back
   where that release has it, after `c2f4a8d61e57`. `7b1d3e9a4c28` (`jobs.html_version`) and
   `8b3d5f0e2a71` (`request_tokens`) had been put under it, so a database already at the

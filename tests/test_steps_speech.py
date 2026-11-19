@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -37,7 +38,10 @@ def test_every_gold_equation_has_speech(record):
         (r"\frac{a}{b}", "a over b"),
         (r"\frac{\Delta d}{\Delta t}", "cap delta d over cap delta t"),
         (r"\frac{a + b}{c}", "the fraction a plus b over c end fraction"),
-        (r"\frac{1}{\frac{1}{x}}", "the fraction 1 over 1 over x end fraction"),
+        (
+            r"\frac{1}{\frac{1}{x}}",
+            "the fraction 1 over the fraction 1 over x end fraction end fraction",
+        ),
         (r"\binom{n}{k}", "open parenthesis n choose k close parenthesis"),
         # powers and subscripts
         (r"x^2", "x squared"),
@@ -48,7 +52,13 @@ def test_every_gold_equation_has_speech(record):
         (r"x_0", "x sub 0"),
         (r"v_\text{f}", "v sub f"),
         (r"x_{i+1}", "x sub i plus 1 end sub"),
-        (r"x_i^2", "x sub i squared"),
+        (r"x_i^2", "x sub i end sub squared"),
+        (r"a+\frac{b}{c}", "a plus the fraction b over c end fraction"),
+        (r"\sqrt{a}+b", "the square root of a end root plus b"),
+        (r"|x|", "the absolute value of x"),
+        (r"|x|+1", "the absolute value of x end absolute value plus 1"),
+        (r"\|x\|", "the norm of x"),
+        (r"\bar{a+b}", "the quantity a plus b end quantity bar"),
         # ions: the charge needs no "end power"; a nuclide is read as the element (the data
         # of `speech_nuclides`), and one that is not known keeps its numbers before its symbol
         (r"\text{SO}_4^{2-}", "S O 4 2 minus"),
@@ -137,6 +147,9 @@ def test_speech_rules(latex, expected):
     assert say(latex) == expected
 
 
+_ENDS = r"(?: end (?:power|sub|root|fraction|absolute value|norm|enclosure|quantity|bar))+$"
+
+
 @pytest.mark.parametrize(
     ("one", "other"),
     [
@@ -147,10 +160,23 @@ def test_speech_rules(latex, expected):
         (r"\frac{ab}{2}", r"a \frac{b}{2}"),
         (r"a_{ab}^2", r"a_a b^2"),
         (r"e^{-x}", r"e^{-}x"),
+        # one saying must not be the other up to a trailing "end ..." word
+        (r"e^{-x}+1", r"e^{-x+1}"),
+        (r"\sqrt{a}+b", r"\sqrt{a+b}"),
+        (r"\sqrt{\sqrt{a}+b}", r"\sqrt{\sqrt{a+b}}"),
+        (r"a+\frac{b}{c}", r"\frac{a+b}{c}"),
+        (r"x_i+1", r"x_{i+1}"),
+        (r"\bar{a}+b", r"\bar{a+b}"),
+        (r"\left(\frac{a}{b}\right)^n+1", r"\left(\frac{a}{b}\right)^{n+1}"),
+        (r"|x|+1", r"|x+1|"),
+        (r"\|x\|+1", r"\|x+1\|"),
+        (r"\sum_{i=1}^{n} a_i+1", r"\sum_{i=1}^{n} a_{i+1}"),
     ],
 )
 def test_two_different_formulas_are_not_said_alike(one, other):
-    assert say(one) != say(other)
+    a, b = say(one), say(other)
+    # alike, or alike up to the "end ..." words that close the last scopes
+    assert re.sub(_ENDS, "", a) != re.sub(_ENDS, "", b)
 
 
 @pytest.mark.parametrize(

@@ -934,25 +934,25 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 
 | Construct | Reading |
 |---|---|
-| Simple fraction (each side one or two plain tokens) | "a over b", "cap delta bold d over cap delta t"; "a over b end fraction" when a plain token follows it, and the long form after a plain token, so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}` are not said alike |
-| Other fractions | "the fraction ... over ... end fraction" |
+| Simple fraction (each side one or two plain tokens) | "a over b", "cap delta bold d over cap delta t"; "a over b end fraction" when a plain token follows it, and the long form after something (a sign, a number, a letter), so `\frac{1}{2m}v^2` and `\frac{1}{2}mv^2`, `\frac{ab}{2}` and `a\frac{b}{2}`, `a+\frac{b}{c}` and `\frac{a+b}{c}` are not said alike |
+| Other fractions | "the fraction ... over ... end fraction"; after something it says where it starts ("a plus the fraction b over c end fraction"), and a fraction inside another is always long |
 | `linethickness=0` fraction | "n choose k" |
-| Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power" |
+| Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power"; a power that holds more than one thing, or that something follows, says where it ends: `e^{-x}+1` "e to the power minus x end power plus 1" against `e^{-x+1}` "e to the power minus x plus 1 end power" |
 | Primes, degrees | "y double prime", "30 degrees" |
-| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a short subscript a plain token (or a script on one) follows is closed, "x sub i end sub y" against `x_{iy}` "x sub i y" |
+| Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a subscript that something follows (a plain token, a sign, the power of `x_i^2`) is closed: "x sub i end sub y" against `x_{iy}` "x sub i y", `x_i+1` "x sub i end sub plus 1" against `x_{i+1}` "x sub i plus 1 end sub" |
 | Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "cap A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
-| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides" and a pair of bars the absolute value |
+| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides". A pair of bars is "the absolute value of x" and a pair of double bars "the norm of x", closed ("... end absolute value", "... end norm") when more follows or the content is more than one thing; a pair that carries a script (`|x|^2`) keeps "vertical bar" |
 | A centered dot or a cross | between vectors (bold letters, arrows, nabla, the test of `signs.py`) "dot" and "cross"; between numbers and scalars "times" |
 | A negated relation | "is not an element of", "is neither less than nor equal to", "not equal to", "is not a subset of", ...; a relation with no word of its own "with stroke" |
 | Distribution and sets | `\sim` after a variable before a distribution "is distributed as"; `\setminus` "set minus"; `\mathit{diff}` is the word "diff" (a plain `diff` is still d, i, f, f) |
-| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
+| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power" unless something follows: "Cu to the power 2 plus end power divided by Cu") |
 | Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
-| Roots | "the square root of x", "... end root" when compound, "the cube root of", "the root of index n of" |
+| Roots | "the square root of x", "... end root" when compound or when something follows (`\sqrt{a}+b` "the square root of a end root plus b" against `\sqrt{a+b}` "the square root of a plus b end root"), "the cube root of", "the root of index n of" |
 | Large operators | "the sum from i equals 1 to n of", "the integral from 0 to 1 of", "the product over k of" |
 | Limits | "the limit as x approaches 0 of" (an arrow under `lim` reads "approaches") |
 | Operators and relations | equals, minus, plus or minus, times, divided by, less than or equal to, approximately equals, proportional to, right arrow, ... |
 | Letters | "x", "cap F" (a capital is "cap", never "capital"); Greek "delta", "cap delta"; bold "bold d"; double-struck "double-struck cap R"; the letters of an upright name (`\mathrm{Var}`) add no "cap" ("V a r") |
-| Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde" |
+| Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde"; over more than one thing "the quantity a plus b end quantity bar" (`\bar{a+b}` and `a+\bar{b}` are not said alike) |
 | Functions | "sine", "cosine", "natural log", ... |
 | Tables | "row 1: ...; row 2: ..." when there are several rows; cells of an aligned equation read as one line, matrix cells are comma-separated |
 | Matrices | a table inside parentheses or brackets: "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix"; one column "the 3 by 1 column matrix", one row "the 1 by 3 row matrix"; inside bars "the 2 by 2 determinant; ...; end determinant". A single fenced cell, an aligned table and brace-fenced tables are not matrices |
@@ -962,7 +962,7 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Text | verbatim, except words that are a single math symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
 
-Two prints that differ are not said alike, and two spellings of one print are: an operator the
+Two prints that differ are not said alike, nor is one the other up to the "end ..." words that close its last scopes ("e to the power minus x plus 1" is not the start of "e to the power minus x plus 1 end power"). A scoped construct (power, subscript, root, accent, fraction, bars) that holds more than one thing, or that something follows, says where it ends; what stands last in another scope says so too ("the square root of the square root of a plus b end root end root"), and simple things stay short ("x squared", "x sub 0", "the square root of 2"). The generated search that checks this (every sequence of the letters a and b, the number 1, `+`, `-` and a product, with roots, bars, brackets, accents, fractions and scripts, up to size 6; 56,796 prints) finds no two prints said alike except `1\frac{1}{a}` and `\frac{1 1}{a}`, a mixed number written the way a numerator with two numbers is, and no print said as another up to a trailing end word. Two spellings of one print are said alike: an operator the
 converter leaves as an identifier (`\vert`, `\Vert`, `\pm`, `\langle`, `\geqslant`) reads as the operator,
 and a transposed run of letters (`\boldsymbol{BB}^T`) as one print with `BB^T`. Left alike on
 purpose: `ab_2` and `{ab}_2` (the same print), round and square matrix brackets, `\cdot`, `\times` and
@@ -974,7 +974,7 @@ before a change to these rules:
 
 - The reading stored with an equation (`EquationFix.speech`) is made in the equation step and
   carries the version of the speech rules that made it (`EquationFix.speech_version`, the code's
-  `speech.SPEECH_VERSION`, 2 since "cap" and the pauses in a formula; 0 where none was stored).
+  `speech.SPEECH_VERSION`, 3 since the scope ends and "the absolute value of"; 2 since "cap" and the pauses in a formula; 0 where none was stored).
   A stored reading made by older rules and not written by a person is made again from its MathML,
   without a model, where it is read: `speech.refresh_readings` on the result in
   `web.review.rerender_html` (the page, the EPUB's `describedMath` and the Word fallback text),

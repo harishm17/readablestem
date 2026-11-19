@@ -37,9 +37,15 @@ conventions, kept short:
   none (`speech_chem`);
 - the rules carry a version (`SPEECH_VERSION`): a reading stored by older rules, and not written
   by a person, is made again from its MathML when it is shown (`reading_for`, `refresh_readings`);
-- two different prints are never said alike: a short fraction or subscript that a plain
-  token follows directly closes itself ("1 over 2 end fraction m v squared" for `\\frac{1}{2}mv^2`,
-  "1 over 2 m v squared" for `\\frac{1}{2m}v^2`);
+- two different prints are never said alike, and one is never the other said up to a trailing
+  "end ..." word: a scoped construct (a power, a subscript, a root, an accent, a fraction, a pair
+  of bars) that holds more than one thing, or that something follows, says where it ends ("e to
+  the power minus x end power plus 1" against "e to the power minus x plus 1 end power"); a
+  fraction that follows something says where it starts ("a plus the fraction b over c end
+  fraction"); a short fraction that a plain token follows closes itself ("1 over 2 end fraction
+  m v squared" for `\\frac{1}{2}mv^2`, "1 over 2 m v squared" for `\\frac{1}{2m}v^2`); paired bars
+  read "the absolute value of x" (a pair of double bars "the norm of x"), and a lone bar keeps
+  its meaning below;
 - a sign is read for what it does in its place: a bar between the arguments of a probability or
   an expectation is "given" and in set braces "such that" (elsewhere "divides"); a centered dot or a
   cross between vectors is "dot" or "cross" (between numbers and scalars "times"); a transpose,
@@ -77,7 +83,10 @@ MAX_DEPTH = 64
 # (`EquationFix.speech_version`); raise this number whenever a rule changes what is said, and
 # every older stored reading is made again from its MathML where it is shown (`reading_for`).
 # 2: "cap K" for a capital, no word for the letters of a name, a pause after a coefficient.
-SPEECH_VERSION = 2
+# 3: scope ends: a power, a subscript, a root, an accent or a fraction that holds more than one
+#    thing and is followed by something says where it ends; paired bars read "the absolute
+#    value of".
+SPEECH_VERSION = 3
 
 
 class SpeechError(ValueError):
@@ -412,55 +421,126 @@ def _starts_plain(node: ET.Element) -> bool:
     return _is_plain_token(node)
 
 
+# Signs after which a new expression starts. A script, a root or an absolute value before one is
+# not followed by more of its expression, and a fraction after one is the first thing of the next.
+_EXPRESSION_SIGNS = frozenset("=<>≤≥⩽⩾≠≈≃≅≡∝≪≫∈∉∋⊂⊆⊃⊇⊥∥∣∴∵∼~≺≻≼≽⊢⊨⊩⊲⊳⊴⊵∤∄⟂→⟶←⟵↔⟷⇒⟹⇐⇔⟺↦⇌,;:")
+_SCRIPTED = frozenset({"msub", "msup", "msubsup"})
+_OVER_UNDER = frozenset({"munder", "mover", "munderover"})
+_INNER_ROWS = frozenset({"msqrt", "menclose"})  # their children are read as one row
+_BAR_ROLE = "bar"  # set on a bar that pairs with another: "open" or "close"
+_BAR_COMPOUND = "bar-compound"  # set on a closing bar whose content is more than one thing
+
+
+def _is_expression_sign(text: str) -> bool:
+    return text in _EXPRESSION_SIGNS or _struck_base(text) in _EXPRESSION_SIGNS
+
+
+def _is_row(node: ET.Element) -> bool:
+    """Is the node's content read in order, as a row of signs and operands?"""
+    return node.tag not in _HANDLERS or node.tag in _INNER_ROWS
+
+
+def _ends_expression(node: ET.Element) -> bool:
+    """A sign or a closing bracket after which nothing of the expression before it continues."""
+    text = _mo_text(node)
+    if not text:
+        return False
+    if text in _BARS:  # an unpaired bar is "given", "such that" or "divides"
+        return node.get(_BAR_ROLE) != "open"
+    return _is_expression_sign(text) or text in _CLOSERS
+
+
+def _starts_expression(node: ET.Element) -> bool:
+    """A sign or an opening bracket after which a new expression starts: a fraction there is the
+    first thing in its expression."""
+    text = _mo_text(node)
+    if not text:
+        return False
+    if text in _BARS:
+        return node.get(_BAR_ROLE) != "close"
+    return _is_expression_sign(text) or text in _OPENERS
+
+
 # Nodes a plain token follows directly in the call in progress (`_mark_followed`). A short
-# fraction or subscript there says where it ends, or `\frac{1}{2}mv^2` and `\frac{1}{2m}v^2`
-# would be said alike.
+# fraction there says where it ends, or `\frac{1}{2}mv^2` and `\frac{1}{2m}v^2` would be said
+# alike.
 _FOLLOWED: ContextVar[frozenset[int]] = ContextVar("speech_followed", default=frozenset())
+# Nodes something follows in their expression, whatever it is. A script, a root or an absolute
+# value there says where it ends, or `e^{-x}+1` and `e^{-x+1}` would differ only by their last word.
+_CONTINUED: ContextVar[frozenset[int]] = ContextVar("speech_continued", default=frozenset())
 
 
-def _mark_followed(root: ET.Element) -> frozenset[int]:
-    """The ids of the nodes a plain token follows directly: the next sibling is one, or the node
-    ends a row (`mrow`) that one follows. Only a plain token can be taken for the rest of a short
-    form: a short form holds no operators, so an operator or a bracket after it cannot be."""
-    found: set[int] = set()
-    stack = [(root, False)]
+def _mark_followed(root: ET.Element) -> tuple[frozenset[int], frozenset[int]]:
+    """The ids of the nodes a plain token follows directly, and of the nodes something follows in
+    their expression: the next sibling is one, or the node ends a row (`mrow`) that one follows.
+    A relation, a comma or a closing bracket after a node ends its expression: nothing follows it
+    there. What stands inside a script, a fraction, a root, an enclosure or a pair of bars is
+    followed by the word that ends it ("end power", "over", "end root"), so a root last in a root
+    says so too. Only a plain token can be taken for the rest of a short fraction: a short form
+    holds no operators, so an operator or a bracket after it cannot be."""
+    plain: set[int] = set()
+    anything: set[int] = set()
+    stack = [(root, False, False)]
     while stack:
-        node, followed = stack.pop()
+        node, after_plain, after_any = stack.pop()
         kids = list(node)
+        row = _is_row(node)
         transparent = node.tag in {"math", "mrow"}
         for k, kid in enumerate(kids):
-            more = k + 1 < len(kids)
-            after = _starts_plain(kids[k + 1]) if more else followed and transparent
-            if after:
-                found.add(id(kid))
-            stack.append((kid, after))
-    return frozenset(found)
+            if row and k + 1 < len(kids):
+                after = kids[k + 1]
+                p = _starts_plain(after)
+                a = not _ends_expression(after) or after.get(_BAR_ROLE) == "close"
+            elif row:
+                p, a = (after_plain, after_any) if transparent else (False, node.tag in _INNER_ROWS)
+            elif node.tag in _SCRIPTED:
+                p, a = k == 0 and len(kids) > 1 and _starts_plain(kids[1]), True
+            elif node.tag in _OVER_UNDER:
+                p, a = False, k == 0
+            else:
+                p = node.tag == "mfrac" and k == 0 and kid.tag == "mfrac"
+                a = node.tag in {"mfrac", "mroot"}
+            if p:
+                plain.add(id(kid))
+            if a:
+                anything.add(id(kid))
+            stack.append((kid, p, a))
+    return frozenset(plain), frozenset(anything)
 
 
-# Fractions a plain token directly precedes in the call in progress: `a\\frac{b}{2}` takes the
-# long form, or it would be said as `\\frac{ab}{2}` is.
+# Fractions that are not the first thing in their expression in the call in progress: a sign, a
+# factor or a function stands before them (`a+\frac{b}{c}`, `a\frac{b}{2}`). They take the long
+# form, so `a+\frac{b}{c}` and `\frac{a+b}{c}`, `a\frac{b}{2}` and `\frac{ab}{2}` are not said
+# alike.
 _PRECEDED: ContextVar[frozenset[int]] = ContextVar("speech_preceded", default=frozenset())
 
 
 def _mixed_number(prev: ET.Element, node: ET.Element) -> bool:
-    """`2\\frac{1}{2}`: a number before a fraction of numbers; `\\frac{21}{2}` is one number."""
+    r"""`2\frac{1}{2}`: a number before a fraction of numbers; `\frac{21}{2}` is one number."""
     return prev.tag == "mn" and node.tag == "mfrac" and len(node) == 2 and node[0].tag == "mn"
 
 
 def _mark_preceded(root: ET.Element) -> frozenset[int]:
-    """The ids of the nodes a plain token directly precedes (a first node in a row follows
-    what the row follows)."""
+    """The ids of the nodes that are not the first thing in their expression: something other than
+    a relation or an opening bracket stands before them. A first node in a row follows what the
+    row follows; a denominator, a script and a root's index follow their base."""
     found: set[int] = set()
-    stack: list[tuple[ET.Element, ET.Element | None]] = [(root, None)]
+    stack = [(root, False)]
     while stack:
-        node, before = stack.pop()
+        node, inherited = stack.pop()
+        kids = list(node)
+        row = _is_row(node)
         transparent = node.tag in {"math", "mrow"}
-        prev = before if transparent else None
-        for kid in node:
-            if prev is not None and _is_plain_token(prev) and not _mixed_number(prev, kid):
+        for k, kid in enumerate(kids):
+            if not row:
+                before = k > 0
+            elif k == 0:
+                before = inherited and transparent
+            else:
+                before = not (_starts_expression(kids[k - 1]) or _mixed_number(kids[k - 1], kid))
+            if before:
                 found.add(id(kid))
-            stack.append((kid, prev))
-            prev = kid
+            stack.append((kid, before))
     return frozenset(found)
 
 
@@ -487,8 +567,7 @@ def _speak_fraction(node: ET.Element) -> list[str]:
     num, den = node[0], node[1]
     if node.get("linethickness") == "0":
         return [*_speak(num), "choose", *_speak(den)]
-    long_form = id(node) in _PRECEDED.get() and _is_plain_token(num)
-    if _is_simple(num) and _is_simple(den) and not long_form:
+    if _is_simple(num) and _is_simple(den) and id(node) not in _PRECEDED.get():
         end = ["end fraction"] if id(node) in _FOLLOWED.get() else []
         return [*_speak(num), "over", *_speak(den), *end]
     return ["the fraction", *_speak(num), "over", *_speak(den), "end fraction"]
@@ -555,17 +634,17 @@ def _power_words(
         return ["star" if text in {"*", "∗"} else SYMBOLS[text]]
     if base is not None and base.tag == "mn" and sup.tag == "mo" and text in {"+", "−", "-"}:
         return ["plus" if text == "+" else "minus"]  # a one-sided limit: 0 plus, 0 minus
-    if _is_signed_token(sup) and not (followed and sup.tag == "mo"):  # `e^{-}x` is not `e^{-x}`
-        return ["to the power", *_speak(sup)]
-    return ["to the power", *_speak(sup), "end power"]
+    # A token or a signed token ends only where something follows (`e^{-x}+1`, `e^{-}x`); a longer
+    # exponent always ends.
+    ends = followed or not _is_signed_token(sup)
+    return ["to the power", *_speak(sup), *(["end power"] if ends else [])]
 
 
 def _sub_words(sub: ET.Element, *, followed: bool = False) -> list[str]:
-    """ "sub i", and "sub i end sub" when a plain token follows (or `x_i y` and `x_{iy}` are said
-    alike); a long subscript always ends."""
-    if _is_simple(sub) or _is_signed_token(sub):
-        return ["sub", *_speak(sub), *(["end sub"] if followed else [])]
-    return ["sub", *_speak(sub), "end sub"]
+    """ "sub i", and "sub i end sub" when something follows (`x_i y` and `x_{iy}`, `x_i+1` and
+    `x_{i+1}` are not said alike); a long subscript always ends."""
+    ends = followed or not (_is_simple(sub) or _is_signed_token(sub))
+    return ["sub", *_speak(sub), *(["end sub"] if ends else [])]
 
 
 def _limit_words(node: ET.Element) -> list[str]:
@@ -632,7 +711,7 @@ def _speak_msub(node: ET.Element) -> list[str]:
     limits = _with_limits(base, sub, None)
     if limits is not None:
         return limits
-    return [*_speak(base), *_sub_words(sub, followed=id(node) in _FOLLOWED.get())]
+    return [*_speak(base), *_sub_words(sub, followed=id(node) in _CONTINUED.get())]
 
 
 def _speak_msup(node: ET.Element) -> list[str]:
@@ -649,7 +728,7 @@ def _speak_msup(node: ET.Element) -> list[str]:
         return limits
     if _inverts(base, sup):
         return ["inverse", FUNCTIONS[_text_of(base)]]
-    return [*_speak(base), *_power_words(sup, base, followed=id(node) in _FOLLOWED.get())]
+    return [*_speak(base), *_power_words(sup, base, followed=id(node) in _CONTINUED.get())]
 
 
 def _speak_msubsup(node: ET.Element) -> list[str]:
@@ -666,9 +745,16 @@ def _speak_msubsup(node: ET.Element) -> list[str]:
         return limits
     return [
         *_speak(base),
-        *_sub_words(sub),
-        *_power_words(sup, base, followed=id(node) in _FOLLOWED.get()),
+        *_sub_words(sub, followed=True),
+        *_power_words(sup, base, followed=id(node) in _CONTINUED.get()),
     ]
+
+
+def _accent_base(base: ET.Element) -> list[str]:
+    """What an accent is over. More than one thing is "the quantity ... end quantity", or
+    `\\bar{a+b}` and `a+\\bar{b}`, `\\vec{AB}` and `\\vec{A}B` are said alike."""
+    words = _speak(base)
+    return words if base.tag in _TOKENS else ["the quantity", *words, "end quantity"]
 
 
 def _speak_munder(node: ET.Element) -> list[str]:
@@ -680,8 +766,8 @@ def _speak_munder(node: ET.Element) -> list[str]:
         return limits
     template = UNDER_ACCENTS.get(_text_of(under)) if under.tag == "mo" else None
     if template:
-        return template.format(" ".join(_speak(base))).split()
-    return [*_speak(base), "with", *_speak(under), "below"]
+        return template.format(" ".join(_accent_base(base))).split()
+    return [*_accent_base(base), "with", *_speak(under), "below"]
 
 
 def _speak_mover(node: ET.Element) -> list[str]:
@@ -693,8 +779,8 @@ def _speak_mover(node: ET.Element) -> list[str]:
         return limits
     template = OVER_ACCENTS.get(_text_of(over)) if over.tag == "mo" else None
     if template:
-        return template.format(" ".join(_speak(base))).split()
-    return [*_speak(base), "with", *_speak(over), "above"]
+        return template.format(" ".join(_accent_base(base))).split()
+    return [*_accent_base(base), "with", *_speak(over), "above"]
 
 
 def _speak_munderover(node: ET.Element) -> list[str]:
@@ -704,7 +790,7 @@ def _speak_munderover(node: ET.Element) -> list[str]:
     limits = _with_limits(base, under, over)
     if limits is not None:
         return limits
-    return [*_speak(base), "with", *_speak(under), "below and", *_speak(over), "above"]
+    return [*_accent_base(base), "with", *_speak(under), "below and", *_speak(over), "above"]
 
 
 def _is_compound(node: ET.Element) -> bool:
@@ -713,7 +799,7 @@ def _is_compound(node: ET.Element) -> bool:
 
 def _speak_msqrt(node: ET.Element) -> list[str]:
     words = ["the square root of", *_speak_children(node)]
-    return [*words, "end root"] if _is_compound(node) else words
+    return [*words, "end root"] if _is_compound(node) or id(node) in _CONTINUED.get() else words
 
 
 def _speak_mroot(node: ET.Element) -> list[str]:
@@ -728,7 +814,9 @@ def _speak_mroot(node: ET.Element) -> list[str]:
     else:
         words = ["the root of index", *_speak(index), "of"]
     words += _speak(base)
-    return [*words, "end root"] if base.tag not in _TOKENS else words
+    return (
+        [*words, "end root"] if base.tag not in _TOKENS or id(node) in _CONTINUED.get() else words
+    )
 
 
 def _speak_menclose(node: ET.Element) -> list[str]:
@@ -1191,10 +1279,63 @@ def _mark_tilde(kids: list[ET.Element]) -> None:
         kid.set(_MARK, word)
 
 
+# Two bars that enclose something are an absolute value (two double bars a norm).
+_ABSOLUTE = {"|": ("the absolute value of", "end absolute value"), "‖": ("the norm of", "end norm")}
+_POSTFIX = frozenset("!′″‴%°")
+
+
+def _pair_bars(kids: list[ET.Element]) -> None:
+    """Pair the bars of a row that enclose something, and say so on them (`_BAR_ROLE`, the opening
+    words in `_MARK`). A bar closes when something it can enclose stands before it (a letter, a
+    number, a closing bracket or another closed bar); after a sign, an opening bracket or at the
+    start of a row it opens. A bar already read another way (`_mark_bars`) or left without its
+    partner stays "vertical bar"."""
+    stack: list[int] = []
+    pairs: list[tuple[int, int]] = []
+    operand = False
+    for i, kid in enumerate(kids):
+        text = _mo_text(kid)
+        if text in _ABSOLUTE and not kid.get(_MARK):
+            if operand and stack and _mo_text(kids[stack[-1]]) == text:
+                pairs.append((stack.pop(), i))
+            else:
+                stack.append(i)
+                operand = False
+        else:
+            operand = kid.tag != "mo" or text in _CLOSERS or text in _POSTFIX
+    for start, end in pairs:
+        inside = kids[start + 1 : end]
+        opener, closer = kids[start], kids[end]
+        opener.set(_BAR_ROLE, "open")
+        opener.set(_MARK, _ABSOLUTE[_mo_text(opener) or ""][0])
+        closer.set(_BAR_ROLE, "close")
+        if len(inside) > 1 or (inside and inside[0].tag not in _TOKENS):
+            closer.set(_BAR_COMPOUND, "1")
+
+
 def _mark_row(kids: list[ET.Element]) -> None:
     _mark_bars(kids)
     _mark_products(kids)
     _mark_tilde(kids)
+
+
+def _mark_rows(root: ET.Element) -> None:
+    """Read every row's signs before anything is said: a script or a root is followed by
+    something, or not, according to how its row's bars pair."""
+    for node in root.iter():
+        if _is_row(node):
+            kids = list(node)
+            _mark_row(kids)
+            _pair_bars(kids)
+
+
+def _close_bars(root: ET.Element, continued: frozenset[int]) -> None:
+    """A closing bar says where the absolute value ends when something follows it or the bars
+    enclose more than one thing; otherwise it says nothing (`|x|`)."""
+    for node in root.iter():
+        if node.get(_BAR_ROLE) == "close":
+            ends = node.get(_BAR_COMPOUND) or id(node) in continued
+            node.set(_MARK, _ABSOLUTE[_mo_text(node) or ""][1] if ends else " ")
 
 
 def _name_letter(node: ET.Element) -> bool:
@@ -1375,13 +1516,18 @@ def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) 
     its meaning: {"\U0001d41d": "vector"} makes a bold d "vector d" instead of "bold d"."""
     root = _parse(mathml)
     _drop_trailing_punctuation(root)
+    _mark_rows(root)
+    plain, continued = _mark_followed(root)
+    _close_bars(root, continued)
     token = _READINGS.set(readings or None)
-    followed = _FOLLOWED.set(_mark_followed(root))
+    followed = _FOLLOWED.set(plain)
+    after_any = _CONTINUED.set(continued)
     preceded = _PRECEDED.set(_mark_preceded(root))
     try:
         words = _speak(root)
     finally:
         _PRECEDED.reset(preceded)
+        _CONTINUED.reset(after_any)
         _FOLLOWED.reset(followed)
         _READINGS.reset(token)
     text = " ".join(word for word in words if word)
