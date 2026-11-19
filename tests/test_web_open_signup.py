@@ -9,6 +9,7 @@ dev login, the fake converter and the offline model client.
 
 from __future__ import annotations
 
+import re
 import threading
 from datetime import timedelta
 
@@ -604,6 +605,25 @@ def test_deleting_an_account_removes_the_person_and_everything_of_theirs(open_we
     kept = rows_of(open_web, theirs)
     assert kept["users"] == 1 and kept["jobs"] == 1 and kept["courses"] == 1
     assert kept["identities"] == 1 and kept["linked"] == 1
+
+
+def test_the_account_deletion_sent_twice_with_one_token_says_deleted_both_times(open_web):
+    """SW43: the second click of "Delete my account" arrives signed out, and is answered with
+    the first answer: the account is gone once, and the person is not sent to sign in."""
+    mine = populate(open_web, CAROL)
+    me = client_for(open_web, CAROL)
+    page = me.get("/account/delete").text
+    form = {
+        "csrf_token": csrf_from(page),
+        "request_token": re.search(r'name="request_token" value="([^"]+)"', page).group(1),
+        "confirm": "yes",
+    }
+    first = me.post("/account/delete", data=form)
+    again = me.post("/account/delete", data=form)
+    assert first.status_code == again.status_code == 303
+    assert first.headers["location"] == again.headers["location"] == "/"
+    assert rows_of(open_web, mine)["users"] == 0
+    assert "Your account and everything in it have been deleted." in me.get("/").text
 
 
 # --------------------------------------------------------------------------- the command line
