@@ -83,41 +83,24 @@ ROOM = {
 
 # How a person uploads a corpus file (`corpus.UPLOADS`).
 UPLOADS = corpus.UPLOADS
-# Files whose conversion asks for answers that are not recorded yet, with how many: the
-# next refresh owes them (docs/eval.md, "Recording and replay").
-OWED = {
-    # Wave 1a changed what these files' conversions ask (words with their styles, kept line
-    # ends, new boxes), and no recording was paid for in it. One refresh owes them all.
-    "w_lecture_5111": 30,
-    "w_exam_5111": 40,
-    "w_notes_6042_ch2": 646,
-    "w_pset_801": 6,
-    "w_slides_60001_lec1": 50,
-    "w_slides_60001_lec10": 98,
-    "w_solutions_1802": 64,
-    "r01_syllabus_16851": 6,
-    "r05_labmanual_5310_lab1": 24,
-    "r07_labnotebook_5310": 8,
-    "r09_handout_14451": 18,
-    "r14_exam_513": 44,
-    "r16_openstax_physics_ch4_end": 20,
-    "r17_arxiv_ligo": 76,
-    "r18_arxiv_opt": 38,
-    "r21_infographic_orcid": 8,
-    "s15_charts_figures": 4,
-    "d1_scripts": 8,
-    "e1_mc_columns": 6,
-    "e2_solutions_rubric": 6,
-    "e3_calendar": 2,
-    "f1_notation": 46,
-    "f2_figures": 14,
-    "f4_matrices": 12,
-    "ar3_sideways90": 2,
-    "ar4_sideways270": 2,
-    "r15_openstax_chem_ch3": 2,
-    "r19_poster_codesign": 4,
-    "r20_newsletter_drp": 2,
-}
+
+
+def owed_answers() -> dict[str, int]:
+    """Files whose conversion asks for answers that are not recorded yet, with how many: the
+    next refresh owes them (docs/eval.md, "Recording and replay"). Read from the replay
+    record (`data/eval/burden-corpus.json`, made by `eval burden`), which CI holds equal to a
+    replay of the corpus (`eval burden --same`), so the list is not kept by hand. A file
+    uploaded in two ways (`w_exam_5111+exam`) asks the same questions in both: the larger
+    count stands."""
+    record = json.loads((corpus.REPO / "data/eval/burden-corpus.json").read_text(encoding="utf-8"))
+    owed: dict[str, int] = {}
+    for upload, count in record["metrics"]["uploads"]["answers_missing"].items():
+        entry = upload.split("+")[0]
+        owed[entry] = max(owed.get(entry, 0), count)
+    return dict(sorted(owed.items()))
+
+
+OWED = owed_answers()
 
 
 # The audit's register of findings numbers its rows F-001 to F-558. A finding met while

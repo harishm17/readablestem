@@ -116,6 +116,18 @@ def test_a_record_kept_up_to_date_fails_a_change_in_either_direction(tmp_path, c
     # The same documents on a machine that has the answers of the lecture only.
     assert burden("--from", records(tmp_path, "c", more[:1]), "--against", record, "--same") == 0
 
+    # The answers the recording lacks are part of the record too (the workflow suite reads
+    # which files owe answers from it): a record made while 3 were missing is stale once the
+    # recording holds them.
+    owing = tmp_path / "owing.json"
+    assert burden("--from", records(tmp_path, "d", measured(missed=3)), "--out", owing) == 0
+    assert (
+        burden("--from", records(tmp_path, "e", measured(missed=3)), "--against", owing, "--same")
+        == 0
+    )
+    assert burden("--from", records(tmp_path, "f", measured()), "--against", owing, "--same") == 1
+    assert "3 in the record" in capsys.readouterr().out
+
 
 def test_a_formula_accepted_with_nothing_to_hold_it_against_is_counted_by_cause(tmp_path):
     run = measured()

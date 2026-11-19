@@ -206,6 +206,18 @@ def judge(
                     f"{row['upload']}: {row['decisions']} decisions on {row['pages']} pages, "
                     f"{was['decisions']} on {was['pages']} in the record"
                 )
+        # The answers an upload asks for that the recording does not hold (what the workflow
+        # suite's `OWED` is read from): an upload measured now, in either record.
+        asked_now = {row["upload"] for row in one["documents"]} | set(
+            one["uploads"]["answers_missing"]
+        )
+        for upload in sorted(asked_now | set(other["uploads"]["answers_missing"])):
+            now_n = one["uploads"]["answers_missing"].get(upload, 0)
+            was_n = other["uploads"]["answers_missing"].get(upload, 0)
+            if upload in asked_now and now_n != was_n:
+                differ.append(
+                    f"{upload}: {now_n} answers missing from the recording, {was_n} in the record"
+                )
         return Verdict(True, more=differ, same=True)
     here = (now.get("split") or {}).get("set_sha256")
     there = (before.get("split") or {}).get("set_sha256")
