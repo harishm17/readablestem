@@ -294,10 +294,12 @@ def test_raised_and_lowered_text_says_which_it_is_except_an_ordinal():
     items = listen.build_transcript(
         doc(
             "<main><p>On the 10<sup>th</sup> it was 19.3 g/cm<sup>3</sup> and SO"
-            "<sub>4</sub><sup>2-</sup>; read x<sub>1</sub>y.</p></main>"
+            "<sub>4</sub><sup>2-</sup>; read x<sub>1</sub>y"
+            '<sup><a role="doc-noteref" href="#fn1">1</a></sup>.</p></main>'
         )
     )
+    # a footnote's mark is a link and says no more than that
     assert (
         "On the 10th it was 19.3 g/cm superscript 3 and SO subscript 4 superscript 2-; "
-        "read x subscript 1 end subscript y." in said(items)
+        "read x subscript 1 end subscript y link 1." in said(items)
     )

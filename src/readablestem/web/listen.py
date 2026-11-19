@@ -412,7 +412,9 @@ class _Transcript:
         if tag == "hr":
             return ""
         inner = self._children_text(node, depth)
-        if tag in ("sup", "sub"):
+        # A raised link is a footnote's mark: "link 1" is its whole name, as before.
+        marks_a_note = any(not isinstance(c, str) and c.tag == "a" for c in node.children)
+        if tag in ("sup", "sub") and not marks_a_note:
             opening, closing = ("\ue001", "\ue002") if tag == "sup" else ("\ue003", "\ue004")
             return f"{opening}{inner}{closing}"
         if node.has_class("flagged-inline"):
