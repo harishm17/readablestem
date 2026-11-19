@@ -627,6 +627,8 @@ BLOCK_EQUATION = "It holds an equation, which has its own decision. Decide that 
 BLOCK_LAST = "At least one paragraph has to stay in the file."
 BLOCK_ALREADY_OUT = "That text is already left out."
 BLOCK_NOT_OUT = "That text is not left out."
+BLOCK_PAGE_OUT = "Its page is left out of the file. Put the page back first."
+BLOCK_NOT_PDF = "Text can be left out of a file converted from a PDF only."
 
 
 def left_out_blocked(result: DocumentResult, element: Element) -> str:
@@ -637,6 +639,8 @@ def left_out_blocked(result: DocumentResult, element: Element) -> str:
     seeing why. Equations, figures, tables and headings have their own decisions."""
     if element.kind not in (Kind.PARAGRAPH, Kind.LIST_ITEM):
         return NOT_A_TEXT_BLOCK
+    if result.origin != "pdf":  # the file's note names a page "of the original PDF"
+        return BLOCK_NOT_PDF
     if any(f.element_id == element.id and f.pending for f in result.fixes):
         return BLOCK_DECISION
     if any(n.code == "footnote" and n.element_id == element.id for n in result.notices):
@@ -719,6 +723,10 @@ def put_back_block(result: DocumentResult, element_id: str) -> StructureChange:
     held = next((b for b in result.left_out_blocks if b.element.id == element_id), None)
     if held is None:
         raise ReviewInvalid([FieldError(fid, BLOCK_NOT_OUT)])
+    if held.element.page in result.omitted_pages:
+        # Its paragraph would be in the file while the note says the page is out, and the
+        # page's count of paragraphs left out (kept with the page) would stay as it was.
+        raise ReviewInvalid([FieldError(fid, BLOCK_PAGE_OUT)])
     before = capture(
         result, elements=[element_id], fixes=[element_id], blocks=True, page=held.element.page
     )

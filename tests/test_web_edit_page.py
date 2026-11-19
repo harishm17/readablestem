@@ -447,6 +447,16 @@ def test_only_a_paragraph_or_list_item_nothing_points_at_is_left_out(edits):
     for target in ("p1-e0", "p1-e2", "p1-e6", PARAGRAPH):
         assert edit_post(edits, target, action="leave_out").status_code == 422, target
     assert not stored(edits).left_out_blocks
+    # Nor is text left out of a Word or LaTeX file, whose note would name a page of "the
+    # original PDF"; and a paragraph is not put back onto a page that is itself left out.
+    word = stored(edits).model_copy(update={"origin": "docx"})
+    with pytest.raises(page_edits.ReviewInvalid):
+        page_edits.leave_out_block(word, PLAIN)
+    result = stored(edits)
+    page_edits.leave_out_block(result, PLAIN)
+    page_edits.omit_page(result, 0, pages=page_edits.page_count(result))
+    with pytest.raises(page_edits.ReviewInvalid):
+        page_edits.put_back_block(result, PLAIN)
 
 
 # --------------------------------------------------------------------------- pictures

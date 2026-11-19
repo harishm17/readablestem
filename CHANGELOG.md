@@ -36,6 +36,11 @@
   stored paragraph (`record.Record.left_out_blocks`), and the CSV has one summary row for each
   ("Paragraph left out of the student file", with the page and the words) in place of the one
   row of page numbers. Two paragraphs on two pages no longer read "(page 1, 3)".
+- Two refusals a hand-made request could get past (the screens do not offer either): a
+  paragraph left out is not put back while its page is left out (it was in the student file
+  under a note that said the page was out, and the page's count of left-out paragraphs went
+  stale), and text is not left out of a Word or LaTeX file, whose note would have named a page
+  "of the original PDF" (`page_edits.put_back_block`, `left_out_blocked`).
 
 ## Unreleased: two edits on one paragraph are two carried changes (branch fix/source-equation-words)
 
