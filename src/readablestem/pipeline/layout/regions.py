@@ -1111,7 +1111,7 @@ def _matching(sides: Sequence[list[Item]]) -> bool:
 
 
 def table_refusal(
-    tree: RegionTree, lines: Sequence[Item], box: BBox, alignment: float
+    tree: RegionTree, lines: Sequence[Item], box: BBox, alignment: float, taken: set[BBox]
 ) -> str | None:
     """Why a table proposal is not accepted, as the reason (`REFUSED_*`), or None. The proposal
     is made on the raw page, before the page has columns; here the page has its tree. A proposal
@@ -1119,11 +1119,11 @@ def table_refusal(
     a cut of its own: nothing else of the page stands beside it). One that stands across a
     gutter is refused only when it has prose on both sides of it, or its rows do not line up
     (`MIN_ALIGNMENT`), or its sides are two labeled lists (an exercise). `lines` are the lines
-    the proposal takes (cells and caption) and `box` is the box of its cells."""
+    the proposal takes (cells and caption), `box` the box of its cells and `taken` the boxes of
+    the lines every proposal of the page takes: the page's own lines are the others."""
     frame = (box[0] - 1, box[1] - 1, box[2] + 1, box[3] + 1)
     cells = [it for it in lines if _centre_in(it[0], frame)]
-    own = {b for b, _ in lines}
-    rest = [b for b, _ in tree.lines if b not in own]
+    rest = [b for b, _ in tree.lines if b not in taken]
     across = _between(tree.root, cells, rest)
     if not across:
         return None

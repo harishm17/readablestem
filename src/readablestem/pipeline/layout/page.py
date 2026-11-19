@@ -186,10 +186,11 @@ def _accepted(
         return proposals
     kept = _split_furniture(page, frags, margins)[0]
     tree = regions._tree_of(page, kept, paths, (), document)
+    taken = {frags[i].bbox for table in proposals for i in table.lines if i < len(frags)}
     accepted = []
     for table in proposals:
         lines = [(frags[i].bbox, frags[i].clean) for i in sorted(table.lines) if i < len(frags)]
-        why = regions.table_refusal(tree, lines, table.bbox, table.alignment)
+        why = regions.table_refusal(tree, lines, table.bbox, table.alignment, taken)
         if why is None:
             accepted.append(table)
         else:
