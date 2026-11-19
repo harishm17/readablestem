@@ -671,6 +671,9 @@ _HOLDS = {
     "word_tracked_changes": (
         "The Word file still has tracked changes, so check the notices before you share it."
     ),
+    "word_table_flattened": (
+        "A table of the Word file is written as a list, so check the notices before you share it."
+    ),
     "word_objects": (
         "Diagrams or charts in the Word file are not in this file, so check the notices "
         "before you share it."

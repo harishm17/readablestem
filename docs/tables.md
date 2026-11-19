@@ -558,10 +558,11 @@ row as headers**, **Use the first column as headers**, **Use the first row and c
 headers** and **This grid is not a table**, and no accept (accepting a table with no headers
 was the fault: F-091). The first three are the same `headers` edit "Change the table" makes.
 The field is left out of the stored JSON when it is None, so a result stored before it
-existed loads and is written exactly as before. Word and LaTeX tables with no header mark
-are still accepted (`none`, no decision asked): the repository's own files have 3 of 31
-unmarked, a real LaTeX project more, and turning each into a decision is a review load that
-is a person's call (WS5.2 report).
+existed loads and is written exactly as before. A Word or LaTeX table with no header mark
+(`none`) is the same required choice, with no model call (`ltx_reader.headers_to_choose`): the
+repository's own files have 3 of 31 unmarked and a real LaTeX project more, so a source that
+used to be accepted now waits for these choices (a one-row table and a table that is not data
+excepted).
 
 ### Checks
 

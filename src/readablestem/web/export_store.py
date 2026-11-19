@@ -13,6 +13,10 @@ change to the page each build once more; nothing else does. A file kept for an o
 is deleted when a newer one is kept, a job keeps at most `MAX_PER_JOB` files, and one over
 `MAX_BYTES` is built every time and not kept.
 
+What a build found out about its file and the job page says beside the download is kept with it
+as a count in a note (`NOTE_KIND`, the same key): the Word file's equations that are written as
+words (`export_docx.DocxExport.not_word`). The note goes when its file goes.
+
 Only a finished file is kept: a build that fails (a picture the format cannot hold, pandoc
 busy or missing) stores nothing, and asks again next time. Who may download, whether the
 document is a draft, the usage event and the deletion clock stay in the routes, in front of
@@ -27,6 +31,7 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Callable
 from contextlib import AbstractContextManager
+from typing import NamedTuple
 
 from sqlalchemy import delete, select
 from sqlalchemy.exc import IntegrityError
@@ -36,11 +41,19 @@ from readablestem.pipeline.assemble import RENDER_VERSION
 from readablestem.web.db import Blob
 
 KIND = "export"
+NOTE_KIND = "export_note"
 MAX_PER_JOB = 6
 MAX_BYTES = 32 * 1024 * 1024
 MEDIA_TYPE = "application/octet-stream"
 
 Opener = Callable[[], AbstractContextManager[Session]]
+
+
+class Built(NamedTuple):
+    """A built file and the count its build found out (None: nothing to say)."""
+
+    data: bytes
+    note: int | None = None
 
 
 def key_for(result_version: int, file_type: str, html: str, title: str, options: str = "") -> str:
@@ -59,24 +72,51 @@ def get(session: Session, job_id: str, key: str) -> bytes | None:
     return bytes(found) if found is not None else None
 
 
-def put(session: Session, job_id: str, key: str, data: bytes) -> None:
+def note_of(session: Session, job_id: str, result_version: int, file_type: str) -> int | None:
+    """The count kept with the file of this version of the document (any title or options),
+    or None when none is kept: the file was not built yet, or it has no count."""
+    found = session.scalar(
+        select(Blob.content)
+        .where(
+            Blob.job_id == job_id,
+            Blob.kind == NOTE_KIND,
+            Blob.element_id.like(f"{result_version}.{RENDER_VERSION}.{file_type}.%"),
+        )
+        .order_by(Blob.created_at.desc())
+        .limit(1)
+    )
+    try:
+        return int(bytes(found)) if found is not None else None
+    except ValueError:
+        return None
+
+
+def put(session: Session, job_id: str, key: str, data: bytes, note: int | None = None) -> None:
     if len(data) > MAX_BYTES:
         return
     current = key.rsplit(".", 2)[0] + "."  # "result_version.render_version."
     session.execute(
         delete(Blob).where(
             Blob.job_id == job_id,
-            Blob.kind == KIND,
+            Blob.kind.in_((KIND, NOTE_KIND)),
             Blob.element_id.not_like(current + "%"),
         )
     )
-    kept = session.scalars(
-        select(Blob.id)
+    kept = session.execute(
+        select(Blob.id, Blob.element_id)
         .where(Blob.job_id == job_id, Blob.kind == KIND)
         .order_by(Blob.created_at.desc(), Blob.id)
     ).all()
     if len(kept) >= MAX_PER_JOB:
-        session.execute(delete(Blob).where(Blob.id.in_(kept[MAX_PER_JOB - 1 :])))
+        old = kept[MAX_PER_JOB - 1 :]
+        session.execute(delete(Blob).where(Blob.id.in_([row.id for row in old])))
+        session.execute(  # their notes go with them
+            delete(Blob).where(
+                Blob.job_id == job_id,
+                Blob.kind == NOTE_KIND,
+                Blob.element_id.in_([row.element_id for row in old]),
+            )
+        )
     try:
         with session.begin_nested():  # two first downloads at once: the second finds it kept
             session.add(
@@ -88,6 +128,17 @@ def put(session: Session, job_id: str, key: str, data: bytes) -> None:
                     content=data,
                 )
             )
+        if note is not None:
+            with session.begin_nested():
+                session.add(
+                    Blob(
+                        job_id=job_id,
+                        kind=NOTE_KIND,
+                        element_id=key,
+                        media_type=MEDIA_TYPE,
+                        content=str(note).encode(),
+                    )
+                )
     except IntegrityError:
         pass
 
@@ -99,7 +150,7 @@ def get_or_build(
     file_type: str,
     html: str,
     title: str,
-    build: Callable[[], bytes],
+    build: Callable[[], bytes | Built],
     options: str = "",
 ) -> bytes:
     """The kept file for this version, or `build()` (kept for next time). `sessions` opens a
@@ -110,7 +161,8 @@ def get_or_build(
         data = get(session, job_id, key)
     if data is not None:
         return data
-    data = build()
+    made = build()
+    data, note = (made.data, made.note) if isinstance(made, Built) else (made, None)
     with sessions() as session:
-        put(session, job_id, key, data)
+        put(session, job_id, key, data, note)
     return data

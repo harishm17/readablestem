@@ -605,6 +605,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "not in this file.",
     "word_objects": "Diagrams, charts or embedded objects in the Word file: {count}. They "
     "are not in this file, so describe them or add them again as pictures.",
+    "word_table_flattened": "Tables in the Word file that are too large to keep as a table: "
+    "{count}. Each is written as a list, one item for each row, so a student does not get its "
+    "columns. Check them, or split the table in Word and upload the file again.",
     "word_rtl_text": "Right-to-left paragraphs in the Word file: {count}. Their words are in "
     "reading order, but this file shows them left to right.",
     "word_tracked_changes": "Tracked changes (insertions and deletions) that nobody accepted "

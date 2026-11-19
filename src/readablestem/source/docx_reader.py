@@ -13,8 +13,10 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
 - A table is a grid with spans. Its header rows are exact only when the rows are marked "repeat as
   header row"; a table with only the style's first-row flag gets one header row as a proposal
   (a warning check, `source.header_unmarked`), and a table whose rows are all headers gets one.
-  The grid's `header_source` is "source" for those and "none" for a table with no header row at all
-  (accepted as before: turning that into a decision is a review load this item left to a person).
+  The grid's `header_source` is "source" for those and "none" for a table with no header row at all,
+  which is the required choice a PDF table with no header has (`ltx_reader.headers_to_choose`).
+  A table too large for a grid is a list, one item a row; a formula in it is an equation of the
+  item like any other, and the table is a required notice (`word_table_flattened`).
 - A footnote or endnote is written where its mark is, as the LaTeX path writes a note. A link is
   a link when it is a web or mail address; a link to a bookmark on a heading is an internal link
   to that heading (pandoc keeps a bookmark only on a heading, and the words of a `REF` field
@@ -91,6 +93,7 @@ from readablestem.source.ltx_reader import (
     ReadError,
     Reading,
     equation_fix,
+    headers_to_choose,
     link_internal,
     needs_decision,
 )
@@ -101,6 +104,7 @@ BOXES_NOTICE = "word_text_boxes"  # optional: text boxes read where they are anc
 HEADERS_NOTICE = "word_headers_footers"  # optional: running heads left out
 OBJECTS_NOTICE = "word_objects"  # required: SmartArt, charts, embedded objects: not in the file
 CHANGES_NOTICE = "word_tracked_changes"  # required: changes were read as accepted
+FLATTENED_NOTICE = "word_table_flattened"  # required: a table too large for a grid is a list
 RTL_NOTICE = "word_rtl_text"  # optional: right-to-left paragraphs, in reading order, shown as LTR
 NOTICE_CODES = (
     HIDDEN_NOTICE,
@@ -108,6 +112,7 @@ NOTICE_CODES = (
     HEADERS_NOTICE,
     OBJECTS_NOTICE,
     CHANGES_NOTICE,
+    FLATTENED_NOTICE,
     RTL_NOTICE,
 )
 FLAT_CHECK = "source.flat_equation"
@@ -138,6 +143,7 @@ class Report:
     pictures: int = 0
     pictures_authored_alt: int = 0
     pictures_unread: int = 0
+    tables_flattened: int = 0  # tables too large for a grid, written as one list item per row
     captions: int = 0
     extra_words: int = 0  # words the tree has that the file's own pass does not
     kinds: Counter[str] = field(default_factory=Counter)
@@ -454,7 +460,6 @@ class _Reader:
         fix, failed = equation_fix(element, cleaned, mathml, failed, display)
         if failed:
             report.math_failed += 1
-            self.out.errors += 1
         else:
             report.math_converted += 1
             if _is_flat(cleaned):
@@ -602,6 +607,7 @@ class _Reader:
                     "review": "optional",
                 }
             )
+        fix = headers_to_choose(fix, grid)
         pictures, self.loose = self.loose, []
         if pictures:
             fix = needs_decision(fix, TABLE_PICTURE)
@@ -690,15 +696,34 @@ class _Reader:
         return text, cleaned, mathml
 
     def _flatten(self, rows: list[Any]) -> None:
-        """A table too large for a grid: one list item per row."""
+        """A table too large for a grid: one list item per row, its cells joined by " | ". A
+        formula in a cell is an equation of the item, read and checked as any other formula, so
+        a student is never read TeX source; the table itself is a required notice
+        (`FLATTENED_NOTICE`), as it is no longer a table."""
+        self.report.tables_flattened += 1
+        bar: list[Any] = [{"t": "Space"}, {"t": "Str", "c": "|"}, {"t": "Space"}]
         for row in rows:
-            texts = [self._cell(cell[4])[0] for cell in row[1]]
-            text = " | ".join(t for t in texts if t)
-            if text:
-                element = self._new(
-                    Kind.LIST_ITEM, text=text, list_marker=None, list_ordered=False, list_level=1
-                )
-                self.chars += len(element.text or "")
+            cells: list[list[Any]] = []
+            for cell in row[1]:
+                inlines: list[Any] = []
+                for paragraph in _paragraph_inlines(cell[4]):
+                    inlines += [{"t": "Space"}, *paragraph] if inlines else paragraph
+                if _plain(inlines):
+                    cells.append(inlines)
+            if not cells:
+                continue
+            joined = [*cells[0]]
+            for inlines in cells[1:]:
+                joined += [*bar, *inlines]
+            element = self._new(
+                Kind.LIST_ITEM, text="", list_marker=None, list_ordered=False, list_level=1
+            )
+            text, spans, _ = self._inline_text(joined, owner=element)
+            element.text = text
+            self._apply_spans(element, spans)
+            self.chars += len(text)
+            if not text.strip() and self.out.elements[-1] is element:
+                self._drop(element)
 
     # ------------------------------------------------------------------ figures
 
@@ -1090,6 +1115,8 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
         out.notices.append(make(BOXES_NOTICE, count=facts.text_boxes))
     if facts.headers_footers:
         out.notices.append(make(HEADERS_NOTICE, count=facts.headers_footers))
+    if report.tables_flattened:
+        out.notices.append(make(FLATTENED_NOTICE, count=report.tables_flattened))
     if facts.rtl_paragraphs:
         out.notices.append(make(RTL_NOTICE, count=facts.rtl_paragraphs))
     objects = facts.smartart + facts.charts + facts.embedded

@@ -406,11 +406,13 @@
           {% endfor %}
         </select>
       </div>
+      {% if has_pages %}
       <div class="field">
         <label for="filter-page">Page</label>
         <input type="number" id="filter-page" name="page" class="input-short" min="1" max="{{ page_count }}" inputmode="numeric" autocomplete="off" aria-describedby="filter-page-hint"{% if decision_filter.page %} value="{{ decision_filter.page }}"{% endif %}>
         <p class="hint" id="filter-page-hint">1 to {{ page_count }}. Leave it empty for every page.</p>
       </div>
+      {% endif %}
     </div>
     <div class="button-row">
       <button type="submit" class="button-secondary">Show these decisions</button>

@@ -1872,6 +1872,14 @@ def job_page_context(
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     context["word_export"] = export_docx.available()  # the Word button needs pandoc
+    # How many equations the Word file written for this version has as words, not as Word
+    # equations: known once the file was made (`export_store.NOTE_KIND`), said beside its link.
+    context["word_as_words"] = 0
+    if context["word_export"]:
+        with session_scope(get_ctx(request).factory) as session:
+            context["word_as_words"] = (
+                export_store.note_of(session, job_id, job.result_version, "docx") or 0
+            )
     # When "Keep for 7 days" would delete it (None: the button is not offered). Only a state
     # with something to keep offers it (F-316).
     keeps = job.state is not None and job.state.keeps

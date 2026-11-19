@@ -182,6 +182,8 @@ A fourth form of the same document, made from the finished HTML alone (no pipeli
 changes): a `.docx` with native equations. `readablestem export docx FILE.html OUT.docx
 [--title T]` writes it, and the job page's "Download as Word (.docx)" (`GET
 /jobs/{id}/download.docx`) serves it. Nothing is read but the file: no model, no network.
+How many equations the file has as words is kept with it (`export_store.NOTE_KIND`) and said on
+the job page beside the download, from the second visit after the file was first made.
 
 [pandoc](https://pandoc.org) does the conversion (`-f html -t docx`): it reads the MathML and
 writes Office Math (OMML), so an equation is an editable Word equation that Word's own

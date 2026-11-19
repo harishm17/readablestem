@@ -334,7 +334,14 @@ def _convert(
     except intake.EnvelopeError:
         raise SourceFailed("source_refused") from None
     if kind == "docx":  # a Word file: read from the file itself, with no LaTeXML
-        return finish(_read_word(blob), origin="docx", report=None)
+        try:
+            reading = _read_word(blob)
+        except SourceFailed as failed:
+            # the job page words the stop for a Word file (`web.views.source_stop_message`): the
+            # PDF route is not taken from here, so what the instructor can do is said
+            failed.detail = failed.detail or {"kind": "docx"}
+            raise
+        return finish(reading, origin="docx", report=None)
     with tempfile.TemporaryDirectory(prefix="rs-source-") as scratch:
         tmp = Path(scratch)
         project, main, beamer, loaded = _project(

@@ -216,6 +216,10 @@ def test_a_ragged_table_is_padded_and_a_huge_one_becomes_a_list(tmp_path):
     grid = read(ragged, tmp_path)
     [table] = grid.elements
     assert grid.fixes[table.id].table.grid.cols == 2  # type: ignore[union-attr]
+    # no header marked in the source: the choice a PDF table with no header has, not an accept
+    headless = grid.fixes[table.id]
+    assert (headless.status, headless.review) == (Status.NEEDS_REVIEW, "required")
+    assert [c.code for c in headless.failed_checks] == ["no_headers"]
     rows = "".join("<tr><td>x</td></tr>" for _ in range(301))
     huge = read(f'<table class="ltx_tabular"><tbody>{rows}</tbody></table>', tmp_path)
     assert set(kinds(huge)) == {"list_item"} and len(huge.elements) == 301

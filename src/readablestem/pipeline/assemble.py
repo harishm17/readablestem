@@ -311,6 +311,8 @@ DRAFT_CLASS = "draft-mark"
 EQUATION_NOTE = "Shown as an image of the original."
 # The same for a formula of a LaTeX source, shown as it was written (no picture).
 EQUATION_WRITTEN_NOTE = "Shown as it was written in LaTeX."
+# A formula of a Word file has no LaTeX in the file: the tool made it from Word's equation.
+EQUATION_MADE_NOTE = "Shown as LaTeX that this tool made from the Word equation."
 FIGURE_NOTE = "This figure has no text description yet."
 # Said once, in the notice at the top, when any part is not converted: the explanation that
 # each box used to repeat. What to do ("ask your instructor for a version you can read") is
@@ -1528,7 +1530,10 @@ class _Renderer:
             self.original(element, self.image_alt(element, equation_alt(element, self.audience)))
             + label
         )
-        note = EQUATION_NOTE if self.has_picture(element) else EQUATION_WRITTEN_NOTE
+        if self.has_picture(element):
+            note = EQUATION_NOTE
+        else:
+            note = EQUATION_MADE_NOTE if self.origin == "docx" else EQUATION_WRITTEN_NOTE
         return self.flag_block(element, reason, original, "Not converted.", note)
 
     def picture_size(self, element: Element, png: bytes | None) -> str:
