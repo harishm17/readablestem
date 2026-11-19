@@ -364,6 +364,21 @@ def test_a_maths_cell_becomes_mathml_and_is_checked_against_its_pdf_glyphs():
 
 
 @pytest.mark.parametrize(
+    ("pdf", "cause"),
+    [
+        (None, "no_local_grid"),  # the PDF gave no grid of its own
+        ([["Quantity", "Value"], ["g", "9.8 m/s2"], ["h", "1"]], "grid_not_aligned"),
+    ],
+)
+def test_a_maths_cell_with_nothing_to_hold_it_against_is_accepted_and_says_why(pdf, cause):
+    grid = local(pdf) if pdf else None
+    fix = run(by_model(cheap=maths_table(r"9.8\ \text{m/s}^{2}", "9.8 m/s^2")), element(grid))
+    said = [c for c in fix.checks if c.name == "table.math_not_compared"]
+    assert [(c.code, c.passed) for c in said] == [(cause, True)]
+    assert not {"table.math_symbols", "table.math_signs"} & {c.name for c in fix.checks}
+
+
+@pytest.mark.parametrize(
     ("printed", "latex"),
     [
         ("6.67\u00d710\u207b\u00b9\u00b9", r"66.7\times 10^{-11}"),  # the decimal point moved
