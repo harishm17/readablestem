@@ -311,7 +311,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         lines += [
             "",
             f"accepted with nothing to hold them against ({held['equations']} equations, "
-            f"{held['tables_with_maths']} tables with maths), by cause:",
+            f"{held['tables_with_maths']} tables with math), by cause:",
         ]
         lines += measure.table(("check:cause", "count"), list(held["causes"].items()))
     lines += ["", f"the {worst} documents that ask the most a page:"]
