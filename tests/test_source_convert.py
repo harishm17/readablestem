@@ -74,7 +74,8 @@ def test_mhchem_is_a_decision_with_our_own_reading_as_the_proposal():
     assert [f.status for f in equations] == [Status.NEEDS_REVIEW, Status.NEEDS_REVIEW]
     assert all(f.review == "required" and f.equation is not None for f in equations)
     assert result.stats.required_decisions == 2
-    assert [n.code for n in result.notices] == ["source_error"]
+    # the one error, and the line that no compile witness ran (`source_not_compared`)
+    assert [n.code for n in result.notices] == ["source_not_compared", "source_error"]
 
 
 def test_a_bibliography_becomes_a_list_with_no_repeats():
