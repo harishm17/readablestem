@@ -232,6 +232,7 @@ const profileVariables = [
   "PAGE_MATH_MODEL",
   "PAGE_MATH_UNCONFIRMED_FACTOR",
   "PAGE_WITNESS_MAX_OUTPUT_TOKENS",
+  "REGION_TREE",
 ];
 
 export default defineRailway(() => {

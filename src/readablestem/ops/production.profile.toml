@@ -133,6 +133,7 @@ EQUATION_LINE_CONTEXT = { value = true, source = "docs/web.md:62 at 693cca24, st
 EQUATION_GLYPH_CHECKS = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:117, on since 2026-11-03" }
 EQUATION_GLYPH_RECONCILE = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:125, on since 2026-11-04" }
 LAYOUT_DISPLAY_GROUPING = { value = false, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:130" }
+REGION_TREE = { value = "off", source = "not stated; code default (new in feat/region-tree, off until a re-recording, docs/layout.md \"The region tree\")" }
 FONT_CODE_TABLES = { value = true, source = "not stated; code default (new in fix/font-code-tables 3db4e23c, no value set in Railway per docs/deploy-railway.md, 2026-11-11)" }
 FLAG_POLICY = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:139, on since 2026-11-03" }
 FIGURE_MODEL_MAX_EDGE_PX = { value = "unset", source = "not stated; code default" }

@@ -138,6 +138,13 @@ class Settings(BaseSettings):
     # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped in the
     # change that enables it.
     layout_display_grouping: bool = False
+    # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
+    # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
+    # tree of regions from the unmerged line fragments first and orders the pages by it. Off:
+    # output is byte-identical to before. Off in production: a changed box changes a crop, so
+    # the recorded model answers of the pages it moves stop matching, and turning it on
+    # comes with a re-recording and a `PIPELINE_VERSION` bump.
+    region_tree: Literal["off", "on"] = "off"
     # The codes of symbol and TeX fonts read as what the font draws, by the font's name
     # (`pipeline/font_codes.py`, docs/layout.md): Symbol, Wingdings, MT-Extra and the APS
     # math font, TeX's ligatures and accents at control codes, and a glyph that starts several

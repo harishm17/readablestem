@@ -7,11 +7,29 @@ from __future__ import annotations
 import bisect
 import statistics
 from collections.abc import Iterable, Sequence
+from typing import Protocol
 
 from readablestem.core.types import BBox
 from readablestem.pipeline.layout.furniture import _margin_zone
 from readablestem.pipeline.layout.rows import _column_of
 from readablestem.pipeline.layout.shared import _Row
+
+
+class _Ordering(Protocol):
+    """What stands in place of a gutter when the page is read by a region tree
+    (`regions.RegionTree`): it orders the boxes itself."""
+
+    def order(
+        self,
+        boxes: Sequence[BBox],
+        body: float,
+        context: Sequence[BBox] = (),
+        *,
+        blocks: bool = False,
+    ) -> list[int]: ...
+
+
+Gutter = tuple[float, float] | _Ordering | None
 
 MIN_GUTTER = 8.0  # narrowest white gap between two text columns
 MAX_GUTTER_CROSSINGS = 24  # lines that may cross a gutter (centred titles, captions)
@@ -128,17 +146,22 @@ def _line_widths(boxes: list[BBox]) -> list[float]:
 
 def _reading_order(
     boxes: Sequence[BBox],
-    gutter: tuple[float, float] | None,
+    gutter: Gutter,
     body: float,
     context: Sequence[BBox] = (),
+    *,
+    blocks: bool = False,
 ) -> list[int]:
     """Indices of `boxes` in reading order.
 
     Two columns: left column, then right column, segment by segment, where full-width
     items close a segment: items crossing the gutter, and narrow items at a section break
     across both columns (see `_section_break`). `context` boxes (e.g. figures while
-    ordering text) shape the column extents but are not returned.
+    ordering text) shape the column extents but are not returned. A region tree in place of
+    the gutter orders the boxes itself; `blocks` says they are blocks, not rows.
     """
+    if gutter is not None and not isinstance(gutter, tuple):
+        return gutter.order(boxes, body, context, blocks=blocks)
     if gutter is None:
         return _top_down(boxes, range(len(boxes)))
     everything = list(boxes) + list(context)
