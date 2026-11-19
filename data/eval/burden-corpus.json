@@ -2,12 +2,12 @@
  "split": {
   "name": "development",
   "seed": "corpus",
-  "set_sha256": "5dd6cabd1e55eef6af6f5885208c22d4b0b5d539b215384cfe0a64379ee44dd2",
+  "set_sha256": "84a76a99c535293f452328bd3c7d17745a8be1859e24005be724f23157141bc0",
   "documents": 72
  },
  "profile": {
   "name": "production",
-  "sha256": "213535ac0803b65f153e0c81abfef42b3c9e26cdf742fe7299335b6eb7c7998c",
+  "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,8 +15,8 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.11",
- "commit": "a98b678ca1d7e5c8650b40c21367f7864df8a96b+changes",
+ "pipeline_version": "0.5.12",
+ "commit": "3478921f979896c5a428fea9ca0c2217748049a0+changes",
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
   "cores": 16
@@ -24,216 +24,206 @@
  "not_finished": [],
  "metrics": {
   "uploads": {
-   "measured": 45,
+   "measured": 43,
    "answers_missing": {
     "ar3_sideways90": 2,
     "ar4_sideways270": 2,
-    "d1_scripts": 14,
+    "d1_scripts": 8,
     "e1_mc_columns": 6,
     "e2_solutions_rubric": 6,
     "e3_calendar": 2,
     "f1_notation": 46,
-    "f2_figures": 26,
+    "f2_figures": 14,
     "f4_matrices": 12,
-    "r01_syllabus_16851": 2,
-    "r05_labmanual_5310_lab1": 6,
-    "r07_labnotebook_5310": 4,
-    "r09_handout_14451": 8,
-    "r14_exam_513": 28,
-    "r16_openstax_physics_ch4_end": 14,
-    "r17_arxiv_ligo": 70,
-    "r18_arxiv_opt": 38,
-    "r21_infographic_orcid": 2,
-    "s15_charts_figures": 2,
-    "w_exam_5111": 6,
-    "w_exam_5111+exam": 6,
-    "w_lecture_5111": 54,
-    "w_mixed_slides+image_pages": 2,
+    "r01_syllabus_16851": 6,
+    "r05_labmanual_5310_lab1": 22,
+    "r07_labnotebook_5310": 8,
+    "r09_handout_14451": 18,
+    "r14_exam_513": 44,
+    "r15_openstax_chem_ch3": 2,
+    "r16_openstax_physics_ch4_end": 20,
+    "r17_arxiv_ligo": 74,
+    "r18_arxiv_opt": 34,
+    "r19_poster_codesign": 4,
+    "r20_newsletter_drp": 2,
+    "r21_infographic_orcid": 8,
+    "s15_charts_figures": 4,
+    "w_exam_5111": 38,
+    "w_exam_5111+exam": 38,
+    "w_lecture_5111": 30,
     "w_notes_6042_ch2": 646,
-    "w_pset_801": 4,
-    "w_slides_60001_lec1": 46,
-    "w_slides_60001_lec10": 150,
-    "w_solutions_1802": 46
+    "w_pset_801": 6,
+    "w_slides_60001_lec1": 48,
+    "w_slides_60001_lec10": 98,
+    "w_solutions_1802": 50
    },
    "not_measured": []
   },
-  "pages": 122,
-  "decisions": 70,
-  "per_page": 0.5738,
+  "pages": 117,
+  "decisions": 58,
+  "per_page": 0.4957,
   "document": {
    "p50": 0.0,
    "p95": 2.2,
-   "mean": 0.3937,
+   "mean": 0.3543,
    "max": 3.0
   },
   "page": {
    "p50": 0,
    "p95": 3,
-   "mean": 0.5738,
+   "mean": 0.4957,
    "max": 8,
-   "none": 0.7131
+   "none": 0.7692
   },
   "kinds": {
    "dense_math": {
-    "pages": 3,
-    "documents": 2,
-    "decisions": 10,
-    "per_page": 3.3333,
+    "pages": 2,
+    "documents": 1,
+    "decisions": 9,
+    "per_page": 4.5,
     "page": {
      "p50": 4,
      "p95": 5,
-     "mean": 3.3333,
+     "mean": 4.5,
      "max": 5
     }
    },
    "figure": {
-    "pages": 17,
-    "documents": 7,
-    "decisions": 14,
-    "per_page": 0.8235,
+    "pages": 6,
+    "documents": 4,
+    "decisions": 4,
+    "per_page": 0.6667,
     "page": {
-     "p50": 1,
+     "p50": 0,
      "p95": 2,
-     "mean": 0.8235,
+     "mean": 0.6667,
      "max": 2
     }
    },
    "scan": {
-    "pages": 13,
+    "pages": 19,
     "documents": 4,
-    "decisions": 9,
-    "per_page": 0.6923,
+    "decisions": 10,
+    "per_page": 0.5263,
     "page": {
      "p50": 0,
      "p95": 4,
-     "mean": 0.6923,
+     "mean": 0.5263,
      "max": 4
     }
    },
    "slide": {
-    "pages": 6,
-    "documents": 1,
+    "pages": 11,
+    "documents": 2,
     "decisions": 5,
-    "per_page": 0.8333,
+    "per_page": 0.4545,
     "page": {
      "p50": 0,
      "p95": 5,
-     "mean": 0.8333,
+     "mean": 0.4545,
      "max": 5
     }
    },
    "table": {
-    "pages": 14,
-    "documents": 10,
+    "pages": 13,
+    "documents": 9,
     "decisions": 3,
-    "per_page": 0.2143,
+    "per_page": 0.2308,
     "page": {
      "p50": 0,
      "p95": 1,
-     "mean": 0.2143,
+     "mean": 0.2308,
      "max": 1
     }
    },
    "typical": {
-    "pages": 69,
-    "documents": 32,
-    "decisions": 29,
-    "per_page": 0.4203,
+    "pages": 66,
+    "documents": 31,
+    "decisions": 27,
+    "per_page": 0.4091,
     "page": {
      "p50": 0,
      "p95": 3,
-     "mean": 0.4203,
+     "mean": 0.4091,
      "max": 8
     }
    }
   },
   "items": {
-   "heading": 26,
-   "equation": 20,
-   "figure": 14,
-   "paragraph": 7,
+   "heading": 21,
+   "equation": 15,
+   "figure": 10,
+   "paragraph": 9,
    "table": 3
   },
   "reasons": {
    "heading.weak_evidence": {
-    "decisions": 26,
-    "per_100_pages": 21.31
+    "decisions": 21,
+    "per_100_pages": 17.95
    },
    "heading.sentence_like": {
-    "decisions": 23,
-    "per_100_pages": 18.85
+    "decisions": 20,
+    "per_100_pages": 17.09
    },
    "below_accept": {
-    "decisions": 20,
-    "per_100_pages": 16.39
+    "decisions": 14,
+    "per_100_pages": 11.97
    },
    "image_page": {
-    "decisions": 4,
-    "per_100_pages": 3.28
+    "decisions": 6,
+    "per_100_pages": 5.13
    },
    "maths_checked": {
-    "decisions": 4,
-    "per_100_pages": 3.28
+    "decisions": 6,
+    "per_100_pages": 5.13
    },
    "glyph_style_mismatch": {
     "decisions": 3,
-    "per_100_pages": 2.46
-   },
-   "heading.repeated_label": {
-    "decisions": 3,
-    "per_100_pages": 2.46
+    "per_100_pages": 2.56
    },
    "numbers_not_a_table": {
     "decisions": 3,
-    "per_100_pages": 2.46
+    "per_100_pages": 2.56
    },
    "text.rtl_order": {
     "decisions": 3,
-    "per_100_pages": 2.46
+    "per_100_pages": 2.56
    },
    "unread_page": {
     "decisions": 3,
-    "per_100_pages": 2.46
-   },
-   "heading.level_repaired": {
-    "decisions": 2,
-    "per_100_pages": 1.64
+    "per_100_pages": 2.56
    },
    "heading.list_like": {
     "decisions": 2,
-    "per_100_pages": 1.64
+    "per_100_pages": 1.71
    },
    "not_equation": {
     "decisions": 2,
-    "per_100_pages": 1.64
-   },
-   "decoration_unproven": {
-    "decisions": 1,
-    "per_100_pages": 0.82
-   },
-   "flag_policy": {
-    "decisions": 1,
-    "per_100_pages": 0.82
+    "per_100_pages": 1.71
    },
    "heading.all_caps": {
     "decisions": 1,
-    "per_100_pages": 0.82
+    "per_100_pages": 0.85
+   },
+   "heading.repeated_label": {
+    "decisions": 1,
+    "per_100_pages": 0.85
    },
    "long_description_unsure": {
     "decisions": 1,
-    "per_100_pages": 0.82
+    "per_100_pages": 0.85
+   },
+   "no_headers": {
+    "decisions": 1,
+    "per_100_pages": 0.85
    },
    "omitted_region": {
     "decisions": 1,
-    "per_100_pages": 0.82
+    "per_100_pages": 0.85
    },
    "sign_mismatch": {
     "decisions": 1,
-    "per_100_pages": 0.82
-   },
-   "style_mismatch": {
-    "decisions": 1,
-    "per_100_pages": 0.82
+    "per_100_pages": 0.85
    }
   },
   "documents": [
@@ -268,28 +258,10 @@
     "per_page": 1.0
    },
    {
-    "upload": "r19_poster_codesign",
-    "pages": 1,
-    "decisions": 1,
-    "per_page": 1.0
-   },
-   {
     "upload": "s16_calendar_grid",
     "pages": 1,
     "decisions": 1,
     "per_page": 1.0
-   },
-   {
-    "upload": "r15_openstax_chem_ch3",
-    "pages": 10,
-    "decisions": 9,
-    "per_page": 0.9
-   },
-   {
-    "upload": "r20_newsletter_drp",
-    "pages": 6,
-    "decisions": 5,
-    "per_page": 0.8333
    },
    {
     "upload": "s10_slides_boxes",
@@ -326,6 +298,12 @@
     "pages": 3,
     "decisions": 1,
     "per_page": 0.3333
+   },
+   {
+    "upload": "w_mixed_slides+image_pages",
+    "pages": 12,
+    "decisions": 3,
+    "per_page": 0.25
    },
    {
     "upload": "r06_labsafety_5310",

@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased: pipeline 0.5.12 (integration/wave-1a)
+
+- `PIPELINE_VERSION` 0.5.12: the rest of the wave 0.5.11 began, raised once more because reports
+  and records were made at 0.5.11 before the later changes (its comment in `pipeline/run.py`
+  lists what a PDF's result now holds). Results from 0.5.10 and 0.5.11 load unchanged and their
+  page is made again. A release at this version is not rolled back past it once a result with
+  the new run kinds or a table's `header_source` is stored.
+- The two reports CI gates were re-made at 0.5.12 by command (`latest-headings.json` with the
+  fake client, `latest-tables-local.json`); both pass `eval gate --require-current`.
+- The replay record `data/eval/burden-corpus.json` was re-made: 43 of the 73 uploads, 117
+  pages, 58 decisions. The 42 uploads in both records ask the same; three left for answers the
+  recording lacks and one came back (docs/eval.md, `eval burden`). No model call, no migration.
+
 ## Unreleased: a capital that is not in the text does not make the next small letter bold
 
 - Fixed, from the small-capitals change before it shipped: the text pass placed characters on

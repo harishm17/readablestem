@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-11-18",
-  "pipeline_version": "0.5.11",
+  "date": "2026-11-19",
+  "pipeline_version": "0.5.12",
   "profile": {
     "name": "development settings",
-    "sha256": "213535ac0803b65f153e0c81abfef42b3c9e26cdf742fe7299335b6eb7c7998c",
+    "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -162,6 +162,15 @@
       "required_by_reason": {
         "heading.repeated_label": 8,
         "heading.weak_evidence": 8
+      },
+      "required_by_band": {
+        "5": 4
+      },
+      "required_by_source": {
+        "pipeline": 4
+      },
+      "required_by_class": {
+        "doubt": 4
       },
       "optional_by_reason": {
         "heading.weak_evidence": 20

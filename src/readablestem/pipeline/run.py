@@ -261,7 +261,22 @@ log = logging.getLogger(__name__)
 # row of numbers inside a maths row's box joins that equation, so the text of equations and of
 # the paragraphs around them changes on TeX pages. Results from 0.5.10 load
 # unchanged; their page is made again (`assemble.RENDER_VERSION` 6).
-PIPELINE_VERSION = "0.5.11"
+# 0.5.12 (2026-11-19): the rest of the wave that 0.5.11 began, raised once more because reports
+# and records were made at 0.5.11 before it (CHANGELOG.md has each change). What a PDF's result
+# holds moves: words in bold, italic, a fixed-pitch face or under a highlight, struck text,
+# blanks and checkboxes are runs (`Element.runs`, CONTENT_RUNS on), and so is a kept line end
+# ("break": a poem, an address); a name in small capitals is text in its own case; a formula's
+# ActualText is chosen by page; an equation number at the far edge stays with its equation; a
+# slide deck is found by its pages and a file may hold several; "Abstract" alone on its line is
+# a heading, an algorithm's steps are one code block, a glossary, index or bibliography entry is
+# a block of its own, footnotes the file names are notes; a long table caption is attached and
+# a table with no header cell is a required choice (`header_source`); links come from typed
+# addresses, numbered references and a LaTeX or Word file's own references; the document's
+# language is settled once. Results from 0.5.10 and 0.5.11 load unchanged and their page is
+# made again (`assemble.RENDER_VERSION` 8). An older release cannot read a result that holds
+# the new run kinds or `header_source`, so a deploy of this version is not rolled back past it
+# once such a result is stored.
+PIPELINE_VERSION = "0.5.12"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
