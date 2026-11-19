@@ -2109,6 +2109,7 @@ def _convert(
                 page_labels=labels,
                 footnote_ids=footnotes,
                 cut_off_pages=cut_off,
+                pipeline_version=PIPELINE_VERSION,
             )
             _send(stage_progress, "checks")
             watch.stage("checks")

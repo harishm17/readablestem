@@ -329,14 +329,11 @@ class _Markdown(html.parser.HTMLParser):
 
     @staticmethod
     def _unconverted_equation(alt: str) -> str:
-        """The PDF's own text of an equation kept as a picture (its alt text before the
-        writer's mark that it was not checked); "" for any other picture."""
+        """The PDF's own text of an equation kept as a picture (its alt text without the
+        writer's words around it); "" for any other picture."""
         from readablestem.pipeline import assemble
 
-        for mark in assemble.EQUATION_TEXT_ALT_SUFFIXES:
-            if alt.endswith(mark):
-                return alt[: -len(mark)]
-        return ""
+        return assemble.equation_alt_text(alt)
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "main":

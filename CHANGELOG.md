@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased: an unconverted equation's alt text warns before it gives the characters (branch fix/alt-warning-first)
+
+- An equation kept as an image whose text layer layout saw as flattened (a fraction bar, a
+  radical sign, an exponent or merged lines) had an alt text that gave the PDF's characters first
+  and the caveat after ("Equation (2.2): d = 12gt2,, as written in the PDF, where fractions and
+  exponents may run together"), so a screen reader said "d equals twelve g t two" before the
+  warning, and a listener who stopped early heard a wrong formula as the equation. The alt text
+  now says first that the equation is not converted and that the characters that follow run
+  fractions and exponents together ("Equation (2.2), not converted. The characters the PDF has
+  for it, with fractions and exponents run together: d = 12gt2"; "Equation not converted. ..." with
+  no number), and only then gives them. A draft adds that they were not compared with the page.
+  An equation with no such reason keeps its form ("t = 0, as written in the PDF"); the rule
+  "the text layer or nothing" is unchanged. The evaluations that strip the tool's words to get
+  the PDF's text (`eval/order.py`, `eval/olmocr_bench.py`, `eval/invented/read.py`) strip the
+  new lead too. The notice at the top (`NOT_CONVERTED_WHY`) and the review screen's sentences
+  for "Keep as image" now say what the alt text does. Trailing punctuation the sentence around
+  an equation leaves on the characters ("12gt2,,") is not changed here. One existing test
+  changed, no new test file.
+- The student file's `generator` tag names the pipeline that converted the result, beside the
+  version of the code that made the page ("ReadableSTEM 0.1.0, pipeline 0.5.12"). A page made
+  from several results (a combined file) keeps the code's version only. No new visible text.
+- A stored page says this only after it is made again: `RENDER_VERSION` is owed a raise for this
+  batch (not raised here). No stored field changes, no migration, no model request or prompt
+  changed.
+
 ## Unreleased: fixes from the independent review of wave 1a (integration/wave-1a)
 
 - Migrations: `8b1d5f3a9e04` (the step facts, the head of the release of 2026-11-18) is back

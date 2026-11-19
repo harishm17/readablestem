@@ -197,21 +197,47 @@ EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 EQUATION_TEXT_ALT_SUFFIX = ", as written in the PDF"
 EQUATION_TEXT_ALT_CHECK_SUFFIX = ", read from the PDF text; not checked"
 # ... and when the region has fractions, roots, exponents or several lines, whose order and
-# size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad):
-EQUATION_FLAT_ALT_SUFFIX = ", as written in the PDF, where fractions and exponents may run together"
-EQUATION_FLAT_ALT_CHECK_SUFFIX = (
-    ", read from the PDF text, where fractions and exponents may run together; not checked"
+# size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad), the
+# warning comes FIRST, so a listener who stops early has not heard a wrong formula as the
+# equation: "Equation (2.2), not converted. The characters the PDF has for it, with fractions
+# and exponents run together: d = 12gt2". The equation's own not-converted words, then these.
+EQUATION_FLAT_ALT_TAIL = Words(
+    ". The characters the PDF has for it, with fractions and exponents run together: ",
+    ". The characters the PDF has for it, with fractions and exponents run together, and not "
+    "compared with the page: ",
 )
-EQUATION_TEXT_ALT_WORDS = Words(EQUATION_TEXT_ALT_SUFFIX, EQUATION_TEXT_ALT_CHECK_SUFFIX)
-EQUATION_FLAT_ALT_WORDS = Words(EQUATION_FLAT_ALT_SUFFIX, EQUATION_FLAT_ALT_CHECK_SUFFIX)
 # Every suffix a page can carry (the student's and the checker's): what marks the tool's own
 # words in an alt text (`_FIXED_ALT_IMG`) and what the evaluations strip to get the PDF's text.
-EQUATION_TEXT_ALT_SUFFIXES = (
-    EQUATION_TEXT_ALT_SUFFIX,
-    EQUATION_FLAT_ALT_SUFFIX,
-    EQUATION_TEXT_ALT_CHECK_SUFFIX,
-    EQUATION_FLAT_ALT_CHECK_SUFFIX,
-)
+EQUATION_TEXT_ALT_SUFFIXES = (EQUATION_TEXT_ALT_SUFFIX, EQUATION_TEXT_ALT_CHECK_SUFFIX)
+_NOT_CONVERTED_LEAD = r"Equation(?: \({char}{{1,50}}\),)? not converted"
+
+
+def flat_alt_lead(char: str = ".") -> str:
+    """The pattern of the warning that opens a flattened equation's alt text (both
+    audiences); `char` is what the equation's number may be made of. The words have no
+    character that the page writes as an entity, so one pattern reads the alt text as the
+    page has it and as a parser gives it."""
+    tails = (EQUATION_FLAT_ALT_TAIL.student, EQUATION_FLAT_ALT_TAIL.checker or "")
+    said = "|".join(re.escape(tail) for tail in tails)
+    return _NOT_CONVERTED_LEAD.format(char=char) + f"(?:{said})"
+
+
+_FLAT_ALT_LEAD = re.compile(flat_alt_lead())
+
+
+def equation_alt_text(alt: str) -> str:
+    """The PDF's own text of an equation kept as a picture: its alt text without the words
+    the tool put before it (the warning of a flattened equation) or after it (where the
+    text is from); "" for any other picture."""
+    lead = _FLAT_ALT_LEAD.match(alt)
+    if lead:
+        return alt[lead.end() :]
+    for mark in EQUATION_TEXT_ALT_SUFFIXES:
+        if alt.endswith(mark):
+            return alt[: -len(mark)]
+    return ""
+
+
 # Layout's reasons that say the text layer of an equation is not in reading order.
 _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
@@ -286,7 +312,8 @@ FIGURE_NOTE = "This figure has no text description yet."
 # in the statement of the same notice.
 NOT_CONVERTED_WHY = Words(
     "A screen reader cannot read what a picture shows, so it says only that each of these "
-    "parts is there. Each one is marked where it stands, with what it is."
+    "parts is there; for an equation it also reads the characters the PDF holds, and says "
+    "where they are from. Each one is marked where it stands, with what it is."
 )
 NOT_CONVERTED_WHY_WRITTEN = Words(
     "A screen reader may not read these parts well. Each one is marked where it stands, with "
@@ -631,20 +658,24 @@ def equation_alt(element: Element, audience: str = STUDENT) -> str:
     is written that the PDF does not hold. Text that is empty, has no letter or digit, holds
     a character that is not text (a symbol font's glyph with no letter, `output_chars`), or
     is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
-    exponents or several lines in the region, the marker says the text may run them
-    together (EQUATION_FLAT_ALT_SUFFIX). The checker's marker says the words were not
-    compared with the page; the student's says only where they are from (`audience`).
+    exponents or several lines in the region, the alt text says first that the equation is
+    not converted and that the characters that follow run them together
+    (EQUATION_FLAT_ALT_TAIL), and only then gives them. The checker's words also say the
+    characters were not compared with the page; the student's say only where they are from
+    (`audience`).
     """
     number = equation_number(element.equation_label)
     named = f"Equation ({number})" if number else "Equation"
+    unconverted = f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
     text = " ".join(_ALT_CONTROL.sub(" ", element.text or "").split())
     usable = any(c.isalnum() for c in text) and not output_chars.count(text)
     if text and len(text) <= EQUATION_ALT_MAX_CHARS and usable:
+        if any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS):
+            return f"{unconverted}{say(EQUATION_FLAT_ALT_TAIL, audience)}{text}"
         lead = f"{named}: " if number else ""
-        flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
-        suffix = say(EQUATION_FLAT_ALT_WORDS if flat else EQUATION_TEXT_ALT_WORDS, audience)
+        suffix = EQUATION_TEXT_ALT_CHECK_SUFFIX if audience == CHECKER else EQUATION_TEXT_ALT_SUFFIX
         return f"{lead}{text}{suffix}"
-    return f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
+    return unconverted
 
 
 # Control and invisible characters a text layer can carry (they would end up in an attribute
@@ -1893,6 +1924,7 @@ _FIXED_ALT_IMG = re.compile(
             r"[^\"<>]{1,500}(?:"
             + "|".join(re.escape(_escape(suffix)) for suffix in EQUATION_TEXT_ALT_SUFFIXES)
             + ")",
+            flat_alt_lead(r'[^"<>]') + r'[^"<>]{1,500}',
             # A kept page's alt names its page: any number in its place.
             *(
                 re.escape(alt).replace(re.escape("{page}"), r"\d+")
@@ -2000,6 +2032,7 @@ def render_html(
     filename: str = "",
     audience: str = STUDENT,
     stamp: Stamp | None = None,
+    pipeline_version: str | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -2007,6 +2040,11 @@ def render_html(
     file, the only one that is stored and that every export is made from. `CHECKER` is the
     draft's page, made fresh for the person who checks it and never stored: it adds what a
     student must not be told ("Check it against the original.").
+
+    `pipeline_version` is the version of the pipeline that converted the result the page is
+    made from (`DocumentResult.pipeline_version`), which the generator tag names beside the
+    version of this code, since the two differ when a stored result is rendered again; None
+    (a page made from several results) names only this code.
 
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
@@ -2137,7 +2175,8 @@ def render_html(
             "<head>",
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
-            f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
+            f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}'
+            f'{f", pipeline {_escape(pipeline_version)}" if pipeline_version else ""}">',
             f'<meta name="{RENDER_META}" content="{RENDER_VERSION}">',
             *(
                 [

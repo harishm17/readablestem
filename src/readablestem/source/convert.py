@@ -465,6 +465,7 @@ def _finish(
         math_alttext=settings.mathml_alttext,
         origin=origin,
         unread=(reading.unread_words, reading.unread_pictures),
+        pipeline_version=pipeline.PIPELINE_VERSION,
     )
     pipeline._send(stage_progress, "checks")
     watch.stage("checks")

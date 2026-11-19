@@ -1930,6 +1930,7 @@ def rerender_html(
         filename=filename,
         audience=audience,
         stamp=stamp,
+        pipeline_version=result.pipeline_version,
         **chosen,
         lang=result.lang,
         elements=result.elements,

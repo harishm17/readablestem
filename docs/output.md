@@ -810,15 +810,23 @@ An equation kept as an image (`assemble.equation_alt`) has the text the PDF hold
 region as alt text, with a marker that says where it comes from: `6.0 m/s, as written in the
 PDF`, or `Equation (2.4): v = d / t, as written in the PDF` when it has a number. The student
 file says only that; a draft, made for the person who checks it, says `read from the PDF
-text; not checked` (audiences, below). Where layout saw fractions, roots,
-exponents or several lines in the region, the marker adds that the text may run them
-together (`v2 = v20 + 2ad` for v squared = v0 squared + 2ad), because the flat text layer
-loses their order and size; an inline equation's exponents are not always known, so
-`g = 9.8 m/s2` can be one. Without usable text (none, no letter or digit, or more than 200
-characters) the alt text is `Equation (2.4), not converted` (the number as printed) or
+text; not checked` (audiences, below). Where layout saw fractions, roots, exponents or several
+lines in the region, the flat text layer has lost their order and size (`v2 = v20 + 2ad` for
+v squared = v0 squared + 2ad), so the alt text says first that the equation is not converted
+and that the characters that follow run fractions and exponents together, and only then gives
+the characters: `Equation (2.2), not converted. The characters the PDF has for it, with
+fractions and exponents run together: d = 12gt2` (`Equation not converted. ...` with no number). A
+listener who stops early has not heard a wrong formula as the equation. A draft's version adds
+`and not compared with the page` before the colon. An inline equation's exponents are not always
+known, so `g = 9.8 m/s2` can be one. Without usable text (none, no letter or digit, or more than
+200 characters) the alt text is `Equation (2.4), not converted` (the number as printed) or
 `Equation not converted`. Nothing is written that the PDF does not hold. The visible note
-and label are unchanged. In a document in another language the alt text is marked
-`lang="en"`, as the other fixed words are.
+and label are unchanged. The evaluations that read the PDF's text back out of the alt text
+(`assemble.equation_alt_text`) strip both forms. In a document in another language the alt
+text is marked `lang="en"`, as the other fixed words are. The page's `generator` tag names the
+pipeline that converted the result the page is made from beside the version of the code
+(`ReadableSTEM 0.1.0, pipeline 0.5.12`), so a stored file made again still says which pipeline
+converted it; a page made from several results names only the code.
 
 - The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The
   border survives forced-colors mode and printing.
