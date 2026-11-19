@@ -1162,6 +1162,13 @@ def _stray_label(row: _Row, form: str) -> bool:
     return False
 
 
+def _runs_on(piece: _Row) -> bool:
+    """Does the piece end the way a clause of a sentence does ("(c) X," "(d) Y, and")? Labels
+    cut out of a line like that list things in prose; they are not options."""
+    words = piece.clean.split()
+    return bool(words) and (words[-1].endswith((",", ";")) or words[-1].lower() in {"and", "or"})
+
+
 def _option_pieces(row: _Row, *, document: _Document) -> list[_Row]:
     """The row cut at each later option label (`_later_labels`): one row per option, each text.
     [row] when it holds one label, or when a piece would not be text."""
@@ -1239,6 +1246,8 @@ def _option_grid(
         label = _option_label(row)
         if label is not None and label[0] == form:
             pieces = _option_pieces(row, document=document)
+            if any(_runs_on(piece) for piece in pieces[:-1]):
+                return None
             for piece in pieces:
                 piece_label = _option_label(piece)
                 if piece_label is None or _stray_label(piece, form):
@@ -1304,7 +1313,9 @@ def _value(cell: _OptionCell) -> int:
 
 
 def _full_sequence(cells: list[_OptionCell]) -> bool:
-    """Do the labels count up one by one, each once, in one style ("A".."D", "1".."4")?"""
+    """Do the labels count up from the first one by one, each once, in one style ("A".."D",
+    "1".."4")? A run that starts later ("B".."D": the "A" is set in the prose above) is not
+    a full sequence."""
     if len(cells) < 2:
         return False
     for style in sorted({s for s, _ in cells[0].readings}):
@@ -1315,7 +1326,7 @@ def _full_sequence(cells: list[_OptionCell]) -> bool:
                 break
             values.append(found[0])
         else:
-            if sorted(values) == list(range(min(values), min(values) + len(values))):
+            if sorted(values) == list(range(1, len(values) + 1)):
                 for cell in cells:
                     cell.readings = tuple((s, v) for s, v in cell.readings if s == style)
                 return True
