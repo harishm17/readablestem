@@ -295,14 +295,16 @@ def delete_jobs(
     # A combined file ("Combine parts") is kept on one part of its group and holds all of them:
     # it goes with any part (`web.combine.combined_file`).
     groups = select(Job.part_group).where(Job.id.in_(ids), Job.part_group.is_not(None))
-    session.execute(
-        delete(Blob).where(
-            Blob.job_id.in_(select(Job.id).where(Job.part_group.in_(groups))),
-            Blob.kind == export_store.KIND,
-            Blob.element_id.like(f"%.{export_store.COMBINED}%"),
+    combined = _deleted(
+        session.execute(
+            delete(Blob).where(
+                Blob.job_id.in_(select(Job.id).where(Job.part_group.in_(groups))),
+                Blob.kind == export_store.KIND,
+                Blob.element_id.like(f"%.{export_store.COMBINED}%"),
+            )
         )
     )
-    blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
+    blobs = combined + _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     session.execute(delete(JobShare).where(JobShare.job_id.in_(ids)))
     session.execute(delete(JobLink).where(JobLink.job_id.in_(ids)))
