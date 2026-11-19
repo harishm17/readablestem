@@ -8,6 +8,10 @@ links or colour is written exactly as before.
 
 from __future__ import annotations
 
+from html.parser import HTMLParser
+
+import pytest
+
 from readablestem.core.types import (
     ColourRun,
     Element,
@@ -201,3 +205,99 @@ def test_struck_text_is_written_as_del_and_said_as_deleted():
         " and the notes."
     )
     assert unmarked.added == {}
+
+
+# --------------------------------------------------------------------------- bold, italic, code
+
+
+class Nesting(HTMLParser):
+    """The tags of a piece of HTML must close in the order they opened; the words are what a
+    reader gets with the tool's own hidden words and the maths left out."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.stack: list[str] = []
+        self.words: list[str] = []
+        self.ok = True
+        self.hidden = 0
+
+    def handle_starttag(self, tag, attrs):
+        if tag in ("math", "br"):
+            self.hidden += 1  # the stand-in maths holds its own letters
+        self.stack.append(tag)
+        if tag == "span" and "visually-hidden" in dict(attrs).get("class", ""):
+            self.hidden += 1
+
+    def handle_endtag(self, tag):
+        if not self.stack or self.stack.pop() != tag:
+            self.ok = False
+            return
+        if tag in ("math", "br") or (tag == "span" and self.hidden):
+            self.hidden = max(0, self.hidden - 1)
+
+    def handle_data(self, data):
+        if not self.hidden:
+            self.words.append(data)
+
+
+MARKER = inline_marker("p1-e1")
+MIXED = f"alpha beta gamma delta epsilon {MARKER} zeta eta theta iota kappa lambda ____"
+END = len(MIXED)
+AFTER_MARKER = MIXED.index(MARKER) + len(MARKER)
+
+
+@pytest.mark.parametrize(
+    "spans",
+    [
+        pytest.param(
+            dict(
+                runs=[
+                    ("strong", 0, 16),
+                    ("emphasis", 6, 26),
+                    ("code", 20, 34),
+                    ("highlight", 3, 30),
+                ]
+            ),
+            id="overlapping",
+        ),
+        pytest.param(
+            dict(
+                links=[uri(0, 30)],
+                colour_runs=[ColourRun(start=5, end=25, rgb=RED)],
+                runs=[("strong", 8, 18), ("emphasis", 10, 40)],
+            ),
+            id="inside a link and a colour run, one crossing the link",
+        ),
+        pytest.param(
+            dict(
+                script_runs=[script(3, 4, "sup")],
+                runs=[
+                    ("deleted", 12, 22),
+                    ("strong", 15, AFTER_MARKER + 9),
+                    ("emphasis", 0, END),
+                    ("highlight", 8, AFTER_MARKER + 14),
+                ],
+                colour_runs=[ColourRun(start=18, end=AFTER_MARKER + 20, rgb=RED)],
+            ),
+            id="round a struck run, maths and a raised letter",
+        ),
+        pytest.param(
+            dict(runs=[("code", 0, END), ("strong", END - 20, END), ("blank", END - 4, END)]),
+            id="over a blank",
+        ),
+    ],
+)
+def test_every_mix_of_runs_nests_and_adds_no_words(spans):
+    # F-510: bold, italic and code are carried, whatever else covers the same words.
+    runs = [Run(start=a, end=b, kind=k) for k, a, b in spans.pop("runs")]
+    kinds = {r.kind for r in runs}
+    element = paragraph(MIXED, runs=runs, **spans)
+    out = html(element)
+    check = Nesting()
+    check.feed(out)
+    assert check.ok and not check.stack, out
+    said = "".join(check.words).replace("deleted: ", "").replace(" end deleted", "")
+    assert said == MIXED.replace(MARKER, "")
+    assert "<strong>" in out and ("<mark>" in out) == ("highlight" in kinds)
+    for tag in ("strong", "em", "mark"):
+        assert f"<{tag}>{MATHS}" not in out

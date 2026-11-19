@@ -174,7 +174,11 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         Link(kind="uri", start=0, end=7, href="https://example.org/discuss"),
     ]
     struck = paragraph.text.index("scalars")  # struck through on the page (F-509)
-    paragraph.runs = [Run(start=struck, end=struck + 7, kind="deleted")]
+    bold = paragraph.text.index("vectors")  # set in bold on the page (F-510)
+    paragraph.runs = [
+        Run(start=bold, end=bold + 7, kind="strong"),
+        Run(start=struck, end=struck + 7, kind="deleted"),
+    ]
     env = WebEnv(tmp_path)
     env.converter.output = output
     with env.running() as client:
@@ -196,16 +200,19 @@ def test_links_stay_on_the_words_that_did_not_change(tmp_path):
         assert [k.href for k in kept.links] == ["https://example.org/notes"]
         page = client.get(f"/jobs/{env.job_id}/review?page=1&tools=1").text
         assert "1 link was taken off" in unescape(page)
-        # The struck word did not change: it is still marked, where it now is.
+        # The bold word and the struck word did not change: still marked, where they now are.
         text = kept.text or ""
-        assert [(r.start, r.end) for r in kept.runs] == [
-            (text.index("scalars"), text.index("scalars") + 7)
+        assert [(r.kind, text[r.start : r.end]) for r in kept.runs] == [
+            ("strong", "vectors"),
+            ("deleted", "scalars"),
         ]
-        # The words of a link and the struck word changed: both go, and both are counted.
+        # The words of a link and the struck word changed: both go, and both are counted. The
+        # bold word is only the look of words that did not change, and stays.
         changed = text.replace("notes", "pages").replace("scalars", "numbers")
         done = edit_post(env, PLAIN, action="text", text=changed)
         assert done.status_code == 303
-        assert element(env, PLAIN).links == [] and element(env, PLAIN).runs == []
+        after = element(env, PLAIN)
+        assert after.links == [] and [r.kind for r in after.runs] == ["strong"]
         page = client.get(f"/jobs/{env.job_id}/review?page=1&tools=1").text
         assert "1 link and 1 struck-text mark were taken off" in unescape(page)
 

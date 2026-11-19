@@ -402,6 +402,9 @@ def test_colour_runs_need_the_flag():
     result = annotate([el("p1-e0", text=text)], PdfText(glyphs={0: coloured(text, "terms")}))
     assert result.elements[0].colour_runs == []
     assert not any(n.code == "colour_reference" for n in result.notices)
+    assert [(n.code, n.count) for n in result.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]
 
 
 def test_linked_text_is_left_out_of_a_run():
@@ -491,6 +494,119 @@ def test_a_language_name_or_tag_is_accepted_and_anything_else_refused():
     for bad in ("", "Klingonese", "x-none", 'en" onload="'):
         with pytest.raises(ValueError):
             set_document_language(stored(), bad)
+
+
+# --------------------------------------------------------------------------- bold, italic, code
+
+
+def set_line(page, y: float, pieces: list[tuple[str, str]], x: float = 72.0) -> None:
+    """One line of `(text, font)` pieces side by side; fonts are PyMuPDF's base-14 codes
+    (helv regular, hebo bold, heit italic, hebi both, cour fixed-pitch, tiit Times italic)."""
+    import pymupdf
+
+    for words, font in pieces:
+        page.insert_text((x, y), words, fontsize=12, fontname=font)
+        x += pymupdf.get_text_length(words, fontname=font, fontsize=12)
+
+
+def styled_page(*, italic: bool = True) -> bytes:
+    """A handout: bold, italic, bold-and-italic and fixed-pitch words in running text, a bold
+    phrase inside a web link, a paragraph set wholly in italic and italic variables."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    em = "heit" if italic else "helv"
+    both = "hebi" if italic else "hebo"
+    first = [("Please ", "helv"), ("do not open", "hebo"), (" the exam until told, read ", "helv")]
+    first += [("Moby Dick", em), (" soon, then ", "helv"), ("both at once", both), (".", "helv")]
+    set_line(page, 100, first)
+    second = [("Call ", "helv"), ("len(L)", "cour"), (" on the list, then follow the ", "helv")]
+    second += [("course link", "hebo"), (" for details of the exam today.", "helv")]
+    set_line(page, 130, second)
+    link = page.search_for("course link", clip=pymupdf.Rect(0, 115, 612, 135))[0]
+    page.insert_link({"kind": pymupdf.LINK_URI, "from": link, "uri": "https://example.org/x"})
+    set_line(page, 160, [("This whole paragraph is set in italic from first word to last.", em)])
+    third = [("Let ", "helv"), ("x", "tiit"), (" and ", "helv"), ("y", "tiit")]
+    third += [(" be reals with ", "helv"), ("x", "tiit"), (" + ", "helv"), ("y", "tiit")]
+    set_line(page, 190, [*third, (" = 3 given.", "helv")])
+    # Highlighted by an annotation and by a rectangle behind the words; a padded shaded box
+    # around a whole line is not a highlight; a red phrase.
+    set_line(page, 220, [("Marked with the pen: pay attention to this phrase today.", "helv")])
+    page.add_highlight_annot(page.search_for("pay attention to this phrase")[0])
+    set_line(page, 250, [("A second mark with a band behind these exact words here.", "helv")])
+    band = page.search_for("band behind these exact words")[0]
+    page.draw_rect(band, color=None, fill=(1, 0.9, 0.1), overlay=False)
+    page.draw_rect(pymupdf.Rect(62, 296, 560, 326), color=None, fill=(0.8, 0.9, 1), overlay=False)
+    set_line(page, 316, [("Boxed sentence with a shaded callout around the whole line.", "helv")])
+    set_line(page, 380, [("Shaded cells one two three stand in a row today.", "helv")])
+    for word in ("one", "two", "three"):
+        cell = page.search_for(word, clip=pymupdf.Rect(0, 360, 612, 390))[0]
+        page.draw_rect(cell, color=None, fill=(1, 0.9, 0.1), overlay=False)
+    x = 72.0
+    for words, rgb in (("The answers are ", (0, 0, 0)), ("printed in red", (1, 0, 0))):
+        page.insert_text((x, 350), words, fontsize=12, fontname="helv", color=rgb)
+        x += pymupdf.get_text_length(words, fontname="helv", fontsize=12)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def styled(
+    pdf: bytes, *, colour: bool = False
+) -> tuple[dict[str, list[tuple[str, str]]], text_pass.TextPassResult]:
+    """The runs (bold, italic, code, highlight) of each paragraph of `pdf` that has any, by its
+    first word, as (kind, words), and the pass's result."""
+    elements = layout.analyze(pdf).elements
+    result = text_pass.apply(pdf, elements, pages=[0], runs=True, colour=colour)
+    return {
+        (e.text or "").split()[0]: [(r.kind, (e.text or "")[r.start : r.end]) for r in e.runs]
+        for e in result.elements
+        if e.kind is Kind.PARAGRAPH and e.runs
+    }, result
+
+
+def test_bold_italic_and_code_words_are_runs_and_a_block_set_in_one_style_is_not():
+    # F-510: "Do not open the exam" reached the student as plain words.
+    found, _ = styled(styled_page())
+    assert found["Please"] == [
+        ("strong", "do not open"),
+        ("emphasis", "Moby Dick"),
+        ("strong", "both at once"),
+        ("emphasis", "both at once"),
+    ]
+    assert found["Call"] == [("code", "len(L)"), ("strong", "course link")]
+    # The paragraph set wholly in italic is italic as a block, and one italic letter beside
+    # an inline equation is a variable: neither is emphasis.
+    assert set(found) == {"Please", "Call", "Marked", "A"}
+
+
+def test_a_pdf_with_no_italic_face_has_no_italic_runs():
+    found, _ = styled(styled_page(italic=False))
+    assert {kind for runs in found.values() for kind, _ in runs} == {"strong", "code", "highlight"}
+
+
+def test_highlights_by_annotation_and_rectangle_are_runs_and_a_shaded_box_is_not():
+    found, result = styled(styled_page())
+    assert found["Marked"] == [("highlight", "pay attention to this phrase")]
+    assert found["A"] == [("highlight", "band behind these exact words")]
+    assert "Boxed" not in found and "Shaded" not in found  # a box, and a row of shaded cells
+    assert result.counts()["highlight_runs"] == 2
+
+
+def test_colour_that_is_not_kept_is_counted_and_said_once():
+    found, result = styled(styled_page())
+    assert [(n.code, n.count) for n in result.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]
+    assert not any(e.colour_runs for e in result.elements) and "The" not in found
+    _, with_colour = styled(styled_page(), colour=True)
+    assert not any(n.code == "colour_used" for n in with_colour.notices)
+    red = [e for e in with_colour.elements if e.colour_runs]
+    assert [(e.text or "")[r.start : r.end] for e in red for r in e.colour_runs] == [
+        "printed in red"
+    ]
+    assert with_colour.counts()["colour_runs"] == result.counts()["colour_runs"] == 1
 
 
 # --------------------------------------------------------------------------- struck text

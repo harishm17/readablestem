@@ -146,11 +146,12 @@ from readablestem.pipeline.layout.page import (
 from readablestem.pipeline.layout.rows import (
     FormField,
     Glyph,
+    Highlight,
     Strike,
     _page_rows,
     line_glyphs,
     page_glyphs,
-    page_strikes,
+    page_paint,
     take_form_fields,
 )
 from readablestem.pipeline.layout.shared import (
@@ -188,6 +189,7 @@ __all__ = [
     "_TEXT_MAP",
     "FormField",
     "Glyph",
+    "Highlight",
     "Layout",
     "LayoutError",
     "Strike",
@@ -230,7 +232,7 @@ __all__ = [
     "line_glyphs",
     "page_glyphs",
     "page_ink",
-    "page_strikes",
+    "page_paint",
     "release",
     "render_page",
     "tagged_level",

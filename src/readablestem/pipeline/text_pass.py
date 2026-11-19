@@ -36,7 +36,11 @@ keep, and adds to the elements without changing their text or anything a model s
 - `Element.colour_runs` (only with FEATURE_COLOUR): text printed in a colour other than
   the body's, and the notice `colour_reference` when text near coloured text refers to
   a colour ("shown in red"). The assembler writes the colour, made dark enough for
-  4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`).
+  4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`). The runs are always found:
+  with the flag off they are counted, not stored, and one notice for the document,
+  `colour_used`, gives how many passages are coloured.
+- `Element.runs`, "highlight": words a Highlight annotation covers, or a colour of its own
+  printed in a rectangle one line high behind them (`highlight_runs`; written as `<mark>`).
 - the notice `link_text_unclear` for a link whose text says nothing on its own ("click
   here", a long bare URL with next to no text around it).
 - `Element.runs`, "deleted" (written with CONTENT_RUNS, on by default; off, they are found and
@@ -93,7 +97,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import contrast, language, layout, page_type
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.baseline_rules import STRIKE_X_SLACK, Ink, classify
-from readablestem.pipeline.layout import FormField, Glyph, Strike
+from readablestem.pipeline.layout import FormField, Glyph, Highlight, Strike
 from readablestem.pipeline.layout.elements import heading_number
 from readablestem.pipeline.layout.glyphs import clean_text
 
@@ -206,8 +210,10 @@ class PdfText:
     links: dict[int, list[PdfLink]] = field(default_factory=dict)
     glyphs: dict[int, list[Glyph]] = field(default_factory=dict)
     annotations: int = 0  # link annotations of any kind on the analysed pages
-    # Per page, the marks that may strike text through (`layout.page_strikes`).
+    # Per page, the marks that may strike text through and the ones that may highlight it
+    # (`layout.page_paint`).
     strikes: dict[int, list[Strike]] = field(default_factory=dict)
+    highlights: dict[int, list[Highlight]] = field(default_factory=dict)
     # Per page, its fillable fields (`layout.take_form_fields`): the notice, and the value of a
     # filled field as the run that says it is one.
     fields: dict[int, list[FormField]] = field(default_factory=dict)
@@ -363,14 +369,14 @@ def embedded_files(doc: pymupdf.Document) -> tuple[list[str], int]:
         return [], 0
 
 
-def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText:
+def read_pdf(pdf_bytes: bytes, pages: Iterable[int]) -> PdfText:
     """/Lang, links and glyphs of the analysed pages (0-based).
 
-    Glyphs are read only where they are needed: pages with links, pages with a mark that may
-    strike text through, and every page when colour runs are on. `layout.analyze` has
-    already rendered these pages in its crash probe, so reading them in this process is
-    safe; PyMuPDF is not thread-safe, so this holds layout's lock like every other PyMuPDF
-    call. Raises whatever PyMuPDF raises.
+    Glyphs are read on every page: they carry the colour, weight, slant and pitch of each
+    character (`style_runs`, `colour_runs`), where links and strikes need them too.
+    `layout.analyze` has already rendered these pages in its crash probe, so reading them in
+    this process is safe; PyMuPDF is not thread-safe, so this holds layout's lock like every
+    other PyMuPDF call. Raises whatever PyMuPDF raises.
     """
     wanted = sorted(set(pages))
     found = PdfText()
@@ -401,9 +407,10 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, colour: bool) -> PdfText
                     links = _pdf_links(doc, number, annotations, in_doc)
                     if links:
                         found.links[number] = links
-                    strikes = layout.page_strikes(doc[number])
-                    if colour or links or strikes:
-                        found.glyphs[number] = layout.page_glyphs(doc[number])
+                    strikes, lit = layout.page_paint(doc[number])
+                    found.glyphs[number] = layout.page_glyphs(doc[number])
+                    if lit:
+                        found.highlights[number] = lit
                     if strikes:
                         strikes = drawn_strikes(doc[number], strikes, found.glyphs[number])
                     if strikes:
@@ -1054,6 +1061,136 @@ def colour_runs(
     return _without(runs, links, element.text or "")
 
 
+# A style that covers this share of an element's characters or more is the block's own style
+# (a paragraph set in italic, a bold caption), not emphasis inside it.
+STYLE_SHARE = 0.7
+# The glyph trait of each style run kind, in the order the runs are listed.
+STYLE_TRAITS = (("strong", "bold"), ("emphasis", "italic"), ("code", "mono"))
+
+
+def style_runs(element: Element, aligner: _Aligner) -> list[Run]:
+    """The element's bold, italic and fixed-pitch words as runs (`strong`, `emphasis`,
+    `code`; offsets into its text), from the weight, slant and pitch of the characters printed
+    there (`Glyph`). A style that covers `STYLE_SHARE` of the element's placed characters is
+    the block's own and makes no run, a run never contains an inline-equation marker (the
+    equation owns the letters it took as variables) and one italic letter is not a run (a
+    variable the equation path left in the text), and a run is kept only when it has a letter
+    or a digit. A PDF with no italic face has no italic glyph, so it has no italic runs.
+    A code block and a glossary entry (written as a term and a definition) get none."""
+    text = element.text or ""
+    if element.preformatted or element.term_end is not None or not text:
+        return []
+    candidates = aligner.glyphs_in(element)
+    if not any(g.bold or g.italic or g.mono for g in candidates):
+        return []
+    glyphs, alignment = aligner.of(element)
+    placed = [i for i in alignment if i is not None]
+    found: list[Run] = []
+    for kind, trait in STYLE_TRAITS:
+        if not (count := sum(getattr(glyphs[i], trait) for i in placed)):
+            continue
+        if count >= STYLE_SHARE * len(placed):
+            continue
+        spans = labelled_runs(
+            text,
+            alignment,
+            lambda i, trait=trait: True if getattr(glyphs[i], trait) else None,
+            across_markers=False,
+        )
+        for start, end, _ in spans:
+            while start < end and text[start].isspace():
+                start += 1
+            while end > start and text[end - 1].isspace():
+                end -= 1
+            piece = text[start:end]
+            if not any(c.isalnum() for c in piece):
+                continue
+            if kind == "emphasis" and len(piece) == 1:
+                continue  # one italic letter is a variable the equation path left in the text
+            found.append(Run(start=start, end=end, kind=kind))
+    return sorted(found, key=lambda r: (r.start, r.end))
+
+
+# A filled rectangle behind text is a highlight when it hugs one line: no taller than this many
+# times the size of the glyphs it holds (a padded box, a shaded callout, a table's shaded
+# cell, a theorem's frame are taller or wider than their words need) and no shorter than this
+# share of it. Its colour is a real colour of its own: lighter than `HIGHLIGHT_MIN_LIGHTNESS`
+# is dark paint (a bar, reversed text), near white or a grey is the page's or a box's shade.
+HIGHLIGHT_MAX_HEIGHT = 1.5
+HIGHLIGHT_MIN_HEIGHT = 0.6
+HIGHLIGHT_MIN_LIGHTNESS = 0.5
+
+
+def is_highlight_colour(rgb: tuple[int, int, int]) -> bool:
+    """Is a fill in this colour the colour of a highlight (see `HIGHLIGHT_MIN_LIGHTNESS`)?"""
+    lightness, chroma, _ = contrast.oklch(rgb)
+    return HIGHLIGHT_MIN_LIGHTNESS <= lightness < WHITEISH_LIGHTNESS and chroma >= GREY_CHROMA
+
+
+# Filled rectangles of one color and height that stand side by side in a row of this many or
+# more are shading (a table's header row, a heat map, a bar), not a highlight of words.
+HIGHLIGHT_ROW = 3
+
+
+def highlight_marks(marks: Sequence[Highlight]) -> list[Highlight]:
+    """`marks` without the filled rectangles that are shading: those of the same color, top and
+    bottom (to the point) that make a row of `HIGHLIGHT_ROW` or more on the page. A highlight
+    annotation is always kept."""
+    rows = Counter((m.rgb, round(m.bbox[1]), round(m.bbox[3])) for m in marks if m.rgb is not None)
+    return [
+        m
+        for m in marks
+        if m.rgb is None or rows[(m.rgb, round(m.bbox[1]), round(m.bbox[3]))] < HIGHLIGHT_ROW
+    ]
+
+
+def highlighted_glyphs(glyphs: Sequence[Glyph], marks: Iterable[Highlight]) -> set[int]:
+    """Indexes into `glyphs` of the glyphs highlighted: every glyph whose middle is inside a
+    Highlight annotation's quad, or inside a filled rectangle that has the colour of a
+    highlight (`is_highlight_colour`) and the height of one line of the glyphs it holds
+    (`HIGHLIGHT_MAX_HEIGHT`)."""
+    marked: set[int] = set()
+    for mark in marks:
+        if mark.rgb is not None and not is_highlight_colour(mark.rgb):
+            continue
+        inside = [i for i, g in enumerate(glyphs) if _centre_in(g.bbox, mark.bbox, 0.0)]
+        if mark.rgb is not None and inside:
+            size = sorted(glyphs[i].size for i in inside)[len(inside) // 2]
+            height = mark.bbox[3] - mark.bbox[1]
+            if not HIGHLIGHT_MIN_HEIGHT * size <= height <= HIGHLIGHT_MAX_HEIGHT * size:
+                continue
+        marked.update(inside)
+    return marked
+
+
+def highlight_runs(element: Element, aligner: _Aligner, marks: Sequence[Highlight]) -> list[Run]:
+    """The element's highlighted words as runs of kind `highlight` (offsets into its text),
+    from the highlight marks of its page: each run trimmed of spaces and kept only when it has
+    a letter or a digit, and never across an inline-equation marker. A code block and a
+    glossary entry get none, as with `style_runs`."""
+    text = element.text or ""
+    if element.preformatted or element.term_end is not None or not text:
+        return []
+    near = [m for m in marks if _overlaps(m.bbox, element.bbox, BOX_SLACK)]
+    if not near:
+        return []
+    glyphs, alignment = aligner.of(element)
+    lit = highlighted_glyphs(glyphs, near)
+    if not lit:
+        return []
+    found: list[Run] = []
+    for start, end, _ in labelled_runs(
+        text, alignment, lambda i: True if i in lit else None, across_markers=False
+    ):
+        while start < end and text[start].isspace():
+            start += 1
+        while end > start and text[end - 1].isspace():
+            end -= 1
+        if any(c.isalnum() for c in text[start:end]):
+            found.append(Run(start=start, end=end, kind="highlight"))
+    return found
+
+
 def _colour_reference_notices(elements: list[Element], coloured: set[str]) -> list[Notice]:
     """`colour_reference` for running text that names a colour, on or near coloured text
     (the same element, or one of the `COLOUR_REFERENCE_REACH` before or after it on the
@@ -1447,8 +1584,13 @@ class TextPassResult:
     lang_source: LangSource
     notices: list[Notice]
     annotations: int = 0
+    # Coloured passages found, whether or not they were kept (FEATURE_COLOUR off: counted, and
+    # the notice `colour_used` says so).
+    colour_runs: int = 0
     # Struck runs found, whether or not they were written (CONTENT_RUNS off: shadow).
     deleted_runs: int = 0
+    # Bold, italic, fixed-pitch and highlighted runs found, by kind, whether or not written.
+    style_runs: dict[str, int] = field(default_factory=dict)
 
     def counts(self) -> dict[str, int]:
         """Content-free numbers for the trace."""
@@ -1457,9 +1599,13 @@ class TextPassResult:
             "links": sum(1 for k in links if k.kind in ("uri", "internal")),
             "typed_links": sum(1 for k in links if k.kind == "typed"),
             "crossrefs": sum(1 for k in links if k.kind == "crossref"),
-            "colour_runs": sum(len(e.colour_runs) for e in self.elements),
+            "colour_runs": self.colour_runs,
             "deleted_runs": self.deleted_runs,
             "deleted_runs_written": sum(r.kind == "deleted" for e in self.elements for r in e.runs),
+            "strong_runs": self.style_runs.get("strong", 0),
+            "emphasis_runs": self.style_runs.get("emphasis", 0),
+            "code_runs": self.style_runs.get("code", 0),
+            "highlight_runs": self.style_runs.get("highlight", 0),
             "blanks": sum(r.kind == "blank" for e in self.elements for r in e.runs),
             "checkboxes": sum(r.kind == "checkbox" for e in self.elements for r in e.runs),
             "passages": sum(1 for e in self.elements if e.lang),
@@ -1538,13 +1684,12 @@ def annotate(
         if own:
             links[element.id] = own
     coloured: dict[str, list[ColourRun]] = {}
-    if colour:
-        body = body_colour(g for glyphs in pdf.glyphs.values() for g in glyphs)
-        for element in elements:
-            if element.kind in RUNNING_KINDS and element.text:
-                found_runs = colour_runs(element, aligner, body, links.get(element.id, []))
-                if found_runs:
-                    coloured[element.id] = found_runs
+    body = body_colour(g for glyphs in pdf.glyphs.values() for g in glyphs)
+    for element in elements:
+        if element.kind in RUNNING_KINDS and element.text:
+            found_runs = colour_runs(element, aligner, body, links.get(element.id, []))
+            if found_runs:
+                coloured[element.id] = found_runs
     struck: dict[str, list[Run]] = {}
     inline_equations = {e.id: e for e in elements if e.kind is Kind.EQUATION}
     for element in elements:
@@ -1553,6 +1698,17 @@ def annotate(
             continue
         if found_struck := deleted_runs(element, aligner, strikes, inline_equations):
             struck[element.id] = found_struck
+    styled: dict[str, list[Run]] = {}
+    marks = {page: highlight_marks(found_marks) for page, found_marks in pdf.highlights.items()}
+    for element in elements:
+        if element.kind not in RUNNING_KINDS or not element.text:
+            continue
+        own = [
+            *style_runs(element, aligner),
+            *highlight_runs(element, aligner, marks.get(element.page, ())),
+        ]
+        if own:
+            styled[element.id] = sorted(own, key=lambda r: (r.start, r.end))
     lang, source, lang_notices = _document_language(elements, pdf.lang, layout_lang, chosen_lang)
     langs = passages(elements, lang)
     updated = []
@@ -1560,9 +1716,10 @@ def annotate(
         update: dict[str, object] = {}
         if element.id in links:
             update["links"] = links[element.id]
-        if element.id in coloured:
+        if colour and element.id in coloured:
             update["colour_runs"] = coloured[element.id]
         marked = [*(struck[element.id] if runs and element.id in struck else [])]
+        marked += styled[element.id] if runs and element.id in styled else []
         if element.kind in LINK_KINDS:
             marked += token_runs(element, pdf.fields.get(element.page, ()))
         if marked:
@@ -1587,13 +1744,25 @@ def annotate(
         notices.append(Notice(code="link_text_unclear", page=page, element_id=owner, count=count))
     if colour:
         notices.extend(_colour_reference_notices(updated, set(coloured)))
+    elif coloured:  # found, not kept: say so once, with how many passages
+        notices.append(Notice(code="colour_used", count=sum(len(r) for r in coloured.values())))
     notices.extend(notice_rules.from_runs(updated))
     if form := sum(len(v) for v in pdf.fields.values()):
         notices.append(Notice(code="form_fields", count=form, review="none"))
     notices.extend(lang_notices)
     found = sum(len(r) for r in struck.values())
+    style_counts: Counter[str] = Counter(
+        r.kind for found_styled in styled.values() for r in found_styled
+    )
     return TextPassResult(
-        updated, lang, source, notices, annotations=pdf.annotations, deleted_runs=found
+        updated,
+        lang,
+        source,
+        notices,
+        annotations=pdf.annotations,
+        colour_runs=sum(len(r) for r in coloured.values()),
+        deleted_runs=found,
+        style_runs=dict(style_counts),
     )
 
 
@@ -1618,7 +1787,7 @@ def apply(
     pass itself leaves the elements as they were, with the language layout reported.
     """
     try:
-        pdf = read_pdf(pdf_bytes, pages, colour=colour)
+        pdf = read_pdf(pdf_bytes, pages)
     except Exception as exc:  # a reading problem never fails the conversion
         log.warning("text pass could not read the PDF: %s", type(exc).__name__)
         pdf = PdfText()
