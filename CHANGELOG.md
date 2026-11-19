@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased: ActualText is chosen by page (branch fix/actualtext-by-page)
+
+- WS2.14, in its reduced form. A file's ActualText was applied to every span, and where a PDF
+  uses it to replace a figure's printed labels or the words of a hidden layer, those words
+  were lost (a tagged handout lost 619 words of its printed text, most of them figure labels).
+  Ignoring it everywhere turns Hindi into U+FFFD and CJK into Kangxi radicals, so the choice is
+  made per page, never per span: a page that carries ActualText is read both ways
+  (`page_type.actualtext_flag`), keeps ActualText where the reading without it holds more
+  U+FFFD, Kangxi radicals or private-use characters, and reads without it otherwise. Pages with
+  no ActualText are not read twice and do not change. The rows, the text pass's glyphs, the
+  equation readers, the page type, the page labels, the tagged headings, the bold letters, the
+  page audit's words and the review probe's text all follow the one choice. No second reader,
+  no flag, and nothing stored per span; SW54e's repair of a doubled Hindi vowel sign stays as it
+  was. Element text changes on affected pages: a `PIPELINE_VERSION` bump is owed (not made in
+  this branch), and the recorded model answers of requests whose element text changed are
+  re-recorded.
+- No migration; no model request, prompt, `PIPELINE_VERSION` or `RENDER_VERSION` changed here.
+
 ## Unreleased: the exam box is suggested from the name (branch feat/exam-suggested-from-title)
 
 - WS2.11, in its reduced form. Nothing told an instructor who uploaded an exam and left "Exam or

@@ -125,6 +125,18 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    not decode is read by the name the font gives it (`pipeline/glyph_names.py`, "Glyph names"
    below), then, for a font with no usable table, as what the font draws
    (`pipeline/font_codes.py`, "Font code tables" below); one that stays undecoded is a gap mark.
+   **ActualText** is chosen once per page (`page_type.actualtext_flag`). A file can give a span
+   the text it means in place of the glyphs' own (Chromium does for Hindi conjuncts and CJK;
+   a tagged PDF does for a figure's labels, and a scan's hidden layer may). A page that carries
+   it is read both ways, with and without (`TEXT_IGNORE_ACTUALTEXT`). It keeps ActualText when
+   the reading without it holds more U+FFFD, Kangxi radicals (U+2F00 to U+2FDF) and
+   private-use characters, and is read without it otherwise, so the printed labels a
+   replacement dropped are read. A page is never mixed, a span at a time. A page with no
+   ActualText is not read twice and does not change. Every reader of a page's characters
+   (rows, `line_glyphs`, `page_glyphs` for the text pass, the page type, the page labels, the
+   tagged headings, the bold letters of equations, the page audit's words, and the review
+   probe's region text and glyph marks) adds the page's flag to its own, so no two steps
+   disagree about what the page says. The choice is kept on the open document.
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
