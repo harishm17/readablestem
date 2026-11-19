@@ -2587,9 +2587,9 @@ stored, and no notice is raised. The LaTeX path follows the same switch for its 
 
 A reviewer's comments live in the PDF's annotations, not in its text, so a student who heard the
 page heard the stale words alone. `text_pass.page_marks` reads each page's shown annotations
-(not the Hidden or NoView ones) while the pass already has the file open: a sticky note, a text
-box's neighbors (highlight, underline, squiggle, strike-out, box, circle, line, polygon, caret,
-stamp) with a non-empty `/Contents`. A text box (FreeText) is not a note: its words are
+(not the Hidden or NoView ones) while the pass already has the file open: a sticky note, a caret,
+a highlight, underline, squiggle, strike-out, box, circle, line, polygon or polyline with a
+non-empty `/Contents`. A text box (FreeText) is not a note: its words are
 already text on the page. A popup is the window of its parent's comment and is read once;
 a file-attachment annotation's `/Contents` is the label of the file and is not a note. A page is
 read for at most 500 comments and a comment for 10,000 characters. The box of an annotation is

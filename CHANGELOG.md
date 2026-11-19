@@ -4,7 +4,7 @@
 
 - WS14.4 (F-541, and the icon part of F-362). The comments in a PDF's annotations were lost, and
   the drawings of its annotations (a sticky note's balloon, a caret, a pushpin) were read as
-  figures. A comment of a sticky note, a caret, a highlight, a box or a stamp is now a paragraph,
+  figures. A comment of a sticky note, a caret, a highlight, an underline or a box is now a paragraph,
   "Note on the page: ...", after the text it marks (a margin note after the nearest line, a reply
   after its parent, a popup once); a caret the file calls a replacement says "replace with ...", and
   struck text keeps its mark beside it. A highlight with no comment adds nothing. The drawings of
