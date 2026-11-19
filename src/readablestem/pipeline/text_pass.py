@@ -1532,6 +1532,28 @@ def deleted_runs(
     return [Run(start=start, end=end, kind="deleted") for start, end in merged]
 
 
+def struck_not_kept(
+    elements: Sequence[Element], aligner: _Aligner, strikes: Mapping[int, Sequence[Strike]]
+) -> list[Notice]:
+    """`struck_not_kept` for each table and each display equation the page strikes through.
+
+    Neither carries runs (a table's cells and an equation read by a model have no offsets
+    into glyphs), so the strike would be lost without a word. An equation a paragraph holds
+    as an inline marker is not one: its strike is a run of that paragraph (`deleted_runs`).
+    """
+    inline = {m.group(1) for e in elements for m in INLINE_MARKER_RE.finditer(e.text or "")}
+    out: list[Notice] = []
+    for element in elements:
+        if element.kind not in (Kind.TABLE, Kind.EQUATION) or element.id in inline:
+            continue
+        near = [
+            s for s in strikes.get(element.page, ()) if _overlaps(s.bbox, element.bbox, BOX_SLACK)
+        ]
+        if near and struck_glyphs(aligner.glyphs_in(element), near):
+            out.append(make("struck_not_kept", page=element.page, element_id=element.id))
+    return out
+
+
 # ============================================================================ language
 
 
@@ -1801,6 +1823,8 @@ def annotate(
     elif coloured:  # found, not kept: say so once, with how many passages
         notices.append(make("colour_used", count=sum(len(r) for r in coloured.values())))
     notices.extend(notice_rules.from_runs(updated))
+    if runs:
+        notices.extend(struck_not_kept(updated, aligner, pdf.strikes))
     if form := sum(len(v) for v in pdf.fields.values()):
         notices.append(make("form_fields", count=form))
     notices.extend(lang_notices)

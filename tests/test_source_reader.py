@@ -729,7 +729,8 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         + run("bold", bold)
         + "</w:p>"
         "<w:p>" + run("Set whole in bold, so the block's own style.", bold) + "</w:p>"
-        '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/>'
+        '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/>'
+        '<w:numId w:val="1"/>'
         "</w:numPr></w:pPr>"
         + run("Bring a ")
         + run("calculator", bold)

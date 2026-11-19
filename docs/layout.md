@@ -2983,6 +2983,8 @@ inventing emphasis:
 
 Headings, program code (`preformatted`) and glossary entries get none; `Element.bold` stays the
 whole-line evidence heading detection uses. Corpus counts (996 files) are in the changelog.
+The Word and LaTeX readers write the same runs from what the source says, with the same 70% rule
+(docs/output.md "From a Word or LaTeX source").
 
 ### Highlighted words (SW51c, `CONTENT_RUNS`)
 
@@ -3035,8 +3037,11 @@ the point) and 90% of its columns must be inked, since a vector figure can keep 
 sample in its drawings that its clip hides, and a reader who sees no line sees no deleted
 text. Only marks that cross glyphs are rendered. And an inline equation the page strikes
 through (a majority of its glyphs struck) is a run that is its marker alone (`deleted_runs`).
-What is not found, named: a struck table cell (cells carry no runs) and a struck display
-equation (equation elements carry no runs). `layout.page_paint` still lists marks that the
+A struck table cell and a struck display equation carry no runs (a cell has no offsets into
+glyphs, an equation is read by a model), so the strike cannot be kept; the table or equation
+gets the optional notice `struck_not_kept` (`text_pass.struck_not_kept`, with `CONTENT_RUNS`
+on), which says the words read as plain text. It is measured on generated pages only; no
+tracked PDF has a struck cell or equation. `layout.page_paint` still lists marks that the
 page clips away or covers (`layout.py`, `page_paint`: it reads `get_cdrawings()` without the
 clip entries), which is why the text pass renders the ones that matter.
 

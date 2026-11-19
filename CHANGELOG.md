@@ -1,5 +1,29 @@
 # Changelog
 
+## Unreleased: bold, italic and code from Word and LaTeX sources, and their color counted (branch fix/emphasis-runs-from-sources)
+
+- A Word or LaTeX source now keeps the bold, italic and code words it states, as the same
+  `strong`, `emphasis` and `code` runs a PDF page makes (`<strong>`, `<em>`, `<code>` in the
+  page, Word, EPUB and Listen). Word: a run's bold and italic, the highlight a run carries, the
+  character style "Verbatim Char", and a run set directly in a fixed-pitch font (Courier,
+  Consolas, Menlo; pandoc drops that font, so the package step gives the run the style).
+  LaTeX: `\textbf`, `\emph`, `\textit`, `\texttt` and `\verb`, from LaTeXML's classes (an `\emph`
+  inside an italic theorem body is a run). The PDF path's rules apply: a style on 70% or more of
+  a block (a bold heading, a whole italic theorem, a bold header cell) is the block's own and
+  makes no run, a run never holds an inline equation, and a heading, program code or a
+  glossary entry gets none. The text of every element and every id are unchanged, so no
+  recorded model request stops matching.
+- A table cell of a Word or LaTeX table keeps its runs (`TableCell.runs`, optional and left out
+  when empty; math cells have none) and the table writes them: `<td><strong>closed</strong>
+  book</td>`. A cell edit in the review screen takes them off, like a text edit that changes
+  words. A stored result that has a cell run cannot be read by a release from before this one.
+- Color in a Word or LaTeX source is counted like a PDF's: with `FEATURE_COLOUR` off the job gets
+  the optional notice `colour_used` with the number of passages. The Word reader never carries
+  color (pandoc drops it), so it counts from the file's own runs and always raises the notice;
+  the LaTeX reader used to keep color whatever the setting and now keeps it only with the flag
+  on. `RENDER_VERSION` and `PIPELINE_VERSION` are owed a raise: a stored Word or LaTeX result
+  has no runs and no `colour_used`.
+
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
 - Speech: `\{x | |x|<1\}` (a plain bar before an absolute value in set braces) read "vertical

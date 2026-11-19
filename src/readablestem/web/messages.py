@@ -529,6 +529,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "could not be kept and is written on the line, so check it reads right.",
     "struck_text": "Text struck through on the page is kept, shown struck through and read "
     "out as deleted: if students no longer need it, take it out with the page tools.",
+    "struck_not_kept": "Something in this table or equation is struck through on the page. The "
+    "converted file cannot show that here, so it reads as ordinary text: check it against the "
+    "PDF, and take out what students no longer need.",
     "form_fields": "This PDF is a fillable form. Its fields are written out as text (a blank, a "
     "box with its state, or the value filled in), and the converted file cannot be filled in: "
     "keep the PDF for students who need to fill it in.",

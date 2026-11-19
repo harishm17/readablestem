@@ -184,8 +184,9 @@ def style_runs(text: str, spans: list[tuple[str, int, int, object]]) -> list[Run
     offsets into `text`: what the PDF path writes for the same words. Spans of one kind are
     joined where they touch or overlap; a style that covers `STYLE_SHARE` of the block's
     letters and digits or more is the block's own (a theorem set in italic, a bold line) and
-    makes no run, except a highlight and an `\\emph` that stands upright in italic text; a run never holds an inline-equation marker; a piece
-    is kept only when it has a letter or a digit."""
+    makes no run, except a highlight and an `\\emph` that stands upright in italic text; a run
+    never holds an inline-equation marker; a piece is kept only when it has a letter or a
+    digit."""
     from readablestem.core.types import INLINE_MARKER_RE
     from readablestem.pipeline.text_pass import STYLE_SHARE
 

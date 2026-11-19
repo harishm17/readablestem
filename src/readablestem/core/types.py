@@ -938,6 +938,7 @@ NOTICE_CODES = frozenset(
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
         "struck_text",  # text the page shows struck through, kept and marked as deleted
+        "struck_not_kept",  # struck text in a table or a display equation, which carry no runs
         "form_fields",  # a fillable PDF form: its fields are read as text, not as live inputs
         "annotations_read",  # comments in the PDF's annotations, included as paragraphs
         "attachments_not_converted",  # files attached to the PDF, not converted

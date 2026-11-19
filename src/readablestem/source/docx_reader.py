@@ -83,11 +83,11 @@ from readablestem.source import docx_package, figures
 from readablestem.source.ltx_reader import (
     BOX,
     CHARS_PER_PAGE,
+    COLOUR_NOTICE,
     FORMULA_UNREAD,
     MAX_DEPTH,
     MAX_ELEMENTS,
     MAX_MATH_CHARS,
-    COLOUR_NOTICE,
     SOURCE_UNREAD_NOTICE,
     TABLE_PICTURE,
     UNKNOWN_FIGURE_REASON,
