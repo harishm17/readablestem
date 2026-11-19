@@ -882,6 +882,7 @@ _STEP_WORD = re.compile(
     r"|continue)\b",
     re.IGNORECASE,
 )
+_ASSIGNMENT = re.compile(r"\u2190|:=|<-|[+\-*/]?=|\+\+")  # "c <- 0", "count = 0", "i++"
 ALGORITHM_MIN_ROWS = 3  # steps under the caption that make an algorithm
 ALGORITHM_MIN_WORDS = 2  # of them, steps that begin with a step word ("for", "end if", "return")
 ALGORITHM_MAX_PITCH = 2.2  # x font size: step to step
@@ -893,10 +894,10 @@ def _algorithm_groups(rows: Sequence[_Row]) -> dict[int, int]:
 
     The rows after a line that opens "Algorithm 3" (a caption; the line stays its own
     block): in one column and one size, a line pitch apart, each one starting with a
-    step word (for, if, while, end, return, input, output ...), or a line of maths (a
-    step that is a formula: "c <- c + 1"), or further right than the first step (what a
-    loop or a branch holds, so a wrapped step stays with its step). The first line that
-    is none of these ends the group. Fewer than `ALGORITHM_MIN_ROWS` steps, or
+    step word (for, if, while, end, return, input, output ...), or an assignment ("count =
+    0"), or a line of maths (a step that is a formula: "c <- c + 1"), or further right
+    than the first step (what a loop or a branch holds, so a wrapped step stays with its
+    step). The first line that is none of these ends the group. Fewer than `ALGORITHM_MIN_ROWS` steps, or
     `ALGORITHM_MIN_WORDS` of them with a step word, is a sentence that begins "Algorithm
     1 ..." and not a caption. Its maths rows become text, so a formula stays a formula
     inside its line (an inline equation)."""
@@ -922,9 +923,11 @@ def _algorithm_groups(rows: Sequence[_Row]) -> dict[int, int]:
             maths = row.kind == "math" and (
                 region is None or not (region.forced or region.labels or len(region.rows) != 1)
             )
-            word = row.kind == "text" and _STEP_WORD.match(row.clean) is not None
+            step = row.kind == "text" and (
+                _STEP_WORD.match(row.clean) is not None or _ASSIGNMENT.search(row.clean) is not None
+            )
             further = bool(group) and row.x0 > group[0].x0 + 0.5 * row.size
-            if not (maths or word or (further and row.kind == "text")):
+            if not (maths or step or (further and row.kind == "text")):
                 break
             group.append(row)
         words = sum(r.kind == "text" and _STEP_WORD.match(r.clean) is not None for r in group)
