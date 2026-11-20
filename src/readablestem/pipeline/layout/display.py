@@ -968,6 +968,7 @@ def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
         regions = _merge_continued_regions(
             regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
         )
+        regions = _absorb_contained_regions(regions)
     for region in regions:
         for row in [*region.rows, *region.labels]:
             row.region = region
@@ -1029,6 +1030,42 @@ def _merge_continued_regions(regions: list[_Region], members: list[list[_Line]])
         target.box = _union([target.box, region.box])
         members[host].extend(lines)
         merged.add(id(region))
+    return [r for r in regions if id(r) not in merged]
+
+
+CONTAINED_SHARE = 0.9  # of a piece's own area that lies inside the display that takes it in
+
+
+def _absorb_contained_regions(regions: list[_Region]) -> list[_Region]:
+    """Join a region that lies inside the box of another display equation to it.
+
+    A tall bracket or brace set in pieces (the "⎛" of a big parenthesis whose lines are
+    placed one by one), the limits under a sum and the double bars of a norm are each a
+    line of their own to the stacking above, and the piece is no formula of its own: it sits
+    inside the box of the formula it belongs to. A region with at least `CONTAINED_SHARE` of
+    its area inside a larger one is read as a part of that one, unless both carry an equation
+    number (two numbered displays are never one).
+    """
+    area = [(r.box[2] - r.box[0]) * (r.box[3] - r.box[1]) for r in regions]
+    merged: set[int] = set()
+    for j in sorted(range(len(regions)), key=lambda k: area[k]):
+        piece = regions[j]
+        if piece.forced or area[j] <= 0:
+            continue
+        for i in sorted(range(len(regions)), key=lambda k: area[k]):
+            host = regions[i]
+            if i == j or id(host) in merged or host.forced or area[i] <= area[j]:
+                continue
+            if host.labels and piece.labels:
+                continue
+            width = min(piece.box[2], host.box[2]) - max(piece.box[0], host.box[0])
+            height = min(piece.box[3], host.box[3]) - max(piece.box[1], host.box[1])
+            if width > 0 and height > 0 and width * height >= CONTAINED_SHARE * area[j]:
+                host.rows.extend(piece.rows)
+                host.rules.extend(p for p in piece.rules if p not in host.rules)
+                host.labels.extend(piece.labels)
+                merged.add(id(piece))
+                break
     return [r for r in regions if id(r) not in merged]
 
 
