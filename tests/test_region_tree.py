@@ -212,5 +212,22 @@ def test_gaps_in_two_lines_of_a_paragraph_are_not_two_columns():
     assert _read(doc, on=True) == "PABAB"
 
 
+def test_a_paragraph_after_a_line_that_runs_to_the_edge_is_no_glossary_entry():
+    """A heading, or the tail of the last page's paragraph, over a paragraph whose first line is
+    indented is no entry with a hanging indent: the lines after it are not split off."""
+    doc, page = _page()
+    right = 300.0
+    starts = [40.0, 51.0] + [40.0] * 8  # the second line is the indented first line
+    for k, x in enumerate(starts):
+        text = f"W{k:02d} alpha beta gamma"
+        while pymupdf.get_text_length(text + "i", fontsize=9) + x < right:  # runs to the edge
+            text += "i"
+        page.insert_text((x, 100 + 12 * k), text, fontsize=9)
+    page.insert_text((40, 100 + 12 * len(starts)), "W10 alpha beta", fontsize=9)
+    for on in (False, True):
+        found = layout.analyze(doc.tobytes(), region_tree=on).elements
+        assert len([e for e in found if e.kind == "paragraph"]) == 1
+
+
 def test_the_setting_is_off_by_default():
     assert config.Settings.model_fields["region_tree"].default == "off"
