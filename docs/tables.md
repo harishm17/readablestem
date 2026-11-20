@@ -233,8 +233,14 @@ rules above.
    never invented.
 8. **Continued tables.** A table split across pages stays two tables. The second gets the
    reason `"continued from previous page"` when it has the same columns (left edges within
-   3 % of the page width) as the last table of the page before and nothing but a running
-   header above it. When the page break split a row (Word and browsers break a tall row;
+   3 % of the page width, 6 % when the part before has a header and this part has none: a
+   header printed once is wider than the figures, so the first part's columns are cut further
+   out than the rows that go on) as the last table of the page before, nothing but a
+   running header above it, and nothing but a running footer under that table on its own page
+   in its part of the width (`_at_foot`: a table with text under it has ended, and the next
+   page's table would be given its header; a footnote under a table that does go on stops
+   the mark too, and that part is then read as a table of its own, as before).
+   When the page break split a row (Word and browsers break a tall row;
    the gold's orders-of-magnitude table ends "... the edges of the known" on one page
    and "universe" on the next), `join_split_row` joins the end back: the first row after
    any header rows repeated from the table before is the end of that table's last row
@@ -256,6 +262,16 @@ rules above.
    cell, and the work counts against the document's detector budget. The one row left under a repeated header is too
    few lines for the aligned-text test, so before this the header, the split row and the
    next row were read as headings and paragraphs.
+   **The header of a continued table.** A part that goes on from the page before is written
+   with the header rows of the part before it when it has none of its own and the table
+   step's grid has the same number of columns (`assemble_tables.carry_headers`, at the time
+   the page is written: the stored grids and the table step's request are not changed). All
+   the header rows are carried, merged cells included, or none; a table of three pages carries
+   its header to the third from the second. A part that printed its header again keeps it and
+   gets no second one. Where the columns do not agree, or the part's first rows repeat the
+   header without being marked as one, nothing is carried and the notice
+   `table_header_missing` ("Worth checking") says the part has no header row. A table whose
+   first part has no header row gets neither.
 
 What layout does with the result: the table's lines, rules and caption lines leave the
 page, and a TABLE element is placed in reading order like a figure (a grid of terms:

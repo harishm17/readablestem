@@ -503,6 +503,34 @@ def test_a_table_at_the_top_of_the_next_page_with_the_same_columns_is_marked_con
     assert tables.REASON_CONTINUED in found[1].reasons
 
 
+def test_a_part_that_goes_on_without_the_header_printed_once_is_marked_continued():
+    # The header is wider than the figures under it, so the first part's columns are cut
+    # further out than the rows that go on, with no header, on the next page.
+    xs = (72, 190, 300, 430)
+
+    def rows(page, y, first, count):
+        for n in range(first, first + count):
+            for x, text in zip(xs, (f"S{n:03d}", "24.32", "54.3", "7.092"), strict=True):
+                write(page, x, y, text)
+            y += 14
+
+    def first(page):
+        write(page, 72, 60, "Intro text before the table, to keep it off the top.")
+        write(page, 72, 100, "Table 1. Measured densities")
+        for x, text in zip(
+            xs, ("Sample", "Mass (g)", "Volume (mL)", "Density (g/mL)"), strict=True
+        ):
+            write(page, x, 130, text)
+        rows(page, 152, 1, 30)
+
+    def second(page):
+        rows(page, 90, 31, 40)
+
+    found = [e for e in analyze(pdf(first, second)).elements if e.kind == Kind.TABLE]
+    assert [e.page for e in found] == [0, 1]
+    assert tables.REASON_CONTINUED in found[1].reasons
+
+
 def test_a_table_on_a_rotated_page_is_found_in_display_space():
     def fill(page):
         page.set_rotation(90)  # a landscape page: 792 x 612 on the screen

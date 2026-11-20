@@ -361,8 +361,14 @@ so a heading is not, and a line that starts a block is not).
    of a block) counts as at the edge. A tail of two lines or more whose lines all stand
    twelve ems or more in from its page's text edge is in the other column of a page whose
    columns were not told apart (a first page with a one-column head over two columns), and is
-   compared like a tail across columns; an index's lines at several x do not qualify. For a list item the head stands at the item's text,
-   not at its marker. When the place test is in doubt the break stays: a wrong join is worse
+   compared like a tail across columns; an index's lines at several x do not qualify. A tail
+   whose block began in the other column has no edge of its column's: its last two lines at one
+   x are its column's text. The head may also start with something other than a lower-case
+   letter when the tail cannot end where it does: the tail ends on a comma or a semicolon
+   (a head that starts with an acronym or a name), or the head starts with a citation shut by
+   punctuation ("[12]."), the end of a sentence. A head that is a "Table N" or "Figure N"
+   caption never joins (a caption set at the top of the page under a comma tail). For a list item the head stands at the item's
+   text, not at its marker. When the place test is in doubt the break stays: a wrong join is worse
    than a cut. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second

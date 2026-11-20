@@ -343,6 +343,10 @@ def test_a_paragraph_cut_by_a_page_break_is_one_element():
         ("speed up while the", {"lone_line": True, "margin": 14.0}, True),  # on an even page
         ("speed up while the", {"indent": 14.0}, False),  # the second starts a paragraph
         ("Speed up while the", {}, False),  # a capital: the sentence began there
+        ("Speed up while the", {"first_last": "and the cart continues to,"}, True),  # a comma
+        ("[12]. Then the", {}, True),  # a citation shut by its full stop ends the sentence
+        ("[12] Smith, J. Then the", {}, False),  # a reference list entry
+        ("TABLE VII: Speed up", {"first_last": "and the cart continues to,"}, False),  # a caption
     ],
 )
 def test_a_paragraph_cut_by_a_page_break_is_joined_only_where_both_parts_agree(

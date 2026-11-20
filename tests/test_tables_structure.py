@@ -236,15 +236,23 @@ def test_a_continued_caption_does_not_stop_the_continuation():
     assert tables.REASON_ROW_SPLIT in found[0].reasons
 
 
-def test_the_same_columns_under_a_new_caption_are_not_marked_continued():
+@pytest.mark.parametrize(
+    ("y0", "under", "caption"),
+    [
+        (600, "", "Table 4 Other pendulum"),  # a new caption over the same columns
+        (300, "The discussion goes on under the table, which has ended here.", ""),
+    ],
+)
+def test_the_same_columns_of_another_table_are_not_marked_continued(y0, under, caption):
     from test_tables_detect import PENDULUM, grid_table
 
     def first(page):
         write(page, 72, 100, "Some text.")
-        grid_table(page, PENDULUM, y0=600)
+        grid_table(page, PENDULUM, y0=y0)
+        write(page, 72, y0 + 140, under)
 
     def second(page):
-        write(page, 100, 60, "Table 4 Other pendulum")
+        write(page, 100, 60, caption)
         grid_table(page, [["0.80", "17.94", "1.794"], ["1.00", "20.06", "2.006"]], y0=72)
 
     found = found_tables(pdf(first, second))

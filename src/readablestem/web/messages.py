@@ -530,6 +530,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "colour_used": "Passages printed in color: {count}. The converted file does not keep "
     "color. If a color carries a meaning here (for example, answers in red), say that "
     "meaning in words.",
+    "table_header_missing": "This table goes on from the page before, but its columns could not "
+    "be given the header of the first part, so a screen reader cannot name them. Check the "
+    "table and set its header row.",
     "colour_only": "A figure tells things apart by color alone, so add labels or patterns "
     "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "

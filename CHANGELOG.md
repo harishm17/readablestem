@@ -195,6 +195,34 @@
   The two TeX compiles (`gold/safe_tex.py`, `source/tex_compile.py`) say in their docstrings why
   there are two and which a new caller uses. The Landlock busy-text test accepts `source_timeout`:
   on a loaded machine LaTeXML ran out of its 120 s (2 of 20 runs failed that way).
+## Unreleased: the header of a table that runs onto the next page (branch fix/across-a-page-break)
+
+- A table that goes on from the page before was two tables, and the second had no header row, so
+  a screen reader read its cells with no column names. The page now writes each such part with
+  the header rows of the part before it (all of them, merged cells included) when the part has
+  no header of its own and the same columns; a part that printed its header again keeps its own,
+  with no second one. Where the columns do not agree the part stays as it was and the new notice
+  `table_header_missing` ("Worth checking") says it has no header row. The stored tables and the
+  table step's request are unchanged, so recorded answers still match. `RENDER_VERSION` is owed a
+  raise: a stored page with a continued table is written differently.
+- A part that goes on with no header after a first part whose header was printed once was not
+  marked "continued from previous page": the header is wider than the figures, so the first
+  part's column edges sat up to 21 pt from the next page's. The edges may now differ by 6 % of
+  the page width (3 % otherwise) when the part before has a header and this part has none. A
+  different column count is still not marked. `PIPELINE_VERSION` is owed a raise for a document
+  that has one.
+- A table at the top of a page was marked as the rest of the last table of the page before even
+  when that table stood in the middle of its page with text under it, and with the change above
+  it would have been given that table's header. A table with text under it in its part of the
+  page's width has ended (`tables._at_foot`). On the 996 corpus PDFs this takes the mark off one
+  table, on a public paper (its "Table 11" was marked as the rest of "Table 10"), and no other.
+- Paragraphs cut at a page break: three more cases are joined, each on evidence that the sentence
+  cannot end there. A paragraph whose block began in the other column of its page and ends the
+  page in a column's body text; a paragraph that ends on a comma or a semicolon, whatever letter
+  the next page starts with; a next page that starts with a citation shut by punctuation
+  ("[12]."). A head that is a "Table N" or "Figure N" caption never joins: the corpus run showed
+  a comma tail joined to a "TABLE VII: ..." line. `PIPELINE_VERSION` is owed a raise for a
+  document that has one.
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 

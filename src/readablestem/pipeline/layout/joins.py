@@ -11,6 +11,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from itertools import pairwise
 
+from readablestem.core.captions import FIGURE_CAPTION, TABLE_CAPTION
 from readablestem.core.types import Kind
 from readablestem.pipeline.layout.blocks import (
     _QUANTITY_WORDS,
@@ -57,6 +58,18 @@ def _ends_sentence(pieces: Sequence[str | _Inline]) -> bool:
     end = last.rstrip().rstrip(_CLOSING)[-1:]
     return end != "" and end in _SENTENCE_END
 
+
+def _ends_open(pieces: Sequence[str | _Inline]) -> bool:
+    """Does the last piece of text end on a comma or a semicolon? A paragraph does not end
+    there, so the next page's first paragraph goes on from it, whatever letter it starts with
+    (an acronym or a name)."""
+    last = next((p for p in reversed(pieces) if not isinstance(p, str) or p.strip()), None)
+    return isinstance(last, str) and last.rstrip()[-1:] in (",", ";")
+
+
+# A page's first text that starts with a citation closed by punctuation ("[12].") is the end
+# of a sentence: a paragraph does not start with one (a reference list's "[12]" has none).
+_CITATION_THEN_PUNCTUATION = re.compile(r"\[\d+(?:\s*[,–-]\s*\d+)*\][.,;)]")  # noqa: RUF001
 
 RUN_IN_LABELS = frozenset({"solution", "answer", "discussion", "procedure", "proof", "hint"})
 MIN_LABEL_COPIES = 2  # a label word that repeats this often is a label
@@ -349,10 +362,15 @@ def _goes_on(
     if tail.family != head.family or tail.bold != head.bold:
         return False
     start = next((p for p in first.pieces if not isinstance(p, str) or p.strip()), None)
-    if (
-        not isinstance(start, str)
-        or not start.lstrip()[:1].islower()
-        or _ends_sentence(last.pieces)
+    if not isinstance(start, str) or _ends_sentence(last.pieces):
+        return False
+    head_text = start.lstrip()
+    if TABLE_CAPTION.match(head_text) or FIGURE_CAPTION.match(head_text):
+        return False  # a caption set at the top of the page is not the end of a sentence
+    if not (
+        head_text[:1].islower()
+        or _CITATION_THEN_PUNCTUATION.match(head_text)
+        or _ends_open(last.pieces)
     ):
         return False
     return _same_edge(last, first, tail_edges, head_edges)
@@ -377,6 +395,12 @@ def _same_edge(
     if any(abs(c - head.x0) <= EDGE_TOLERANCE for c in xs):
         return True
     tail_edge = last.origin if item else tail_edges.get(tail.column)
+    if tail_edge is None and not item and len(last.rows) >= 2:
+        # A block that begins in the other column has no edge of its column's: its last two
+        # lines standing at one x are the column's body text.
+        before = last.rows[-2]
+        if before.column == tail.column and abs(before.x0 - tail.x0) <= EDGE_TOLERANCE:
+            tail_edge = tail.x0
     head_edge = head_edges.get(head.column)
     if tail_edge is None or head_edge is None:
         return False
