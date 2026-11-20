@@ -672,7 +672,12 @@ def test_panels_under_one_caption_are_one_figure_when_they_are_joined():
     top = y + 40
     _panel(page, 100, top, "A")
     _panel(page, 270, top, "B")
-    _label(page, (100, top + 140), "Figure 3: Height of the ball in two runs, one thrown softly (A) and one hard (B).", 10)
+    _label(
+        page,
+        (100, top + 140),
+        "Figure 3: Height of the ball in two runs, one thrown softly (A) and one hard (B).",
+        10,
+    )
     _running_text(page, top + 180, 1, start=2)
     pdf = doc.tobytes()
     apart = _figures(layout.analyze(pdf))
