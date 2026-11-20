@@ -490,6 +490,7 @@ def _inline_runs(
                 or (c == "," and (depth > 0 or _ellipsis_comma(chars, i)))
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
+                or _separator_in_bracket(chars, info, i, depth, document=document)
                 or (document.tex_made and glyph_math.script_punctuation(chars, info.script, i))
                 or (
                     document.tex_made and glyph_math.percent_of_number(chars, i)
@@ -504,7 +505,10 @@ def _inline_runs(
                 chars[i].blank
                 and (
                     _between_formulas(chars, i)
-                    or _word_space_between_operands(chars, info, i, document=document)
+                    or (
+                        _word_space_between_operands(chars, info, i, document=document)
+                        and not _math_word_joins(chars, info, kinds, start, i, document=document)
+                    )
                 )
                 and not (document.tex_made and glyph_math.touching(chars, i))
             ):
@@ -518,8 +522,64 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds, document=document)
             if reasons:
                 runs.append((start, end, reasons))
+    if document.inline_joins:
+        runs = _joined_labels(chars, info, runs)
     joined = _with_simple_maths(row, info, _join_signatures(chars, runs), document=document)
     return _with_chemistry(row, kinds, _with_nuclides(row, kinds, joined))
+
+
+LABEL_MAX_GLYPHS = 4  # the longest label that joins a formula: "H0", "P(A)", "f_n"
+
+
+def _joined_labels(
+    chars: list[_Char], info: _CharInfo, runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """Rule (b). A short label that ends in a colon ("H0:") or in ":=" ("f :=") right before a
+    run, and holds a maths letter, is the left side of the formula the run holds: the run takes
+    it in, with the colon."""
+    out: list[tuple[int, int, list[str]]] = []
+    for start, end, reasons in runs:
+        label = _label_before(chars, info, start)
+        if label is not None:
+            while out and out[-1][1] > label:  # the label was a run of its own
+                label = min(label, out[-1][0])
+                reasons = [*out.pop()[2], *reasons]
+            start = label
+        out.append((start, end, list(dict.fromkeys(reasons))))
+    return out
+
+
+def _label_before(chars: list[_Char], info: _CharInfo, start: int) -> int | None:
+    """Where the label of the run at `start` begins, or None when no label ending in a colon
+    stands right before it."""
+    k = start - 1
+    while k >= 0 and chars[k].blank:
+        k -= 1
+    defines = k >= 1 and chars[k].c == "=" and chars[k - 1].c == ":"
+    if defines:
+        k -= 1  # ":=": the run was cut after it
+    if k < 0 or chars[k].c != ":":
+        return None
+    j = k - 1
+    while j >= 0 and chars[j].blank:
+        j -= 1
+    last = j
+    while j >= 0 and not chars[j].blank:
+        j -= 1
+    first = j + 1
+    glyphs = range(first, last + 1)
+    if first > last or last - first + 1 > LABEL_MAX_GLYPHS:
+        return None
+    if not all(
+        info.mathy(g) and (chars[g].c.isalnum() or chars[g].c in "'\u2032*") for g in glyphs
+    ):
+        # "(e/c < M):" ends a condition and "P \u2297 P_B:" a statement; neither names a formula
+        return None
+    if not any(chars[g].c.isalpha() for g in glyphs):
+        return None
+    # A bare letter before a colon ("A:", "e:") is as often a heading of a list as the left
+    # side of a formula; a label with an index ("H0:") is a name only a formula has.
+    return first if defines or any(info.script[g] for g in glyphs) else None
 
 
 def _with_simple_maths(
@@ -918,6 +978,56 @@ def _reaction_row(row: _Row, info: _CharInfo, *, document: _Document) -> bool:
 WORD_SPACE = 0.25  # x font size: the narrowest gap that is a word space
 _OPERAND_END = frozenset(")]}'\u2032!\u221e%")
 _OPERAND_START = frozenset("([{\u2202\u2207\u221a\u222b\u2211\u220f\u221e")
+
+
+def _math_word_joins(
+    chars: list[_Char],
+    info: _CharInfo,
+    kinds: Sequence[ScriptKind | None],
+    start: int,
+    i: int,
+    *,
+    document: _Document,
+) -> bool:
+    """Does the word space at `i` stay inside the run that began at `start`, because a maths word
+    ("mod", "min") follows it, or because it follows one and an operand comes after?
+
+    "a \\equiv b mod n" is one formula: the space before "mod" and the one after it are the
+    author's `\\bmod` and `\\pmod` spacing, not the end of a formula. The run so far must be maths
+    on its own evidence, and the word must not be the first thing of the run."""
+    if not document.inline_joins:
+        return False
+    before = next((k for k in range(i - 1, start - 1, -1) if not chars[k].blank), None)
+    after = next((k for k in range(i + 1, len(chars)) if not chars[k].blank), None)
+    if before is None or after is None:
+        return False
+    if info.maths_words[after] and not info.script[after]:  # "b" then "mod"
+        return bool(_inline_evidence(chars, info, start, i, kinds, document=document))
+    if info.maths_words[before] and not info.script[before]:  # "mod" then "n"
+        first = before
+        while first > start and info.maths_words[first - 1]:
+            first -= 1
+        return first > start and info.mathy(after)
+    return False
+
+
+def _separator_in_bracket(
+    chars: list[_Char], info: _CharInfo, i: int, depth: int, *, document: _Document
+) -> bool:
+    """Is the colon or semicolon at `i` an argument separator inside a bracket the run opened
+    ("I(A : B)", "P(n; m)") that closes on this row with maths in between? Ending the run there
+    left the bracket open in one formula and its closing half in the next."""
+    if not (document.inline_joins and document.tex_made and chars[i].c in ";:" and depth > 0):
+        return False
+    for k in range(i + 1, min(len(chars), i + 40)):
+        c = chars[k]
+        if c.blank:
+            continue
+        if c.c in ")]}":
+            return k > i + 1
+        if not (info.mathy(k) or c.c in ",;:"):
+            return False
+    return False
 
 
 def _word_space_between_operands(

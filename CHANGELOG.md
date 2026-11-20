@@ -16,6 +16,19 @@
   stored result loads unchanged and keeps its old caption until the file is converted again.
   The pages a layout change like this one reaches need a `PIPELINE_VERSION` raise when the wave
   is released. No migration.
+## Unreleased: inline formulas kept whole (WS4.8, off)
+
+- New switch `LAYOUT_INLINE_JOINS` / `layout.analyze(inline_joins=True)`, off in code and in
+  production, wired like `LAYOUT_DISPLAY_GROUPING`. Four rules behind it (`layout/inline_runs.py`,
+  `layout/shared.py`): more operator names are math words; a colon or semicolon inside a bracket
+  that closes on the row does not end a run; a word space next to a math word ("a = b mod n")
+  does not end a run; a label with an index or ":=" ("H0:", "f :=") joins the run after it.
+  On the development papers' position truth the four give 87 more whole formulas and lose none
+  (8,990 to 9,077 of 11,258); with `LAYOUT_DISPLAY_GROUPING` also on, 9,118. A fifth rule, part
+  labels "(a)" split off as text, was measured and not built: it changed no box once narrowed.
+  With the switch off nothing changes; no version bump, nothing to migrate.
+- Gold: a macro argument that starts with a letter, put after a control word in the body
+  (`\lVert#1` with `A`), keeps a space between them (`gold/arxiv_tex.py`).
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

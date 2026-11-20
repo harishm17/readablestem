@@ -49,6 +49,9 @@ _MATH_WORDS = frozenset(
     )
 )
 
+# More operator names, taken as maths words only when `analyze(inline_joins=True)`.
+_MORE_MATH_WORDS = frozenset(("erfi", "erfc", "supp", "diam", "codim", "coker", "arccot"))
+
 
 _SUPERSCRIPT_FLAG = 1
 
@@ -443,7 +446,9 @@ def _word_lengths(
         )
         for k in members:
             lengths[k] = 1 if italic_variables else len(members)
-            maths_word[k] = named or word in _MATH_WORDS
+            maths_word[k] = (
+                named or word in _MATH_WORDS or (document.inline_joins and word in _MORE_MATH_WORDS)
+            )
         i = j
     return lengths, maths_word
 

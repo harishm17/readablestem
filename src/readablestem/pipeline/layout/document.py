@@ -128,6 +128,7 @@ def analyze(
     max_pages: int | None = None,
     page_math: Any = None,
     display_grouping: bool = False,
+    inline_joins: bool = False,
     region_tree: bool = False,
     table_search_limited: bool = True,
     on_page: Callable[[int, int], None] | None = None,
@@ -149,6 +150,9 @@ def analyze(
 
     `display_grouping` (`LAYOUT_DISPLAY_GROUPING`, off): the rules of "One printed display, one
     element" in docs/layout.md. Off, the output is what it was before they existed.
+
+    `inline_joins` (`LAYOUT_INLINE_JOINS`, off): the rules of "Inline formulas kept whole"
+    in docs/layout.md. Off, the output is what it was before they existed.
 
     `region_tree` (`REGION_TREE`, off): the page's columns are found by a tree of regions built
     from the unmerged lines ("The region tree" in docs/layout.md). Off, the output is what it
@@ -178,6 +182,7 @@ def analyze(
                     page_math,
                     _Document(
                         grouping=display_grouping,
+                        inline_joins=inline_joins,
                         region_tree=region_tree,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
                     ),
