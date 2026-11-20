@@ -2018,6 +2018,30 @@ marks, and in a file that names none only a raised digit or sign that opens a li
 type low on the page, or a raised run at the end of a heading that is the same as the opening
 of such a line on the page.
 
+Wave 2b, from a count of the public papers (131 destinations, 155 notes found, 124 linked; the
+count is the footnote destinations, the `footnote` notices and the internal links to them).
+In a file that names none, a block is a note only when it opens with a mark printed raised in
+the text above it that is the whole mark ("12" is not the "1" raised above it) and goes on in
+words: a row of axis labels in small type low on a figure (11 "notes" on one page), a lone page
+number, an integral's lower limit and a running footer ("12 Authors") were notes when one raised
+digit of the same kind stood anywhere above (`_footnote`, `_lead_token`; 14 false notes on 4
+papers, none now; one note of that shape is lost with them, the "Mathematics Subject
+Classification" line of ax_mathap_240306449, a note only because a "2" was raised somewhere above,
+as the same line of ax_mathco_240306468, which was never one). The nuclide rule leaves a mark alone (`_nuclide_runs` reads no glyph with
+`NOTE_MARK_FLAG`), so a note that opens "In fact" or "As" is not indium or arsenic with the mark
+for its mass number (2 notes, 2 papers). In a file that names none, the raised mark in the text
+before a math letter, right after a word of text type or a comma, stop or colon, is flagged the
+same way as a named one and is no part of the equation with the letter (`_flag_text_marks`: an
+exponent, after a math letter or a bracket, is not touched). And a note the file names but no link
+points at (a class that writes the destinations and no link rectangles: 6 notes on 2 papers) is
+linked by its mark, the raised one in the text above on the same page that the note opens with
+(`_layout_notices`); it still has to be found once. Not changed, and why: the 2 author notes of
+ax_astrophga_240306369 and the note of a table (`a`) have no mark printed in the text, nothing to
+link; `[1]` of 2503.22999 is a bibliography item the file names `footnote`. The false footnote on
+2407.04005 p10 (p10-e50), "a mark inside a heading" and the 17 not found could not be measured
+on the public papers: none of them has a false note, a heading mark that is not linked, or a
+named note not found (131 destinations, 131 found).
+
 **Contents pages.** A page with at least two lines that end in dot leaders (five dots, or
 an ellipsis counting for three) is a contents page (`_contents_rows`). Each such line is a
 list item of its own with its title only: the leaders go, and so does the page number (at
@@ -2107,15 +2131,18 @@ the long line, "repeat"; the line of a paragraph goes on to a "for ..." that run
 margin). Any other (a long first line, a long line that wraps into a second one, a long line
 over a loop line that reaches the margin) may be a long step ("Initialize the table of
 counts ..." set out to the margin) or the running text under a float's caption, so the lines
-must then show more: one step set further right under a line that opens a block and ends as
-one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
-A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
+must then show more: one step set further right than the line above it and a later one set back
+to the left of the line above it (`_nested`, from the indent alone: it reads no word, so a block
+that opens with no "do", "then" or colon shows itself, and a sentence that begins "For" is no
+proof by its first word; it was a proof of opening and closing words before wave 2b, and it is
+the same on all 22 public pages with an "Algorithm" or "Procedure" line, which is the set it was
+tried on). A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
 lines that start more than `ALGORITHM_SET_IN` (6) em apart prove nothing: a line that far right
 is a display equation of the text, centered in the column ("... as follows:" over "v = d / t"),
 and a closing line that far left of it is the sentence going on ("until the last word is read").
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
-a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
+a block, and either consecutive line numbers ("3:") with one step set in and a later one set back (`_nested`;
 the numbered lines of a manuscript and the questions of an exam all start at one place), or no
 numbers, an indent ladder of three left edges and something only code holds (a formula, an
 assignment, an "end", a block word on a line that ends in "do", "then" or a colon). A bullet is
@@ -2158,8 +2185,11 @@ the column's right edge, and the new line has no number, does not start with a c
 word) is joined to its step; a word broken by a hyphen across the wrap is mended. A line with no
 number right of the numbers (a step that broke early, a comment on a line of its own) is joined
 too when the next number is within `ALGORITHM_BETWEEN` (2) rows below it. A bit of math or
-small print the text layer cut off a line (`ALGORITHM_SAME_LINE`) is a piece of that line, and rows
-the page lists out of order are put back in the order of their lines.
+small print the text layer cut off a line (`ALGORITHM_SAME_LINE`) is a piece of that line, and so
+is one that hangs under the line's end, up to `ALGORITHM_HANG` (0.7) em lower and starting no
+more than `ALGORITHM_HANG_AT` (1.5) em left of where the line ends (the subscripts of a tall
+expression: the steps after it stayed outside the block, Algorithm 3 of ax_statme_240307124);
+rows the page lists out of order are put back in the order of their lines.
 
 A display equation between two steps ends the rows there; the algorithm goes on at the next step
 within `ALGORITHM_REACH` (16) lines (`_after_equation`) as a second block: the step with the next
@@ -2184,8 +2214,9 @@ the caption ends within `ALGORITHM_WRAPPED` (3) em of the column's right edge (a
 only an algorithm, a narrow column), a first step with no step word is read as the second line
 of the caption. Algorithms still lost (independent reviews 9, finding 1, and 10, findings 2
 to 5): under a long first line in plain words, steps that show no nesting in the way asked
-above, which are a flat algorithm (no line set further right), one whose loop lines end in no
-"do", "then" or colon unless a short "return x" or an "end" is set back to the left, a loop
+above, which are a flat algorithm (no line set further right), one whose last line is still inside
+its loop (nothing is set back to the left after the line that goes in; the words "do", "then"
+and a colon are no longer asked), a loop
 that holds two formula lines or more (a display equation of several lines is not a step) and
 a loop whose only line is a formula set more than 6 em to the right. The same pages with a
 short first line are read as algorithms, and so are those with the long line second when it
@@ -2195,7 +2226,12 @@ one after the other, a long step over "count = 0" or over a loop line that reach
 margin; with flat steps under them these are paragraphs. Pseudo-code numbered "1." under a
 caption whose only nesting is between lines 9 and 10 is a list. An "=" step that is the first
 of its block after an equation is not picked up when the line that opens the block wraps
-into a second line that starts where it does.
+into a second line that starts where it does. Counted on the public pages (wave 2b: the 22 pages
+of `layout-dev-1`, the arXiv gold and the repository's own with an "Algorithm" or "Procedure" line)
+and not built, each on one page: a step after a monospaced comment row (2405.15050 p4), an
+Input list of two-row math regions that stops after the first line and leaves the steps from
+the seventh on as paragraphs (2504.06207 p4), and a step whose second line is a paragraph of its
+own between the steps (Algorithm 1 of ax_statme_240307124, p12).
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a

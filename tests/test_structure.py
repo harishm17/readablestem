@@ -397,6 +397,23 @@ def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
     (step,) = [e for e in analyze(page_of(hanging)).elements if e.preformatted]
     assert [line[:2] for line in step.text.split("\n")] == ["1:", "2:", "3:", "4:", "5:", "6:"]
 
+    # The nearest thing the indent proof must not take: two paragraphs under a caption, each set
+    # in on its first line, with lines that open "For" and "If" (set in, then back out).
+    def paragraphs(page):
+        page.insert_text((72, 100), "Algorithm 2 Overview of the method", fontsize=BODY)
+        text = [
+            (87, "We take every verse of the poem and scan it one word at a time until the"),
+            (72, "end is reached. For every word of the verse we count the stressed syllables"),
+            (72, "and add them to the running total, which is kept for the whole poem."),
+            (87, "If the total is above the threshold then the verse is marked as heavy and"),
+            (72, "we go on to the next one. For each marked verse we write a line in the margin"),
+            (72, "and return to the start of the poem when all verses have been read."),
+        ]
+        for n, (x, line) in enumerate(text):
+            page.insert_text((x, 128 + 13.5 * n), line, fontsize=BODY)
+
+    assert not [e for e in analyze(page_of(paragraphs)).elements if e.preformatted]
+
 
 def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
     def fill(page):

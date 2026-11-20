@@ -1,5 +1,46 @@
 # Changelog
 
+## Unreleased: footnotes still missed and algorithm blocks still lost (branch fix/footnotes-algorithms, O-034, O-054, O-394)
+
+A count on the public papers (131 footnote destinations, 155 notes found, 124 linked to their
+mark) and a count of the algorithm shapes on the 22 public pages with an "Algorithm" or
+"Procedure" line, each fix with a case in `tests/test_structure.py` that fails without it
+(`layout/page.py`, `layout/notices.py`, `layout/inline_runs.py`, `layout/blocks.py`,
+`layout/bold.py`):
+
+- **A number or a row of labels is no footnote.** In a file that names no footnotes, a block of
+  smaller type low on the page was a note when it began with a digit that was raised anywhere
+  above. A row of axis labels (11 "notes" on one page), a lone page number, an integral's lower
+  limit and a running footer ("12 Authors") were notes. A note now opens with the whole mark
+  that is printed raised above, and goes on in words: 14 false notes on 4 papers, 0 now. One
+  note of that shape is lost: the "Mathematics Subject Classification" line of one paper,
+  which was a note only because a "2" stood raised somewhere above.
+- **A note that opens "In fact" is not indium.** The mark and the word after it were read as a
+  nuclide (`6 In`) and became an equation inside the note: 2 papers. A footnote's mark is no
+  mass number. In a file that names no footnotes, the mark in the text before a math letter
+  ("system,1 n") is also kept out of the equation.
+- **A note the file names and no link points at is linked by its mark.** Some classes write
+  the destinations with no link rectangles, so no mark was found: 6 notes on 2 papers are
+  linked now (the raised mark above, on the same page, that the note opens with, found once).
+  Linked 124 to 130 of the 131 destinations; the other notes are 2 author notes with no mark
+  in the text and one table note.
+- **An algorithm that holds a bold letter waiting for evidence keeps its lines.** The pass
+  that puts a bold letter back as plain text tidied the block's lines into one: 4 blocks on 4
+  pages of one paper (`layout/bold.py`).
+- **Nesting is proved from the indent alone.** `_nested` asked a line that opens a block to
+  begin with a step word and end in "do", "then" or a colon (review 11, finding 1b); it now
+  asks that one line is set right of the line above it and a later one back to the left of
+  the line above it. The same on all 22 public pages and on the generated prose that is
+  nearest to an algorithm (a paragraph under a caption, two paragraphs, a manuscript page, a
+  numbered list with a sub-list, an outline).
+- **A bit of math under a step's end is the step's.** The subscripts of a tall expression
+  hang a little lower than the line; the row was the end of the block, and the steps after it
+  were paragraphs (Algorithm 3 of one paper, 3 steps).
+- Left, and written in docs/layout.md: a step after a monospaced comment row, an Input list
+  on two-row math regions, a step whose second line is a paragraph of its own between steps (one
+  page each); the 17 notes the earlier count could not find and the false note named for
+  2407.04005 are not on the public papers.
+
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"
