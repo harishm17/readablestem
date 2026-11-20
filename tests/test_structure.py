@@ -338,8 +338,9 @@ def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_w
     for caption in ("Algorithm 2 Scan a verse", None):
 
         def fill(page, caption=caption):
-            y = prose(page, 100)
-            y = numbered_algorithm(page, y + 10, caption=caption)
+            y = prose(page, 100, "The scan of a verse is listed in")
+            y = prose(page, y, "Algorithm 2.")  # a sentence's last line, not a caption
+            y = numbered_algorithm(page, y, caption=caption)
             prose(page, y + 10, "The count is printed after the last word.")
 
         elements = analyze(page_of(fill)).elements

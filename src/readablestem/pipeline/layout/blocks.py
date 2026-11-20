@@ -1067,6 +1067,8 @@ def _step_kind(row: _Row, steps: _Steps, edges: _RightEdges) -> str | None:
     if row.column != anchor.column:
         return None
     number = steps.number(row)
+    if number is None and _ALGORITHM_CAPTION.match(row.clean):
+        return None  # the caption of another algorithm (what came before only named this one)
     lead = number is not None or _STEP_WORD.match(row.clean) is not None
     small = ALGORITHM_SMALL <= row.size / anchor.size <= 1.05
     if abs(row.size - anchor.size) > 0.5 and not (lead and small):
