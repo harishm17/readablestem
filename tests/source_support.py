@@ -124,7 +124,7 @@ LOSSES: dict[str, Loss] = {
     "inline_picture": Loss(
         _article("Press \\includegraphics[height=1em]{i1.png} to go."),
         None,
-        "Press to go.",
+        "Press (picture below) to go.",
         files=("i1.png",),
         figures=1,
     ),

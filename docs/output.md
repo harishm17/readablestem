@@ -1344,12 +1344,12 @@ and `w:i`, or a style that sets them), the highlight a Word run carries as `high
 pandoc drops a direct font; a run struck through is left as it is, and loses a code style it
 has, since code carries no strike and the words would read as live). Pandoc reads a strike only
 as `w:strike` on the run, so the package step writes a double strike (`w:dstrike`) and a strike
-that a character style sets that way too (`_keep_strikes`); a strike set by a paragraph style is
-not read. The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
+that a character style or a paragraph style sets that way too (`_keep_strikes`). The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
 `\emph`, `\textit`, `\texttt`, `\verb`). Both use the PDF path's rules: a style on 70% or more
 of a block's characters is the block's own and makes no run (a bold heading, a whole italic
 theorem body, a header cell set in bold), a run never holds an inline equation or a blank
-edge, and it needs a letter or a digit. An `\emph` inside a theorem's italic body is a run
+edge, and it needs a letter or a digit (and, as on the PDF path, a single italic letter is a
+variable, not an emphasis, so it makes no run). An `\emph` inside a theorem's italic body is a run
 (the words stand out against the italic). Headings, program code and glossary entries get
 none. Nothing is guessed from looks: a heading style is not bold text. A table cell of a Word
 or LaTeX table that holds no math keeps its runs (`TableCell.runs`, offsets into the cell's
@@ -1357,12 +1357,20 @@ text) and the table is written with the same tags: `<td><strong>closed</strong> 
 cell edit in the review screen drops them, like a text edit that changes words.
 
 Links of a Word or LaTeX source (a web or mail address, `\\ref`, `\\cite`, a Word bookmark on
-a heading) are kept in a paragraph, a list item, a heading and a footnote, which is written
-after its sentence as "(note: ...)". They are not kept in a table cell or a caption: a cell
-(`TableCell`) and a caption (`Element.caption`) hold plain text, so a link there is its words.
+a heading) are kept in a paragraph, a list item, a heading, a table cell and a footnote, which
+is written after its sentence as "(note: ...)". A table cell holds its links as `TableCell.links`
+(offsets into the cell's text, like its runs): a web address is a link, and a reference to a
+heading, equation, theorem, figure or table of the document is an internal link, as in a
+paragraph (a cell's link to its own table makes none). The table's page writes them as
+`<a>` inside the cell, and a cell edit in the review screen drops them with the runs. A table
+too large for a grid is a list, one item a row: its rows keep their runs and links, and a
+formula in a row is an equation of its own item. A caption (`Element.caption`) holds plain
+text, so a link there is its words; none of the public development LaTeX sources has a web
+address in a caption.
 A picture in the middle of a sentence is a figure straight after the block that holds it (the
-output has no place for a picture inside a sentence); the words it stood between stay two
-words.
+output has no place for a picture inside a sentence), and the sentence reads "(picture below)"
+where it stood, so the words do not run together (a picture on its own line leaves nothing). A
+Word source, which is off in production, does the same.
 
 Color of a Word or LaTeX source follows the PDF path: a passage in a real color is counted,
 and with `FEATURE_COLOUR` off the job gets one `colour_used` notice with the count. The Word

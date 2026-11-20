@@ -21,6 +21,34 @@
   pages were lost by 0.5.13); the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
+## Unreleased: what the Word and LaTeX readers left out (O-073, O-395)
+
+Six shapes in a Word or LaTeX source lost something or ran two words together; each was
+reproduced on the smallest source first. Fixed in `source/ltx_reader.py`, `source/docx_reader.py`
+and `source/docx_package.py`, each with a row in `tests/test_source_reader.py`:
+
+- A link in a table cell (a web address or a `\ref` to a heading, equation, theorem, figure
+  or table) is kept: `TableCell.links` is new (offsets into the cell's text, left out of a
+  stored result when empty), the table's page writes it as `<a>` in the cell, and a cell edit in
+  the review screen drops it with the runs. A Word cell keeps its links too. A link in a caption
+  is still its words (a caption is a plain string with no place for spans); no public
+  development source has a web address in one.
+- A table too large for a grid (read as a list, one item a row) keeps its bold, italic, code
+  and links per row; a formula in a row is now an equation of its own item.
+- A single italic letter is a variable, not an emphasis: it makes no run, as on the PDF path.
+- A strike set by a Word paragraph style is read (it was lost without a word).
+- A picture in a sentence leaves "(picture below)" where it stood, so the words around it no
+  longer run together (LaTeX and Word).
+- Not built: a source that runs out of memory (a macro that calls itself) still gets the
+  general "could not be read" sentence; nothing tells it from a very large source.
+
+Stored results load unchanged. A Word or LaTeX source made again gives different documents
+where it has a link in a table cell, a flattened table with emphasis, a single italic letter,
+a paragraph-style strike or a picture in a sentence; the student page of a table with a link
+changes. A `PIPELINE_VERSION` and a `RENDER_VERSION` raise are owed (not made here). No
+migration. Roll back: the models take no extra fields to be an error, so an earlier version opens a
+result with `links` on a cell and ignores them (the cell shows its words, no links).
+
 ## Unreleased: fixes after the fourth and fifth reviews of the algorithm blocks (reviews 10 and 11)
 
 Review 10 ran 48 pages of its own on the review-9 fixes, with the 171 pages of the three

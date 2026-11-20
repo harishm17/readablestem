@@ -491,8 +491,8 @@ def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_
         "Mail a@b.org or see www.example.org and \\href{https://example.org/h}{the page}.\n"
         "See Section 1, Equation (1), Table 1 and Figure 1, and $x=3$ in Table~\\ref{tab:d}.\n"
         "\\begin{equation}v=v_0+at\\end{equation}\n"
-        "\\begin{table}\\caption{Data}\\label{tab:d}\\begin{tabular}{lc}A&1\\\\\\end{tabular}"
-        "\\end{table}\n\\section{Next}Back to Section 1.\n\\end{document}\n"
+        "\\begin{table}\\caption{Data}\\label{tab:d}\\begin{tabular}{lc}\\href{https://example.org/c}{A}&\\ref{sec:next}\\\\\\end{tabular}"
+        "\\end{table}\n\\section{Next}\\label{sec:next}Back to Section 1.\n\\end{document}\n"
     )
     blob = envelope.wrap("tex", "refs.tex", None, tex.encode())
     result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
@@ -509,6 +509,14 @@ def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_
         ("internal", "Table 1", table),  # the file's own \ref: exact, widened to its word
     ]
     assert links_of(result, last) == [("crossref", "Section 1", heading)]
+    # a table's cells keep the links they hold: an address, and a reference to a heading
+    cells = next(e for e in result.elements if e.table).table.cells
+    next_heading = next(e.id for e in result.elements if e.text == "Next")
+    assert [(c.text[k.start : k.end], k.href or k.target_id) for c in cells for k in c.links] == [
+        ("A", "https://example.org/c"),
+        ("2", next_heading),
+    ]
+    assert 'href="https://example.org/c"' in result.html
     for target in (heading, equation, table):  # every link goes to a place in the file
         assert f'href="#{target}"' in result.html and f'id="{target}"' in result.html
     # the count the job page keeps ("links kept of N in the file") is the file's own: the \href

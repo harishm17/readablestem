@@ -1739,7 +1739,8 @@ def _edit_cell(
         if text == cell.text:
             raise ReviewInvalid([FieldError(fid, "This is the text the cell has already.")], values)
         edited.text = text
-        edited.runs = []  # the source's bold and italic belonged to the old words
+        edited.runs = []  # the source's bold, italic and links belonged to the old words
+        edited.links = []
     # Text typed into an empty cell of the header rows or column is a header too.
     if edited.header is None and not edited.is_empty:
         if edited.row < grid.header_rows:

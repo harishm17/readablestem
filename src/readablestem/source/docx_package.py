@@ -457,15 +457,15 @@ def _code_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
 
 
 def _struck_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
-    """Ids of the character styles that strike their text through, with one line or two: by
-    their own setting, or that of the style they are based on."""
+    """Ids of the character and paragraph styles that strike their text through, with one line
+    or two: by their own setting, or that of the style they are based on."""
     if "word/styles.xml" not in names:
         return set()
     root = _parse(archive, "word/styles.xml", MAX_SMALL_PART_BYTES)
     own: dict[str, bool | None] = {}  # None: the style says nothing, so its base decides
     base: dict[str, str] = {}
     for style in root.iter(f"{{{W}}}style"):
-        if style.get(f"{{{W}}}type") != "character":
+        if style.get(f"{{{W}}}type") not in ("character", "paragraph"):
             continue
         name = style.get(_STYLE_ID, "")
         own[name] = _struck(style.find(_RPR))
@@ -494,15 +494,29 @@ def _keep_strikes(root: ET.Element, struck_styles: set[str], code_styles: set[st
     and a struck run in a code style came out as code, which carries no strike, so the style
     goes (a struck "x = 5" read as live code is the answer the author took back). A run whose
     character style strikes it gets the strike itself, so it holds when `_mark_code` gives the
-    run another style."""
+    run another style. A paragraph style that strikes (a "Deleted" style for a whole answer)
+    strikes the runs of its paragraphs the same way: pandoc reads no strike from a style of a
+    paragraph."""
+    in_struck_paragraph: set[int] = set()
+    if struck_styles:
+        for paragraph in root.iter(_P):
+            props = paragraph.find(_PPR)
+            pstyle = props.find(_PSTYLE) if props is not None else None
+            if pstyle is not None and pstyle.get(_VAL, "") in struck_styles:
+                in_struck_paragraph.update(id(run) for run in _own_runs(paragraph))
     for run in root.iter(_R):
         props = run.find(_RPR)
         if props is None:
-            continue
+            if id(run) not in in_struck_paragraph:
+                continue
+            props = ET.Element(_RPR)
+            run.insert(0, props)
         style = props.find(_RSTYLE)
         said = _struck(props)
         if said is None:
-            said = style is not None and style.get(_VAL, "") in struck_styles
+            said = (style is not None and style.get(_VAL, "") in struck_styles) or (
+                id(run) in in_struck_paragraph
+            )
         if not said:
             continue
         for tag in _STRIKES:
@@ -511,6 +525,17 @@ def _keep_strikes(root: ET.Element, struck_styles: set[str], code_styles: set[st
         ET.SubElement(props, _STRIKES[0])
         if style is not None and style.get(_VAL, "") in code_styles | {CODE_STYLE}:
             props.remove(style)
+
+
+def _own_runs(paragraph: ET.Element):
+    """The runs of a paragraph, not those of a paragraph nested in it (a text box)."""
+    stack = [paragraph]
+    while stack:
+        for child in stack.pop():
+            if child.tag == _R:
+                yield child
+            elif child.tag != _P:
+                stack.append(child)
 
 
 def _mark_code(root: ET.Element, code_styles: set[str], facts: Facts) -> None:

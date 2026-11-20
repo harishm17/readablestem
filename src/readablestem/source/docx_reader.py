@@ -21,8 +21,11 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
   a link when it is a web or mail address (in a note too: the working copy keeps the address a
   note's own relationships hold, `docx_package`); a link to a bookmark on a heading is an
   internal link to that heading (pandoc keeps a bookmark only on a heading, and the words of a
-  `REF` field are plain text), and a link to any other bookmark is its words. Struck text is kept
-  and marked deleted; superscripts and subscripts are runs.
+  `REF` field are plain text), and a link to any other bookmark is its words. A link in a table
+  cell is kept (`TableCell.links`), a link in a caption is its words. Struck text is kept and
+  marked deleted, whether the run, its character style or its paragraph style strikes it
+  (`docx_package._keep_strikes`); superscripts and subscripts are runs. A picture in a sentence
+  leaves `(picture below)` where it stood.
 - An equation typed in Word (`m:oMath`) is the LaTeX pandoc reads from it, checked by the same
   `check_latex` as any LaTeX the product accepts and written to MathML by the pipeline's one
   `safe_latex_to_mathml`; no model is asked. `ltx_reader.equation_fix` makes the fix, so a source
@@ -89,6 +92,7 @@ from readablestem.source.ltx_reader import (
     MAX_DEPTH,
     MAX_ELEMENTS,
     MAX_MATH_CHARS,
+    PICTURE_MARK,
     SOURCE_UNREAD_NOTICE,
     TABLE_PICTURE,
     UNKNOWN_FIGURE_REASON,
@@ -168,6 +172,10 @@ class _Reader:
         # links to such a name: element, start, end, name (`ltx_reader.link_internal`).
         self.ids: dict[str, str] = {}
         self.refs: list[tuple[Element, int, int, str]] = []
+        # the same for words in a table's cells: the table's element id, row, column, start,
+        # end, name (`staged` holds those of the grid being made, without the element's id)
+        self.cell_refs: list[tuple[str, int, int, int, int, str]] = []
+        self.staged: list[tuple[int, int, int, int, str]] = []
 
     # ------------------------------------------------------------------ elements
 
@@ -360,6 +368,7 @@ class _Reader:
         spans: list[tuple[str, int, int, object]] = []
         formulas = 0
         length = 0
+        beside_words = bool(_plain(inlines))  # a picture here stood in a sentence
 
         def emit(text: str) -> None:
             nonlocal length
@@ -386,7 +395,9 @@ class _Reader:
                         formulas += 1
                         emit(latex)
                 elif kind == "Image":
-                    self.loose.append(item)
+                    self.loose.append(item)  # a figure of its own after this block
+                    if beside_words:
+                        emit(PICTURE_MARK)  # where it stood, so its absence is said
                 elif kind == "Note":
                     note, note_spans, _ = self._inline_text(
                         _note_inlines(content), owner=None, depth=level + 1
@@ -601,6 +612,7 @@ class _Reader:
             self._drop(element)
             self._flatten(rows)
             return
+        self.cell_refs += [(element.id, *ref) for ref in self.staged]
         proposal = False
         if marked:
             header_rows = min(marked, grid.rows - 1)
@@ -650,6 +662,7 @@ class _Reader:
             self._picture(picture)
 
     def _grid(self, rows: list[Any], caption: str | None) -> TableGrid | None:
+        self.staged = []
         taken: set[tuple[int, int]] = set()
         cells: list[TableCell] = []
         width = 0
@@ -662,11 +675,12 @@ class _Reader:
                 for dr in range(row_span):
                     for dc in range(col_span):
                         taken.add((r + dr, c + dc))
-                text, latex, mathml, runs = self._cell(cell[4])
+                text, latex, mathml, runs, links, refs = self._cell(cell[4])
+                self.staged += [(r, c, a, b, name) for a, b, name in refs]
                 cells.append(
                     TableCell(
                         row=r, col=c, row_span=row_span, col_span=col_span,
-                        text=text, latex=latex, mathml=mathml, runs=runs,
+                        text=text, latex=latex, mathml=mathml, runs=runs, links=links,
                     )
                 )  # fmt: skip
                 c += col_span
@@ -700,10 +714,13 @@ class _Reader:
                     bounded.append(TableCell(row=r, col=c))
         return TableGrid(rows=height, cols=width, cells=bounded, caption=caption, source="local")
 
-    def _cell(self, blocks: list[Any]) -> tuple[str, str | None, str | None, list[Run]]:
-        """(text, latex, mathml, runs) of a cell: its paragraphs joined by a space. A cell that
-        holds maths is also written as LaTeX with its words in `\\text{}`, when that
-        converts, and has no runs."""
+    def _cell(
+        self, blocks: list[Any]
+    ) -> tuple[str, str | None, str | None, list[Run], list[Link], list[tuple[int, int, str]]]:
+        """(text, latex, mathml, runs, links, refs) of a cell: its paragraphs joined by a space.
+        `refs`: its links to a bookmark (start, end, name), made once every element exists. A
+        cell that holds maths is also written as LaTeX with its words in `\\text{}`, when that
+        converts, and has no runs or links."""
         words: list[str] = []
         pieces: list[str] = []
         styled: list[tuple[str, int, int, object]] = []
@@ -721,16 +738,26 @@ class _Reader:
                     has_math = True
         text = " ".join(w for w in words if w)
         if not has_math:
-            return text, None, None, style_runs(text, styled)
+            links: list[Link] = []
+            refs: list[tuple[int, int, str]] = []
+            for kind, a, b, extra in styled:
+                if kind == "ref":
+                    refs.append((a, b, str(extra)))
+                elif kind == "uri" and not any(k.start < b and a < k.end for k in links):
+                    try:
+                        links.append(Link(kind="uri", start=a, end=b, href=str(extra)))
+                    except ValueError:
+                        continue
+            return text, None, None, style_runs(text, styled), links, refs
         for inlines in _paragraph_inlines(blocks):
             pieces.append(_latex_of(inlines))
         latex = " ".join(p for p in pieces if p).strip()
         cleaned, mathml, failed = self._convert(latex, "inline")
         if failed or not mathml:
             self.report.math_failed += 1
-            return text, None, None, []
+            return text, None, None, [], [], []
         self.report.math_converted += 1
-        return text, cleaned, mathml, []
+        return text, cleaned, mathml, [], [], []
 
     def _flatten(self, rows: list[Any]) -> None:
         """A table too large for a grid: one list item per row, its cells joined by " | ". A
@@ -1132,7 +1159,7 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
     reader.meta(tree.get("meta", {}))
     reader.blocks(tree.get("blocks", []))
     reader.attach_captions()
-    link_internal(reader.out.elements, reader.ids, reader.refs)
+    link_internal(reader.out.elements, reader.ids, reader.refs, reader.cell_refs, reader.out.fixes)
     out, report = reader.out, reader.report
     out.lang = _language(facts)
     report.math_held = facts.equations
