@@ -27,6 +27,7 @@ from readablestem.pipeline.layout.inline_runs import (
     JOINED_REASON,
     _classify_row,
     _is_equation_number,
+    _prose_words,
 )
 from readablestem.pipeline.layout.shared import (
     _ROW_RELATIONS,
@@ -161,6 +162,108 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
             continue
         line.kind = number.kind = "math"
         line.reasons = [*line.reasons, NUMBERED_REASON]
+
+
+SET_OFF_REASON = "set off like a display"
+SET_OFF_WORDS = 4  # the most English words a promoted line may hold
+SET_OFF_INDENT = 2.5  # x font size: least space on each side of the line inside its column's text
+NEAR_LINES = 1.5  # x font size: how far above and below the lines that give the left edge are
+
+
+def _promote_set_off_lines(rows: list[_Row]) -> None:
+    """Make a printed line that is mostly maths, has a few words in it and is set off from the
+    text of its column a display equation (`LAYOUT_DISPLAY_GROUPING`).
+
+    "Diam(C) = sup ...", "Pr[...] <= 2 exp(...)", "f(q) <= p iff q <= g(p)", a system's
+    "... in Omega x (0, T)" each read as text because of the word, so the formula was cut
+    around it, and the word, or the bracket after it, stayed in a paragraph. The evidence is
+    the line as a whole: all the rows on one baseline (`_same_line`), at least
+    `SET_OFF_INDENT` font sizes in from the left and the right end of the column's running
+    text (a line of prose reaches one of them), with `NUMBERED_SHARE` of its characters maths,
+    maths in it (a row that is maths or reads as maths), and at most `SET_OFF_WORDS` words.
+    Its text rows become maths, so the crop and the reading hold the word.
+    """
+    prose = [r for r in rows if r.kind == "text" and not r.absorbed and not r.vertical]
+    if not any(len(r.clean) >= 30 for r in prose):
+        return
+    candidates = [
+        r
+        for r in rows
+        if not r.absorbed
+        and not r.vertical
+        and r.marker is None
+        and not r.exercise_number
+        and not (r.kind == "frag" and _is_equation_number(r.clean))
+    ]
+    candidates.sort(key=lambda r: r.baseline)
+    seen: set[int] = set()
+    for i, first in enumerate(candidates):
+        if id(first) in seen or first.kind != "text":
+            continue
+        line = [first]
+        for other in candidates[i + 1 :]:
+            if other.baseline - first.baseline > 0.4 * max(first.size, other.size):
+                break
+            if any(_same_line(other, member) for member in line):
+                line.append(other)
+        seen.update(id(r) for r in line)
+        around = [t for t in prose if t.kind == "text" and t.column == first.column]
+        around = [t for t in around if t not in line]
+        edge = [t for t in around if len(t.clean) >= 30]
+        if not edge:
+            continue
+        size = max(r.size for r in line)
+        left, right = min(t.x0 for t in edge), max(t.x1 for t in edge)
+        # The text edge on the left is the one of the lines around it: a list item or a
+        # theorem sets its text in from the column's edge, and so does the tail of its sentence
+        # after a display ("with A(x) in R, and b(x) in R."), which is not set off from it.
+        top, bottom = min(r.y0 for r in line), max(r.y1 for r in line)
+        near = [
+            t.x0
+            for t in around
+            if top - NEAR_LINES * size <= t.y1 and t.y0 <= bottom + NEAR_LINES * size
+        ]
+        left = min(near, default=left)
+        if (
+            min(r.x0 for r in line) - left < SET_OFF_INDENT * size
+            or right - max(r.x1 for r in line) < SET_OFF_INDENT * size
+        ):
+            continue
+        if not any(r.kind == "math" or r.score >= EQUATION_THRESHOLD for r in line):
+            continue
+        if _tight_under_text(line, around, size):
+            continue
+        infos = [(r, _CharInfo.of(r)) for r in line]
+        counted = mathy = words = 0
+        for r, info in infos:
+            ink = [k for k, c in enumerate(r.chars) if not c.blank and c.c not in ",.;:"]
+            counted += len(ink)
+            mathy += sum(info.mathy(k) for k in ink)
+            words += _prose_words(r, info)
+        if not counted or mathy < NUMBERED_SHARE * counted or words > SET_OFF_WORDS:
+            continue
+        for r in line:
+            if r.kind == "text":
+                r.kind = "math"
+                r.reasons = [*r.reasons, SET_OFF_REASON]
+
+
+SET_OFF_GAP = 0.3  # x font size: the least blank above a display line, from the text over it
+
+
+def _tight_under_text(line: list[_Row], text: Sequence[_Row], size: float) -> bool:
+    """Does a line of running text stand directly over `line`, no further off than the gap
+    between two lines of a paragraph? Then `line` is the tail of that paragraph (the last line
+    of a list item, "... for every t we have x = y") and not a display, which has blank above."""
+    x0, x1 = min(r.x0 for r in line), max(r.x1 for r in line)
+    top = min(r.y0 for r in line)
+    return any(
+        t.x0 < x1
+        and t.x1 > x0
+        and top - 3 * size <= t.y1 <= top + 0.5 * size
+        and top - t.y1 < SET_OFF_GAP * size
+        for t in text
+    )
 
 
 CLOSE_NUMBER_GAP = 0.3  # x font size: the least a bracketed number stands from the maths before it
