@@ -818,7 +818,19 @@ way, the next or previous value ("b." for "a."; the same glyph for a dash) and t
 or the item text starting within 3 pt in x. "i" is both a letter and a roman numeral; its
 siblings decide. So "A ball rolls", "2.5 metres is", "2.3 Speed", a lone "B. Smith" or
 "I. Newton", and a wrapped sentence that happens to start a line with a dash, stay
-paragraphs. Headings are decided first: "1. Introduction" in a large font is a heading.
+paragraphs. A capital letter and a full stop whose text opens like a list of authors (another initial,
+or a surname and a comma, "and" or "et al": "A. Smith, B. Jones", "D. S. Turaga, ...") is the
+marker of a list only beside its neighbor: the item just before or just after it in reading
+order (a page's left column, then its right), or the one just above or below it at the same x,
+is the next or the previous letter (`_names`, `_list_markers`). Some line of a long document
+has the next letter, and a reference list or a byline had its lines read as lettered items.
+Any other capital letter keeps the sibling test above. Headings are decided first: "1. Introduction" in a large font is a
+heading; so is a line of 2 to 12 words that starts with a capital letter and a full stop and is
+set, all of it, in bold or in italics, and does not end like a sentence ("A. Problem
+Descriptions", IEEE's subsections; reason "lettered title", one level under its section like
+a letter of an index). A line like that is a block of its own, apart from the text under it
+set in another face (`_lettered_title`). A bold line that starts with a bullet glyph in its text
+is a list item, not a heading (a bullet drawn beside the row changes nothing).
 
 The item text starts after the marker; continuation lines join the item (a hanging
 indent is fine). **Levels** come from the left edge of the item text, which is the same
@@ -833,7 +845,13 @@ than half the font size right of it (`MARKER_INDENT`; slides set the sub-bullets
 15 pt in while their text is 5 to 14 pt right of the text above). Each open level keeps the
 series that opened it: when the sub-bullets' text starts exactly on the text edge of their
 numbered parent, the x does not tell which level "2)" goes back to, so it goes back to the open
-level of its own series at that x. Items of one series (a
+level of its own series at that x. A numbered series that
+starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
+above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
+goes back to the letters. A list that a paragraph, a figure or a table cut ("(i)", the words of
+an answer, "(ii)") goes on where the next item takes up the numbering of one of the levels the
+block closed (the next value of the same series at that level's indent): it keeps those
+levels (`_list_levels`, `_taken_up`). Items of one series (a
 wrapped list of names that start with initials) and the options of a grid are not moved by
 it. The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or
@@ -911,7 +929,7 @@ math font, stay math.
   A number that is a row of its own (`6.`, `14)`, in a text font, one or two tokens: OpenStax
   sets it above or beside the first line of an exercise that is only a stacked fraction or a
   system) is marked the same way (`_lone_exercise_number`, `_Row.exercise_number`); read as
-  a fragment it was drawn into the equation by `_math_neighbours`.
+  a fragment it was drawn into the equation by `_math_neighbors`.
 - **Rows of a table, braced systems (T2-2).** Two whole equations also join when they are
   set at most 0.7 x font size apart and share a left edge, a right edge or a center
   within 0.3 x font size (`_table_rows`: OpenStax centers each row of a system; a row may
@@ -1292,7 +1310,7 @@ OpenStax also prints "Solve the system by substitution. {" with the brace the la
 sentence's row and the two equations in rows of their own to its right, level with the brace and
 not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a math row
 starts within two font sizes to its right, another math row sits under that one, and the brace's
-middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
+middle is level with the two; `_math_neighbors` then takes the brace row into the system, so the
 crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
 layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
 answer key has them (text layer within 0.99), no other section moves by more than two; nothing else in

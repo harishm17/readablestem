@@ -12,7 +12,15 @@ from dataclasses import dataclass, replace
 from readablestem.core.types import Kind
 from readablestem.pipeline.layout.context import _PageGuard
 from readablestem.pipeline.layout.glyphs import _BULLET_GLYPHS, _Char, _clean
-from readablestem.pipeline.layout.shared import _Block, _Context, _Marker, _Path, _Row, _tokens
+from readablestem.pipeline.layout.shared import (
+    _Block,
+    _Context,
+    _face,
+    _Marker,
+    _Path,
+    _Row,
+    _tokens,
+)
 
 # Bullets only at the start of a line and followed by a space (LaTeX's second-level "\u2013",
 # third-level "\u2217", Markdown's "-" and "*"); maths or punctuation anywhere else. They
@@ -309,6 +317,7 @@ def _list_markers(
     together; the rows of a page that failed get no marker.
     """
     candidates: list[_MarkerCandidate] = []
+    page_of: dict[int, int] = {}
     for number, rows in rows_by_page.items():
         with guard(number):
             bullets = _DrawnBullets(paths.get(number, []), ctx.body)
@@ -322,6 +331,7 @@ def _list_markers(
                     for c in found
                 ]
             candidates.extend(found)
+            page_of.update((id(c), number) for c in found)
     index: dict[tuple, tuple[list[float], list[float]]] = {}
     for candidate in candidates:
         for reading in candidate.readings or (("bullet", 0),):
@@ -342,6 +352,51 @@ def _list_markers(
                 return True
         return False
 
+    # A capital letter and a full stop starts a line of an author list as readily as an item
+    # ("A. Smith, B. Jones"), and some line of a long document has the next letter. A line that
+    # reads as names needs its sibling beside it: a neighbor, the item just before or just after
+    # it in reading order, or the one just above or below it at the same x.
+    capitals = sorted(
+        (c for c in candidates if _capital_letter(c)),
+        key=lambda c: (page_of[id(c)], c.row.column == "R", c.row.baseline),
+    )  # in reading order: a page's left column, then its right
+    in_column: dict[tuple[int, str], list[_MarkerCandidate]] = {}
+    for c in capitals:
+        in_column.setdefault((page_of[id(c)], c.row.column), []).append(c)
+
+    def stacked(candidate: _MarkerCandidate, step: int) -> _MarkerCandidate | None:
+        """The nearest capital letter above (-1) or below (1) at the same x."""
+        near = [
+            (gap, other)
+            for other in in_column[(page_of[id(candidate)], candidate.row.column)]
+            if abs(other.x0 - candidate.x0) <= MARKER_ALIGN
+            and (gap := (other.row.baseline - candidate.row.baseline) * step) > 0
+        ]
+        return min(near, key=lambda t: t[0])[1] if near else None
+
+    place = {id(c): k for k, c in enumerate(capitals)}
+
+    def beside(candidate: _MarkerCandidate) -> bool:
+        value = _capital_letter(candidate)
+        k = place[id(candidate)]
+        neighbors = (
+            (capitals[k - 1] if k else None, -1),
+            (capitals[k + 1] if k + 1 < len(capitals) else None, 1),
+            (stacked(candidate, -1), -1),
+            (stacked(candidate, 1), 1),
+        )
+        return any(
+            other is not None
+            and _capital_letter(other) == value + step
+            and (
+                page_of[id(other)] != page_of[id(candidate)]  # a list goes on over a page break
+                or (other.row.column != candidate.row.column and _face(candidate.row) != "")
+                or abs(other.x0 - candidate.x0) <= MARKER_ALIGN
+                or abs(other.marker.x - candidate.marker.x) <= MARKER_ALIGN
+            )
+            for other, step in neighbors
+        )
+
     for candidate in candidates:
         if candidate.readings:
             confirmed = any(
@@ -349,10 +404,31 @@ def _list_markers(
                 for style, value in candidate.readings
                 for step in (-1, 1)
             )
+            if confirmed and _capital_letter(candidate) and _names(candidate):
+                confirmed = beside(candidate)
         else:  # the same bullet glyph on another row (this one counts itself)
             confirmed = aligned((candidate.family, ("bullet", 0)), candidate, 2)
         if candidate.sure or confirmed:
             candidate.row.marker = candidate.marker
+
+
+_NAMES = re.compile(r"[A-Z]\.|[A-Z][\w'\u2019-]+(?:,| and\b| et al\b)")
+
+
+def _names(candidate: _MarkerCandidate) -> bool:
+    """Does the text after the marker open like a list of authors: another initial ("S. Choi"), or
+    a surname and a comma, "and" or "et al"?"""
+    parts = candidate.row.clean.split(maxsplit=1)
+    return len(parts) == 2 and _NAMES.match(parts[1]) is not None
+
+
+def _capital_letter(candidate: _MarkerCandidate) -> int:
+    """The place in the alphabet of a marker that is a capital letter and a full stop ("A." is 1),
+    else 0."""
+    text = candidate.marker.text
+    if candidate.family != ("letter", "{}.") or len(text) != 2 or not text[0].isupper():
+        return 0
+    return ord(text[0]) - 64
 
 
 def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
@@ -363,9 +439,16 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     closes levels until one matches. Indents are measured from the left edge of the
     item's column (`_Block.origin`), so a list that goes on in the next column or on a
     page with another margin keeps its levels.
+
+    What the indent leaves open is read from the markers. A numbered series that starts again
+    at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item above
+    even where the texts start at one indent (the answer lines of an exam). A list that a
+    paragraph, a figure or a table cut ("(i)" ... "negative" ... "(ii)") goes on where the
+    next item takes up the numbering of an open level: its levels are kept for that item.
     """
     levels: dict[int, int] = {}
-    stack: list[tuple[float, str]] = []  # per open level: the x of its text, its marker series
+    stack: list[_Level] = []  # the open levels: the x of the text, the marker series
+    cut: list[_Level] = []  # the levels a block that is not an item closed, to be taken up
     options: float | None = None  # the x the options of the grid being read are placed at
     before: tuple[str, float] | None = None  # (series, x of the marker) of the item before
     for block in blocks:
@@ -373,11 +456,17 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             continue
         if block.marker is None:
             if block.kind != Kind.EQUATION:
+                cut = stack or cut
                 stack = []
                 before = None
             continue
         x = block.marker.x - block.origin
         series, own = _series(block.marker), _marker_x(block)
+        number = _numbered(block.marker, stack[-1] if stack else cut[-1] if cut else None)
+        if not stack and cut and number is not None and block.marker.option is None:
+            taken = _taken_up(cut, number, x, tolerance)
+            stack = cut[: taken + 1] if taken is not None else []
+        cut = []
         # The marker of another series set right of the one above opens a level even where the
         # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.
         nested = (
@@ -393,27 +482,107 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
         elif options is None:
             # The options of a grid are one list below the item they follow, whichever column
             # each is set in (a row-major grid reads A, B across, C, D below), and all at one level.
-            options = max(x, stack[-1][0] + 2 * tolerance) if stack else x
+            options = max(x, stack[-1].x + 2 * tolerance) if stack else x
             x = options
         else:
             x = options
         while stack and (
-            x < stack[-1][0] - tolerance
-            or (len(stack) > 1 and abs(x - stack[-2][0]) < abs(x - stack[-1][0]))
+            x < stack[-1].x - tolerance
+            or (len(stack) > 1 and abs(x - stack[-2].x) < abs(x - stack[-1].x))
         ):
             stack.pop()
-        if stack and not nested and block.marker.option is None and series != stack[-1][1]:
-            # Sub-bullets whose text starts on the text edge of their numbered parent (Word and
-            # Google Docs set them so): the x does not tell which open level "2)" goes back
-            # to, its series does.
+        # "(a)" after "1.": a series that starts again is a list under the item above.
+        starts = (
+            block.marker.option is None
+            and number is not None
+            and number.value == 1
+            and bool(stack)
+            and stack[-1].number is not None
+            and stack[-1].number.key != number.key
+        )
+        # Sub-bullets whose text starts on the text edge of their numbered parent (Word and
+        # Google Docs set them so): the x does not tell which open level "2)" goes back to, its
+        # series does.
+        if (
+            stack
+            and not nested
+            and not starts
+            and block.marker.option is None
+            and not stack[-1].is_series(series, number)
+        ):
             for depth in range(len(stack) - 2, -1, -1):
-                if stack[depth][1] == series and abs(x - stack[depth][0]) <= tolerance:
+                if stack[depth].is_series(series, number) and abs(x - stack[depth].x) <= tolerance:
                     del stack[depth + 1 :]
                     break
-        if not stack or x > stack[-1][0] + tolerance or nested:
-            stack.append((x, series))
+        if not stack or x > stack[-1].x + tolerance or nested or starts:
+            stack.append(_Level(x, series, number))
+        else:
+            stack[-1] = _Level(stack[-1].x, stack[-1].series, number)
         levels[id(block)] = len(stack)
     return levels
+
+
+@dataclass(frozen=True)
+class _Number:
+    """An ordered marker read in its series: the form and style ("({})|lower-roman"), the value."""
+
+    key: str
+    value: int
+
+
+@dataclass(frozen=True)
+class _Level:
+    """One open level of `_list_levels`: the x of its item text, its marker series, and the
+    last numbered marker on it."""
+
+    x: float
+    series: str
+    number: _Number | None = None
+
+    def is_series(self, series: str, number: _Number | None) -> bool:
+        """Is a marker of this series and place on this level? Numbers are compared as places in a
+        series ("(i)" is not "(a)"), anything else by its kind."""
+        if self.number is not None and number is not None:
+            return self.number.key == number.key
+        return self.series == series
+
+
+def _numbered(marker: _Marker, level: _Level | None) -> _Number | None:
+    """The marker of an ordered item as a place in a series, or None for a bullet. "i" is the
+    letter after "h" and the roman numeral one otherwise; the level above, when it is numbered,
+    decides which."""
+    parsed = _ordered_marker(marker.text) if marker.ordered else None
+    if parsed is None:
+        return None
+    form, body = parsed
+    readings = marker_readings(body)
+    if not readings:
+        return None
+    if len(readings) > 1:
+        above = level.number if level is not None else None
+        follows = [
+            r
+            for r in readings
+            if above is not None and above.key == f"{form}|{r[0]}" and r[1] == above.value + 1
+        ]
+        readings = tuple(follows or [r for r in readings if r[1] == 1] or readings[:1])
+    style, value = readings[0]
+    return _Number(f"{form}|{style}", value)
+
+
+def _taken_up(cut: list[_Level], number: _Number, x: float, tolerance: float) -> int | None:
+    """The depth, among the levels a block closed, whose numbering the item takes up: the next
+    value of the same series at that level's indent."""
+    for depth in range(len(cut) - 1, -1, -1):
+        last = cut[depth].number
+        if (
+            last is not None
+            and last.key == number.key
+            and last.value + 1 == number.value
+            and abs(x - cut[depth].x) <= tolerance
+        ):
+            return depth
+    return None
 
 
 def _series(marker: _Marker) -> str:

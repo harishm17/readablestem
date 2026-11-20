@@ -59,6 +59,7 @@ from readablestem.pipeline.layout.shared import (
     _Block,
     _CharInfo,
     _Context,
+    _face,
     _Figure,
     _Inline,
     _Marker,
@@ -94,6 +95,9 @@ REASON_ABSTRACT = "abstract label"
 # A capital letter alone on a line in the sequence of an index or a glossary (`_letter_rows`):
 # a heading one level under the section it is in (`heading_levels`).
 REASON_LETTER = "letter heading"
+# "A. Reinforcement Learning" set in bold or italic on a line of its own (IEEE's subsections):
+# one level under the section it is in, like a letter of an index.
+REASON_LETTERED = "lettered title"
 REASON_LIST_NUMBER = "list-style number"
 
 # "2.3 Speed", "Chapter 2: Motion", "IV. Results", "A) Units". Letters and roman numerals
@@ -482,6 +486,31 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
     if prev.bold != row.bold:
         return False
     return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
+
+
+MAX_LETTERED_TITLE_WORDS = 12
+
+
+def _lettered_title(row: _Row) -> bool:
+    """Is the row a title that starts with a capital letter and a full stop ("A. Problem
+    Descriptions") and is set, all of it, in bold or in italics? A list item of that shape has
+    its words in the type of the text round it; an author's initials ("A. Smith, B. Jones")
+    are set as the text is, and a title does not end like a sentence or a clause."""
+    marker = row.marker
+    if marker is None or len(marker.text) != 2 or not marker.text[0].isupper():
+        return False
+    words = row.clean.split()
+    if not 2 <= len(words) <= MAX_LETTERED_TITLE_WORDS or row.clean[-1:] in ".,;:":
+        return False
+    return _face(row) != ""
+
+
+def _opens_with_bullet(row: _Row) -> bool:
+    """Does the row's text open with a bullet glyph? A bold line that does is an item of a list
+    ("• E1 reaction"), not a title; a bullet drawn beside the row is not in its text, and a
+    label such as "Solution" set after one stays what it was."""
+    marker = row.marker
+    return marker is not None and not marker.ordered and marker.end > marker.start
 
 
 # `Element.reasons` of a table of contents' entry (a list item): the link step looks for
@@ -1627,6 +1656,15 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
+            if (
+                geometric
+                and len(run.rows) == 1
+                and _lettered_title(prev)
+                and _face(row) != _face(prev)
+            ):  # the title and the text under it are two blocks, not one list item
+                run.block_end = True
+                runs.append(_Run([row], row.kind, block_start=True))
+                continue
             if geometric and _same_style(prev, row, ctx):
                 run.add(row)
                 continue
@@ -1849,6 +1887,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and len(text) <= MAX_BOLD_HEADING_CHARS
         and letters >= 2
         and _title_like(text)
+        and not _opens_with_bullet(rows[0])
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif (
@@ -1862,6 +1901,8 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
+    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
+        heading = [REASON_LETTERED]
     if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
         # step like any display equation, and the page keeps its real headings.

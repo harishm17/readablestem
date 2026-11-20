@@ -589,6 +589,14 @@ class _Straight:
         return (self.c, self.lo), (self.c, self.hi)
 
 
+def _face(row: _Row) -> str:
+    """ "bold" or "italic" when every letter of the row is, else ""."""
+    if row.bold:
+        return "bold"
+    letters = [c for c in row.ink if c.c.isalnum()]
+    return "italic" if letters and all(c.italic for c in letters) else ""
+
+
 class _RowIndex:
     """Rows sorted by top edge, for finding rows within a vertical window quickly."""
 

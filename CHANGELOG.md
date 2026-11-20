@@ -358,6 +358,26 @@
   placeholder's end: found anywhere else, a one-digit tail and the mark matched inside a
   placeholder's own name on one paper and would have put the link in the equation.
 - Docs: docs/layout.md "Footnotes".
+## Unreleased: list leftovers (branch fix/list-leftovers)
+
+- Answer lines of an exam: a numbered series that starts again at its first value ("(a)"
+  after "1.", "(i)" after "(a)") is now a level under the item above even where the texts start
+  at one indent, and "(b)" goes back to the letters. A list cut by a paragraph, a figure or a
+  table goes on at its levels where the next item takes up the numbering. Before, the list
+  ended at the first answer word and the items after it began again at level 1
+  (`lists._list_levels`, `_Level`, `_Number`, `_taken_up`).
+- A line that starts with a capital letter and a full stop and then reads as names ("A. Smith,
+  B. Jones", "D. S. Turaga, ...", a surname and a comma) is a list item only when the item just
+  before or just after it in reading order is the next or previous letter; some line of a long
+  document with the next letter was enough, so a reference list or a byline became a lettered
+  list (`lists._list_markers`, `_names`). Any other capital letter keeps the old test.
+- "A. Problem Descriptions" set in bold or italics on a line of its own, a title of 2 to 12
+  words that does not end like a sentence, is a heading one level under its section, not a list
+  item (`blocks._lettered_title`, reason "lettered title", `document.heading_levels`).
+- A bold line that begins with a bullet glyph stays a list item; it was read as a bold heading.
+  A bullet drawn beside the row (a label such as "Solution") changes nothing.
+- No change to a prompt, a model or the version numbers: a PDF's lists, headings and levels
+  change, so the next pipeline raise is owed.
 
 ## Unreleased: fixes after the independent review of this batch (branch fix/review-5)
 

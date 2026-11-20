@@ -340,3 +340,80 @@ def test_a_bullet_with_only_an_operator_is_an_item_and_a_near_indent_takes_the_n
         (2, "and the rest executed left to right"),
         (1, "computers only know what you tell them"),
     ]
+
+
+def test_a_series_that_starts_again_is_a_level_down_and_a_list_goes_on_after_a_paragraph():
+    """An exam: "1." then "(a)" then "(i)", set with indents inside the nesting tolerance. Each
+    series that starts again is a level down, "(b)" goes back to the letters, and "(ii)" after
+    the answer words "negative" and "positive" still belongs to the list they interrupt."""
+
+    def fill(page):
+        x = {"1.": 72, "(a)": 74, "(i)": 78, "(ii)": 78, "(b)": 74}
+        rows = [("1.", "Thermodynamics of a gas"), ("(a)", "A reaction is run twice")]
+        rows += [("(i)", "Circle the sign of the change"), (None, "negative"), (None, "positive")]
+        rows += [("(ii)", "Briefly explain your answer"), ("(b)", "A second reaction is run")]
+        rows += [("(i)", "Circle the sign of the change")]
+        for i, (marker, text) in enumerate(rows):
+            y = 100 + 24 * i
+            if marker is None:
+                page.insert_text((100, y), text, fontsize=BODY)
+                continue
+            page.insert_text((x[marker], y), marker, fontsize=BODY)
+            page.insert_text((x[marker] + 20, y), text, fontsize=BODY)
+
+    got = [(m, lvl) for m, _, lvl, _ in items(analyze(one_page(fill)).elements)]
+    assert got == [("1.", 1), ("(a)", 2), ("(i)", 3), ("(ii)", 3), ("(b)", 2), ("(i)", 3)]
+
+
+def test_lines_of_a_reference_list_that_start_with_initials_are_not_a_lettered_list():
+    """A wrapped reference line starts "D. Horgan, J. Quan": a capital letter and a full stop. A
+    "C." and a "D." a few lines apart are not a run of items; "A." "B." "C." in a row are."""
+
+    def fill(page):
+        lines = [
+            "C. Zhang, S. Agarwal and K. Slama, Training language models",
+            "T. Lampe and M. Riedmiller, Learning to act",
+            "D. Horgan and J. Quan, Deep q-learning from demonstrations",
+            "S. Savarese and L. Fei-Fei, Surreal",
+        ]
+        write(page, 72, 100, lines)
+
+    assert not items(analyze(one_page(fill)).elements)
+
+
+def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_its_item():
+    def fill(page):
+        y = write(page, 72, 100, ["A. Reinforcement Learning"], fontname="heit")
+        y = write(
+            page,
+            72,
+            y,
+            [
+                "Let us consider a decision process described by states and",
+                "actions, with a reward that the robot collects.",
+            ],
+        )
+        y = write(page, 72, y + 10, ["B. Problem Descriptions"], fontname="heit")
+        write(page, 72, y, ["In this paper we consider tasks with one robot arm."])
+
+    got = [(e.kind, e.text) for e in analyze(one_page(fill)).elements]
+    assert [k for k, _ in got].count(Kind.HEADING) == 2
+    assert not items(analyze(one_page(fill)).elements)
+
+
+def test_a_bullet_item_set_in_bold_is_a_list_item_not_a_heading():
+    def fill(page):
+        write(page, 72, 100, ["Questions for the datasheet", ""], fontname="hebo")
+        for i, text in enumerate(
+            [
+                "Who funded the creation of the dataset?",
+                "What data does each instance hold?",
+                "Is any information missing from it?",
+            ]
+        ):
+            page.insert_text((72, 140 + 24 * i), "•", fontsize=BODY, fontname="hebo")
+            page.insert_text((86, 140 + 24 * i), text, fontsize=BODY, fontname="hebo")
+
+    got = analyze(one_page(fill)).elements
+    assert len(items(got)) == 3
+    assert [e.text for e in got if e.kind == Kind.HEADING] == ["Questions for the datasheet"]
