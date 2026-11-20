@@ -235,8 +235,12 @@ rules above.
    reason `"continued from previous page"` when it has the same columns (left edges within
    3 % of the page width, 6 % when the part before has a header and this part has none: a
    header printed once is wider than the figures, so the first part's columns are cut further
-   out than the rows that go on) as the last table of the page before and nothing but a
-   running header above it. When the page break split a row (Word and browsers break a tall row;
+   out than the rows that go on) as the last table of the page before, nothing but a
+   running header above it, and nothing but a running footer under that table on its own page
+   in its part of the width (`_at_foot`: a table with text under it has ended, and the next
+   page's table would be given its header; a footnote under a table that does go on stops
+   the mark too, and that part is then read as a table of its own, as before).
+   When the page break split a row (Word and browsers break a tall row;
    the gold's orders-of-magnitude table ends "... the edges of the known" on one page
    and "universe" on the next), `join_split_row` joins the end back: the first row after
    any header rows repeated from the table before is the end of that table's last row

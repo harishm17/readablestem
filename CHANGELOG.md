@@ -16,6 +16,11 @@
   the page width (3 % otherwise) when the part before has a header and this part has none. A
   different column count is still not marked. `PIPELINE_VERSION` is owed a raise for a document
   that has one.
+- A table at the top of a page was marked as the rest of the last table of the page before even
+  when that table stood in the middle of its page with text under it, and with the change above
+  it would have been given that table's header. A table with text under it in its part of the
+  page's width has ended (`tables._at_foot`). On the 996 corpus PDFs this takes the mark off one
+  table, on a public paper (its "Table 11" was marked as the rest of "Table 10"), and no other.
 - Paragraphs cut at a page break: three more cases are joined, each on evidence that the sentence
   cannot end there. A paragraph whose block began in the other column of its page and ends the
   page in a column's body text; a paragraph that ends on a comma or a semicolon, whatever letter
