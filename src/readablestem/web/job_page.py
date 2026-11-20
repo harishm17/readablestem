@@ -318,7 +318,7 @@ def breakdown(fixes: list[Fix], notices: Iterable[Notice] = ()) -> Breakdown:
 
 # What a reader is told while the owner has decisions open: no number, because the count
 # describes work the reader can neither see nor do.
-OWNER_STILL_CHECKING = "The owner is still checking this document."
+OWNER_STILL_CHECKING = "The owner is still reviewing this document."
 
 
 def open_decisions_line(count: int, audience: str = "owner") -> str:
@@ -678,7 +678,7 @@ def _language_row(facts: SourceFacts, result: DocumentResult) -> Row:
     )
     # A detected or assumed language is a guess, so the HTML side does not say "Yes".
     if language_needs_check(result):
-        html = f"{language_line(result)}: check it under Language below."
+        html = f"{language_line(result)}: look at it under Language below."
     else:
         html = f"Yes: {language_line(result)}."
     return Row("hear the right language", pdf, html)

@@ -300,7 +300,7 @@ def _publish(ctx, session, job: Job, user) -> str:
 
 
 NOT_READY_FOR_LINK = (
-    "A class link can be made once this document is ready, with nothing left to check."
+    "A class link can be made once this document is ready, with nothing left to look at."
 )
 NO_ROOM_FOR_LINK = (
     "There is no room to keep a published copy. Delete a document you no longer need."

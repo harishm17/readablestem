@@ -148,7 +148,7 @@ def unread_message(result_json: dict[str, Any] | None) -> str:
     return (
         f"This tool could not read part of the {noun}: {unread_phrase(words, pictures)} "
         f"from it {'is' if one else 'are'} not in the file, as listed under “Not handled in "
-        f"this file” below. Check that the file reads well without {'it' if one else 'them'} "
+        f"this file” below. Look at whether the file reads well without {'it' if one else 'them'} "
         "before you post it, or upload the PDF instead."
     )
 

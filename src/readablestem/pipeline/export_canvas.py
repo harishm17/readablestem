@@ -579,7 +579,7 @@ def readme(export: CanvasExport) -> str:
             "  4. Switch the editor to its HTML view (the </> button).",
             "  5. Open canvas-page.html in a plain text editor (Notepad, TextEdit), copy all of",
             "     it, paste it into the HTML view, and save.",
-            "  6. Look at the page as a student would (Student View). Check a picture and an",
+            "  6. Open the page as a student would (Student View) and look at a picture and an",
             "     equation.",
             *_wrap(
                 f"The pictures are found by the course number ({export.course_number}) and the "
@@ -658,7 +658,7 @@ def readme(export: CanvasExport) -> str:
         "",
         *_wrap(
             "These steps follow Canvas's published source code. They have not been tried in your "
-            "Canvas, which may differ, so check one picture and one equation after posting.",
+            "Canvas, which may differ, so look at one picture and one equation after posting.",
             "",
         ),
         "",

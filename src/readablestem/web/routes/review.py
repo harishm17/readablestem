@@ -210,7 +210,7 @@ TABLE_OPEN = (
 )
 USE_LOCAL_DONE = (
     "Its words are the PDF's own, so the checks could not compare them with anything: "
-    "check it against the image."
+    "compare it with the image."
 )
 EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
 # What the words of a text decision are called on its card: the text layer's, not a picture's.
@@ -1015,7 +1015,7 @@ def _item(
         read_label=TEXT_LAYER_LABEL if fix.reason in TEXT_NOTICE_OF else ReviewItem.read_label,
         read_lang=(element.lang or "") if element is not None else "",
         accept_label=LOOKS_RIGHT if fix.reason in TEXT_NOTICE_OF else ReviewItem.accept_label,
-        reason_lead="Check this" if fix.reason in TEXT_NOTICE_OF else ReviewItem.reason_lead,
+        reason_lead="Look at this" if fix.reason in TEXT_NOTICE_OF else ReviewItem.reason_lead,
         text_layer=(element.text or "").strip()
         if element is not None and fix.kind is Kind.EQUATION
         else "",
@@ -2628,7 +2628,7 @@ def undo(
         flash(
             request,
             "Nothing was undone: this document changed after this page was opened. "
-            "Check the page as it is now and undo again if you still want to.",
+            "Look at the page as it is now and undo again if you still want to.",
             kind="warning",
         )
         return _back(exc.job_id, view)

@@ -90,7 +90,8 @@ ACTION_WORDS = {
     "leave_out_block": "Left a paragraph out of the student file",
     "restore_block": "Put a paragraph left out back into the student file",
     "add_figure": "Added a picture the tool missed, with the person's own alt text",
-    "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
+    "add_equation": "Marked an equation the tool missed; the tool read it and a person looked at "
+    "it",
     "omit_page": "Left the page out of the student file and of the review",
     "restore_page": "Put the page back into the student file and the review",
     "read_again": "Had the tool read the equation again",

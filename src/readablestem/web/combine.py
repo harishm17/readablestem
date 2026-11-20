@@ -134,7 +134,7 @@ def language_check(kept: list[KeptPart]) -> str:
     if check == "split":
         return (
             f"The parts are in different languages and no language has most of them, so the "
-            f"combined file is set to {name}; each part is read in its own language. Check each "
+            f"combined file is set to {name}; each part is read in its own language. Look at each "
             "part's language before you post the file."
         )
     return ""

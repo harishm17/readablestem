@@ -7,7 +7,7 @@
 <section aria-labelledby="language-heading">
   <h{{ hl|default(2) }} id="language-heading">Language</h{{ hl|default(2) }}>
   <div class="setting-line">
-    <p>Language: {{ pg.language }}.{% if pg.language_check %} Screen readers use it to choose a voice, so check that it is right.{% endif %}</p>
+    <p>Language: {{ pg.language }}.{% if pg.language_check %} Screen readers use it to choose a voice, so look at whether it is right.{% endif %}</p>
     <details class="inline-details"{% if pg.language_check %} id="change-language"{% endif %}>
       <summary>Change<span class="visually-hidden"> the language</span></summary>
       {% call form("job.language", "/jobs/" ~ job.id ~ "/language") %}

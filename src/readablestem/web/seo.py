@@ -424,7 +424,7 @@ def structured_data(
             "Short alt text for figures, and longer descriptions for charts and diagrams",
             "Tables rebuilt with header cells",
             "Beamer slide decks read frame by frame",
-            "Scanned and handwritten pages converted on request, each equation checked",
+            "Scanned and handwritten pages converted on request, each equation looked at",
             "A short review by the instructor of what could change what a student reads",
             "Downloads as HTML, Word, EPUB, a Canvas zip and a Common Cartridge",
         ],

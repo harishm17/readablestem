@@ -70,7 +70,7 @@ def kinds_phrase(counts: Mapping[str, int]) -> str:
         for kind, (one, many) in KIND_WORDS.items()
         if counts.get(kind)
     ]
-    return join_words(parts) or plural(sum(counts.values()), "part")
+    return join_words(parts) or plural(sum(counts.values()), "item")
 
 
 def _pages_list(pages: tuple[int, ...]) -> str:
@@ -86,7 +86,7 @@ NEVER_CHECKED = (
     "Whether the file reads well with a screen reader. Nobody has listened to it with NVDA, "
     "JAWS or VoiceOver.",
     "The axe accessibility test. It runs on the tool's own test documents, not on yours.",
-    "Whether each part says what the PDF meant. The structure checks look at the structure "
+    "Whether each item says what the PDF meant. The structure checks look at the structure "
     "of the file (language, title, headings, lists, tables, image descriptions), not at "
     "the meaning.",
 )
@@ -127,12 +127,12 @@ def review_sentence(s: CheckedSummary) -> str:
     if not s.reviewed:
         return NOT_REVIEWED
     when = f", on {long_date(s.reviewed_on)}" if s.reviewed_on is not None else ""
-    flagged = "part the tool flagged" if s.flagged == 1 else "parts the tool flagged"
+    flagged = "item the tool flagged" if s.flagged == 1 else "items the tool flagged"
     text = f"Your instructor reviewed {s.load.decided} of {s.flagged} {flagged}{when}."
     if k := s.accepted_failing:
         were, them = ("was", "it") if k == 1 else ("were", "them")
         text += (
-            f" {plural(k, 'part')} {were} kept as the tool wrote {them} without a check passing."
+            f" {plural(k, 'item')} {were} kept as the tool wrote {them} without a check passing."
         )
     return text
 
@@ -158,7 +158,7 @@ def pictures_sentence(s: CheckedSummary) -> str:
     k = s.pictures
     if not k:
         return ""
-    parts = f"{plural(k, 'part')} could not be converted"
+    parts = f"{plural(k, 'item')} could not be converted"
     if s.origin == "pdf":
         shown = "is shown as a picture" if k == 1 else "are shown as pictures"
         shown += " of the original"
@@ -279,18 +279,18 @@ def picture_link(number: int, kind: str, page: int, origin: str = "pdf") -> str:
     page only for a PDF: a Word or LaTeX file has no pages to name."""
     one = STUDENT_KIND_WORDS.get(kind) or KIND_WORDS.get(kind, (kind, kind))[0]
     where = f", page {page}" if origin == "pdf" else ""
-    return f"Part {number} not converted: {one}{where}"
+    return f"Item {number} not converted: {one}{where}"
 
 
 def more_pictures(n: int) -> str:
     where = "it is" if n == 1 else "they are"
-    return f"{plural(n, 'more part')}, each marked “Not converted” where {where}."
+    return f"{plural(n, 'more item')}, each marked “Not converted” where {where}."
 
 
 # --------------------------------------------------------------------------- the owner
 
-READY_ALL = "Every part the tool found was converted."
-RECORD_NO_PICTURES = "No part is shown as a picture."
+READY_ALL = "Every item the tool found was converted."
+RECORD_NO_PICTURES = "No item is shown as a picture."
 NO_CHECKS = "No structure checks are stored for this file."
 CHECKS_SCOPE = "They check structure, not whether the content is right."
 
@@ -406,14 +406,14 @@ def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
         text = "Nobody has reviewed this file yet."
     else:
         when = f", the last on {long_date(s.reviewed_on)}" if s.reviewed_on else ""
-        flagged = plural(s.flagged, "flagged part")
+        flagged = plural(s.flagged, "flagged item")
         text = (
             f"You reviewed {s.load.decided} of {flagged}{when}."
             if owner
             else f"{s.load.decided} of {flagged} reviewed{when}."
         )
         if k := s.accepted_failing:
-            text += f" {plural(k, 'part')} kept with a check failing."
+            text += f" {plural(k, 'item')} kept with a check failing."
     if u := s.unopened:
         text += f" {plural(u, 'optional note')} not opened."
     return text
@@ -438,14 +438,14 @@ def notes_line(s: CheckedSummary) -> str:
     if not u:
         return ""
     return (
-        f"{plural(u, 'part')} {'was' if u == 1 else 'were'} accepted by the tool with an "
+        f"{plural(u, 'item')} {'was' if u == 1 else 'were'} accepted by the tool with an "
         "optional note nobody has opened, so not reviewed"
     )
 
 
 NOTES_HOLD = "None holds up the file."
 CHECKS_NOT_MEANING = (
-    "the structure checks look at the structure of the file, not at whether each part says "
+    "the structure checks look at the structure of the file, not at whether each item says "
     "what you meant."
 )
 DID_NOT_RUN = (
@@ -456,7 +456,7 @@ DID_NOT_RUN = (
 def card_yes(s: CheckedSummary) -> str:
     """The start of a before/after row about structure (headings, lists, links): "Yes" only
     when every part the tool found was converted; otherwise only the converted parts have it."""
-    return "Yes" if s.all_found_converted else "In the converted parts"
+    return "Yes" if s.all_found_converted else "In the converted items"
 
 
 # --------------------------------------------------------------------------- the record
@@ -495,7 +495,7 @@ def record_not_reviewed(s: CheckedSummary) -> list[str]:
         )
     if k := s.accepted_failing:
         lines.append(
-            f"{plural(k, 'part')} {'was' if k == 1 else 'were'} kept as the tool wrote "
+            f"{plural(k, 'item')} {'was' if k == 1 else 'were'} kept as the tool wrote "
             f"{'it' if k == 1 else 'them'} with a check failing (“Accept anyway”)."
         )
     return lines
@@ -518,7 +518,7 @@ SUMMARY_TOOL = "Made by ReadableSTEM, a tool that assists with accessibility."
 SUMMARY_UNKNOWN = f"{SUMMARY_TOOL} This file does not record what was converted or reviewed."
 # Written to the person who checks a file, not to its readers: only a draft's page carries it
 # (`assemble.render_html(audience="checker")`), never the student file or an export of it.
-CHECK_BEFORE_USE = "Check it before students use it."
+CHECK_BEFORE_USE = "Look at it before students use it."
 
 
 def export_summary(s: CheckedSummary, for_checker: bool = False) -> str:

@@ -317,7 +317,7 @@ def latex_problems(latex: str, failed: list[Check]) -> list[str]:
         elif code == "unsupported_ce":
             sentence = (
                 "The chemistry in \\ce{...} is outside what this tool can read: write the "
-                "formula with ordinary LaTeX, or check it for a typo."
+                "formula with ordinary LaTeX, or look for a typo."
             )
         elif code == "unknown_command":
             sentence = _unknown_commands(latex) or explain_check(check).text
@@ -388,7 +388,7 @@ def _unknown_commands(latex: str) -> str | None:
         return None
     many = len(set(found)) > 1
     verb = "are not commands" if many else "is not a command"
-    return f"{_names(found)} {verb} this tool supports: check for a typo, or write it another way."
+    return f"{_names(found)} {verb} this tool supports: look for a typo, or write it another way."
 
 
 def _forbidden_commands(latex: str) -> str | None:

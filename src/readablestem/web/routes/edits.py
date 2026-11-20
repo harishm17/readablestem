@@ -81,7 +81,7 @@ router = APIRouter()
 # The page the person lands on is drawn from the document as it is now.
 STALE_FLASH = (
     "Nothing was changed: this document changed after this page was opened. "
-    "Check the page as it is now and make the change again."
+    "Look at the page as it is now and make the change again."
 )
 
 

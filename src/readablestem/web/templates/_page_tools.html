@@ -137,7 +137,7 @@
                   {{ field_aria("addalt-error-" ~ tools.number, add.errors.get("addalt"), "addalt-hint-" ~ tools.number) }}>{{ add.values.get("alt", "") }}</textarea>
       </div>
       {% else %}
-      <p id="add-note-{{ tools.number }}">The tool will read this part as an equation. It takes a few seconds and uses part of this document's allowance for reading with the model. You then check what it read, as a decision.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>
+      <p id="add-note-{{ tools.number }}">The tool will read this part as an equation. It takes a few seconds and uses part of this document's allowance for reading with the model. You then look at what it read, as a decision.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>
       {% endif %}
       {{ field_error("add-error-" ~ tools.number, add.errors.get("add")) }}
       <div class="decide-row" id="add-{{ tools.number }}" tabindex="-1">
@@ -148,7 +148,7 @@
     {% else %}
     <form method="get" action="/jobs/{{ job.id }}/review" class="decide-form add-region-form">
       <input type="hidden" name="page" value="{{ tools.number }}"><input type="hidden" name="tools" value="1">
-      <p class="hint" id="add-hint">For a picture the tool did not find (it needs alt text), or an equation it missed (the tool reads it, and you check the answer). Describe where it is on the page; you see it cut out before anything is added.</p>
+      <p class="hint" id="add-hint">For a picture the tool did not find (it needs alt text), or an equation it missed (the tool reads it, and you look at the answer). Describe where it is on the page; you see it cut out before anything is added.</p>
       <fieldset class="table-fieldset" aria-describedby="add-hint">
         <legend>What is it?</legend>
         <div class="checkbox-field"><input type="radio" id="add-picture" name="add" value="picture"{% if add.kind != "equation" %} checked{% endif %}><label for="add-picture">A picture or diagram</label></div>

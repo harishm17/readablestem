@@ -203,7 +203,7 @@ def compare_equation(
                     3,
                     "unseen",
                     f"{_capital(other)} has a {out.unseen[-1]}. The PDF's text cannot show "
-                    "that style, so check it in the image.",
+                    "that style, so look at it in the image.",
                 )
             )
             continue

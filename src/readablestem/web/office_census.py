@@ -87,6 +87,6 @@ def read_lines(census: Census | None) -> list[str]:
         lines.append(
             f"{many} equation{'s' if many != 1 else ''} typed in the equation editor "
             f"{'was' if many == 1 else 'were'} read as {'a picture' if many == 1 else 'pictures'} "
-            "of the page, like any equation in a PDF, so check them against the original."
+            "of the page, like any equation in a PDF, so compare them with the original."
         )
     return lines

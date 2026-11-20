@@ -326,12 +326,12 @@ FIGURE_NOTE = "This figure has no text description yet."
 # each box used to repeat. What to do ("ask your instructor for a version you can read") is
 # in the statement of the same notice.
 NOT_CONVERTED_WHY = Words(
-    "A screen reader cannot read what a picture shows, so it says only that each of these "
-    "parts is there; for an equation it also reads the characters the PDF holds, and says "
+    "A screen reader cannot read what a picture shows, so it says only that each of these items "
+    "is there; for an equation it also reads the characters the PDF holds, and says "
     "where they are from. Each one is marked where it stands, with what it is."
 )
 NOT_CONVERTED_WHY_WRITTEN = Words(
-    "A screen reader may not read these parts well. Each one is marked where it stands, with "
+    "A screen reader may not read these items well. Each one is marked where it stands, with "
     "what it is."
 )
 # Pages and pictures kept as images (pipeline.page_type: there is no handwriting or scan
@@ -395,12 +395,13 @@ OMITTED_NOTE = "Writing on the page that is not in the text."
 # checker is told to check it, with the label that goes with it.
 IMAGE_PAGE_NOTE = Words(
     "This page was read from a picture of the original, so small errors are possible.",
-    "Check it against the original.",
+    "Compare it with the original.",
 )
 IMAGE_PAGE_LABEL = Words("Note:", "Converted from an image of the page.")
 IMAGE_PAGE_SHOW = Words("Show the original page {page}")
 IMAGE_PAGE_ORIGINAL_ALT = Words(
-    "Original of page {page}.", "Original of page {page}, shown for checking the converted text."
+    "Original of page {page}.", "Original of page {page}, shown for comparing with the converted "
+        "text."
 )
 # The label of a figure's note: to the student what is missing, to the checker what to do.
 FIGURE_LABEL = Words("No description.", "Needs a description.")
@@ -1847,13 +1848,13 @@ def image_pages_note(pages: list[int]) -> str:
     numbers = [str(p + 1) for p in sorted(set(pages))]
     if not numbers:
         return ""
-    tail = "it starts with a note and the original page to check it against."
+    tail = "it starts with a note and the original page to compare it with."
     if len(numbers) == 1:
         return f"Page {numbers[0]} was converted from an image of the page: {tail}"
     listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
     return (
         f"Pages {listed} were converted from images of the pages: each starts with a note "
-        "and the original page to check it against."
+        "and the original page to compare it with."
     )
 
 

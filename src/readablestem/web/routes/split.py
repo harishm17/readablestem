@@ -154,7 +154,7 @@ NOTE_KEY = re.compile(r"^[a-z_]{1,40}:[A-Za-z0-9_-]{1,64}$")
 EXCERPT_CHARS = 400  # of a paragraph a notice is about, shown in its panel
 # Elements with words of their own that the page tools can change (T3-5).
 TEXT_KINDS = frozenset({Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING})
-IMAGE_ONLY = "This can only be checked against the page image."
+IMAGE_ONLY = "This can only be compared with the page image."
 NO_TEXT_ROUTES = frozenset({"vision_page", "nothing"})  # where a page's content comes from
 MAX_EVIDENCE_CHARS = 300  # of a sentence shown as evidence
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
@@ -784,9 +784,9 @@ class SplitBuilder:
         )
         panel = Panel(
             mode="notice",
-            title="Worth checking",
+            title="Worth a look",
             subtitle=f"Page {page}",
-            status="Optional check",
+            status="Optional item",
             status_class="pill-optional",
             notice=card,
             why=card.sentence,
@@ -874,7 +874,7 @@ class SplitBuilder:
             tier = _tier(fix)
             panel = Panel(
                 mode="item",
-                title="Optional check" if tier == "optional" else self.item(fix).status_label,
+                title="Optional item" if tier == "optional" else self.item(fix).status_label,
             )
             panel.status = (
                 "Accepted, with a note" if tier == "optional" else self.item(fix).status_label
@@ -939,7 +939,7 @@ class SplitBuilder:
             )
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_size = self.region_size(element, fix.kind)
-            outlined = ", the symbol to check outlined" if compare.pdf_marks else ""
+            outlined = ", the symbol to look at outlined" if compare.pdf_marks else ""
             panel.region_alt = f"{item.label} in the PDF, with the words around it{outlined}."
         elif fix.kind is Kind.FIGURE and element is not None:
             panel.evidence = self.evidence(fix, element, item, panel)
@@ -1187,7 +1187,7 @@ class SplitBuilder:
                     name = f"{what}, needs your decision ({of})"
                 tag = str(decision.number)
             elif tier == "optional":
-                tag, name = "Note", f"{label}, optional check"
+                tag, name = "Note", f"{label}, optional item"
             else:
                 tag, name, tier = (
                     "✓",
@@ -1213,7 +1213,7 @@ class SplitBuilder:
             if not place.key or notice.page != index or notice.element_id in placed:
                 continue  # only a notice about text, once for its paragraph
             placed.add(notice.element_id or "")
-            name = f"Page {number}, optional check: " + explain_notice(notice).text
+            name = f"Page {number}, optional item: " + explain_notice(notice).text
             if place.names:
                 name += " " + ", ".join(f"“{n}”" for n in place.names)
             is_current = place.key == current_note
