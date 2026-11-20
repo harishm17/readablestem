@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: the eval gate guards the last nine constants, and smaller follow-ups
+
+- **The eval gate guards nine more constants** (`eval/gate.py`): `table_step.NUMERIC_SHARE`,
+  `page_math.MIN_PAGE_CHARS`, `page_math_reconcile.RULE_MARGIN` and `ATTACHED_LETTERS`,
+  `page_witness.SPLIT_MIN_ROWS`, `witness_reconcile.MIN_GLYPH`, `image_page.RECOVERY_MARGIN`,
+  `image_page_check.CROP_MARGIN_PX` and `MIN_CROP_HEIGHT_PX` had waited, marked "NOT YET
+  GUARDED", for the two no-model reports to be made again. They are made again here
+  (`data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`: same scores, now
+  holding the nine flags), so no constant that decides a request or a bar is left unguarded.
+- **`eval burden` ends with its verdict.** The reasons and the note that the band check was not
+  made come first; the last line printed is "The bar is met", "The bar is NOT met." or "The bar
+  was not judged", so a long line above it cannot hide it.
+- **Docs say what is true on main without naming a release.** `docs/deploy.md` "Roll back" and
+  `docs/deploy-railway.md` give the rule for stored results (roll back across a release that
+  adds a value the older code refuses only before the first document is converted by the newer
+  one) and point to the changelog for which release does what; `docs/operations.md` says there
+  is no per-job storage cap and why, in place of "not built".
+- Tests: `tests/test_layout_lists.py`, `tests/test_region_tree.py`, `tests/test_structure.py`
+  and `tests/test_web_edit_page.py` lose a dash permutation, a test of a setting's default, a
+  markup pin and a dead assertion, and fold tests that set up the same page into one.
+
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"

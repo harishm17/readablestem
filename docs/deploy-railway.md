@@ -788,9 +788,10 @@ and choose **Rollback** (Railway keeps images for 72 hours after removal; **conf
 This switches the code only. The database is not rolled back and the pre-deploy migration does not run
 backwards: an older version starts against a newer schema (it logs `schema_ahead` and carries on), which
 works while migrations are additive. A release whose migration removed or renamed something needs a
-forward fix or a backup restore (deploy.md "Roll back" explains this and the stored-results limits at
-0.4.0 and 0.5.12). A rollback below 0.5.12 is safe only until the first document is converted by the new
-release: after that the older code answers 500 for each such document, so fix forward.
+forward fix or a backup restore (deploy.md "Roll back" explains this and the stored-results limit).
+A newer release can store a value the older code refuses to load: a rollback across such a release
+is safe only until the first document is converted by the new release, and after that the older code
+answers 500 for each such document, so fix forward.
 Then fix on a branch and ship forward.
 
 ## Logs and monitoring

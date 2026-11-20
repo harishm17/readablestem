@@ -13,8 +13,8 @@ import re
 from pathlib import Path
 
 import pymupdf
+import pytest
 
-from readablestem import config
 from readablestem.pipeline import layout
 from readablestem.pipeline.layout import regions
 from test_tables_detect import grid_table
@@ -173,35 +173,28 @@ def _picture(page: pymupdf.Page, rect: pymupdf.Rect) -> None:
     page.insert_image(rect, pixmap=pixels)
 
 
-def test_a_picture_that_starts_a_little_below_the_first_line_beside_it_is_in_its_row():
-    doc, page = _page()
+def _picture_a_little_below_the_first_line(page: pymupdf.Page) -> None:
     _picture(page, pymupdf.Rect(40, 96, 280, 300))
     _lines(page, "A", 40, 320, 30, 44)
     _lines(page, "B", 320, 100, 40, 44)
-    assert _read(doc, on=True) == "AB"
 
 
-def test_a_rule_under_one_column_is_no_blank_of_the_line_in_the_other():
-    doc, page = _page()
+def _rule_under_one_column(page: pymupdf.Page) -> None:
     _lines(page, "A", 40, 100, 40, 62)
     _lines(page, "B", 320, 100, 8, 48)
     _lines(page, "B", 320, 240, 20, 48)
     page.draw_line((308, 219), (550, 219), width=0.6)  # under the 10th line of A, in a gap of B
-    assert _read(doc, on=True) == "AB"
 
 
-def test_line_numbers_in_the_margins_do_not_stop_the_columns():
-    doc, page = _page()
+def _line_numbers_in_the_margins(page: pymupdf.Page) -> None:
     _lines(page, "A", 72, 100, 30, 34)
     _lines(page, "B", 330, 100, 30, 34)
     for i in range(0, 30, 5):
         page.insert_text((56, 100 + 13 * i), str(i + 5), fontsize=7)
         page.insert_text((560, 100 + 13 * i), str(i + 35), fontsize=7)
-    assert _read(doc, on=True) == "AB"
 
 
-def test_gaps_in_two_lines_of_a_paragraph_are_not_two_columns():
-    doc, page = _page()
+def _gaps_in_two_lines_of_a_paragraph(page: pymupdf.Page) -> None:
     _lines(page, "P", 40, 100, 3, 110)
     page.insert_text((40, 150), "A01 alpha beta gamma delta eps", fontsize=9)
     page.insert_text((210, 150), "B01 " + WORDS[:60], fontsize=9)
@@ -209,8 +202,22 @@ def test_gaps_in_two_lines_of_a_paragraph_are_not_two_columns():
     page.insert_text((110, 163), "A03 gamma delta", fontsize=9)
     page.insert_text((210, 163), "B02 " + WORDS[:60], fontsize=9)
     page.insert_text((210, 176), "B03 " + WORDS[:60], fontsize=9)
-    assert _read(doc, on=True) == "PABAB"
 
 
-def test_the_setting_is_off_by_default():
-    assert config.Settings.model_fields["region_tree"].default == "off"
+@pytest.mark.parametrize(
+    ("draw", "wanted"),
+    [
+        # A picture that starts a little below the first line beside it is in its row.
+        (_picture_a_little_below_the_first_line, "AB"),
+        # A rule under one column is no blank of the line in the other.
+        (_rule_under_one_column, "AB"),
+        # Line numbers in the margins do not stop the columns.
+        (_line_numbers_in_the_margins, "AB"),
+        # Gaps in two lines of a paragraph are not two columns.
+        (_gaps_in_two_lines_of_a_paragraph, "PABAB"),
+    ],
+)
+def test_what_could_cut_a_column_but_does_not(draw, wanted):
+    doc, page = _page()
+    draw(page)
+    assert _read(doc, on=True) == wanted

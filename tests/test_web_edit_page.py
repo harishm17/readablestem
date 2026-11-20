@@ -371,10 +371,7 @@ def test_a_paragraph_is_made_a_sidebar_or_a_quotation_and_the_page_has_the_wrapp
     assert edit_post(edits, PLAIN, action="role", role="quote").status_code == 422
     assert edit_post(edits, PLAIN, action="role", role="verse").status_code == 422
     assert element(edits, PLAIN).role == "quote"
-
-
-def test_a_role_is_cleared_and_undone(edits):
-    edit_post(edits, PLAIN, action="role", role="aside")
+    # Cleared, and undone.
     assert edit_post(edits, PLAIN, action="role", role="").status_code == 303
     assert element(edits, PLAIN).role is None
     assert "<aside" not in (with_file(edits).html or "")
@@ -385,7 +382,7 @@ def test_a_role_is_cleared_and_undone(edits):
         data={"csrf_token": token(edits.browser, path), "version": version(edits)},
     )
     assert undo.status_code == 303
-    assert element(edits, PLAIN).role == "aside"
+    assert element(edits, PLAIN).role == "quote"
 
 
 def test_only_a_plain_paragraph_can_be_a_sidebar_or_a_quotation(edits):
@@ -425,9 +422,7 @@ def test_a_paragraph_left_out_is_listed_to_put_back_named_in_the_record_and_not_
     assert "Discuss vectors and scalars" in (with_file(edits).html or "")
     assert not stored(edits).left_out_blocks
     assert edit_post(edits, PLAIN, action="put_back").status_code == 422  # not left out now
-
-
-def test_a_paragraph_left_out_is_undone(edits):
+    # Left out again, then undone.
     edit_post(edits, PLAIN, action="leave_out")
     path = f"/jobs/{edits.job_id}/review"
     done = edits.browser.post(
@@ -488,9 +483,7 @@ def test_a_picture_is_added_with_its_alt_text(edits):
         and fix.figure.alt == "A sketch of a cart on a ramp."
     )
     assert fix.status is Status.EDITED and fix.reviewed and fix.review == "none"
-    # In the reading order: after the paragraph above it, before the figure below.
-    order = [e.id for e in sorted(result.elements, key=lambda e: e.order)]
-    assert order.index("p1-x1") > order.index("p1-e5") or True
+    # It takes an order number of its own.
     assert len({e.order for e in result.elements}) == len(result.elements)
     with session_scope(edits.ctx.factory) as session:
         crop = session.scalar(select(Blob).where(Blob.kind == "crop", Blob.element_id == "p1-x1"))

@@ -154,20 +154,17 @@ blob (18.3 MB); the largest crop is 2.3 MB (a scanned page) and 0.57 MB in the d
 per page run from 24 KB to 1.4 MB, and the scanned document is the only one that is mostly crops
 (page pictures at up to 2576 px).
 
-*What a per-job cap would be.* The largest document measured stores 140 MB (1.4 MB a page), so a
-cap that refuses none of these with a margin of four is **560 MB a job (5.6 MB a page)**. That is
-above a person's whole allowance (`STORAGE_PER_USER_MB` 300; 250 for the open tier), so a per-job cap
-set where it refuses nothing measured never refuses anything the person's cap would let through:
-it is not built. What it would bound is the growth after the upload, which `storage.check_room`
-does not count (it adds the incoming upload only; a conversion then stores 3 to 14 times the
-upload in these samples, 7.6 times for the scanned 100 pages). The place for a refusal is
-`Worker._write_result` (`web/worker.py`), where the output's crops, HTML and result are known and
-written in one transaction; refusing at upload (`web/intake.py` `store_job`, `web/pending.py`) can
-only judge the upload and the page count. The words a person has today for a full allowance are
-"You are storing X MB of the Y MB you can keep, and <file> would go over it. Delete documents you
-no longer need (My documents, then Delete), then upload <file> again. Nothing was uploaded." They
-say "Nothing was uploaded", which would not be true after a conversion, so a refusal there needs a
-sentence of its own.
+*No per-job cap.* The largest document measured stores 140 MB (1.4 MB a page). A cap that
+refuses none of these with a margin of four would be 560 MB a job (5.6 MB a page), which is above
+a person's whole allowance (`STORAGE_PER_USER_MB` 300; 250 for the open tier), so a per-job cap
+would never refuse anything the person's cap lets through, and there is none. What the person's cap
+does not count is the growth after the upload: `storage.check_room` adds the incoming upload only,
+and a conversion then stores 3 to 14 times the upload in these samples (7.6 times for the scanned
+100 pages). The place that knows the whole result is `Worker._write_result` (`web/worker.py`),
+where the output's crops, HTML and result are written in one transaction; the upload doors
+(`web/intake.py` `store_job`, `web/pending.py`) can judge only the upload and the page count. The
+sentence a person gets today for a full allowance ends "Nothing was uploaded", which is true at
+the upload door and would not be after a conversion.
 
 *The stored page and its pictures, and what the step records cost to load* (measured 2026-11-19 on the
 same documents). The `jobs.html` column holds figure and page pictures as base64 PNG or JPEG. It is
