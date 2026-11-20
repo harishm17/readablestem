@@ -2098,6 +2098,8 @@ opens "Algorithm 2 is ..." or "Algorithm 1 shows ..." is a sentence and no capti
 (`_CAPTION_SENTENCE`). The lines under a caption before its first block word (Input, Initialize
 ...) are steps only when each is a line of its own: the first word of the next line would still
 have fitted on it (`_stops_short`), so the running text under a float's caption is not taken.
+After the first such line, one that runs to the edge with a step word under it is a long step
+("Observe s in accordance with the initial state distribution", then "for k = 0, 1, ... do").
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
 a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
@@ -2112,10 +2114,14 @@ of the one above, and each begins with a step word or a line number, holds an as
 line that is none of these ends the block. The caption stays a block of its own. The text has one
 line to a step, indented `ALGORITHM_INDENT` (2) spaces per level. Where the steps have no numbers,
 a line in lower case under one that ran to the right edge is the rest of that step, but not under
-a line that opens a block ("for each w do"), not when it holds an assignment, and not when it
-stands inside a block where the line above it starts (on a page of little but the algorithm the
-right edge is where the steps end). A step that goes on for more than `ALGORITHM_RUN_ON` (2) lines
-is a paragraph: the rows end before it.
+a line that opens a block (it begins with a block word and ends in "do", "then" or a colon: "for
+each w do"; an "Input: ... :" line opens none), and not when it holds an assignment. On a page
+of little but the algorithm the right edge is only where its longer steps end
+(`_RightEdges.firm`: the longest lines of the column end more than an em past it), and there a
+line inside a block that starts where the step above it starts is the next step ("put a tea bag
+in the cup", "wait three minutes"); where the edge is a margin it is the rest of the step, as
+algorithms set with no hanging indent wrap. A step that goes on for more than `ALGORITHM_RUN_ON`
+(2) lines is a paragraph: the rows end before it.
 
 Line numbers ("3:", "12") are cut off the words and written in a gutter, right-aligned in front
 of the step ("3:   if x then"). The levels come from where the words start, not from the numbers,

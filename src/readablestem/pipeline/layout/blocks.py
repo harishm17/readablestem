@@ -1069,10 +1069,12 @@ class _Steps:
         line = [g for g in rows if abs(g.baseline - top) <= 0.3 * self.anchor.size]
         return max(line, key=lambda g: g.x1)
 
-    def line_start(self, row: _Row) -> float:
-        """Where the line that `row` (one of the rows taken) stands on begins."""
+    def line(self, row: _Row) -> list[_Row]:
+        """The rows taken that stand on the line of `row` (one of them), left to right."""
         near = 0.3 * self.anchor.size
-        return min(g.x0 for g in self.rows if abs(g.baseline - row.baseline) <= near)
+        return sorted(
+            (g for g in self.rows if abs(g.baseline - row.baseline) <= near), key=lambda g: g.x0
+        )
 
     def on_line(self, row: _Row) -> bool:
         """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?"""
@@ -1127,30 +1129,39 @@ def _step_kind(
     above = steps.above(row)
     first = group[0] if group else row
     inside = row.x0 > first.x0 + 0.5 * row.size  # what a loop or a branch holds
-    if (  # the rest of a sentence, which starts in lower case; not what a "... do" line holds,
-        # and not the next step inside a block, set where the one above it starts (on a page
-        # of little else the right edge is where the steps end)
+    if (  # the rest of a sentence, which starts in lower case
         above is not None
         and number is None
         and _wraps_on(above, edges)
         and not row.clean[:1].isupper()
         and not _STEP_WORD.match(row.clean)
         and _ASSIGNMENT.search(row.clean) is None
-        and not _OPENS.fullmatch(above.clean.rstrip())
-        and not (inside and abs(row.x0 - steps.line_start(above)) <= 0.25 * row.size)
     ):
-        return "wrap"
+        line = steps.line(above)
+        head = line[0]
+        # Not what a "for ... do" line holds; and, where the right edge is no margin (a page
+        # of little but the algorithm: the edge is where its longer steps end), not the next
+        # step inside a block, set where the step above it starts.
+        opens = _BLOCK_WORD.match(head.clean) and _OPENS.fullmatch(above.clean.rstrip())
+        went_on = any(id(g) in steps.wraps for g in line)
+        beside = inside and not went_on and abs(row.x0 - head.x0) <= 0.25 * row.size
+        if not opens and not (beside and not edges.firm(above)):
+            return "wrap"
     if lead or _ASSIGNMENT.search(row.clean) is not None or inside:
         return "step"
     # The lines before the first block word of a captioned algorithm ("Initialize ...",
-    # "Choose ..."): each a line of its own (a line the next one runs on from is a paragraph's),
-    # not the item of a list, and not under a caption that is a sentence ("Algorithm 1 ... .").
+    # "Choose ..."): each a line of its own (a line the next one runs on from is a paragraph's;
+    # after the first, one that runs to the edge with a step word under it is a long step),
+    # and not under a caption that is a sentence ("Algorithm 1 ... .").
     sentence = (
         caption is not None and caption.clean.rstrip()[-1:] in ".?!" and len(caption.clean) > 40
     )
     if caption is None or steps.blocked or sentence:
         return None
-    return "step" if _stops_short(row, following, edges) else None
+    own = _stops_short(row, following, edges) or (
+        bool(group) and following is not None and _STEP_WORD.match(following.clean) is not None
+    )
+    return "step" if own else None
 
 
 def _resumes(row: _Row, steps: _Steps) -> bool:
@@ -1366,13 +1377,14 @@ def _algorithm_groups(
     assignment ("count = 0"), or a line of math (a step that is a formula: "c <- c + 1"), or
     further right than the first step (what a loop or a branch holds). Under a caption the
     lines before the first block word (Input, Initialize ...) are steps too, each one a line
-    of its own (`_stops_short`); a line that opens "Algorithm 2 is ..." is a sentence, not a
+    of its own (`_stops_short`; after the first, a line that runs to the edge with a step word
+    under it is a long step); a line that opens "Algorithm 2 is ..." is a sentence, not a
     caption (`_CAPTION_SENTENCE`), and the item of a list ("1.", "2)", a bullet) is no step
     anywhere. Where the steps have no numbers, a line in lower case under one that ran to the
-    right edge is the rest of that step, unless the line above opens a block ("... do"), the
-    line holds an assignment, or it stands inside a block where the line above starts; a step
-    that goes on for more than `ALGORITHM_RUN_ON` lines is a paragraph and ends the rows
-    before it. When the steps
+    right edge is the rest of that step, unless the line above opens a block ("for ... do"),
+    the line holds an assignment, or it stands inside a block where the step above starts on
+    a page whose right edge is no margin (`_RightEdges.firm`); a step that goes on for more
+    than `ALGORITHM_RUN_ON` lines is a paragraph and ends the rows before it. When the steps
     carry line numbers ("3:", "12") each has the next number and a row with none is the rest of
     the step before it (a line that ran to the right edge, or a short line or a comment right
     of the numbers with the next number within `ALGORITHM_BETWEEN` rows), which stays on its

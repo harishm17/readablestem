@@ -1584,9 +1584,10 @@ class _RightEdges:
 
     def __init__(self, rows: Sequence[_Row]) -> None:
         self._rows = [r for r in rows if r.kind == "text" and not r.vertical]
-        self._seen: dict[tuple[str, int], float] = {}
+        self._seen: dict[tuple[str, int], tuple[float, float]] = {}
 
-    def of(self, row: _Row) -> float:
+    def _ends(self, row: _Row) -> tuple[float, float]:
+        """The right edge for `row`, and where the longest lines end (19 in 20 end by there)."""
         key = (row.column, round(row.size))
         if key not in self._seen:
             near = max(1.0, 0.12 * row.size)
@@ -1594,9 +1595,23 @@ class _RightEdges:
                 r.x1
                 for r in self._rows
                 if r.column == row.column and abs(r.size - row.size) <= near
+            ) or [row.x1]
+            last = len(ends) - 1
+            self._seen[key] = (
+                ends[min(last, 3 * len(ends) // 4)],
+                ends[min(last, 19 * len(ends) // 20)],
             )
-            self._seen[key] = ends[min(len(ends) - 1, 3 * len(ends) // 4)] if ends else row.x1
         return self._seen[key]
+
+    def of(self, row: _Row) -> float:
+        return self._ends(row)[0]
+
+    def firm(self, row: _Row) -> bool:
+        """Is that edge a margin the lines are set to: the longest lines end within an em of
+        it? Where a page holds little but short lines of uneven length (an algorithm and its
+        title), the edge is only where the longer ones happen to end."""
+        edge, longest = self._ends(row)
+        return longest - edge <= row.size
 
 
 INDENT_REACH = 4  # em: how far left of an indented first line the paragraph's next line may start

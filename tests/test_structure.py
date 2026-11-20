@@ -290,11 +290,22 @@ LONG_LOOP = [
 ]
 
 
+# Steps in plain words, on a page of nothing else: its right edge is where the longer ones end.
+HANDOUT = [
+    (0, "for each cup on the tray do"),
+    (1, "put a tea bag in the cup and pour the water"),
+    (1, "wait three minutes"),
+    (1, "take the bag out"),
+    (0, "end for"),
+    (0, "return the tray"),
+]
+
+
 def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
-    for listed in (ALGORITHM, LONG_LOOP):
+    for listed in (ALGORITHM, LONG_LOOP, HANDOUT):
 
         def fill(page, listed=listed):
-            y = running(page, 100, RUNNING)
+            y = 100.0 if listed is HANDOUT else running(page, 100, RUNNING)
             y = algorithm(page, y + 10, listed)
             # A display equation of the text, and the sentence going on after it.
             page.insert_text((280, y + 14), "v =", fontsize=12)

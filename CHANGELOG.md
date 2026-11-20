@@ -40,9 +40,13 @@ numbers, read worse than before it. Fixed here (`layout/blocks.py`):
   colon), so a poem's indented lines are not taken.
 - **A loop line keeps its body on the next line.** Where the steps have no numbers, the line
   under one that ran to the right edge was glued to it ("for each word w in the line do count =
-  count + stress(w)"). It is not the rest of the line above when that line opens a block, when
-  it holds an assignment, or when it stands inside a block where the line above starts. A step
-  that goes on for more than two lines is a paragraph and ends the rows before it.
+  count + stress(w)"). It is not the rest of the line above when that line opens a block or
+  when it holds an assignment; and, on a page of little but the algorithm, where the right edge
+  is only where the longer steps end (`_RightEdges.firm`), when it stands inside a block where
+  the step above starts ("put a tea bag in the cup and pour the water", "wait three minutes").
+  A step that goes on for more than two lines is a paragraph and ends the rows before it.
+- The eight public files the algorithm change touched read the same before and after these
+  fixes (elements compared one by one), so what that change gained is kept.
 - **The text after an equation is not the algorithm going on.** After a display equation an
   algorithm with no numbers goes on only at a step word or an assignment written with an arrow
   or ":="; "where d = 12 is ..." is a paragraph.
