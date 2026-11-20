@@ -747,6 +747,8 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         + run("link", '<w:color w:val="0563C1"/>').join(
             ["<w:hyperlink w:anchor='x'>", "</w:hyperlink>"]
         )
+        # a script face named for its foundry is no fixed-pitch font
+        + run(" in a script face", '<w:rFonts w:ascii="Monotype Corsiva"/>')
         + "</w:p>"
         '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
         + run("A heading ")

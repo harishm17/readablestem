@@ -1324,7 +1324,9 @@ not change and takes off those whose words did, without a message (it is only th
 the words). Runs come from the text pass (docs/layout.md "Bold, italic and fixed-pitch
 words"); a Word or LaTeX source says them outright and gets the same runs (below).
 `CONTENT_RUNS` off finds and counts them (`strong_runs`, `emphasis_runs`, `code_runs` in the
-trace) and writes none.
+trace) and writes none, in a source's table cells as in its text. A font is fixed-pitch by its
+name ("mono", Courier, Consolas, Menlo and the like); a name that holds "Monotype", the foundry
+(Monotype Corsiva is a script face), is not.
 
 #### From a Word or LaTeX source
 

@@ -120,7 +120,10 @@ _BR, _CR = f"{{{W}}}br", f"{{{W}}}cr"
 _RFONTS, _COLOR = f"{{{W}}}rFonts", f"{{{W}}}color"
 _HYPERLINK, _STYLE_ID, _STYLE_NAME = f"{{{W}}}hyperlink", f"{{{W}}}styleId", f"{{{W}}}name"
 CODE_STYLE = "VerbatimChar"  # the id of "Verbatim Char", which pandoc reads as code
-_MONO = re.compile(r"mono|courier|consolas|menlo|lucida console|andale|typewriter", re.I)
+# "Monotype Corsiva" is a script face named for its foundry, not a fixed-pitch one
+_MONO = re.compile(
+    r"mono(?!type)|courier|consolas|menlo|monaco|lucida console|andale|typewriter", re.I
+)
 # a tab, a break and the mark of a note each stand between two words in the reading
 _BREAKS = (f"{{{W}}}tab", _BR, _CR, f"{{{W}}}footnoteReference", f"{{{W}}}endnoteReference")
 _FALSE = {"0", "false", "off"}

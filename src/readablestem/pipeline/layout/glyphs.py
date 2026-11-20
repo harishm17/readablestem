@@ -94,7 +94,8 @@ _REGULAR_FACE = re.compile(
 )
 
 
-_MONO_FONT = re.compile(r"mono|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
+# "MonotypeCorsiva" and "MonotypeSorts" are named for their foundry: neither is fixed-pitch
+_MONO_FONT = re.compile(r"mono(?!type)|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
 
 # TeX fonts whose letters are a style the text layer drops: MSBM's R is \mathbb{R}, the
 # reals, but its text layer says "R". (pattern, style, capitals only): MSBM, bbm and

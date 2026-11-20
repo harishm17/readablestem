@@ -430,6 +430,11 @@ def _finish(
                 e.model_copy(update={"runs": [r for r in e.runs if r.kind not in CONTENT_RUNS]})
                 for e in elements
             ]
+        if not options.content_runs:  # a table cell's bold, italic and code go the same way
+            grids = [e.table for e in elements if e.table]
+            grids += [fix.table.grid for fix in reading.fixes.values() if fix.table]
+            for cell in (cell for grid in grids for cell in grid.cells if cell.runs):
+                cell.runs = []
         if not options.colour and coloured:
             elements = [e.model_copy(update={"colour_runs": []}) for e in elements]
             reading.notices.append(make(ltx_reader.COLOUR_NOTICE, count=coloured))

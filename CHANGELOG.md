@@ -96,6 +96,12 @@
   the LaTeX reader used to keep color whatever the setting and now keeps it only with the flag
   on. `RENDER_VERSION` and `PIPELINE_VERSION` are owed a raise: a stored Word or LaTeX result
   has no runs and no `colour_used`.
+- A font named for the Monotype foundry ("Monotype Corsiva", a script face) is no longer read as
+  fixed-pitch because its name holds "mono": in a Word file its words were about to become code,
+  and on a PDF page they already were (`docx_package._MONO`, `layout.glyphs._MONO_FONT`). Monaco
+  counts as fixed-pitch in a Word file.
+- `CONTENT_RUNS` off takes the runs off a Word or LaTeX table's cells too, as it does off the
+  text.
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
