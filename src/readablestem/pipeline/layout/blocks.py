@@ -1890,8 +1890,6 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and not _opens_with_bullet(rows[0])
     ):
         heading = [REASON_BOLD_BODY, *evidence]
-    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
-        heading = [REASON_LETTERED, *(["bold"] if bold else [])]
     elif (
         upright
         and titled
@@ -1903,6 +1901,8 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
+    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
+        heading = [REASON_LETTERED]
     if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
         # step like any display equation, and the page keeps its real headings.
