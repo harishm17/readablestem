@@ -19,6 +19,51 @@
   0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
+## Unreleased: fixes after the independent review of the algorithm blocks (review 7)
+
+The review ran probe pages on the code before and after the algorithm change. Numbered
+algorithms read better; prose and lists near an "Algorithm n" line, and algorithms with no
+numbers, read worse than before it. Fixed here (`layout/blocks.py`):
+
+- **Prose under an "Algorithm n" line stays prose.** A line that opens "Algorithm 2 is ..." or
+  "Algorithm 1 shows ..." is a sentence, not a caption (`_CAPTION_SENTENCE`). The lines under a
+  caption before its first block word are steps only when each is a line of its own
+  (`_stops_short`), so the running text under a float's caption ("Algorithm 2 Overview of the
+  method", the algorithm itself a picture) is not taken, and neither is the text that goes on
+  under an algorithm.
+- **A list is not an algorithm.** The item of a list ("1.", "2)", a bullet) is never a step,
+  under a caption or without one: "Algorithm 5.1 (Euclid)" written as four numbered sentences is
+  four list items again. With no caption, numbered lines must hold one step inside another
+  (`_nested`), so exam questions numbered "1 If ...", "2 For ..." and the numbered lines of a
+  manuscript are paragraphs again; lines with no numbers must hold something only code has (a
+  formula, an assignment, an "end", a block word on a line that ends in "do", "then" or a
+  colon), so a poem's indented lines are not taken.
+- **A loop line keeps its body on the next line.** Where the steps have no numbers, the line
+  under one that ran to the right edge was glued to it ("for each word w in the line do count =
+  count + stress(w)"). It is not the rest of the line above when that line opens a block, when
+  it holds an assignment, or when it stands inside a block where the line above starts. A step
+  that goes on for more than two lines is a paragraph and ends the rows before it.
+- **The text after an equation is not the algorithm going on.** After a display equation an
+  algorithm with no numbers goes on only at a step word or an assignment written with an arrow
+  or ":="; "where d = 12 is ..." is a paragraph.
+- **A comment or a short line stays in its numbered block.** A line with no number, right of the
+  numbers, with the next number within two rows below it, is the rest of the step above. An
+  unnumbered comment line or a step that broke early split the algorithm into two blocks with a
+  stray paragraph between.
+- Left, and written in docs/layout.md: the part of an algorithm on the page after a page break;
+  typed pseudo-code in a proportional font with two-digit line numbers (levels one too deep
+  from line 10); a page that holds only an algorithm whose first step has no step word (the
+  step is read as the second line of the caption).
+
+And in the Word reader (`source/docx_package.py`), after the same review:
+
+- **Every strike is read.** Pandoc does not read a double strike (`w:dstrike`) or a strike a
+  character style sets, so such words came out as live text, and a struck run in the "Verbatim
+  Char" style came out as live code. The package step now writes each of them as `w:strike` on
+  the run itself (`_keep_strikes`, `_struck_styles`: the style's own setting or that of the
+  style it is based on) and takes the code style off a struck run. All are `deleted` runs. Not
+  read: a strike set by a paragraph style.
+
 ## Unreleased: fixes after the independent review of this wave (review 6)
 
 - **A one-page quiz keeps its name line and its points** (`layout/furniture.py`). The rule
@@ -34,8 +79,9 @@
   measured: taking such lines when they are set smaller than the body text.
 - **A struck-through run in a fixed-pitch font stays struck** (`source/docx_package.py`). The
   package step gave every run in such a font the code style, and code carries no strike, so
-  "~~x = 5~~ x = 7" in Courier New read as one live "x = 5 x = 7". A run with `w:strike` or
-  `w:dstrike` keeps what it has and is a `deleted` run, as in 0.5.13.
+  "~~x = 5~~ x = 7" in Courier New read as one live "x = 5 x = 7". A run with `w:strike`
+  keeps what it has and is a `deleted` run, as in 0.5.13 (a double strike, `w:dstrike`, was
+  read by neither version: see the review-7 entry above).
 - **"(i)" after an "(h)" that has sub-items goes on with the letters** (`layout/lists.py`).
   The marker was read against the innermost open level, the bullets under "(h)", so it was
   roman one: a list of one item under "(h)", which "(j)" then left. It is read against the
@@ -64,10 +110,14 @@
   words (a right-aligned gutter) and whose indentation is the steps' own; a step that wraps and
   goes on at the left edge is one step (a word broken at the wrap is mended); an algorithm with no
   "Algorithm n" line is found from its steps when they are numbered or form an indent ladder with a
-  closing step; a display equation or a page break in the middle leaves two blocks with the same
-  levels, the equation keeping its crop and its place. Numbered lists, tables with a line-number
-  column, margin line numbers and monospaced listings are not taken. Four fields on `_Row`
-  (`algo_level`, `algo_number`, `algo_start`, `algo_join`) carry the result.
+  closing step; a display equation in the middle leaves two blocks with the same levels, the
+  equation keeping its crop and its place (a formula of one line that is a step by itself is a
+  line of the block instead, its formulas inline equations: in `ax_eesssp_240306423`,
+  `ax_eesssp_240306460` and `ax_statme_240307124` the equation counts moved by 1, 1 and 4).
+  Numbered lists, tables with a line-number column and monospaced listings are not taken. Not
+  built: an algorithm that goes over a page break is read page by page, so the part on the
+  second page is a block only when it proves itself an algorithm with no caption. Four fields
+  on `_Row` (`algo_level`, `algo_number`, `algo_start`, `algo_join`) carry the result.
 - A paragraph that opens "Algorithm 2 shows ..." or has "Algorithm 2." at the start of a line is
   not an algorithm when some of its lines begin with "for" or "if": lines that all run on from
   one to the next are prose (`_reads_on`).

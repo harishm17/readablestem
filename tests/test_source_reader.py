@@ -530,7 +530,7 @@ def _cells(*rows: str, marked: bool) -> str:
     return out + "</w:tbl>"
 
 
-def word(body: str, rels: str = "") -> bytes:
+def word(body: str, rels: str = "", styles: str = "") -> bytes:
     parts = office.docx_parts()
     document = (
         str(parts["word/document.xml"])
@@ -542,7 +542,7 @@ def word(body: str, rels: str = "") -> bytes:
         f'<w:style w:type="paragraph" w:styleId="{i}"><w:name w:val="{n}"/></w:style>'
         for i, n in (("Title", "Title"), ("ListParagraph", "List Paragraph"), ("Quote", "Quote"))
     )
-    styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + "</w:styles>")
+    styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + styles + "</w:styles>")
     W = office.W_NS
     numbering = (
         f'{office.HEAD}<w:numbering xmlns:w="{W}">'
@@ -807,6 +807,11 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         + run("make test", mono)
         + run(" not ")
         + run("make all", mono + "<w:strike/>")  # struck out: not live code
+        # nor is code in the code style, struck with two lines, or by the style a run has
+        + run(" or ")
+        + run("make old", '<w:rStyle w:val="VerbatimChar"/><w:dstrike/>')
+        + run(" or ")
+        + run("make it", '<w:rStyle w:val="Gone"/>' + mono)
         + run(" in the ")
         + run("red", '<w:color w:val="FF0000"/>')
         + run(" part, a ")
@@ -831,7 +836,11 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
             "<w:r><w:t>closed book</w:t></w:r>", run("closed", bold) + run(" book")
         )
     )
-    reading = read_word(word(body))
+    gone = (
+        '<w:style w:type="character" w:styleId="Gone"><w:name w:val="Gone"/>'
+        "<w:rPr><w:strike/></w:rPr></w:style>"
+    )
+    reading = read_word(word(body, styles=gone))
     first, heading, whole = reading.elements[:3]
     assert [((first.text or "")[r.start : r.end], r.kind) for r in first.runs] == [
         ("not", "strong"),
@@ -839,6 +848,8 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         ("slowly", "strong"),
         ("make test", "code"),
         ("make all", "deleted"),
+        ("make old", "deleted"),
+        ("make it", "deleted"),
     ]
     assert not heading.runs and not whole.runs  # a heading is not bold text; a whole block is not
     [item] = [e for e in reading.elements if e.kind.value == "list_item"]

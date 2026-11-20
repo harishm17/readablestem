@@ -1341,8 +1341,11 @@ The Word reader takes `Strong` and `Emph` from pandoc's reading of the file (a r
 and `w:i`, or a style that sets them), the highlight a Word run carries as `highlight`, and
 `code` from the character style "Verbatim Char" and from a run whose own font is fixed-pitch
 (Courier, Consolas, Menlo and the like: the package step gives such a run the style, because
-pandoc drops a direct font; a run struck through is left as it is, since code carries no strike
-and the words would read as live). The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
+pandoc drops a direct font; a run struck through is left as it is, and loses a code style it
+has, since code carries no strike and the words would read as live). Pandoc reads a strike only
+as `w:strike` on the run, so the package step writes a double strike (`w:dstrike`) and a strike
+that a character style sets that way too (`_keep_strikes`); a strike set by a paragraph style is
+not read. The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
 `\emph`, `\textit`, `\texttt`, `\verb`). Both use the PDF path's rules: a style on 70% or more
 of a block's characters is the block's own and makes no run (a bold heading, a whole italic
 theorem body, a header cell set in bold), a run never holds an inline equation or a blank

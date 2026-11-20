@@ -231,7 +231,9 @@ def test_a_number_that_the_row_around_it_hides_is_still_the_equations_label(fill
     assert equation.display == "block"
     assert equation.equation_label == "(106)"
     assert "(106)" not in (equation.text or "")
-    assert [e.text for e in elements if e.kind == Kind.PARAGRAPH and len(e.text or "") < 9] == []
+    # no paragraph holds the number, and none is the mark alone
+    paragraphs = [e.text or "" for e in elements if e.kind == Kind.PARAGRAPH]
+    assert [text for text in paragraphs if "(106)" in text or len(text) < 9] == []
 
 
 # ---------------------------------------------------------------- rows of a table

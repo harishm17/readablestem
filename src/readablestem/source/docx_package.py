@@ -119,6 +119,7 @@ _NOBREAK_HYPHEN = f"{{{W}}}noBreakHyphen"
 _BR, _CR = f"{{{W}}}br", f"{{{W}}}cr"
 _RFONTS, _COLOR = f"{{{W}}}rFonts", f"{{{W}}}color"
 _HYPERLINK, _STYLE_ID, _STYLE_NAME = f"{{{W}}}hyperlink", f"{{{W}}}styleId", f"{{{W}}}name"
+_STRIKES, _BASED_ON = (f"{{{W}}}strike", f"{{{W}}}dstrike"), f"{{{W}}}basedOn"
 CODE_STYLE = "VerbatimChar"  # the id of "Verbatim Char", which pandoc reads as code
 # "Monotype Corsiva" is a script face named for its foundry, not a fixed-pitch one
 _MONO = re.compile(
@@ -294,6 +295,7 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
         facts.smartart = sum(1 for n in names if re.fullmatch(r"word/diagrams/data[^/]*\.xml", n))
         hidden_styles = _hidden_styles(archive, names)
         code_styles = _code_styles(archive, names)
+        struck_styles = _struck_styles(archive, names)
         out: dict[str, bytes] = {}
         out["[Content_Types].xml"] = _read_bytes(archive, "[Content_Types].xml", 1 << 20)
         out["_rels/.rels"] = _filter_rels(
@@ -305,6 +307,7 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
                 continue
             root = _parse(archive, name, MAX_PART_BYTES)
             _hide(root, hidden_styles, facts)
+            _keep_strikes(root, struck_styles, code_styles)
             _mark_code(root, code_styles, facts)
             facts.coloured += _coloured(root)
             _count(root, facts, main=name == "word/document.xml")
@@ -453,15 +456,72 @@ def _code_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
     }
 
 
+def _struck_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
+    """Ids of the character styles that strike their text through, with one line or two: by
+    their own setting, or that of the style they are based on."""
+    if "word/styles.xml" not in names:
+        return set()
+    root = _parse(archive, "word/styles.xml", MAX_SMALL_PART_BYTES)
+    own: dict[str, bool | None] = {}  # None: the style says nothing, so its base decides
+    base: dict[str, str] = {}
+    for style in root.iter(f"{{{W}}}style"):
+        if style.get(f"{{{W}}}type") != "character":
+            continue
+        name = style.get(_STYLE_ID, "")
+        own[name] = _struck(style.find(_RPR))
+        based = style.find(_BASED_ON)
+        base[name] = based.get(_VAL, "") if based is not None else ""
+
+    def struck(name: str, seen: frozenset[str] = frozenset()) -> bool:
+        if name not in own or name in seen:
+            return False
+        said = own[name]
+        return said if said is not None else struck(base[name], seen | {name})
+
+    return {name for name in own if struck(name)}
+
+
+def _struck(props: ET.Element | None) -> bool | None:
+    """Do these run properties strike the text through (`w:strike`, or `w:dstrike` for two
+    lines)? None when they say nothing about it."""
+    marks = [] if props is None else [m for m in map(props.find, _STRIKES) if m is not None]
+    return any(_is_on(m) for m in marks) if marks else None
+
+
+def _keep_strikes(root: ET.Element, struck_styles: set[str], code_styles: set[str]) -> None:
+    """Write every strike the way pandoc reads one: `w:strike` on the run itself. Pandoc does
+    not read a double strike (`w:dstrike`), so "~~x = 5~~" set that way came out as live text;
+    and a struck run in a code style came out as code, which carries no strike, so the style
+    goes (a struck "x = 5" read as live code is the answer the author took back). A run whose
+    character style strikes it gets the strike itself, so it holds when `_mark_code` gives the
+    run another style."""
+    for run in root.iter(_R):
+        props = run.find(_RPR)
+        if props is None:
+            continue
+        style = props.find(_RSTYLE)
+        said = _struck(props)
+        if said is None:
+            said = style is not None and style.get(_VAL, "") in struck_styles
+        if not said:
+            continue
+        for tag in _STRIKES:
+            for mark in props.findall(tag):
+                props.remove(mark)
+        ET.SubElement(props, _STRIKES[0])
+        if style is not None and style.get(_VAL, "") in code_styles | {CODE_STYLE}:
+            props.remove(style)
+
+
 def _mark_code(root: ET.Element, code_styles: set[str], facts: Facts) -> None:
     """Give each run set in a fixed-pitch font the style `CODE_STYLE`. A run struck through
-    keeps what it has: code carries no strike, and a struck "x = 5" read as live code is the
-    answer the author took back."""
+    (`_keep_strikes` has written each strike on its run) keeps what it has: code carries no
+    strike."""
     for run in root.iter(_R):
         props = run.find(_RPR)
         if props is None or not _text_of(run).strip():
             continue
-        if any(_is_on(props.find(f"{{{W}}}{tag}")) for tag in ("strike", "dstrike")):
+        if _struck(props):
             continue
         style = props.find(_RSTYLE)
         if _is_mono(props) or (style is not None and style.get(_VAL, "") in code_styles):
