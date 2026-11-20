@@ -155,6 +155,7 @@ def test_production_refuses_a_storage_statement_that_does_not_match_its_setting(
         ({"feature_word_source": True}, "the Word .docx file"),
         ({"feature_word_source": True}, "reading a Word file"),
         ({}, "the conversion result (proposed LaTeX, MathML, alt text, headings"),
+        ({}, "the model's answers for the steps a conversion has finished"),
         ({}, f"for the last {recipients.listen_kept_documents()} documents you listened to"),
         ({"contact_email": "help@example.org"}, "email help@example.org"),
     ],

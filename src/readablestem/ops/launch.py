@@ -266,12 +266,21 @@ def privacy_claim_problems(settings: Settings) -> list[str]:
         ),
         # What the model's answers leave behind: the conversion result, kept with the document
         # (`Job.result_json`), and the answers about whole pages that "Try again" reuses
-        # (`web.step_cache`: `StepRecord`, deleted with the document, which the notice's
-        # "all of it is deleted" covers; the notice does not name them, a finding in the report).
+        # (`web.step_cache`: `StepRecord`, deleted with the document by `ops.retention`).
         (
             True,
             "the conversion result (proposed LaTeX, MathML, alt text, headings",
             "web.db.Job.result_json",
+        ),
+        (
+            True,
+            "the model's answers for the steps a conversion has finished",
+            "web.step_cache (StepRecord: kept with the document, deleted with it)",
+        ),
+        (
+            bool(input_kinds(settings)),
+            "Word and PowerPoint conversion",
+            "OFFICE_INPUT_ENABLED (web.office_convert: a temporary folder removed at once)",
         ),
         # What Listen keeps, in the browser only: the number of documents is read from the
         # player's own code (static/listen.js `KEEP`).

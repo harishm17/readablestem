@@ -3,10 +3,11 @@
 ## Unreleased: what the pages promise, and leftovers of the Word and export work (branch fix/page-promises-and-leftovers)
 
 - The pages rule (`web/quota.py`, `PAGES_RULE`) says what cancel does: a document canceled before it
-  starts, or stopped for being only scans or handwriting, gives its pages back that day; any other
+  starts, or stopped for being only scans or handwriting, gives its pages back while it is still the
+  day of the upload (the count is by day, so nothing comes back after midnight UTC); any other
   failed or deleted document does not. A canceled document a worker had begun keeps its pages
   (`test_canceling_gives_the_pages_back_only_before_a_worker_began_the_document`).
-- The checker's draft says "In the student's file, a link here writes to your contact line." where the
+- The checker's draft says "In the student's file, a link here goes to the document's contact line." where the
   student's file has the instructor link on a flag note, instead of carrying the link
   (`assemble.DRAFT_CONTACT_NOTE`). A draft is never stored; no student file changes.
 - The pages read the limits and days they state from the setting or constant that holds them
@@ -17,6 +18,11 @@
   build (`ops.launch.privacy_claim_problems`). The retention summary is a download for an
   office (`/privacy/retention`), written from the same settings, data list, recipients and deletion
   rules as the notice and `/security`.
+- The privacy notice names the model's answers for the steps a conversion has finished, which
+  are kept with the document so that "Try again" asks only for what is missing
+  (`web/step_cache.py`; they were stored and deleted with the document before, and not named).
+  Its sentence about temporary folders names only the steps this service runs: a LaTeX build
+  and Word and PowerPoint conversion are left out where they are off. Both are launch claims.
 - CI installs pandoc 3.1.11.1 from the upstream release by exact version and sha256
   (`.github/actions/pandoc`), the version production runs, in both jobs that need it.
 - Docs name no model, price or version a file in the code already holds; they point to it

@@ -301,7 +301,7 @@ def with_medium(html: str, medium: str) -> str:
 
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 # In a draft, where the student's file links to the instructor's contact line (`instructor_link`).
-DRAFT_CONTACT_NOTE = "In the student's file, a link here writes to your contact line."
+DRAFT_CONTACT_NOTE = "In the student's file, a link here goes to the document's contact line."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.
 DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'

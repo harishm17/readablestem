@@ -52,8 +52,8 @@ logger = logging.getLogger(__name__)
 # failed one give nothing back.
 PAGES_RULE = (
     "Pages count when you upload. A document you cancel before it starts, or that stops for "
-    "being only scans or handwriting, gives them back that day. Any other failed or deleted "
-    "document does not."
+    "being only scans or handwriting, gives its pages back if it is still the day you uploaded "
+    "it. Any other failed or deleted document does not."
 )
 
 
