@@ -57,19 +57,19 @@ _SUPERSCRIPTS = {
     **dict(
         zip(
             "0123456789",
-            "⁰¹²³⁴⁵⁶⁷⁸⁹",
+            "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079",
             strict=True,
         )
     ),
-    "+": "⁺",
-    "-": "⁻",
-    "−": "⁻",  # minus sign
-    "–": "⁻",  # en dash: some fonts print a raised minus as one
-    "=": "⁼",
-    "(": "⁽",
-    ")": "⁾",
-    "n": "ⁿ",
-    "i": "ⁱ",
+    "+": "\u207a",
+    "-": "\u207b",
+    "\u2212": "\u207b",  # minus sign
+    "\u2013": "\u207b",  # en dash: some fonts print a raised minus as one
+    "=": "\u207c",
+    "(": "\u207d",
+    ")": "\u207e",
+    "n": "\u207f",
+    "i": "\u2071",
 }
 
 
@@ -79,7 +79,8 @@ RAISED_RUN = re.compile("[" + "".join(sorted(set(_SUPERSCRIPTS.values()))) + "]+
 
 def raised_characters(run: str) -> str:
     """A raised run as text that has no place for a script (a table cell, a caption): in
-    superscript characters ("10⁻¹⁸"), or "^(...)" when one has no superscript form."""
+    superscript characters (10 and the raised 8), or "^(...)" when one has no superscript
+    form."""
     if all(ch in _SUPERSCRIPTS for ch in run):
         return "".join(_SUPERSCRIPTS[ch] for ch in run)
     return f"^({run})" if len(run) > 1 else f"^{run}"
