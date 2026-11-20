@@ -388,7 +388,7 @@ def test_a_labelled_tab_over_a_sentence_is_not_swallowed_by_the_figure_below_it(
     _rect(page, (72, 373.1, 540, 373.8), colour=None, width=0, fill=dark)
     _rect(page, (72, 373.8, 137.7, 393.6), colour=None, width=0, fill=dark)
     page.insert_text((78, 387), "EXAMPLE 5.2", fontsize=8.25, color=(1, 1, 1))
-    _label(page, (72, 409), "The data in Table 5.1 are 55 smiling times, in seconds, of a baby.", 8.25)
+    _label(page, (72, 409), "The data in Table 5.1 are 55 smiling times, in seconds.", 8.25)
     for row, col in itertools.product(range(4), range(11)):
         x, y = 144.3 + 29.4 * col, 416.7 + 24.6 * row
         _rect(page, (x, y, x + 29.4, y + 24.6), colour=None, width=0, fill=grey)
