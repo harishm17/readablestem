@@ -147,6 +147,33 @@ def test_production_refuses_a_storage_statement_that_does_not_match_its_setting(
         prod(tmp_path).check_production()
 
 
+@pytest.mark.parametrize(
+    "setting,phrase",
+    [
+        ({"feature_latex_source": True}, "a LaTeX build"),
+        ({"feature_latex_source": True}, "the LaTeX .tex file or the zip of the LaTeX project"),
+        ({"feature_word_source": True}, "the Word .docx file"),
+        ({"feature_word_source": True}, "reading a Word file"),
+        ({}, "the conversion result (proposed LaTeX, MathML, alt text, headings"),
+        ({}, f"for the last {recipients.listen_kept_documents()} documents you listened to"),
+        ({"contact_email": "help@example.org"}, "email help@example.org"),
+    ],
+)
+def test_production_refuses_a_notice_that_drops_a_stored_thing_it_must_name(
+    tmp_path, monkeypatch, setting, phrase
+):
+    """What the notice says of source files, the conversion result, Listen and the contact
+    address is each tied to its setting or code (`launch.privacy_claim_problems`)."""
+    settings = prod(tmp_path, **setting)
+    assert launch.privacy_claim_problems(settings) == []
+    notice = launch.rendered_notice(settings)
+    assert notice is not None and phrase in notice
+    monkeypatch.setattr(launch, "rendered_notice", lambda _settings: notice.replace(phrase, "[]"))
+    assert any(
+        f"does not say {phrase!r}" in item for item in launch.privacy_claim_problems(settings)
+    )
+
+
 # ------------------------------------------------------------------ the privacy notice
 
 
