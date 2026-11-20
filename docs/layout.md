@@ -2086,24 +2086,44 @@ of a sentence or run in before its text is not one. A line that begins "Keywords
 words -" or "Index Terms -" starts a block of its own (`_KEYWORDS_LINE`, in `_runs`). There
 are no roles and no `keywords` role.
 
-**Algorithms (WS2.6 b).** The lines under a line that opens "Algorithm 2" are read as one
-block, `Element.preformatted`, when at least `ALGORITHM_MIN_ROWS` (3) of them follow, at
-least `ALGORITHM_MIN_WORDS` (2) of them begin with a step word (for, if, else, while, repeat,
-until, end, return, input, output, require, ensure, function, procedure, do, then ...),
-each line in one column and one size and within 2.2 lines of the one above (`_algorithm_groups`).
-A line belongs to the block if it begins with a step word, holds an assignment ("count = 0",
-"c <- 0", `:=`), is a line of math, or starts further right than the first step; the first
-line that is none of these ends the block. The caption stays a block of its own. The text has
-one line to a step and the step's indent level (its distance from the leftmost step in units
-of the smallest step between two left edges) as `ALGORITHM_INDENT` (2) spaces per level
-(`_indents`, `_paragraph_pieces`). Unlike program code its inline math stays math: a math
-row inside it becomes text, the formulas in it are inline equations as in any paragraph, and
-`assemble.code_block` writes them with the equation markup. In the Word file a code block
-that holds an equation is written as lines of a paragraph (pandoc would flatten the
-equation to its characters), the indentation as no-break spaces (`export_docx._lines_of`).
-Not read: an algorithm set under a rule only (no "Algorithm n" line), line numbers beside
-the steps (they make every step start at one edge, so the indentation is lost), and a step
-that wraps to a second line at the left edge.
+**Algorithms (WS2.6 b, O-050).** An algorithm is read as one block, `Element.preformatted`, from
+its steps (`_algorithm_groups`, `_scan`, `_is_algorithm`). Under a line that opens "Algorithm 2"
+it takes at least `ALGORITHM_MIN_ROWS` (3) lines, `ALGORITHM_MIN_WORDS` (2) of them beginning with
+a step word (for, if, else, while, repeat, until, end, return, input, output, require, ensure,
+function, procedure, do, then ...), and one that opens or closes a block (or
+`ALGORITHM_MIN_NUMBERS` (2) numbered steps). Lines with no numbers that all run on from one to the
+next (each reaches the right edge or stops where the next line's first word no longer fits) are a
+paragraph that opens "Algorithm 2 shows ..." and are left as one (`_reads_on`). With no caption line (one under a rule, a box or
+nothing) it takes more proof: `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a
+step word, a step that closes a block, and either every line numbered ("3:", not the "1." or "2)"
+of a list) or no numbers and an indent ladder of three left edges; a line with a list marker
+keeps it out. The lines are in one column and one size, within `ALGORITHM_MAX_PITCH` (2.2) lines
+of the one above, and each begins with a step word or a line number, holds an assignment
+("count = 0", "c <- 0", `:=`), is a line of math, or starts further right than the first step; a
+line that is none of these ends the block. The caption stays a block of its own. The text has one
+line to a step, indented `ALGORITHM_INDENT` (2) spaces per level.
+
+Line numbers ("3:", "12") are cut off the words and written in a gutter, right-aligned in front
+of the step ("3:   if x then"). The levels come from where the words start, not from the numbers,
+and the steps must carry consecutive numbers (`_Steps.expect`), so a numbered list of sentences, a
+table with a line-number column and line numbers in a page margin (which no step follows) are not
+taken. Up to `ALGORITHM_PREAMBLE` (4) lines (Input, Output) may come before the first number. A
+step that goes on in a second line (the line before it ran to within `ALGORITHM_WRAPPED` (3) em of
+the column's right edge, and the new line has no number, does not start with a capital or a step
+word) is joined to its step; a word broken by a hyphen across the wrap is mended. A bit of math or
+small print the text layer cut off a line (`ALGORITHM_SAME_LINE`) is a piece of that line, and rows
+the page lists out of order are put back in the order of their lines.
+
+A display equation between two steps ends the rows there; the algorithm goes on at the next step
+within `ALGORITHM_REACH` (16) lines (`_after_equation`) as a second block. The levels are those
+of the whole algorithm, so the second block keeps the indentation it had, the line numbers
+continue, and the equation keeps its crop and its place in the order. Unlike program code an
+algorithm's inline math stays math: a math row inside it becomes text, the formulas in it are
+inline equations as in any paragraph, and `assemble.code_block` writes them with the equation
+markup. In the Word file a code block that holds an equation is written as lines of a paragraph
+(pandoc would flatten the equation to its characters), the indentation and the gap after a line
+number as no-break spaces (`export_docx._lines_of`). A monospaced listing is code, read before
+this, and its line numbers are not taken apart.
 
 **Monospaced quotations (WS2.6 c).** A block of monospaced lines that has none of the
 punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier followed by

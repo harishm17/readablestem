@@ -37,6 +37,23 @@
   header row, so the notice is where a reviewer learns what students get.
 - Stored results: the notice list of a document with a continued table changes, and PDFs of
   the shapes above read differently, so this goes with the wave's `PIPELINE_VERSION` raise.
+## Unreleased: algorithm blocks with line numbers, wrapped steps and equations (branch fix/algorithm-blocks, O-050, WS2.6)
+
+- Algorithms (`layout/blocks.py`: `_algorithm_groups`, `_scan`, `_is_algorithm`, `_place`): a
+  line-numbered algorithm is one `<pre><code>` block whose line numbers are kept apart from the
+  words (a right-aligned gutter) and whose indentation is the steps' own; a step that wraps and
+  goes on at the left edge is one step (a word broken at the wrap is mended); an algorithm with no
+  "Algorithm n" line is found from its steps when they are numbered or form an indent ladder with a
+  closing step; a display equation or a page break in the middle leaves two blocks with the same
+  levels, the equation keeping its crop and its place. Numbered lists, tables with a line-number
+  column, margin line numbers and monospaced listings are not taken. Four fields on `_Row`
+  (`algo_level`, `algo_number`, `algo_start`, `algo_join`) carry the result.
+- A paragraph that opens "Algorithm 2 shows ..." or has "Algorithm 2." at the start of a line is
+  not an algorithm when some of its lines begin with "for" or "if": lines that all run on from
+  one to the next are prose (`_reads_on`).
+- Word export (`export_docx._lines_of`): the gap after a line number is no-break spaces too.
+- PIPELINE_VERSION and RENDER_VERSION are not raised here; a raise is owed (stored documents with
+  an algorithm change their block text).
 
 ## Unreleased: Listen's side panel for a large picture, and very wide equations on paper (branch fix/wide-print-and-listen-column)
 

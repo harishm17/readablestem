@@ -291,7 +291,155 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
         prose(page, y, "Each word is checked once, and the count is kept at the end.")
         prose(page, y + 22, "The result is then compared with the reader's own marks.")
 
-    assert not [e for e in analyze(page_of(fill)).elements if e.preformatted]
+    def paragraph(page):  # its lines run on, and three of them begin with a step word
+        lines = (
+            "We now turn to the second method, which is faster on long poems and is the one "
+            "listed below in|Algorithm 2. The scan is run once over the whole verse and the "
+            "marks are kept in a table that|for every word holds the count of its stressed "
+            "syllables, so the reader can check the result,|if the reader wants to, against the "
+            "marks in the printed edition of the poem that we used here|while the scan is still "
+            "running on the next verse."
+        )
+        for n, line in enumerate(lines.split("|")):
+            page.insert_text((72, 100 + 13.5 * n), line, fontsize=BODY, fontname="helv")
+        prose(page, 190, "The count is printed after the last word of the verse is read.")
+
+    for page in (fill, paragraph):
+        assert not [e for e in analyze(page_of(page)).elements if e.preformatted]
+
+
+NUMBERED = [
+    (0, "count = 0"),
+    (0, "for each word w in the line do"),
+    (1, "if w is stressed then"),
+    (2, "count = count + 1"),
+    (1, "end if"),
+    (0, "end for"),
+    (0, "return count"),
+]
+
+
+def numbered_algorithm(
+    page, y: float, steps=NUMBERED, caption="Algorithm 2 Scan a verse", wrapped=None
+):
+    """Steps numbered "1:", "2:" in a left gutter, indented by level; a step listed in `wrapped`
+    goes on at the left edge of the text on a second line."""
+    if caption:
+        page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
+        y += 14
+    for n, (level, text) in enumerate(steps, 1):
+        page.insert_text((72, y), f"{n}:", fontsize=BODY - 1, fontname="helv")
+        page.insert_text((95 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+        y += 14
+        if wrapped and n in wrapped:
+            page.insert_text((95, y), wrapped[n], fontsize=BODY, fontname="helv")
+            y += 14
+    return y + 10
+
+
+NUMBERED_LINES = [
+    "1: count = 0",
+    "2: for each word w in the line do",
+    "3:   if w is stressed then",
+    "4:     count = count + 1",
+    "5:   end if",
+    "6: end for",
+    "7: return count",
+]
+
+
+def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_without_a_caption():
+    for caption in ("Algorithm 2 Scan a verse", None):
+
+        def fill(page, caption=caption):
+            y = prose(page, 100, "The scan of a verse is listed in")
+            y = prose(page, y, "Algorithm 2.")  # a sentence's last line, not a caption
+            y = numbered_algorithm(page, y, caption=caption)
+            prose(page, y + 10, "The count is printed after the last word.")
+
+        elements = analyze(page_of(fill)).elements
+        steps = [e for e in elements if e.preformatted]
+        assert len(steps) == 1 and steps[0].text.split("\n") == NUMBERED_LINES
+        assert caption is None or any(e.text == caption for e in elements)
+
+
+def test_a_step_that_wraps_back_to_the_left_edge_stays_one_step():
+    def fill(page):
+        y = prose(page, 100)
+        long = "count = count + 1 and then add the length of the word to the running total"
+        steps = [*NUMBERED[:3], (2, long), *NUMBERED[4:]]
+        y = numbered_algorithm(page, y + 10, steps, wrapped={4: "of the verse so far"})
+        prose(page, y + 10, "The count is printed after the last word.")
+
+    steps = [e for e in analyze(page_of(fill)).elements if e.preformatted]
+    assert len(steps) == 1
+    lines = steps[0].text.split("\n")
+    assert len(lines) == 7
+    assert lines[3] == (
+        "4:     count = count + 1 and then add the length of the word to the running total"
+        " of the verse so far"
+    )
+
+
+def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_levels():
+    def fill(page):
+        y = prose(page, 100)
+        page.insert_text((72, y + 10), "Algorithm 3 Scan a verse", fontsize=BODY, fontname="helv")
+        y += 24
+        for n, (level, text) in enumerate(NUMBERED, 1):
+            page.insert_text((72, y), f"{n}:", fontsize=BODY - 1, fontname="helv")
+            page.insert_text((95 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+            if n == 3:  # a display equation with a fraction bar sits between steps 3 and 4
+                page.insert_text((280, y + 14), "v =", fontsize=12)
+                page.insert_text((306, y + 6), "d", fontsize=12)
+                page.draw_line((302, y + 10), (316, y + 10), width=0.6)
+                page.insert_text((306, y + 23), "t", fontsize=12)
+                y += 40
+        prose(page, y + 10, "The count is printed after the last word.")
+
+    elements = analyze(page_of(fill)).elements
+    assert [(e.kind, bool(e.preformatted)) for e in elements][2:5] == [
+        (Kind.PARAGRAPH, True),
+        (Kind.EQUATION, False),
+        (Kind.PARAGRAPH, True),
+    ]
+    assert [e.text.split("\n") for e in elements if e.preformatted] == [
+        NUMBERED_LINES[:3],
+        NUMBERED_LINES[3:],
+    ]
+
+
+def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():
+    def exercises(page):
+        y = prose(
+            page, 100, "Ask each student to do the following exercises before the next class."
+        )
+        for n, text in enumerate(
+            [
+                "Describe how a verse is scanned for stress marks.",
+                "Explain why the count of stressed syllables matters.",
+                "Compare the scansion of two poems by the same author.",
+                "Write a short note on what you found and why it matters.",
+            ],
+            1,
+        ):
+            page.insert_text((72, y), f"{n}.", fontsize=BODY, fontname="helv")
+            page.insert_text((95, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        prose(page, y + 10, "Hand your answers in by Friday.")
+
+    def table(page):
+        y = 100.0
+        rows = [("Alpha", "low"), ("Beta", "high"), ("Gamma", "mid"), ("Delta", "low")]
+        for n, (name, level) in enumerate(rows, 1):
+            page.insert_text((72, y), str(n), fontsize=BODY, fontname="helv")
+            page.insert_text((120, y), name, fontsize=BODY, fontname="helv")
+            page.insert_text((250, y), level, fontsize=BODY, fontname="helv")
+            y += 16
+
+    for fill in (exercises, table):
+        assert not [e for e in analyze(page_of(fill)).elements if e.preformatted]
 
 
 # ------------------------------------------------------------------------- glossary
