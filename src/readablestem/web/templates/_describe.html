@@ -14,14 +14,14 @@
 {% set text = item.values.get("description", "") %}
 {% set choice = item.no_proposal and not text %}
 <details class="edit-box describe-box"{% if err or text or choice %} open{% endif %} id="describe-{{ eid }}">
-  <summary>{% if text %}Change the description in words{% elif choice %}Keep as a picture with my description{% else %}Describe it in words{% endif %}<span class="visually-hidden"> ({{ name }})</span></summary>
+  <summary>{% if text %}Change the description in words{% elif choice %}{{ strings.KEEP_AS_IMAGE }} with my description{% else %}Describe it in words{% endif %}<span class="visually-hidden"> ({{ name }})</span></summary>
   {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "decide-form"}) %}
     <input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ result_version }}">
     {% set describe_hint %}{{ item.describe_hint }} One or two short sentences; aim for {{ alt_guideline }} characters or fewer{% if text %} (this has {{ text|length }}){% endif %}.{% if text %} Empty the box and save to take the description away.{% endif %}{% endset %}
     {% call(aria) field("description-" ~ eid, "Description of " ~ name, error=err, hint=describe_hint, hint_id="description-hint-" ~ eid, error_id="description-error-" ~ eid) %}
       <textarea id="description-{{ eid }}" name="description" rows="3" maxlength="1000" class="prose-input" data-edit-field{{ aria }}>{{ text }}</textarea>
     {% endcall %}
-    <button type="submit" name="action" value="describe" class="button-secondary" data-role="describe">{% if choice %}Keep as a picture{% else %}Save the description{% endif %}<span class="visually-hidden"> of {{ name }}</span></button>
+    <button type="submit" name="action" value="describe" class="button-secondary" data-role="describe">{% if choice %}{{ strings.KEEP_AS_IMAGE }}{% else %}Save the description{% endif %}<span class="visually-hidden"> of {{ name }}</span></button>
   {% endcall %}
 </details>
 {% endif %}

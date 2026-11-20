@@ -75,7 +75,7 @@ def test_a_decision_is_listed_with_who_when_and_what_the_tool_had(web):
     decide(web, "p2-e2", action="reject")
     words = text_of(web.browser.get(f"/jobs/{web.job_id}/record").text)
     assert "Decisions and changes made by a person" in words
-    assert "Accepted" in words and "Rejected, original kept" in words
+    assert "Accepted" in words and "Kept as image" in words and "Rejected" not in words
     assert "Asked for a decision" in words  # what the tool had for the first
     assert ALICE in words  # by whom
     assert re.search(r"\w+ \d{1,2}, 20\d\d, \d\d:\d\d UTC", words)  # when

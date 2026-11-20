@@ -42,7 +42,7 @@ from readablestem.core.types import DocumentResult, Notice
 from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
-from readablestem.web import job_page
+from readablestem.web import job_page, strings
 from readablestem.web import outcome as words
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_day, format_time
@@ -366,7 +366,7 @@ class Context:
 class Counts:
     """The open required decisions of a finished job (a group of repeated headings counted
     once), and what the statement of what was converted, checked and reviewed
-    (`pipeline.checked.CheckedSummary`) says of it: `whole`, whether it is ready to share, and
+    (`pipeline.checked.CheckedSummary`) says of it: `whole`, whether it is ready to post, and
     `remains`, what stands between it and that. `open` is the summary's own count when there
     is one; the documents list passes the stored `jobs.open_decisions` alone for a job with
     decisions open, made by the same function (`core.triage.review_load`). `whole` None: not
@@ -606,7 +606,7 @@ def gaps_of(job: Facts, left: int, viewer: str = "owner", ctx: Context | None = 
     missing = (
         Step(
             "missing",
-            "Convert the missing items",
+            strings.CONVERT_MISSING_ITEMS,
             f"/jobs/{job.id}/retry",
             form=True,
             explain="Only the items that were not converted are sent again. Nothing is counted "
@@ -800,7 +800,7 @@ def finished_facts(result: object) -> dict[str, Any] | None:
     word to add (`gaps_of`, `_unanalysed_pages`, `_held_by_notice`). A plain result is read by
     `load` from these alone; any other has its result read. `by` names the code that made
     them (`_facts_stamp`): facts made by other code are made again on first sight, so a list
-    never shows a sentence or a "Ready to share" that this code would not say. None for a
+    never shows a sentence or a "Ready to post" that this code would not say. None for a
     result this version cannot read."""
     if not isinstance(result, dict):
         return None
@@ -859,7 +859,7 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | Non
             return _make("ready_remains", held, steps)
         return _make("ready", checked_words.READY_ALL, steps)
     # Not known to be whole (no summary), or a part is a picture, a page is left out or a
-    # structure check failed: "Ready", and what remains, never "Ready to share".
+    # structure check failed: "Ready", and what remains, never "Ready to post".
     return _make("ready_remains", counts.remains, steps)
 
 

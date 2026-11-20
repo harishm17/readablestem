@@ -1,7 +1,7 @@
 {# Audiences: owner #}
 {% from "components/forms.html" import form with context %}
 {# "Try again" (T3-1, web/retry.py): for a conversion that stopped, or finished with parts
-   not converted because the AI service did not answer or the day's budget ran out.
+   not converted because the model did not answer or the day's budget ran out.
    `job.retry` is the state's offer (web/states.py), with the tries left in its label; None
    when trying again cannot help. With no tries left the state's message says so and its
    next step is to upload the file again. #}

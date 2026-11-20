@@ -296,7 +296,7 @@ CHECKS_SCOPE = "They check structure, not whether the content is right."
 
 
 def not_converted_sentence(s: CheckedSummary) -> str:
-    """What stands between the file and "Ready to share" among its parts, said as each is
+    """What stands between the file and "Ready to post" among its parts, said as each is
     shown: "2 equations are shown as images that screen readers cannot read." for a picture;
     "2 equations are shown as LaTeX text, not written so that screen readers can read them
     aloud." for an equation of a Word or LaTeX file, which has no picture ("" when none)."""
@@ -368,7 +368,7 @@ def checks_failed_sentence(s: CheckedSummary) -> str:
 
 
 def remains(s: CheckedSummary) -> str:
-    """What stands between a finished job with no open decision and "Ready to share" ("" when
+    """What stands between a finished job with no open decision and "Ready to post" ("" when
     nothing does)."""
     parts = [
         not_converted_sentence(s),
@@ -507,7 +507,7 @@ ACTION_ROWS = {
     "accepted": "Accepted as proposed by a person",
     "accepted_failing_check": "Accepted by a person with a check failing",
     "edited": "Edited by a person",
-    "kept_as_image": "Kept as a picture by a person",
+    "kept_as_image": "Kept as image by a person",
     "marked_decorative": "Marked as decoration by a person",
     "optional_unopened": "Optional notes never opened",
 }

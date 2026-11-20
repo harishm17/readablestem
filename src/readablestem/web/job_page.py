@@ -23,7 +23,7 @@ wording is tested in one place. Design notes:
   layer is never called unreadable, and there is no score. The equation text shown is
   document content: it is rendered for the owner only and never logged.
 - **Notices** (`notice_lists`): `pipeline.notices.current` sorted into "Not handled in
-  this file" (what the result records as found and not converted), "Worth checking", and
+  this file" (what the result records as found and not converted), "Worth a look", and
   "Handled in this file" (footnotes and code blocks, one line each with its count). One
   sentence each (`web.messages`), with the page and a link to the decision when a notice
   has one; what the file does not contain is never listed.
@@ -660,7 +660,7 @@ def _link_row(facts: SourceFacts, result: DocumentResult, yes: str) -> Row | Non
     )
     section = notice_rules.section(notice) if notice is not None else "not_handled"
     href = "#worth-checking-heading" if section == "worth_checking" else "#not-handled-heading"
-    return Row("follow the links", pdf, html, href, "See the notice")
+    return Row("follow the links", pdf, html, href, "See the notes")
 
 
 def _title_row(facts: SourceFacts, result: DocumentResult) -> Row:

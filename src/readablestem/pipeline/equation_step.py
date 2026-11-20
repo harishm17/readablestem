@@ -1499,7 +1499,7 @@ def _fix(
     bar = SKIP_ESCALATION_FROM if single else _accept_at(candidate, settings)
     if confidence >= bar and all(c.code in NOTE_CODES for c in failed):
         # Notes only (a cosmetic style difference, no speech text): accepted, listed as
-        # optional checks on the review screen.
+        # optional items on the review screen.
         return make(Status.ACCEPTED, proposal=True, review="optional" if failed else "none")
     return make(Status.NEEDS_REVIEW, proposal=True)
 

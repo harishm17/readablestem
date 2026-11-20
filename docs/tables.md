@@ -80,7 +80,7 @@ the largest that got through the detector at all):
 
   A stop is said, not silent: the conversion writes the "not finished" fact `table_search`
   with reason `time_limit` for each page cut short (`job_not_finished`, operations.md), each
-  such page carries the notice `tables_not_searched` ("Worth checking"), and the job is
+  such page carries the notice `tables_not_searched` ("Worth a look"), and the job is
   not "Ready" with nothing to add until the owner has seen it. A document within the budget
   reads exactly as it would without one. Evals and replays run without it
   (`TABLE_SEARCH_UNLIMITED`, eval.md "The same file gives the same document"), so no score
@@ -270,9 +270,9 @@ rules above.
    its header to the third from the second. A part that printed its header again keeps it and
    gets no second one. Where the columns do not agree, or the part's first rows repeat the
    header without being marked as one, nothing is carried and the notice
-   `table_header_missing` ("Worth checking") says the part has no header row. A table whose
+   `table_header_missing` ("Worth a look") says the part has no header row. A table whose
    first part has no header row gets neither. A part that is given the header gets the notice
-   `table_header_carried` ("Worth checking"): the review card shows the grid stored for the
+   `table_header_carried` ("Worth a look"): the review card shows the grid stored for the
    part, which has no header row, so the notice is where a reviewer learns what students get
    and can check that the two parts are one table.
 

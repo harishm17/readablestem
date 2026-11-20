@@ -21,7 +21,7 @@ Layout (see `web.review` for the rules), in three sections:
    (T3-11, `routes/edits.py`) and, with a page that lists them first, equations whose
    checks passed and figures with generated alt text (`web.bulk_accept`, `routes/bulk.py`).
    "Needs your decision" can be narrowed by kind and page (`filter_decisions`).
-2. "Optional checks (M)": fixes accepted automatically with a note (a cosmetic style
+2. "Optional items (M)": fixes accepted automatically with a note (a cosmetic style
    difference, a heading with weak evidence, a long alt text), folded away in a
    <details>, each note in plain English. Nothing there blocks "done"; each can still be
    edited or rejected. A note of the second automated check (a possible mismatch between
@@ -84,6 +84,7 @@ from readablestem.web import (
     page_images,
     queue,
     shares,
+    strings,
 )
 from readablestem.web.compare import region_pixels
 from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
@@ -232,31 +233,31 @@ class RejectWords:
 
 REJECT_WORDS = {
     Kind.EQUATION: RejectWords(
-        "Keep as image",
+        strings.KEEP_AS_IMAGE,
         "Students see a picture. Screen readers read the characters the PDF holds for it, "
         "and warn first where fractions and exponents may run together.",
         "Kept as an image of the original. Screen readers will hear the characters the PDF "
         "holds for the equation, with a warning first where fractions and exponents may "
         "run together.",
-        "Kept as an image by you",
+        strings.KEPT_AS_IMAGE,
     ),
     # A table's image is kept, marked "not converted" (when there was no proposal, there
     # is nothing else to keep).
     Kind.TABLE: RejectWords(
-        "Keep as image",
-        "Students see a picture marked “not converted”; screen readers get no table.",
-        "The image of the table is kept in the document, marked “not converted”.",
-        "Kept as an image by you",
+        strings.KEEP_AS_IMAGE,
+        "Students see a picture marked “Not converted”; screen readers get no table.",
+        "The image of the table is kept in the document, marked “Not converted”.",
+        strings.KEPT_AS_IMAGE,
     ),
     # Text read from an image of a scanned or handwritten page (ADR 0007).
     Kind.PARAGRAPH: RejectWords(
-        "Keep as image",
+        strings.KEEP_AS_IMAGE,
         "Students see a picture marked “Not converted”; screen readers get no text.",
         "The text is kept as an image of the original, marked “Not converted”.",
-        "Kept as an image by you",
+        strings.KEPT_AS_IMAGE,
     ),
     Kind.FIGURE: RejectWords(
-        "Keep without a description",
+        strings.KEEP_WITHOUT_DESCRIPTION,
         "The figure stays, marked “Needs a description”; screen readers get no description.",
         "Kept without a description, marked “Needs a description”.",
         "Left without a description by you",
@@ -275,17 +276,17 @@ PLAIN_TEXT_WORDS = RejectWords(
     "Made plain text by you",
 )
 OTHER_WORDS = RejectWords(
-    "Keep the original",
+    strings.KEEP_ORIGINAL,
     "The PDF's original stays, marked for a later look.",
     DONE_MESSAGES["reject"],
-    "Original kept by you",
+    strings.KEPT_ORIGINAL,
 )
 
 
 # A formula of a LaTeX source with no picture to keep (`web.review.reject_keeps`): its
 # LaTeX stays as it was written, marked for a later look.
 AS_WRITTEN_WORDS = RejectWords(
-    "Leave as written",
+    strings.LEAVE_AS_WRITTEN,
     "Students see the LaTeX as it was written, marked “Not converted”.",
     "Left as written, marked “Not converted”.",
     "Left as written by you",
@@ -294,10 +295,10 @@ AS_WRITTEN_WORDS = RejectWords(
 
 # A page (or handwriting) kept as an image before any model work (pipeline.page_type).
 KEPT_IMAGE_WORDS = RejectWords(
-    "Keep as image",
+    strings.KEEP_AS_IMAGE,
     "Students see a picture marked “Not converted”; screen readers hear only that.",
     "Kept as an image, marked “Not converted”.",
-    "Kept by you",  # short: the review screen's status pill does not wrap at 320 px
+    strings.KEPT_AS_IMAGE,
 )
 
 
@@ -385,7 +386,7 @@ def counted(n: int, kind: Kind) -> str:
 class CheckView:
     text: str  # sentence for the reviewer (web.messages)
     code: str  # "name: code", shown small for debugging
-    severity: str  # "Must be fixed", "Worth checking", or "Note" on an optional check
+    severity: str  # "Must be fixed", "Worth a look", or "Note" on an optional item
 
 
 @dataclass
@@ -817,11 +818,7 @@ def page_group_view(
     region = reason == "handwriting_on_page"
     hint_kind = "handwriting" if region else "drawn" if reason == "unread_page" else "page"
     hint = PAGE_GROUP_HINTS[hint_kind][many]
-    if region:
-        button = "Keep the handwriting as images" if len(members) > 1 else "Keep it as an image"
-        button += ", marked “Not converted”"
-    else:
-        button = f"Keep the page image{'s' if many else ''}, marked “Not converted”"
+    button = strings.KEEP_AS_IMAGE
     kept = {p - 1 for p in pages}
     hidden_chars = sum(t.left_out_chars for t in result.page_types if t.page in kept)
     hidden = ""
@@ -1718,7 +1715,7 @@ def _page(
     for fix in result.fixes:
         first_fix.setdefault(fix.element_id, fix)
     # T3-7: the notices about links, text and figures, each with where it is on the review
-    # screen, listed with the optional checks.
+    # screen, listed with the optional items.
     note_rows = notice_places.rows(
         view.id,
         [

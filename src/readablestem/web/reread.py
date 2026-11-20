@@ -55,7 +55,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from readablestem.core.budget import BudgetExceeded, JobBudget, Reservation
 from readablestem.core.types import Element, Fix, ModelCall
 from readablestem.models.base import T, VisionClient, VisionRequest
-from readablestem.web import access, notation
+from readablestem.web import access, notation, strings
 from readablestem.web.database import rowcount, utc_today
 from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.deps import get_ctx
@@ -212,7 +212,7 @@ def reread_allowance_message(allowance: int) -> str:
     again at midnight UTC)."""
     used_up = allowance_phrase(allowance, allowance, "read", retry_after().words)
     return (
-        f"Model reads from the review screen: {used_up} "
+        f"{strings.MODEL_READS_TODAY}: {used_up} "
         "That is the most a new account can start. A read counts when it starts and is given "
         "back when nothing was read. So this could not be read. Type it yourself, or try "
         "again then."

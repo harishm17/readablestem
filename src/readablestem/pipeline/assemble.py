@@ -400,8 +400,8 @@ IMAGE_PAGE_NOTE = Words(
 IMAGE_PAGE_LABEL = Words("Note:", "Converted from an image of the page.")
 IMAGE_PAGE_SHOW = Words("Show the original page {page}")
 IMAGE_PAGE_ORIGINAL_ALT = Words(
-    "Original of page {page}.", "Original of page {page}, shown for comparing with the converted "
-        "text."
+    "Original of page {page}.",
+    "Original of page {page}, shown for comparing with the converted text.",
 )
 # The label of a figure's note: to the student what is missing, to the checker what to do.
 FIGURE_LABEL = Words("No description.", "Needs a description.")

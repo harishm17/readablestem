@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 from readablestem.core.types import PageType
 from readablestem.pipeline import page_type
 from readablestem.pipeline.checked_words import source_noun
+from readablestem.web import strings
 
 if TYPE_CHECKING:
     from readablestem.config import Settings
@@ -235,8 +236,8 @@ def outage_message(result_json: dict[str, Any] | None, *, offered: bool = True) 
     )
     if offered:
         text += (
-            " Use “Convert the missing items” below, now or later: only those items are sent "
-            "again, and it does not use up your daily pages."
+            f" Use “{strings.CONVERT_MISSING_ITEMS}” below, now or later: only those items "
+            "are sent again, and it does not use up your daily pages."
         )
     return text
 
@@ -253,8 +254,8 @@ def budget_message(result_json: dict[str, Any] | None, code: str, *, offered: bo
         text += f" {KEPT}"
         if offered:
             text += (
-                " After 00:00 UTC use “Convert the missing items” below to convert them: only "
-                "those items are sent again, and it does not use up your daily pages."
+                f" After 00:00 UTC use “{strings.CONVERT_MISSING_ITEMS}” below to convert "
+                "them: only those items are sent again, and it does not use up your daily pages."
             )
         return text
     return (

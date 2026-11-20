@@ -1,4 +1,4 @@
-"""Download all: one zip of the documents that are ready to share (T3-4, `web.bundle`).
+"""Download all: one zip of the documents that are ready to post (T3-4, `web.bundle`).
 
 `GET /app/download` is every ready document of the person, `GET /courses/{id}/download` the
 ones converted for one course. Both are plain GETs for the owner, like a single download: no

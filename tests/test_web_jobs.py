@@ -111,7 +111,7 @@ def test_the_keep_checkboxes_are_off_by_default(web):
         checkbox = page[page.index(f'id="{box}"') - 60 : page.index(f'id="{box}"') + 120]
         assert "checked" not in checkbox
     assert "Keep for 7 days" in page
-    assert "Also let us look at the results (30 days)" in page
+    assert "Also let ReadableSTEM look at the results (30 days)" in page
 
 
 @pytest.mark.parametrize(

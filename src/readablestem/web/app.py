@@ -44,7 +44,17 @@ from readablestem.observability.logging import configure_logging, request_loggin
 from readablestem.observability.tracing import NoopTracer, Tracer, make_tracer
 from readablestem.ops.launch import launch_blockers
 from readablestem.pipeline import checked_words, language
-from readablestem.web import analytics, dev_only, forms, notation, output, page_images, poll, seo
+from readablestem.web import (
+    analytics,
+    dev_only,
+    forms,
+    notation,
+    output,
+    page_images,
+    poll,
+    seo,
+    strings,
+)
 from readablestem.web.assets import CachedStaticFiles, static_url
 from readablestem.web.auth import make_oauth, seed_admins
 from readablestem.web.auth import router as auth_router
@@ -226,6 +236,7 @@ def make_templates(site_url: str = "") -> Jinja2Templates:
     env.globals["zip_limit"] = zip_limit  # ty: ignore[invalid-assignment]
     env.globals["allowance"] = _allowance  # ty: ignore[invalid-assignment]
     env.globals["PAGES_RULE"] = PAGES_RULE  # ty: ignore[invalid-assignment]
+    env.globals["strings"] = strings  # ty: ignore[invalid-assignment]
     # Beside a button that starts a model read, for a person the document was shared with.
     env.globals["REREAD_SHARED_NOTE"] = REREAD_SHARED_NOTE  # ty: ignore[invalid-assignment]
     env.filters["utc_text"] = _utc_text

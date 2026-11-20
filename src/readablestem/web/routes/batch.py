@@ -247,7 +247,7 @@ def batch_page(request: Request, result_id: str, user: UserDep) -> Response:
 
 @router.get("/app/batch/{result_id}/download")
 def batch_download(request: Request, result_id: str, user: UserDep) -> Response:
-    """One zip of this batch's documents that are ready to share (`routes.bundle`): finished,
+    """One zip of this batch's documents that are ready to post (`routes.bundle`): finished,
     no decision open. The same rules as "Download all", for this batch's documents only."""
     _, ids = _batch(request, result_id, user)
     if not ids:

@@ -1,6 +1,6 @@
 """The second automated check's note on the review screen, in a real browser.
 
-An accepted figure the check flagged is listed under "Optional checks" with the plain
+An accepted figure the check flagged is listed under "Optional items" with the plain
 sentence from web/messages.py, never under "Needs your decision"; the page has zero
 serious or critical axe-core violations at 1280 and 320 CSS px and does not scroll
 sideways on a phone. Run with: uv run pytest -m browser tests/test_web_second_check_browser.py

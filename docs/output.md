@@ -1120,7 +1120,7 @@ accessibility summary, the Canvas README, the record) says they are not in the f
 `file_repaired` (optional) is the line for a repaired file with content on every page.
 
 `lang_assumed` and `lang_mixed` are required checks: until the owner confirms the language
-or changes it, the job is not "Ready to share" (the state "Converted: confirm the
+or changes it, the job is not "Ready to post" (the state "Converted: confirm the
 language", `web.states`) and the open item is counted. Where the document language
 came from is `DocumentResult.lang_source`. The job page shows the language and lets the
 instructor change it: the route calls `text_pass.set_document_language(result, tag)` (a
@@ -1157,7 +1157,7 @@ SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></s
 The text itself is unchanged (`H2O`), so search and copy read as before. A run is skipped
 when it would start inside an inline equation's marker or overlap another. What cannot be
 carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
-written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+written flat, and the notice `scripts_flattened` ("Worth a look") says where.
 
 The page, Word and the EPUB keep the raised or lowered run as `<sup>`, `<sub>` or Word's own
 superscript and subscript, which a screen reader reads as plain characters ("g/cm3"). Listen
@@ -1295,7 +1295,7 @@ What each output holds for the struck date above:
 
 Where runs come from: the text pass marks struck PDF text (docs/layout.md "Struck text"),
 and the LaTeX reader turns `\sout` and `\xout` (ulem) into deleted runs. Each element with
-struck text gets the optional notice `struck_text` ("Worth checking", with its page; it adds
+struck text gets the optional notice `struck_text` ("Worth a look", with its page; it adds
 no required decision): the instructor may want to take out words students no longer need.
 A text edit that changes struck words takes the run off, and the edit's message counts it
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
@@ -1942,7 +1942,7 @@ Keep the two in step when a limit changes.
   in a figure's caption. A link whose rectangle covers only part of a word links that
   part.
 - Link text is kept as printed, also when it says nothing on its own ("click here"):
-  only the instructor can reword it (the job page lists it as worth checking).
+  only the instructor can reword it (the job page lists it as “Worth a look”).
 - Language detection needs about 100 letters of prose; a short handout of mostly math is
   assumed to be English unless the PDF says otherwise, and the job then waits for you to
   confirm the language. You can also choose the language when you upload. A passage is

@@ -55,7 +55,7 @@
 {# A table's findings are with its proposal (each names the part of the table it is about). #}
 {% if item.checks and not (item.table and item.table.findings) %}
 <div class="explained">
-  <p><strong>{% if item.second_check %}Optional item (worth a look; it does not hold up the document):{% elif item.optional %}Optional item (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
+  <p><strong>{% if item.second_check %}{{ strings.OPTIONAL_ITEM }} (worth a look; it does not hold up the document):{% elif item.optional %}{{ strings.OPTIONAL_ITEM }} (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
   <ul class="check-list">
     {% for check in item.checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>
@@ -374,7 +374,7 @@
           <li><a href="{{ parts.link('group-' ~ g.slug) }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
           {% endfor %}
         </ul>{% endif %}</li>
-      <li><a href="{{ parts.link('optional-checks') }}">Optional items</a>: {{ optional|length + note_rows|length }}</li>
+      <li><a href="{{ parts.link('optional-checks') }}">{{ strings.OPTIONAL_ITEMS }}</a>: {{ optional|length + note_rows|length }}</li>
       <li><a href="{{ parts.link('decided') }}">Your decisions</a>: {{ mine|length }}</li>
       <li><a href="{{ parts.link('accepted') }}">Accepted automatically</a>: {{ auto|length }}</li>
       {% if has_pages %}<li><a href="{{ parts.link('page-changes') }}">Page changes</a></li>{% endif %}
@@ -512,7 +512,7 @@
 
 {% if parts.shows("optional-checks", "optional", "notes") %}
 <section id="optional-checks" class="review-section" aria-labelledby="optional-checks-title" tabindex="-1">
-  <h2 id="optional-checks-title">Optional items ({{ optional|length + note_rows|length }})</h2>
+  <h2 id="optional-checks-title">{{ strings.OPTIONAL_ITEMS }} ({{ optional|length + note_rows|length }})</h2>
   {% if optional %}
   {% if second_checks %}
   {% set small = optional|length - second_checks %}

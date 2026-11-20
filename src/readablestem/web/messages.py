@@ -22,6 +22,7 @@ from dataclasses import dataclass
 
 from readablestem.core.types import Check, DocumentResult, Kind, Notice
 from readablestem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
+from readablestem.web import strings
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
 # went wrong; a code alone can be ambiguous ("empty" LaTeX vs "empty" alt text).
@@ -31,7 +32,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
         "source.macro",
         "unknown_command",
     ): "This formula could not be read from the source file as it is (it uses a command this "
-    "tool does not know, or a form it cannot convert): correct it or choose “Leave as written”.",
+    "tool does not know, or a form it cannot convert): correct it or choose "
+    f"“{strings.LEAVE_AS_WRITTEN}”.",
     # LaTeX source (readablestem.source.ltx_reader): what a table, heading or figure shows
     # that LaTeX could not read, or a picture that left its table cell
     (
@@ -47,7 +49,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "it is.",
     # LaTeX (pipeline.validate.check_latex)
     ("latex.not_empty", "empty"): "The transcription is empty: type the LaTeX for this "
-    "equation, or choose “Keep as image”.",
+    f"equation, or choose “{strings.KEEP_AS_IMAGE}”.",
     ("latex.length", "too_long"): f"The LaTeX is longer than {MAX_LATEX_CHARS:,} characters, "
     "which usually means more than one equation was transcribed.",
     ("latex.balanced_braces", "unbalanced_braces"): "A { has no matching } (or the other way "
@@ -414,14 +416,14 @@ REASON_MESSAGES: dict[str, str] = {
     "low_confidence": "The model was not sure enough to make a proposal, so write one "
     "yourself or keep the original.",
     "not_equation": "The model judged that this is not an equation: if it is, type the LaTeX, "
-    "and if not, choose “Keep as image”.",
+    f"and if not, choose “{strings.KEEP_AS_IMAGE}”.",
     # An equation read from a PDF, and a formula of a LaTeX or Word source that could not be
     # converted and has no proposal of ours (`source.ltx_reader.equation_fix`): the same words
     # are true of both, so they name neither the model nor the image.
     "invalid_latex": "The LaTeX for this equation failed a required check (listed below), so "
     "correct it or keep the original.",
     "invalid_alt": "The model's alt text failed a required check (listed below), so write new alt "
-    "text or choose “Keep without a description”.",
+    f"text or choose “{strings.KEEP_WITHOUT_DESCRIPTION}”.",
     # f"model_{outcome}" for every models.base Outcome: no usable answer from any attempt
     "model_ok": "The model answered, but its answer could not be used.",
     "model_refused": "The model declined to answer for this item.",
@@ -486,7 +488,7 @@ REASON_MESSAGES: dict[str, str] = {
 }
 
 # DocumentResult.notices: one sentence per notice code for the job page's list ("Not
-# handled in this file" and "Worth checking"; core.types.Notice). Kept apart from the
+# handled in this file" and "Worth a look"; core.types.Notice). Kept apart from the
 # check and fix-reason tables because a notice is not a review decision. Every code in
 # core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py).
 NOTICE_MESSAGES: dict[str, str] = {
@@ -718,7 +720,7 @@ LISTEN_LABELS = {
     "skip-link": "Skip link",
 }
 
-SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth a look"}
+SEVERITY_LABELS = {"error": "Must be fixed", "warning": strings.WORTH_A_LOOK}
 # Failed checks of a fix accepted with optional notes (`Fix.review == "optional"`): they
 # never block anything, so they are labelled as notes, not by severity.
 NOTE_LABEL = "Note"

@@ -43,7 +43,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
-from readablestem.web import exam, job_page
+from readablestem.web import exam, job_page, strings
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_when, machine_date
 from readablestem.web.messages import (
@@ -80,7 +80,7 @@ KEEP_NOTE = (
 ACTION_WORDS = {
     "accept": "Accepted",
     "edit": "Edited",
-    "reject": "Rejected, original kept",
+    "reject": strings.KEPT_ORIGINAL,
     "add_data_table": "Added a data table",
     # Edits no decision on a proposal covers (T3-5, T3-16).
     "describe": "Described the image in words",
@@ -287,9 +287,21 @@ def _page_of(elements: dict[str, Element], element_id: str) -> int | None:
     return element.page + 1 if element is not None else None
 
 
-def _decision_words(edit: Any) -> str:
+# What "reject" kept, by the kind of item: the picture of an equation, a table or text read from
+# an image, or a figure left without a description. Any other kind keeps the original.
+REJECT_WORDS = {
+    "equation": strings.KEPT_AS_IMAGE,
+    "table": strings.KEPT_AS_IMAGE,
+    "paragraph": strings.KEPT_AS_IMAGE,
+    "figure": strings.KEPT_WITHOUT_DESCRIPTION,
+}
+
+
+def _decision_words(edit: Any, kind: str = "") -> str:
     """What the decision was, in words, from the stored action and the marks its `after` keeps."""
     action = str(edit.action)
+    if action == "reject" and kind in REJECT_WORDS:
+        return REJECT_WORDS[kind]
     after = edit.after if isinstance(edit.after, dict) else {}
     if action == "accept" and after.get(BULK_KEY):
         kind = after[BULK_KEY]
@@ -463,7 +475,7 @@ def notice_not_checked(result: DocumentResult) -> list[str]:
     """The lines of the result that say something is not in the file or was not checked (the rows
     of `core.page_checks` with `not_checked`: words left out, pages whose drawings were not
     analysed, a source never compared with a compiled copy), one sentence per code: the job
-    page lists them under "Not handled" or "Worth checking", and the record, which says "every
+    page lists them under "Not handled" or "Worth a look", and the record, which says "every
     part the tool found was converted", says them too. A page-level line names its pages, and a
     count in the sentence is the total."""
     out = []
@@ -594,7 +606,7 @@ def build(
                 item=item,
                 page=page_edit if page_edit is not None else _page_of(elements, edit.element_id),
                 tool_had=TOOL_STATUS_WORDS.get(str(before), str(before)),
-                decision=_decision_words(edit),
+                decision=_decision_words(edit, kind),
                 by=who.get(edit.user_id, owner),
                 by_file=file_who.get(edit.user_id, owner),
                 refs=(ref(item, edit.element_id),),

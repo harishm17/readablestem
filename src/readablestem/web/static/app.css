@@ -473,7 +473,6 @@ math[intent] mi { text-transform: none; }
 .explained { margin: var(--space-2) 0; }
 .explained p { margin: var(--space-1) 0; }
 .check-list li { margin: var(--space-1) 0; }
-.code-line { display: block; color: var(--ink-muted); font-size: var(--step--1); }
 .changed-note { border: 1px solid var(--ok); border-radius: var(--radius-control); background: var(--ok-tint); padding: var(--space-2) var(--space-4); margin: var(--space-3) 0; }
 @media (forced-colors: active) { .changed-note { border: 1px solid CanvasText; } }
 .heading-proposal { background: var(--surface); padding: var(--space-2) var(--space-3); border-radius: var(--radius-control); font-weight: 700; }
@@ -492,7 +491,7 @@ math[intent] mi { text-transform: none; }
    Marks on the page image: the position of each comes from /jobs/{id}/review/marks.css?page=N
    (the CSP allows no inline styles). Every mark is a link of at least 24 x 24 CSS px
    (WCAG 2.5.8), and status is in its number, shape and text, never its color alone:
-   a decision is a numbered disc and a solid frame, an optional check a "Note" label and
+   a decision is a numbered disc and a solid frame, an optional item a "Note" label and
    a dashed frame, an accepted item a tick and a dotted frame (shown on request). The
    marks keep their own colors in forced-colors mode: they sit on the page image, which
    stays white whatever the theme, and system colors could make them white on white. */
@@ -819,7 +818,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 .fallback .not-a-table { margin-top: var(--space-2); }
 .saved-state { margin: var(--space-2) 0; font-weight: 700; color: var(--ok); }
 
-/* Optional checks */
+/* Optional items */
 .optional-area { overflow-wrap: anywhere; }
 .optional-box { background: var(--surface); border-radius: var(--radius-frame); padding: var(--space-1) var(--space-4); }
 @media (forced-colors: active) { .optional-box { border: 1px solid CanvasText; } }
@@ -969,7 +968,7 @@ fieldset.fallback > legend { padding-right: var(--space-2); }
 }
 .box-required .box-tag { background: var(--pmark-required); color: #fff; }
 .box-repeat .box-tag { background: #fff; color: var(--pmark-required); border: 2px solid var(--pmark-required); }
-/* Optional checks and accepted items stay quiet: the frame's shape (dashed, dotted; the
+/* Optional items and accepted items stay quiet: the frame's shape (dashed, dotted; the
    legend says which is which) with its label ("Note", a tick) only while it is pointed
    at, focused or selected, so it never covers the words around it at rest. Its link
    name always says what it is. */

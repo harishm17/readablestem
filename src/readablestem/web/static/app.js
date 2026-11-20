@@ -1069,7 +1069,7 @@ document.addEventListener("htmx:beforeRequest", function (event) {
  *
  * - sets the tab's title to the new status ("Converted: notes.pdf"), so a tab left in the
  *   background shows it;
- * - offers an opt-in browser notice ("Notify me when it finishes"). The Notification API is
+ * - offers an opt-in browser notification ("Notify me when it finishes"). The Notification API is
  *   asked only after the button is used; where it is missing, blocked, or the page is
  *   already in front, nothing else happens. Nothing is sent to the server.
  *
@@ -1105,8 +1105,8 @@ document.addEventListener("htmx:beforeRequest", function (event) {
     box.hidden = false;
     if (permission === "granted") {
       button.setAttribute("aria-disabled", "true");
-      button.textContent = "Notice is on";
-      say("You will get a notice when it finishes, if this tab is in the background.");
+      button.textContent = "Notifications are on";
+      say("You will get a notification when it finishes, if this tab is in the background.");
     }
   }
 
@@ -1118,17 +1118,17 @@ document.addEventListener("htmx:beforeRequest", function (event) {
         if (permission === "granted") {
           showState();
         } else if (permission === "denied") {
-          say("Your browser blocked notices. This page's title still changes when it finishes.");
+          say("Your browser blocked notifications. This page's title still changes when it finishes.");
           button.setAttribute("aria-disabled", "true");
         } else {
-          say("No notice: you did not allow it.");
+          say("No notification: you did not allow it.");
         }
       };
       try {
         var asked = window.Notification.requestPermission(done);
         if (asked && typeof asked.then === "function") asked.then(done, done);
       } catch (e) {
-        say("Your browser could not ask for notices.");
+        say("Your browser could not ask for notifications.");
       }
     });
     showState();
@@ -1166,7 +1166,7 @@ document.addEventListener("htmx:beforeRequest", function (event) {
         note.close();
       };
     } catch (e) {
-      /* some browsers allow notices only from a service worker: the title still changed */
+      /* some browsers allow notifications only from a service worker: the title still changed */
     }
   });
 })();

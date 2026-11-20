@@ -611,7 +611,7 @@ def readme(export: CanvasExport) -> str:
             "",
             *_wrap(
                 "To paste the content into a Canvas Page instead, download the zip again from "
-                "the job page and enter your Canvas course number (the number after /courses/ "
+                "the document page and enter your Canvas course number (the number after /courses/ "
                 "in the address of your course). You then also get canvas-page.html, and these "
                 "instructions explain how to use it.",
                 "  ",

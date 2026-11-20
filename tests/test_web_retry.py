@@ -437,11 +437,11 @@ def test_a_conversion_during_an_outage_is_not_a_dead_end(site):
     # The job page says what happened and offers the way on; the status page says the
     # service is not answering.
     page = text_of(site.browser.get(f"/jobs/{job_id}").text)
-    assert "The AI service did not answer" in page
+    assert "The model did not answer" in page
     assert states.TABLE["ready"].label not in page
-    assert "Convert the missing parts" in page
+    assert "Convert the missing items" in page
     assert "Nothing is wrong with your PDF" in page
-    assert "The AI service is not answering right now" in page
+    assert "The model is not answering right now" in page
     status = text_of(site.browser.get("/status").text)
     assert "AI service" in status and "Not answering since" in status  # after the state's symbol
     # The person decides one of the items that was not converted: keep the original.
@@ -472,7 +472,7 @@ def test_a_conversion_during_an_outage_is_not_a_dead_end(site):
     assert site.job(job_id).cost_usd == pytest.approx(clean_cost)
     # The outage note is gone, and so is the status line (one answered request ends it).
     page = text_of(site.browser.get(f"/jobs/{job_id}").text)
-    assert "AI service did not answer" not in page
+    assert "The model did not answer" not in page
     assert "AI service Not answering" not in text_of(site.browser.get("/status").text)
     assert fixes_json(result)[: len(clean.fixes)] != []  # a real document
 

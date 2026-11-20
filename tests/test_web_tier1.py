@@ -100,7 +100,7 @@ def test_the_upload_form_has_two_separate_choices_both_off(ux):
     html = ux.browser.get("/app").text
     for box, label in (
         ("keep", "Keep for 7 days"),
-        ("share", "Also let us look at the results (30 days)"),
+        ("share", "Also let ReadableSTEM look at the results (30 days)"),
     ):
         assert f'id="{box}"' in html and f'name="{box}"' in html
         assert label in html
@@ -391,7 +391,7 @@ def test_the_link_row_counts_the_links_kept_and_names_the_lost_ones():
     assert row.pdf == "Yes: 8 links."
     assert row.html == "6 of 8 links kept; 2 were not web addresses."
     assert row.href in {"#not-handled-heading", "#worth-checking-heading"}
-    assert row.href_text == "See the notice"
+    assert row.href_text == "See the notes"
 
 
 # --------------------------------------------------------------------------- T1-18: groups

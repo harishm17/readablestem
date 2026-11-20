@@ -5,7 +5,7 @@ Three choices on the upload form, stored as `Job.retention_mode`:
 - `day`: nothing ticked. Deleted `RETENTION_HOURS` (24) after the last activity.
 - `week`: "Keep for 7 days". Deleted 7 days after the last activity;
   nobody else looks at it.
-- `dev`: "Also let us look at the results (30 days)". Kept 30 days from upload, and the
+- `dev`: "Also let ReadableSTEM look at the results (30 days)". Kept 30 days from upload, and the
   developer may look at the results to find and fix mistakes in the tool
   (`Job.opt_in_retention`, which `ops.export` reads, is true exactly for this mode).
 
@@ -30,6 +30,7 @@ from datetime import datetime, timedelta
 from typing import Literal
 
 from readablestem.config import Settings
+from readablestem.web import strings
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_when
 from readablestem.web.db import Job, utcnow
@@ -259,5 +260,5 @@ def rules_line(settings: Settings) -> str:
     return (
         f"Documents go {window_words(settings, 'day')} after you last work on them "
         f"({WEEK_DAYS} days if you keep them, {window_words(settings, 'dev')} from upload if "
-        "you let us look at the results). Files you downloaded are not affected."
+        f"you {strings.OPT_IN}). Files you downloaded are not affected."
     )

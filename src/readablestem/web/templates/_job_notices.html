@@ -34,7 +34,7 @@
 {% endif %}
 {% if pg.notices.worth_checking %}
 <section aria-labelledby="worth-checking-heading">
-  <h2 id="worth-checking-heading">Worth a look</h2>
+  <h2 id="worth-checking-heading">{{ strings.WORTH_A_LOOK }}</h2>
   <p class="hint">None of these holds anything up.</p>
   <ul class="check-list">
     {{ notice_items(pg.notices.worth_checking, job.id, job.can_review) }}

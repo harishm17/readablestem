@@ -176,7 +176,7 @@
     {# Scrolls sideways when wide: a named tab stop, so it can be scrolled from the keyboard. #}
     <div class="cmp-row" tabindex="0" role="group" aria-label="Proposed {{ item.label|lower }}"><div class="cmp-math">{{ item.mathml }}</div></div>
     {% else %}
-    <p class="cmp-none">No proposal yet.{% if item.can_read_again %} Read it again, type the LaTeX, keep it as a picture with your description{% if item.can_not_equation %}, or say it is not an equation{% endif %}.{% else %} Type the LaTeX below, or keep it as an image.{% endif %}</p>
+    <p class="cmp-none">No proposal yet.{% if item.can_read_again %} {{ strings.READ_AGAIN }}, type the LaTeX, keep it as an image with your description{% if item.can_not_equation %}, or say it is not an equation{% endif %}.{% else %} Type the LaTeX below, or keep it as an image.{% endif %}</p>
     {% endif %}
   </div>
   {{ speech_lines(item, p.spoken) }}
@@ -662,10 +662,10 @@
       <div class="tech">
         <p class="part-label">Details for this item</p>
         <p>Confidence: {{ panel.confidence }}</p>
-        {% if panel.item.reason %}<p>{{ panel.item.reason.text }} <span class="code-line">Code: <code>{{ panel.item.reason.code }}</code></span></p>{% endif %}
+        {% if panel.item.reason %}<p>{{ panel.item.reason.text }}</p>{% endif %}
         {% if panel.checks %}
         <ul class="check-list">
-          {% for check in panel.checks %}<li><strong>{{ check.severity }}:</strong> {{ check.text }} <span class="code-line">Code: <code>{{ check.code }}</code></span></li>{% endfor %}
+          {% for check in panel.checks %}<li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>{% endfor %}
         </ul>
         {% endif %}
       </div>
@@ -704,7 +704,7 @@
   <section class="optional-area" aria-labelledby="optional-summary{% if decided_lines %} decided-summary{% endif %}">
     {% if optional %}
     <details class="optional-box"{% if optional_open %} open{% endif %}>
-      <summary id="optional-summary">Optional items ({{ optional|length }})</summary>
+      <summary id="optional-summary">{{ strings.OPTIONAL_ITEMS }} ({{ optional|length }})</summary>
       <p class="hint">Accepted automatically with a small note. Nothing to do unless you disagree.</p>
       <ul class="optional-list">
         {% for line in optional %}{{ item_line(line) }}{% endfor %}
@@ -752,7 +752,7 @@
       <ul class="legend" aria-label="What the marks mean">
         {% if "required" in tiers %}<li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>{% endif %}
         {% if "repeat" in tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Same decision, other page</li>{% endif %}
-        {% if "optional" in tiers %}<li><span class="key key-optional" aria-hidden="true"></span> Optional item</li>{% endif %}
+        {% if "optional" in tiers %}<li><span class="key key-optional" aria-hidden="true"></span> {{ strings.OPTIONAL_ITEM }}</li>{% endif %}
         {% if "accepted" in tiers %}<li><span class="key key-accepted" aria-hidden="true"></span> Accepted</li>{% endif %}
       </ul>
       {% endif %}

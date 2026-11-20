@@ -5,8 +5,8 @@ stored on the job as `Job.office_json`). Here the counts become two things:
 
 - notices (`core.types.Notice`, whole document), added to the result when it is stored: open
   tracked changes in a Word file are *required* (listed under "Not handled in this file", and
-  the job is "Ready", not "Ready to share"); speaker notes, hidden slides and comments are
-  *optional* ("Worth checking"). Each says how many; none quotes the file.
+  the job is "Ready", not "Ready to post"); speaker notes, hidden slides and comments are
+  *optional* ("Worth a look"). Each says how many; none quotes the file.
 - `read_lines`: the sentences of the job page's "How this file was read" section.
 
 Counts the census holds but nothing here reads (`units`, `units_exact`) are for a later charge

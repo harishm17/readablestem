@@ -1,7 +1,7 @@
 """A zip of several finished documents: "Download all" (T3-4).
 
 An instructor who converted a whole unit has a dozen files to fetch one by one. The zip holds
-the student file of every document that is ready to share: finished, with no decision still
+the student file of every document that is ready to post: finished, with no decision still
 open (a document with decisions open is a draft, and the single download asks before giving
 one; the zip leaves such documents out and says how many). Each file is named as its own
 download is (`routes.jobs.download_filename`: the title and the start of the id, so two

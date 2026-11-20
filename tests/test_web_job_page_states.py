@@ -135,7 +135,7 @@ def test_a_text_decision_is_one_decision_and_deciding_it_makes_the_job_shareable
     response = web.browser.post(f"/jobs/{job_id}/review/{paragraph.id}", data=form)
     assert response.status_code == 303
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html).startswith("Ready to share:")
+    assert title(html).startswith("Ready to post:")
 
 
 def section_of_status(html: str) -> str:
@@ -160,21 +160,21 @@ def test_an_assumed_language_is_not_ready_to_share_until_the_owner_confirms_it(w
         web, lang_source="default", notices=[Notice(code="lang_assumed", review="required")]
     )
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert not title(html).startswith("Ready to share")
+    assert not title(html).startswith("Ready to post")
     assert "Confirm the language" in page_text(html)
     assert post_language(web, job_id, "en").status_code == 303
-    assert title(web.browser.get(f"/jobs/{job_id}").text).startswith("Ready to share")
+    assert title(web.browser.get(f"/jobs/{job_id}").text).startswith("Ready to post")
 
 
 def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     nothing_to_decide(web)
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Ready to share: SECRET-HEADING Kinematics | ReadableSTEM"
+    assert title(html) == "Ready to post: SECRET-HEADING Kinematics | ReadableSTEM"
     ready = page_text(section(html, "ready-heading"))
     assert "The tool flagged nothing in this file for review, and nobody has reviewed it." in ready
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
-    assert "Before you share" in ready and "Where will you post it?" in ready
+    assert "Before you post" in ready and "Where will you post it?" in ready
     assert "Recommended" in ready
     assert "Do not paste it into a page editor" in ready
     # As the posting help says: the HTML is the main version, linked where the PDF was.
@@ -324,7 +324,7 @@ OLD_PAGE = "<!doctype html><html lang='en'><head><title>T</title></head><body></
 
 
 def clean(result: DocumentResult) -> None:
-    """The fake result with every part converted and nothing flagged (a clean typed page)."""
+    """The fake result with every item converted and nothing flagged (a clean typed page)."""
     result.elements = [e for e in result.elements if e.id != "p1-e5"]
     result.fixes = [f for f in result.fixes if f.element_id != "p1-e5"]
     for fix in result.fixes:
@@ -413,8 +413,8 @@ def statement_of(web, job_id: str) -> dict[str, object]:
             {
                 "state": "Ready",
                 "job": "61 equations are shown as images that screen readers cannot read.",
-                "note": "61 parts could not be converted and are shown as pictures",
-                "notice": "Part 1 not converted: equation, page 1",
+                "note": "61 items could not be converted and are shown as pictures",
+                "notice": "Item 1 not converted: equation, page 1",
                 "summary": "0 of 61 equations are MathML.",
                 "csv": {"Shown as pictures of the original": "61"},
             },
@@ -428,19 +428,19 @@ def statement_of(web, job_id: str) -> dict[str, object]:
                 "note": "Pages 2, 3, 4, 5, 6, 7 and 8 (7 of 8) of the original PDF were left out",
                 "notice": "Which pages were left out",
                 "summary": "were left out of this file",
-                "csv": {"Every part the tool found was converted.": "No"},
+                "csv": {"Every item the tool found was converted.": "No"},
             },
             id="7-of-8-pages-left-out",
         ),
         pytest.param(
             accepted_anyway,
             {
-                "state": "Ready to share",
-                "job": "You reviewed 34 of 34 flagged parts. 34 parts kept with a check failing.",
-                "note": "Your instructor reviewed 34 of 34 parts the tool flagged. 34 parts were "
+                "state": "Ready to post",
+                "job": "You reviewed 34 of 34 flagged items. 34 items kept with a check failing.",
+                "note": "Your instructor reviewed 34 of 34 items the tool flagged. 34 items were "
                 "kept as the tool wrote them without a check passing.",
                 "notice": "",
-                "summary": "34 parts were kept as the tool wrote them without a check passing.",
+                "summary": "34 items were kept as the tool wrote them without a check passing.",
                 "csv": {"Accepted by a person with a check failing": "34"},
             },
             id="34-of-34-accepted-anyway",
@@ -448,7 +448,7 @@ def statement_of(web, job_id: str) -> dict[str, object]:
         pytest.param(
             optional_unopened,
             {
-                "state": "Ready to share",
+                "state": "Ready to post",
                 "job": "Nobody has reviewed this file yet. 26 optional notes not opened.",
                 "note": "This version has not been reviewed by a person.",
                 "notice": "This version has not been reviewed by a person.",
@@ -465,7 +465,7 @@ def statement_of(web, job_id: str) -> dict[str, object]:
                 "note": "14 words of the LaTeX source could not be read and are not in this file",
                 "notice": "14 words of the LaTeX source could not be read",
                 "summary": "14 words of the LaTeX source could not be read",
-                "csv": {"Every part the tool found was converted.": "No"},
+                "csv": {"Every item the tool found was converted.": "No"},
             },
             id="14-source-words-not-read",
         ),
@@ -475,9 +475,9 @@ def statement_of(web, job_id: str) -> dict[str, object]:
                 "state": "Ready",
                 "job": "3 equations are shown as LaTeX text, not written so that screen readers "
                 "can read them aloud.",
-                "note": "3 parts could not be converted and are shown as LaTeX that this tool "
+                "note": "3 items could not be converted and are shown as LaTeX that this tool "
                 "made from the Word file",
-                "notice": "Part 1 not converted: equation",
+                "notice": "Item 1 not converted: equation",
                 "summary": "0 of 3 equations are MathML.",
                 "csv": {
                     "Shown as pictures of the original": "0",
@@ -490,12 +490,12 @@ def statement_of(web, job_id: str) -> dict[str, object]:
         pytest.param(
             clean,
             {
-                "state": "Ready to share",
-                "job": "Every part the tool found was converted.",
+                "state": "Ready to post",
+                "job": "Every item the tool found was converted.",
                 "note": "Its equations are written so that screen readers can read them aloud.",
                 "notice": "This version has not been reviewed by a person.",
                 "summary": "2 of 2 equations are MathML.",
-                "csv": {"Every part the tool found was converted.": "Yes"},
+                "csv": {"Every item the tool found was converted.": "Yes"},
             },
             id="clean-typed-control",
         ),
@@ -504,7 +504,7 @@ def statement_of(web, job_id: str) -> dict[str, object]:
 def test_every_surface_says_what_was_converted_and_reviewed(web, make, expected):
     """SW7 (F-034, F-110): the student page, its opening notice, the job's state, the job
     page, the EPUB's accessibility summary and the record say one statement, from one model,
-    and none says more than was done: no "Ready to share" or "Everything was converted"
+    and none says more than was done: no "Ready to post" or "Everything was converted"
     while a part is a picture or a page is left out, no "reviewed" for notes nobody opened,
     and an "Accept anyway" said apart."""
     make(web.converter.output.result)
@@ -518,7 +518,7 @@ def test_every_surface_says_what_was_converted_and_reviewed(web, make, expected)
         assert said["notice"] == ""  # reviewed, nothing a picture or left out
     assert expected["summary"] in said["summary"]
     # Text alone is enough only when nothing is a picture or left out.
-    assert said["sufficient"] == (expected["state"] == "Ready to share")
+    assert said["sufficient"] == (expected["state"] == "Ready to post")
     for label, value in expected["csv"].items():
         assert said["csv"][label] == value
     for words in ("Everything was converted", "checked the parts", "Your instructor checked"):

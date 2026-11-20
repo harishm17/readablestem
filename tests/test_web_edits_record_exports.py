@@ -139,7 +139,7 @@ def test_clean_tables_accepted_together_and_a_cell_read_by_the_model_are_marked(
     decisions = [r["decision"] for r in rows]
     bulk = "Accepted, together with the other clean tables, in one action"
     assert decisions.count(bulk) == 2
-    assert "Table cell read by the AI service at the person's request, then saved" in decisions
+    assert "Table cell read by the model at the person's request, then saved" in decisions
     assert all(r["by"] == "the owner" for r in rows)
 
 
