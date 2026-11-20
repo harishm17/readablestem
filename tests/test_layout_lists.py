@@ -502,6 +502,12 @@ def test_a_bold_item_in_a_run_of_its_series_is_an_item_and_a_bold_title_over_tex
     got = analyze(one_page(titles)).elements
     assert [e.text for e in got if e.kind == Kind.HEADING] == ["A. Methods", "B. Results"]
 
+    def topics(page):  # "X and Y" lines are an outline's items, not a list of authors
+        y = write(page, 72, 100, ["The outline:"])
+        write(page, 90, y, ["B. Predation and herbivory", "C. Mutualism and commensalism"])
+
+    assert [m for m, *_ in items(analyze(one_page(topics)).elements)] == ["B.", "C."]
+
 
 def test_a_series_that_starts_again_after_a_figure_or_a_paragraph_is_under_the_item_above():
     def fill(page):
