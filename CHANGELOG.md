@@ -72,6 +72,23 @@
 - Tests: `tests/test_layout_lists.py`, `tests/test_region_tree.py`, `tests/test_structure.py`
   and `tests/test_web_edit_page.py` lose a dash permutation, a test of a setting's default, a
   markup pin and a dead assertion, and fold tests that set up the same page into one.
+## Unreleased: three more rules for one printed display, one element (branch feat/display-box-rules)
+
+- Behind `LAYOUT_DISPLAY_GROUPING` (`layout.analyze(display_grouping=True)`), still off in
+  `config.py` and in `production.profile.toml`: with it off nothing changes. Turning it on moves
+  boxes, so it needs a `PIPELINE_VERSION` raise and new recorded equation requests. On the 21
+  development papers the display formulas the box score finds whole go from 803 of 1,004 with
+  the switch off, and 842 with the first three grouping rules, to 903 (89.9%):
+  - A line of mostly maths with at most four words, set in from both edges of its column's text
+    and not under a line of text, is a display (`display._promote_set_off_lines`): 46 made
+    whole, 1 broken.
+  - A region inside the box of a larger one is a part of it
+    (`display._absorb_contained_regions`): the tall brackets and norm bars that were elements
+    of their own (14 made whole, none broken).
+  - The limits of a sum, product or integral set at the size of its row join it
+    (`display._limits_of`): 1, none broken.
+- Not changed: the equation numbers that are still loose (O-037, O-391); docs/layout.md says
+  what was counted.
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

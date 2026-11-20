@@ -1000,7 +1000,7 @@ math font, stay math.
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Three patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Six patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behavior.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
@@ -1028,6 +1028,41 @@ math font, stay math.
      "0 > s_1 > s_2 > ..." out of the inline formula as a full stop; three dots after a comma
      or a relation or operator (`_trailing_ellipsis`) stay in it. Four dots are an ellipsis
      and the sentence's full stop, and the full stop still goes.
+  4. *A line set off like a display, with a word in it.* A line with a prose word is read as
+     text, so its formula was cut around the word ("Diam(C) <= ... for all i" came out as two
+     inline formulas and a paragraph). `_promote_set_off_lines` makes such a line a display
+     when it is mostly math (`NUMBERED_SHARE`) with at most `SET_OFF_WORDS` words, has some
+     math row or a line score at the equation threshold, and stands in `SET_OFF_INDENT` font
+     sizes from both edges of the text of its column (the left edge is that of the lines within
+     `NEAR_LINES` sizes of it, so the last line of an indented paragraph is not a display), and
+     does not sit within `SET_OFF_GAP` of the bottom of a line of text above it (a paragraph's
+     last line). The rows of the line become math rows; nothing is joined.
+  5. *A piece inside a display.* The top of a tall bracket set in pieces, the double bars of a
+     norm: a line of its own to the stacking, inside the box of the formula it belongs to.
+     `_absorb_contained_regions` joins a region with at least `CONTAINED_SHARE` (0.9) of its
+     area inside a larger one; two numbered displays are never joined.
+  6. *Limits at the size of the row.* `_joins_line` takes limits by their size (a script size
+     under a big operator); a paper that sets them at the size of the row ("k=1" at 7 pt under
+     a sum at 7 pt) gave it nothing to go by. `_limits_of` joins a line that hangs right under
+     (or sits right over) a big operator (sum, product, integral, union, intersection),
+     centered on it and no wider than twice its sign.
+
+  Measured on the 21 development papers (a development box score kept outside the repository; 11,258 formulas, display
+  class 1,004): whole 80.0% with the switch off, 83.9% with rules 1 to 3, and with 4, 5 and 6
+  added one after the other 88.4% (rule 4: 46 formulas made whole, 1 broken: an inline formula
+  that a display's box now reaches), 89.8% (rule 5: 14, none broken) and 89.9% (rule 6: 1,
+  none broken). No paper got worse. The one display that was whole in the first round of the
+  grouping and is not any more (2412.12319, equation 82) is not in the box score: the gold
+  writes its aligned rows one by one and the layout reads them as one array that holds every
+  row, the form kept below.
+
+  Loose equation numbers (O-037, O-391), counted on the same papers with the switch on: 6
+  numbers left at the end of an equation's text with no label (2103.06872, 2305.10416 twice,
+  2308.10321, 2411.03309, 2412.18448), and 6 numbers that are a paragraph of their own: 2 at
+  the left margin of a display ("(3)" in 2309.01468), 1 right of a display, and 3 with no
+  equation level with them (2411.03309: "(10)" beside a line of digits, "11 00 ,", that is
+  read as text). They are no cluster, none was built, and the rules above leave them as they
+  were.
 
   Not done, and why: aligned rows that the gold writes one by one stay one element with rows
   (that is the form a screen reader reads best, and `scripts/rw_spoken.py` scores it per

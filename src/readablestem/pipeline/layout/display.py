@@ -27,6 +27,7 @@ from readablestem.pipeline.layout.inline_runs import (
     JOINED_REASON,
     _classify_row,
     _is_equation_number,
+    _prose_words,
 )
 from readablestem.pipeline.layout.shared import (
     _ROW_RELATIONS,
@@ -161,6 +162,108 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
             continue
         line.kind = number.kind = "math"
         line.reasons = [*line.reasons, NUMBERED_REASON]
+
+
+SET_OFF_REASON = "set off like a display"
+SET_OFF_WORDS = 4  # the most English words a promoted line may hold
+SET_OFF_INDENT = 2.5  # x font size: least space on each side of the line inside its column's text
+NEAR_LINES = 1.5  # x font size: how far above and below the lines that give the left edge are
+
+
+def _promote_set_off_lines(rows: list[_Row]) -> None:
+    """Make a printed line that is mostly maths, has a few words in it and is set off from the
+    text of its column a display equation (`LAYOUT_DISPLAY_GROUPING`).
+
+    "Diam(C) = sup ...", "Pr[...] <= 2 exp(...)", "f(q) <= p iff q <= g(p)", a system's
+    "... in Omega x (0, T)" each read as text because of the word, so the formula was cut
+    around it, and the word, or the bracket after it, stayed in a paragraph. The evidence is
+    the line as a whole: all the rows on one baseline (`_same_line`), at least
+    `SET_OFF_INDENT` font sizes in from the left and the right end of the column's running
+    text (a line of prose reaches one of them), with `NUMBERED_SHARE` of its characters maths,
+    maths in it (a row that is maths or reads as maths), and at most `SET_OFF_WORDS` words.
+    Its text rows become maths, so the crop and the reading hold the word.
+    """
+    prose = [r for r in rows if r.kind == "text" and not r.absorbed and not r.vertical]
+    if not any(len(r.clean) >= 30 for r in prose):
+        return
+    candidates = [
+        r
+        for r in rows
+        if not r.absorbed
+        and not r.vertical
+        and r.marker is None
+        and not r.exercise_number
+        and not (r.kind == "frag" and _is_equation_number(r.clean))
+    ]
+    candidates.sort(key=lambda r: r.baseline)
+    seen: set[int] = set()
+    for i, first in enumerate(candidates):
+        if id(first) in seen or first.kind != "text":
+            continue
+        line = [first]
+        for other in candidates[i + 1 :]:
+            if other.baseline - first.baseline > 0.4 * max(first.size, other.size):
+                break
+            if any(_same_line(other, member) for member in line):
+                line.append(other)
+        seen.update(id(r) for r in line)
+        around = [t for t in prose if t.kind == "text" and t.column == first.column]
+        around = [t for t in around if t not in line]
+        edge = [t for t in around if len(t.clean) >= 30]
+        if not edge:
+            continue
+        size = max(r.size for r in line)
+        left, right = min(t.x0 for t in edge), max(t.x1 for t in edge)
+        # The text edge on the left is the one of the lines around it: a list item or a
+        # theorem sets its text in from the column's edge, and so does the tail of its sentence
+        # after a display ("with A(x) in R, and b(x) in R."), which is not set off from it.
+        top, bottom = min(r.y0 for r in line), max(r.y1 for r in line)
+        near = [
+            t.x0
+            for t in around
+            if top - NEAR_LINES * size <= t.y1 and t.y0 <= bottom + NEAR_LINES * size
+        ]
+        left = min(near, default=left)
+        if (
+            min(r.x0 for r in line) - left < SET_OFF_INDENT * size
+            or right - max(r.x1 for r in line) < SET_OFF_INDENT * size
+        ):
+            continue
+        if not any(r.kind == "math" or r.score >= EQUATION_THRESHOLD for r in line):
+            continue
+        if _tight_under_text(line, around, size):
+            continue
+        infos = [(r, _CharInfo.of(r)) for r in line]
+        counted = mathy = words = 0
+        for r, info in infos:
+            ink = [k for k, c in enumerate(r.chars) if not c.blank and c.c not in ",.;:"]
+            counted += len(ink)
+            mathy += sum(info.mathy(k) for k in ink)
+            words += _prose_words(r, info)
+        if not counted or mathy < NUMBERED_SHARE * counted or words > SET_OFF_WORDS:
+            continue
+        for r in line:
+            if r.kind == "text":
+                r.kind = "math"
+                r.reasons = [*r.reasons, SET_OFF_REASON]
+
+
+SET_OFF_GAP = 0.3  # x font size: the least blank above a display line, from the text over it
+
+
+def _tight_under_text(line: list[_Row], text: Sequence[_Row], size: float) -> bool:
+    """Does a line of running text stand directly over `line`, no further off than the gap
+    between two lines of a paragraph? Then `line` is the tail of that paragraph (the last line
+    of a list item, "... for every t we have x = y") and not a display, which has blank above."""
+    x0, x1 = min(r.x0 for r in line), max(r.x1 for r in line)
+    top = min(r.y0 for r in line)
+    return any(
+        t.x0 < x1
+        and t.x1 > x0
+        and top - 3 * size <= t.y1 <= top + 0.5 * size
+        and top - t.y1 < SET_OFF_GAP * size
+        for t in text
+    )
 
 
 CLOSE_NUMBER_GAP = 0.3  # x font size: the least a bracketed number stands from the maths before it
@@ -785,7 +888,14 @@ def _join_connectives(lines: list[_Line], rows: Sequence[_Row]) -> list[_Line]:
     return lines
 
 
-def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] = ()) -> bool:
+def _joins_line(
+    above: _Line,
+    box: BBox,
+    line: _Line,
+    earlier: Sequence[_Line] = (),
+    *,
+    grouping: bool = False,
+) -> bool:
     """Does `line` continue the display equation whose last line is `above` (box `box`)?
 
     A line that starts with "=" or an operator may sit a little further down (half as
@@ -809,11 +919,38 @@ def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] =
         return True  # beside the equation: rows of a brace, a matrix or an array
     if min(above.size, line.size) <= SCRIPT_RATIO * size:
         return True  # limits under a big operator ("i = 1" under a sum) or over it
+    if grouping and (_limits_of(above, line, size) or _limits_of(line, above, size)):
+        return True  # the same at the size of the row (a paper that sets limits at 7 pt)
     for peer in (above, *earlier):  # one row of the equation to line up with is enough
         if _table_rows(peer, line, box, size):
             return True
         x0, x1 = peer.relation_x, line.relation_x
         if x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size:
+            return True
+    return False
+
+
+LIMIT_OPERATORS = frozenset("\u222b\u222e\u2211\u220f\u2210\u22c3\u22c2")  # int oint sum prod ...
+LIMIT_REACH = 0.8  # x font size: how far above or below a big operator its limits sit
+
+
+def _limits_of(operator: _Line, limits: _Line, size: float) -> bool:
+    """Is `limits` the limits of a big operator (sum, product, integral) in `operator`?
+
+    The limits of a sum hang right under its sign (or sit right over it), centred on it
+    and no wider than twice the sign. A paper that sets them at the size of the row they
+    belong to gives `_joins_line` no size to tell them by.
+    """
+    centre = (limits.box[0] + limits.box[2]) / 2
+    for c in operator.ink:
+        if c.c not in LIMIT_OPERATORS:
+            continue
+        gap = limits.box[1] - c.y1 if limits.box[1] >= c.y1 - 0.3 * size else c.y0 - limits.box[3]
+        if (
+            -0.3 * size <= gap <= LIMIT_REACH * size
+            and c.x0 - 0.5 * size <= centre <= c.x1 + 0.5 * size
+            and limits.box[2] - limits.box[0] <= 2 * (c.x1 - c.x0) + size
+        ):
             return True
     return False
 
@@ -843,7 +980,11 @@ def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
         reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
         active = [k for k in active if regions[k].box[3] >= reach]
         host = next(
-            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line, peers[k])),
+            (
+                k
+                for k in reversed(active)
+                if _joins_line(last[k], regions[k].box, line, peers[k], grouping=document.grouping)
+            ),
             None,
         )
         if host is None:
@@ -865,6 +1006,7 @@ def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
         regions = _merge_continued_regions(
             regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
         )
+        regions = _absorb_contained_regions(regions)
     for region in regions:
         for row in [*region.rows, *region.labels]:
             row.region = region
@@ -926,6 +1068,42 @@ def _merge_continued_regions(regions: list[_Region], members: list[list[_Line]])
         target.box = _union([target.box, region.box])
         members[host].extend(lines)
         merged.add(id(region))
+    return [r for r in regions if id(r) not in merged]
+
+
+CONTAINED_SHARE = 0.9  # of a piece's own area that lies inside the display that takes it in
+
+
+def _absorb_contained_regions(regions: list[_Region]) -> list[_Region]:
+    """Join a region that lies inside the box of another display equation to it.
+
+    A tall bracket or brace set in pieces (the "⎛" of a big parenthesis whose lines are
+    placed one by one), the limits under a sum and the double bars of a norm are each a
+    line of their own to the stacking above, and the piece is no formula of its own: it sits
+    inside the box of the formula it belongs to. A region with at least `CONTAINED_SHARE` of
+    its area inside a larger one is read as a part of that one, unless both carry an equation
+    number (two numbered displays are never one).
+    """
+    area = [(r.box[2] - r.box[0]) * (r.box[3] - r.box[1]) for r in regions]
+    merged: set[int] = set()
+    for j in sorted(range(len(regions)), key=lambda k: area[k]):
+        piece = regions[j]
+        if piece.forced or area[j] <= 0:
+            continue
+        for i in sorted(range(len(regions)), key=lambda k: area[k]):
+            host = regions[i]
+            if i == j or id(host) in merged or host.forced or area[i] <= area[j]:
+                continue
+            if host.labels and piece.labels:
+                continue
+            width = min(piece.box[2], host.box[2]) - max(piece.box[0], host.box[0])
+            height = min(piece.box[3], host.box[3]) - max(piece.box[1], host.box[1])
+            if width > 0 and height > 0 and width * height >= CONTAINED_SHARE * area[j]:
+                host.rows.extend(piece.rows)
+                host.rules.extend(p for p in piece.rules if p not in host.rules)
+                host.labels.extend(piece.labels)
+                merged.add(id(piece))
+                break
     return [r for r in regions if id(r) not in merged]
 
 

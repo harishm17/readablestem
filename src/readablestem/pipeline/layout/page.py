@@ -43,6 +43,7 @@ from readablestem.pipeline.layout.display import (
     _equation_regions,
     _mark_case_rows,
     _promote_numbered_lines,
+    _promote_set_off_lines,
     _split_braced_systems,
     _split_exercise_numbers,
     _split_labels,
@@ -436,6 +437,8 @@ def _page_blocks(
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
     _promote_numbered_lines(rows)
+    if document.grouping:
+        _promote_set_off_lines(rows)
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []
