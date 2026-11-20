@@ -73,7 +73,7 @@
   <li>A file that is too large to convert at once (a PDF{% if office_on %}, or for a Word or PowerPoint file the PDF made from it{% endif %}) is kept, as stored, while you choose which
     pages to convert. It is deleted <strong>{{ retention_hours }} hours</strong> after you
     uploaded it, when you discard it, or once every page has been sent to be converted.
-    Nothing is sent to an AI service until you choose the pages. The sample document is
+    Nothing is sent to the model until you choose the pages. The sample document is
     a recorded conversion of a published textbook section, not your file: it is deleted on the
     same schedule as your own documents.</li>
   {# The one submit rule (web/forms.py, `request_tokens`): deleted at sign-out, with the

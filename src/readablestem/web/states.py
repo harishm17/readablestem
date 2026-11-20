@@ -606,10 +606,10 @@ def gaps_of(job: Facts, left: int, viewer: str = "owner", ctx: Context | None = 
     missing = (
         Step(
             "missing",
-            "Convert the missing parts",
+            "Convert the missing items",
             f"/jobs/{job.id}/retry",
             form=True,
-            explain="Only the parts that were not converted are sent again. Nothing is counted "
+            explain="Only the items that were not converted are sent again. Nothing is counted "
             "against your daily pages, and your decisions are kept.",
         )
         if left and owner

@@ -68,7 +68,7 @@ from readablestem.web.review import (
 
 STATEMENT = (
     "This record lists what the tool did to this document, what a person decided and when, "
-    "which parts were not converted, and which structure checks ran. It does not say that "
+    "which items were not converted, and which structure checks ran. It does not say that "
     "the document meets any standard or law, and nobody at the tool has looked at the "
     "document. The accessibility office makes that judgment."
 )
@@ -115,7 +115,7 @@ RELABEL_WORDS = (
     "stayed waiting for a decision."
 )
 MAX_NAMED_EQUATIONS = 6
-MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, then saved"
+MODEL_READ_WORDS = "Table cell read by the model at the person's request, then saved"
 # What a carried edit was (web.carry_edits.CARRIED_KEY).
 CARRIED_EDIT_WORDS = {
     "text": "change to the words of the text",
@@ -734,7 +734,7 @@ def to_csv(record: Record) -> str:
     if record.downloaded is not None:
         row("document", "File types downloaded", detail=", ".join(record.downloaded) or "None")
     c = record.counts
-    row("summary", "Parts found", detail=c.items)
+    row("summary", "Items found", detail=c.items)
     for kind, n in record.by_kind.items():
         row("summary", f"Found: {kind}", detail=n)
     row("summary", "Accepted by the tool, no decision from a person", detail=c.accepted)

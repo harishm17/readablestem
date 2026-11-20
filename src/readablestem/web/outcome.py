@@ -230,12 +230,12 @@ def outage_message(result_json: dict[str, Any] | None, *, offered: bool = True) 
         return ""
     n, total, kinds = outage
     text = (
-        f"The AI service did not answer for {n} of {total} {kinds}, so they were not "
+        f"The model did not answer for {n} of {total} {kinds}, so they were not "
         f"converted. Nothing is wrong with your PDF. {KEPT}"
     )
     if offered:
         text += (
-            " Use “Convert the missing parts” below, now or later: only those parts are sent "
+            " Use “Convert the missing items” below, now or later: only those items are sent "
             "again, and it does not use up your daily pages."
         )
     return text
@@ -253,8 +253,8 @@ def budget_message(result_json: dict[str, Any] | None, code: str, *, offered: bo
         text += f" {KEPT}"
         if offered:
             text += (
-                " After 00:00 UTC use “Convert the missing parts” below to convert them: only "
-                "those parts are sent again, and it does not use up your daily pages."
+                " After 00:00 UTC use “Convert the missing items” below to convert them: only "
+                "those items are sent again, and it does not use up your daily pages."
             )
         return text
     return (
