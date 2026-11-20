@@ -721,10 +721,12 @@ p.draft-failed { border-color: var(--warn); background: var(--warn-tint); }
 .redo-lead + .decide-row { margin-top: var(--space-2); }
 .region-image { display: block; max-width: 100%; height: auto; margin: var(--space-2) 0 var(--space-3); border: 1px solid var(--border-subtle); border-radius: var(--radius-control); background: var(--paper); }
 @media (max-width: 40rem) {
-  /* On a phone a region picture is shown whole, at its own size, in the box a crop is shown
-     in (templates/_crop.html): it scrolls sideways, and nothing of what the person has to judge
-     is cut off. Without its size on the tag it keeps shrinking to the column. */
-  .region-box .region-image[width] { max-width: none; }
+  /* On a phone a region picture is shown whole in the box a crop is shown in
+     (templates/_crop.html), up to one and a half times the column: it scrolls sideways a
+     little, its words stay large enough to read, and nothing of what the person has to judge
+     is cut off. At its own size (three pixels a point for a heading's band) a heading would
+     run off the screen. Without its size on the tag it keeps shrinking to the column. */
+  .region-box .region-image[width] { max-width: 150%; }
 }
 .figure-view { margin: var(--space-2) 0 var(--space-3); }
 .figure-view img { display: block; max-width: 100%; max-height: 22rem; height: auto; border: 1px solid var(--border-subtle); background: var(--paper); }

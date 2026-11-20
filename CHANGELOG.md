@@ -23,8 +23,9 @@
 ## Unreleased: region pictures whole on a phone and sized before they load (branch fix/review-second-batch)
 
 - On a phone a heading's band, the lines around an item and a region cut on request are no
-  longer cut to a strip with a fade: each is shown whole in the box a crop uses, which scrolls
-  sideways, can be reached from the keyboard and says it is wider than the screen.
+  longer cut to a strip with a fade: each is shown whole in the box a crop uses, at most one and
+  a half times the column wide, which scrolls sideways, can be reached from the keyboard and
+  says it is wider than the screen.
 - Pictures cut on request (a heading's band, an item with the page around it, the repeated
   headings' copies in both views, a table's picture, the region preview of the page tools) and
   the job card's example picture carry their width and height, so the page does not move while

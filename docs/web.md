@@ -3436,7 +3436,9 @@ keyboard browser test runs this path on a group labeled "Solution".
 - A picture of an item or of a region cut on request (`/jobs/{id}/regions/{element}.png`,
   `/jobs/{id}/pages/{n}/region.png`) is not cut on a phone: it is shown whole in the same
   focusable, named box that scrolls sideways as a crop (`templates/_crop.html`
-  `region_image`). Its tag carries a width and height worked out before it is cut
+  `region_image`), at most one and a half times the column wide, so a heading is in view
+  whole and its words are large enough to read (at the picture's own size, three pixels a
+  point, a heading ran off the screen). Its tag carries a width and height worked out before it is cut
   (`compare.region_pixels`, `routes.edits.region_crop_pixels`) so the page does not move while
   it loads. A heading's and a table's edges move to whole lines when the picture is cut, so
   its height is a little more than the picture's own (a band's picture was 154 px high where

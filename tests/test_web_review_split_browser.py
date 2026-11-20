@@ -192,11 +192,12 @@ def test_the_page_image_is_a_named_focusable_region_that_scrolls_on_a_phone(site
     wait_images(page)
     band = page.locator(".region-image").first
     natural, shown = band.evaluate("i => [[i.naturalWidth, i.naturalHeight], [i.width, i.height]]")
-    assert shown[0] >= natural[0] * 0.99  # not squeezed to the phone's width
-    assert abs(shown[1] / shown[0] - natural[1] / natural[0]) < 0.01  # same shape
+    assert abs(shown[1] / shown[0] - natural[1] / natural[0]) < 0.01  # same shape: none cut off
     box = band.locator("xpath=ancestor::*[@role='group'][1]")
     assert box.get_attribute("tabindex") == "0" and box.get_attribute("aria-label")
-    assert box.evaluate("e => e.scrollWidth > e.clientWidth")
+    # wider than the phone's column, so its words can be read, and all of it can be scrolled to
+    assert shown[0] > box.evaluate("e => e.clientWidth")
+    assert box.evaluate("e => e.scrollWidth") >= shown[0]
     assert not sideways_overflow(page)
     context.close()
 
