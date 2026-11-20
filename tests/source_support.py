@@ -69,6 +69,18 @@ LOSSES: dict[str, Loss] = {
         "main.tex, line",
         ("error", "expected", "}", "main.tex"),
     ),
+    "self_calling_macro": Loss(
+        "\\documentclass{article}\\begin{document}\n\\def\\a{\\a}Text \\a here.\n\\end{document}\n",
+        "source_loop",
+        "\\a",
+        ("error", "recursion", "\\a", "main.tex"),
+    ),
+    "nested_macro": Loss(
+        "\\documentclass{article}\\begin{document}\n\\def\\a{{\\a}}\\a\n\\end{document}\n",
+        "source_loop",
+        "calls itself",
+        ("fatal", "perl", "deep_recursion", ""),
+    ),
     "undefined_text": Loss(
         "\\documentclass{article}\\begin{document}\nA \\term{word} and \\hw.\n\\end{document}\n",
         "source_undefined",

@@ -201,6 +201,7 @@ def summary(report: SourceReport) -> dict[str, int]:
 # cause):
 STOP_CODES = (
     "source_missing_file",  # a file named by \input, \bibliography, ... is not in the upload
+    "source_loop",  # LaTeXML says a command calls itself (`LOOPS`)
     "source_syntax_error",  # a brace or an environment is not closed, or a special character
     # (^ _ & #) is in the text: what follows is wrong or gone
     "source_unsupported_class",  # a class with no binding, followed by errors
@@ -209,6 +210,13 @@ STOP_CODES = (
     "source_failed",  # any other error LaTeXML reported outside a formula
 )
 SYNTAX = frozenset({"expected", "unexpected"})
+# What LaTeXML itself prints when a command calls itself: `Error:recursion:\a Token \a expands
+# into itself!` (the run goes on and ends in seconds), and the two fatal stops of a nest that
+# never closes (`\def\a{{\a}}`: Perl's own "Deep recursion", or LaTeXML's "Excessive
+# recursion"). As (category, object): only the first names the command. Measured 2026-11-19; a
+# loop that never names itself (`\def\a{\b}\def\b{\a}`) or only grows (`\def\a{x\a}`) is
+# told from a long run by nothing in the log, and is left to the time and memory limits.
+LOOPS = frozenset({("perl", "deep_recursion"), ("internal", "<recursion>")})
 # A character TeX reads only in maths (^ _), between cells (&) or in a definition (#), written
 # in running text: LaTeXML says `unexpected:^` or `misdefined:&`, and the stop names it.
 CHARACTERS = {"unexpected": frozenset({"^", "_"}), "misdefined": frozenset({"&", "#"})}
@@ -217,6 +225,10 @@ MAX_DETAIL_ITEMS = 20
 
 def _item(problem: SourceProblem) -> dict[str, object]:
     return {"name": problem.name, "file": problem.file, "line": problem.line}
+
+
+def _loop(problem: SourceProblem) -> bool:
+    return problem.category == "recursion" or (problem.category, problem.name) in LOOPS
 
 
 def _character(problem: SourceProblem) -> bool:
@@ -284,6 +296,8 @@ def stop(report: SourceReport, *, beamer: bool = False) -> tuple[str, dict[str, 
     decided = {m.name for m in report.marks if m.in_formula and m.decided} - undecided
     if found := [p for p in report.problems if p.category == "missing_file"]:
         return "source_missing_file", _detail([_item(p) for p in found])
+    if loops := [p for p in errors if _loop(p)]:  # the first command named, when one is
+        return "source_loop", _detail([_item(p) for p in loops if p.category == "recursion"][:1])
     items: dict[str, dict[str, object]] = {}  # each command once, at its first place
     for p in errors:
         if p.category == "undefined" and p.name not in decided:
