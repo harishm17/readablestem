@@ -183,6 +183,7 @@ FILE_FAILURES = frozenset(
         "source_refused",
         "source_timeout",
         "source_missing_file",
+        "source_loop",
         "source_syntax_error",
         "source_undefined",
         "source_unsupported_class",

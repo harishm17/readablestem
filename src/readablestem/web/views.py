@@ -113,6 +113,9 @@ JOB_ERROR_MESSAGES = {
     "source_syntax_error": "LaTeX cannot read this source past an error: a brace or an "
     "environment is not closed. Everything after that point would be missing, so nothing was "
     "converted. Compile it, fix the error and upload it again, or upload the PDF.",
+    "source_loop": "A command in this source calls itself without end, so LaTeX cannot finish "
+    "reading it and nothing was converted. Trying again will not change that. Compile the file "
+    "on your own computer, look for the command that calls itself and fix it, or upload the PDF.",
     "source_undefined": "This source uses commands that are not defined. They would appear to "
     "students as raw code, so nothing was converted. Define them in the source, or upload the "
     "PDF.",
@@ -212,6 +215,12 @@ def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
             f"LaTeX cannot read this source past {where}: a brace or an environment is not "
             "closed. Everything after that point would be missing, so nothing was converted. "
             "Compile it, fix the error and upload it again, or upload the PDF."
+        )
+    if code == "source_loop" and first:
+        return (
+            f"The command {first['name']}{at} calls itself without end, so LaTeX cannot finish "
+            "reading this source and nothing was converted. Trying again will not change that. "
+            "Compile the file on your own computer, fix that command, or upload the PDF."
         )
     if code == "source_unsupported_class" and detail.get("class"):
         return (

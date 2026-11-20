@@ -1352,6 +1352,14 @@ or LaTeX table that holds no math keeps its runs (`TableCell.runs`, offsets into
 text) and the table is written with the same tags: `<td><strong>closed</strong> book</td>`. A
 cell edit in the review screen drops them, like a text edit that changes words.
 
+Links of a Word or LaTeX source (a web or mail address, `\\ref`, `\\cite`, a Word bookmark on
+a heading) are kept in a paragraph, a list item, a heading and a footnote, which is written
+after its sentence as "(note: ...)". They are not kept in a table cell or a caption: a cell
+(`TableCell`) and a caption (`Element.caption`) hold plain text, so a link there is its words.
+A picture in the middle of a sentence is a figure straight after the block that holds it (the
+output has no place for a picture inside a sentence); the words it stood between stay two
+words.
+
 Color of a Word or LaTeX source follows the PDF path: a passage in a real color is counted,
 and with `FEATURE_COLOUR` off the job gets one `colour_used` notice with the count. The Word
 reader counts it from the file's own runs (a run's `w:color`; not a hyperlink's, not "auto")

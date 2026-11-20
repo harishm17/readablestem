@@ -18,9 +18,10 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
   A table too large for a grid is a list, one item a row; a formula in it is an equation of the
   item like any other, and the table is a required notice (`word_table_flattened`).
 - A footnote or endnote is written where its mark is, as the LaTeX path writes a note. A link is
-  a link when it is a web or mail address; a link to a bookmark on a heading is an internal link
-  to that heading (pandoc keeps a bookmark only on a heading, and the words of a `REF` field
-  are plain text), and a link to any other bookmark is its words. Struck text is kept
+  a link when it is a web or mail address (in a note too: the working copy keeps the address a
+  note's own relationships hold, `docx_package`); a link to a bookmark on a heading is an
+  internal link to that heading (pandoc keeps a bookmark only on a heading, and the words of a
+  `REF` field are plain text), and a link to any other bookmark is its words. Struck text is kept
   and marked deleted; superscripts and subscripts are runs.
 - An equation typed in Word (`m:oMath`) is the LaTeX pandoc reads from it, checked by the same
   `check_latex` as any LaTeX the product accepts and written to MathML by the pipeline's one
@@ -280,11 +281,12 @@ class _Reader:
 
     def _heading(self, level: int, inlines: list[Any], name: str = "") -> None:
         element = self._new(Kind.HEADING, text="", bold=True)
-        text, _, formulas = self._inline_text(inlines, owner=None)
+        text, spans, formulas = self._inline_text(inlines, owner=None)
         if not text:
             self._drop(element)
             return
         element.text = text
+        self._apply_spans(element, spans, links_only=True)
         if name:  # pandoc names a heading's bookmark by the heading's id
             self.ids.setdefault(name, element.id)
         self._heading_fix(element, level, text)
@@ -386,11 +388,17 @@ class _Reader:
                 elif kind == "Image":
                     self.loose.append(item)
                 elif kind == "Note":
-                    note, _, _ = self._inline_text(
+                    note, note_spans, _ = self._inline_text(
                         _note_inlines(content), owner=None, depth=level + 1
                     )
                     if note:
-                        emit(f" (note: {note})")
+                        emit(" (note: ")
+                        spans.extend(
+                            (kind, length + a, length + b, extra)
+                            for kind, a, b, extra in note_spans
+                            if kind in ("uri", "ref")
+                        )
+                        emit(f"{note})")
                 elif kind == "Code":
                     start = length
                     emit(content[1])
@@ -442,13 +450,22 @@ class _Reader:
                 shifted.append((kind, a2, b2, extra))
         return text, shifted, formulas
 
-    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(
+        self,
+        element: Element,
+        spans: list[tuple[str, int, int, object]],
+        *,
+        links_only: bool = False,
+    ) -> None:
+        """The runs and links of `spans` on `element`'s text; with `links_only`, the links
+        alone (a heading's words are bold already)."""
         text = element.text or ""
         markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
-        for run in style_runs(text, spans):
-            inline.add(element, run)
+        if not links_only:
+            for run in style_runs(text, spans):
+                inline.add(element, run)
         for kind, start, end, extra in spans:
-            if start >= end or end > len(text):
+            if start >= end or end > len(text) or (links_only and kind not in ("uri", "ref")):
                 continue
             if any(a < start < b or a < end < b for a, b in markers):
                 continue  # a span may not start or end inside an inline marker

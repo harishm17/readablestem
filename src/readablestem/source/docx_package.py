@@ -327,6 +327,16 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
         out["word/_rels/document.xml.rels"] = _filter_rels(
             rels, "word", _KEPT_REL_TYPES, names, keep_present=out.keys()
         )
+        for notes in ("footnotes", "endnotes"):  # a note's own links name their address here
+            rels_name = f"word/_rels/{notes}.xml.rels"
+            if f"word/{notes}.xml" in out and rels_name in names:
+                out[rels_name] = _filter_rels(
+                    _read_bytes(archive, rels_name, office.MAX_RELS_BYTES),
+                    "word",
+                    {"hyperlink"},
+                    names,
+                    keep_present=out.keys(),
+                )
     facts.equations = _equations_of(out)
     return Prepared(working=_zip(out), facts=facts, census=census, _original=data)
 

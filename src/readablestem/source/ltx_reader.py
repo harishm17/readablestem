@@ -20,14 +20,15 @@ What each part becomes:
   equation, a theorem's paragraph, a figure, a table, a bibliography or list item, or the
   paragraph that holds the id. The words stay as they are; an id that became no element
   (`Reading` made nothing there), a link inside the element it names and one in a place that
-  holds no links (a table cell, a caption, a note, a heading) make no link;
+  holds no links (a table cell, a caption: `TableCell` and `caption` are plain text) make no
+  link. A link in a heading or in a footnote (written after its sentence) is kept;
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
   no usable picture the figure is a required decision (`source_figure_missing`). A picture
   outside a float (centered, in a sentence, a list item or a table cell) is a figure of its own
-  straight after the block that holds it; a table that loses a picture from a cell this way is
-  a required decision (`source_table_picture`). The words and blocks of a float beside its
-  caption and pictures are read in order after them;
+  straight after the block that holds it (the words it cut stay two words); a table that loses
+  a picture from a cell this way is a required decision (`source_table_picture`). The words
+  and blocks of a float beside its caption and pictures are read in order after them;
 - an error node in running text stays in the text as written; the conversion stops such a
   source (`source.report.stop`), so raw code never reaches a student. Every error counted here
   adds the required notice `source_error`. A formula LaTeX could not read in a place that has
@@ -589,10 +590,11 @@ class _Reader:
         for child in _children(step):
             classes = _classes(child)
             if "ltx_frame_title" in classes:
-                text, _ = self._inline_text(child, skip_tags=True)
+                text, spans = self._inline_text(child, skip_tags=True)
                 if text:
                     level = self.section_level + 1 if self.section_level >= 1 else 2
                     heading = self._new(Kind.HEADING, text=text + note, bold=True)
+                    self._apply_spans(heading, spans, links_only=True)
                     self._heading_fix(heading, min(level, 6), text + note)
                     self.chars += len(heading.text or "")
             else:
@@ -627,10 +629,11 @@ class _Reader:
             self.section_level = level
         titled = bool(classes & {"ltx_title_document", "ltx_title_titlepage"})
         notes: list[str] = []  # `\thanks` on the title: a line of its own, not in the title
-        text, _ = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
+        text, spans = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
         if not text:
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
+        self._apply_spans(element, spans, links_only=True)
         if number := _printed_tag(node):
             self.out.printed[element.id] = number
         self._heading_fix(element, level, text)
@@ -699,13 +702,22 @@ class _Reader:
         self.read.add(id(node))
 
         after_break = [False]  # a kept line end was just written: no space follows it
+        gap = [False]  # a picture stood between two letters: the words it cut are two words
 
         def emit(text: str) -> None:
+            if gap[0]:
+                gap[0] = False
+                if text[:1].isalnum():
+                    text = f" {text}"
             if after_break[0]:
                 text = text.lstrip(" ")
                 if not text:
                     return
                 after_break[0] = False
+            elif parts and parts[-1].endswith(" ") and text.startswith(" "):
+                text = text[1:]  # two spaces become one below: say so here, so the spans match
+                if not text:
+                    return
             parts.append(text)
             length[0] += len(text)
 
@@ -743,6 +755,7 @@ class _Reader:
                 return
             if _is_picture(item):
                 self.loose.append(item)  # a figure of its own after this block
+                gap[0] = bool(parts) and parts[-1][-1:].isalnum()
                 return
             self.read.add(id(item))
             if tag == "math":
@@ -763,17 +776,16 @@ class _Reader:
                 emit(_squash(self._take(item)))
             elif classes & {"ltx_note"}:
                 self._take(item)
-                note = _squash(
-                    "".join(
-                        _text_without_tag(c)
-                        for c in item.iter()
-                        if "ltx_note_content" in _classes(c)
-                    )
-                )
+                contents = [c for c in item.iter() if "ltx_note_content" in _classes(c)]
+                note = _squash("".join(_text_without_tag(c) for c in contents))
                 if note and notes is not None:
                     notes.append(note)
                 elif note:
-                    emit(f" (note: {note})")
+                    emit(" (note: ")
+                    start = length[0]
+                    emit(f"{note})")
+                    for kind, a, b, extra in self._note_links(contents, note):
+                        spans.append((kind, start + a, start + b, extra))
             else:
                 start = length[0]
                 if item.text:
@@ -814,13 +826,21 @@ class _Reader:
                 shifted.append((kind, a, b, extra))
         return text, shifted
 
-    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(
+        self,
+        element: Element,
+        spans: list[tuple[str, int, int, object]],
+        *,
+        links_only: bool = False,
+    ) -> None:
+        """The runs and links of `spans` on `element`'s text; with `links_only`, the links
+        alone (a heading's words are bold already)."""
         text = element.text or ""
-        if not element.preformatted:
+        if not element.preformatted and not links_only:
             for run in style_runs(text, spans):
                 inline.add(element, run)
         for kind, start, end, extra in spans:
-            if start >= end or end > len(text):
+            if start >= end or end > len(text) or (links_only and kind not in ("uri", "ref")):
                 continue
             # a span may not start or end inside an inline marker
             if any(
@@ -842,6 +862,27 @@ class _Reader:
                     _add_colour(element, start, end, extra)
             except ValueError:
                 continue
+
+    def _note_links(self, contents: list[Node], note: str) -> list[tuple[str, int, int, object]]:
+        """The links in a note's words as spans of `note` (the text written after "(note: "),
+        read the way the words around the note are. None when the note holds no link, or when
+        its words read differently here: the note's text is never changed by its links."""
+        if len(contents) != 1 or not any(
+            _local(a.tag) == "a" and (a.get("href") or "").startswith(("http", "mailto:", "#"))
+            for a in contents[0].iter()
+        ):
+            return []
+        loose, errors, done = list(self.loose), self.errors, set(self.done)
+        text, spans = self._inline_text(contents[0], skip_tags=True)
+        self.loose, self.errors, self.done = loose, errors, done  # a note makes no figure here
+        lead = len(text) - len(note)  # the note's own mark (`SKIP`) stands before its words
+        if lead < 0 or not text.endswith(note):
+            return []
+        return [
+            (kind, a - lead, b - lead, extra)
+            for kind, a, b, extra in spans
+            if kind in ("uri", "ref") and a >= lead
+        ]
 
     # ------------------------------------------------------------------ lists
 
