@@ -830,14 +830,14 @@ a capital letter and a full stop and is set, all of it, in bold or in italics, a
 like a sentence ("A. Problem Descriptions", IEEE's subsections; reason "lettered title", one
 level under its section like a letter of an index). The type alone does not tell such a title
 from an item (the options of a question are set in italics too), so two more things are asked
-of it (`_mark_lettered_titles`): the next row of its column is text without a marker in
-another face, the text the title stands over; and the nearest marker above it in its column
-is not the letter before with only that item's own lines between them, which is the next item
-of a list. An option of a grid is never one. The title is a block of its own, apart from the
-text under it. Known and left: a title followed at once by a numbered line ("A. Datasets",
-then "1) CIFAR-10: ...") stays the list item it was. A bold line that starts with a bullet
-glyph in its text is a list item, not a heading (a bullet drawn beside the row changes
-nothing).
+of it (`_mark_lettered_titles`): the next row of its column is not text in the title's own
+face, and has no marker unless it opens a numbering ("A. Datasets", then "1) CIFAR-10: ...");
+and the nearest marker above it in its column is not the letter before with only that item's
+own lines between them, which is the next item of a list. An option of a grid is never one.
+The title is a block of its own, apart from the text under it. Known and left: a title that
+wraps onto a second row in the same face stays the list item it was. A bold line that starts
+with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
+changes nothing).
 
 The item text starts after the marker; continuation lines join the item (a hanging
 indent is fine). **Levels** come from the left edge of the item text, which is the same

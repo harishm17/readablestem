@@ -505,9 +505,10 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
     them, in bold or in italics, and not ending like a sentence or a clause.
 
     The type alone does not tell a title from an item: the options of a question are set in
-    italics too, and the right answer of a key in bold. A title stands apart from the text under
-    it, so the next row of its column is text without a marker in another face. And it does not
-    go on from the letter before: when the nearest marker above it in its column is that letter,
+    italics too, and the right answer of a key in bold. A title stands apart from what is under
+    it, so the next row of its column is not text in its own face, and has no marker unless it
+    opens a numbering ("A. Experimental Settings" over "1) Datasets: ..."). And it does not go
+    on from the letter before: when the nearest marker above it in its column is that letter,
     with nothing between them but that item's own lines, the row is the next item of a list."""
     for i, row in enumerate(rows):
         value, face = _capital(row), _face(row)
@@ -517,7 +518,9 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
         if row.clean[-1:] in ".,;:":
             continue
         under = next((r for r in rows[i + 1 :] if r.column == row.column), None)
-        if under is None or under.marker is not None or _face(under) == face:
+        if under is None or (under.kind == "text" and _face(under) == face):
+            continue
+        if under.marker is not None and not _opens_numbering(under.marker):
             continue
         between: set[str] = set()
         for above in reversed(rows[:i]):
@@ -526,12 +529,18 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
             if above.marker is None:
                 between.add(_face(above))
                 continue
-            if _capital(above) == value - 1 and between <= {_face(above)}:
+            if value > 1 and _capital(above) == value - 1 and between <= {_face(above)}:
                 break  # the next item of the list that letter is in
             row.lettered_title = True
             break
         else:
             row.lettered_title = True
+
+
+def _opens_numbering(marker: _Marker) -> bool:
+    """Is the marker the first of a numbered series ("1)", "1.")?"""
+    parsed = _ordered_marker(marker.text) if marker.ordered else None
+    return parsed is not None and marker_readings(parsed[1]) == (("decimal", 1),)
 
 
 def _lettered_title(row: _Row) -> bool:

@@ -396,8 +396,8 @@
 - "A. Problem Descriptions" set in bold or italics on a line of its own, a title of 2 to 12
   words that does not end like a sentence, is a heading one level under its section, not a list
   item (`blocks._mark_lettered_titles`, reason "lettered title", `document.heading_levels`).
-  Only over text in another face, and never as the next letter of a list: the options of a
-  question set in italics stay its options (they had all become headings on the branch).
+  Only over a row in another face or the first line of a numbering, and never as the next
+  letter of a list: the options of a question set in italics stay its options.
 - A bold line that begins with a bullet glyph stays a list item; it was read as a bold heading.
   A bullet drawn beside the row (a label such as "Solution") changes nothing.
 - No change to a prompt, a model or the version numbers: a PDF's lists, headings and levels
