@@ -252,6 +252,24 @@ def test_a_webp_picture_is_written_as_a_png():
     assert made.images == 1
 
 
+def test_a_document_of_many_scanned_pages_is_made_within_the_childs_memory(monkeypatch):
+    """O-396: pandoc holds a picture's data address about 200 times its size, so a scanned
+    100-page document (a picture a page) needed more than the child's heap and failed. The
+    heap here is a tenth of production's and the pages are 12 of the 100."""
+    from PIL import Image
+
+    monkeypatch.setattr(ed, "HEAP_LIMIT", "300m")
+    figures = []
+    for number in range(12):
+        picture = Image.effect_noise((425, 550), 20 + number).convert("RGB").resize((1275, 1650))
+        buffer = io.BytesIO()
+        picture.save(buffer, "JPEG", quality=60)
+        uri = "data:image/jpeg;base64," + base64.b64encode(buffer.getvalue()).decode()
+        figures.append(f'<figure><img src="{uri}" alt="Scanned page {number}"></figure>')
+    html = f'<html lang="en"><body><h1>T</h1>{"".join(figures)}</body></html>'
+    assert ed.export_docx(html).images == 12
+
+
 # --------------------------------------------------------------------- the child process
 
 

@@ -770,6 +770,14 @@ class _Transcript:
         summary = next(
             (c for c in node.children if isinstance(c, Node) and c.tag == "summary"), None
         )
+        if node.has_class("toc-details"):
+            # The contents list is navigation, not a section of the document: the landmark has
+            # said "Navigation, Contents" and the student page draws the list open wherever the
+            # browser can, so a listener hears the entries, not a control to open.
+            for child in node.children:
+                if child is not summary and isinstance(child, Node):
+                    self.block(child, depth + 1)
+            return
         label = _words(self.inline(summary)) if summary is not None else ""
         self.add(LISTEN_LABELS["section-closed"], label, "expandable")
         was = self._details
