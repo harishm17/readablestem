@@ -738,6 +738,11 @@ in `railway.ts`, so `railway config apply` does not change that).
   (`.dockerignore` applies), builds the Dockerfile, runs the pre-deploy migration, checks `/healthz`,
   then switches traffic. It deploys uncommitted files too, so run it from a clean tree. Deploy the
   cron service the same way (`railway up --service cron`) after changes that touch `ops`.
+  `.railwayignore` keeps `.claude/` and `.git/` out of the upload: a checkout that holds coding
+  agents' worktrees is many gigabytes with them, and its upload failed in November 2026. If an
+  upload from the checkout fails all the same, export the commit to an empty folder
+  (`git archive <commit> | tar -x -C <folder>`) and name the folder: `railway up <folder>
+  --service web`, run from the linked checkout.
 - **GitHub-connected deploys** (not used today) would be a `source: github(...)` on the service in
   `railway.ts`, applied with the plan and apply steps above. Do not give it `build.watchPatterns`
   unless every deploy comes from GitHub: with them `railway up` skips builds.
