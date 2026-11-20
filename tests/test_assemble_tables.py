@@ -232,6 +232,8 @@ def test_a_table_that_goes_on_from_the_page_before_names_its_columns(header, col
     assert html.count('<th scope="col">Time (s)</th>') == named
     codes = [n.code for n in from_fixes([first, second], fixes, long_descriptions=False)]
     assert ("table_header_missing" in codes) is said
+    # The review card shows the part's own grid, so a carried header is said there too.
+    assert ("table_header_carried" in codes) is (named == 2 and not header)
 
 
 # --------------------------------------------------------------------------- html checks

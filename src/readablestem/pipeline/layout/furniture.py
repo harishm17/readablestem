@@ -46,6 +46,11 @@ PAGE_NUMBER = re.compile(
 
 
 _PAGE_DIGITS = re.compile(r"^(?:page\s+)?\d{1,4}(?:\s*(?:/|of)\s*\d{1,4})?$", re.IGNORECASE)
+# A number that says it is a page's: "Page 3", "Page 3 of 9", "3 of 9". "25" and "17/20" do not
+# (points, a score), so lines with words are never taken on their strength (`by_shape`).
+_PAGE_WORDS = re.compile(
+    r"^(?:page\s+\d{1,4}(?:\s*(?:/|of)\s*\d{1,4})?|\d{1,4}\s+of\s+\d{1,4})$", re.IGNORECASE
+)
 
 
 def _norm_margin(text: str) -> str:
@@ -93,10 +98,13 @@ def _lines_of(rows: Sequence[_Row]) -> list[list[_Row]]:
     return [sorted(line, key=lambda r: r.x0) for line in lines]
 
 
-def _ends_in_number(line: Sequence[_Row]) -> bool:
-    """Does the line hold one page number, at its start or its end?"""
+def _ends_in_number(line: Sequence[_Row], *, worded: bool = False) -> bool:
+    """Does the line hold one page number, at its start or its end? `worded`: one that says
+    it is a page's ("Page 3 of 9"), which a bare number does not."""
     numbers = [r for r in line if _is_page_digits(r.clean)]
-    return len(numbers) == 1 and (numbers[0] is line[0] or numbers[0] is line[-1])
+    if len(numbers) != 1 or not (numbers[0] is line[0] or numbers[0] is line[-1]):
+        return False
+    return not worded or bool(_PAGE_WORDS.match(numbers[0].clean.strip(" -\u2013\u2014|")))
 
 
 def _line_box(line: Sequence[_Row]) -> BBox:
@@ -209,7 +217,10 @@ class _MarginFilter:
         away, so it never stands clear; a page of nothing but the lines has no text block to
         be clear of. A page number alone on its line counts on every file (a number set low
         on a tall page is outside the band of `drops`); lines with words, on files of at most
-        `SHAPE_PAGES` pages: on longer ones the words repeat and `drops` has them."""
+        `SHAPE_PAGES` pages (on longer ones the words repeat and `drops` has them), and only
+        with a number that says it is a page's ("Page 3", "3 of 9"): the name line and the
+        points of a one-page quiz end in a bare number too, and nothing repeats to tell them
+        from a running head."""
         # A row already taken (a page number the place rule has) is evidence, not a row to take.
         lines = _lines_of([f for f in frags if not f.vertical])
         taken: set[int] = set()
@@ -243,11 +254,16 @@ class _MarginFilter:
         return []  # nothing follows: no text block to be clear of
 
     def _is_furniture_stack(self, stack: list[list[_Row]]) -> bool:
-        """Does one line of the stack end in a page number, and is nothing in it a heading?"""
+        """Does one line of the stack end in a page number, and is nothing in it a heading?
+        Lines with words go only with a number that says it is a page's: "Points ... 25" at the
+        head of a quiz and "Total marks ... 50" at its foot end in a number too."""
         if not any(_ends_in_number(line) for line in stack):
             return False
         words = [r for line in stack for r in line if not _is_page_digits(r.clean)]
-        if words and self.pages > SHAPE_PAGES:
+        if words and (
+            self.pages > SHAPE_PAGES
+            or not any(_ends_in_number(line, worded=True) for line in stack)
+        ):
             return False
         return not any(self.prominent(r) for r in words) and all(
             r.size < HEADING_SIZE_RATIO * self.body for line in stack for r in line

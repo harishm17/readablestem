@@ -805,6 +805,8 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         + run("slowly", bold + italic)
         + run(" and run ")
         + run("make test", mono)
+        + run(" not ")
+        + run("make all", mono + "<w:strike/>")  # struck out: not live code
         + run(" in the ")
         + run("red", '<w:color w:val="FF0000"/>')
         + run(" part, a ")
@@ -836,6 +838,7 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         ("twice slowly", "emphasis"),
         ("slowly", "strong"),
         ("make test", "code"),
+        ("make all", "deleted"),
     ]
     assert not heading.runs and not whole.runs  # a heading is not bold text; a whole block is not
     [item] = [e for e in reading.elements if e.kind.value == "list_item"]

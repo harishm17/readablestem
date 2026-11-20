@@ -193,7 +193,11 @@ reader, neither to find them nor as a second opinion
    its start or end (digits, or `Page 3 of 9`; a bare year is not one). A page number alone on
    its line is taken on a file of any length (a number 90 % of the way down an A4 page is
    outside the 7 % band); the lines with words, only when the reference holds one page, since
-   on a longer file their words repeat and the repeat rule has them. A head with no page
+   on a longer file their words repeat and the repeat rule has them, and only with a number
+   that says it is a page's (`Page 3`, `Page 3 of 9`, `3 of 9`): the name line and the points
+   of a one-page quiz end in a bare number as a running head does (`Points: ... 25`,
+   `Total marks ... 50`), and they stay. A journal's head with a bare page number beside its
+   name stays on a one-page file for the same reason. A head with no page
    number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
    under it a line away, so it never stands clear. What goes is counted as `furniture` left
    out, as on a longer file. The
@@ -879,7 +883,10 @@ numbered parent, the x does not tell which level "2)" goes back to, so it goes b
 level of its own series at that x. A numbered series that
 starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
 above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
-goes back to the letters. A list that a paragraph, a figure or a table cut ("(i)", the words of
+goes back to the letters. A marker with two readings ("(i)": the letter after "(h)", or roman
+one) is read against the open level the item stands on, then the innermost one, after the
+levels right of it are closed: the bullets under "(h)" say nothing of the "(i)" that follows
+them (`_numbered`). A list that a paragraph, a figure or a table cut ("(i)", the words of
 an answer, "(ii)") goes on where the next item takes up the numbering of one of the levels the
 block closed (the next value of the same series at that level's indent): it keeps those
 levels (`_list_levels`, `_taken_up`). Items of one series (a

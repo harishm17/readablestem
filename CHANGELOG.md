@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased: fixes after the independent review of this wave (review 6)
+
+- **A one-page quiz keeps its name line and its points** (`layout/furniture.py`). The rule
+  that finds a head or foot by its shape on a one-page file took any lines at the edge of the
+  page that stood clear of the text and ended in a number: "Name: ... 20", "Quiz 3: Limits and
+  continuity ... Points: 25", "Total marks for this paper ... 50" went with the running heads,
+  counted as furniture and nothing more. Lines with words now go only with a number that says
+  it is a page's ("Page 3", "Page 3 of 9", "3 of 9"); a page number alone on its line goes as
+  before. A journal's head with a bare page number beside its name stays on a one-page file.
+  Parsing benchmark (olmOCR-bench, headers_footers, no model, 266 pages): 38.6, between the
+  34.5 of pipeline 0.5.13 as deployed and the 51.4 of the rule as first built; the difference
+  is the heads this rule can no longer tell from a quiz's own lines. Not built, to be
+  measured: taking such lines when they are set smaller than the body text.
+- **A struck-through run in a fixed-pitch font stays struck** (`source/docx_package.py`). The
+  package step gave every run in such a font the code style, and code carries no strike, so
+  "~~x = 5~~ x = 7" in Courier New read as one live "x = 5 x = 7". A run with `w:strike` or
+  `w:dstrike` keeps what it has and is a `deleted` run, as in 0.5.13.
+- **"(i)" after an "(h)" that has sub-items goes on with the letters** (`layout/lists.py`).
+  The marker was read against the innermost open level, the bullets under "(h)", so it was
+  roman one: a list of one item under "(h)", which "(j)" then left. It is read against the
+  open level the item stands on, after the levels right of it are closed.
+- **The mark that ends a fraction goes with its equation** (`layout/drawings.py`). A comma or
+  full stop set between the two lines of a fraction, beside the numerator, was a row of its
+  own once its equation number was cut from it, and came out as a paragraph of one comma (two
+  public papers of the development sets after this wave's change to the cut, ten before it).
+  A lone mark level with a maths row and just right of it is maths with it, the rule
+  `_same_line` already has for rows that are maths.
+- **An italic title that opens like a surname is still a title** (`layout/lists.py`). "B.
+  Offline, Online & Optimistic Learning" reads like a line of authors ("B. Smith, J. Doe"),
+  so the marker was held back and the title was a paragraph between two headings. The test for
+  authors is for rows not set whole in italics or bold.
+- **A carried table header is said** (`pipeline/notices.py`). A part of a table that is
+  written with the header row of the part before it gets the optional notice
+  `table_header_carried`: the review card shows the grid stored for the part, which has no
+  header row, so the notice is where a reviewer learns what students get.
+- Stored results: the notice list of a document with a continued table changes, and PDFs of
+  the shapes above read differently, so this goes with the wave's `PIPELINE_VERSION` raise.
+
 ## Unreleased: Listen's side panel for a large picture, and very wide equations on paper (branch fix/wide-print-and-listen-column)
 
 - Listen (`web/listen.py`, `web/routes/listen.py`): a picture whose data is over `MAX_THING_IMAGE`

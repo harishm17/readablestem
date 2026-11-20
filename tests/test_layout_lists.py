@@ -365,6 +365,22 @@ def test_a_series_that_starts_again_is_a_level_down_and_a_list_goes_on_after_a_p
     assert got == [("1.", 1), ("(a)", 2), ("(i)", 3), ("(ii)", 3), ("(b)", 2), ("(i)", 3)]
 
 
+def test_the_letter_i_after_an_h_with_bullets_under_it_goes_on_with_the_letters():
+    """ "(i)" is the letter after "(h)" and the roman one. The dashes under "(h)" are the
+    innermost open level when it comes: read against them it was roman one, a list under
+    "(h)" that "(j)" then left."""
+
+    def fill(page):
+        y = 100
+        for letter in "ghij":
+            y = write(page, 72, y, [f"({letter}) Item text of the letter {letter} goes here"])
+            if letter == "h":
+                y = write(page, 100, y, ["- first point under h", "- second point under h"])
+
+    got = [(m, lvl) for m, _, lvl, _ in items(analyze(one_page(fill)).elements)]
+    assert got == [("(g)", 1), ("(h)", 1), ("-", 2), ("-", 2), ("(i)", 1), ("(j)", 1)]
+
+
 def test_lines_of_a_reference_list_that_start_with_initials_are_not_a_lettered_list():
     """A wrapped reference line starts "D. Horgan, J. Quan": a capital letter and a full stop. A
     "C." and a "D." a few lines apart are not a run of items; "A." "B." "C." in a row are."""
@@ -382,6 +398,8 @@ def test_lines_of_a_reference_list_that_start_with_initials_are_not_a_lettered_l
 
 
 def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_its_item():
+    # The second title opens like a surname and a comma, and a line that starts with an
+    # initial stands between it and "A.": a line of authors is not set whole in italics.
     def fill(page):
         y = write(page, 72, 100, ["A. Reinforcement Learning"], fontname="heit")
         y = write(
@@ -389,11 +407,11 @@ def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_i
             72,
             y,
             [
-                "Let us consider a decision process described by states and",
-                "actions, with a reward that the robot collects.",
+                "Let us consider a decision process described by states and actions.",
+                "T. Lampe and M. Riedmiller describe the reward that the robot collects.",
             ],
         )
-        y = write(page, 72, y + 10, ["B. Problem Descriptions"], fontname="heit")
+        y = write(page, 72, y + 10, ["B. Offline, Online and Optimistic Learning"], fontname="heit")
         write(page, 72, y, ["In this paper we consider tasks with one robot arm."])
 
     got = [(e.kind, e.text) for e in analyze(one_page(fill)).elements]

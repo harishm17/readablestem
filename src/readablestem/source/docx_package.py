@@ -454,10 +454,14 @@ def _code_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
 
 
 def _mark_code(root: ET.Element, code_styles: set[str], facts: Facts) -> None:
-    """Give each run set in a fixed-pitch font the style `CODE_STYLE`."""
+    """Give each run set in a fixed-pitch font the style `CODE_STYLE`. A run struck through
+    keeps what it has: code carries no strike, and a struck "x = 5" read as live code is the
+    answer the author took back."""
     for run in root.iter(_R):
         props = run.find(_RPR)
         if props is None or not _text_of(run).strip():
+            continue
+        if any(_is_on(props.find(f"{{{W}}}{tag}")) for tag in ("strike", "dstrike")):
             continue
         style = props.find(_RSTYLE)
         if _is_mono(props) or (style is not None and style.get(_VAL, "") in code_styles):

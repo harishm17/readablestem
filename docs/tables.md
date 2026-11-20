@@ -271,7 +271,10 @@ rules above.
    gets no second one. Where the columns do not agree, or the part's first rows repeat the
    header without being marked as one, nothing is carried and the notice
    `table_header_missing` ("Worth checking") says the part has no header row. A table whose
-   first part has no header row gets neither.
+   first part has no header row gets neither. A part that is given the header gets the notice
+   `table_header_carried` ("Worth checking"): the review card shows the grid stored for the
+   part, which has no header row, so the notice is where a reviewer learns what students get
+   and can check that the two parts are one table.
 
 What layout does with the result: the table's lines, rules and caption lines leave the
 page, and a TABLE element is placed in reading order like a figure (a grid of terms:

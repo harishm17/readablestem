@@ -673,7 +673,9 @@ def _math_neighbours(row: _Row, other: _Row, *, cross: bool = True) -> bool:
     overlapping in x, or inside its box (the second row of a matrix, beside the tall bracket
     the first row starts with), or an equation number beside it (`_number_beside`), or an
     opening brace level with `other` and a little to its left (the brace of a system,
-    `_stray_brace_cut`)."""
+    `_stray_brace_cut`), or a lone comma or full stop level with `other` and just right of it
+    (the mark that ends a fraction stands between its two lines: beside the numerator, so not
+    "vertically adjacent", and a paragraph of one comma once its number was cut from it)."""
     size = max(row.size, other.size)
     if other.x0 <= (row.x0 + row.x1) / 2 <= other.x1 and other.y0 <= row.y0 and row.y1 <= other.y1:
         return True
@@ -688,6 +690,14 @@ def _math_neighbours(row: _Row, other: _Row, *, cross: bool = True) -> bool:
     gap_y = max(row.y0 - other.y1, other.y0 - row.y1)
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
+        return True
+    if (  # the comma that ends the maths, level with it (`display._same_line` has the same rule)
+        row.ink
+        and all(c.c in ",.;:" for c in row.ink)
+        and row.column == other.column
+        and 0 <= row.x0 - other.x1 <= 1.5 * size
+        and min(row.y1, other.y1) - max(row.y0, other.y0) >= 0.5 * row.height
+    ):
         return True
     if not (row.column == other.column or (cross and row.x0 >= other.x1)):
         return False

@@ -111,6 +111,11 @@ ROWS: tuple[CheckLine, ...] = (
         "optional",
         "a table that goes on from the page before, with no header row to carry over",
     ),
+    _page(
+        "table_header_carried",
+        "optional",
+        "a table that goes on from the page before, written with that part's header row",
+    ),
     _page("colour_only", "optional", "a figure that tells things apart by color alone"),
     _page("long_description_missing", "optional", "a chart or diagram without a long description"),
     _page("struck_text", "optional", "words the page strikes through, kept and marked"),

@@ -17,7 +17,9 @@ written by the steps (the figure and table work only set their fix fields):
   Their decision is the figure's fix, one per reason for the whole document
   (`pipeline.page_type`, `run.PAGE_GROUP_PREFIX`);
 - `table_header_missing` (optional): a table that goes on from the page before and has no
-  header row, which could not be taken from the part before (`assemble_tables.carry_headers`);
+  header row, which could not be taken from the part before (`assemble_tables.carry_headers`),
+  and `table_header_carried` (optional): one that is written with the header row of the part
+  before, which the review card of the part does not show (the grid stored for it has none);
 - `colour_only` (optional): a figure with `FigureFix.colour_only`;
 - `long_description_missing` (optional): a chart or diagram without a long
   description, when long descriptions are on.
@@ -67,6 +69,7 @@ COLOUR_ONLY = "colour_only"
 LONG_DESCRIPTION_MISSING = "long_description_missing"
 STRUCK_TEXT = "struck_text"
 TABLE_HEADER_MISSING = "table_header_missing"
+TABLE_HEADER_CARRIED = "table_header_carried"
 # Text decisions layout raises on a paragraph or list item (`Element.reasons`), WS2.4a and
 # SW54a: options run together in one block, and right-to-left words whose order the PDF's
 # text layer does not give reliably. Both are "required": not handled in this file.
@@ -96,6 +99,7 @@ DERIVED_CODES = frozenset(
         LONG_DESCRIPTION_MISSING,
         STRUCK_TEXT,
         TABLE_HEADER_MISSING,
+        TABLE_HEADER_CARRIED,
         *TEXT_CODES,
     }
 ) | (KEPT_IMAGE_CODES)
@@ -197,8 +201,12 @@ def from_fixes(
     first: dict[str, Fix] = {}
     for fix in fixes:
         first.setdefault(fix.element_id, fix)
-    for part in assemble_tables.carry_headers(elements, first)[1]:
+    carried, refused = assemble_tables.carry_headers(elements, first)
+    for part in refused:
         found.append(make(TABLE_HEADER_MISSING, page=part.page, element_id=part.id))
+    for part in elements:
+        if part.id in carried:
+            found.append(make(TABLE_HEADER_CARRIED, page=part.page, element_id=part.id))
     return found
 
 

@@ -533,6 +533,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "table_header_missing": "This table goes on from the page before, but its columns could not "
     "be given the header of the first part, so a screen reader cannot name them. Check the "
     "table and set its header row.",
+    "table_header_carried": "This table goes on from the page before and has no header row "
+    "of its own, so students get it with the header row of the part before it. Check that it "
+    "is the same table. If it is not, set this table's own header row.",
     "colour_only": "A figure tells things apart by color alone, so add labels or patterns "
     "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "

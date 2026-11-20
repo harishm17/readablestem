@@ -404,7 +404,14 @@ def _list_markers(
                 for style, value in candidate.readings
                 for step in (-1, 1)
             )
-            if confirmed and _capital_letter(candidate) and _names(candidate):
+            # Authors are not set whole in italics or bold; a title is ("B. Offline, Online &
+            # Optimistic Learning" opens like a surname and a comma).
+            if (
+                confirmed
+                and _capital_letter(candidate)
+                and _names(candidate)
+                and not _face(candidate.row)
+            ):
                 confirmed = beside(candidate)
         else:  # the same bullet glyph on another row (this one counts itself)
             confirmed = aligned((candidate.family, ("bullet", 0)), candidate, 2)
@@ -462,7 +469,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             continue
         x = block.marker.x - block.origin
         series, own = _series(block.marker), _marker_x(block)
-        number = _numbered(block.marker, stack[-1] if stack else cut[-1] if cut else None)
+        number = _numbered(block.marker, stack or cut, x, tolerance)
         if not stack and cut and number is not None and block.marker.option is None:
             taken = _taken_up(cut, number, x, tolerance)
             stack = cut[: taken + 1] if taken is not None else []
@@ -491,6 +498,8 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             or (len(stack) > 1 and abs(x - stack[-2].x) < abs(x - stack[-1].x))
         ):
             stack.pop()
+        if stack:  # read against the levels left open: "(i)" after an "(h)" with bullets under it
+            number = _numbered(block.marker, stack, x, tolerance)
         # "(a)" after "1.": a series that starts again is a list under the item above.
         starts = (
             block.marker.option is None
@@ -547,10 +556,13 @@ class _Level:
         return self.series == series
 
 
-def _numbered(marker: _Marker, level: _Level | None) -> _Number | None:
+def _numbered(
+    marker: _Marker, levels: Sequence[_Level], x: float, tolerance: float
+) -> _Number | None:
     """The marker of an ordered item as a place in a series, or None for a bullet. "i" is the
-    letter after "h" and the roman numeral one otherwise; the level above, when it is numbered,
-    decides which."""
+    letter after "h" and the roman numeral one otherwise. The open level the item stands on
+    (`x`, the innermost first) decides which, then the innermost open level: the bullets under
+    "(h)" are open when "(i)" comes, and say nothing of it."""
     parsed = _ordered_marker(marker.text) if marker.ordered else None
     if parsed is None:
         return None
@@ -559,13 +571,15 @@ def _numbered(marker: _Marker, level: _Level | None) -> _Number | None:
     if not readings:
         return None
     if len(readings) > 1:
-        above = level.number if level is not None else None
+        on = [lv for lv in reversed(levels) if abs(x - lv.x) <= tolerance]
+        above = [lv.number for lv in (*on, *levels[-1:]) if lv.number is not None]
         follows = [
             r
+            for last in above
             for r in readings
-            if above is not None and above.key == f"{form}|{r[0]}" and r[1] == above.value + 1
+            if last.key == f"{form}|{r[0]}" and r[1] == last.value + 1
         ]
-        readings = tuple(follows or [r for r in readings if r[1] == 1] or readings[:1])
+        readings = tuple(follows[:1] or [r for r in readings if r[1] == 1] or readings[:1])
     style, value = readings[0]
     return _Number(f"{form}|{style}", value)
 
