@@ -6,6 +6,7 @@ test_web_events.py, test_web_canvas_download.py): who may get them, the clock, t
 
 from __future__ import annotations
 
+import contextlib
 import io
 import re
 import threading
@@ -195,6 +196,32 @@ def test_the_canvas_course_number_is_part_of_what_is_kept(web, monkeypatch):  # 
             fetch(web.browser, f"/jobs/{job_id}/download/canvas?course={course}").status_code == 200
         )
     assert len(built) == 3
+
+
+def test_combined_files_do_not_push_the_files_of_the_first_part_out(web):  # noqa: F811
+    """The first part of a long upload holds its own Word, EPUB, Canvas (one per course number)
+    and Cartridge files and the three combined ones: the combined files have their own count."""
+    job_id = ready_job(web)
+    built: list[str] = []
+
+    def keep(file_type: str, title: str = "t") -> None:
+        def build() -> bytes:
+            built.append(file_type)
+            return b"x"
+
+        with session_scope(web.ctx.factory) as session:
+            export_store.get_or_build(
+                lambda: contextlib.nullcontext(session), job_id, 1, file_type, "", title, build
+            )
+
+    own = ["docx", "epub", "cartridge", "canvas", "canvas-2", "canvas-3"]
+    combined = [export_store.COMBINED + t for t in ("html", "docx", "epub")]
+    for file_type in (*own, *combined):
+        keep(file_type)
+    built.clear()
+    for file_type in (*own, *combined):
+        keep(file_type)
+    assert built == []  # all nine are still kept: none was built again
 
 
 # --------------------------------------------------------------------------- drafts

@@ -1,0 +1,8 @@
+{# What the Word file does with an equation Word cannot take (Audiences: reviewer, reader). The
+   count is known once the file was first made (`export_store.NOTE_KIND`), so a page opened before
+   that says what the file does and when the number shows; the page does not poll for it. #}
+{% if word_as_words|default(0) %}
+<p class="hint" id="word-as-words">{{ word_as_words }} {{ "equation" if word_as_words == 1 else "equations" }} of the Word file {{ "is" if word_as_words == 1 else "are" }} written as words, not as Word {{ "equation" if word_as_words == 1 else "equations" }}, and marked so in the file. {{ "It is" if word_as_words == 1 else "They are" }} complete on the web page.</p>
+{% elif not word_as_words_known|default(true) %}
+<p class="hint" id="word-as-words">An equation that cannot be a Word equation is written as words in the Word file and marked there. This page counts them once the file has been made and the page is opened again.</p>
+{% endif %}

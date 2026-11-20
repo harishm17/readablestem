@@ -10,7 +10,8 @@ digest covers the title, the options that change the file (the Canvas course num
 page itself, draft banner and all. So a new decision (`jobs.result_version`), a release that
 changes the rendering (`assemble.RENDER_VERSION`), a different file type or option, and any
 change to the page each build once more; nothing else does. A file kept for an older version
-is deleted when a newer one is kept, a job keeps at most `MAX_PER_JOB` files, and one over
+is deleted when a newer one is kept, a job keeps at most `MAX_PER_JOB` files (and, on the
+first part of a long upload, `MAX_COMBINED` combined files besides them), and one over
 `MAX_BYTES` is built every time and not kept.
 
 What a build found out about its file and the job page says beside the download is kept with it
@@ -48,6 +49,7 @@ KIND = "export"
 NOTE_KIND = "export_note"
 COMBINED = "combine-"  # in front of the file type of a combined file ("Combine parts")
 MAX_PER_JOB = 6
+MAX_COMBINED = 3  # the combined files kept on the first part: HTML, Word, EPUB
 MAX_BYTES = 32 * 1024 * 1024
 MEDIA_TYPE = "application/octet-stream"
 
@@ -107,13 +109,19 @@ def put(session: Session, job_id: str, key: str, data: bytes, note: int | None =
             Blob.element_id.not_like(current + "%"),
         )
     )
+    # A combined file has its own count: on the first part of a long upload the four file types
+    # of the part and the three of the combined file (7) are all reachable, so one count of
+    # `MAX_PER_JOB` would make Word, EPUB and Canvas of the part push each other out.
+    combined = key.startswith(current + COMBINED)
+    own = Blob.element_id.like(current + COMBINED + "%")
     kept = session.execute(
         select(Blob.id, Blob.element_id)
-        .where(Blob.job_id == job_id, Blob.kind == KIND)
+        .where(Blob.job_id == job_id, Blob.kind == KIND, own if combined else ~own)
         .order_by(Blob.created_at.desc(), Blob.id)
     ).all()
-    if len(kept) >= MAX_PER_JOB:
-        old = kept[MAX_PER_JOB - 1 :]
+    limit = MAX_COMBINED if combined else MAX_PER_JOB
+    if len(kept) >= limit:
+        old = kept[limit - 1 :]
         session.execute(delete(Blob).where(Blob.id.in_([row.id for row in old])))
         session.execute(  # their notes go with them
             delete(Blob).where(

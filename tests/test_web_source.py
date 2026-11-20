@@ -614,7 +614,10 @@ def test_what_a_word_file_leaves_a_person_to_decide_is_said_not_left_to_chance(
         monkeypatch.setattr(export_docx, "export_docx", two_as_words)
         ready = job_id_from(send(client, office.docx_with_equation(), "ready.docx"))
         assert env.run_worker() == ready
-        assert "written as words" not in client.get(f"/jobs/{ready}").text
+        before = " ".join(client.get(f"/jobs/{ready}").text.split())
+        assert (
+            "2 equations of the Word file" not in before and "once the file has been made" in before
+        )
         assert fetch(client, f"/jobs/{ready}/download.docx").status_code == 200
         assert "2 equations of the Word file are written as words" in " ".join(
             client.get(f"/jobs/{ready}").text.split()
