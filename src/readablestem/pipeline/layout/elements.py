@@ -121,6 +121,26 @@ def _contents_links(elements: list[Element]) -> list[Element]:
     return out
 
 
+def _mark_spots(text: str, found: _FootnoteMark) -> list[int]:
+    """Where in `text` the mark stands, by what is printed just before it. An inline equation
+    stands in the text as a placeholder, so the glyphs it took from the line are not there:
+    the context is cut from its left until it is found, down to the placeholder itself. A cut
+    context that ends a number ("0.1") is no place for a mark."""
+    before = found.before
+    contexts = [before[start:] for start in range(len(before)) if before[start:].strip()]
+    for k, context in enumerate([*contexts, "\u27e7"]):
+        spots = [
+            m.end() - len(found.mark)
+            for needle in (context + found.mark, context + " " + found.mark)
+            for m in re.finditer(re.escape(needle), text)
+        ]
+        if spots and k and any(text[at - 2 : at].strip(".,").isdigit() for at in spots):
+            return []
+        if spots:
+            return spots
+    return []
+
+
 def _footnote_links(elements: list[Element], marks: dict[str, _FootnoteMark]) -> list[Element]:
     """The elements with an internal link from each footnote's mark in the text to the
     footnote. The mark is found again in the element's text by what is printed just before
@@ -131,12 +151,7 @@ def _footnote_links(elements: list[Element], marks: dict[str, _FootnoteMark]) ->
         owner = by_id.get(found.block_id)
         if owner is None or owner.text is None or not found.before.strip():
             continue
-        wanted = [found.before + found.mark, found.before + " " + found.mark]
-        spots = [
-            m.end() - len(found.mark)
-            for needle in wanted
-            for m in re.finditer(re.escape(needle), owner.text)
-        ]
+        spots = _mark_spots(owner.text, found)
         if len(spots) != 1:
             continue
         start = spots[0]

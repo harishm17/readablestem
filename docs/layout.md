@@ -1933,6 +1933,22 @@ footnote by its place and size alone (a listing's line numbers in small type wer
 "footnotes" in one file, and a numbered list at the foot of a page was one too), and a file that
 names none behaves as before.
 
+Three more cases of such a file (the wave 2a footnote work). Some classes put a one-line note's
+destination at the foot of its line, a little under it: when no line has the point above its top
+or within it, the line it lies just under is the note (`_row_at`). The symbol notes of a title or
+author block (`*`, a dagger) have a destination at the corner of the page, on no line: such a
+destination starts the one line low on the page, in small type, that opens with the glyphs its link
+covers in the text, and a mark that opens no line or two places nothing (`_place_by_mark`). And a
+block that begins a column is no continuation of the note that ends the one before it
+(`_merge_column_continuations`): a note ending in a URL, with no full stop, took the first
+paragraph of the next column in with it. The glyphs of a note's mark (the ones its link covers, and
+the ones that open the note's own line) are never read as math (`NOTE_MARK_FLAG`, `_char_class`),
+so a mark beside a letter in a math font is not made an inline equation with it. The mark is found
+again in the element's text by what is printed before it; when an inline equation took some of
+those glyphs (it stands in the text as a placeholder) the context is cut from its left, down to the
+placeholder itself, and still has to be found exactly once, and not as the end of a number
+(`_mark_spots`).
+
 A raised number is set off from the word it touches where the glyphs are cut (`_mark_notes`,
 `SET_OFF_FLAG`), not by repairing the string afterwards: the mark that opens a note's own text
 ("2 We built"), a mark in the body that a link names, and a raised digit that ends a heading (a

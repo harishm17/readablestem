@@ -109,6 +109,7 @@ _LETTER_STYLE_FONTS = (
 
 _BOLD_FLAG = 16
 _ITALIC_FLAG = 2
+NOTE_MARK_FLAG = 1 << 21  # `_Char.flags` of a footnote's mark (`page._mark_notes`): never maths
 _MONO_FLAG = 8
 
 # The letter styles `glyph_style` names (the equation step compares them with the reading's).
@@ -380,6 +381,8 @@ def _char_class(ch: _Char) -> str:
     c = ch.c
     if ch.blank:
         return "W"
+    if ch.flags & NOTE_MARK_FLAG:
+        return "P"
     if ch.math:
         return "M"
     if ch.mono:
