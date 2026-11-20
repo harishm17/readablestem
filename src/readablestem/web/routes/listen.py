@@ -4,7 +4,9 @@
 `view`, like the student preview, and like it never read out as a draft to a person who may not
 take one: `output.shown`), and `GET /demo/listen` is public, for the stored demo. Both
 only read: no POST, nothing stored, nothing logged, and the transcript is made from the same
-HTML the student gets (`web.listen`), kept in memory per job result version.
+HTML the student gets (`web.listen`), kept in memory per job result version. A picture too
+large to copy into the page is loaded from the crop route, which gives the same people the same
+access.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from fastapi.responses import Response
 from readablestem.core.types import DocumentResult
 from readablestem.web import documents, listen, output
 from readablestem.web.db import session_scope
-from readablestem.web.deps import UserDep, get_ctx, render
+from readablestem.web.deps import ELEMENT_ID, UserDep, get_ctx, render
 from readablestem.web.routes.jobs import current_html, job_access, require_done
 from readablestem.web.routes.pages import DEMO_DIR, DEMO_PAGE
 from readablestem.web.shares import VIEW, role_of
@@ -43,7 +45,10 @@ def listen_page(request: Request, job_id: str, user: UserDep) -> Response:
     def speeches() -> dict[str, str]:
         return listen.stored_speeches(DocumentResult.model_validate(result_json or {}))
 
-    items = listen.transcript_for(job_id, version, html, speeches)
+    def crop_url(element_id: str) -> str:  # a picture too large to copy is loaded from its crop
+        return f"/jobs/{job_id}/crops/{element_id}.png" if ELEMENT_ID.match(element_id) else ""
+
+    items = listen.transcript_for(job_id, version, html, speeches, crop_url)
     return render(
         request,
         "listen.html",

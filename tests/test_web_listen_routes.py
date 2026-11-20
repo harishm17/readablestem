@@ -96,6 +96,25 @@ def test_the_owner_hears_the_converted_page(site):
     assert body.count("data-listen-id=") == body.count("data-listen-item")
 
 
+def test_a_picture_too_large_to_copy_is_loaded_from_its_crop_by_whoever_may_see_the_page(site):
+    """O-101: the side panel does not carry a picture past the limit in the page; it names the
+    crop the student page's own figure was cut from, which the same people can load."""
+    big = "A" * (listen.MAX_THING_IMAGE + 1)
+    with session_scope(site.ctx.factory) as session:
+        session.get(Job, site.job_id).html = as_current(
+            '<!doctype html><html lang="en"><head><title>Notes</title></head><body><main>'
+            f'<figure id="p1-e4"><img src="data:image/png;base64,{big}" alt="A rising line.">'
+            "</figure></main></body></html>"
+        )
+    listen.CACHE.clear()
+    crop = f"/jobs/{site.job_id}/crops/p1-e4.png"
+    for who in (site.owner, site.viewer):
+        body = who.get(f"/jobs/{site.job_id}/listen").text
+        assert f'<img src="{crop}" alt="A rising line.">' in body and big not in body
+        assert who.get(crop).status_code == 200
+    assert site.stranger.get(crop).status_code == 404
+
+
 def test_a_person_it_was_shared_with_can_open_it_and_a_stranger_gets_the_404(site):
     path = f"/jobs/{site.job_id}/listen"
     assert site.viewer.get(path).status_code == 200
