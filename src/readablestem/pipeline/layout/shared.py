@@ -803,7 +803,8 @@ class _Block:
     # Raised or lowered text this block's element cannot carry (`Element.script_runs`): it is
     # written flat, and a notice says so (`scripts_flattened`).
     flat_scripts: bool = False
-    marked: str | None = None  # headings: `text` with its raised and lowered runs marked
+    # headings and captions: `text` with its raised and lowered runs marked
+    marked: str | None = None
     # Display equations placed by the page math pass: its LaTeX, and "span" or "layout".
     page_latex: str | None = None
     page_status: PageStatus | None = None

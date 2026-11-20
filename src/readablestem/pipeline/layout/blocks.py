@@ -2442,7 +2442,15 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
     ):
         heading = [REASON_LARGER_FONT, f"font {ratio:.2f}x body", *evidence]
     elif CAPTION.match(text):
-        return _Block("caption", box, rows, text=readable_math_letters(text), font_size=size)
+        marked = readable_math_letters(_join_text(rows, marked=True, document=document))
+        return _Block(
+            "caption",
+            box,
+            rows,
+            text=readable_math_letters(text),
+            font_size=size,
+            marked=marked if script_marks.has_marks(marked) else None,
+        )
     elif (
         upright
         and bold
@@ -3076,9 +3084,16 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure], *, document: 
     for _, c_index, f_index in sorted(pairs):
         if c_index in used_captions or figures[f_index].caption is not None:
             continue
-        figures[f_index].caption = blocks[c_index].text
+        # A raised run is written in superscript characters, as a table caption's is; a
+        # lowered one has no such form here and stays flat, and the notice says so.
+        marked = blocks[c_index].marked
+        figures[f_index].caption = (
+            script_marks.as_characters(marked) if marked else blocks[c_index].text
+        )
         figures[f_index].flat_scripts = any(
-            kind for row in blocks[c_index].rows for kind in _script_kinds(row, document=document)
+            kind == "sub"
+            for row in blocks[c_index].rows
+            for kind in _script_kinds(row, document=document)
         )
         pieces = _paragraph_pieces(blocks[c_index], document=document)
         if any(isinstance(piece, _Inline) for piece in pieces):

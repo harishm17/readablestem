@@ -250,7 +250,7 @@ def equation_alt_text(alt: str) -> str:
 
 
 # Layout's reasons that say the text layer of an equation is not in reading order.
-_FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
+_FLATTENED_REASONS = ("superscript", "power of ten", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
 # A figure with no description, never empty alt text: only decoration with evidence has that
 # (`pipeline.decoration`, WS6.4).
