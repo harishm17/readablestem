@@ -2018,7 +2018,7 @@ marks, and in a file that names none only a raised digit or sign that opens a li
 type low on the page, or a raised run at the end of a heading that is the same as the opening
 of such a line on the page.
 
-Wave 2b, from a count of the public papers (131 destinations, 155 notes found, 124 linked; the
+Wave 2b, from a count of the public papers (131 destinations, 155 notes found, 124 linked; now 139 found, 135 linked; the
 count is the footnote destinations, the `footnote` notices and the internal links to them).
 In a file that names none, a block is a note only when it opens with a mark printed raised in
 the text above it that is the whole mark ("12" is not the "1" raised above it) and goes on in

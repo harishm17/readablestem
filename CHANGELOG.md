@@ -3,7 +3,7 @@
 ## Unreleased: footnotes still missed and algorithm blocks still lost (branch fix/footnotes-algorithms, O-034, O-054, O-394)
 
 A count on the public papers (131 footnote destinations, 155 notes found, 124 linked to their
-mark) and a count of the algorithm shapes on the 22 public pages with an "Algorithm" or
+mark; 139 found and 135 linked now) and a count of the algorithm shapes on the 22 public pages with an "Algorithm" or
 "Procedure" line, each fix with a case in `tests/test_structure.py` that fails without it
 (`layout/page.py`, `layout/notices.py`, `layout/inline_runs.py`, `layout/blocks.py`,
 `layout/bold.py`):
@@ -22,8 +22,8 @@ mark) and a count of the algorithm shapes on the 22 public pages with an "Algori
 - **A note the file names and no link points at is linked by its mark.** Some classes write
   the destinations with no link rectangles, so no mark was found: 6 notes on 2 papers are
   linked now (the raised mark above, on the same page, that the note opens with, found once).
-  Linked 124 to 130 of the 131 destinations; the other notes are 2 author notes with no mark
-  in the text and one table note.
+  Linked 124 to 135 of the 139 notes found (the dev and dev2 sets hold some of the same papers, counted twice); the 4 left are 2 author notes with no mark in the
+  text, one table note and one bibliography item the file names `footnote`.
 - **An algorithm that holds a bold letter waiting for evidence keeps its lines.** The pass
   that puts a bold letter back as plain text tidied the block's lines into one: 4 blocks on 4
   pages of one paper (`layout/bold.py`).
