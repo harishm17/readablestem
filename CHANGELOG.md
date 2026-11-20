@@ -16,6 +16,11 @@
 - A page number alone at the foot or head of a page of any length was missed when the line
   stood between 7 % and 12 % from the edge (an A4 page's number 90 % down, past the 7 % band
   of `drops`). The same rule takes it when it stands alone with the edge to itself.
+- Corpus hash run against 957c9310 (73 uploads replayed, 332 PDFs in three variants): one
+  upload changes (a 5-page handout loses one paragraph, a lone "1" 92 % of the way down a page,
+  now counted as furniture), and 21 PDFs change in `analyze` (papers of the development sets
+  and the repository's own samples), each by the bare page numbers of 1 to 27 pages that stood
+  7 % to 12 % from the edge, never a line with words. The rows taken in every one were read.
 - Parsing benchmark (olmOCR-bench, no model, 747 pages, pipeline 0.5.13): headers_footers 34.5
   to 51.4 (325 of 632 checks); table_tests, long_tiny_text and baseline did not change;
   multi_column 69.2 to 69.1, two order checks of one journal article whose gold counts its
