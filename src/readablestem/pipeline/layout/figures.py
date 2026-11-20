@@ -615,7 +615,11 @@ def _sentence_between(
     rows: Sequence[_Row], box: BBox, figure: BBox, *, document: _Document
 ) -> bool:
     """Is there a line of prose (at least SENTENCE_WORDS words) inside the union of `box` and
-    `figure` that is in neither? A label or a tick label is never that long."""
+    `figure` that is in neither? A label or a tick label is never that long. Not when `box`
+    is in a row of its own (a glyph drawn as an outline in a line of text): that line is the
+    drawing's, and it joins the figure as it always did."""
+    if any(_centre_inside(box, r.bbox) for r in rows if r.kind == "text" and not r.vertical):
+        return False
     union = _union([box, figure])
     return any(
         r.kind == "text"
