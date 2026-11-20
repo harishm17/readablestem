@@ -1041,7 +1041,8 @@ class _Steps:
         if not rows:
             return None
         top = max(g.baseline for g in rows)
-        return max((g for g in rows if abs(g.baseline - top) <= 0.3 * self.anchor.size), key=lambda g: g.x1)
+        line = [g for g in rows if abs(g.baseline - top) <= 0.3 * self.anchor.size]
+        return max(line, key=lambda g: g.x1)
 
     def on_line(self, row: _Row) -> bool:
         """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?"""
@@ -1055,7 +1056,7 @@ class _Steps:
 def _step_kind(row: _Row, steps: _Steps, edges: _RightEdges) -> str | None:
     """How `row` goes with the algorithm collected so far: "number" (a step with the next
     line number), "step", "wrap" (the line before goes on in it), "piece" (a bit of the line
-    before: maths or small print the text layer set in a row of its own), or None (it does
+    before: math or small print the text layer set in a row of its own), or None (it does
     not belong)."""
     anchor, caption, group = steps.anchor, steps.caption, steps.rows
     region = row.region
@@ -1077,7 +1078,8 @@ def _step_kind(row: _Row, steps: _Steps, edges: _RightEdges) -> str | None:
         if row.kind == "text" and number is None and above is not None and _wraps_on(above, edges):
             return "wrap"
         return None
-    if number is not None and (caption is not None or not group) and len(group) <= ALGORITHM_PREAMBLE:
+    early = caption is not None or not group
+    if number is not None and early and len(group) <= ALGORITHM_PREAMBLE:
         return "number" if row.kind == "text" or free else None
     if row.kind != "text":
         return "step" if single and group else None
@@ -1099,7 +1101,9 @@ def _step_kind(row: _Row, steps: _Steps, edges: _RightEdges) -> str | None:
         return "step"
     # The lines before the first block word of a captioned algorithm ("Initialize ...",
     # "Choose ..."), unless the caption is a sentence ("Algorithm 1 shows how ... .").
-    sentence = caption is not None and caption.clean.rstrip()[-1:] in ".?!" and len(caption.clean) > 40
+    sentence = (
+        caption is not None and caption.clean.rstrip()[-1:] in ".?!" and len(caption.clean) > 40
+    )
     return "step" if caption is not None and not steps.blocked and not sentence else None
 
 
@@ -1127,7 +1131,7 @@ def _resumes(row: _Row, steps: _Steps) -> bool:
 
 def _after_equation(rows: Sequence[_Row], at: int, steps: _Steps) -> int | None:
     """Where an algorithm goes on after a display equation in one of its steps: the index of
-    the row that `_resumes`, when what lies between is maths (and, in a numbered algorithm,
+    the row that `_resumes`, when what lies between is math (and, in a numbered algorithm,
     the lines that go with it: a "where ...", an indented piece) and the row is within
     `ALGORITHM_REACH` lines of the last step. None when no such row follows."""
     group, anchor = steps.rows, steps.anchor
@@ -1227,7 +1231,7 @@ def _is_algorithm(steps: _Steps) -> bool:
 
 def _lines(steps: _Steps) -> list[list[_Row]]:
     """The rows of one algorithm as its lines, top to bottom: rows on one baseline make one
-    line, left to right, and a piece (a bit of maths or small print) joins the line it is
+    line, left to right, and a piece (a bit of math or small print) joins the line it is
     nearest to."""
     whole = sorted(
         (r for r in steps.rows if id(r) not in steps.pieces), key=lambda r: (r.baseline, r.x0)
@@ -1255,7 +1259,7 @@ def _algorithm_groups(
     own block, and a second line of it is no step), or, with more proof (`_is_algorithm`), by
     its steps alone. Its rows are in one column and one size, a line pitch apart, each one
     starting with a step word (for, if, while, end, return, input, output ...), or an
-    assignment ("count = 0"), or a line of maths (a step that is a formula: "c <- c + 1"), or
+    assignment ("count = 0"), or a line of math (a step that is a formula: "c <- c + 1"), or
     further right than the first step (what a loop or a branch holds). Under a caption the
     lines before the first block word (Input, Initialize ...) are steps too. When the steps
     carry line numbers ("3:", "12") each has the next number and a row with none is the rest of
@@ -1263,7 +1267,7 @@ def _algorithm_groups(
     numbers are cut off the text (`_Row.algo_number`), so the indent is the step's own, not
     the number's. A display equation in a step ends the rows there and the algorithm goes on
     in the next step below it, as a block of its own, with the equation and its place in the
-    order as they were. Maths rows become text, so a formula stays a formula inside its line
+    order as they were. Math rows become text, so a formula stays a formula inside its line
     (an inline equation)."""
     found: dict[int, int] = {}
     order = list(rows)

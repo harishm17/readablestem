@@ -281,6 +281,8 @@ def _lines_of(pre: _Node) -> _Node:
                     if body:
                         start = False
                     if line:
+                        # a line number set apart from its step leaves a run of spaces
+                        body = re.sub(" {2,}", lambda run: "\u00a0" * len(run.group()), body)
                         paragraph.children.append("\u00a0" * (len(line) - len(body)) + body)
 
     add(pre.children)

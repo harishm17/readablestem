@@ -306,12 +306,14 @@ def test_a_file_that_lacks_an_equation_is_refused(tmp_path):
 
 def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
     """A poem's `<br>` is a line break; an algorithm (a code block with a formula in a step)
-    is lines of a paragraph with its indentation, and its formula an Office equation."""
+    is lines of a paragraph with its line numbers and indentation, and its formula an
+    Office equation."""
     html = (
         '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
         "<p>Whose woods these are<br>His house is in the village</p>"
-        "<pre><code>for each word do\n  if x then\n    <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
-        "\n  end if\nend for</code></pre>"
+        "<pre><code>1: for each word do\n2:   if x then\n"
+        "3:     <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
+        "\n4:   end if\n5: end for</code></pre>"
         '<aside aria-label="Sidebar"><p>Set apart.</p></aside>'
         "<blockquote><p>Quoted.</p></blockquote></main></body></html>"
     )
@@ -323,7 +325,7 @@ def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
     # A sidebar and a quotation keep a style of their own in Word, so neither reads as body text.
     assert re.search(r'w:val="Sidebar".*?Set apart', xml, re.S)
     assert re.search(r'w:val="BlockText".*?Quoted', xml, re.S)
-    assert "\N{NO-BREAK SPACE}" * 4 + "<m:oMath>" in xml.replace(
+    assert "3:" + "\N{NO-BREAK SPACE}" * 5 + "<m:oMath>" in xml.replace(
         "</w:t></w:r><m:oMath>", "<m:oMath>"
     )
 
