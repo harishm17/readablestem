@@ -705,6 +705,12 @@ _HOLDS = {
         "The search for tables was cut short on some pages, so a table there may be read as "
         "plain text: check the notices before you share it."
     ),
+    # `layout.notices._hidden_text_notices`: a paragraph or more of words nobody sees on a typed
+    # page is left out, and may be what the page says
+    "hidden_text_check": (
+        "A page has a lot of hidden text that was left out, so compare it with the original "
+        "before you share it."
+    ),
     # `text_pass.comment_notes`: a comment may have been written for the instructor alone (an
     # answer, a co-author's remark), and every one is a paragraph of the student file
     "annotations_read": (

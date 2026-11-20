@@ -246,6 +246,29 @@
 - The Word file's count of equations written as words is kept with the built file and said on the
   job page beside the download.
 - `RENDER_VERSION` is owed for the page note of a Word equation shown as LaTeX; none is raised here.
+## Unreleased: hidden words, annotation art in the ink reader, and the record's handled lines (branch fix/hidden-words-ink-turns)
+
+- What an annotation paints (a sticky note's icon, a highlight's box) was left out of figures and
+  handwriting by layout only. The upload probe (`page_type._probe_ink`) and the stroke reader
+  (`ink_strokes.extract_ink`, whose strokes go to the reader of a handwritten page) took the page's
+  drawings whole: on a handwritten page a sticky note added 4 strokes and a highlight 1. Both now
+  read the drawings through `without_annotation_art`, as does the page-type measurement
+  (`eval/page_types.py`). A pen stroke (Ink annotation) is still read as handwriting.
+- Text painted where nobody sees it (under 2 pt, or flat on the page) is counted in the stored page
+  type (`PageType.unseen_chars`, written when above 0, so older records load). A kept page whose
+  only hidden text was of that kind had a notice with its count but nothing on the review screen
+  and the job page: they read the stored record, which did not have it (`left_out_chars`).
+- A typed page with 400 or more characters of hidden or covered text (`page_type.HIDDEN_BLOCK`)
+  now has the required line `hidden_text_check` instead of the optional `hidden_text_ignored`, and
+  keeps a finished job at "Ready" (`states._HOLDS`). The cut comes from the corpus census
+  (docs/layout.md): pages with less were debris; the pages with more had a text layer of their own
+  beside drawings. Not built: a page tool that keeps those words in the file. It needs the words
+  read again from the PDF as blocks, a stored decision, an undo and a place in the model's context;
+  the line tells the instructor to add them to the source and upload again.
+- The review record and its CSV have "Handled in this file" (section `handled`): the same lines
+  as the job page, from `job_page.handled_lines`. A page saved sideways reads as such only on a job
+  read after the line existed; an older job's page is right all the same (its elements are in the
+  turned frame and every later reader turns the page again), so the turn is not stored.
 
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 

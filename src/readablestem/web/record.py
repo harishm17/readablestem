@@ -41,6 +41,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline import checked, checked_words
+from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import exam, job_page
 from readablestem.web.database import as_utc
@@ -248,6 +249,8 @@ class Record:
     failed_checks: list[CheckRow] = field(default_factory=list)
     open_items: list[ItemRef] = field(default_factory=list)
     not_checked: list[str] = field(default_factory=list)
+    # What was found and converted, as the job page's "Handled in this file" says it.
+    handled: list[str] = field(default_factory=list)
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
     left_out_pages: list[int] = field(default_factory=list)  # 1-based
@@ -648,6 +651,7 @@ def build(
         failed_checks=failed,
         open_items=open_items,
         not_checked=not_checked_list(result, summary),
+        handled=[line.text for line in job_page.handled_lines(notice_rules.current(result))],
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
         left_out_blocks=[
@@ -690,7 +694,7 @@ def safe_cell(value: object) -> str:
 def to_csv(record: Record) -> str:
     """The record as one CSV table (UTF-8; the route adds a byte order mark so Excel reads
     the letters right). Each row has a `section`: document, summary, decision, open,
-    not_converted, check, not_checked."""
+    not_converted, check, not_checked, handled."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\r\n")
     # Who decided is a column only in the owner's file: a person the document was shared with
@@ -769,4 +773,6 @@ def to_csv(record: Record) -> str:
         row("check", ch.code, tool_had=ch.severity, decision="Did not pass", detail=ch.text)
     for line in record.not_checked:
         row("not_checked", detail=line)
+    for line in record.handled:
+        row("handled", detail=line)
     return out.getvalue()

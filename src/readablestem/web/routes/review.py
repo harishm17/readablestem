@@ -823,7 +823,7 @@ def page_group_view(
     else:
         button = f"Keep the page image{'s' if many else ''}, marked “Not converted”"
     kept = {p - 1 for p in pages}
-    hidden_chars = sum(t.untrusted_chars for t in result.page_types if t.page in kept)
+    hidden_chars = sum(t.left_out_chars for t in result.page_types if t.page in kept)
     hidden = ""
     if hidden_chars >= 3 and not region:  # page_type.HIDDEN_FEW
         these = "These pages have" if many else "This page has"

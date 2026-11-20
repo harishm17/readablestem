@@ -80,8 +80,12 @@ def classify_file(path: Path, pages: list[int]) -> Classified:
             started = time.perf_counter()
             flags = page_type.TEXT_FLAGS | page_type.actualtext_flag(page)
             raw = page.get_text("rawdict", flags=flags)["blocks"]
-            drawings = page.get_cdrawings()
-            result = page_type.classify(page, raw, drawings, budget=budget, producer=hint)
+            drawn = page.get_cdrawings()  # as layout reads the page: the ink without annotation art
+            drawings = page_type.without_annotation_art(page, drawn)
+            covers = drawn if len(drawings) != len(drawn) else None
+            result = page_type.classify(
+                page, raw, drawings, budget=budget, producer=hint, covers=covers
+            )
             out[number] = (result, (time.perf_counter() - started) * 1000)
     return out
 
