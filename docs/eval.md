@@ -3366,13 +3366,13 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.13 by
-`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 58 decisions,
-0.496 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.14 by
+`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 57 decisions,
+0.487 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
 capitals, equation numbers and kept line ends) make the pipeline ask questions the
-recording does not hold, so 30 uploads are left out for 1,326 answers missing, among them the
-equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 76,
+recording does not hold, so 30 uploads are left out for 1,324 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 644, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 76,
 `w_solutions_1802` 64). The decisions a page of the records are not comparable: the dense
 mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
 0.5.11 record (2026-11-18, 45 uploads, 70 decisions), the 42 uploads in both ask the same;
@@ -3380,7 +3380,15 @@ mathematics that carried most of the load in 0.5.10 is the part now left out. Ag
 and 2 answers missing) and `w_mixed_slides+image_pages` came back. Against the 0.5.12 record the same 43 uploads are
 measured and each asks the same decisions: the list, block-start and page-join changes of
 0.5.13 moved elements only on uploads that were already left out (28 more answers missing on
-seven of them). **A paid recording of the
+seven of them). Against the 0.5.13 record the same 43 uploads are measured and 42 ask the
+same decisions: `r06_labsafety_5310` asks none where it asked one, because a bulleted line
+on its second page that was read as a heading and sent for a decision ("reads like a
+sentence") is a list item now. The same 30 uploads are left out, and one of them
+(`w_notes_6042_ch2`) has two answers fewer missing. The record also lists, for each upload,
+the elements that ask for a decision (`asked`) and the ones a reviewer may look at
+(`optional`), and counts the formulas accepted with nothing to hold them against
+(`not_compared`: 2 of the 52 equations, both for want of usable characters; no decision is
+asked for these). **A paid recording of the
 answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
 the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.
