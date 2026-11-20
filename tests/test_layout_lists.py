@@ -400,6 +400,16 @@ def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_i
     assert [k for k, _ in got].count(Kind.HEADING) == 2
     assert not items(analyze(one_page(fill)).elements)
 
+    def options(page):  # the options of a question, set in italics, are still its options
+        y = write(page, 72, 100, ["1. Which law relates the force on a body to its motion?"])
+        rows = ["A. Newton's first law", "B. Newton's second law", "C. Hooke's law of springs"]
+        y = write(page, 90, y, rows, fontname="heit")
+        write(page, 72, y + 10, ["Explain your choice in one or two sentences below."])
+
+    got = analyze(one_page(options)).elements
+    assert [m for m, *_ in items(got)] == ["1.", "A.", "B.", "C."]
+    assert Kind.HEADING not in kinds(got)
+
 
 def test_a_bullet_item_set_in_bold_is_a_list_item_not_a_heading():
     def fill(page):

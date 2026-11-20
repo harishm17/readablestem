@@ -491,18 +491,53 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
 MAX_LETTERED_TITLE_WORDS = 12
 
 
-def _lettered_title(row: _Row) -> bool:
-    """Is the row a title that starts with a capital letter and a full stop ("A. Problem
-    Descriptions") and is set, all of it, in bold or in italics? A list item of that shape has
-    its words in the type of the text round it; an author's initials ("A. Smith, B. Jones")
-    are set as the text is, and a title does not end like a sentence or a clause."""
+def _capital(row: _Row) -> int:
+    """The place in the alphabet of the capital letter the row's marker is ("A." is 1), else 0."""
     marker = row.marker
-    if marker is None or len(marker.text) != 2 or not marker.text[0].isupper():
-        return False
-    words = row.clean.split()
-    if not 2 <= len(words) <= MAX_LETTERED_TITLE_WORDS or row.clean[-1:] in ".,;:":
-        return False
-    return _face(row) != ""
+    if marker is None or marker.option is not None:
+        return 0  # the options of a grid are a list whatever they are set in
+    return ord(marker.text[0]) - 64 if len(marker.text) == 2 and marker.text[0].isupper() else 0
+
+
+def _mark_lettered_titles(rows: list[_Row]) -> None:
+    """Set `_Row.lettered_title` on the rows that are a title of the shape "A. Problem
+    Descriptions": 2 to 12 words that start with a capital letter and a full stop, set, all of
+    them, in bold or in italics, and not ending like a sentence or a clause.
+
+    The type alone does not tell a title from an item: the options of a question are set in
+    italics too, and the right answer of a key in bold. A title stands apart from the text under
+    it, so the next row of its column is text without a marker in another face. And it does not
+    go on from the letter before: when the nearest marker above it in its column is that letter,
+    with nothing between them but that item's own lines, the row is the next item of a list."""
+    for i, row in enumerate(rows):
+        value, face = _capital(row), _face(row)
+        words = row.clean.split()
+        if not value or not face or not 2 <= len(words) <= MAX_LETTERED_TITLE_WORDS:
+            continue
+        if row.clean[-1:] in ".,;:":
+            continue
+        under = next((r for r in rows[i + 1 :] if r.column == row.column), None)
+        if under is None or under.marker is not None or _face(under) == face:
+            continue
+        between: set[str] = set()
+        for above in reversed(rows[:i]):
+            if above.column != row.column:
+                continue
+            if above.marker is None:
+                between.add(_face(above))
+                continue
+            if _capital(above) == value - 1 and between <= {_face(above)}:
+                break  # the next item of the list that letter is in
+            row.lettered_title = True
+            break
+        else:
+            row.lettered_title = True
+
+
+def _lettered_title(row: _Row) -> bool:
+    """Is the row a title that starts with a capital letter and a full stop, set in bold or in
+    italics (`_mark_lettered_titles`)?"""
+    return row.lettered_title
 
 
 def _opens_with_bullet(row: _Row) -> bool:
@@ -1592,6 +1627,7 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
     steps = {k: v for k, v in _algorithm_groups(rows).items() if k not in code}
     code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
     rows = _option_grids(rows, ctx, code, document=document)
+    _mark_lettered_titles(rows)
     scored: dict[int, list[_Row]] = {}  # a points label, by the run of the line it scores
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)

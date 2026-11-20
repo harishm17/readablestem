@@ -80,6 +80,9 @@ class _Row:
     # A capital letter alone on its line, in a sequence of such lines (A, B, C ... of a
     # glossary or an index): a heading of its own (`_letter_rows`).
     letter: bool = False
+    # "A. Problem Descriptions" in bold or italics over text in another face: a heading, not
+    # the item of a list (`blocks._mark_lettered_titles`).
+    lettered_title: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
