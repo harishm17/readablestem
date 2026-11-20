@@ -282,6 +282,10 @@ class TableCell(BaseModel):
     # table; `strong`, `emphasis`, `code`, `highlight` runs, offsets into `text`). A PDF's
     # cells have none, and a cell with maths has none.
     runs: list[Run] = Field(default_factory=list, exclude_if=lambda v: not v)
+    # Words of `text` that link to a web address or to a place in the document (a Word or LaTeX
+    # table: a web address, a reference, a citation; "uri" and "internal" links, offsets into
+    # `text`). A PDF's cells have none, and a cell with maths has none.
+    links: list[Link] = Field(default_factory=list, exclude_if=lambda v: not v)
 
     @property
     def is_empty(self) -> bool:

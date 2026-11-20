@@ -221,9 +221,24 @@ def test_a_ragged_table_is_padded_and_a_huge_one_becomes_a_list(tmp_path):
     headless = grid.fixes[table.id]
     assert (headless.status, headless.review) == (Status.NEEDS_REVIEW, "required")
     assert [c.code for c in headless.failed_checks] == ["no_headers"]
-    rows = "".join("<tr><td>x</td></tr>" for _ in range(301))
-    huge = read(f'<table class="ltx_tabular"><tbody>{rows}</tbody></table>', tmp_path)
+    rows = "".join("<tr><td>x</td></tr>" for _ in range(300))
+    first = (
+        '<tr><td><span class="ltx_text ltx_font_bold">Row</span> one</td>'
+        '<td><a href="https://example.org/x">site</a> and <span class="ltx_text ltx_font_italic">'
+        "slow</span></td></tr>"
+    )
+    huge = read(f'<table class="ltx_tabular"><tbody>{first}{rows}</tbody></table>', tmp_path)
     assert set(kinds(huge)) == {"list_item"} and len(huge.elements) == 301
+    # a row keeps what its cells set apart: bold and italic words, a link
+    row = huge.elements[0]
+    assert row.text == "Row one | site and slow"
+    assert [((row.text or "")[r.start : r.end], r.kind) for r in row.runs] == [
+        ("Row", "strong"),
+        ("slow", "emphasis"),
+    ]
+    assert [((row.text or "")[k.start : k.end], k.href) for k in row.links] == [
+        ("site", "https://example.org/x")
+    ]
 
 
 def test_a_figure_gets_the_projects_picture_and_its_caption(tmp_path):
@@ -239,13 +254,21 @@ def test_a_figure_gets_the_projects_picture_and_its_caption(tmp_path):
     assert figure.id not in result.fixes  # the figure step (a model) decides this one
 
 
-def test_a_picture_in_a_sentence_follows_its_paragraph_and_keeps_the_words_apart(tmp_path):
+def test_a_picture_in_a_sentence_follows_its_paragraph_and_says_where_it_stood(tmp_path):
     (tmp_path / "icon.png").write_bytes(png_bytes())
     picture = '<img src="icon.png" class="ltx_graphics"/>'
-    body = f'<p class="ltx_p">Press{picture}to start.</p><p class="ltx_p">Next block.</p>'
+    body = (
+        f'<p class="ltx_p">Press{picture}to start.</p><p class="ltx_p">{picture}</p>'
+        '<p class="ltx_p">Next block.</p>'
+    )
     result = read(body, tmp_path)
-    assert kinds(result) == ["paragraph", "figure", "paragraph"]
-    assert result.elements[0].text == "Press to start."
+    assert kinds(result) == ["paragraph", "figure", "figure", "paragraph"]
+    # the words it cut are two words, and the sentence says a picture stood there; a picture
+    # that is a paragraph of its own leaves no paragraph and no mark
+    assert [e.text for e in result.elements if e.kind.value == "paragraph"] == [
+        "Press (picture below) to start.",
+        "Next block.",
+    ]
 
 
 def test_a_figure_without_a_usable_picture_is_a_required_decision(tmp_path):
@@ -355,6 +378,8 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
         '<ul class="ltx_biblist"><li id="bib.bib1" class="ltx_bibitem">'
         '<span class="ltx_tag ltx_tag_bibitem">[1]</span>'
         '<span class="ltx_bibblock">A. One, 1990.</span></li></ul>'
+        '<table class="ltx_tabular"><tbody><tr><td>See <a href="https://example.org/c">site</a></td>'
+        f"<td>and Section {ref('S2', '2')}, {ref('nowhere', '?')}</td></tr></tbody></table>"
     )
     result = read(body, tmp_path)
     by_id = {e.id: e for e in result.elements}
@@ -365,7 +390,7 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
             for k in element.links
         ]
 
-    toc, _, paragraph, theorem, _, row_b, _, back, entry = result.elements
+    toc, _, paragraph, theorem, _, row_b, _, back, entry, table = result.elements
     assert found(toc) == [("2 Next", "internal", "Next")]
     # the number is the link's words; a link to nothing makes none, nor does a theorem citing
     # itself; the second row of a group is the equation the second number names
@@ -378,6 +403,13 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
     assert found(back) == [("First", "internal", "First")]  # a heading's link
     assert paragraph.links[1].target_id == row_b.id
     assert entry.kind is Kind.LIST_ITEM and not theorem.links
+    # a table's cells keep their links too, in the element and in its fix
+    for grid in (table.table, result.fixes[table.id].table.grid):
+        assert [
+            (c.text[k.start : k.end], k.kind, k.href or by_id[k.target_id or ""].text)
+            for c in grid.cells
+            for k in c.links
+        ] == [("site", "uri", "https://example.org/c"), ("2", "internal", "Next")]
 
 
 def test_a_footnote_is_kept_in_the_text(tmp_path):
@@ -744,11 +776,20 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
         '<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
         '<w:r><w:t xml:space="preserve">Again </w:t></w:r><w:hyperlink w:anchor="_Ref1">'
         "<w:r><w:t>Motion</w:t></w:r></w:hyperlink></w:p>"
+        + _cells("Page|Part", "LINK|BACK", marked=True)
+        .replace(
+            "<w:r><w:t>LINK</w:t></w:r>",
+            '<w:hyperlink r:id="rId30"><w:r><w:t>the page</w:t></w:r></w:hyperlink>',
+        )
+        .replace(
+            "<w:r><w:t>BACK</w:t></w:r>",
+            '<w:hyperlink w:anchor="_Ref1"><w:r><w:t>Motion</w:t></w:r></w:hyperlink>',
+        )
     )
     data = with_footnote(word(body, rels=link + 'TargetMode="External"/>'))
     blob = envelope.wrap("docx", "notes.docx", None, data)
     result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
-    heading, first, theorem, last, back, again = result.elements
+    heading, first, theorem, last, back, again, table = result.elements
 
     def found(element: Element) -> list[tuple[str, str]]:
         return [(k.kind, (element.text or "")[k.start : k.end]) for k in element.links]
@@ -764,6 +805,12 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
     assert found(last) == [("crossref", "Theorem 1")]
     assert last.links[0].target_id == theorem.id and not theorem.links
     assert found(back) == [("internal", "Motion")] and back.links[0].target_id == heading.id
+    # the cells of a table keep their links as a paragraph's do
+    assert [
+        (c.text[k.start : k.end], k.kind, k.href or k.target_id)
+        for c in table.table.cells
+        for k in c.links
+    ] == [("the page", "uri", "https://example.org/x"), ("Motion", "internal", heading.id)]
 
 
 @needs_pandoc
@@ -820,6 +867,9 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         )
         # a script face named for its foundry is no fixed-pitch font
         + run(" in a script face", '<w:rFonts w:ascii="Monotype Corsiva"/>')
+        + run(", where ")
+        + run("x", italic)  # one italic letter is a variable typed in the text, not emphasis
+        + run(" is the speed")
         + "</w:p>"
         '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
         + run("A heading ")
@@ -828,9 +878,10 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         "<w:p>" + run("Set whole in bold, so the block's own style.", bold) + "</w:p>"
         '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/>'
         '<w:numId w:val="1"/>'
-        "</w:numPr></w:pPr>"
-        + run("Bring a ")
-        + run("calculator", bold)
+        "</w:numPr></w:pPr>" + run("Bring a ") + run("calculator", bold) + "</w:p>"
+        # a paragraph style that strikes: the answer the author took back
+        '<w:p><w:pPr><w:pStyle w:val="Taken"/></w:pPr>'
+        + run("Answer is 42")
         + "</w:p>"
         + _cells("Item|Note", "Quiz|closed book", marked=True).replace(
             "<w:r><w:t>closed book</w:t></w:r>", run("closed", bold) + run(" book")
@@ -838,6 +889,8 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
     )
     gone = (
         '<w:style w:type="character" w:styleId="Gone"><w:name w:val="Gone"/>'
+        "<w:rPr><w:strike/></w:rPr></w:style>"
+        '<w:style w:type="paragraph" w:styleId="Taken"><w:name w:val="Taken"/>'
         "<w:rPr><w:strike/></w:rPr></w:style>"
     )
     reading = read_word(word(body, styles=gone))
@@ -852,6 +905,10 @@ def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
         ("make it", "deleted"),
     ]
     assert not heading.runs and not whole.runs  # a heading is not bold text; a whole block is not
+    [taken] = [e for e in reading.elements if (e.text or "").startswith("Answer")]
+    assert [((taken.text or "")[r.start : r.end], r.kind) for r in taken.runs] == [
+        ("Answer is 42", "deleted")
+    ]
     [item] = [e for e in reading.elements if e.kind.value == "list_item"]
     assert [(item.text or "")[r.start : r.end] for r in item.runs] == ["calculator"]
     [table] = [e for e in reading.elements if e.table]
