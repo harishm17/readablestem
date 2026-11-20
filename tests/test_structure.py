@@ -241,6 +241,23 @@ def test_abstract_at_the_start_of_a_sentence_is_not_a_heading():
 
 # ------------------------------------------------------------------------ algorithms
 
+RUNNING = (
+    "It reads the verse once from left to right and keeps a single running count of the stressed|"
+    "syllables for every word it meets, adding one to the count whenever the word carries a|"
+    "stress, and moves on when it does not. The count is printed at the end of the verse."
+)
+
+
+def running(page, y: float, text: str, pitch: float = 13.5, indent: float = 0.0) -> float:
+    """The lines of one paragraph ("|" ends a line), set one under the other, the first one
+    `indent` further right."""
+    for n, line in enumerate(text.split("|")):
+        x = 72 + (indent if n == 0 else 0.0)
+        page.insert_text((x, y), line, fontsize=BODY, fontname="helv")
+        y += pitch
+    return y + 8
+
+
 ALGORITHM = [
     (0, "input: a line of verse"),
     (0, "count = 0"),
@@ -262,27 +279,39 @@ def algorithm(page, y: float, steps=ALGORITHM, caption="Algorithm 1 Count stress
     return y + 10
 
 
-def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
-    def fill(page):
-        y = prose(page, 100)
-        y = algorithm(page, y + 10)
-        prose(page, y + 10, "The count is printed after the last word.")
+# A loop line that runs to the right edge: what the loop holds starts in lower case below it.
+LONG_LOOP = [
+    (0, "count = 0"),
+    (0, "for each word w in the line of the verse that the reader has marked for the scan do"),
+    (1, "count = count + stress(w)"),
+    (1, "mark w as read"),
+    (0, "end for"),
+    (0, "return count"),
+]
 
-    elements = analyze(page_of(fill)).elements
-    steps = [e for e in elements if e.preformatted]
-    assert len(steps) == 1
-    assert steps[0].text.split("\n") == [
-        "input: a line of verse",
-        "count = 0",
-        "for each word w in the line do",
-        "  if w is stressed then",
-        "    count = count + 1",
-        "  end if",
-        "end for",
-        "return count",
-    ]
-    captions = [e.text for e in elements if (e.text or "").startswith("Algorithm 1")]
-    assert captions == ["Algorithm 1 Count stressed syllables"]  # its own block, above
+
+def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
+    for listed in (ALGORITHM, LONG_LOOP):
+
+        def fill(page, listed=listed):
+            y = running(page, 100, RUNNING)
+            y = algorithm(page, y + 10, listed)
+            # A display equation of the text, and the sentence going on after it.
+            page.insert_text((280, y + 14), "v =", fontsize=12)
+            page.insert_text((306, y + 6), "d", fontsize=12)
+            page.draw_line((302, y + 10), (316, y + 10), width=0.6)
+            page.insert_text((306, y + 23), "t", fontsize=12)
+            prose(page, y + 50, "where d = 12 is the length of the verse and t = 3 its count.")
+
+        elements = analyze(page_of(fill)).elements
+        steps = [e for e in elements if e.preformatted]
+        assert len(steps) == 1
+        assert steps[0].text.split("\n") == ["  " * level + text for level, text in listed]
+        captions = [e.text for e in elements if (e.text or "").startswith("Algorithm 1")]
+        assert captions == ["Algorithm 1 Count stressed syllables"]  # its own block, above
+        assert any(  # a paragraph still, its two values inline equations
+            (e.text or "").startswith("where ") and not e.preformatted for e in elements
+        )
 
 
 def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
@@ -304,7 +333,32 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
             page.insert_text((72, 100 + 13.5 * n), line, fontsize=BODY, fontname="helv")
         prose(page, 190, "The count is printed after the last word of the verse is read.")
 
-    for page in (fill, paragraph):
+    steps = (  # a paragraph with a short last line: two of its lines begin with a step word
+        "It reads the verse once from left to right and keeps a single running count of the stress|"
+        "for every word it meets, adding one to the count whenever the word carries a stress and|"
+        "if the word is unstressed it moves on. The count is printed at the end."
+    )
+
+    def sentence(page):  # a one-line paragraph, and the paragraph after the next opens "For"
+        y = running(page, 100, RUNNING)
+        y = running(page, y, "Algorithm 2 is the faster method.")
+        y = running(page, y, steps)
+        running(
+            page,
+            y,
+            "For each verse the count is then compared with the marks in the printed edition of "
+            "the|poem, and the two are listed side by side.",
+        )
+
+    def float_caption(page):  # a picture's caption, the running text under it in paragraphs
+        y = running(page, 100, RUNNING)
+        page.draw_rect(pymupdf.Rect(120, y, 480, y + 100), width=0.8)
+        page.draw_line((140, y + 20), (460, y + 80), width=1.5)
+        y = prose(page, y + 114, "Algorithm 2 Overview of the method") - 8
+        y = running(page, y, steps, pitch=14) - 8
+        running(page, y, RUNNING, pitch=14, indent=15)
+
+    for page in (fill, paragraph, sentence, float_caption):
         assert not [e for e in analyze(page_of(page)).elements if e.preformatted]
 
 
@@ -368,13 +422,16 @@ def test_a_step_that_wraps_back_to_the_left_edge_stays_one_step():
         y = prose(page, 100)
         long = "count = count + 1 and then add the length of the word to the running total"
         steps = [*NUMBERED[:3], (2, long), *NUMBERED[4:]]
-        y = numbered_algorithm(page, y + 10, steps, wrapped={4: "of the verse so far"})
+        # Step 1 has a comment on a line of its own, though it stops far short of the edge.
+        wrapped = {1: "// the running count", 4: "of the verse so far"}
+        y = numbered_algorithm(page, y + 10, steps, wrapped=wrapped)
         prose(page, y + 10, "The count is printed after the last word.")
 
     steps = [e for e in analyze(page_of(fill)).elements if e.preformatted]
     assert len(steps) == 1
     lines = steps[0].text.split("\n")
     assert len(lines) == 7
+    assert lines[0] == "1: count = 0 // the running count"
     assert lines[3] == (
         "4:     count = count + 1 and then add the length of the word to the running total"
         " of the verse so far"
@@ -438,7 +495,36 @@ def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():
             page.insert_text((250, y), level, fontsize=BODY, fontname="helv")
             y += 16
 
-    for fill in (exercises, table):
+    def numbered(page, y, items, stop):
+        for n, text in enumerate(items, 1):
+            page.insert_text((72, y), f"{n}{stop}", fontsize=BODY, fontname="helv")
+            page.insert_text((95, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        return y
+
+    def euclid(page):  # a textbook's algorithm, written as a list of sentences
+        y = prose(page, 100, "The oldest method we know is the one below.")
+        y = prose(page, y, "Algorithm 5.1 (Euclid)") - 8
+        items = [
+            "If b is zero, stop: the greatest common divisor is a.",
+            "For any other b, divide a by b and call the remainder r.",
+            "If r is not zero, replace a by b and b by r.",
+            "Return to step 1.",
+        ]
+        y = numbered(page, y, items, ".")
+        prose(page, y + 10, "The pair gets smaller at every pass.")
+
+    def questions(page):  # numbers with no stop, and first words that are step words
+        y = prose(page, 100, "Answer all questions.")
+        items = [
+            "If f(x) = 3x + 2, find f(4).",
+            "For the function g(x) = x^2, find g(-3).",
+            "If h(x) = f(g(x)), find h(1).",
+            "Return to question 1.",
+        ]
+        numbered(page, y, items, "")
+
+    for fill in (exercises, table, euclid, questions):
         assert not [e for e in analyze(page_of(fill)).elements if e.preformatted]
 
 
