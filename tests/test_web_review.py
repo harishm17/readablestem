@@ -338,7 +338,7 @@ def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     assert '<a href="#latex-p1-e3">' in response.text  # error summary links to the field
     # Explained in words that name the problem; the code is for the Details, not here.
     assert (
-        "Your LaTeX was not saved. \\bad is not a command this tool supports: check for a "
+        "Your LaTeX was not saved. \\bad is not a command this tool supports: look for a "
         "typo, or write it another way." in unescape(response.text)
     )
     assert "(latex.allowed_commands: unknown_command)" not in response.text

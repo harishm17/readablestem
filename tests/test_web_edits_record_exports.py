@@ -102,7 +102,7 @@ def test_the_record_lists_every_new_kind_of_decision_with_who_and_when(review):
         "Changed the words of the text": "Paragraph",
         "Made a heading of a paragraph": None,
         "Added a picture the tool missed, with the person's own alt text": None,
-        "Marked an equation the tool missed; the tool read it and a person checked": None,
+        "Marked an equation the tool missed; the tool read it and a person looked at it": None,
         "Described the image in words": None,
         "Left the page out of the student file and of the review": "Page 2",
     }

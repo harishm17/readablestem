@@ -169,7 +169,7 @@ PUBLIC_PAGES = (
     PublicPage(
         "/help/posting",
         "Posting in your course",
-        "sharing the HTML file with students",
+        "posting the HTML file for students",
         (_T + "help_posting.html", _T + "_help_pages.html"),
     ),
     PublicPage(
