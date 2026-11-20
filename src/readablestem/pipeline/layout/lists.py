@@ -473,6 +473,9 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
         if not stack and cut and number is not None and block.marker.option is None:
             taken = _taken_up(cut, number, x, tolerance)
             stack = cut[: taken + 1] if taken is not None else []
+            last = cut[-1].number
+            if taken is None and number.value == 1 and last is not None and last.key != number.key:
+                stack = list(cut)  # "(a)" after "1." and a figure: the list of that item (`starts`)
         cut = []
         # The marker of another series set right of the one above opens a level even where the
         # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.
