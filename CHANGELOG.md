@@ -8,11 +8,25 @@
   next to a setting that differs. The profile's hash is unchanged (`90c66bc8ef67`): neither field
   is in it. No stored document, page or model request changes.
 - Job page: while the layout runs (the longest silent stretch of a conversion: for a 100-page
-  public-paper document 89 s of 167 s, the other steps' longest 9 s, measured 2026-11-19 on a
-  loaded box) the first line reads "Reading the layout: 7 of 16 pages" with the step's own progress
-  bar. `layout.analyze` takes `on_page(done, total)`, called before each page's table search; it
-  goes through the same stage events and the same 2 s write limit as every other step. No new
-  polling. Nothing a conversion writes changes.
+  document of public papers 89 s of 167 s with nothing counted, the other steps' longest being
+  23 s, measured 2026-11-19 on a loaded box) the first line reads "Reading the layout: 7 of 16
+  pages" with the step's own progress bar, and its longest silent stretch is 27 s. `layout.analyze`
+  takes `on_page(done, total)`, called before each page's table search; it goes through the same
+  stage events and the same 2 s write limit as every other step, with no new polling. A scanned
+  document's wait is in the page-reading pass, which this does not count (47 s of 107 s with
+  stubbed answers). Nothing a conversion writes changes.
+- Docs, measured 2026-11-19 (no code): peak memory of Word (0.41 to 0.42 GB; LibreOffice does not
+  add 300 MB to it, about 190 MB and not running at the child's peak), of MuPDF with and without a
+  second parser (no addition shown), and of a dense 100-page document (2.0 to 2.1 GB, which the
+  "0.5 GB" figure did not cover); PowerPoint could not be measured on this box (no Impress).
+  What a document stores by table, the largest row, and where a per-job cap would go (not built:
+  at four times the largest measured it is above the per-person cap); the stored page's pictures
+  and the step-record load (nothing built); what stops each of the three residues of the content
+  budget, and the real paper the page budget refuses (budget kept: accepting it needs a 1.5 GB
+  layout child and about 100 s).
+- No test of flat memory across ten conversions is kept: conversion 10 was within 5% of
+  conversion 1 in 7 of 9 runs, and what grows is the allocator's retained memory and SQLite's
+  page cache, not Python objects.
 
 ## Unreleased: the page and the exports, leftovers (branch fix/output-leftovers)
 

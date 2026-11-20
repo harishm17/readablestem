@@ -582,7 +582,7 @@ with the documents it has converted: twelve conversions of one 6-page document t
 is memory the allocator keeps, 15 to 18 MB of it given back by `malloc_trim`); with SQLite's default page
 cache it grows more (247 to 340 MB over twelve conversions of a 28-page paper), which is the database
 driver's cache, not the app's: Postgres keeps its pages in the server. A test that asks conversion 10 to be
-within 5 % of conversion 1 failed in 3 of 11 runs on this box, so none is kept.
+within 5 % of conversion 1 failed in 2 of 9 runs on this box (one run went 215 MB after conversion 1, 232 MB after conversion 10), so none is kept.
 
 **CPU.** One vCPU is enough (deploy.md: about 20 CPU-seconds for a 30-page document, about 25 for 100 pages and 35 for 100 pages with 51 MB of pictures, measured 2026-11-03 on one CPU with fake models: 31 s and 44 s of wall time). Replicas: 1.
 
