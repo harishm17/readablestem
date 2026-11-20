@@ -829,6 +829,17 @@ know the paragraph was taken out. A paragraph made a sidebar or a quotation load
 as a plain paragraph: the role is ignored, not refused. So a rollback from 0.5.13 to 0.5.12
 is safe until a reviewer has left a paragraph out; below 0.5.12 the limit above applies.
 
+0.5.14 adds no limit of its own. A result it stores can hold six notice codes that 0.5.13 does
+not have (`table_header_missing`, `table_header_carried`, `struck_not_kept`,
+`hidden_text_check`, `tables_not_searched`, `word_table_flattened`), bold, italic and code runs
+in a Word or LaTeX table's cells, and a page's count of unseen characters. 0.5.13 opens such a
+result: the job page, the review screen, the record and the student page all answered 200 for
+a stored result holding all six codes (run against 0.5.13 on 2026-11-19). Its job page lists
+each of the six as "Something in this file may need a look.", since it has no words for them;
+it writes the cells without their runs and makes the student page again with its own rules.
+So a rollback from 0.5.14 to 0.5.13 is safe; what a reviewer loses is the words of those check
+lines until traffic goes forward again.
+
 If data has to come back, restore a backup (this overwrites the instance's current
 data):
 

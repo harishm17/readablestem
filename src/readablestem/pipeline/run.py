@@ -292,7 +292,23 @@ log = logging.getLogger(__name__)
 # (the paragraph is plain again) and refuses a result that holds the notice code
 # `block_omitted` (a paragraph left out), so the roll-back limit of 0.5.12 stands
 # (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.13"
+# 0.5.14 (2026-11-19): one raise for the wave after 0.5.13 (CHANGELOG.md has each change). What
+# a PDF's result holds moves: a one-page file keeps no bare page number and no "Page 3 of 9"
+# line; equation numbers left in the text or made paragraphs go to their equations, and the mark
+# that ends a fraction stays with it; more of the footnotes a file names are found and linked;
+# lettered titles, "(i)" after "(h)" and option lists; a table that goes on from the page before
+# is marked and written with that part's header row; an algorithm with line numbers, wrapped
+# steps or an equation in it is one or two code blocks with the numbers set apart; the table
+# search stops on CPU time; text painted where nobody can see it is left out and counted
+# (`PageStats.unseen_chars`). A Word or LaTeX file's result: bold, italic and code in table
+# cells (`TableCell.runs`), struck code stays struck, a table with no header marking is a
+# required choice. New notice codes: `table_header_missing`, `table_header_carried`,
+# `struck_not_kept`, `hidden_text_check`, `tables_not_searched`, `word_table_flattened`.
+# Results from 0.5.10 to 0.5.13 load unchanged and their page is made again
+# (`assemble.RENDER_VERSION` 10). 0.5.13 opens a 0.5.14 result (it has no words for the new
+# notice lines and drops a cell's runs), so the roll-back limit stays at 0.5.12
+# (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.14"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

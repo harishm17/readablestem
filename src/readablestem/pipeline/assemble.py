@@ -117,7 +117,12 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # said once (the visible label is hidden from a screen reader when the alt text says it); an
 # equation of a Word or LaTeX file shown as its LaTeX is not called a picture, and its link
 # names no page; the speech rules for scripts and accents changed.
-RENDER_VERSION = 9
+# 10: a table that goes on from the page before is written with that part's header rows; the
+# finish sentence's date has its year; a sidebar's name; every code block that can scroll and
+# every wide table is a tab stop, a script inside a script keeps a readable size, and a very wide
+# equation is not cut on paper; the words for a Word file's equations; the speech rules for
+# bars and for raised and lowered text.
+RENDER_VERSION = 10
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII

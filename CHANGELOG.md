@@ -1,5 +1,24 @@
 # Changelog
 
+## Pipeline 0.5.14, render 10 (2026-11-19)
+
+- `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"
+  entry below down to the 0.5.13 entry. What a PDF's result holds changed (a one-page file's
+  page number, equation numbers, footnotes, lists and lettered titles, a table that goes on
+  from the page before, algorithms, text painted where nobody can see it, the table search's
+  time limit). A Word or LaTeX file's result changed too: bold, italic and code in table cells,
+  struck code, a table with no header marking is a required choice, and color is counted (the
+  LaTeX reader keeps it only with the setting on). The student page changed (a continued table's carried header rows, the year in
+  the finish sentence's date, a sidebar's name, tab stops, nested scripts, very wide equations
+  on paper, the words for a Word file's equations, speech for bars and for raised and lowered
+  text). Six notice codes are new: `table_header_missing`, `table_header_carried`,
+  `struck_not_kept`, `hidden_text_check`, `tables_not_searched`, `word_table_flattened`.
+  Stored results load unchanged and their pages are made again. No migration.
+  `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
+  `data/eval/burden-corpus.json` and `data/eval/parsing-bench-olmocr.json` are re-made at
+  0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
+  0.5.13 opens a 0.5.14 result (docs/deploy.md).
+
 ## Unreleased: fixes after the independent review of this wave (review 6)
 
 - **A one-page quiz keeps its name line and its points** (`layout/furniture.py`). The rule
@@ -37,6 +56,7 @@
   header row, so the notice is where a reviewer learns what students get.
 - Stored results: the notice list of a document with a continued table changes, and PDFs of
   the shapes above read differently, so this goes with the wave's `PIPELINE_VERSION` raise.
+
 ## Unreleased: algorithm blocks with line numbers, wrapped steps and equations (branch fix/algorithm-blocks, O-050, WS2.6)
 
 - Algorithms (`layout/blocks.py`: `_algorithm_groups`, `_scan`, `_is_algorithm`, `_place`): a
@@ -213,7 +233,8 @@
 - A table cell of a Word or LaTeX table keeps its runs (`TableCell.runs`, optional and left out
   when empty; math cells have none) and the table writes them: `<td><strong>closed</strong>
   book</td>`. A cell edit in the review screen takes them off, like a text edit that changes
-  words. A stored result that has a cell run cannot be read by a release from before this one.
+  words. A release from before this one reads a stored result that has a cell run and drops the
+  run: the cell is plain text there (checked against 0.5.13).
 - Color in a Word or LaTeX source is counted like a PDF's: with `FEATURE_COLOUR` off the job gets
   the optional notice `colour_used` with the number of passages. The Word reader never carries
   color (pandoc drops it), so it counts from the file's own runs and always raises the notice;
