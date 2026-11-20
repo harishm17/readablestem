@@ -191,7 +191,7 @@ navigation and a screen reader with Word can read, not a picture. It is GPL-2.0-
 is run as a separate program, never linked (THIRD_PARTY_NOTICES.md). The Docker image installs
 it from the distribution (about 200 MB on disk; the Ubuntu 3.7 package's installed size is
 201,810 kB, so read the real figure from the first Railway build). The tests pass with pandoc
-3.1.3 (Ubuntu 24.04, as CI installs), 3.1.11 (Debian trixie, the image) and 3.7. Without pandoc on `PATH` there is no Word download: the route is a 503 and the
+3.1.3 (Ubuntu 24.04's own package), 3.1.11.1 (Debian trixie, the image, and the version CI installs from pandoc's release, `.github/actions/pandoc`) and 3.7. Without pandoc on `PATH` there is no Word download: the route is a 503 and the
 job page shows no button. The pure-Python alternative was not taken: the Office MathML-to-OMML
 stylesheet (`MML2OMML.XSL`) ships with Office and is not redistributable, and a converter of
 our own would be a second MathML reader to keep right.
@@ -209,7 +209,7 @@ our own would be a second MathML reader to keep right.
   pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
   picture and drops it on a paragraph, a list, a row or a cell, so there the id moves to an
   empty `<span>` at the element's start (F-514). A figure's id is a bookmark only from pandoc
-  3.2 on (production runs 3.1.11.1, CI 3.1.3), so the filter wraps the figure in a div that
+  3.2 on (production and CI run 3.1.11.1), so the filter wraps the figure in a div that
   has the id, the same in every version (F-581). A footnote's mark (`doc-noteref`)
   is renamed so pandoc's reader does not turn it into an empty note.
 - **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
@@ -272,7 +272,7 @@ our own would be a second MathML reader to keep right.
   HTML's order, alt text on every picture and never an address, the language, the title);
   a page with every feature; a remote address never opened; a fake `pandoc` for the timeout,
   failure, missing-equation and secret-free environment cases; and LibreOffice opening the
-  file when it is installed. They skip, saying why, without pandoc (CI installs it).
+  file when it is installed. They skip, saying why, without pandoc (CI installs 3.1.11.1, `.github/actions/pandoc`).
 
 ### The EPUB export (`pipeline/export_epub.py`)
 

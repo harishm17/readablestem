@@ -1,0 +1,27 @@
+name: Install pandoc 3.1.11.1
+description: >
+  The pandoc production runs (Dockerfile, docs/dependencies.md), from pandoc's own release on
+  GitHub by exact version, checked against the sha256 written here. The runner's distribution
+  package is older (3.1.3 on Ubuntu 24.04), so the Word export tests would pass on a version
+  that is not the one that ships. Change the version, the file and the checksum together.
+runs:
+  using: composite
+  steps:
+    - name: Download, check and install pandoc 3.1.11.1
+      shell: bash
+      env:
+        PANDOC_VERSION: "3.1.11.1"
+        PANDOC_DEB: pandoc-3.1.11.1-1-amd64.deb
+        # sha256 of the file at https://github.com/jgm/pandoc/releases/download/3.1.11.1/ (the
+        # release lists no checksum; this was taken from two separate downloads that agreed).
+        PANDOC_SHA256: ab0ac0aa1c3f9b23243d14e43023e06cbce51a52420aba17d27bd0d9c28f73ac
+      run: |
+        set -euo pipefail
+        curl --fail --silent --show-error --location --retry 3 \
+          --output "$RUNNER_TEMP/$PANDOC_DEB" \
+          "https://github.com/jgm/pandoc/releases/download/${PANDOC_VERSION}/${PANDOC_DEB}"
+        echo "${PANDOC_SHA256}  $RUNNER_TEMP/$PANDOC_DEB" | sha256sum --check -
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends "$RUNNER_TEMP/$PANDOC_DEB"
+        pandoc --version | head -n 1
+        test "$(pandoc --version | head -n 1)" = "pandoc ${PANDOC_VERSION}"
