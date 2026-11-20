@@ -489,6 +489,7 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
 
 
 MAX_LETTERED_TITLE_WORDS = 12
+WRAPPED_TITLE_GAP = 0.5  # x row height: how far under a title its second row stands
 
 
 def _capital(row: _Row) -> int:
@@ -517,7 +518,19 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
             continue
         if row.clean[-1:] in ".,;:":
             continue
-        under = next((r for r in rows[i + 1 :] if r.column == row.column), None)
+        ahead = [r for r in rows[i + 1 :] if r.column == row.column]
+        if (  # a title that goes on in a second row of its face, one line down
+            ahead
+            and ahead[0].kind == "text"
+            and ahead[0].marker is None
+            and _face(ahead[0]) == face
+            and ahead[0].y0 - row.y1 <= WRAPPED_TITLE_GAP * row.height
+        ):
+            more = ahead[0].clean.split()
+            if len(words) + len(more) > MAX_LETTERED_TITLE_WORDS or ahead[0].clean[-1:] in ".,;:":
+                continue
+            ahead = ahead[1:]
+        under = ahead[0] if ahead else None
         if under is None or (under.kind == "text" and _face(under) == face):
             continue
         if under.marker is not None and not _opens_numbering(under.marker):
@@ -2279,8 +2292,8 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
             if (
                 geometric
-                and len(run.rows) == 1
-                and _lettered_title(prev)
+                and len(run.rows) <= MAX_BOLD_HEADING_ROWS
+                and _lettered_title(run.rows[0])
                 and _face(row) != _face(prev)
             ):  # the title and the text under it are two blocks, not one list item
                 run.block_end = True
@@ -2524,7 +2537,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and not rows[0].in_series
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
-    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
+    elif upright and len(rows) <= MAX_BOLD_HEADING_ROWS and _lettered_title(rows[0]):
         heading = [REASON_LETTERED]
     if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
