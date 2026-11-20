@@ -1477,10 +1477,10 @@ def _join_panels(
     were figures with a picture and no words: a reader got one description for each of them
     and the caption on one. A line of text among the panels (a paragraph that runs between two
     pictures) ends the join. The rows among the panels are then claimed as labels
-    (`_claim_labels`), and a mark of one or two characters within PANEL_MARK_REACH body sizes
-    of the figure's box ("A", "b", "3") is a label of it too (panel letters stand at a corner,
-    beyond the reach of `_label_owners`), unless it is a word ("to", "of") or the start of a
-    list item."""
+    (`_claim_labels`), and a row of one or two characters within PANEL_MARK_REACH body sizes
+    of any figure's box ("A", "b", "3", "n") is a label of it too (panel letters and the names
+    of a drawing's parts stand at a corner, beyond the reach of `_label_owners`), unless it is
+    a word ("to", "of") or the start of a list item."""
     joined: set[int] = set()
     reach = PANEL_GAP * ctx.body
     for host in figures:
@@ -1535,7 +1535,7 @@ def _join_panels(
     if joined:
         _claim_labels(kept, rows, ctx, document=document)  # the rows among the panels
     for figure in kept:
-        if figure.equation or figure.caption is None:
+        if figure.equation:
             continue
         near = _pad(figure.bbox, PANEL_MARK_REACH * ctx.body)
         for row in rows:
