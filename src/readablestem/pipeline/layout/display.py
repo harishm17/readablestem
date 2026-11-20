@@ -888,7 +888,14 @@ def _join_connectives(lines: list[_Line], rows: Sequence[_Row]) -> list[_Line]:
     return lines
 
 
-def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] = ()) -> bool:
+def _joins_line(
+    above: _Line,
+    box: BBox,
+    line: _Line,
+    earlier: Sequence[_Line] = (),
+    *,
+    grouping: bool = False,
+) -> bool:
     """Does `line` continue the display equation whose last line is `above` (box `box`)?
 
     A line that starts with "=" or an operator may sit a little further down (half as
@@ -912,11 +919,38 @@ def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] =
         return True  # beside the equation: rows of a brace, a matrix or an array
     if min(above.size, line.size) <= SCRIPT_RATIO * size:
         return True  # limits under a big operator ("i = 1" under a sum) or over it
+    if grouping and (_limits_of(above, line, size) or _limits_of(line, above, size)):
+        return True  # the same at the size of the row (a paper that sets limits at 7 pt)
     for peer in (above, *earlier):  # one row of the equation to line up with is enough
         if _table_rows(peer, line, box, size):
             return True
         x0, x1 = peer.relation_x, line.relation_x
         if x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size:
+            return True
+    return False
+
+
+LIMIT_OPERATORS = frozenset("\u222b\u222e\u2211\u220f\u2210\u22c3\u22c2")  # int oint sum prod ...
+LIMIT_REACH = 0.8  # x font size: how far above or below a big operator its limits sit
+
+
+def _limits_of(operator: _Line, limits: _Line, size: float) -> bool:
+    """Is `limits` the limits of a big operator (sum, product, integral) in `operator`?
+
+    The limits of a sum hang right under its sign (or sit right over it), centred on it
+    and no wider than twice the sign. A paper that sets them at the size of the row they
+    belong to gives `_joins_line` no size to tell them by.
+    """
+    centre = (limits.box[0] + limits.box[2]) / 2
+    for c in operator.ink:
+        if c.c not in LIMIT_OPERATORS:
+            continue
+        gap = limits.box[1] - c.y1 if limits.box[1] >= c.y1 - 0.3 * size else c.y0 - limits.box[3]
+        if (
+            -0.3 * size <= gap <= LIMIT_REACH * size
+            and c.x0 - 0.5 * size <= centre <= c.x1 + 0.5 * size
+            and limits.box[2] - limits.box[0] <= 2 * (c.x1 - c.x0) + size
+        ):
             return True
     return False
 
@@ -946,7 +980,11 @@ def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
         reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
         active = [k for k in active if regions[k].box[3] >= reach]
         host = next(
-            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line, peers[k])),
+            (
+                k
+                for k in reversed(active)
+                if _joins_line(last[k], regions[k].box, line, peers[k], grouping=document.grouping)
+            ),
             None,
         )
         if host is None:
