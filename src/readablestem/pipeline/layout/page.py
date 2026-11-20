@@ -1420,6 +1420,35 @@ def _set_off(row: _Row, at: int) -> None:
         row.__dict__.pop(cached, None)
 
 
+def _flag_text_marks(row: _Row, marks: set[str]) -> None:
+    """The raised glyphs of `row` that are a mark of a note below (`marks`), with no destination
+    to say so: one right after a word of text type or a clause's end ("system,1 n" read the
+    mark and the math letter after it as one equation). A raised digit after a math letter or
+    a bracket is an exponent and stays what it was."""
+    chars = row.chars
+    i = 0
+    while i < len(chars):
+        if not (row.is_script(chars[i]) and chars[i].c.strip()):
+            i += 1
+            continue
+        j = i
+        while j < len(chars) and row.is_script(chars[j]) and chars[j].c.strip():
+            j += 1
+        before = chars[i - 1] if i else None
+        if (
+            before is not None
+            and "".join(c.c for c in chars[i:j]) in marks
+            and (before.c in ".,;:?!" or (before.c.isalpha() and not before.math))
+        ):
+            _flag_marks(row, range(i, j))
+        i = j
+
+
+def _in_notes(row: _Row, height: float, ctx: _Context) -> bool:
+    """`row` is low on the page, in smaller type than the body: where a footnote stands."""
+    return row.y0 >= FOOTNOTE_ZONE * height and row.size < FOOTNOTE_SIZE * ctx.body
+
+
 def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> None:
     """Where a footnote starts on this page, and each note mark set off from the word it
     touches (a raised "2" kept as a character of "Feehly" read "2Feehly").
@@ -1443,15 +1472,31 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
                 unplaced.append(dest.name)
         _place_by_mark(rows, notes.references.get(number, ()), unplaced, height, ctx)
     marks: set[str] = set()
+    unlinked: set[str] = set()  # marks of notes no link of the file points at
+    linked = (
+        {r.name for refs in notes.references.values() for r in refs} if notes is not None else set()
+    )
+    # what is printed raised above the notes: the mark of an unnamed note is one of these
+    raised = {
+        c.c
+        for r in rows
+        if not r.vertical and not _in_notes(r, height, ctx)
+        for c in r.chars
+        if c.c.strip() and r.is_script(c)
+    }
     for row in rows:
         if row.vertical:
             continue
-        low = row.y0 >= FOOTNOTE_ZONE * height and row.size < FOOTNOTE_SIZE * ctx.body
+        low = _in_notes(row, height, ctx)
         end = _lead_mark(row, named=bool(row.note)) if row.note or (not named and low) else 0
         if end:
-            marks.add("".join(c.c for c in row.chars[:end] if not c.blank))
-            if row.note:
-                _flag_marks(row, [i for i in range(end) if not row.chars[i].blank])
+            token = "".join(c.c for c in row.chars[:end] if not c.blank)
+            marks.add(token)
+            if not any(name in linked for name in row.note):
+                unlinked.add(token)  # nothing in the file says where its mark stands
+            lead = [i for i in range(end) if not row.chars[i].blank]
+            if row.note or row.chars[lead[0]].c in raised:
+                _flag_marks(row, lead)
             _set_off(row, end)
     heading_rows = [r for r in rows if not r.note and not r.vertical and _heading_sized(r, ctx)]
     for ref in notes.references.get(number, ()) if notes is not None else ():
@@ -1469,6 +1514,9 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
             elif (after := hits[-1] + 1) < len(row.chars) and row.chars[after].c.isalnum():
                 _set_off(row, after)
             break
+    for row in rows if unlinked else ():
+        if not row.vertical and not _in_notes(row, height, ctx):
+            _flag_text_marks(row, unlinked)
     if named or not marks:
         return
     for row in heading_rows:
