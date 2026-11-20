@@ -396,6 +396,16 @@ def test_lines_of_a_reference_list_that_start_with_initials_are_not_a_lettered_l
 
     assert not items(analyze(one_page(fill)).elements)
 
+    def alphabetical(page):  # sorted by surname, the first initials run on by chance
+        lines = [
+            "M. Zhang, S. Agarwal and K. Slama, Training language models",
+            "N. Lampe and M. Riedmiller, Learning to act",
+            "O. Horgan and J. Quan, Deep q-learning from demonstrations",
+        ]
+        write(page, 72, 100, lines)
+
+    assert not items(analyze(one_page(alphabetical)).elements)
+
 
 def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_its_item():
     # The second title opens like a surname and a comma, and a line that starts with an
@@ -412,10 +422,13 @@ def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_i
             ],
         )
         y = write(page, 72, y + 10, ["B. Offline, Online and Optimistic Learning"], fontname="heit")
-        write(page, 72, y, ["In this paper we consider tasks with one robot arm."])
+        y = write(page, 72, y, ["In this paper we consider tasks with one robot arm."])
+        wrapped = ["C. Offline, Online and Optimistic Learning with", "a Title on Two Rows"]
+        y = write(page, 72, y + 10, wrapped, fontname="heit")  # a title that wraps is one heading
+        write(page, 72, y, ["The third title goes over two rows and its text is under it."])
 
     got = [(e.kind, e.text) for e in analyze(one_page(fill)).elements]
-    assert [k for k, _ in got].count(Kind.HEADING) == 2
+    assert [k for k, _ in got].count(Kind.HEADING) == 3
     assert not items(analyze(one_page(fill)).elements)
 
     def options(page):  # the options of a question, set in italics, are still its options
@@ -445,3 +458,71 @@ def test_a_bullet_item_set_in_bold_is_a_list_item_not_a_heading():
     got = analyze(one_page(fill)).elements
     assert len(items(got)) == 3
     assert [e.text for e in got if e.kind == Kind.HEADING] == ["Questions for the datasheet"]
+
+
+def test_a_bold_item_in_a_run_of_its_series_is_an_item_and_a_bold_title_over_text_is_a_heading():
+    def key(page):  # the right answer of a key is set in bold among upright options
+        y = write(page, 72, 100, ["1. Which law relates the force on a body to its motion?"])
+        y = write(page, 90, y, ["A. Newton's first law"])
+        y = write(page, 90, y, ["B. Newton's second law"], fontname="hebo")
+        write(page, 90, y, ["C. Hooke's law of springs"])
+
+    def agenda(page):  # every line of the list is bold
+        y = write(page, 72, 100, ["The course has three parts, in this order:"])
+        write(
+            page,
+            72,
+            y,
+            ["A. Course Goals", "B. Grading Policy", "C. Office Hours"],
+            fontname="hebo",
+        )
+
+    def outline(page):  # "I." is the letter after "H." and not a roman section number
+        y = write(page, 72, 100, ["The talk:"])
+        write(page, 90, y, [f"{c}. Part number {c}" for c in "GHIJ"])
+
+    for fill, markers in ((key, ["1.", "A.", "B.", "C."]), (agenda, ["A.", "B.", "C."])):
+        got = analyze(one_page(fill)).elements
+        assert [m for m, *_ in items(got)] == markers
+        assert Kind.HEADING not in kinds(got)
+    got = analyze(one_page(outline)).elements
+    assert [m for m, *_ in items(got)] == ["G.", "H.", "I.", "J."]
+    assert Kind.HEADING not in kinds(got)
+
+    def titles(page):  # the same bold lines, each with text under it, are section titles
+        text = [
+            "The text of the section runs on for a full line of the page, and then",
+            "a second one.",
+        ]
+        y = write(page, 72, 100, ["A. Methods"], fontname="hebo")
+        y = write(page, 72, y, text)
+        y = write(page, 72, y + 10, ["B. Results"], fontname="hebo")
+        write(page, 72, y, text)
+
+    got = analyze(one_page(titles)).elements
+    assert [e.text for e in got if e.kind == Kind.HEADING] == ["A. Methods", "B. Results"]
+
+    def topics(page):  # "X and Y" lines are an outline's items, not a list of authors
+        y = write(page, 72, 100, ["The outline:"])
+        write(page, 90, y, ["B. Predation and herbivory", "C. Mutualism and commensalism"])
+
+    assert [m for m, *_ in items(analyze(one_page(topics)).elements)] == ["B.", "C."]
+
+
+def test_a_series_that_starts_again_after_a_figure_or_a_paragraph_is_under_the_item_above():
+    def fill(page):
+        y = write(page, 72, 100, ["1. Consider a cart rolling down a ramp of known slope"])
+        y = write(
+            page, 72, y + 20, ["Figure 1 shows the ramp used for both parts of this question."]
+        )
+        for marker, text in (
+            ("(a)", "Find the net force on the cart"),
+            ("(b)", "Find its acceleration"),
+        ):
+            page.insert_text((74, y + 20), marker, fontsize=BODY)
+            page.insert_text((94, y + 20), text, fontsize=BODY)
+            y += 25
+        write(page, 72, y + 20, ["2. Now the cart is pushed up the same ramp"])
+
+    got = [(m, lvl) for m, _, lvl, _ in items(analyze(one_page(fill)).elements)]
+    assert got == [("1.", 1), ("(a)", 2), ("(b)", 2), ("2.", 1)]

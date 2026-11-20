@@ -388,6 +388,7 @@ def _list_markers(
         return any(
             other is not None
             and _capital_letter(other) == value + step
+            and not _names(other, sure=True)  # a reference list has the next initial too
             and (
                 page_of[id(other)] != page_of[id(candidate)]  # a list goes on over a page break
                 or (other.row.column != candidate.row.column and _face(candidate.row) != "")
@@ -420,13 +421,16 @@ def _list_markers(
 
 
 _NAMES = re.compile(r"[A-Z]\.|[A-Z][\w'\u2019-]+(?:,| and\b| et al\b)")
+# What cannot confirm a neighbor: "and" counts only before an initial ("Lampe and M. Riedmiller"),
+# not before a word ("Predation and herbivory" is an outline's item).
+_SURE_NAMES = re.compile(r"[A-Z]\.|[A-Z][\w'\u2019-]+(?:,| et al\b| and [A-Z]\.)")
 
 
-def _names(candidate: _MarkerCandidate) -> bool:
+def _names(candidate: _MarkerCandidate, *, sure: bool = False) -> bool:
     """Does the text after the marker open like a list of authors: another initial ("S. Choi"), or
-    a surname and a comma, "and" or "et al"?"""
+    a surname and a comma, "and" or "et al"? With `sure`, "and" counts only before an initial."""
     parts = candidate.row.clean.split(maxsplit=1)
-    return len(parts) == 2 and _NAMES.match(parts[1]) is not None
+    return len(parts) == 2 and (_SURE_NAMES if sure else _NAMES).match(parts[1]) is not None
 
 
 def _capital_letter(candidate: _MarkerCandidate) -> int:
@@ -473,6 +477,15 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
         if not stack and cut and number is not None and block.marker.option is None:
             taken = _taken_up(cut, number, x, tolerance)
             stack = cut[: taken + 1] if taken is not None else []
+            last = cut[-1].number
+            if (
+                taken is None
+                and number.value == 1
+                and last is not None
+                and last.key != number.key
+                and not number.key.endswith("|decimal")  # "1." starts a list of its own
+            ):
+                stack = list(cut)  # "(a)" after "1." and a figure: the list of that item (`starts`)
         cut = []
         # The marker of another series set right of the one above opens a level even where the
         # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.

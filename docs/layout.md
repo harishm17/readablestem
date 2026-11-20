@@ -541,7 +541,10 @@ bump and a recorded re-measurement first.
   (`"larger font"`).
 - A **bold body-size** run of at most 2 rows and 120 characters that starts a block (after a
   gap, an indent or a sentence end) and reads like a title (no lowercase start, no trailing
-  comma) is a heading with weak evidence (`"bold body-size line"`).
+  comma) is a heading with weak evidence (`"bold body-size line"`). A row that is the item of a
+  run of its series (`_Row.in_series`, below) is not one: the bold "B. Newton's second law"
+  among upright options of an answer key, the bold lettered lines of an agenda and "I. Outline
+  topic" between "H." and "J." are items, and a standalone numbered line is held to the same.
 - A **standalone numbered line** at body size ("2.3 Units of Speed", one row, a gap above
   and below, no full stop) is a heading (`"standalone numbered line"`), but only with a
   real section shape (`section_heading_number`): a dotted number
@@ -850,7 +853,9 @@ paragraphs. A capital letter and a full stop whose text opens like a list of aut
 or a surname and a comma, "and" or "et al": "A. Smith, B. Jones", "D. S. Turaga, ...") is the
 marker of a list only beside its neighbor: the item just before or just after it in reading
 order (a page's left column, then its right), or the one just above or below it at the same x,
-is the next or the previous letter (`_names`, `_list_markers`). Some line of a long document
+is the next or the previous letter (`_names`, `_list_markers`), unless that neighbor opens
+like an author line itself (an initial, a surname and a comma or "et al", "and" before an initial;
+an alphabetical reference list has the next initial in its next entry). Some line of a long document
 has the next letter, and a reference list or a byline had its lines read as lettered items.
 Any other capital letter keeps the sibling test above. Headings are decided first:
 "1. Introduction" in a large font is a heading; so is a line of 2 to 12 words that starts with
@@ -862,8 +867,14 @@ of it (`_mark_lettered_titles`): the next row of its column is not text in the t
 face, and has no marker unless it opens a numbering ("A. Datasets", then "1) CIFAR-10: ...");
 and the nearest marker above it in its column is not the letter before with only that item's
 own lines between them, which is the next item of a list. An option of a grid is never one.
-The title is a block of its own, apart from the text under it. Known and left: a title that
-wraps onto a second row in the same face stays the list item it was. A bold line that starts
+The title is a block of its own, apart from the text under it. A title that wraps onto a second
+row of its face (no marker, less than half a row height under it, at most 12 words in all, the
+second row not ending like a sentence) is one title of two rows; a title that ends in a full stop
+is still read as an item. The type alone does not make a heading of a lettered or numbered line
+that stands in a run of its series either (`_mark_series_items`, `_Row.in_series`): the next
+marker of its column, past its own lines, is the next value ("A.", "B.", "C."; "I." between "H."
+and "J."), or the marker nearest above is the value before with nothing but its own lines
+between. A heading of the same shape has text, or a figure, under it. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
 changes nothing).
 
@@ -883,7 +894,8 @@ numbered parent, the x does not tell which level "2)" goes back to, so it goes b
 level of its own series at that x. A numbered series that
 starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
 above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
-goes back to the letters. A marker with two readings ("(i)": the letter after "(h)", or roman
+goes back to the letters. The same holds right after a cut: "(a)" after "1." and a figure is
+the list of that item, one level down, and not the first level again (`_list_levels`). A marker with two readings ("(i)": the letter after "(h)", or roman
 one) is read against the open level the item stands on, then the innermost one, after the
 levels right of it are closed: the bullets under "(h)" say nothing of the "(i)" that follows
 them (`_numbered`). A list that a paragraph, a figure or a table cut ("(i)", the words of

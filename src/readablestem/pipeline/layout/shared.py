@@ -87,6 +87,9 @@ class _Row:
     # "A. Problem Descriptions" in bold or italics over text in another face: a heading, not
     # the item of a list (`blocks._mark_lettered_titles`).
     lettered_title: bool = False
+    # The item of a run of one series ("B." set in bold between "A." and "C."; the lines of an
+    # agenda), whatever it is set in: never a heading by its type (`blocks._mark_series_items`).
+    in_series: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False

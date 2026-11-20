@@ -489,6 +489,7 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
 
 
 MAX_LETTERED_TITLE_WORDS = 12
+WRAPPED_TITLE_GAP = 0.5  # x row height: how far under a title its second row stands
 
 
 def _capital(row: _Row) -> int:
@@ -517,7 +518,19 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
             continue
         if row.clean[-1:] in ".,;:":
             continue
-        under = next((r for r in rows[i + 1 :] if r.column == row.column), None)
+        ahead = [r for r in rows[i + 1 :] if r.column == row.column]
+        if (  # a title that goes on in a second row of its face, one line down
+            ahead
+            and ahead[0].kind == "text"
+            and ahead[0].marker is None
+            and _face(ahead[0]) == face
+            and ahead[0].y0 - row.y1 <= WRAPPED_TITLE_GAP * row.height
+        ):
+            more = ahead[0].clean.split()
+            if len(words) + len(more) > MAX_LETTERED_TITLE_WORDS or ahead[0].clean[-1:] in ".,;:":
+                continue
+            ahead = ahead[1:]
+        under = ahead[0] if ahead else None
         if under is None or (under.kind == "text" and _face(under) == face):
             continue
         if under.marker is not None and not _opens_numbering(under.marker):
@@ -547,6 +560,64 @@ def _lettered_title(row: _Row) -> bool:
     """Is the row a title that starts with a capital letter and a full stop, set in bold or in
     italics (`_mark_lettered_titles`)?"""
     return row.lettered_title
+
+
+def _next_in_series(first: _Marker, second: _Marker) -> bool:
+    """Is `second` the marker right after `first` in one series ("B." after "A.", "2)" after
+    "1)", "II." after "I.")?"""
+    one = _ordered_marker(first.text) if first.ordered else None
+    two = _ordered_marker(second.text) if second.ordered else None
+    if one is None or two is None or one[0] != two[0]:
+        return False
+    return any(
+        style == after and value + 1 == next_value
+        for style, value in marker_readings(one[1])
+        for after, next_value in marker_readings(two[1])
+    )
+
+
+def _mark_series_items(rows: list[_Row]) -> None:
+    """Set `_Row.in_series` on the rows with an ordered marker that stand in a run of their
+    series: the next marker of the row's column, past the item's own lines, is the next value,
+    or the nearest one above is the value before with nothing between but its own lines.
+
+    A heading of the same shape has body text, or a figure, under it, so its neighbors are not
+    markers: "B. Newton's second law" in bold among upright options, the bold lines of an agenda
+    and "I." between "H." and "J." of an outline are items whatever they are set in. The options
+    of a grid are a list too."""
+    for i, row in enumerate(rows):
+        marker = row.marker
+        if marker is None or not marker.ordered:
+            continue
+        if marker.option is not None:
+            row.in_series = True
+            continue
+        face = _face(row)
+        for under in rows[i + 1 :]:
+            if under.column != row.column:
+                continue
+            if under.marker is None and face and _face(under) == face:
+                continue  # more lines of the item itself
+            row.in_series = under.marker is not None and _next_in_series(marker, under.marker)
+            break
+        if row.in_series:
+            continue
+        between: set[str] = set()
+        lines = 0
+        for above in reversed(rows[:i]):
+            if above.column != row.column:
+                continue
+            if above.marker is None:
+                between.add(_face(above))
+                lines += 1
+                continue
+            row.in_series = (
+                above.marker.ordered
+                and _next_in_series(above.marker, marker)
+                and between <= {_face(above)}
+                and (face != "" or lines == 0)  # lines in the text's face may be a section's
+            )
+            break
 
 
 def _opens_with_bullet(row: _Row) -> bool:
@@ -2157,6 +2228,7 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
     code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
     rows = _option_grids(rows, ctx, code, document=document)
     _mark_lettered_titles(rows)
+    _mark_series_items(rows)
     scored: dict[int, list[_Row]] = {}  # a points label, by the run of the line it scores
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
@@ -2223,8 +2295,8 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
             if (
                 geometric
-                and len(run.rows) == 1
-                and _lettered_title(prev)
+                and len(run.rows) <= MAX_BOLD_HEADING_ROWS
+                and _lettered_title(run.rows[0])
                 and _face(row) != _face(prev)
             ):  # the title and the text under it are two blocks, not one list item
                 run.block_end = True
@@ -2453,6 +2525,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and letters >= 2
         and _title_like(text)
         and not _opens_with_bullet(rows[0])
+        and not rows[0].in_series
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif (
@@ -2464,9 +2537,10 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and len(text) <= 80
         and len(text.split()) <= 12
         and text[-1:] != "."
+        and not rows[0].in_series
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
-    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
+    elif upright and len(rows) <= MAX_BOLD_HEADING_ROWS and _lettered_title(rows[0]):
         heading = [REASON_LETTERED]
     if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
