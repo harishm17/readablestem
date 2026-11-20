@@ -94,6 +94,14 @@ class _Row:
     page_checked: bool = False
     page_inline: list[tuple[int, int, str]] = field(default_factory=list)
     page_nonmath: list[tuple[int, int]] = field(default_factory=list)
+    # A step of an algorithm (`blocks._algorithm_groups`): its indent level in the whole
+    # algorithm, the line number it was printed with ("3:", cut off the front of its text by
+    # `algo_start` characters), and whether it goes on the line of the row before it (a
+    # step that wraps, or a piece of one line the text layer cut in two).
+    algo_level: int = 0
+    algo_number: str = ""
+    algo_start: int = 0
+    algo_join: bool = False
 
     @cached_property
     def ink(self) -> list[_Char]:
