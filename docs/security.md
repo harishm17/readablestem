@@ -93,7 +93,7 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/terms`, `/limits`, `/pricing`, `/security`, `/for-accessibility-offices` and its `/summary` download, `/help`, `/help/review`, `/help/posting`, `/help/latex`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
+| Public | `/`, `/demo`, `/demo/listen` (the stored demo's listening transcript; read-only, no user data), `/demo/source.pdf` (page 3 of the demo's source, CC BY 4.0), `/privacy`, `/privacy/retention` (the retention summary download), `/terms`, `/limits`, `/pricing`, `/security`, `/for-accessibility-offices` and its `/summary` download, `/help`, `/help/review`, `/help/posting`, `/help/latex`, `/status`, `/healthz`, `/healthz/ops` (the status word only), `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` and `/style` (the design tokens and components; `noindex`, no data) exist only where `ENV` is `dev` or `test` and answer 404 in production (`web/dev_only.py`) |
 | Signed-in user, owner or a person the owner shared the document with (below) | `/account`, `/account/delete` (GET, POST), `POST /account/keep-default` and `POST /account/name` (CSRF-checked; set the caller's own "keep 7 days by default" and name only), `GET /account/export` ("Download everything": the caller's own ready documents in each file type, their review records, courses and settings, built from the same rows as `/app/download`), `/app`, `/app/documents`, `/app/download`, `/app/batch/{id}` and `/app/batch/{id}/download` (the answer to an upload of several files, kept an hour; the uploader only), `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages, including the owner-only `GET /uploads/{id}/preview`), everything under `/courses/...` (including `/courses/{id}/download`, and the CSRF-checked `POST /courses/{id}/starter` and `POST /courses/{id}/documents`, which touch only the caller's own course and documents) |
 | Admin | `/admin`, `/admin/health` (late scheduled tasks, storage, sandbox probe), `POST /admin/allowlist`, `POST /admin/allowlist/remove` and `POST /admin/users/block` (each answers with a question first and acts only with `confirm=yes`; the address is in the form, never in a URL), `POST /admin/users/unblock`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove`, `GET /admin/reports`, `POST /admin/reports/{report_id}/close` (the problem reports, readable by the operator only) |
 | Analytics proxy (only with `ANALYTICS_ENABLED`) | `GET`/`POST /m/{path}`: no sign-in, no cookie, reaches PostHog's two hosts only (fixed in code, `..` refused), rate limited per address (`analytics`, 300 per 10 minutes), the visitor's address is not forwarded (PostHog sees the relay's own), bodies capped by the global 1 MiB limit; `tests/test_analytics.py` checks it. Absent from the route table above while the setting is off |
@@ -679,11 +679,51 @@ same way before any step reads them, so a job, `readablestem convert` and the ev
 with the same code whatever the file passed before, and a PDF figure of a LaTeX project over
 the page budget is left without a picture (`source/figures.py`).
 
-Not bounded by it: how many times a page draws the same form. A form is counted once per
-page, but each `Do` runs it again: a 1.9 KB file whose page draws a 1 MB form 300 times is
-taken, and the upload probe spends 4.9 s on it (2026-11-11). Bounding it needs the drawing
-operators counted, which means scanning the page's content for them; until then the
-probe's 30 s limit and the job's time limit are what stop a larger one.
+**A real paper over the page budget** (measured 2026-11-19 on a public 23-page, 11.8 MB paper
+from the development set, the one real file the corpus work found refused by it). One page
+inflates to 71.5 MiB (the next largest 2.9 MiB; the document 77.5 MiB, under its budget). The
+page holds one content stream, two forms that inflate to about 31 and 41 MiB, 8 pictures and
+18 fonts, no annotations. The check that refuses it is the page budget of
+`content_budget.check`, reached first from the upload probe (`web/pdf_probe.py`) and again from
+`layout.analyze`; the person is told what every `content_too_large` file is told ("...is too
+large to read: a page of it, or the file as a whole, holds far more drawing instructions than a
+course document does. Save it as a PDF again (Print to PDF makes a simpler file), or split it
+into parts, and upload that."). The smallest budget that accepts it is 72 MiB, and the count
+itself is cheap there (the probe's check passes in 0.2 s, 64 MB), but a second limit then
+stops the page: the layout step's own child process (`access.PROBE_MEMORY_BYTES`, 768 MB plus
+twice the file) refuses it as `too_complex` ("the PDF needs more memory than a page may use"),
+and at 1024 MB the child dies ("could not be rendered"). With both raised (72 MiB and 1536 MB)
+`layout.analyze` of the document took 102 to 106 s on one CPU of that box and the converting
+process peaked at 1.32 GB, with a 1.12 GB child beside it: well past the 0.4 to 0.9 GB that
+docs/deploy-railway.md plans for one conversion. The budget stays at 32 MiB. A budget that
+admits this paper would have to come with a memory plan for the layout child.
+
+Not bounded by the budget, and what stops each (measured 2026-11-19 on a box running 3 to 5
+times slower than normal, with generated files; times are as measured there):
+
+- **One form drawn many times.** A form is counted once per page, but each `Do` runs it
+  again. A 1 MB form of white space drawn 300 times (5.4 KB file) took the upload probe 11.5 s,
+  600 times 21.8 s, 1000 times 38.1 s, with 69 MB of memory in every case. The probe's own
+  limit stops it: past `INSPECT_TIMEOUT_S` (30 s) the upload is refused as `unreadable`
+  ("could not be opened. It may be damaged."), and the address-space cap of 768 MB bounds
+  memory. A file the probe takes is converted inside the job's time limit (180 s and 30 s a
+  page): the 600-draw file took 141.8 s in a conversion with the model steps stubbed (child
+  peak 105 MB), and a slower one ends with the time-limit message. Bounding the draws
+  themselves needs the drawing operators counted, which means scanning every page's content
+  for them; the three limits above are what stop a larger file until then.
+- **A stored document opened on the review screen.** The page picture is made from the stored
+  upload in the probe's child (`web/page_images.py`), which has the same 768 MB cap and its
+  own time limit, `RENDER_TIMEOUT_S` (20 s). The same 600-draw file took 9.0 s and 78 MB; the
+  1000-draw file took 14.2 s, though the upload refuses it. A render past the limit gives
+  "The image could not be made." (503) for that picture and leaves the review screen working.
+  A stored document was taken by the probe first, so its render is no longer than its probe.
+- **MuPDF's repair path.** A file with no usable cross-reference table is rebuilt by
+  scanning for objects, including every object stream. A file that lists 80,000 objects took
+  the probe 11.6 s and 85 MB; 200,000 objects (451 KB), 4 million objects in one stream
+  (9.3 MB) and 4 million across 2,000 streams (17 MB) did not finish in 40 s and were
+  killed at the probe's 30 s limit in the app: refused as `unreadable`, with memory
+  under 90 MB at the point of the kill. The upload size limit and the probe's time limit and
+  address-space cap are the bounds; no code of its own.
 
 ### Hostile-input set
 

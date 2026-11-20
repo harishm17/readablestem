@@ -15,6 +15,8 @@ from pathlib import Path
 import pytest
 
 from fixtures.web.support import WebEnv
+from readablestem.web.dates import format_day
+from readablestem.web.db import utcnow
 from readablestem.web.recipients import recipients
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -84,6 +86,27 @@ def test_the_page_makes_no_conformance_claim_and_says_what_it_does_not_do(page):
     assert "no data agreement is offered" in text
     assert "student records" in text and "never sign in" in text
     assert "not legal advice" in text
+
+
+def test_the_summary_dates_its_facts_in_words_with_the_year(tmp_path):
+    html = get(tmp_path, SUMMARY).text
+    assert f"Facts as they were on {format_day(utcnow())}." in text_of(html)
+
+
+def test_the_retention_summary_is_a_download_written_from_the_settings(tmp_path):
+    """The privacy notice links a file for an office: what is kept, for how long, who receives
+    it and how it is deleted, from the same hours, days and companies as the notice."""
+    env = WebEnv(tmp_path, retention_hours=36, opt_in_retention_days=45)
+    with env.running() as client:
+        file = client.get("/privacy/retention")
+        privacy = client.get("/privacy").text
+    assert file.status_code == 200
+    assert "attachment" in file.headers["content-disposition"]
+    text = text_of(file.text)
+    assert "36 hours" in text and "45 days" in text
+    assert all(r.name in text for r in recipients(env.settings))
+    assert "database backups keep a copy" in text and "Delete now" in text
+    assert 'href="/privacy/retention"' in privacy
 
 
 # --------------------------------------------------------------------------- wording rules

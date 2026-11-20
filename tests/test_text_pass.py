@@ -696,6 +696,16 @@ def struck_page() -> bytes:
     bar = pymupdf.Rect(hidden.x0, 430 - 4.2, hidden.x1, 430 - 3.0)
     page.draw_line((hidden.x0, 430 - 3.6), (hidden.x1, 430 - 3.6), width=0.6)
     page.draw_rect(bar, color=None, fill=(1, 1, 1))
+    # A ruled table whose last cell holds a struck date: a cell carries no runs.
+    xs, ys = [72, 220, 368, 516], [600, 630, 660]
+    for x in xs:
+        page.draw_line((x, ys[0]), (x, ys[-1]), width=0.8)
+    for y in ys:
+        page.draw_line((xs[0], y), (xs[-1], y), width=0.8)
+    for r, row in enumerate([["Item", "Weight", "Due"], ["Quiz", "10 percent", "Dec 9"]]):
+        for c, word in enumerate(row):
+            page.insert_text((xs[c] + 6, ys[r] + 20), word, fontsize=12)
+    page.add_strikeout_annot(page.search_for("Dec 9")[0])
     data = doc.tobytes()
     doc.close()
     return data
@@ -722,11 +732,17 @@ def test_struck_text_is_marked_deleted_and_underlines_and_blanks_are_not():
     notices = [n for n in result.notices if n.code == "struck_text"]
     assert sum(n.count for n in notices) == 3
     assert all(n.review == "optional" and n.page == 0 for n in notices)
+    # The struck date in the table's cell cannot be a run: the table says so instead.
+    table = next(e for e in result.elements if e.kind.value == "table")
+    assert [(n.element_id, n.review) for n in result.notices if n.code == "struck_not_kept"] == [
+        (table.id, "optional")
+    ]
     # CONTENT_RUNS off (the shadow rollout): found and counted, not written.
     shadow = text_pass.apply(pdf, elements, pages=[0])
     assert shadow.counts()["deleted_runs"] == 3 and shadow.counts()["deleted_runs_written"] == 0
     assert not any(r.kind == "deleted" for e in shadow.elements for r in e.runs)
     assert not any(n.code == "struck_text" for n in shadow.notices)
+    assert not any(n.code == "struck_not_kept" for n in shadow.notices)
 
 
 def reviewed_page() -> bytes:

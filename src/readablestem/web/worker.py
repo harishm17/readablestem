@@ -1114,7 +1114,25 @@ class Worker:
             )
             if updated == 1 and code in IMAGE_PAGE_REFUSALS:
                 self._give_back_pages(session, attempt.claim.job_id)
+            if updated == 1:
+                self._end_snapshot(session, attempt.claim.job_id, code)
         return JobStatus.FAILED if updated == 1 else DISCARDED
+
+    def _end_snapshot(self, session: Session, job_id: str, code: str) -> None:
+        """A revision that failed in a way no "Try again" is offered for (a file this tool cannot
+        convert, or no tries left) will never carry anything onto a version: what was kept of
+        the earlier document at its upload is removed. A canceled or retryable one keeps it,
+        for "Convert it" and "Try again" read it when the earlier document is gone."""
+        job = session.get(Job, job_id)
+        if job is None or not job.revises_job_id:
+            return
+        if (
+            retry_rules.offer(
+                status=JobStatus.FAILED, error_code=code, result_json=None, retries=job.retries or 0
+            )
+            is None
+        ):
+            carry_snapshot.drop(session, job_id)
 
     def _give_back_pages(self, session: Session, job_id: str) -> None:
         """The pages of a job the upload could not tell was only scans or handwriting, back on
@@ -1445,14 +1463,17 @@ class Worker:
                     )
                 )
             for kind, element_id in edits.items:
+                # What changed the new result keeps the snapshots a person's own edit keeps, so
+                # the next revision reads the edit back (`carry_edits.edit_row`).
+                change = edits.changes.get((kind, element_id))
                 session.add(
                     ReviewEdit(
                         job_id=job.id,
                         user_id=job.user_id,
                         element_id=element_id,
                         action=carry.CARRIED_ACTION,
-                        before=None,
-                        after={carry_edits.CARRIED_KEY: kind},
+                        before=change.before if change else None,
+                        after=(change.after if change else {}) | {carry_edits.CARRIED_KEY: kind},
                     )
                 )
             job.carried_json = report.to_json() | {"from_name": earlier.name}

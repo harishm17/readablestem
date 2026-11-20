@@ -22,6 +22,13 @@ through this module:
    (output folder plus overlay) is polled and the process group killed over `MAX_TOTAL_BYTES`;
    the tmpfs mounts have fixed sizes. When bubblewrap is missing the compile is refused: there
    is no unsandboxed fallback.
+
+The product has its own, smaller compile (`source.tex_compile.compile_tex`): one `pdflatex` pass
+in the product's sandbox, which either backend runs. This one stays because the gold sets need
+what that one does not do: `latexmk` for as many passes as references and bibliographies take,
+`xelatex` and Tectonic besides `pdflatex`, and a project folder compiled from its own
+subfolder. A new caller in the product uses `source.tex_compile`; development tooling that builds
+a gold document uses this one.
 """
 
 from __future__ import annotations

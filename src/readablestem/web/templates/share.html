@@ -58,7 +58,7 @@
         <button type="submit" class="button-secondary">Change {{ row.email }} to {{ role_words['review' if row.role == 'view' else 'view']|lower }}</button>
       {% endcall %}
       {% call form("share.revoke", "/jobs/" ~ job_id ~ "/share/" ~ row.id ~ "/revoke", {"class": "inline-form"}) %}
-        <button type="submit" class="button-danger">Remove {{ row.email }}</button>
+        <button type="submit" data-busy-label="Opening…" class="button-danger-outline">Remove {{ row.email }}</button>
       {% endcall %}
       </div>
     </li>

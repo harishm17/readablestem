@@ -69,13 +69,42 @@ the largest that got through the detector at all):
   "Page cap") is not given to it;
 - a page with more than `tables.MAX_DETECTOR_ITEMS` (30,000) path items has no table
   proposed, and its lines are read as text;
-- a document has a time budget for slow detections (`tables.DetectorBudget`): a detection
-  longer than `DETECTOR_FREE_S` (3 s; a page with a table takes under 1 s) draws the time
-  beyond that from `DETECTOR_EXCESS_S` (60 s) for the whole document, and when it is used
-  up the document's remaining pages get no proposals (one content-free warning). A
-  document within the budget reads exactly as it would without one; one over it depends
-  on the machine's speed from there on (plan WS5.14; the ink analysis's budget is counted
-  in work since WS14.9).
+- a document has a time budget for slow detections (`tables.DetectorBudget`), counted in
+  the CPU time of the thread that searches (`time.thread_time`), so waiting for a core on a
+  busy machine costs it nothing. A search longer than `DETECTOR_FREE_S` (3 s; a page with a
+  table takes under 1 s) draws the time beyond that from `DETECTOR_EXCESS_S` (360 s) for
+  the whole document. When that is used up, the document's remaining pages get no
+  proposals from the layout model and no continued table (`find_continued`); their own
+  rules and aligned text still propose. Nothing countable on a page before the search
+  predicts its cost, which is why the limit is time and not a count of work.
+
+  A stop is said, not silent: the conversion writes the "not finished" fact `table_search`
+  with reason `time_limit` for each page cut short (`job_not_finished`, operations.md), each
+  such page carries the notice `tables_not_searched` ("Worth checking"), and the job is
+  not "Ready" with nothing to add until the owner has seen it. A document within the budget
+  reads exactly as it would without one. Evals and replays run without it
+  (`TABLE_SEARCH_UNLIMITED`, eval.md "The same file gives the same document"), so no score
+  depends on the machine.
+
+  The 360 s come from the recorded searches of the two sets of arXiv papers the table
+  work is measured on (`data/eval/table-search-seconds.json`: a short hash and the seconds of
+  each searched page per paper, 3,121 pages), replayed through the budget with every search
+  taking longer by a factor (`python -m readablestem.eval.table_search`). The seconds are
+  wall time on a quiet machine, where wall over thread CPU time was 1.02:
+
+  | Each search takes | Development, 70 papers | Held out, 91 papers |
+  |---|---|---|
+  | 1, 2 or 4 times as long | none stopped | none stopped |
+  | 8 times | 4 stopped, 19 pages cut short | 3 stopped, 16 pages cut short |
+  | 2 times, under the old 60 s of wall time | 2 stopped, 12 pages | 1 stopped, 2 pages |
+  | 4 times, under the old 60 s of wall time | 24 stopped, 201 pages | 24 stopped, 230 pages |
+
+  The first paper is stopped at 4.85 times its recorded cost; at 4 times the most any paper
+  uses is 289 of the 360 s. Four times is the share of a core a small hosting plan gives a
+  job. What the numbers do not show: the papers are arXiv papers, not course material (a
+  lecture of pen strokes costs far more a page, and most such pages are kept as images and
+  never searched), and the CPU time onnxruntime spends on its own threads, when it may use
+  more than one CPU, is not counted.
 
 The detector's time depends on what is drawn on the page, not on its tables, and is
 nearly all inside PyMuPDF: a lecture slide with 202 pen-stroke paths (11,000 curve items)
@@ -204,8 +233,14 @@ rules above.
    never invented.
 8. **Continued tables.** A table split across pages stays two tables. The second gets the
    reason `"continued from previous page"` when it has the same columns (left edges within
-   3 % of the page width) as the last table of the page before and nothing but a running
-   header above it. When the page break split a row (Word and browsers break a tall row;
+   3 % of the page width, 6 % when the part before has a header and this part has none: a
+   header printed once is wider than the figures, so the first part's columns are cut further
+   out than the rows that go on) as the last table of the page before, nothing but a
+   running header above it, and nothing but a running footer under that table on its own page
+   in its part of the width (`_at_foot`: a table with text under it has ended, and the next
+   page's table would be given its header; a footnote under a table that does go on stops
+   the mark too, and that part is then read as a table of its own, as before).
+   When the page break split a row (Word and browsers break a tall row;
    the gold's orders-of-magnitude table ends "... the edges of the known" on one page
    and "universe" on the next), `join_split_row` joins the end back: the first row after
    any header rows repeated from the table before is the end of that table's last row
@@ -227,6 +262,19 @@ rules above.
    cell, and the work counts against the document's detector budget. The one row left under a repeated header is too
    few lines for the aligned-text test, so before this the header, the split row and the
    next row were read as headings and paragraphs.
+   **The header of a continued table.** A part that goes on from the page before is written
+   with the header rows of the part before it when it has none of its own and the table
+   step's grid has the same number of columns (`assemble_tables.carry_headers`, at the time
+   the page is written: the stored grids and the table step's request are not changed). All
+   the header rows are carried, merged cells included, or none; a table of three pages carries
+   its header to the third from the second. A part that printed its header again keeps it and
+   gets no second one. Where the columns do not agree, or the part's first rows repeat the
+   header without being marked as one, nothing is carried and the notice
+   `table_header_missing` ("Worth checking") says the part has no header row. A table whose
+   first part has no header row gets neither. A part that is given the header gets the notice
+   `table_header_carried` ("Worth checking"): the review card shows the grid stored for the
+   part, which has no header row, so the notice is where a reviewer learns what students get
+   and can check that the two parts are one table.
 
 What layout does with the result: the table's lines, rules and caption lines leave the
 page, and a TABLE element is placed in reading order like a figure (a grid of terms:
@@ -460,7 +508,7 @@ flattened exponent (10⁵ is "105" in most text layers).
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Table | `cheap_model` (gpt-6-luna), through `router.call_with_fallback` (an outage falls back to the main model) | the answer is unusable, says it is not a data table, or fails any check except the spacing note and `no_pdf_text` (a second reading cannot change those) |
+| Table | `cheap_model`, through `router.call_with_fallback` (an outage falls back to the main model) | the answer is unusable, says it is not a data table, or fails any check except the spacing note and `no_pdf_text` (a second reading cannot change those) |
 
 The escalation is one main-model call with no fallback (its fallback would be the cheap
 model again). The main model's answer is kept unless it produced nothing, only the cheap
@@ -529,10 +577,11 @@ row as headers**, **Use the first column as headers**, **Use the first row and c
 headers** and **This grid is not a table**, and no accept (accepting a table with no headers
 was the fault: F-091). The first three are the same `headers` edit "Change the table" makes.
 The field is left out of the stored JSON when it is None, so a result stored before it
-existed loads and is written exactly as before. Word and LaTeX tables with no header mark
-are still accepted (`none`, no decision asked): the repository's own files have 3 of 31
-unmarked, a real LaTeX project more, and turning each into a decision is a review load that
-is a person's call (WS5.2 report).
+existed loads and is written exactly as before. A Word or LaTeX table with no header mark
+(`none`) is the same required choice, with no model call (`ltx_reader.headers_to_choose`): the
+repository's own files have 3 of 31 unmarked and a real LaTeX project more, so a source that
+used to be accepted now waits for these choices (a one-row table and a table that is not data
+excepted).
 
 ### Checks
 

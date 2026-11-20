@@ -20,14 +20,15 @@ What each part becomes:
   equation, a theorem's paragraph, a figure, a table, a bibliography or list item, or the
   paragraph that holds the id. The words stay as they are; an id that became no element
   (`Reading` made nothing there), a link inside the element it names and one in a place that
-  holds no links (a table cell, a caption, a note, a heading) make no link;
+  holds no links (a table cell, a caption: `TableCell` and `caption` are plain text) make no
+  link. A link in a heading or in a footnote (written after its sentence) is kept;
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
   no usable picture the figure is a required decision (`source_figure_missing`). A picture
   outside a float (centered, in a sentence, a list item or a table cell) is a figure of its own
-  straight after the block that holds it; a table that loses a picture from a cell this way is
-  a required decision (`source_table_picture`). The words and blocks of a float beside its
-  caption and pictures are read in order after them;
+  straight after the block that holds it (the words it cut stay two words); a table that loses
+  a picture from a cell this way is a required decision (`source_table_picture`). The words
+  and blocks of a float beside its caption and pictures are read in order after them;
 - an error node in running text stays in the text as written; the conversion stops such a
   source (`source.report.stop`), so raw code never reaches a student. Every error counted here
   adds the required notice `source_error`. A formula LaTeX could not read in a place that has
@@ -91,6 +92,7 @@ BOX = (0.0, 0.0, 1.0, 1.0)
 UNKNOWN_FIGURE_REASON = "source_figure_missing"
 SOURCE_ERROR_NOTICE = "source_error"
 SOURCE_UNREAD_NOTICE = "source_unread"
+COLOUR_NOTICE = "colour_used"  # optional: passages in colour the converted file does not keep
 # A failed check that makes an item a required decision because the reader could not write
 # all of it faithfully: a formula LaTeX could not read, shown as its TeX in a table, heading or
 # caption; a picture taken out of a table cell. A check, not a reason: review shows a table's
@@ -147,6 +149,106 @@ def _squash(text: str) -> str:
     return _SPACE.sub(" ", text).strip()
 
 
+# What a source says about how words are set: bold, italic, fixed-pitch and highlighted. A
+# reader collects them as spans (kind, start, end, None) of the text it writes and
+# `style_runs` makes the runs the PDF path writes (`text_pass.style_runs`).
+STYLE_KINDS = ("strong", "emphasis", "code", "highlight")
+
+
+def squashed(
+    raw: str, spans: list[tuple[str, int, int, object]]
+) -> tuple[str, list[tuple[str, int, int, object]]]:
+    """`raw` with runs of white space made one space and trimmed, and `spans` (offsets into
+    `raw`) moved to the same words in that text; a span with no words left is dropped."""
+    text = _SPACE.sub(" ", raw)
+    lead = len(text) - len(text.lstrip(" "))
+    text = text.strip()
+    moved = [0] * (len(raw) + 1)
+    position, previous = 0, False
+    for i, ch in enumerate(raw):
+        moved[i] = position
+        space = _SPACE.fullmatch(ch) is not None
+        if not (space and previous):
+            position += 1
+        previous = space
+    moved[len(raw)] = position
+    kept = []
+    for kind, a, b, extra in spans:
+        a, b = max(0, moved[a] - lead), min(len(text), max(0, moved[b] - lead))
+        if b > a:
+            kept.append((kind, a, b, extra))
+    return text, kept
+
+
+def style_runs(text: str, spans: list[tuple[str, int, int, object]]) -> list[Run]:
+    """The runs (`strong`, `emphasis`, `code`, `highlight`) of the style spans in `spans`,
+    offsets into `text`: what the PDF path writes for the same words. Spans of one kind are
+    joined where they touch or overlap; a style that covers `STYLE_SHARE` of the block's
+    letters and digits or more is the block's own (a theorem set in italic, a bold line) and
+    makes no run, except a highlight and an `\\emph` that stands upright in italic text; a run
+    never holds an inline-equation marker; a piece is kept only when it has a letter or a
+    digit."""
+    from readablestem.core.types import INLINE_MARKER_RE
+    from readablestem.pipeline.text_pass import STYLE_SHARE
+
+    markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
+    plain = [not c.isspace() for c in text]
+    for a, b in markers:
+        plain[a:b] = [False] * (b - a)
+    found: list[Run] = []
+
+    def joined_of(kind: str, upright: bool = False) -> list[list[int]]:
+        joined: list[list[int]] = []
+        for _, start, end, _extra in sorted(
+            (s for s in spans if s[0] == kind and (s[3] == "upright") == upright),
+            key=lambda s: s[:3],
+        ):
+            if joined and start <= joined[-1][1]:
+                joined[-1][1] = max(joined[-1][1], end)
+            else:
+                joined.append([start, end])
+        return joined
+
+    for kind in STYLE_KINDS:
+        joined = joined_of(kind)
+        covered = sum(sum(plain[a:b]) for a, b in joined)
+        if kind != "highlight" and covered and covered >= STYLE_SHARE * sum(plain):
+            joined = []  # the block's own style
+        if kind == "emphasis":  # an `\\emph` in italic text: set apart by being upright
+            joined = [*joined, *joined_of(kind, upright=True)]
+        for a, b in joined:
+            cuts = [a, *(x for m in markers if a <= m[0] and m[1] <= b for x in m), b]
+            for start, end in zip(cuts[::2], cuts[1::2], strict=True):
+                while start < end and text[start].isspace():
+                    start += 1
+                while end > start and text[end - 1].isspace():
+                    end -= 1
+                if any(c.isalnum() for c in text[start:end]):
+                    found.append(Run(start=start, end=end, kind=kind))
+    return sorted(found, key=lambda r: (r.start, r.end))
+
+
+def _upright(item: Node) -> str | None:
+    """ "upright" for an `\\emph` LaTeXML sets upright (it stands in italic text)."""
+    classes = _classes(item)
+    return "upright" if "ltx_emph" in classes and "ltx_font_upright" in classes else None
+
+
+def _style_of(item: Node) -> str | None:
+    """How LaTeXML says an inline element is set: `\\textbf` and `{\\bf}` give
+    `ltx_font_bold`, `\\textit` and `\\emph` `ltx_font_italic`, `\\texttt` and `\\verb`
+    `ltx_font_typewriter`. An `\\emph` set upright (inside italic text, a theorem's) is the
+    emphasis there."""
+    classes = _classes(item)
+    if "ltx_font_bold" in classes:
+        return "strong"
+    if "ltx_font_italic" in classes or ("ltx_emph" in classes and "ltx_font_upright" in classes):
+        return "emphasis"
+    if "ltx_font_typewriter" in classes and _local(item.tag) != "pre":
+        return "code"
+    return None
+
+
 def _children(node: Node) -> list[Node]:
     return [c for c in node if isinstance(c.tag, str)]
 
@@ -174,6 +276,26 @@ def needs_decision(fix: Fix, code: str) -> Fix:
             "status": Status.NEEDS_REVIEW if fix.status is Status.ACCEPTED else fix.status,
             "review": "required",
             "checks": [*fix.checks, Check(name=SOURCE_READ_CHECK, passed=False, code=code)],
+        }
+    )
+
+
+def headers_to_choose(fix: Fix, grid: TableGrid) -> Fix:
+    """`fix` of a source table whose file marks no header (`header_source` "none") as a required
+    choice, the one a PDF table with no header has (`table.headers` `no_headers`, WS5.2): read
+    to a blind student, a table with no header is bare cells. A person chooses the first row,
+    the first column or both, or says it is not a table; nothing is guessed, no model is asked.
+    A one-row table and a table that is not data are left as they are."""
+    if grid.header_source != "none" or not grid.is_data or grid.rows < 2:
+        return fix
+    return fix.model_copy(
+        update={
+            "status": Status.NEEDS_REVIEW if fix.status is Status.ACCEPTED else fix.status,
+            "review": "required",
+            "checks": [
+                *fix.checks,
+                Check(name="table.headers", passed=False, severity="warning", code="no_headers"),
+            ],
         }
     )
 
@@ -468,10 +590,11 @@ class _Reader:
         for child in _children(step):
             classes = _classes(child)
             if "ltx_frame_title" in classes:
-                text, _ = self._inline_text(child, skip_tags=True)
+                text, spans = self._inline_text(child, skip_tags=True)
                 if text:
                     level = self.section_level + 1 if self.section_level >= 1 else 2
                     heading = self._new(Kind.HEADING, text=text + note, bold=True)
+                    self._apply_spans(heading, spans, links_only=True)
                     self._heading_fix(heading, min(level, 6), text + note)
                     self.chars += len(heading.text or "")
             else:
@@ -506,10 +629,11 @@ class _Reader:
             self.section_level = level
         titled = bool(classes & {"ltx_title_document", "ltx_title_titlepage"})
         notes: list[str] = []  # `\thanks` on the title: a line of its own, not in the title
-        text, _ = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
+        text, spans = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
         if not text:
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
+        self._apply_spans(element, spans, links_only=True)
         if number := _printed_tag(node):
             self.out.printed[element.id] = number
         self._heading_fix(element, level, text)
@@ -578,13 +702,22 @@ class _Reader:
         self.read.add(id(node))
 
         after_break = [False]  # a kept line end was just written: no space follows it
+        gap = [False]  # a picture stood between two letters: the words it cut are two words
 
         def emit(text: str) -> None:
+            if gap[0]:
+                gap[0] = False
+                if text[:1].isalnum():
+                    text = f" {text}"
             if after_break[0]:
                 text = text.lstrip(" ")
                 if not text:
                     return
                 after_break[0] = False
+            elif parts and parts[-1].endswith(" ") and text.startswith(" "):
+                text = text[1:]  # two spaces become one below: say so here, so the spans match
+                if not text:
+                    return
             parts.append(text)
             length[0] += len(text)
 
@@ -622,6 +755,7 @@ class _Reader:
                 return
             if _is_picture(item):
                 self.loose.append(item)  # a figure of its own after this block
+                gap[0] = bool(parts) and parts[-1][-1:].isalnum()
                 return
             self.read.add(id(item))
             if tag == "math":
@@ -642,17 +776,16 @@ class _Reader:
                 emit(_squash(self._take(item)))
             elif classes & {"ltx_note"}:
                 self._take(item)
-                note = _squash(
-                    "".join(
-                        _text_without_tag(c)
-                        for c in item.iter()
-                        if "ltx_note_content" in _classes(c)
-                    )
-                )
+                contents = [c for c in item.iter() if "ltx_note_content" in _classes(c)]
+                note = _squash("".join(_text_without_tag(c) for c in contents))
                 if note and notes is not None:
                     notes.append(note)
                 elif note:
-                    emit(f" (note: {note})")
+                    emit(" (note: ")
+                    start = length[0]
+                    emit(f"{note})")
+                    for kind, a, b, extra in self._note_links(contents, note):
+                        spans.append((kind, start + a, start + b, extra))
             else:
                 start = length[0]
                 if item.text:
@@ -671,6 +804,8 @@ class _Reader:
                     spans.append((tag, start, length[0], None))
                 if classes & STRUCK and length[0] > start:
                     spans.append(("deleted", start, length[0], None))
+                if (look := _style_of(item)) and length[0] > start:
+                    spans.append((look, start, length[0], _upright(item)))
                 if tag == "span" and length[0] > start and (rgb := _style_colour(item)):
                     spans.append(("colour", start, length[0], rgb))
 
@@ -691,10 +826,21 @@ class _Reader:
                 shifted.append((kind, a, b, extra))
         return text, shifted
 
-    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(
+        self,
+        element: Element,
+        spans: list[tuple[str, int, int, object]],
+        *,
+        links_only: bool = False,
+    ) -> None:
+        """The runs and links of `spans` on `element`'s text; with `links_only`, the links
+        alone (a heading's words are bold already)."""
         text = element.text or ""
+        if not element.preformatted and not links_only:
+            for run in style_runs(text, spans):
+                inline.add(element, run)
         for kind, start, end, extra in spans:
-            if start >= end or end > len(text):
+            if start >= end or end > len(text) or (links_only and kind not in ("uri", "ref")):
                 continue
             # a span may not start or end inside an inline marker
             if any(
@@ -716,6 +862,27 @@ class _Reader:
                     _add_colour(element, start, end, extra)
             except ValueError:
                 continue
+
+    def _note_links(self, contents: list[Node], note: str) -> list[tuple[str, int, int, object]]:
+        """The links in a note's words as spans of `note` (the text written after "(note: "),
+        read the way the words around the note are. None when the note holds no link, or when
+        its words read differently here: the note's text is never changed by its links."""
+        if len(contents) != 1 or not any(
+            _local(a.tag) == "a" and (a.get("href") or "").startswith(("http", "mailto:", "#"))
+            for a in contents[0].iter()
+        ):
+            return []
+        loose, errors, done = list(self.loose), self.errors, set(self.done)
+        text, spans = self._inline_text(contents[0], skip_tags=True)
+        self.loose, self.errors, self.done = loose, errors, done  # a note makes no figure here
+        lead = len(text) - len(note)  # the note's own mark (`SKIP`) stands before its words
+        if lead < 0 or not text.endswith(note):
+            return []
+        return [
+            (kind, a - lead, b - lead, extra)
+            for kind, a, b, extra in spans
+            if kind in ("uri", "ref") and a >= lead
+        ]
 
     # ------------------------------------------------------------------ lists
 
@@ -915,7 +1082,8 @@ class _Reader:
             checks=[Check(name="source.exact", passed=True)],
         )
         # a cell whose picture follows the table reads as empty in it
-        self.out.fixes[element.id] = needs_decision(fix, TABLE_PICTURE) if pictures else fix
+        fix = needs_decision(fix, TABLE_PICTURE) if pictures else fix
+        self.out.fixes[element.id] = headers_to_choose(fix, grid)
         self.chars += sum(len(c.text) for c in grid.cells)
         return element
 
@@ -1472,7 +1640,7 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                 col_span = max(1, min(int(cell.get("colspan", "1")), 50))
             except ValueError:
                 row_span = col_span = 1
-            text = _squash("".join(_cell_text(cell)))
+            text, styled = squashed(*_cell_text(cell))
             latex = mathml = None
             maths = [m for m in cell.iter() if _local(m.tag) == "math"]
             if len(maths) == 1 and not _squash(_text_without_math(cell)):
@@ -1487,6 +1655,7 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                 TableCell(
                     row=r, col=col, row_span=row_span, col_span=col_span, text=text,
                     latex=latex, mathml=mathml, header=header,
+                    runs=[] if latex else style_runs(text, styled),
                 )
             )  # fmt: skip
             for dr in range(row_span):
@@ -1548,16 +1717,33 @@ def _lenient(grid: TableGrid) -> TableGrid | None:
     return plain if not grid_problems(plain) else None
 
 
-def _cell_text(cell: Node):
-    if cell.text:
-        yield cell.text
-    for child in _children(cell):
-        if _local(child.tag) == "math":
-            yield child.get("alttext") or "".join(child.itertext())
-        else:
-            yield from _cell_text(child)
-        if child.tail:
-            yield child.tail
+def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
+    """The text of a cell as written and the spans of its styled words (offsets into it)."""
+    parts: list[str] = []
+    spans: list[tuple[str, int, int, object]] = []
+    length = 0
+
+    def visit(item: Node) -> None:
+        nonlocal length
+        if item.text:
+            parts.append(item.text)
+            length += len(item.text)
+        for child in _children(item):
+            start = length
+            if _local(child.tag) == "math":
+                shown = child.get("alttext") or "".join(child.itertext())
+                parts.append(shown)
+                length += len(shown)
+            else:
+                visit(child)
+                if (look := _style_of(child)) and length > start:
+                    spans.append((look, start, length, _upright(child)))
+            if child.tail:
+                parts.append(child.tail)
+                length += len(child.tail)
+
+    visit(cell)
+    return "".join(parts), spans
 
 
 _LATEX_TEXT = {

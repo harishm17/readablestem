@@ -59,7 +59,7 @@ from readablestem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
-from readablestem.web import forms, links, reports
+from readablestem.web import export_store, forms, links, reports
 from readablestem.web.database import insert_ignore
 from readablestem.web.db import (
     AuthIdentity,
@@ -292,7 +292,19 @@ def delete_jobs(
         row.id: utc_day(row.finished_at or row.created_at, now) for row in rows if not row.is_sample
     }
     _count_review_actions(session, day_of)
-    blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
+    # A combined file ("Combine parts") is kept on one part of its group and holds all of them:
+    # it goes with any part (`web.combine.combined_file`).
+    groups = select(Job.part_group).where(Job.id.in_(ids), Job.part_group.is_not(None))
+    combined = _deleted(
+        session.execute(
+            delete(Blob).where(
+                Blob.job_id.in_(select(Job.id).where(Job.part_group.in_(groups))),
+                Blob.kind == export_store.KIND,
+                Blob.element_id.like(f"%.{export_store.COMBINED}%"),
+            )
+        )
+    )
+    blobs = combined + _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     session.execute(delete(JobShare).where(JobShare.job_id.in_(ids)))
     session.execute(delete(JobLink).where(JobLink.job_id.in_(ids)))

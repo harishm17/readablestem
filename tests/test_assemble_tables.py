@@ -23,6 +23,7 @@ from readablestem.pipeline import html_checks
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
 from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.notices import from_fixes
 from readablestem.pipeline.student_sheet import TABLE as TABLE_CSS
 
 
@@ -197,6 +198,42 @@ def test_a_proposal_without_its_caption_gets_the_elements_caption():
     own = grid(caption="Table 1 Free fall (corrected).")
     html = render([element], [table_fix(table=TableFix(grid=own))])
     assert "Free fall (corrected).</caption>" in html and html.count("<caption") == 1
+
+
+def continued_part(*, header: bool, cols: int = 2) -> tuple[Element, Fix]:
+    """The part of a table on the next page, as the table step wrote it: no header row unless
+    the page printed it again."""
+    head = [
+        TableCell(row=0, col=c, text=("Time (s)", "Speed (m/s)")[c], header="col") for c in (0, 1)
+    ]
+    body = [TableCell(row=int(header), col=c, text=str(c + 2)) for c in range(cols)]
+    rows = 1 + int(header)
+    cells = [*(head if header else []), *body]
+    part = TableGrid(rows=rows, cols=cols, cells=cells, header_rows=int(header))
+    element = table_element("p2-e1", 2).model_copy(
+        update={"page": 1, "reasons": ["continued from previous page"]}
+    )
+    return element, table_fix("p2-e1", table=TableFix(grid=part))
+
+
+@pytest.mark.parametrize(
+    ("header", "cols", "named", "said"),
+    [
+        (False, 2, 2, False),  # the part has no header: the first part's is carried
+        (True, 2, 2, False),  # it printed its own again: no second one
+        (False, 3, 1, True),  # not the same columns: nothing carried, and the page says so
+    ],
+)
+def test_a_table_that_goes_on_from_the_page_before_names_its_columns(header, cols, named, said):
+    first = table_element()
+    second, second_fix = continued_part(header=header, cols=cols)
+    fixes = [table_fix(table=TableFix(grid=grid())), second_fix]
+    html = render([first, second], fixes)
+    assert html.count('<th scope="col">Time (s)</th>') == named
+    codes = [n.code for n in from_fixes([first, second], fixes, long_descriptions=False)]
+    assert ("table_header_missing" in codes) is said
+    # The review card shows the part's own grid, so a carried header is said there too.
+    assert ("table_header_carried" in codes) is (named == 2 and not header)
 
 
 # --------------------------------------------------------------------------- html checks

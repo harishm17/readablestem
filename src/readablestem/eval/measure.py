@@ -82,6 +82,10 @@ ROOM: dict[str, Any] = {
 }
 # How long one upload's process may run before it is stopped and counted as failed.
 LIMIT_S = 1800.0
+# The error of a replay in which the table search stopped: a replay runs it with no time
+# limit (`replay_settings`), so a stop means the setting did not reach the conversion, and
+# the upload's figures would depend on the machine. It is counted as failed, not measured.
+TABLE_SEARCH_STOPPED = "table_search_stopped"
 # The fields of a result that say how long something took. Two conversions of one file
 # agree on everything else (`parts`).
 _TIMING = frozenset({"latency_ms", "seconds"})
@@ -124,6 +128,9 @@ class Converted:
     # (0-based, None when no element holds it), kind, reasons and members. None in a record
     # made before this was kept, which is not the same as a document that asks nothing.
     decisions: list[dict[str, Any]] | None = None
+    # The elements whose fix is optional, not a decision (`core.triage.tier_for`): with the
+    # decisions' bands, what `eval burden` reads to see a decision of band 1 or 2 become one.
+    optional: list[str] | None = None
     # The audit of the files built from the result (`eval.outputs.audit_document`): each
     # wrong place, what each output held and the outputs that could not be built. None
     # when the replay was not asked to build them.
@@ -137,6 +144,9 @@ class Converted:
     # glyphs by code, and what layout left out by name. Counts only. None when the replay
     # did not take them (`eval.say_once_report`), and in a record made before this was kept.
     say_once: list[dict[str, Any]] | None = None
+    # How many formulas the conversion accepted with nothing to hold them against, and why
+    # (`held_against_nothing`). Counts only. None in a record made before this was kept.
+    not_compared: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}
@@ -146,6 +156,30 @@ class Converted:
         fields: dict[str, Any] = dict(raw)
         fields["facts"] = StepFacts.model_validate(raw.get("facts") or {})
         return cls(**fields)
+
+
+def held_against_nothing(result: DocumentResult) -> dict[str, Any]:
+    """The formulas of `result` and the passed checks that say one was held against nothing:
+    an equation (`equation.not_compared`) or a table's maths cells (`table.math_not_compared`),
+    each counted under its cause."""
+    from readablestem.pipeline.equation_step import NOT_COMPARED
+    from readablestem.pipeline.table_step import MATH_NOT_COMPARED
+
+    causes: Counter[str] = Counter()
+    equations = tables = 0
+    for fix in result.fixes:
+        equations += fix.kind == Kind.EQUATION
+        tables += fix.kind == Kind.TABLE and any(c.name == "table.math" for c in fix.checks)
+        causes.update(
+            f"{c.name}:{c.code}"
+            for c in fix.checks
+            if c.passed and c.name in (NOT_COMPARED, MATH_NOT_COMPARED)
+        )
+    return {
+        "equations": equations,
+        "tables_with_math": tables,
+        "causes": dict(sorted(causes.items())),
+    }
 
 
 def every_upload() -> list[Upload]:
@@ -249,6 +283,7 @@ def replay_settings(answers: Path) -> Settings:
         model_answers_offline=True,
         # A replay sends nothing, so any key will do.
         anthropic_api_key="sk-ant-replay-sends-nothing",
+        table_search_unlimited=True,
         **ROOM,
     )
     return profile.load().apply(base)
@@ -338,7 +373,14 @@ def result_of(upload: Upload, settings: Settings) -> tuple[bytes, DocumentResult
 
         # A file the reader refuses or cannot finish ends as a job's does: with its code.
         return error_code_for(exc)
+    if _table_search_stopped(output.facts):
+        return TABLE_SEARCH_STOPPED
     return job.pdf, output.result
+
+
+def _table_search_stopped(facts: StepFacts | None) -> bool:
+    stops = facts.not_finished if facts is not None else []
+    return any(stop.step == step_facts.TABLE_SEARCH for stop in stops)
 
 
 def order_rows(entry_id: str, pdf: bytes, result: DocumentResult) -> dict[str, list] | None:
@@ -439,8 +481,11 @@ def convert(upload: Upload, settings: Settings, *, outputs: bool = False) -> Con
         own_peak_mb=own_peak_mb,
         parts=parts(result),
         decisions=[asdict(decision) for decision in triage.decisions(result)],
+        optional=sorted(f.element_id for f in result.fixes if triage.tier_for(f) == "optional"),
         outputs=audit,
         order=order_rows(upload.entry, pdf, result),
+        error=TABLE_SEARCH_STOPPED if _table_search_stopped(facts) else "",
+        not_compared=held_against_nothing(result),
     )
 
 
@@ -689,6 +734,7 @@ def stamps(
         "profile": profile.stamp(settings),
         "pipeline_version": PIPELINE_VERSION,
         "commit": sha + ("+changes" if dirty else ""),
+        "provenance": run_record.provenance(corpus.REPO),
         "machine": machine(),
         "not_finished": [
             {"upload": done.upload, "step": stop.step, "page": stop.page, "reason": stop.reason}

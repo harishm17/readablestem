@@ -9,6 +9,7 @@ last review decision.
 
 from __future__ import annotations
 
+import struct
 import zlib
 from collections import Counter
 from dataclasses import dataclass, field
@@ -34,7 +35,7 @@ from readablestem.web import (
     states,
 )
 from readablestem.web.database import as_utc
-from readablestem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
+from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, utcnow
 from readablestem.web.messages import Explained, explain_check, severity_label
 from readablestem.web.outcome import FAILED_MESSAGES
 
@@ -112,6 +113,9 @@ JOB_ERROR_MESSAGES = {
     "source_syntax_error": "LaTeX cannot read this source past an error: a brace or an "
     "environment is not closed. Everything after that point would be missing, so nothing was "
     "converted. Compile it, fix the error and upload it again, or upload the PDF.",
+    "source_loop": "A command in this source calls itself without end, so LaTeX cannot finish "
+    "reading it and nothing was converted. Trying again will not change that. Compile the file "
+    "on your own computer, look for the command that calls itself and fix it, or upload the PDF.",
     "source_undefined": "This source uses commands that are not defined. They would appear to "
     "students as raw code, so nothing was converted. Define them in the source, or upload the "
     "PDF.",
@@ -146,9 +150,28 @@ CHARACTER_ADVICE = {
 }
 
 
+# A Word file read from the file itself that could not be converted (`error_detail` kind "docx",
+# `source.convert`). The PDF route a Word file takes with the reader off is not taken from a
+# stopped job (its upload is the Word file, charged by its own estimate), so the way on is
+# said: save the Word file as a PDF and upload that.
+WORD_SAVE_AS_PDF = "In Word, choose File, Save As (or Export), pick PDF, and upload that PDF."
+WORD_STOP_MESSAGES = {
+    "source_failed": "This Word file could not be read, so nothing was converted. "
+    + WORD_SAVE_AS_PDF,
+    "source_unreadable": "This Word file could not be read, so nothing was converted. "
+    + WORD_SAVE_AS_PDF,
+    "source_timeout": "This Word file did not finish in the time one conversion may take, "
+    "which usually means a very large file. Trying again will not change that. " + WORD_SAVE_AS_PDF,
+    "source_refused": "This Word file has something this tool will not read, so nothing was "
+    "converted. " + WORD_SAVE_AS_PDF,
+}
+
+
 def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
     """The stop sentence of a source job, naming the file or commands from its
     `error_detail` (`source.report.stop`); the plain sentence when there is no detail."""
+    if detail and detail.get("kind") == "docx" and code in WORD_STOP_MESSAGES:
+        return WORD_STOP_MESSAGES[code or ""]
     plain = job_error_message(code)
     if not detail:
         return plain
@@ -192,6 +215,12 @@ def source_stop_message(code: str | None, detail: dict[str, Any] | None) -> str:
             f"LaTeX cannot read this source past {where}: a brace or an environment is not "
             "closed. Everything after that point would be missing, so nothing was converted. "
             "Compile it, fix the error and upload it again, or upload the PDF."
+        )
+    if code == "source_loop" and first:
+        return (
+            f"The command {first['name']}{at} calls itself without end, so LaTeX cannot finish "
+            "reading this source and nothing was converted. Trying again will not change that. "
+            "Compile the file on your own computer, fix that command, or upload the PDF."
         )
     if code == "source_unsupported_class" and detail.get("class"):
         return (
@@ -395,6 +424,12 @@ class JobView:
     @property
     def is_owner(self) -> bool:
         return self.role == "owner"
+
+    @property
+    def combine_left_out(self) -> int:
+        """The parts of this file that "Combine parts" would leave out: the ones the person
+        keeps that are not ready (the combine page's count, `combine_view`)."""
+        return max(0, len(self.parts) - self.combinable)
 
     @property
     def can_review(self) -> bool:
@@ -679,6 +714,27 @@ def last_decision(session: Session, job: Job) -> date | None:
     return when.date() if when is not None else None
 
 
+# A PNG file holds its width and height as two 4-byte numbers at bytes 16 to 24: the
+# database hands back those 8 bytes, not the crop.
+CropSizes = dict[str, tuple[int, int] | None]
+
+
+def crop_sizes(session: Session, job_id: str) -> CropSizes:
+    """The size in pixels of each stored crop of a job, by element: the picture's own header."""
+    rows = session.execute(
+        select(Blob.element_id, func.substr(Blob.content, 17, 8)).where(
+            Blob.job_id == job_id, Blob.kind == "crop"
+        )
+    ).all()
+    sizes: CropSizes = {}
+    for element_id, header in rows:
+        if not element_id:
+            continue
+        width, height = struct.unpack(">II", bytes(header)) if len(header or b"") == 8 else (0, 0)
+        sizes[element_id] = (width, height) if width and height else None
+    return sizes
+
+
 def job_view(
     session: Session,
     job: Job,
@@ -714,7 +770,9 @@ def job_view(
     if with_page and job.status == JobStatus.DONE and job.result_json:
         result = DocumentResult.model_validate(job.result_json)
         applied = notation.applied_phrases(result.notation_applied)
-        page = job_page.page_data(result, last_decision(session, job), job.filename)
+        page = job_page.page_data(
+            result, last_decision(session, job), job.filename, crop_sizes(session, job.id)
+        )
         carried = carry_view(job, result)
     # Only a finished job has a summary (the job page shows it for no other); a poll of one
     # that is waiting or converting does not load its result.

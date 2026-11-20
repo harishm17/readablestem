@@ -4,6 +4,7 @@ tests/test_source_convert.py."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -216,6 +217,10 @@ def test_a_ragged_table_is_padded_and_a_huge_one_becomes_a_list(tmp_path):
     grid = read(ragged, tmp_path)
     [table] = grid.elements
     assert grid.fixes[table.id].table.grid.cols == 2  # type: ignore[union-attr]
+    # no header marked in the source: the choice a PDF table with no header has, not an accept
+    headless = grid.fixes[table.id]
+    assert (headless.status, headless.review) == (Status.NEEDS_REVIEW, "required")
+    assert [c.code for c in headless.failed_checks] == ["no_headers"]
     rows = "".join("<tr><td>x</td></tr>" for _ in range(301))
     huge = read(f'<table class="ltx_tabular"><tbody>{rows}</tbody></table>', tmp_path)
     assert set(kinds(huge)) == {"list_item"} and len(huge.elements) == 301
@@ -232,6 +237,15 @@ def test_a_figure_gets_the_projects_picture_and_its_caption(tmp_path):
     assert figure.kind is Kind.FIGURE and figure.caption == "A plot."
     assert result.images[figure.id].startswith(b"\x89PNG")
     assert figure.id not in result.fixes  # the figure step (a model) decides this one
+
+
+def test_a_picture_in_a_sentence_follows_its_paragraph_and_keeps_the_words_apart(tmp_path):
+    (tmp_path / "icon.png").write_bytes(png_bytes())
+    picture = '<img src="icon.png" class="ltx_graphics"/>'
+    body = f'<p class="ltx_p">Press{picture}to start.</p><p class="ltx_p">Next block.</p>'
+    result = read(body, tmp_path)
+    assert kinds(result) == ["paragraph", "figure", "paragraph"]
+    assert result.elements[0].text == "Press to start."
 
 
 def test_a_figure_without_a_usable_picture_is_a_required_decision(tmp_path):
@@ -325,7 +339,9 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
         '<div id="S1" class="ltx_section"><h2 class="ltx_title ltx_title_section">'
         '<span class="ltx_tag ltx_tag_section">1 </span>First</h2>'
         f'<div class="ltx_para"><p class="ltx_p">See Section {ref("S2", "2")}, equation '
-        f"({ref('S1.E2', '2')}), {ref('bib.bib1', '1')} and {ref('nowhere', '?')}.</p></div>"
+        f"({ref('S1.E2', '2')}), {ref('bib.bib1', '1')} and {ref('nowhere', '?')}."
+        '<span class="ltx_note ltx_role_footnote"><sup class="ltx_note_mark">1</sup>'
+        f'<span class="ltx_note_content">Also {ref("S2", "Next")}.</span></span></p></div>'
         '<div id="Thm1" class="ltx_theorem"><h6 class="ltx_title ltx_runin">'
         '<span class="ltx_tag">Theorem 1</span>.</h6><div class="ltx_para">'
         f'<p class="ltx_p">It holds, as {ref("Thm1", "Theorem 1")} says.</p></div></div>'
@@ -334,6 +350,8 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
         '<tbody id="S1.E2"><tr class="ltx_equation">'
         f"<td>{math('b', '<mi>b</mi>')}</td></tr></tbody></table></div>"
         '<div id="S2" class="ltx_section"><h2 class="ltx_title ltx_title_section">Next</h2></div>'
+        '<div id="S3" class="ltx_section"><h2 class="ltx_title ltx_title_section">'
+        f"Back to {ref('S1', 'First')}</h2></div>"
         '<ul class="ltx_biblist"><li id="bib.bib1" class="ltx_bibitem">'
         '<span class="ltx_tag ltx_tag_bibitem">[1]</span>'
         '<span class="ltx_bibblock">A. One, 1990.</span></li></ul>'
@@ -347,7 +365,7 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
             for k in element.links
         ]
 
-    toc, _, paragraph, theorem, _, row_b, _, entry = result.elements
+    toc, _, paragraph, theorem, _, row_b, _, back, entry = result.elements
     assert found(toc) == [("2 Next", "internal", "Next")]
     # the number is the link's words; a link to nothing makes none, nor does a theorem citing
     # itself; the second row of a group is the equation the second number names
@@ -355,7 +373,9 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
         ("2", "internal", "Next"),
         ("2", "internal", ""),
         ("1", "internal", "A. One, 1990."),
+        ("Next", "internal", "Next"),  # in the footnote written after the sentence
     ]
+    assert found(back) == [("First", "internal", "First")]  # a heading's link
     assert paragraph.links[1].target_id == row_b.id
     assert entry.kind is Kind.LIST_ITEM and not theorem.links
 
@@ -510,7 +530,7 @@ def _cells(*rows: str, marked: bool) -> str:
     return out + "</w:tbl>"
 
 
-def word(body: str, rels: str = "") -> bytes:
+def word(body: str, rels: str = "", styles: str = "") -> bytes:
     parts = office.docx_parts()
     document = (
         str(parts["word/document.xml"])
@@ -522,7 +542,7 @@ def word(body: str, rels: str = "") -> bytes:
         f'<w:style w:type="paragraph" w:styleId="{i}"><w:name w:val="{n}"/></w:style>'
         for i, n in (("Title", "Title"), ("ListParagraph", "List Paragraph"), ("Quote", "Quote"))
     )
-    styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + "</w:styles>")
+    styles = str(parts["word/styles.xml"]).replace("</w:styles>", named + styles + "</w:styles>")
     W = office.W_NS
     numbering = (
         f'{office.HEAD}<w:numbering xmlns:w="{W}">'
@@ -659,6 +679,49 @@ def test_a_member_name_that_leaves_the_package_is_refused_before_pandoc(member):
     assert refused.value.code == "office_unsafe"
 
 
+def with_footnote(data: bytes) -> bytes:
+    """`data` (from `word`) with footnote 2, "Cited: the source", whose link has its address in
+    the footnotes part's own relationships."""
+    import io
+    import zipfile
+
+    with zipfile.ZipFile(io.BytesIO(data)) as archive:
+        parts: dict[str, bytes | str] = {n: archive.read(n) for n in archive.namelist()}
+    W, R = office.W_NS, "http://schemas.openxmlformats.org/package/2006/relationships"
+    separators = (
+        '<w:footnote w:type="separator" w:id="-1"><w:p><w:r><w:separator/></w:r></w:p></w:footnote>'
+        '<w:footnote w:type="continuationSeparator" w:id="0"><w:p><w:r>'
+        "<w:continuationSeparator/></w:r></w:p></w:footnote>"
+    )
+    parts["word/footnotes.xml"] = (
+        f'{office.HEAD}<w:footnotes xmlns:w="{W}" xmlns:r="{office.OD}">{separators}'
+        '<w:footnote w:id="2"><w:p><w:r><w:footnoteRef/></w:r><w:r><w:t xml:space="preserve"> '
+        'Cited: </w:t></w:r><w:hyperlink r:id="rId30"><w:r><w:t>the source</w:t></w:r>'
+        "</w:hyperlink></w:p></w:footnote></w:footnotes>"
+    )
+    parts["word/_rels/footnotes.xml.rels"] = (
+        f'{office.HEAD}<Relationships xmlns="{R}"><Relationship Id="rId30" '
+        f'Type="{office.OD}/hyperlink" Target="https://example.org/y" TargetMode="External"/>'
+        "</Relationships>"
+    )
+    for name, old, new in (
+        (
+            "word/_rels/document.xml.rels",
+            "</Relationships>",
+            f'<Relationship Id="rId31" Type="{office.OD}/footnotes" Target="footnotes.xml"/>'
+            "</Relationships>",
+        ),
+        (
+            "[Content_Types].xml",
+            "</Types>",
+            '<Override PartName="/word/footnotes.xml" ContentType="application/vnd.openxmlformats-'
+            'officedocument.wordprocessingml.footnotes+xml"/></Types>',
+        ),
+    ):
+        parts[name] = bytes(parts[name]).decode().replace(old, new)
+    return office._zip(parts)
+
+
 @needs_pandoc
 def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_links_kept():
     from readablestem.config import get_settings
@@ -672,16 +735,20 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
         '<w:r><w:t>Motion</w:t></w:r><w:bookmarkEnd w:id="1"/></w:p>'
         "<w:p><w:r><w:t xml:space='preserve'>Write to a@b.org or see www.example.org, </w:t></w:r>"
         '<w:hyperlink r:id="rId30"><w:r><w:t>the page</w:t></w:r></w:hyperlink>'
-        "<w:r><w:t xml:space='preserve'> and www.example.org/typed. See Table 1.</w:t></w:r></w:p>"
+        "<w:r><w:t xml:space='preserve'> and www.example.org/typed. See Table 1.</w:t></w:r>"
+        '<w:r><w:footnoteReference w:id="2"/></w:r></w:p>'
         "<w:p><w:r><w:t>Theorem 1. A statement.</w:t></w:r></w:p>"
         "<w:p><w:r><w:t>Then Theorem 1 gives the table's answer.</w:t></w:r></w:p>"
         '<w:p><w:r><w:t xml:space="preserve">Back to </w:t></w:r><w:hyperlink w:anchor="_Ref1">'
         "<w:r><w:t>Motion</w:t></w:r></w:hyperlink><w:r><w:t>.</w:t></w:r></w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
+        '<w:r><w:t xml:space="preserve">Again </w:t></w:r><w:hyperlink w:anchor="_Ref1">'
+        "<w:r><w:t>Motion</w:t></w:r></w:hyperlink></w:p>"
     )
-    data = word(body, rels=link + 'TargetMode="External"/>')
+    data = with_footnote(word(body, rels=link + 'TargetMode="External"/>'))
     blob = envelope.wrap("docx", "notes.docx", None, data)
     result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
-    heading, first, theorem, last, back = result.elements
+    heading, first, theorem, last, back, again = result.elements
 
     def found(element: Element) -> list[tuple[str, str]]:
         return [(k.kind, (element.text or "")[k.start : k.end]) for k in element.links]
@@ -691,7 +758,105 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
         ("typed", "www.example.org"),
         ("uri", "the page"),  # the file's own link, unchanged
         ("typed", "www.example.org/typed"),
+        ("uri", "the source"),  # a link in the footnote written after the sentence
     ]
+    assert found(again) == [("internal", "Motion")] and again.links[0].target_id == heading.id
     assert found(last) == [("crossref", "Theorem 1")]
     assert last.links[0].target_id == theorem.id and not theorem.links
     assert found(back) == [("internal", "Motion")] and back.links[0].target_id == heading.id
+
+
+@needs_pandoc
+def test_a_word_equation_that_fails_the_checks_is_explained_in_words_true_of_a_file():
+    """The review item of a formula no check accepts says what happened to a source, not to a
+    page: no model, picture, PDF or page it never had."""
+    from readablestem.web.messages import explain_check, explain_reason
+
+    body = (
+        "<w:p><m:oMathPara><m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant>"
+        "</m:oMath></m:oMathPara></w:p>"
+    )
+    reading = read_word(word(body))
+    [equation] = [e for e in reading.elements if e.kind is Kind.EQUATION]
+    fix = reading.fixes[equation.id]
+    assert fix.review == "required" and fix.status in (Status.FAILED, Status.NEEDS_REVIEW)
+    said = [explain_check(c).text for c in fix.failed_checks]
+    if fix.reason:
+        said.append(explain_reason(fix.reason).text)
+    assert said
+    for sentence in said:
+        words = set(re.findall(r"[A-Za-z']+", sentence))
+        assert not {"model", "model's", "image", "PDF", "page"} & words
+
+
+@needs_pandoc
+def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
+    def run(words: str, props: str = "") -> str:
+        return f"<w:r><w:rPr>{props}</w:rPr><w:t xml:space='preserve'>{words}</w:t></w:r>"
+
+    mono = '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>'
+    bold, italic = "<w:b/>", "<w:i/>"
+    body = (
+        "<w:p>"
+        + run("Do ")
+        + run("not", bold)
+        + run(" open it, read ")
+        + run("twice ", italic)
+        + run("slowly", bold + italic)
+        + run(" and run ")
+        + run("make test", mono)
+        + run(" not ")
+        + run("make all", mono + "<w:strike/>")  # struck out: not live code
+        # nor is code in the code style, struck with two lines, or by the style a run has
+        + run(" or ")
+        + run("make old", '<w:rStyle w:val="VerbatimChar"/><w:dstrike/>')
+        + run(" or ")
+        + run("make it", '<w:rStyle w:val="Gone"/>' + mono)
+        + run(" in the ")
+        + run("red", '<w:color w:val="FF0000"/>')
+        + run(" part, a ")
+        + run("link", '<w:color w:val="0563C1"/>').join(
+            ["<w:hyperlink w:anchor='x'>", "</w:hyperlink>"]
+        )
+        # a script face named for its foundry is no fixed-pitch font
+        + run(" in a script face", '<w:rFonts w:ascii="Monotype Corsiva"/>')
+        + "</w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+        + run("A heading ")
+        + run("bold", bold)
+        + "</w:p>"
+        "<w:p>" + run("Set whole in bold, so the block's own style.", bold) + "</w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/>'
+        '<w:numId w:val="1"/>'
+        "</w:numPr></w:pPr>"
+        + run("Bring a ")
+        + run("calculator", bold)
+        + "</w:p>"
+        + _cells("Item|Note", "Quiz|closed book", marked=True).replace(
+            "<w:r><w:t>closed book</w:t></w:r>", run("closed", bold) + run(" book")
+        )
+    )
+    gone = (
+        '<w:style w:type="character" w:styleId="Gone"><w:name w:val="Gone"/>'
+        "<w:rPr><w:strike/></w:rPr></w:style>"
+    )
+    reading = read_word(word(body, styles=gone))
+    first, heading, whole = reading.elements[:3]
+    assert [((first.text or "")[r.start : r.end], r.kind) for r in first.runs] == [
+        ("not", "strong"),
+        ("twice slowly", "emphasis"),
+        ("slowly", "strong"),
+        ("make test", "code"),
+        ("make all", "deleted"),
+        ("make old", "deleted"),
+        ("make it", "deleted"),
+    ]
+    assert not heading.runs and not whole.runs  # a heading is not bold text; a whole block is not
+    [item] = [e for e in reading.elements if e.kind.value == "list_item"]
+    assert [(item.text or "")[r.start : r.end] for r in item.runs] == ["calculator"]
+    [table] = [e for e in reading.elements if e.table]
+    assert [c.text[r.start : r.end] for c in table.table.cells for r in c.runs] == ["closed"]
+    # pandoc keeps no colour: the passages are counted from the file, the link's own colour not
+    assert [(n.code, n.count) for n in reading.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]

@@ -43,6 +43,7 @@ _MATH_WORDS = frozenset(
         *("sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh"),
         *("arcsin", "arccos", "arctan", "log", "ln", "lg", "exp", "lim", "max", "min"),
         *("sup", "inf", "det", "dim", "ker", "arg", "deg", "gcd", "lcm", "mod", "var"),
+        *("argmin", "argmax"),
         *("cov", "const", "sgn", "tr", "mol", "rad", "proj", "rank", "diag", "grad", "curl"),
         *("erf", "coth", "sech", "csch", "arsinh", "arcosh", "artanh"),
     )
@@ -80,6 +81,9 @@ class _Row:
     # A capital letter alone on its line, in a sequence of such lines (A, B, C ... of a
     # glossary or an index): a heading of its own (`_letter_rows`).
     letter: bool = False
+    # "A. Problem Descriptions" in bold or italics over text in another face: a heading, not
+    # the item of a list (`blocks._mark_lettered_titles`).
+    lettered_title: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
@@ -90,6 +94,14 @@ class _Row:
     page_checked: bool = False
     page_inline: list[tuple[int, int, str]] = field(default_factory=list)
     page_nonmath: list[tuple[int, int]] = field(default_factory=list)
+    # A step of an algorithm (`blocks._algorithm_groups`): its indent level in the whole
+    # algorithm, the line number it was printed with ("3:", cut off the front of its text by
+    # `algo_start` characters), and whether it goes on the line of the row before it (a
+    # step that wraps, or a piece of one line the text layer cut in two).
+    algo_level: int = 0
+    algo_number: str = ""
+    algo_start: int = 0
+    algo_join: bool = False
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -401,30 +413,70 @@ def _word_lengths(
             i += 1
             continue
         j = i
-        while (
-            j < len(chars)
-            and classes[j] == "L"
-            and script[j] == script[i]
-            # TeX sets "ln" upright and the variable after it in italic: two words, not one
-            and (not document.tex_made or chars[j].italic == chars[i].italic)
-        ):
-            j += 1
-        italic_variables = upright and j - i <= 3 and all(c.italic for c in chars[i:j])
-        word = "".join(c.c for c in chars[i:j]).lower()
-        if italic_variables and italic_text and j - i > 1 and word in hyphens.words():
+        members: list[int] = []  # the word's letters: a limit set under it is not one
+        while True:
+            while (
+                j < len(chars)
+                and classes[j] == "L"
+                and script[j] == script[i]
+                # TeX sets "ln" upright and the variable after it in italic: two words, not one
+                and (not document.tex_made or chars[j].italic == chars[i].italic)
+            ):
+                members.append(j)
+                j += 1
+            after = _limit_end(chars, classes, script, j) if not script[i] else j
+            if after == j:
+                break
+            j = after
+        letters = [chars[k] for k in members]
+        italic_variables = upright and len(letters) <= 3 and all(c.italic for c in letters)
+        word = "".join(c.c for c in letters).lower()
+        if italic_variables and italic_text and len(letters) > 1 and word in hyphens.words():
             italic_variables = False
         named = (
             document.tex_made
             and not italic_variables
             and not script[i]
-            and not any(c.italic for c in chars[i:j])
+            and not any(c.italic for c in letters)
+            and len(members) == j - i
             and glyph_math.function_name(chars, i, j)
         )
-        for k in range(i, j):
-            lengths[k] = 1 if italic_variables else j - i
+        for k in members:
+            lengths[k] = 1 if italic_variables else len(members)
             maths_word[k] = named or word in _MATH_WORDS
         i = j
     return lengths, maths_word
+
+
+def _limit_end(chars: list[_Char], classes: list[str], script: list[bool], j: int) -> int:
+    """Where the word that `chars[:j]` ends in goes on, past a limit set under or over it.
+
+    The limit of "argmin" (the θ under it) is read in x order, so it comes between the letters
+    of the word: "argm", θ, "in". A group of script characters at `j` that starts well inside the
+    letter before it (a script after a base starts at the base's right edge) and is followed by
+    a letter of the word is that. The word goes on after the group (returned); otherwise `j`.
+    """
+    n = len(chars)
+    if j == 0 or j >= n or not script[j] or classes[j - 1] != "L" or script[j - 1]:
+        return j
+    m = j
+    while m < n and script[m]:
+        m += 1
+    if m >= n or classes[m] != "L" or script[m]:
+        return j
+    before = chars[j - 1]
+    low = min(c.x0 for c in chars[j:m])
+    if low >= before.x1 - 0.2 * before.size:
+        return j
+    # Only a maths word has a limit set ("argmin", "lim"); the letters of "as" with a stray
+    # character of the line below between them are still two letters of maths.
+    start, end = j, m
+    while start > 0 and classes[start - 1] == "L" and not script[start - 1]:
+        start -= 1
+    while end < n and classes[end] == "L" and not script[end]:
+        end += 1
+    word = "".join(chars[k].c for k in (*range(start, j), *range(m, end))).lower()
+    return m if word in _MATH_WORDS else j
 
 
 def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[bool]) -> int:
@@ -587,6 +639,14 @@ class _Straight:
         if self.horizontal:
             return (self.lo, self.c), (self.hi, self.c)
         return (self.c, self.lo), (self.c, self.hi)
+
+
+def _face(row: _Row) -> str:
+    """ "bold" or "italic" when every letter of the row is, else ""."""
+    if row.bold:
+        return "bold"
+    letters = [c for c in row.ink if c.c.isalnum()]
+    return "italic" if letters and all(c.italic for c in letters) else ""
 
 
 class _RowIndex:

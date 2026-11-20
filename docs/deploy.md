@@ -139,8 +139,9 @@ If a step fails, fix the cause and re-run the same command; nothing here is done
 
 - The gcloud CLI, signed in: `gcloud auth login`.
 - A Google Cloud billing account (`gcloud billing accounts list` shows its ID).
-- An Anthropic API key with access to `claude-opus-5-5` and `claude-haiku-5-5` ("Using
-  Claude" below), or, to use OpenAI instead, an account with `gpt-6.1-sol` and `gpt-6-luna`.
+- An Anthropic API key with access to the models `ANTHROPIC_MAIN_MODEL` and
+  `ANTHROPIC_CHEAP_MODEL` name ("Using Claude" below), or, to use OpenAI instead, an account
+  with the two models `MAIN_MODEL` and `CHEAP_MODEL` name (defaults in `config.py`).
 - `openssl` (the script uses it to generate random secrets) and this repository checked
   out at the commit you want to deploy.
 - Optional: a domain you control, for a URL nicer than `*.run.app`.
@@ -206,9 +207,9 @@ processor for the app, so the privacy page changes with the setting and
 3. In `deploy/.env.deploy` set `MODEL_PROVIDER=anthropic`, leave `ANTHROPIC_API_KEY` empty
    and type it when asked (the secret is `anthropic-api-key`; `OPENAI_API_KEY` is neither
    asked for nor given to the service). Optional: `ANTHROPIC_WORKSPACE_ID`,
-   `ANTHROPIC_MAIN_MODEL` (default `claude-opus-5-5`) and `ANTHROPIC_CHEAP_MODEL` (default
-   `claude-haiku-5-5`; `claude-sonnet-5-5` is the usual alternative). Models without a price
-   in `models/pricing.py` are refused at start-up.
+   `ANTHROPIC_MAIN_MODEL` and `ANTHROPIC_CHEAP_MODEL` (the defaults are in `config.py`, the
+   production values in `ops/production.profile.toml`). Models without a price in
+   `models/pricing.py` are refused at start-up.
 4. Locally, the same names go in `.env` (`.env.example`). `Settings.check_production` asks
    for `ANTHROPIC_API_KEY` instead of `OPENAI_API_KEY` when the provider is anthropic.
 
@@ -233,33 +234,30 @@ Things that differ from OpenAI, all on by default and safe to leave:
   `ANTHROPIC_REFUSAL_FALLBACK=false` turns it off). `claude-haiku-5-5` has no such fallback;
   a decline there is a `refused` outcome, which the app then retries on the other model as
   usual. The fallback model is billed at its own rates; the reservation uses the dearer.
-- Prices (`models/pricing.py`, checked 2026-11-11): claude-opus-5-5 $4 / $20 per million
-  tokens (cache read $0.20, write $5), claude-sonnet-5-5 $2 / $10 (read $0.10, write $2.50),
-  claude-haiku-5-5 $0.10 / $0.50 for prompts up to 100K tokens, $0.50 / $2.50 above
-  (read 0.1x, write 1.25x). claude-fable-5-2 ($8 / $40, read $0.20, write $10) has a row so
-  that a ladder with it can be costed; no step uses it.
+- Prices: `models/pricing.py` holds the price of every model the app can call (input, output,
+  cache read and write, and the date they were checked) and refuses a model with no row. They
+  are not copied here.
 - The instructions are cached (5 minutes), so from a job's second call on, the instruction
   tokens are billed at the cache-read rate.
-- A reservation (the worst case held before each call, then replaced by the real cost) is
-  larger than on OpenAI because it covers thinking and the image. It prices the crop that
-  is actually sent: Claude counts a PNG at about width x height / 750 tokens (scaled to at
+- A reservation (the amount held before each call, then replaced by the real cost) is
+  larger than on OpenAI because it covers thinking and the image. The worst case, below,
+  is what a step with no measured size holds; a step with one holds the smaller of the two
+  (see "Measured sizes"). It prices the crop that is actually sent: Claude counts a PNG at about width x height / 750 tokens (scaled to at
   most 2,576 px on the long edge, capped near 4,800 tokens; measured with the free
   token-counting endpoint on 2026-10-14), with a 1.35 allowance for newer tokenizers. For
-  a typical 600 x 200 equation crop one `claude-opus-5-5` call reserves $0.10 ($0.002 on
-  `claude-haiku-5-5`); the
-  worst case (a 2,048 px crop) is $0.14, $0.22 with long descriptions and $0.53 with
-  tables. It used to be a flat 6,500 image tokens plus an 8,192-token thinking allowance,
-  about $0.32 a call: more than the $0.30 a one-page job was allowed, so a one-page upload
-  could not make a single call and every element came back "not converted"
+  a typical 600 x 200 equation crop and for a 2,048 px crop the worst case per call and model
+  is what `models.pricing.reservation_usd` returns. It used to be a flat 6,500 image tokens
+  plus an 8,192-token thinking allowance, which came to more than the whole one-page job
+  budget, so a one-page upload could not make a single call and every element came back
+  "not converted"
   (`budget_job_usd`). `tests/test_models_pricing_images.py` keeps the reservation an upper
   bound of what a call can bill.
 - **Measured sizes (WS10.4).** For the steps that were measured, the reservation is the
   smaller of that worst case and a size fixed from the calls of the corpus replay (39
   uploads, 1,376 calls, measured 2026-11-18; `models/pricing.py`, `RESERVATIONS`): twice
-  the dearest call of the step and model, rounded up. Equations $0.0015 (`claude-haiku-5-5`)
-  and $0.046 (`claude-opus-5-5`); figures $0.0015 and $0.065; image pages $0.142 (opus);
-  tables $0.012 and $0.12. The worst case was $0.0020 to $0.0036 on haiku and $0.10 to $0.27
-  on opus. A step with no row (`page_math`, `page_witness`, OpenAI) keeps the worst case: no
+  the dearest call of the step and model, rounded up (the sizes are in `RESERVATIONS`, not
+  copied here). A call holds the smaller of its worst case and its size
+  (`reservation_usd`). A step with no row (`page_math`, `page_witness`, OpenAI) keeps the worst case: no
   call of those steps is in the recordings. The table has no setting: a size changes with a
   new measurement. In the replay no call settled above its reservation. A call that is
   charged at its reservation because no usage came back (a timeout after the send) is stored
@@ -295,12 +293,12 @@ Decisions second check off), measured with `readablestem convert` on 1 vCPU
 `readablestem eval cost` measures these from a replay of the test corpus, by page kind and
 by step, and `readablestem eval speed` the seconds and the memory (eval.md, "What a page
 costs and how long it takes"). The two figures the public pages are built from,
-`TYPICAL_PAGE_USD` ($0.0145) and `DENSE_PAGE_USD` ($0.034 to $0.092), are kept in
-`ops/limits.py` and are changed only from a replay of held-out documents.
+`TYPICAL_PAGE_USD` and `DENSE_PAGE_USD` are kept in `ops/limits.py` (with the values) and are
+changed only from a replay of held-out documents.
 
-The planning rate is **$0.015 a dense page** (`ops/limits.py`, `PLANNING_USD_PER_PAGE`);
-a 100-page document (the most one job takes, `MAX_PAGES_PER_JOB`) at that rate is $1.50. Worst-case reservations on `claude-opus-5-5`:
-$0.14 a call (equations, figures), $0.22 with long descriptions, $0.53 with tables; eight
+The planning rate is `PLANNING_USD_PER_PAGE` in `ops/limits.py`, a dense page's cost;
+a document of the most pages one job takes (`MAX_PAGES_PER_JOB`) at that rate costs that
+many times it. Worst-case reservations are `models.pricing.reservation_usd`; eight
 calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 
 | Setting | Claude | OpenAI | Why |
@@ -830,6 +828,17 @@ until traffic goes forward again. Once anything has been converted, fix forward.
 know the paragraph was taken out. A paragraph made a sidebar or a quotation loads in 0.5.12
 as a plain paragraph: the role is ignored, not refused. So a rollback from 0.5.13 to 0.5.12
 is safe until a reviewer has left a paragraph out; below 0.5.12 the limit above applies.
+
+0.5.14 adds no limit of its own. A result it stores can hold six notice codes that 0.5.13 does
+not have (`table_header_missing`, `table_header_carried`, `struck_not_kept`,
+`hidden_text_check`, `tables_not_searched`, `word_table_flattened`), bold, italic and code runs
+in a Word or LaTeX table's cells, and a page's count of unseen characters. 0.5.13 opens such a
+result: the job page, the review screen, the record and the student page all answered 200 for
+a stored result holding all six codes (run against 0.5.13 on 2026-11-19). Its job page lists
+each of the six as "Something in this file may need a look.", since it has no words for them;
+it writes the cells without their runs and makes the student page again with its own rules.
+So a rollback from 0.5.14 to 0.5.13 is safe; what a reviewer loses is the words of those check
+lines until traffic goes forward again.
 
 If data has to come back, restore a backup (this overwrites the instance's current
 data):

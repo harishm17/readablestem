@@ -16,6 +16,10 @@ written by the steps (the figure and table work only set their fix fields):
   (required): the image of handwriting on a typed page.
   Their decision is the figure's fix, one per reason for the whole document
   (`pipeline.page_type`, `run.PAGE_GROUP_PREFIX`);
+- `table_header_missing` (optional): a table that goes on from the page before and has no
+  header row, which could not be taken from the part before (`assemble_tables.carry_headers`),
+  and `table_header_carried` (optional): one that is written with the header row of the part
+  before, which the review card of the part does not show (the grid stored for it has none);
 - `colour_only` (optional): a figure with `FigureFix.colour_only`;
 - `long_description_missing` (optional): a chart or diagram without a long
   description, when long descriptions are on.
@@ -64,6 +68,8 @@ HANDWRITING_ON_PAGE = "handwriting_on_page"
 COLOUR_ONLY = "colour_only"
 LONG_DESCRIPTION_MISSING = "long_description_missing"
 STRUCK_TEXT = "struck_text"
+TABLE_HEADER_MISSING = "table_header_missing"
+TABLE_HEADER_CARRIED = "table_header_carried"
 # Text decisions layout raises on a paragraph or list item (`Element.reasons`), WS2.4a and
 # SW54a: options run together in one block, and right-to-left words whose order the PDF's
 # text layer does not give reliably. Both are "required": not handled in this file.
@@ -87,7 +93,15 @@ KEPT_IMAGE_CODES = frozenset(
 # Codes this module derives from the fixes; any stored notice with one of them is
 # replaced by `current`.
 DERIVED_CODES = frozenset(
-    {TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING, STRUCK_TEXT, *TEXT_CODES}
+    {
+        TABLE_NOT_REBUILT,
+        COLOUR_ONLY,
+        LONG_DESCRIPTION_MISSING,
+        STRUCK_TEXT,
+        TABLE_HEADER_MISSING,
+        TABLE_HEADER_CARRIED,
+        *TEXT_CODES,
+    }
 ) | (KEPT_IMAGE_CODES)
 # Figures that need more than short alt text (W3C "complex images").
 # Where a notice is listed on the job page: `core.page_checks.Section`, from the table.
@@ -159,6 +173,10 @@ def from_fixes(
     """The notices that follow from these fixes, one per (code, element), in reading
     order. `long_descriptions`: whether the run wrote long descriptions (the flag);
     without it, a chart without one is the expected output, not something to check."""
+    from readablestem.pipeline import assemble_tables  # (it imports the layout, which imports this)
+
+    elements = sorted(elements, key=lambda e: e.order)
+    fixes = list(fixes)
     page_of = {e.id: e.page for e in elements}
     found: list[Notice] = []
     seen: set[tuple[str, str]] = set()
@@ -180,6 +198,15 @@ def from_fixes(
             add(LONG_DESCRIPTION_MISSING, fix)
         if fix.pending and fix.kind in TEXT_DECISION_KINDS and fix.reason in TEXT_NOTICE_OF:
             add(TEXT_NOTICE_OF[fix.reason], fix)
+    first: dict[str, Fix] = {}
+    for fix in fixes:
+        first.setdefault(fix.element_id, fix)
+    carried, refused = assemble_tables.carry_headers(elements, first)
+    for part in refused:
+        found.append(make(TABLE_HEADER_MISSING, page=part.page, element_id=part.id))
+    for part in elements:
+        if part.id in carried:
+            found.append(make(TABLE_HEADER_CARRIED, page=part.page, element_id=part.id))
     return found
 
 

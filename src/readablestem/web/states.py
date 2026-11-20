@@ -45,6 +45,7 @@ from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import job_page
 from readablestem.web import outcome as words
 from readablestem.web.database import as_utc
+from readablestem.web.dates import format_day, format_time
 from readablestem.web.db import Job, JobStatus, utcnow
 
 if TYPE_CHECKING:
@@ -182,6 +183,7 @@ FILE_FAILURES = frozenset(
         "source_refused",
         "source_timeout",
         "source_missing_file",
+        "source_loop",
         "source_syntax_error",
         "source_undefined",
         "source_unsupported_class",
@@ -411,7 +413,7 @@ def state_of(
             return _make("restarting", _restart_message())
         if ctx.budget_closed:
             reset = _next_reset(ctx.now)
-            return _make("waiting_reset", words.WAITING_BUDGET, time=f"{reset:%H:%M} UTC")
+            return _make("waiting_reset", words.WAITING_BUDGET, time=format_time(reset))
         return _make("waiting", ctx.waiting_line or "Waiting for its turn.")
     if job.status == JobStatus.RUNNING:
         if job.cancel_requested:
@@ -508,7 +510,7 @@ def _deleted(job: Facts) -> State:
         "This document was deleted.",
         (upload,),
         group=NEEDS,
-        date=f"{when:%b} {when.day}, {when.year}",
+        date=format_day(when, "short"),
     )
 
 
@@ -670,6 +672,9 @@ _HOLDS = {
     "word_tracked_changes": (
         "The Word file still has tracked changes, so check the notices before you share it."
     ),
+    "word_table_flattened": (
+        "A table of the Word file is written as a list, so check the notices before you share it."
+    ),
     "word_objects": (
         "Diagrams or charts in the Word file are not in this file, so check the notices "
         "before you share it."
@@ -694,6 +699,18 @@ _HOLDS = {
     ),
     "option_labels": (
         "Answer options may be run together, so check the notices before you share it."
+    ),
+    # `layout._not_searched_notices`: the table search ran out of time before this page, so a
+    # table there may be plain text
+    "tables_not_searched": (
+        "The search for tables was cut short on some pages, so a table there may be read as "
+        "plain text: check the notices before you share it."
+    ),
+    # `layout.notices._hidden_text_notices`: a paragraph or more of words nobody sees on a typed
+    # page is left out, and may be what the page says
+    "hidden_text_check": (
+        "A page has a lot of hidden text that was left out, so compare it with the original "
+        "before you share it."
     ),
     # `text_pass.comment_notes`: a comment may have been written for the instructor alone (an
     # answer, a co-author's remark), and every one is a paragraph of the student file

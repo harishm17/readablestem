@@ -17,8 +17,20 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.13",
- "commit": "3b177567bc222a402f17531b3c4d469d46c23606",
+ "pipeline_version": "0.5.14",
+ "commit": "709a023fe83bf6f53d386f4060a589fa8b977154",
+ "provenance": {
+  "commit": "709a023fe83bf6f53d386f4060a589fa8b977154",
+  "clean": true,
+  "pipeline_version": "0.5.14",
+  "render_version": 10,
+  "tools": {
+   "pandoc": "pandoc 3.7.0.2",
+   "latexml": "latexml (LaTeXML version 0.8.8)",
+   "pymupdf": "1.28.2",
+   "fonts": "fonts-liberation=1:2.1.5-3build1 fonts-noto-core=20201225-2build1"
+  }
+ },
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
   "cores": 16
@@ -55,13 +67,13 @@
   },
   "pages_that_asked_a_model": 599,
   "requests_refused_by_step": {
-   "equation": 2862,
-   "figure": 1172,
+   "equation": 2854,
+   "figure": 1174,
    "image_page": 264,
    "table": 530
   },
   "stopped_early": 0,
-  "seconds_median": 2.79
+  "seconds_median": 3.75
  },
  "metrics": {
   "multi_column": {
@@ -83,15 +95,15 @@
   "headers_footers": {
    "checks": 753,
    "run": 632,
-   "passed": 218,
-   "score": 34.5,
-   "score_if_dropped_failed": 29.0,
+   "passed": 244,
+   "score": 38.6,
+   "score_if_dropped_failed": 32.4,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 86,
     "scan with no text layer": 35
    },
    "run_no_request": 218,
-   "score_no_request": 25.7,
+   "score_no_request": 31.2,
    "pdfs": 266,
    "pdfs_run": 227,
    "column": "Hdr/Ftr"

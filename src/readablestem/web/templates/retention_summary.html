@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ReadableSTEM: what is kept, for how long, and who receives it</title>
+{# A self-contained file for a disability or privacy office to keep or print: the stylesheet of
+   the offices summary is put inline by web/offices.py, no script, no outside request. Every
+   statement is written from what the privacy notice and the security page are written from,
+   not typed again: the data list (`data_items`), the retention table (`_retention_table.html`,
+   the settings' hours and days), the companies (`recipients`) and the deletion rules
+   (`_deletion_rules.html`), so it cannot say something they do not. #}
+{{ style_tag }}
+</head>
+<body>
+{% from "_data_matrix.html" import matrix %}
+{% from "_recipients.html" import retention_short %}
+<main>
+<h1>ReadableSTEM: what is kept, for how long, and who receives it</h1>
+<p class="meta">Facts as they were on {{ as_of }}. This describes the beta; it is not a
+  contract. <a href="{{ site_url }}/privacy">Open the live privacy notice</a>, which may be
+  newer.</p>
+
+<h2>What is kept, and for how long</h2>
+{{ matrix(data_items, "Each kind of data, who receives it and how long they keep it") }}
+
+<h2>How long a document is kept</h2>
+{% set retention_voice = "instructor" %}
+{% include "_retention_table.html" %}
+
+<h2>Who receives it</h2>
+<ul>
+  {% for r in recipients %}
+  <li><strong>{{ r.name }}</strong>:
+    {%- set got = received_by(r.name) %}
+    {% if got %}{{ got|join("; ") }}{% else %}nothing from a document{% endif %}.</li>
+  {% endfor %}
+</ul>
+<p>Uploads are not used to train models by ReadableSTEM. What the model companies say about
+  their own retention is their statement; ReadableSTEM cannot check it.</p>
+
+<h2>How it is deleted</h2>
+{% include "_deletion_rules.html" %}
+{% if contact_email %}<p class="meta">Questions: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>{% endif %}
+</main>
+</body>
+</html>

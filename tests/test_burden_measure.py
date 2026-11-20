@@ -115,3 +115,75 @@ def test_a_record_kept_up_to_date_fails_a_change_in_either_direction(tmp_path, c
 
     # The same documents on a machine that has the answers of the lecture only.
     assert burden("--from", records(tmp_path, "c", more[:1]), "--against", record, "--same") == 0
+
+    # The answers the recording lacks are part of the record too (the workflow suite reads
+    # which files owe answers from it): a record made while 3 were missing is stale once the
+    # recording holds them.
+    owing = tmp_path / "owing.json"
+    assert burden("--from", records(tmp_path, "d", measured(missed=3)), "--out", owing) == 0
+    assert (
+        burden("--from", records(tmp_path, "e", measured(missed=3)), "--against", owing, "--same")
+        == 0
+    )
+    assert burden("--from", records(tmp_path, "f", measured()), "--against", owing, "--same") == 1
+    assert "3 in the record" in capsys.readouterr().out
+
+
+def test_a_decision_of_a_high_band_that_became_optional_fails_the_bar(tmp_path, capsys):
+    """A rule that moves a risky decision to a note lowers the count and passes it; the bar
+    names the element. A record made before bands were kept is compared by the counts and says
+    the band check was not made."""
+
+    def lecture(*, asks: list[tuple[str, int]], optional: list[str]) -> list[Converted]:
+        decisions = [asked(0, "equation") | {"element": e, "band": b} for e, b in asks]
+        return [
+            Converted(
+                "w_lecture_5111",
+                pages=PAGES,
+                kinds=["typical"] * PAGES,
+                decisions=decisions,
+                optional=optional,
+            )
+        ]
+
+    before = tmp_path / "before.json"
+    two = lecture(asks=[("p1-e2", 2), ("p3-e1", 4)], optional=[])
+    assert burden("--from", records(tmp_path, "a", two), "--out", before) == 0
+    # Band 4 becomes optional: the count falls, and that is allowed.
+    low = lecture(asks=[("p1-e2", 2)], optional=["p3-e1"])
+    assert burden("--from", records(tmp_path, "b", low), "--against", before) == 0
+    capsys.readouterr()
+    # Band 2 becomes optional: named.
+    high = lecture(asks=[("p3-e1", 4)], optional=["p1-e2"])
+    assert burden("--from", records(tmp_path, "c", high), "--against", before) == 1
+    assert "w_lecture_5111 p1-e2: a decision of band 2 before, optional now" in (
+        capsys.readouterr().out
+    )
+    # An earlier record without bands: the counts only, and the output says so.
+    plain = tmp_path / "plain.json"
+    assert burden("--from", records(tmp_path, "d", measured()), "--out", plain) == 0
+    assert burden("--from", records(tmp_path, "e", measured()), "--against", plain) == 0
+    assert "band check was not made" in capsys.readouterr().out
+
+
+def test_a_formula_accepted_with_nothing_to_hold_it_against_is_counted_by_cause(tmp_path):
+    run = measured()
+    run[0] = replace(
+        run[0],
+        not_compared={
+            "equations": 7,
+            "tables_with_math": 2,
+            "causes": {"equation.not_compared:no_characters": 2, "table.math_not_compared:x": 1},
+        },
+    )
+    run[1] = replace(
+        run[1], not_compared={"equations": 1, "causes": {"equation.not_compared:no_characters": 1}}
+    )
+    out = tmp_path / "out.json"
+    assert burden("--from", records(tmp_path, "a", run), "--out", out) == 0
+    held = json.loads(out.read_text())["metrics"]["not_compared"]
+    assert (held["equations"], held["tables_with_math"]) == (8, 2)
+    assert held["causes"] == {
+        "equation.not_compared:no_characters": 3,
+        "table.math_not_compared:x": 1,
+    }

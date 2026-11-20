@@ -182,6 +182,8 @@ A fourth form of the same document, made from the finished HTML alone (no pipeli
 changes): a `.docx` with native equations. `readablestem export docx FILE.html OUT.docx
 [--title T]` writes it, and the job page's "Download as Word (.docx)" (`GET
 /jobs/{id}/download.docx`) serves it. Nothing is read but the file: no model, no network.
+How many equations the file has as words is kept with it (`export_store.NOTE_KIND`) and said on
+the job page beside the download, from the second visit after the file was first made.
 
 [pandoc](https://pandoc.org) does the conversion (`-f html -t docx`): it reads the MathML and
 writes Office Math (OMML), so an equation is an editable Word equation that Word's own
@@ -189,7 +191,7 @@ navigation and a screen reader with Word can read, not a picture. It is GPL-2.0-
 is run as a separate program, never linked (THIRD_PARTY_NOTICES.md). The Docker image installs
 it from the distribution (about 200 MB on disk; the Ubuntu 3.7 package's installed size is
 201,810 kB, so read the real figure from the first Railway build). The tests pass with pandoc
-3.1.3 (Ubuntu 24.04, as CI installs), 3.1.11 (Debian trixie, the image) and 3.7. Without pandoc on `PATH` there is no Word download: the route is a 503 and the
+3.1.3 (Ubuntu 24.04's own package), 3.1.11.1 (Debian trixie, the image, and the version CI installs from pandoc's release, `.github/actions/pandoc`) and 3.7. Without pandoc on `PATH` there is no Word download: the route is a 503 and the
 job page shows no button. The pure-Python alternative was not taken: the Office MathML-to-OMML
 stylesheet (`MML2OMML.XSL`) ships with Office and is not redistributable, and a converter of
 our own would be a second MathML reader to keep right.
@@ -207,7 +209,7 @@ our own would be a second MathML reader to keep right.
   pandoc keeps an id on a heading, `div`, `span`, `section`, `table`, `pre`, list item and
   picture and drops it on a paragraph, a list, a row or a cell, so there the id moves to an
   empty `<span>` at the element's start (F-514). A figure's id is a bookmark only from pandoc
-  3.2 on (production runs 3.1.11.1, CI 3.1.3), so the filter wraps the figure in a div that
+  3.2 on (production and CI run 3.1.11.1), so the filter wraps the figure in a div that
   has the id, the same in every version (F-581). A footnote's mark (`doc-noteref`)
   is renamed so pandoc's reader does not turn it into an empty note.
 - **In pandoc**, one Lua filter (`pipeline/data/export_docx.lua`, `--lua-filter`): page markers
@@ -232,6 +234,10 @@ our own would be a second MathML reader to keep right.
 - **After pandoc**, in `word/document.xml`, whatever the pandoc version:
   - every picture's alt text is also written on the picture itself (pandoc writes the
     picture's address there, which a screen reader would read out);
+  - a picture the page writes with an empty alt (decoration, WS6.4) is marked as decorative
+    the way Word does it, `adec:decorative val="1"` in the extension list of its `wp:docPr`
+    (`_mark_decorative`), so Word's accessibility checker does not ask for alt text for it
+    and a screen reader leaves it out;
   - a table whose first row is a header gets `w:tblHeader`, so it repeats on each page and is
     read as a header;
   - pandoc's title paragraph is dropped when the first heading says the same thing (the
@@ -266,7 +272,7 @@ our own would be a second MathML reader to keep right.
   HTML's order, alt text on every picture and never an address, the language, the title);
   a page with every feature; a remote address never opened; a fake `pandoc` for the timeout,
   failure, missing-equation and secret-free environment cases; and LibreOffice opening the
-  file when it is installed. They skip, saying why, without pandoc (CI installs it).
+  file when it is installed. They skip, saying why, without pandoc (CI installs 3.1.11.1, `.github/actions/pandoc`).
 
 ### The EPUB export (`pipeline/export_epub.py`)
 
@@ -483,7 +489,9 @@ document in another language marks it `lang="en"`).
 - **Block roles (WS16.3).** `Element.role` (`"aside"` or `"quote"`, left out of the JSON when
   empty, so a stored result reads unchanged) says what a paragraph is to the document. A
   paragraph with a role is written inside `<aside aria-label="Sidebar">` (a pull quote, a
-  sidebar, a margin note; it is not in the outline and screen readers list it as a
+  sidebar, a margin note; a page with more than one is named "Sidebar 1 of 3", "Sidebar 2 of 3",
+  and so on, so a screen reader's list of regions tells them apart; a sidebar holds only
+  paragraphs, so it has no heading of its own to be named by; it is not in the outline and screen readers list it as a
   complementary landmark) or `<blockquote>` (a block quote); neighbors of one role share one
   wrapper. A list item or a defined term never takes a wrapper. A footnote is not a role (it is
   the notice `footnote`, above) and code is `Element.preformatted`. The Word reader
@@ -504,7 +512,9 @@ document in another language marks it `lang="en"`).
   (pandoc drops `<aside>`, so the export wraps it in a styled `div`; Word has no landmark for
   it, so the role is the style's name); the EPUB keeps `<aside aria-label>` and `<blockquote>`;
   Canvas and the cartridge keep both elements and the `aria-label` but not the bar (Canvas has
-  no stylesheet; the margin and padding stay inline); Listen says "Side notes, Sidebar" before
+  no stylesheet; the margin and padding stay inline); Word has styles and no region names, so
+  every sidebar keeps the one style "Sidebar"; Listen says "Side notes, Sidebar" (or "Side notes,
+  Sidebar 2 of 3") before
   an aside and "Quote" and "End quote" around a quotation.
 
 The tab order is the skip link, then the contents list's links, then the file.
@@ -548,7 +558,16 @@ and each part's equations, figures and tables as in the part.
   says so.
 - **Like "Download all".** Each part that is in the file restarts its deletion clock
   (`retention.restart_clock`) and counts as downloaded (`events.record_download`); the file is
-  not stored.
+  kept, below.
+- **Kept.** The file is built once for these parts and kept on the first part like the other
+  exports (`web.combine.combined_file`, `web.export_store`, file type `combine-html`,
+  `combine-docx` or `combine-epub`). Its key holds the first part's version, `RENDER_VERSION`
+  and a digest of the title, the contact line, the alt-text setting and each part's id, version,
+  pages and stored result: a new decision, a release, a part added, deleted or made again each
+  build it once more. It goes with any part of the group (`ops.retention.delete_jobs`), so no
+  copy of a deleted part is left. Measured before it was kept (3 parts of 30 pages, 5 requests,
+  one process, box load about 20): 0.75 to 1.0 s for light pages (180 elements a page), 1.1 to
+  1.3 s for medium (360) and 2.0 to 2.5 s for dense (580); as EPUB 1.4 to 4.6 s.
 - **Gaps.** Source pages between the first and last part that no joined part holds are named
   in the student note ("Pages 5, 6, 7 and 8 of the original PDF were left out of this file.",
   the sentence for a page the instructor left out), so the file never reads as complete when
@@ -577,7 +596,7 @@ and each part's equations, figures and tables as in the part.
   yet confirmed) votes for nothing and is marked with nothing, since its tag is a guess: it
   is read in the file's language until its owner confirms it on the part's page
   (`text_pass.set_document_language`), and the next file made follows. The combined file is
-  made on request and stored nowhere, so it has no language control of its own. The combine
+  made from the parts and has no language control of its own. The combine
   page asks once for the whole (`web.combine.language_check`, `#combine-language`), however
   many parts are unconfirmed, and also when the parts disagree and no language is held by
   more than half of them. Tables, figures and equations carry no `lang` of their own, in a
@@ -671,7 +690,8 @@ alone. The evidence is one of:
 
 The rule is the same for a figure the model calls decorative and for one whose reading
 failed (`decoration.settle`, after every step in the PDF and LaTeX converters, and again
-before a stored result's page is made again, `review.rerender_html`). With evidence, the
+before a stored result's page is made again, `review.rerender_html`, and before each part of a
+combined file is joined, `web.combine.combined_html`). With evidence, the
 figure is decoration and the evidence is stored on its record (`FigureFix.decoration`, left
 out of the JSON when absent); a figure whose reading failed becomes decoration with an
 optional note (`figure.decoration`, `decoration_by_rule`). Without evidence, a figure the
@@ -679,8 +699,8 @@ model calls decorative is a required decision (`figure.decoration`, `decoration_
 and is written like any figure with no description: flagged, with alt "Figure not
 described", until a person decides. Decoration is written inside `class="decorative"`
 (`assemble.DECORATIVE_CLASS`), and the output check `html.img_alt_content` fails on any
-other empty alt text. The EPUB, Canvas and Word files keep the page's alt text (Word writes
-no description for decoration), and Listen skips decoration and says "Image, not converted:
+other empty alt text. The EPUB, Canvas and Word files keep the page's alt text (Word marks
+decoration as decorative, below), and Listen skips decoration and says "Image, not converted:
 Figure not described" for the rest.
 
 ## Figure images in the student file (UX review MF23)
@@ -798,6 +818,13 @@ the print build waits for WS21.1):
   equation is wider than the paper. It is complete on the web page." The note is generated
   content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
   The rules of each width step are added to the stylesheet only when an equation has it.
+  Measured (O-094): of the 123 display equations in 73 stored pages, 54 carry the classes and the
+  widest is 1.29 times the sheet's text width on screen, which the 70% floor covers (it reaches
+  1.43 times), so none is cut on paper; the estimate runs wide, and the note shows for 2 that fit.
+  A landscape page for an equation beyond the floor (`@page` with a name, `page:` on the
+  equation) prints in Chromium for an equation up to about 2.2 times the column, but container
+  queries and `cqw` are evaluated against the portrait width there, so the scale and the note are
+  wrong, and an equation left to overflow shrinks the whole sheet (to 9 pt). It was not built.
 - A picture is never wider than the sheet (`max-width: 100%`) on paper, and on screen while the
   window is wider than 40 em.
 
@@ -810,10 +837,17 @@ the print build waits for WS21.1):
   instead of shrinking with the column. Wider than that, it fits the column as before.
 - An inline kept equation (`.flagged-inline`) is an inline block with its own line height: the
   line grows to hold the crop instead of the crop overlapping the lines next to it.
-- Left out (triage: reduce): the "Larger" switch, the box's name and focus on every scroll box
-  (browsers that make a scroller focusable by default do; Safari does not), moving an inline
-  crop wider than half the column to its own line, and the dark-mode inversion of crops. The
-  EPUB sheet already frames pictures and does not invert them.
+- The box that can scroll is a named tab stop, as a wide equation's is (`tabindex="0"`,
+  `role="group"`, `aria-label="Original picture"`, `assemble._picture_scroller_attrs`), so a
+  keyboard user can scroll it (axe `scrollable-region-focusable`). Only a box whose own child
+  is the picture, and a picture at least `WIDE_PICTURE_PX` (240 CSS px) wide or of no known
+  size, gets one: a figure's picture shrinks with the column, and a narrower one fits the
+  narrowest column. At 320 px axe reports the rule once on a 672 px kept equation without
+  the attributes and nothing with them. The EPUB, Word, Canvas and cartridge files carry or
+  drop the attributes like those of a wide equation; EPUBCheck finds nothing.
+- Left out (triage: reduce): the "Larger" switch, moving an inline crop wider than half the
+  column to its own line, and the dark-mode inversion of crops. The EPUB sheet already frames
+  pictures and does not invert them.
 - A figure's long description prints open (`details.figure-description`); where the browser
   has no `::details-content`, its summary says "open this description before printing".
 
@@ -862,7 +896,7 @@ and label are unchanged. The evaluations that read the PDF's text back out of th
 (`assemble.equation_alt_text`) strip both forms. In a document in another language the alt
 text is marked `lang="en"`, as the other fixed words are. The page's `generator` tag names the
 pipeline that converted the result the page is made from beside the version of the code
-(`ReadableSTEM 0.1.0, pipeline 0.5.13`), so a stored file made again still says which pipeline
+(`ReadableSTEM <package version>, pipeline <PIPELINE_VERSION>`), so a stored file made again still says which pipeline
 converted it; a page made from several results names only the code.
 
 - The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The
@@ -1125,6 +1159,14 @@ when it would start inside an inline equation's marker or overlap another. What 
 carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
 written flat, and the notice `scripts_flattened` ("Worth checking") says where.
 
+The page, Word and the EPUB keep the raised or lowered run as `<sup>`, `<sub>` or Word's own
+superscript and subscript, which a screen reader reads as plain characters ("g/cm3"). Listen
+says which it is, so a listener can tell "cm3" from "cm cubed": "19.3 g/cm superscript 3",
+"x subscript 1 end subscript y". "End superscript" and "end subscript" are said only when text
+goes on right behind the run (not before a space, a punctuation mark or the end); the ending
+of an ordinal ("10th", "2nd") adds no words, and neither does a footnote's mark, which is said
+as its link ("link 1").
+
 ## Chemistry
 
 Formulas, ions, state symbols, reactions and concentrations are inline or display equations
@@ -1259,6 +1301,10 @@ A text edit that changes struck words takes the run off, and the edit's message 
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
 last run.
 
+A strike on a table or a display equation cannot be kept (a cell and an equation read by a
+model have no runs): that table or equation gets the optional notice `struck_not_kept`, and
+the words read as plain text.
+
 ### Bold, italic and fixed-pitch words (F-510)
 
 Words a PDF sets in bold, in italic or in a fixed-pitch face inside a paragraph or list item
@@ -1283,8 +1329,46 @@ fixed-pitch stack). Word keeps bold, italic and a "Verbatim Char" style for code
 and Listen are written from the same HTML. A text edit moves the runs with the words that did
 not change and takes off those whose words did, without a message (it is only the look of
 the words). Runs come from the text pass (docs/layout.md "Bold, italic and fixed-pitch
-words"); a Word or LaTeX source has none yet. `CONTENT_RUNS` off finds and counts them
-(`strong_runs`, `emphasis_runs`, `code_runs` in the trace) and writes none.
+words"); a Word or LaTeX source says them outright and gets the same runs (below).
+`CONTENT_RUNS` off finds and counts them (`strong_runs`, `emphasis_runs`, `code_runs` in the
+trace) and writes none, in a source's table cells as in its text. A font is fixed-pitch by its
+name ("mono", Courier, Consolas, Menlo and the like); a name that holds "Monotype", the foundry
+(Monotype Corsiva is a script face), is not.
+
+#### From a Word or LaTeX source
+
+The Word reader takes `Strong` and `Emph` from pandoc's reading of the file (a run's `w:b`
+and `w:i`, or a style that sets them), the highlight a Word run carries as `highlight`, and
+`code` from the character style "Verbatim Char" and from a run whose own font is fixed-pitch
+(Courier, Consolas, Menlo and the like: the package step gives such a run the style, because
+pandoc drops a direct font; a run struck through is left as it is, and loses a code style it
+has, since code carries no strike and the words would read as live). Pandoc reads a strike only
+as `w:strike` on the run, so the package step writes a double strike (`w:dstrike`) and a strike
+that a character style sets that way too (`_keep_strikes`); a strike set by a paragraph style is
+not read. The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
+`\emph`, `\textit`, `\texttt`, `\verb`). Both use the PDF path's rules: a style on 70% or more
+of a block's characters is the block's own and makes no run (a bold heading, a whole italic
+theorem body, a header cell set in bold), a run never holds an inline equation or a blank
+edge, and it needs a letter or a digit. An `\emph` inside a theorem's italic body is a run
+(the words stand out against the italic). Headings, program code and glossary entries get
+none. Nothing is guessed from looks: a heading style is not bold text. A table cell of a Word
+or LaTeX table that holds no math keeps its runs (`TableCell.runs`, offsets into the cell's
+text) and the table is written with the same tags: `<td><strong>closed</strong> book</td>`. A
+cell edit in the review screen drops them, like a text edit that changes words.
+
+Links of a Word or LaTeX source (a web or mail address, `\\ref`, `\\cite`, a Word bookmark on
+a heading) are kept in a paragraph, a list item, a heading and a footnote, which is written
+after its sentence as "(note: ...)". They are not kept in a table cell or a caption: a cell
+(`TableCell`) and a caption (`Element.caption`) hold plain text, so a link there is its words.
+A picture in the middle of a sentence is a figure straight after the block that holds it (the
+output has no place for a picture inside a sentence); the words it stood between stay two
+words.
+
+Color of a Word or LaTeX source follows the PDF path: a passage in a real color is counted,
+and with `FEATURE_COLOUR` off the job gets one `colour_used` notice with the count. The Word
+reader counts it from the file's own runs (a run's `w:color`; not a hyperlink's, not "auto")
+and never carries it, so `colour_used` is raised whatever the flag says; the LaTeX reader keeps
+color runs only with the flag on and strips and counts them otherwise.
 
 ### Highlighted text (SW51c)
 
@@ -1577,8 +1661,16 @@ beside them.
   apart from it and from each other by weight and style (h5 bold, h6 bold italic). Captions,
   the notes beside a kept picture, footnotes and page markers are one step smaller, 0.9 em
   (16.2 px), with more room above a caption. No text on the page is under 14 px; the
-  stacked scripts of a nuclide or an ion are 0.8 em (14.4 px). The exceptions are
-  the scripts inside math, which the browser sizes. The scale is the same
+  stacked scripts of a nuclide or an ion are 0.8 em (14.4 px), and a script inside a script
+  (`sup` in `sup`, `sub` in `sub`, and the mixed pairs) takes the size of the script it is in,
+  not another step down (`sub sub, sub sup, sup sub, sup sup { font-size: inherit }` in the
+  sheet and in `app.css`; the browser's `smaller` gave 12.5 px). The exception is the scripts
+  inside math, which the browser sizes by script level and no floor is set for: measured in
+  Chromium 156 with the student sheet at the default text size (18 px), the math is 19.8 px
+  (1.1 em), a first-level script 13.9 px and a second-level script 9.9 px (the same at 1280 and
+  390 px wide). A floor would make a second-level script as large as a first-level one, and the
+  size is how math says "this is a script of a script"; the reader's zoom and the text-size
+  setting scale all three together. The scale is the same
   in the EPUB (sizes are relative there, so it follows the reader's own text size) and in
   the standalone Canvas page; the Canvas page for pasting leaves heading sizes to Canvas's
   own theme (rules on bare `h1` to `h6` are not carried into it). The Word file is made by
@@ -1769,9 +1861,15 @@ file is written and 2 when the input cannot be read or turned into that file typ
 output cannot be written (a message on stderr, no traceback).
 
 ```
-readablestem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
-                  [--report OUT.json] [--axe]
+readablestem convert FILE.pdf [--out OUT.html] (--max-usd X | --fake) [--pages 1,3]
+                  [--concurrency 4] [--report OUT.json] [--axe]
 ```
+
+Without `--out` the file is written beside the input with its name and `.html` (`notes.pdf`
+gives `notes.html`). A file with decisions still open is a draft, as in the web app: it opens
+with the draft line, its notes are in the words for the person who checks it, and without
+`--out` its name ends in `-draft` (`notes-draft.html`). With `--out` the name is kept and one
+line under "Draft:" says the file is a draft because decisions are still open.
 
 `--max-usd` caps this run with an in-memory spend guard; `MAX_USD_PER_JOB` and
 `MAX_MODEL_CALLS_PER_JOB` cap it too. Before converting, a real run checks that

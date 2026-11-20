@@ -20,6 +20,7 @@ copy is final. Each item names the file to change; none of it is document conten
 
 from __future__ import annotations
 
+import re
 from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -191,6 +192,9 @@ def privacy_claim_problems(settings: Settings) -> list[str]:
     `sent_material_problems`; who receives it is `unnamed_recipients`. Empty when every
     statement is there."""
     from readablestem.web import events, offices, reports, retention
+    from readablestem.web.app import SESSION_MAX_AGE_S, STATIC_DIR
+    from readablestem.web.office_convert import input_kinds
+    from readablestem.web.recipients import listen_kept_documents
 
     notice = rendered_notice(settings)
     if notice is None:
@@ -223,12 +227,106 @@ def privacy_claim_problems(settings: Settings) -> list[str]:
             "the names of the files, packages and commands LaTeX reported a problem with",
             "FEATURE_LATEX_SOURCE (Job.error_detail)",
         ),
+        # What is kept of a source file, and what is only made and removed. The tool compiles no
+        # PDF of a LaTeX source in a job (`source.tex_compile` is called by none), so the notice
+        # names no stored PDF for it: the file or zip as uploaded (`web.intake`, the "upload"
+        # blob) and a temporary folder for the build (`source.convert`).
+        (
+            settings.feature_latex_source,
+            "the LaTeX .tex file or the zip of the LaTeX project",
+            "FEATURE_LATEX_SOURCE (web.intake, the upload blob; no compiled PDF is stored)",
+        ),
+        (
+            settings.feature_latex_source,
+            "a LaTeX build",
+            "FEATURE_LATEX_SOURCE (source.convert: a temporary folder removed when the build ends)",
+        ),
+        (
+            True,
+            "the Word export",
+            "web.routes.jobs (the Word download; export_docx makes and removes a folder)",
+        ),
+        # Word and PowerPoint: a file turned into a PDF is not kept, only the PDF
+        # (`routes.jobs._office_to_pdf`); a .docx the reader takes is kept as uploaded
+        # (`routes.jobs._place_word`).
+        (
+            bool(input_kinds(settings)),
+            "the Word or PowerPoint file itself is not kept",
+            "OFFICE_INPUT_ENABLED (routes.jobs: the stored upload is the PDF made from it)",
+        ),
+        (
+            settings.feature_word_source,
+            "the Word .docx file",
+            "FEATURE_WORD_SOURCE (routes.jobs._place_word stores the file as uploaded)",
+        ),
+        (
+            settings.feature_word_source,
+            "reading a Word file",
+            "FEATURE_WORD_SOURCE (source.pandoc: a temporary folder removed when the read ends)",
+        ),
+        # What the model's answers leave behind: the conversion result, kept with the document
+        # (`Job.result_json`), and the answers about whole pages that "Try again" reuses
+        # (`web.step_cache`: `StepRecord`, deleted with the document by `ops.retention`).
+        (
+            True,
+            "the conversion result (proposed LaTeX, MathML, alt text, headings",
+            "web.db.Job.result_json",
+        ),
+        (
+            True,
+            "the model's answers for the steps a conversion has finished",
+            "web.step_cache (StepRecord: kept with the document, deleted with it)",
+        ),
+        (
+            bool(input_kinds(settings)),
+            "Word and PowerPoint conversion",
+            "OFFICE_INPUT_ENABLED (web.office_convert: a temporary folder removed at once)",
+        ),
+        # What Listen keeps, in the browser only: the number of documents is read from the
+        # player's own code (static/listen.js `KEEP`).
+        (
+            True,
+            f"for the last {listen_kept_documents()} documents you listened to",
+            "static/listen.js KEEP",
+        ),
+        (
+            True,
+            "never its text, and it is not sent to the server",
+            "static/listen.js (`remember` keeps ids; the player makes no request)",
+        ),
+        (
+            True,
+            f"(for up to {SESSION_MAX_AGE_S // 86400} days)",
+            "web.app.SESSION_MAX_AGE_S",
+        ),
+        # Terms and takedown: the account can be deleted by the person (`routes.account`), and
+        # a request to us goes to the contact address (`Settings.contact_email`, required in
+        # production).
+        (
+            True,
+            '"Delete my account"). To have your data deleted by us',
+            "web.routes.account (POST /account/delete)",
+        ),
+        (
+            bool(settings.contact_email),
+            f"email {settings.contact_email}",
+            "CONTACT_EMAIL (Settings.check_production requires it)",
+        ),
     ]
-    return [
+    problems = [
         f"web/templates/privacy.html: does not say {words!r} ({source})"
         for on, words, source in claims
         if on and words not in notice
     ]
+    # "It is not sent to the server": the player's own code makes no request.
+    if re.search(
+        r"\bfetch\(|XMLHttpRequest|sendBeacon", (STATIC_DIR / "listen.js").read_text("utf-8")
+    ):
+        problems.append(
+            "web/static/listen.js makes a request but the privacy notice says what Listen keeps "
+            "in the browser is not sent to the server"
+        )
+    return problems
 
 
 def second_reader_problem(settings: Settings) -> str | None:

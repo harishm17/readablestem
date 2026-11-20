@@ -3,9 +3,9 @@ reports.
 
 PROOF.md is written by `make proof` from the recorded held-out run (CI replays it and fails on
 any difference), so it is the source of the registered numbers. The re-measurement numbers
-are the README's; the real-world, development, chemistry and handwriting numbers are their own
-reports' (docs/eval-*.md). /limits states them all in prose and the landing page a short
-summary; these tests fail when a page and those files drift, when a number that is not blind
+are those of docs/results.md; the real-world, development, chemistry and handwriting numbers
+are their own reports' (docs/eval-*.md). /limits states them all in prose and the landing page
+a short summary; these tests fail when a page and those files drift, when a number that is not blind
 is shown without saying so, and when a development number is not labelled as one.
 """
 
@@ -21,6 +21,7 @@ from fixtures.web.support import WebEnv
 ROOT = Path(__file__).resolve().parent.parent
 PROOF = (ROOT / "PROOF.md").read_text(encoding="utf-8")
 README = (ROOT / "README.md").read_text(encoding="utf-8")
+RESULTS = (ROOT / "docs/results.md").read_text(encoding="utf-8")
 REALWORLD = (ROOT / "docs/eval-realworld.md").read_text(encoding="utf-8")
 DEV_BASELINE = (ROOT / "docs/eval-dev-baseline-2026-11-03.md").read_text(encoding="utf-8")
 CHEMISTRY = (ROOT / "docs/eval-chemistry-heldout.md").read_text(encoding="utf-8")
@@ -59,7 +60,7 @@ def pages(tmp_path_factory) -> dict[str, str]:
 
 def test_limits_latest_registered_numbers_match_the_fresh5_report(pages):
     text = squash(pages["/limits"])
-    assert "It ran on 2026-11-04 with version 0.5.9" in text
+    assert "It ran on November 4, 2026 with version 0.5.9" in text
     assert "did not record its settings" in text and "live service uses" not in text
     for number in ("0.840", "0.836", "+0.004", "−0.023 to +0.036", "0.793", "0.770"):
         assert number in text, number
@@ -95,21 +96,22 @@ def test_limits_first_registered_result_is_history_and_matches_proof_md(pages):
     assert f"{round(proof_cell('judge_pass_rate') * 100)}% passed a model judge" in text
 
 
-def test_limits_remeasurement_matches_readme_and_says_not_blind(pages):
+def test_limits_remeasurement_matches_the_results_page_and_says_not_blind(pages):
     row = re.search(
         r"^\| Equations right, end to end \(primary\) \| ([0-9.]+) [^|]*\| \*\*([0-9.]+)\*\*",
-        README,
+        RESULTS,
         re.M,
     )
-    assert row, "the README's re-measurement table changed shape"
+    assert row, "the re-measurement table of docs/results.md changed shape"
     registered, remeasured = row.groups()
     assert registered == f"{proof_cell('end_to_end_exact_lenient (all gold equations)'):.3f}"
     text = squash(pages["/limits"])
     assert f"{remeasured} of equations exactly right end to end, against {registered}" in text
     assert "not a blind result" in text
-    assert "not a blind result" in README.lower()
-    assert "#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result" in pages["/limits"]
-    assert "### Re-measurement on the same sections, 2026-10-21 (not a blind result)" in README
+    assert "not a blind result" in RESULTS.lower() and "not a blind result" in README.lower()
+    anchor = "#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result"
+    assert "/docs/results.md" + anchor in pages["/limits"] and anchor in README
+    assert "## Re-measurement on the same sections, 2026-10-21 (not a blind result)" in RESULTS
 
 
 def test_the_other_results_match_their_reports_and_development_is_labelled(pages):
@@ -138,7 +140,7 @@ def test_the_landing_page_summarises_without_overclaiming(pages):
     # The newest registered held-out result is the one framing: level on what a listener hears,
     # drawn as two compact charts (web/proof_facts.py). The four measures and how each was
     # measured are on /limits and the comparison guide, behind one link; the earlier test
-    # (chatbot ahead on exactly right) is history there, in PROOF.md and in the README, not on
+    # (chatbot ahead on exactly right) is history there, in PROOF.md and docs/results.md, not on
     # the landing page.
     assert 'class="proof-strip"' not in pages["/"] and 'class="proof-strip"' in pages["/limits"]
     assert 'class="proof-chart proof-chart-compact"' in pages["/"]

@@ -37,7 +37,8 @@
   the Word or PowerPoint file itself is not kept.{% endif %}{% if latex_source %} For LaTeX source we also store the names of the files, packages and
   commands LaTeX reported a problem with.{% endif %} We also store its file name, images cut from it (equations and
   figures), the conversion result (proposed LaTeX, MathML, alt text, headings and the names of
-  any files attached inside the PDF), the
+  any files attached inside the PDF), the model's answers for the steps a conversion has
+  finished (kept with the document so that “Try again” asks only for what is missing), the
   converted HTML, a count of the changes made to it and the time of the last one (they make the
   version id its file shows), and your review decisions.</p>
 <p>The review record of a document lists what the tool did, who made each review decision and when,
@@ -49,21 +50,21 @@
      24-hour and 7-day clocks restart on every review decision, language, title or contact
      change, and download; "Keep for 7 days" on the job page makes a 24-hour document a
      7-day one, counted from that moment; the "let us look" choice is 30 days from upload and does not restart. #}
-  <li>If neither box is checked on the upload form (the default, unless you saved 7 days in
+  <li>If neither box is checked on the upload form (the default, unless you saved {{ week_days }} days in
     <a href="/account#account-keep">Account</a>), all of it is deleted automatically
     <strong>{{ retention_hours }} hours</strong> after you last worked on it: after your
     last review decision or download, or the upload if there is none. From that moment it
     can no longer be opened or downloaded; an hourly clean-up then removes it from the
     database, normally within the hour.</li>
-  <li>If you check "Keep for 7 days", it is deleted
-    <strong>7 days</strong> after you last worked on it instead. Nobody else looks at it.
-    "Keep for 7 days" on the document's page does the same later, and shows the day it
+  <li>If you check "Keep for {{ week_days }} days", it is deleted
+    <strong>{{ week_days }} days</strong> after you last worked on it instead. Nobody else looks at it.
+    "Keep for {{ week_days }} days" on the document's page does the same later, and shows the day it
     will then be deleted.</li>
   <li>If you also check "Also let us look at the results ({{ opt_in_days }} days)", it is
     deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
     who run ReadableSTEM may look at the conversion results to find and fix mistakes in the
     tool. Both boxes
-    are unchecked unless you check them; “Keep for 7 days” can be made the default for new
+    are unchecked unless you check them; “Keep for {{ week_days }} days” can be made the default for new
     uploads in <a href="/account">Account</a>.</li>
   <li>Only your own work restarts these times: a review decision, a download, or a change of the
     document's language, title or contact. A person you share with does not keep it longer.</li>
@@ -81,7 +82,7 @@
     which form it was and the outcome of the request (the page it led to and its notice), so
     that a second press gets the same answer instead of doing it twice. It holds no document
     content. It is deleted when you sign out, with your account, and at the latest after
-    7 days; the token of an account deletion is kept without the account for those 7 days.</li>
+    {{ session_days }} days; the token of an account deletion is kept without the account for those {{ session_days }} days.</li>
   {# The Railway `backup` service (.railway/railway.ts) dumps the database daily and keeps the
      last 6 dumps (docs/deploy-railway.md, "Backups"). Keep this sentence true: if the
      schedule or the kept time changes, change the sentence. #}
@@ -97,6 +98,8 @@
     until the document is deleted, also when you delete the course first.</li>
   {% endif %}
 </ul>
+<p><a href="/privacy/retention" download>Download a one-page summary</a> of what is kept, for how
+  long, who receives it and how it is deleted, for a disability or privacy office.</p>
 </details>
 
 <h2 id="who-else-sees">Who else sees your documents</h2>
@@ -144,7 +147,7 @@
   stores your email address, your name, the time of your last sign-in, and the id your
   sign-in provider gives your account{% if microsoft_on %} (for Microsoft, also your
   organization's directory id){% endif %}, so we know it is you next time, and whether you
-  chose to keep new documents for 7 days by default. An account is
+  chose to keep new documents for {{ week_days }} days by default. An account is
   made only for a verified address, and only while the day's sign-ups are not full.
   If a sign-in is turned away, nothing is stored about it. We also keep a count of the
   accounts made each day, with no names in it.</p>
@@ -170,19 +173,19 @@
   is verified. For people on the beta list we store the email address, name, the time of
   the last sign-in, and the id your sign-in provider gives your account{% if microsoft_on %}
   (for Microsoft, also your organization's directory id){% endif %}, so we know it is you
-  next time, and whether you chose to keep new documents for 7 days by default. If you sign in and are not on the list, nothing is stored about you. You can
+  next time, and whether you chose to keep new documents for {{ week_days }} days by default. If you sign in and are not on the list, nothing is stored about you. You can
   delete your account yourself from the <a href="/account">Account</a> page once you are
   signed in.</p>
 {% endif %}
 </details>
 
 <h2>Cookies</h2>
-<p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.
+<p>One cookie keeps you signed in (for up to {{ session_days }} days) and protects forms against forgery.
   There are no analytics, advertising or third-party tracking cookies. While you type a
   review decision, the text is kept in your browser tab until you save it, close the tab or
   sign out; it is never sent to the server before you save.</p>
 <p>The Listen page remembers where you stopped and your speed, voice and other player settings
-  in your browser's local storage, for the last 20 documents you listened to. It keeps a
+  in your browser's local storage, for the last {{ listen_keep }} documents you listened to. It keeps a
   document's id and the ids of places in it, never its text, and it is not sent to the server.
   It stays until you clear this site's data in your browser.</p>
 {# web/analytics.py and static/analytics.js: PostHog through this site's /m/ path, a random
@@ -257,8 +260,10 @@
   <li>The converted document is shown in a sandbox that stops it running scripts.</li>
   <li>An uploaded file is first opened in a separate short-lived process with its own time
     and memory limits, and is kept in the database. Some steps write a temporary copy of derived content to a
-    private folder, which is removed when the step ends: the Word export, a LaTeX build,
-    {% if word_source %}reading a Word file, {% endif %}and Word and PowerPoint conversion.</li>
+    private folder, which is removed when the step ends:
+    {# Only the steps this service runs are named (the launch check reads the same settings). #}
+    {%- set folder_steps = ["the Word export"] + (["a LaTeX build"] if latex_source else []) + (["reading a Word file"] if word_source else []) + (["Word and PowerPoint conversion"] if office_on else []) %}
+    {{ folder_steps[:-1]|join(", ") }}{% if folder_steps|length > 1 %} and {% endif %}{{ folder_steps[-1] }}.</li>
   <li>Sign-in, uploads and daily page counts have limits that stop automated misuse.</li>
   {% if office_on %}
   {# T3-30. What the code does: a Word or PowerPoint file is

@@ -278,6 +278,10 @@ class TableCell(BaseModel):
     # like any inline equation, and the page writes what it read into the cell
     # (`pipeline.table_math`).
     equation_id: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Words of `text` the source sets in bold, italic or a fixed-pitch face (a Word or LaTeX
+    # table; `strong`, `emphasis`, `code`, `highlight` runs, offsets into `text`). A PDF's
+    # cells have none, and a cell with maths has none.
+    runs: list[Run] = Field(default_factory=list, exclude_if=lambda v: not v)
 
     @property
     def is_empty(self) -> bool:
@@ -933,7 +937,10 @@ NOTICE_CODES = frozenset(
         "lang_mixed",  # no one language holds most of the text: the largest is the document's
         "long_description_missing",  # a complex figure without a long description
         "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
+        "table_header_missing",  # a continued table with no header row, none to carry over
+        "table_header_carried",  # a continued table written with the header of the part before
         "struck_text",  # text the page shows struck through, kept and marked as deleted
+        "struck_not_kept",  # struck text in a table or a display equation, which carry no runs
         "form_fields",  # a fillable PDF form: its fields are read as text, not as live inputs
         "annotations_read",  # comments in the PDF's annotations, included as paragraphs
         "attachments_not_converted",  # files attached to the PDF, not converted
@@ -948,9 +955,14 @@ NOTICE_CODES = frozenset(
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
+        # ... and a paragraph or more of them (`page_type.HIDDEN_BLOCK`): the instructor looks
+        "hidden_text_check",
         # The page's drawings were not checked for handwriting: over a count of work, or the
         # clock guard fired (`page_type.InkBudget`, plan WS14.9). Its typed text was read.
         "drawings_not_analysed",
+        # The table search's CPU time for the document ran out (tables.DetectorBudget): a table
+        # on this page may be read as text.
+        "tables_not_searched",
         # A PDF that had to be repaired when it was opened (`source_facts.repair_notices`):
         # "file_cut_off" when its last pages are empty (`page` the first of them, `count` how
         # many; required: the owner continues with the pages before them or uploads a fresh
@@ -995,6 +1007,7 @@ NOTICE_CODES = frozenset(
         "word_headers_footers",  # running headers and footers, not part of the text
         "word_objects",  # SmartArt, charts or embedded objects: not read
         "word_tracked_changes",  # tracked changes: the reader took the accepted text
+        "word_table_flattened",  # a table too large for a grid, written as a list (`count`)
         "word_rtl_text",  # right-to-left paragraphs: words in reading order, no direction kept
     }
 )
@@ -1081,6 +1094,10 @@ class PageType(BaseModel):
     visible_chars: int = Field(default=0, ge=0)
     invisible_chars: int = Field(default=0, ge=0)
     covered_chars: int = Field(default=0, ge=0)
+    # Painted where nobody can see it (under 2 pt, or flat on the page): left out like the two
+    # above, but no sign of a text layer from a scan. Not written when 0, and 0 in a record
+    # stored before it was kept.
+    unseen_chars: int = Field(default=0, ge=0, exclude_if=lambda v: not v)
     image_coverage: float = Field(default=0.0, ge=0.0, le=1.0)
     ink_strokes: int = Field(default=0, ge=0)
     ink_rows: int = Field(default=0, ge=0)
@@ -1098,6 +1115,11 @@ class PageType(BaseModel):
     @property
     def untrusted_chars(self) -> int:
         return self.invisible_chars + self.covered_chars
+
+    @property
+    def left_out_chars(self) -> int:
+        """Every character of the page's text layer that was left out: what the notice counts."""
+        return self.untrusted_chars + self.unseen_chars
 
 
 class OmittedPage(BaseModel):

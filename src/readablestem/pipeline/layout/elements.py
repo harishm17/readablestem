@@ -121,6 +121,30 @@ def _contents_links(elements: list[Element]) -> list[Element]:
     return out
 
 
+def _mark_spots(text: str, found: _FootnoteMark) -> list[int]:
+    """Where in `text` the mark stands, by what is printed just before it. An inline equation
+    stands in the text as a placeholder, so the glyphs it took from the line are not there:
+    the context is then cut from its left, and what is left of it must stand right after a
+    placeholder's end, down to nothing left (the mark right after the placeholder). A short
+    tail of the context found anywhere else is no evidence: "2" before the mark "1" is also
+    inside a placeholder's name ("p1-e21"). A cut context that ends a number ("0.1") is no place
+    for a mark either."""
+    before = found.before
+    mark = re.escape(found.mark)
+    whole = [m.end() - len(found.mark) for m in re.finditer(re.escape(before) + " ?" + mark, text)]
+    if whole:
+        return whole
+    tails = dict.fromkeys(before[start:].strip() for start in range(1, len(before) + 1))
+    for tail in tails:
+        after_equation = "\u27e7 ?" + re.escape(tail) + (" ?" if tail else "") + mark
+        spots = [m.end() - len(found.mark) for m in re.finditer(after_equation, text)]
+        if any(text[at - 2 : at].strip(".,").isdigit() for at in spots):
+            return []
+        if spots:
+            return spots
+    return []
+
+
 def _footnote_links(elements: list[Element], marks: dict[str, _FootnoteMark]) -> list[Element]:
     """The elements with an internal link from each footnote's mark in the text to the
     footnote. The mark is found again in the element's text by what is printed just before
@@ -131,12 +155,7 @@ def _footnote_links(elements: list[Element], marks: dict[str, _FootnoteMark]) ->
         owner = by_id.get(found.block_id)
         if owner is None or owner.text is None or not found.before.strip():
             continue
-        wanted = [found.before + found.mark, found.before + " " + found.mark]
-        spots = [
-            m.end() - len(found.mark)
-            for needle in wanted
-            for m in re.finditer(re.escape(needle), owner.text)
-        ]
+        spots = _mark_spots(owner.text, found)
         if len(spots) != 1:
             continue
         start = spots[0]

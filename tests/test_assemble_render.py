@@ -214,8 +214,13 @@ def test_a_paragraph_with_a_role_is_written_as_a_sidebar_or_a_quotation():
         para(4, "Body two."),
     ]
     html = render(elements, [], {})
-    # Neighbours of one role are one sidebar; the sidebar has a name a screen reader says.
+    # Neighbours of one role are one sidebar; the sidebar has a name a screen reader says, and
+    # a page with two sidebars names each one differently.
     assert re.search(r'<aside aria-label="[^"]+"><p id="p1-e1">Side one.</p><p id="p1-e2">', html)
+    more = [*elements, para(5, "Another.", "aside")]
+    names = re.findall(r'<aside aria-label="([^"]+)"', render(more, [], {}))
+    assert len(names) == 2 and len(set(names)) == 2
+    assert len(re.findall(r'<aside aria-label="([^"]+)"', html)) == 1
     assert '<blockquote><p id="p1-e3">Said by someone else.</p></blockquote>' in html
     assert '<p id="p1-e0">Body one.</p>' in html and '<p id="p1-e4">Body two.</p>' in html
     # An element with no role is stored without the field.
@@ -442,6 +447,15 @@ def test_unsafe_mathml_in_an_accepted_fix_falls_back_to_the_original():
     assert 'data-status="accepted" data-reason="mathml_rejected"' in item
     assert f'alt="{EQUATION_NOT_CONVERTED_ALT}"' in item
     assert "<script" not in html and "<math" not in html
+    # The note counts what the page shows: the refused one is a picture, not MathML.
+    mixed = render(
+        [equation("e1", 0), equation("e2", 1)],
+        [accepted("e1", "<math><mi>x</mi><script>alert(1)</script></math>"),
+         accepted("e2", "<math><mi>y</mi></math>")],
+        {"e1": png(), "e2": png()},
+    )  # fmt: skip
+    assert "1 of its 2 equations is written so that screen readers" in about(mixed)
+    assert block(mixed, "e2").count("<math") == 1
 
 
 def test_missing_crop_shows_extracted_text_and_says_so():

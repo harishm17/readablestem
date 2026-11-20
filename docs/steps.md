@@ -17,8 +17,8 @@ an optional note (`"optional"`).
 ```mermaid
 flowchart LR
   C[crop PNG] --> R{route}
-  R -->|inline, text layer <= 25 chars| L[gpt-6-luna]
-  R -->|display or long| S[gpt-6.1-sol]
+  R -->|inline, text layer <= 25 chars| L[cheap model]
+  R -->|display or long| S[main model]
   L -->|confidence < auto-accept or error check| S
   L & S --> V[clean LaTeX -> check_latex -> safe_latex_to_mathml -> check_mathml]
   V --> X[text-layer cross-check]
@@ -734,7 +734,7 @@ layout's. Measurements: [eval-page-math.md](eval-page-math.md).
 ## Page witness and the glyph-checked second reading (equations; `FEATURE_PAGE_WITNESS`, off)
 
 With the flag on, one call per math page (`pipeline/page_witness.py`, prompt `page_witness`, model
-`PAGE_WITNESS_MODEL`, default `claude-opus-5-5`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS` 12,288, timeout `PAGE_WITNESS_TIMEOUT_S` 240 s (a timeout is charged its whole worst-case reservation), effort
+`PAGE_WITNESS_MODEL`, default in `config.py`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS`, timeout `PAGE_WITNESS_TIMEOUT_S` (a timeout is charged its whole worst-case reservation), effort
 `ANTHROPIC_EFFORT_PAGE_WITNESS`, default medium) reads every formula on the page from the page image and the
 numbered text-layer rows, table cells, captions and figure labels included. Each formula is anchored by a quote
 of its text-layer row(s); `page_math.locate` and `page_math.verify` decide whether the quote holds, so a formula
@@ -993,7 +993,7 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Primes, degrees | "y double prime", "30 degrees" |
 | Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub"; a subscript that something follows (a plain token, a sign, the power of `x_i^2`) is closed: "x sub i end sub y" against `x_{iy}` "x sub i y", `x_i+1` "x sub i end sub plus 1" against `x_{i+1}` "x sub i plus 1 end sub" |
 | Transpose, star, inverse, one-sided limits | `A^T` over a matrix or vector (a capital or bold letter, a bracketed one, `A^\top`) "cap A transpose", `x^*` "x star", `\dagger` "dagger", `\sin^{-1}` "inverse sine", `0^+` "0 plus" |
-| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides". A pair of bars is "the absolute value of x" and a pair of double bars "the norm of x", closed ("... end absolute value", "... end norm") when more follows or the content is more than one thing; a pair that carries a script (`|x|^2`) keeps "vertical bar", and so does every bar of a row where one bar has no partner or the bars of a pair each stand between two operands (`a|b, c|d`, a bra and a ket): there a bar can be a sign of its own. A pair of single bars around one capital letter (`|S|`, `|A|`) or around a row with a set sign or a colon (`|A \cup B|`, `|G:H|`) also keeps "vertical bar": it is the size of a set, a determinant or an index as often as an absolute value |
+| A bar | `\mid` or `\vert` between the arguments of a call (`P(A \mid B)`, `E[X \mid Y]`) "given"; between set braces "such that"; between brackets `\langle ... \rangle` "vertical bar"; otherwise `\mid` "divides". A pair of bars is "the absolute value of x" and a pair of double bars "the norm of x", closed ("... end absolute value", "... end norm") when more follows or the content is more than one thing; a pair of single bars that carries a script (`|x|^2`) keeps "vertical bar", while a pair of double bars with a script on the second (`\|A\|_F`) is a norm ("the norm of cap A end norm sub cap F"); and so does every bar of a row where one bar has no partner or the bars of a pair each stand between two operands (`a|b, c|d`, a bra and a ket): there a bar can be a sign of its own. A pair of single bars around one capital letter (`|S|`, `|A|`) or around a row with a set sign or a colon (`|A \cup B|`, `|G:H|`) also keeps "vertical bar": it is the size of a set, a determinant or an index as often as an absolute value, and so do single bars around a cross of two things that are not numbers (`|A \times B|`, `|\vec a \times \vec b|`: a size, a magnitude or a determinant-like value; the signs are named, "vertical bar cap A times cap B vertical bar"). In set braces with an odd number of plain bars (`\{x | |x|<1\}`) the first bar that follows something it can end, with the bars before it in pairs, is "such that" and the others pair |
 | A centered dot or a cross | between vectors (bold letters, arrows, nabla, the test of `signs.py`) "dot" and "cross"; between numbers and scalars "times" |
 | A negated relation | "is not an element of", "is neither less than nor equal to", "not equal to", "is not a subset of", ...; a relation with no word of its own "with stroke" |
 | Distribution and sets | `\sim` after a variable before a distribution "is distributed as"; `\setminus` "set minus"; `\mathit{diff}` is the word "diff" (a plain `diff` is still d, i, f, f) |
@@ -1026,7 +1026,7 @@ before a change to these rules:
 
 - The reading stored with an equation (`EquationFix.speech`) is made in the equation step and
   carries the version of the speech rules that made it (`EquationFix.speech_version`, the code's
-  `speech.SPEECH_VERSION`, 3 since the scope ends and "the absolute value of"; 2 since "cap" and the pauses in a formula; 0 where none was stored).
+  `speech.SPEECH_VERSION`, 4 since the set-builder bar before an absolute value, the norm with a script and the cross inside bars; 3 since the scope ends and "the absolute value of"; 2 since "cap" and the pauses in a formula; 0 where none was stored).
   A stored reading made by older rules and not written by a person is made again from its MathML,
   without a model, where it is read: `speech.refresh_readings` on the result in
   `web.review.rerender_html` (the page, the EPUB's `describedMath` and the Word fallback text),
@@ -1057,8 +1057,8 @@ note: the output keeps MathML only, so a missing reading aid changes nothing a s
 `pipeline/table_step.py` (`rebuild`, prompt `table.md`), behind `FEATURE_TABLES`; the
 full description is in [tables.md](tables.md). In short:
 
-- Same shape as equations: gpt-6-luna reads the crop first (router fallback on API
-  errors), gpt-6.1-sol is asked once when a check fails or the answer says the crop is
+- Same shape as equations: the cheap model reads the crop first (router fallback on API
+  errors), the main model is asked once when a check fails or the answer says the crop is
   not a data table, and the better answer is kept. Spend goes through the same
   `JobBudget` reservations; `BudgetExceeded` propagates.
 - The answer is rows of cells (text, LaTeX for math cells, header flags, spans), placed
@@ -1157,7 +1157,7 @@ An answer that cannot be used is never a pass. The verdict keeps the key of the 
 asked (`models.question`: pictures, listing, prompt, model, effort, reply format), so it
 is tied to the exact input it was given, and two runs of one input can be compared.
 
-**Model and money.** `PAGE_AUDIT_MODEL` (default `claude-sonnet-5-5`) at low effort
+**Model and money.** `PAGE_AUDIT_MODEL` (default in `config.py`) at low effort
 (`ANTHROPIC_EFFORT_PAGE_AUDIT` overrides), `PAGE_AUDIT_MAX_OUTPUT_TOKENS` 1,500. Before a
 request is sent its worst case is priced (the whole input at the full price and the whole
 output limit): over `PAGE_AUDIT_MAX_USD_PER_PAGE` (default $0.10) the page is
@@ -1325,7 +1325,7 @@ decorative rules were added; the prompt versions have changed since.
 
 ADR 0005 (accepted by Harish, 2026-10-08). After a step has made its fix, a second model
 is asked fixed questions about the proposal through the OpenAI Decisions API
-(`POST /v1/decisions`, gpt-6-luna), which answers with probabilities instead of text. It
+(`POST /v1/decisions`, the cheap model), which answers with probabilities instead of text. It
 never generates anything and never replaces the checks above; it only ranks. Its
 probabilities are not calibrated, so they are compared with thresholds from settings and
 never shown to a reader as a confidence. Wording, as everywhere: "a second automated
@@ -1422,7 +1422,7 @@ screen's optional note work unchanged. It asks a Claude model that did not read 
 with an audit prompt, whether the proposal matches the image.
 
 **Independent of the first pass** in three ways: a different model (`CLAUDE_CHECK_MODEL`,
-claude-sonnet-5-5; the first pass is claude-haiku-5-5 and claude-opus-5-5, and
+a default in `config.py`; the first pass is the cheap and main models, and
 `anthropic_effort_for` gives it its own effort `CLAUDE_CHECK_EFFORT`, low); a different
 prompt (`models/prompts/check_figure.md`, `check_equation.md`: "you audit text someone else
 wrote", the image first, no confidence field to echo); and it never sees the first pass's

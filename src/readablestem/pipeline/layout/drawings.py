@@ -637,7 +637,7 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
             crossing[id(row)] = not (number and _column_content_near(row, rows))
         return crossing[id(row)]
 
-    reach = 0.6 * index.largest  # _math_neighbours' widest vertical gap
+    reach = max(0.6, NUMBER_UNDER_GAP) * index.largest  # _math_neighbours' widest vertical gap
     while queue:
         source = queue.popleft()
         for row in index.near(source.y0 - reach, source.y1 + reach):
@@ -673,7 +673,9 @@ def _math_neighbours(row: _Row, other: _Row, *, cross: bool = True) -> bool:
     overlapping in x, or inside its box (the second row of a matrix, beside the tall bracket
     the first row starts with), or an equation number beside it (`_number_beside`), or an
     opening brace level with `other` and a little to its left (the brace of a system,
-    `_stray_brace_cut`)."""
+    `_stray_brace_cut`), or a lone comma or full stop level with `other` and just right of it
+    (the mark that ends a fraction stands between its two lines: beside the numerator, so not
+    "vertically adjacent", and a paragraph of one comma once its number was cut from it)."""
     size = max(row.size, other.size)
     if other.x0 <= (row.x0 + row.x1) / 2 <= other.x1 and other.y0 <= row.y0 and row.y1 <= other.y1:
         return True
@@ -689,9 +691,19 @@ def _math_neighbours(row: _Row, other: _Row, *, cross: bool = True) -> bool:
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
         return True
+    if (  # the comma that ends the maths, level with it (`display._same_line` has the same rule)
+        row.ink
+        and all(c.c in ",.;:" for c in row.ink)
+        and row.column == other.column
+        and 0 <= row.x0 - other.x1 <= 1.5 * size
+        and min(row.y1, other.y1) - max(row.y0, other.y0) >= 0.5 * row.height
+    ):
+        return True
     if not (row.column == other.column or (cross and row.x0 >= other.x1)):
         return False
-    return _number_beside(row, other.bbox, size)
+    return _number_beside(row, other.bbox, size) or (
+        row.column == other.column and _number_under(row, other.bbox, size)
+    )
 
 
 def _column_content_near(label: _Row, rows: Sequence[_Row]) -> bool:
@@ -718,6 +730,26 @@ def _number_column(row: _Row, column: str, x1: float) -> bool:
     a two-column section, the number at the right edge of an equation in the left column is
     in the right column."""
     return row.column == column or row.x0 >= x1
+
+
+NUMBER_UNDER_GAP = 1.2  # x font size: furthest a number under its equation's right end stands
+
+
+def _number_under(row: _Row, box: BBox, size: float) -> bool:
+    """Is `row` a bracketed equation number set right-aligned under the maths in `box`?
+
+    A display that fills its column leaves no room for its number at the right: TeX sets the
+    number on a line of its own below the equation, ending at the equation's right end or the
+    column's edge. The number is a little below the box (at most `NUMBER_UNDER_GAP` font
+    sizes) and stands at the box's right end: under its last font size, or just past it.
+    """
+    if not EQUATION_NUMBER.match(row.clean):
+        return False
+    return (
+        -0.2 * size <= row.y0 - box[3] <= NUMBER_UNDER_GAP * size
+        and row.x0 < box[2] + size
+        and row.x1 >= box[2] - size
+    )
 
 
 def _number_beside(row: _Row, box: BBox, size: float, *, far: bool = False) -> bool:

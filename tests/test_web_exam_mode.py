@@ -118,6 +118,26 @@ def test_a_document_named_like_an_exam_but_not_converted_as_one_is_said_to_its_o
     assert web.job(named).exam_mode is False  # a hint only: the choice is still off
 
 
+def test_a_source_document_says_nothing_of_the_exam_choice(web):
+    """A Word or LaTeX source is read from its own file: the choice does not apply, so neither
+    its job page nor its record says "Not an exam or quiz"."""
+    from fixtures.web.review_doc import review_output, review_pdf
+
+    pdf = job_id_from(upload(web.browser, review_pdf()))
+    web.run_worker()
+    asked = "Not an exam or quiz"
+    assert asked in web.browser.get(f"/jobs/{pdf}").text  # a PDF says it
+    output = review_output()
+    output.result.origin = "latex"
+    web.converter.output = output
+    source = job_id_from(upload(web.browser, review_pdf()))
+    web.run_worker()
+    assert web.job(source).status == "done"
+    for path in (f"/jobs/{source}", f"/jobs/{source}/record"):
+        page = web.browser.get(path)
+        assert page.status_code == 200 and asked not in page.text, path
+
+
 # --------------------------------------------------------------------------- the note
 
 

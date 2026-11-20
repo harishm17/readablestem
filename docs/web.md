@@ -64,7 +64,7 @@ value and where that value came from. This page does not repeat those values.
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default in code; which are on in production is in the production profile |
 | `CONTENT_RUNS` | Struck text (WS16.1, F-509) stored and written as a `deleted` run (docs/output.md "Struck, bold and other marked text"). On by default since 2026-11-18; off is the old shadow rollout, where struck runs are found and counted in the trace but not written |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
-| `FEATURE_PAGE_WITNESS`, `PAGE_WITNESS_MODEL`, `PAGE_WITNESS_MAX_OUTPUT_TOKENS`, `PAGE_WITNESS_TIMEOUT_S`, `ANTHROPIC_EFFORT_PAGE_WITNESS` | The page witness (docs/steps.md): one call per math page to `claude-opus-5-5` reads every formula; disagreements and formulas only it found are required decisions. Off by default; first dev measurement in docs/eval-equation-round5.md |
+| `FEATURE_PAGE_WITNESS`, `PAGE_WITNESS_MODEL`, `PAGE_WITNESS_MAX_OUTPUT_TOKENS`, `PAGE_WITNESS_TIMEOUT_S`, `ANTHROPIC_EFFORT_PAGE_WITNESS` | The page witness (docs/steps.md): one call per math page to the model `PAGE_WITNESS_MODEL` names (`config.py`) reads every formula; disagreements and formulas only it found are required decisions. Off by default; first dev measurement in docs/eval-equation-round5.md |
 | `EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING` | Equation reading flags (docs/steps.md, docs/layout.md, docs/eval-flag-policy.md), all off by default in code; production's values are in the production profile. Turning `LAYOUT_DISPLAY_GROUPING` on needs a `PIPELINE_VERSION` bump |
 | `REGION_TREE` | Reading order from a tree of regions instead of one gutter (docs/layout.md "The region tree"), `off` or `on`, `off` by default in code and in the production profile. Turning it on changes the order of some pages, so it needs a `PIPELINE_VERSION` bump |
 | `FONT_CODE_TABLES` | The codes of symbol and TeX fonts read as what the font draws, by font name (`pipeline/font_codes.py`, docs/layout.md "Font code tables"). **On by default in code**; set `false` on `web` to turn it off without a deploy. It changes element text on documents with these fonts, so stored step answers for them are asked again. Production's value is in the production profile |
@@ -91,7 +91,7 @@ value and where that value came from. This page does not repeat those values.
 | `FEATURE_IMAGE_PAGES`, `IMAGE_PAGES_MODEL`, `IMAGE_PAGES_USD_PER_PAGE` ($0.25), `IMAGE_PAGES_MAX_USD_PER_JOB` ($7.50), `ANTHROPIC_EFFORT_IMAGE_PAGES`, `IMAGE_PAGES_TIMEOUT_S`, `IMAGE_PAGES_DPI`, `IMAGE_PAGES_OMISSION_CHECK` (default on), `IMAGE_PAGES_RECOVER_OMISSIONS` (default on), `IMAGE_PAGES_VECTOR_CROPS` (default off, unmeasured: on a handwritten page whose ink is vector, the pictures of expressions are drawn from the pen strokes) and `IMAGE_PAGES_VECTOR_CHECKS` (default on: a letter in the other case, a power lost, added or moved, and ink no block accounts for are flagged by comparing the reading with the strokes, docs/layout.md), `IMAGE_PAGES_SECOND_READING` (default off), `IMAGE_PAGES_ACCEPT_AGREED` (default off), `IMAGE_PAGES_MATHS_ALWAYS_REQUIRED` (default on), `IMAGE_PAGES_SECOND_READER` (`off`, `local`, `claude`, `openai`; default `off`), `IMAGE_PAGES_SECOND_READER_TIME_S` (120) | Scanned and handwritten pages read from an image of the page (ADR 0007, "Scanned and handwritten pages on request" below); the omission check makes writing the reading left out a required decision, and the recovery reads such a stretch from a picture of just that part so it is converted instead; the second reading reads each `medium` block with a formula again from a picture of its line and records whether the two agree, and acceptance lets a block whose two readings agree, the second sure of every symbol, be an optional note (off: docs/eval-handwriting.md, "Root causes and fixes"); the last makes every block of a page read from an image that holds math (a display equation, or a paragraph, list item or heading with a formula) a required decision whatever the reader's confidence (ADR 0007, point 12; typed pages and prose-only blocks are not affected); the second reader (`docs/math-readers.md`, "Using a reader in the pipeline") reads the crop of each handwritten display equation and compares it with the page's reading, so the review card can offer the differences as choices (it must also be enabled with its `MATH_READER_*_ENABLED`). The flag only offers the upload option; the model is the main one unless `IMAGE_PAGES_MODEL` says otherwise; a job that asked may spend `IMAGE_PAGES_USD_PER_PAGE` a page, at most `IMAGE_PAGES_MAX_USD_PER_JOB`, when that is more than `MAX_USD_PER_JOB` and `MAX_USD_PER_PAGE` allow |
 | `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary that the HTTP cron route and `readablestem ops cron` both run (docs/steps.md, docs/operations.md). All on by default in code; the Decisions ones do nothing with `MODEL_PROVIDER=anthropic` |
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai` is the default in code; production's provider is in the production profile) and its key and models |
-| `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organization-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
+| `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (defaults in `config.py`), the workspace id an organization-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `MODEL_ANSWERS_FILE`, `MODEL_ANSWERS_OFFLINE`, `MODEL_ANSWERS_REKEY`, `MODEL_ANSWERS_LIVE_USD` | Dev and test only: the real client sits behind a JSON-lines file of recorded answers (`eval/answers.py`, the format `eval pipeline --answers` uses). `MODEL_ANSWERS_REKEY=true` reads a file recorded before 2026-11-11 through its older keys and writes each row found that way again under the new one (docs/eval.md, "Recorded answers"). A recorded request is answered from the file at no cost; any other is asked and appended, so a walkthrough or browser test pays for each answer once. With `MODEL_ANSWERS_OFFLINE=true` a missing answer is refused instead of asked, so a replay spends nothing. `MODEL_ANSWERS_LIVE_USD` is the most one process may pay for answers the file lacks: once that is spent a missing answer is refused in the same way, and replayed answers do not count. A replay also needs no room under `DAILY_SPEND_CAP_USD`: uploads and the worker are not held back by the headroom a live call needs (`web.spend.conversion_headroom_usd`), so a copy of the server with a $0.01 cap still converts. Conversions and review-screen re-reads are both recorded. With the Claude second check on (`CLAUDE_SECOND_CHECK`), its answers go into the same file (step `check`) and replay from it, offline as well; a verdict the file lacks comes back as an unanswered check, with no call. Ignored with `FAKE_MODELS`; refused in production. Keep the file outside the repository |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
@@ -102,7 +102,11 @@ value and where that value came from. This page does not repeat those values.
 
 ## Routes
 
-In the Who column, `owner`, `review` and `view` are what a document's routes need
+The routes themselves are the decorators in `web/routes/*.py` and `web/app.py`; that is the
+list. This table says who may call the main ones and what they do. It leaves out routes
+described in the section of their feature (sharing, courses, the class link, sign-in) and the
+admin, SEO and file routes, so a route missing here is not a route that does not exist.
+`tests/_routes.py` names the routes the tests answer. In the Who column, `owner`, `review` and `view` are what a document's routes need
 (`routes.jobs.job_access`; "Sharing a document" below): the owner always has it, and a person
 the owner shared the document with by email has it if their right is that one or a higher one
 (`view` < `review` < `owner`). `signed in` routes are about the person's own account and lists.
@@ -116,6 +120,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/demo/listen` | anyone | "Listen as a student" for the stored demo: the transcript of what a screen reader roughly says, with the player ("Listen as a student", below); `noindex`, read-only |
 | GET `/guides` | anyone | The list of the guides below it, each with an audience line, its summary and date (`seo.GUIDES`); in the sitemap, `llms.txt` and the footer. The comparison guide ("Choosing a tool for STEM course files") opens with a short decision list by file and need, then the table; its Inputs cell and the landing, limits, ADA, offices and privacy pages name LaTeX source only when `latex_source` is on |
 | GET `/privacy`, `/terms` | anyone | Each opens with a short summary (privacy: a retention table, `_retention_table.html`, the default and every exception, from the settings; terms: "In short"). The beta wording, describing the real behavior (hourly purge, the `backup` service's daily database dumps kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
+| GET `/privacy/retention` | anyone | The retention summary, a one-page HTML download for an office (`retention_summary.html`): what is kept, for how long, who receives it and the deletion rules, from the same settings, data list (`offices.data_items`), recipients and `_deletion_rules.html` as `/privacy` and `/security`. Linked from `/privacy` and `/security` |
 | GET `/for-accessibility-offices` | anyone | The page for an accessibility or procurement office (`web/offices.py`, `offices.html`): data flow (an SVG with a described list as its text equivalent), a table by kind of data (what is sent where and for how long) at the top, written from `offices.data_items`, a pointer to the table by company on `/security#by-company` (one row per entry of `web/recipients.py`, the list `/privacy` uses, so tracing and analytics appear only when on), retention from the settings (`_retention_table.html`), no training and the `store` setting (OpenAI path only), student records (FERPA), what the tool does not do, an eight-step pilot checklist. It makes no conformance claim (`tests/test_web_offices.py`). Linked from every footer, in the sitemap and `llms.txt` |
 | GET `/for-accessibility-offices/summary` | anyone | The same facts on one printable page, a self-contained HTML file sent as a download (`offices_summary.html`, inline style, no script, `VIEW_CSP`); not indexed. Its table of data is the page's (`offices.data_items`), the pilot is an ordered list, and it prints on one Letter or A4 page (`tests/test_web_ux2_lane_d_browser.py`) |
 | GET `/limits` | anyone | Known limits: what you can upload first (file types, size, daily limits, storage, how long it is kept), then what it handles and does not do, how much review it needs, and the measured accuracy (including tables, links, color, language and file types, as this server is set up) |
@@ -169,7 +174,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/download.epub` | view | The document as an EPUB 3 publication (`pipeline/export_epub.py`). Same rules, errors and recording as the Word file (file type `epub`); a plain link in the EPUB route of "Where will you post it?" |
 | GET `/jobs/{id}/share` | owner | Who can open this document (G1, "Sharing a document" below): the people and their right, the form to add one, the document's address to copy. 404 for a sample or an unfinished document |
 | POST `/jobs/{id}/share` | owner | Give a person (`email`, in full) the right `role` (`view` or `review`), or change theirs; 422 with the reason beside the field for an address that is not one, your own, a right that does not exist, or an eleventh person. CSRF-checked, nothing is sent |
-| POST `/jobs/{id}/share/{share_id}/revoke` | owner | Remove one person's access; it stops on their next request. CSRF-checked |
+| POST `/jobs/{id}/share/{share_id}/revoke` | owner | Without `confirm=yes` the answer is the question "Remove <address> from <title>?" (`share_remove_confirm.html`; no address is in a URL, and nothing is written); with it, remove the person's access, effective on their next request. A second click on a person already gone gets the same notice as the first. CSRF-checked, one-submit form `share.revoke` |
 | GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
@@ -191,7 +196,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/pages/{n}/omit`, `/restore` | review | Leave page `n` out of review and of the student file (T3-16), and put it back. From a kept-image card the form also sends `after=review` (and `view`): the reviewer then goes on to the next decision instead of the page tools |
 | POST `/jobs/{id}/tables/accept-clean` | review | Accept every table that waits with nothing wrong found in it (T3-11), one write |
 | POST `/jobs/{id}/tables/{element_id}/read-cell` | review | Read a table's math cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
-| GET, POST `/jobs/{id}/delete` | owner | A "Delete “<title>”?" confirmation page (the file, its upload time, the decisions made on it; the button is named `Delete “<title>”`, cut at 48 characters, and "No, keep it" is a button of the same size); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list. The account, course and upload-discard confirmations follow the same pattern (`page-confirm` body class, compact footer) |
+| GET, POST `/jobs/{id}/delete` | owner | A "Delete “<title>”?" confirmation page (the file, its upload time, the decisions made on it; the button is named `Delete “<title>”`, cut at 48 characters, and "No, keep it" is a button of the same size); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list. The account, course and upload-discard confirmations follow the same pattern (`page-confirm` body class, compact footer), and so do the questions for removing a person (a course's People section, the share page, the Admin page), a symbol and a class link: one heading that is the question, a short paragraph of what is lost, and two choices of the same size, the destructive button named for the thing and "No, keep it". `_delete_notes.html` ("Not reached by deleting": backups, what was already sent to the AI providers) is added to the pages that delete stored documents, files, a course or the account, since only those leave copies behind; removing access deletes nothing, so those pages do not carry it. The older delete pages and the newer ones are the one shape (WS24.6, O-108) |
 | GET, POST `/jobs/{id}/feedback` | view | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
 | GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all"); `?format=` as for `/app/download` |
@@ -514,7 +519,7 @@ the first sign-in makes an account and how to delete it (`ops/launch.py`).
 `POST /jobs` checks, in order:
 
 1. the daily spend cap: if not even the largest single model call the pipeline makes
-   fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031 on the OpenAI pair and about $0.11 on `claude-opus-5-5` at 2026-10 prices:
+   fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, priced by `models/pricing.py`:
    a display equation on the main model), a friendly 503 page ("Conversions are paused
    for today"). A smaller threshold admitted uploads that could convert nothing;
 1a. the wait a refusal states (`quota.retry_after`, `Wait`): every refusal that tells a person to come back builds its
@@ -833,7 +838,8 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   start numbers, tables with spans and a header row only when the author marked one (an unmarked
   first row is a proposal with a check), pictures with the author's alt text (accepted without
   a model; a picture without text goes to the figure step), footnotes (in the text, as a note),
-  links, super- and subscripts, the title style, captions, and every equation typed in Word
+  links, super- and subscripts, bold, italic, fixed-pitch and highlighted words as runs
+  (docs/output.md "From a Word or LaTeX source"), the title style, captions, and every equation typed in Word
   (`m:oMath`): pandoc writes LaTeX, which goes through `read_latex`, `check_latex` and
   `safe_latex_to_mathml` and then to the same fix a LaTeX equation gets. One that cannot be
   converted is shown as its LaTeX and is a required decision (the equation element is listed
@@ -843,7 +849,9 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
 - **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
   copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
   `w:lang`, the document language is the most common one; headers and footers (dropped) are
-  counted (`word_headers_footers`, optional); a default table style (read as a header row by
+  counted (`word_headers_footers`, optional); color (dropped) is counted from the file's runs
+  (`colour_used`, optional); a font set on a run, not in a style (dropped), makes a run "Verbatim
+  Char" when it is fixed-pitch; a default table style (read as a header row by
   pandoc) is told from a marked header row; SmartArt, charts and embedded objects (silent) are
   counted as the required notice `word_objects`; the Title style, which pandoc moves to its
   metadata (with Subtitle, Author, Date and Abstract), is the title and a level 1 heading, the
@@ -855,6 +863,18 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   otherwise counted by the coverage rule: every word of the file is in pandoc's tree or counted as
   `source_unread` (a required notice) so nothing is left out without a number. Tracked changes
   are read as accepted, and say so (`word_tracked_changes`, required).
+- **Tables and equations in the reading.** A table with no header marking (no repeated header
+  row, no first-row flag) is the choice a PDF table with no header has: `table.headers`
+  `no_headers`, required, with the first row, the first column, both, or "not a table", and no
+  Accept; no model is asked (`ltx_reader.headers_to_choose`, which a LaTeX source's table gets
+  too). A table too large for a grid (over 300 rows, 60 columns or 5,000 cells) is a list, one
+  item for each row; a formula in it is an equation element of the item, read and checked like
+  any other, and the table is the required notice `word_table_flattened`. A failed equation is
+  counted in `Report.math_failed` and is a required decision where it is shown; the reading's
+  `errors` count is the LaTeX reader's alone (its `source_error` notice).
+- **Pages.** A source has none: its elements' page is 0, so the review list names no page for
+  an item (`ReviewItem.page` 0) and offers no page filter, and a link or a record row names the
+  part, not a page.
 - **What is stored.** The file as uploaded, wrapped in the envelope (`source/envelope.py`, kind
   `docx`, media type `application/x-readablestem-docx`), as the job's `upload` row of `blobs`: the
   same row, counted in the person's stored bytes and deleted with the document (`delete_jobs`,
@@ -1014,14 +1034,24 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
   room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time limit: a macro that
   calls itself, a very large file; not offered "Try again") or `timeout` and the message "Upload
-  the PDF instead"; nothing half-made is kept. If LaTeXML or the sandbox is missing, the upload
+  the PDF instead"; nothing half-made is kept. A Word file read from the file itself that fails has no
+  PDF route to fall back to (with the switch off the PDF is made at upload, by LibreOffice, and
+  its pages are what is charged; a job made from the Word file has no such PDF), so its job page
+  says what to do: save the Word file as a PDF and upload that (`kind` "docx" in the job's
+  `error_detail`, `views.WORD_STOP_MESSAGES`). If LaTeXML or the sandbox is missing, the upload
   itself is refused at once.
 - **Lost content stops the job.** LaTeXML exits 0 when it drops content; what it said is in its
   log (`out/latexml.out`, `out/post.out`), which `source.report.parse` reads into
   `DocumentResult.source_report` with the error nodes the reader found (`SourceReport`). A loss
   outside a formula stops the job (`source.report.stop`): `source_missing_file` (an `\input` or
   `\include` that is not in the upload, or a `\bibliography` whose `.bib` is not: the one error of
-  `latexmlpost` that stops a job), `source_syntax_error` (an unclosed brace or environment,
+  `latexmlpost` that stops a job), `source_loop` (LaTeXML itself says a command calls itself:
+  "expands into itself", or Perl's or LaTeXML's "deep" or "excessive recursion" for a nest that
+  never closes; the sentence names the command when LaTeXML does, and says that trying again
+  will not help and to look for the command on one's own computer; a loop LaTeXML does not name,
+  like two commands calling each other, or one that only grows, is told from a very large source
+  by nothing in the log and ends at the time or memory limit as `source_timeout` or
+  `source_failed`), `source_syntax_error` (an unclosed brace or environment,
   with its file and line; or a `^`, `_`, `&` or `#` in running text, named with what to write
   instead), `source_unsupported_class` / `source_unsupported_package` (no binding,
   and the document used what it defines; a `.sty` in the upload is not read either; a class read
@@ -1242,12 +1272,11 @@ wants a colleague or an accessibility coordinator to read it or to review it wit
 - **The owner's side.** The job page's "Share this document" opens `/jobs/{id}/share`: a
   one-line "add a person, copy the link, send it yourself", a form (email address; View or
   Review as whole-row choices, each with what it allows; the Share button has when access ends
-  beside it), the people with access with "Change ... to" and "Remove ..." (a danger button)
-  per person, the document's address to copy: a selectable read-only box that wraps, so the
+  beside it), the people with access with "Change ... to" and "Remove ..." (an outlined danger
+  button that opens the question first, as every other Remove does) per person, the document's address to copy: a selectable read-only box that wraps, so the
   whole address shows at any width (the class link's address is the same), plus a "Copy link"
   button that `static/copy-link.js` shows (with a polite confirmation; without script the box is
-  copied by hand). In forced colors "Remove ..." keeps a thick double edge, so it does not
-  look like the "Change ... to" button. Beside the address the page says when the document is deleted (every share
+  copied by hand). Beside the address the page says when the document is deleted (every share
   ends then) and links to the job page's keep controls. The sign-in wording names only the
   providers this server has (`routes.sharing.sign_in_words`); the exact-address rule is under
   "Help with sharing", and an error summary sits directly above the form. Nothing is emailed; the
@@ -1490,7 +1519,7 @@ Every sentence about what was converted, checked or reviewed is made from one mo
 `pipeline.checked.CheckedSummary`, by one module, `pipeline/checked_words.py`; no template
 writes such a sentence. The summary is computed from the stored result (`checked.of_result`:
 its elements, fixes, pages left out and the page's structure checks) and is never stored. It
-holds what was converted by kind (equations in MathML, figures described or marked as
+holds what was converted by kind (equations in MathML, counted only when the page's sanitizer accepts the MathML, figures described or marked as
 decoration, tables rebuilt or written as text, the parts not converted with their kind and page,
 each shown as a picture of the original or, for an equation of a Word or LaTeX file, which has no
 picture, as its LaTeX text (`Picture.as_text`), the pages left out), the structure checks (how many ran, which failed), what people did
@@ -1514,7 +1543,8 @@ checked, the day of the last decision and the version.
 - "Every part the tool found was converted." is the sentence for a whole job, never
   "Everything was converted": ink the tool did not find is not counted until page facts exist.
   A LaTeX source whose reader left words or pictures unread (`checked.unread_of`, from
-  `SourceReport.unread_words` and `unread_pictures`, SW42.4) is not whole either: the student
+  `SourceReport.unread_words` and `unread_pictures`, SW42.4; a Word file's reader leaves a
+  report with those two counts only when it left something unread) is not whole either: the student
   note and its opening notice say "14 words of the LaTeX source could not be read and are not
   in this file", the owner's lines say they "were not read", and the record says "No".
 - The job page's pictures line, notes line, structure-checks line and "What was checked, and
@@ -1717,6 +1747,15 @@ in the reader's time zone with how far away it is ("Fri, Oct 9, 6:32 PM CDT (in 
 hours)"), also in lists swapped in by htmx (a mutation observer looks only at the nodes that
 were inserted, not at the whole page again). Without JavaScript the UTC text stays (UX
 review MF16). The `utc_text` filter is the plain text, for titles and attributes.
+
+A day with no time of day is written by one function, `web.dates.format_day` (the `day` template
+filter): "October 9, 2026", or "Oct 9, 2026" with `'short'`, from a date, a time (put in UTC
+first) or an ISO date. It is used for the day a version was made, a policy's date, the last day
+of a class link, the offices summary's "Facts as they were on ...", the admin page's day columns
+and canary days, and a quota's reset time (`format_time`, "00:00 UTC"). The pipeline's
+About-this-document date uses the same words (`checked_words.long_date`). Left as they were on
+purpose: the operator console and `ops` reports (ISO days, for sorting and pasting), machine
+`datetime` attributes and `<input type="date">` limits.
 
 ## Courses and notation (`web/routes/courses.py`, `web/notation.py`)
 
@@ -1997,7 +2036,8 @@ or "compliance" (`tests/test_web_record.py` checks both). It goes when the docum
 first. CSV cells that start like a formula (`=`, `+`, `-`, `@`) get a quote in front; the file
 starts with a byte order mark so Excel reads non-English letters right. Its columns are
 `section, item, page, tool_had, decision, by, when_utc, detail`, with the sections `document`,
-`summary`, `decision`, `open`, `not_converted`, `check` and `not_checked`.
+`summary`, `decision`, `open`, `not_converted`, `check`, `not_checked` and `handled` (the job page's
+"Handled in this file" lines, made by `job_page.handled_lines`, one row each).
 `docs/vendor-information.md` is the matching one-page sheet for a procurement office: what the
 tool does, what happens to a document, and where it falls short. The site's own page for such an
 office is `/for-accessibility-offices`; change the sheet and that page together.
@@ -2048,12 +2088,22 @@ the site is built, with the same component and the same script).
   **Layout (F-465).** The transcript has the reading width (`--prose-max`) with the role as a
   small line above the text. In a window 64rem or wider a second column (`.listen-thing`)
   draws the selected item itself: the equation as MathML (`Item.thing`, from the same parsed
-  MathML the reading is made from), a table's first 40 rows, or a picture when its data is under
-  150,000 characters (a larger picture is left to the student page, so a page never carries its
-  images twice). It is filled by `listen.js` from the `<template data-listen-thing>` in the
+  MathML the reading is made from), a table's first 40 rows, or a picture. A picture whose data
+  is under 150,000 characters is copied into the row; a larger one is not (a page would carry
+  its images twice): the panel loads it from `/jobs/{id}/crops/{figure id}.png`, the crop the
+  student page's figure was cut from, which the same people may load (view access, as for the
+  page), and where there is no such address (the demo) it says "This picture is on the student
+  page." It is filled by `listen.js` from the `<template data-listen-thing>` in the
   item's row when the place changes, and it is `aria-hidden`, never takes focus and is not a
-  live region, so a screen reader hears the item once, from the transcript; a narrow window has
-  no second column. Every item also has a link, "Student page", to its place on `/jobs/{id}/view`
+  live region, so a screen reader hears the item once, from the transcript. A narrow window has
+  no second column, by decision (WS23.4): below 64rem the item would have to go above or under
+  the line being read, and at 320, 390 and 768 px (measured at 100% zoom; 200% only makes the
+  window shorter) a figure is 890 to 1,030 px wide at its own size, so it either shrinks until
+  its writing cannot be read or becomes a second scroll area, a table can be 40 rows tall, and
+  the transport that sticks already takes 58 to 106 px of a short window; the transcript
+  already says in words what the item is, and the "Student page" link opens it. The panel is
+  not drawn there, and a large picture's `<img>` is `loading="lazy"`, so it is not fetched
+  either. Every item also has a link, "Student page", to its place on `/jobs/{id}/view`
   (`Item.anchor`: the id of the element the item came from, else the nearest element before it
   that has one, else the top of the page); the demo and the showcase pages have no student page
   and show no link.
@@ -2363,13 +2413,15 @@ there). What it does not do:
 - **Pay for finished steps again.** While a job converts, each model step whose answer is
   worth keeping (`pipeline.run.reusable`: not `model_*`, `budget_*`, `internal_error` or
   `crop_error` failures, which a new try could change) is stored in `step_records` under a
-  key made from the element, its picture, its nearby text, the conversion options, every
+  key made from the element, its picture, its nearby text, the conversion options its step
+  reads (equations: the course notation; tables: the tables switch; figures: exam mode and
+  long descriptions, `pipeline.run._STEP_OPTIONS`), every
   behavior setting of the production profile and a digest of the conversion code and its
   prompts (`pipeline.run.step_key`, `code_identity`). A later conversion of the same job
   takes those answers instead of calling the model, so a retry spends only on what was
   missing; the cost and calls of the steps given back are taken off the new result's totals
   (`DbStepCache.reused_usd`), so `jobs.cost_usd` counts every step once. A changed key (a
-  new course notation, exam mode, another model, a changed setting, a deploy that changed
+  new course notation (equations), exam mode (figures), another model, a changed setting, a deploy that changed
   the conversion code) asks again: a stored fix is the model's answer after the code has
   judged it, so it is good for that code only, and nobody has to remember a version bump.
   The passes that ask about a whole page (page math, the page witness, a page read from
@@ -2497,7 +2549,10 @@ From top to bottom:
    There is no percentage and no finish time. The batch page includes the same part
    ("Uploaded 4 minutes ago.", slow after 15 minutes).
 2. **The steps**, outside the live region and polled on their own: "Reading the layout:
-   16 pages", "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
+   16 pages" (while the layout runs, "Reading the layout: 7 of 16 pages" with the step's
+   progress bar: the pages whose table search is done, the part of the layout that takes
+   most of its time, told by `layout.analyze(on_page=...)` through the same stage events as
+   the other steps), "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
    and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
    "Building the HTML file", "Running the structure checks", each "(done)" or "(in
    progress)". Without JavaScript the page shows them as they were when it loaded, with
@@ -2656,6 +2711,9 @@ From top to bottom:
    (`assemble.contact_link`, which checks it again). The `mailto:` subject is the document's
    title and the item by kind and page ("Equation on page 3"), never its content; the body is
    empty. The link text says what it does ("Email your instructor about this equation").
+   The draft a reviewer downloads has no such link: the person who checks it is not the
+   student, so each note there says where the student's file has the link
+   (`assemble.DRAFT_CONTACT_NOTE`).
    Nothing is sent or stored by the app. Both are CSRF-checked, owner
    only, finished jobs only; an unusable line shows the job page again, status 400, with
    the error under the field and the typed text kept. Neither is logged.
@@ -3387,6 +3445,37 @@ flag in `sessionStorage`), as it does after a saved decision. On each card the c
 first after the heading (equation, heading, text, figure, table, repeated-heading and page
 cards), so Accept is at most three Tab stops from the heading.
 
+**A group the page advises as bold.** On a repeated-heading card where the page advises bold
+text, "Keep as headings" is the other choice (`data-anyway="advice"`), so A does not press it:
+focus goes to the button and the status line says the page suggests the other choice. The
+keyboard browser test runs this path on a group labeled "Solution".
+
+**Known limits of the review screen.**
+
+- The list view has no keyboard shortcuts and its cards are not reordered. The shortcuts
+  act on the one card the review screen shows (`#decision`, its `.decision-nav` links, the key
+  list written from that card). The list view has no such card: every card is on the page at
+  once, the heading group's buttons are not marked `data-role="accept"`, and N and P have
+  nothing to go to. Acting on "the card that holds focus" would need a second handler and a key
+  list that changes with focus, so the list view is worked with Tab and the buttons.
+- Once the window is scrolled, the side-by-side page pane is about a header's height shorter
+  than it could be: its height is measured once under the header (`--page-top`), not followed
+  as the header scrolls away. Accepted, not built.
+- The instructor's preview (`GET /jobs/{id}/view`, `routes.jobs.student_page`) is the bare
+  student file, with nothing of the app around it, and it carries nothing that is not in the
+  file. The way back to the page tools is the browser's Back button and the job page ("Fix
+  something on a page").
+- A picture of an item or of a region cut on request (`/jobs/{id}/regions/{element}.png`,
+  `/jobs/{id}/pages/{n}/region.png`) is not cut on a phone: it is shown whole in the same
+  focusable, named box that scrolls sideways as a crop (`templates/_crop.html`
+  `region_image`), at most one and a half times the column wide, so a heading is in view
+  whole and its words are large enough to read (at the picture's own size, three pixels a
+  point, a heading ran off the screen). Its tag carries a width and height worked out before it is cut
+  (`compare.region_pixels`, `routes.edits.region_crop_pixels`) so the page does not move while
+  it loads. A heading's and a table's edges move to whole lines when the picture is cut, so
+  its height is a little more than the picture's own (a band's picture was 154 px high where
+  188 was given): the page then moves by that difference once.
+
 **Describe it in words** (T3-16; `web.review.describe_in_words`, `templates/_describe.html`).
 An item shown as an image (an equation or table kept as the original, a page or handwriting
 kept as an image; `web.review.can_describe`) has a folded "Describe it in words" box, in both
@@ -3447,7 +3536,7 @@ an edit or an error, and when `tools=1`) with, in this order:
   item, a heading, program code, a glossary entry or a footnote, and the route refuses those with
   the same words. The change is one `ReviewEdit` (`set_role`, an Undo snapshot of the element,
   counted among the changes to pages), the page's HTML is made again when asked for, and it then
-  has the paragraph in its `<aside aria-label="Sidebar">` or `<blockquote>`, neighbors of one
+  has the paragraph in its `<aside aria-label="Sidebar">` (numbered when the page has several) or `<blockquote>`, neighbors of one
   role in one wrapper. There is no keyboard shortcut for it: the list of keys on the review
   screen (N, P, A, E) is for decisions, and "Make it a heading" has none either. A paragraph made
   a heading loses its role.
@@ -3494,8 +3583,10 @@ an edit or an error, and when `tools=1`) with, in this order:
 - *Add something the tool missed.* Step 1 is a plain GET form: a picture or an equation on its
   own line, and the region as four numbers from 0 to 100 (left and right across the page, top
   and bottom down it), or by two lines: "Starts after line" and "Ends before line", two selects
-  filled from the page's paragraphs, list items and headings in reading order (each option is
-  the line's first words, with "the top of the page" and "the bottom of the page" as ends; no
+  filled from the page's paragraphs, list items and headings in reading order, every one of
+  them however dense the page (each option is its number from the top of the page and the
+  line's first words, so typing a line's number in the list goes to it; "the top of the page"
+  and "the bottom of the page" are the ends; no
   view of the image, no JavaScript). The server writes the box the lines make into the four
   numbers (`page_edits.region_between`: below the first line, above the second, as wide as the
   page's text margins, rounded outward), so step 2 and the add route are the same for both; when

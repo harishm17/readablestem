@@ -53,7 +53,7 @@
   </div>
   <div class="visually-hidden">
   <table>
-    <caption>ReadableSTEM, the chatbot on Opus and the chatbot on Haiku, on {{ proof_facts.set_label }}: {{ proof_facts.pipeline }}, run recorded {{ proof_facts.date }}</caption>
+    <caption>ReadableSTEM, the chatbot on Opus and the chatbot on Haiku, on {{ proof_facts.set_label }}: {{ proof_facts.pipeline }}, run recorded {{ proof_facts.date|day }}</caption>
     <thead>
       <tr><th scope="col">Measure</th>{% for line in rows[0].lines %}<th scope="col">{{ line.system }}</th>{% endfor %}</tr>
     </thead>
@@ -74,7 +74,7 @@
     {% else %}
     <p>{{ proof_facts.numbers.units }} documents the tool had never seen (arXiv papers, textbook sections,
       course notes), {{ proof_facts.numbers.gold }} equations, a test set up before it ran, {{ proof_facts.pipeline }},
-      run {{ proof_facts.date }} (<a href="{{ proof_facts.facts[0].href }}">the registered report</a>).
+      run {{ proof_facts.date|day }} (<a href="{{ proof_facts.facts[0].href }}">the registered report</a>).
       {{ proof_facts.settings_line }}</p>
     <p><strong>On the main score, what a listener hears, ReadableSTEM and the Opus chatbot are
       level</strong> ({{ proof_facts.facts[0].value }} and {{ proof_facts.chart[0].lines[1].value }}): the

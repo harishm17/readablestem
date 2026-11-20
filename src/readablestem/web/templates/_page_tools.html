@@ -1,6 +1,7 @@
 {# Audiences: owner, reviewer #}
 {% from "components/forms.html" import form with context %}
 {% from "components/fields.html" import field_classes, field_error, field_aria %}
+{% from "_crop.html" import region_image %}
 {# The page tools (T3-5, T3-16), under the optional checks on the review screen: change the
    words of a paragraph or a heading, make a line a heading, add a picture or an equation
    the tool missed, leave the page out of the student file (and put it back). Included by
@@ -39,7 +40,6 @@
       {% endif %}
       {% endfor %}
     </ul>
-    {% if tools.lines_cut %}<p class="hint">{{ tools.lines_cut }} more {{ "line is" if tools.lines_cut == 1 else "lines are" }} not listed here.</p>{% endif %}
     {% else %}
     <p>Nothing was found on this page that has words to change.</p>
     {% endif %}
@@ -121,7 +121,7 @@
     {% set add = tools.add %}
     {% if add.confirming %}
     <figure class="region-preview">
-      <img class="region-image" src="{{ add.preview_url }}" alt="The part of page {{ tools.number }} you chose, cut out.">
+      {{ region_image(add.preview_url, "The part of page " ~ tools.number ~ " you chose, cut out.", add.preview_size, "the part of page " ~ tools.number ~ " you chose") }}
       <figcaption>The part of page {{ tools.number }} you chose.</figcaption>
     </figure>
     {% call form("review.add_region", "/jobs/" ~ job.id ~ "/pages/" ~ tools.number ~ "/add", {"class": "decide-form"}) %}
@@ -168,18 +168,18 @@
       {% if add.lines %}
       <fieldset class="table-fieldset region-lines" aria-describedby="lines-hint-{{ tools.number }}">
         <legend>Or choose it by the lines around it</legend>
-        <p class="hint" id="lines-hint-{{ tools.number }}">It is the part of the page between the two lines, across the width of the text. If you choose lines here, they are used and the four edges above are not.</p>
+        <p class="hint" id="lines-hint-{{ tools.number }}">It is the part of the page between the two lines, across the width of the text. If you choose lines here, they are used and the four edges above are not. Every line of the page is listed, numbered from the top: in a list, type a line's number to go to it.</p>
         <div class="region-grid">
           <div class="field"><label for="after-{{ tools.number }}">Starts after line</label>
             <select id="after-{{ tools.number }}" name="after">
               <option value="">No line chosen</option>
               <option value="top"{% if add.after == "top" %} selected{% endif %}>The top of the page</option>
-              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.after == line.element_id %} selected{% endif %}>{{ line.preview }}</option>{% endfor %}
+              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.after == line.element_id %} selected{% endif %}>{{ loop.index }}. {{ line.preview }}</option>{% endfor %}
             </select></div>
           <div class="field"><label for="before-{{ tools.number }}">Ends before line</label>
             <select id="before-{{ tools.number }}" name="before">
               <option value="">No line chosen</option>
-              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.before == line.element_id %} selected{% endif %}>{{ line.preview }}</option>{% endfor %}
+              {% for line in add.lines %}<option value="{{ line.element_id }}"{% if add.before == line.element_id %} selected{% endif %}>{{ loop.index }}. {{ line.preview }}</option>{% endfor %}
               <option value="bottom"{% if add.before == "bottom" %} selected{% endif %}>The bottom of the page</option>
             </select></div>
         </div>

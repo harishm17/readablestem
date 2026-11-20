@@ -7,7 +7,6 @@ import html
 import json
 import re
 import struct
-from datetime import date
 from functools import cache
 from pathlib import Path
 
@@ -20,6 +19,7 @@ from readablestem.pipeline import export_docx
 from readablestem.web import analytics, office_convert, offices, outcome, proof_facts, seo
 from readablestem.web.assets import cached_html, fixed_file, static_url
 from readablestem.web.database import ping
+from readablestem.web.dates import format_day
 from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from readablestem.web.deps import SESSION_FLASH, current_user, get_ctx, render
 from readablestem.web.health import ops_freshness, readiness
@@ -235,7 +235,7 @@ def for_accessibility_offices_summary(request: Request) -> Response:
     context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
     context["latex_source"] = _features(request)["latex_source"]
     context["proof_facts"] = proof_facts.load()
-    context["as_of"] = utcnow().date().isoformat()
+    context["as_of"] = format_day(utcnow())
     context["style_tag"] = offices.summary_style_tag()
     return render(
         request,
@@ -244,6 +244,26 @@ def for_accessibility_offices_summary(request: Request) -> Response:
         headers={
             "Content-Security-Policy": VIEW_CSP,
             "Content-Disposition": f'attachment; filename="{offices.SUMMARY_FILENAME}"',
+        },
+    )
+
+
+@router.get(offices.RETENTION_PATH)
+def retention_summary(request: Request) -> Response:
+    """What is kept, for how long, who receives it and how it is deleted, as a self-contained
+    HTML file to download or print. Written from the data list, the retention table and the
+    deletion rules the privacy notice and the security page are written from (web.offices)."""
+    ctx = get_ctx(request)
+    context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["as_of"] = format_day(utcnow())
+    context["style_tag"] = offices.summary_style_tag()
+    return render(
+        request,
+        "retention_summary.html",
+        context,
+        headers={
+            "Content-Security-Policy": VIEW_CSP,
+            "Content-Disposition": f'attachment; filename="{offices.RETENTION_FILENAME}"',
         },
     )
 
@@ -322,14 +342,9 @@ def _guide_context(path: str) -> dict[str, object]:
     page = next(page for page in seo.PUBLIC_PAGES if page.path == path)
     return {
         "updated": page.updated,
-        "updated_text": _long_date(page.updated),
+        "updated_text": format_day(page.updated),
         "published": page.published or page.updated,
     }
-
-
-def _long_date(iso: str) -> str:
-    day = date.fromisoformat(iso)
-    return f"{day:%B} {day.day}, {day.year}"
 
 
 @router.get(seo.GUIDES_INDEX)
@@ -339,7 +354,7 @@ def guides_index(request: Request) -> Response:
     for guide in seo.GUIDES:
         page = next(p for p in seo.PUBLIC_PAGES if p.path == guide.path)
         guides.append(
-            {"guide": guide, "updated": page.updated, "updated_text": _long_date(page.updated)}
+            {"guide": guide, "updated": page.updated, "updated_text": format_day(page.updated)}
         )
     return render(request, "guides.html", {"guides": guides})
 

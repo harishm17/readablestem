@@ -9,13 +9,14 @@ import bisect
 import math
 from collections import Counter
 from collections.abc import Collection, Sequence
+from dataclasses import replace
 from functools import cached_property
 from typing import Any, cast
 
 import pymupdf
 
 from readablestem.core.types import BBox, Kind
-from readablestem.pipeline import baseline_rules, page_type, say_once, tables
+from readablestem.pipeline import baseline_rules, named_links, page_type, say_once, tables
 from readablestem.pipeline.layout import regions
 from readablestem.pipeline.layout.blocks import (
     _TEXT_BLOCKS,
@@ -41,6 +42,7 @@ from readablestem.pipeline.layout.display import (
     _contiguous_regions,
     _equation_regions,
     _mark_case_rows,
+    _promote_numbered_lines,
     _split_braced_systems,
     _split_exercise_numbers,
     _split_labels,
@@ -81,7 +83,7 @@ from readablestem.pipeline.layout.furniture import (
     _norm_margin,
     _rotated_key,
 )
-from readablestem.pipeline.layout.glyphs import _MATH_SYMBOL_FONT, _Char, _union
+from readablestem.pipeline.layout.glyphs import _MATH_SYMBOL_FONT, NOTE_MARK_FLAG, _Char, _union
 from readablestem.pipeline.layout.inline_runs import _classify_row, _equation_pictures
 from readablestem.pipeline.layout.order import (
     Gutter,
@@ -152,6 +154,7 @@ def _split_furniture(
     number = cast(int, page.number)
     gone = {id(f) for f in frags if margins.drops(f, height)}
     placed = {id(f) for f in frags if id(f) not in gone and margins.at_place(f, height, number)}
+    gone |= margins.by_shape(frags, height, gone | placed)
     placed -= _attached(frags, placed, gone, height)
     out = gone | placed
     standing = [f for f in frags if id(f) not in out]
@@ -419,7 +422,8 @@ def _page_blocks(
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(
-        _split_braced_systems(_split_labels(rows), document=document), document=document
+        _split_braced_systems(_split_labels(rows, document=document), document=document),
+        document=document,
     )
     _mark_notes(rows, number, page_rect.height, ctx)
     for row in rows:
@@ -431,6 +435,7 @@ def _page_blocks(
     _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
+    _promote_numbered_lines(rows)
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []
@@ -1076,6 +1081,7 @@ def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
             and block.kind == Kind.PARAGRAPH
             and not prev.code
             and not block.code
+            and not any(row.note for row in prev.rows)  # a footnote the file names ends there
             and block.bbox[1] < prev.bbox[1]
             and prev.rows[-1].clean[-1:] not in tuple(".?!:")
             and block.rows[0].clean[:1].islower()
@@ -1313,13 +1319,14 @@ _FOOTNOTE_MARKS = frozenset("*\u2020\u2021\u00a7")
 
 def _row_at(rows: Sequence[_Row], point: tuple[float, float]) -> _Row | None:
     """The line a destination points at: hyperref puts it a little above the top of its
-    line, so the row whose top is nearest below it (or at it), at its x."""
+    line, so the row whose top is nearest below it (or at it), at its x. Some classes put
+    it at the foot of a one-line note, a little under the line: when no row has it above its
+    top or within it, the row it lies just under."""
     x, y = point
-    near = [
-        r
-        for r in rows
-        if not r.vertical and r.y0 - 0.7 * r.size <= y <= r.y1 and r.x0 - r.size <= x <= r.x1
-    ]
+    across = [r for r in rows if not r.vertical and r.x0 - r.size <= x <= r.x1]
+    near = [r for r in across if r.y0 - 0.7 * r.size <= y <= r.y1]
+    if not near:
+        near = [r for r in across if r.y1 < y <= r.y1 + 0.3 * r.size]
     return min(near, key=lambda r: abs(r.y0 - y)) if near else None
 
 
@@ -1358,6 +1365,48 @@ def _lead_mark(row: _Row, named: bool) -> int:
     return end
 
 
+def _place_by_mark(
+    rows: list[_Row],
+    refs: Sequence[named_links.Reference],
+    unplaced: list[str],
+    height: float,
+    ctx: _Context,
+) -> None:
+    """A destination the file names but does not place on a line (the symbol notes of an
+    author block point at the corner of the page) starts the one line low on the page, in
+    small type, that opens with the glyphs its link covers in the text. A mark that opens no
+    line, or opens two, places nothing."""
+    for name in unplaced:
+        ref = next((r for r in refs if r.name == name), None)
+        source = next(
+            (r for r in rows if ref is not None and not r.note and _covers(r, ref.box)), None
+        )
+        if ref is None or source is None:
+            continue
+        mark = "".join(source.chars[i].c for i in _mark_chars(source, ref.box)).strip()
+        lines = [
+            r
+            for r in rows
+            if not r.note
+            and not r.vertical
+            and r.y0 >= FOOTNOTE_ZONE * height
+            and r.size < FOOTNOTE_SIZE * ctx.body
+            and (end := _lead_mark(r, named=True))
+            and "".join(c.c for c in r.chars[:end] if not c.blank) == mark
+        ]
+        if mark and len(lines) == 1:
+            lines[0].note = (name,)
+
+
+def _flag_marks(row: _Row, indices: Collection[int]) -> None:
+    """The glyphs at `indices` are a footnote's mark: not maths whatever their font (`_char_class`),
+    so a mark never goes into an inline equation with the word beside it."""
+    for i in indices:
+        row.chars[i] = replace(row.chars[i], flags=row.chars[i].flags | NOTE_MARK_FLAG)
+    for cached in _ROW_CACHES:
+        row.__dict__.pop(cached, None)
+
+
 def _set_off(row: _Row, at: int) -> None:
     """A blank before `row.chars[at]`, between a note mark and the word it touches: the glyph
     where the mark ends is where the split is made (`row.text` and the rest are made again)."""
@@ -1385,10 +1434,14 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
     notes = ctx.notes
     named = notes is not None
     if notes is not None:
+        unplaced: list[str] = []
         for dest in notes.destinations.get(number, ()):
             row = _row_at(rows, dest.point)
             if row is not None:
                 row.note = (*row.note, dest.name)
+            else:
+                unplaced.append(dest.name)
+        _place_by_mark(rows, notes.references.get(number, ()), unplaced, height, ctx)
     marks: set[str] = set()
     for row in rows:
         if row.vertical:
@@ -1397,6 +1450,8 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
         end = _lead_mark(row, named=bool(row.note)) if row.note or (not named and low) else 0
         if end:
             marks.add("".join(c.c for c in row.chars[:end] if not c.blank))
+            if row.note:
+                _flag_marks(row, [i for i in range(end) if not row.chars[i].blank])
             _set_off(row, end)
     heading_rows = [r for r in rows if not r.note and not r.vertical and _heading_sized(r, ctx)]
     for ref in notes.references.get(number, ()) if notes is not None else ():
@@ -1406,6 +1461,7 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
             hits = _mark_chars(row, ref.box)
             if not hits:
                 continue
+            _flag_marks(row, hits)
             if row in heading_rows and hits[-1] == max(
                 i for i, c in enumerate(row.chars) if not c.blank
             ):

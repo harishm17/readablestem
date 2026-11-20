@@ -37,8 +37,15 @@ Element conventions:
   that has no number yet and is not level with a numbered line; a number that fits none
   stays text. A number of one column does not go to the math of the other when text of its
   own column stands within two lines of it. Equation pieces that
-  `display_grouping` does not join keep a number each, or none. A number set less than a
-  font size from its equation (a `multline`'s) is not cut off and stays in the equation's text.
+  `display_grouping` does not join keep a number each, or none. A bracketed number set less
+  than a font size from its equation (a `multline`'s, `CLOSE_NUMBER_GAP` at the least) is cut
+  off when it ends at the right edge of its column's text and what stands before it reads as
+  math on its own (`_closes_display`); elsewhere it stays in the equation's text. A number
+  that stands under the right end of its equation, not beside it, is its label when nothing
+  stands between them (`_number_under`, `_line_over_number`), and a line of math with a few
+  words in it ("... for every n > 0") is a display when such a number stands beside it
+  (`_promote_numbered_lines`). A number left of the math, at the column's margin
+  ("(10.18)" in front of the equation), is not read as a label yet.
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
   `text` does not include the marker.
@@ -116,6 +123,10 @@ guards PyMuPDF, its warning store and the caches, nothing else.
 
 ## How a page is read
 
+The order and the regions of a page are found by rules, with no model and no learned layout
+reader, neither to find them nor as a second opinion
+([ADR 0010](decisions/0010-reading-order-rules-first.md): the figures and what would change it).
+
 0. **Tables first.** On every analyzed page the data tables are found
    (`pipeline/tables.py`, [tables.md](tables.md)) before anything below: their lines,
    rules and `"Table N"` caption leave the page, and each comes back as one TABLE element
@@ -174,7 +185,22 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    and as big as the body or bigger, so it is not apart from it and stays; a first line of
    the body in the band stays too. A bare page number that shares a line with a line that
    stays (a table cell) is not dropped, and a number set at heading size is a chapter
-   number, not a page number. The
+   number, not a page number. A head or foot that no other page repeats (a one-page file, a
+   page cut from a journal) is found by its shape (`_MarginFilter.by_shape`, since
+   2026-11-19): at an edge of the page, up to 4 lines that stand together in the outer 12 %
+   (each less than a line from the one before) and then a line's height clear of the rest of
+   the page, none set as a heading (1.15 x body or bold), one of them with a page number at
+   its start or end (digits, or `Page 3 of 9`; a bare year is not one). A page number alone on
+   its line is taken on a file of any length (a number 90 % of the way down an A4 page is
+   outside the 7 % band); the lines with words, only when the reference holds one page, since
+   on a longer file their words repeat and the repeat rule has them, and only with a number
+   that says it is a page's (`Page 3`, `Page 3 of 9`, `3 of 9`): the name line and the points
+   of a one-page quiz end in a bare number as a running head does (`Points: ... 25`,
+   `Total marks ... 50`), and they stay. A journal's head with a bare page number beside its
+   name stays on a one-page file for the same reason. A head with no page
+   number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
+   under it a line away, so it never stands clear. What goes is counted as `furniture` left
+   out, as on a longer file. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
@@ -339,8 +365,14 @@ so a heading is not, and a line that starts a block is not).
    of a block) counts as at the edge. A tail of two lines or more whose lines all stand
    twelve ems or more in from its page's text edge is in the other column of a page whose
    columns were not told apart (a first page with a one-column head over two columns), and is
-   compared like a tail across columns; an index's lines at several x do not qualify. For a list item the head stands at the item's text,
-   not at its marker. When the place test is in doubt the break stays: a wrong join is worse
+   compared like a tail across columns; an index's lines at several x do not qualify. A tail
+   whose block began in the other column has no edge of its column's: its last two lines at one
+   x are its column's text. The head may also start with something other than a lower-case
+   letter when the tail cannot end where it does: the tail ends on a comma or a semicolon
+   (a head that starts with an acronym or a name), or the head starts with a citation shut by
+   punctuation ("[12]."), the end of a sentence. A head that is a "Table N" or "Figure N"
+   caption never joins (a caption set at the top of the page under a comma tail). For a list item the head stands at the item's
+   text, not at its marker. When the place test is in doubt the break stays: a wrong join is worse
    than a cut. The element keeps the
    first part's page and box, so a link or a color in the second part is not placed on the
    text (the text pass aligns against the first box), and an inline equation of the second
@@ -814,7 +846,26 @@ way, the next or previous value ("b." for "a."; the same glyph for a dash) and t
 or the item text starting within 3 pt in x. "i" is both a letter and a roman numeral; its
 siblings decide. So "A ball rolls", "2.5 metres is", "2.3 Speed", a lone "B. Smith" or
 "I. Newton", and a wrapped sentence that happens to start a line with a dash, stay
-paragraphs. Headings are decided first: "1. Introduction" in a large font is a heading.
+paragraphs. A capital letter and a full stop whose text opens like a list of authors (another initial,
+or a surname and a comma, "and" or "et al": "A. Smith, B. Jones", "D. S. Turaga, ...") is the
+marker of a list only beside its neighbor: the item just before or just after it in reading
+order (a page's left column, then its right), or the one just above or below it at the same x,
+is the next or the previous letter (`_names`, `_list_markers`). Some line of a long document
+has the next letter, and a reference list or a byline had its lines read as lettered items.
+Any other capital letter keeps the sibling test above. Headings are decided first:
+"1. Introduction" in a large font is a heading; so is a line of 2 to 12 words that starts with
+a capital letter and a full stop and is set, all of it, in bold or in italics, and does not end
+like a sentence ("A. Problem Descriptions", IEEE's subsections; reason "lettered title", one
+level under its section like a letter of an index). The type alone does not tell such a title
+from an item (the options of a question are set in italics too), so two more things are asked
+of it (`_mark_lettered_titles`): the next row of its column is not text in the title's own
+face, and has no marker unless it opens a numbering ("A. Datasets", then "1) CIFAR-10: ...");
+and the nearest marker above it in its column is not the letter before with only that item's
+own lines between them, which is the next item of a list. An option of a grid is never one.
+The title is a block of its own, apart from the text under it. Known and left: a title that
+wraps onto a second row in the same face stays the list item it was. A bold line that starts
+with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
+changes nothing).
 
 The item text starts after the marker; continuation lines join the item (a hanging
 indent is fine). **Levels** come from the left edge of the item text, which is the same
@@ -829,7 +880,16 @@ than half the font size right of it (`MARKER_INDENT`; slides set the sub-bullets
 15 pt in while their text is 5 to 14 pt right of the text above). Each open level keeps the
 series that opened it: when the sub-bullets' text starts exactly on the text edge of their
 numbered parent, the x does not tell which level "2)" goes back to, so it goes back to the open
-level of its own series at that x. Items of one series (a
+level of its own series at that x. A numbered series that
+starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
+above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
+goes back to the letters. A marker with two readings ("(i)": the letter after "(h)", or roman
+one) is read against the open level the item stands on, then the innermost one, after the
+levels right of it are closed: the bullets under "(h)" say nothing of the "(i)" that follows
+them (`_numbered`). A list that a paragraph, a figure or a table cut ("(i)", the words of
+an answer, "(ii)") goes on where the next item takes up the numbering of one of the levels the
+block closed (the next value of the same series at that level's indent): it keeps those
+levels (`_list_levels`, `_taken_up`). Items of one series (a
 wrapped list of names that start with initials) and the options of a grid are not moved by
 it. The indent is measured from the left edge of the item's column on its page (the
 leftmost x where at least three rows start), so a list that goes on in the next column or
@@ -907,7 +967,7 @@ math font, stay math.
   A number that is a row of its own (`6.`, `14)`, in a text font, one or two tokens: OpenStax
   sets it above or beside the first line of an exercise that is only a stacked fraction or a
   system) is marked the same way (`_lone_exercise_number`, `_Row.exercise_number`); read as
-  a fragment it was drawn into the equation by `_math_neighbours`.
+  a fragment it was drawn into the equation by `_math_neighbors`.
 - **Rows of a table, braced systems (T2-2).** Two whole equations also join when they are
   set at most 0.7 x font size apart and share a left edge, a right edge or a center
   within 0.3 x font size (`_table_rows`: OpenStax centers each row of a system; a row may
@@ -1288,7 +1348,7 @@ OpenStax also prints "Solve the system by substitution. {" with the brace the la
 sentence's row and the two equations in rows of their own to its right, level with the brace and
 not with the sentence. `_stray_brace_cut` cuts the brace off the sentence's row when a math row
 starts within two font sizes to its right, another math row sits under that one, and the brace's
-middle is level with the two; `_math_neighbours` then takes the brace row into the system, so the
+middle is level with the two; `_math_neighbors` then takes the brace row into the system, so the
 crop shows the brace and the text reads it first (`_equation_block`). Measured on dev-v2 with the
 layout alone: Elementary Algebra 5.2 has 80 instead of 53 of its 101 gold equations cut as the
 answer key has them (text layer within 0.99), no other section moves by more than two; nothing else in
@@ -1929,6 +1989,25 @@ footnote by its place and size alone (a listing's line numbers in small type wer
 "footnotes" in one file, and a numbered list at the foot of a page was one too), and a file that
 names none behaves as before.
 
+Three more cases of such a file (the wave 2a footnote work). Some classes put a one-line note's
+destination at the foot of its line, a little under it: when no line has the point above its top
+or within it, the line it lies just under is the note (`_row_at`). The symbol notes of a title or
+author block (`*`, a dagger) have a destination at the corner of the page, on no line: such a
+destination starts the one line low on the page, in small type, that opens with the glyphs its link
+covers in the text, and a mark that opens no line or two places nothing (`_place_by_mark`). And a
+block that begins a column is no continuation of the note that ends the one before it
+(`_merge_column_continuations`): a note ending in a URL, with no full stop, took the first
+paragraph of the next column in with it. The glyphs of a note's mark (the ones its link covers, and
+the ones that open the note's own line) are never read as math (`NOTE_MARK_FLAG`, `_char_class`),
+so a mark beside a letter in a math font is not made an inline equation with it. The mark is found
+again in the element's text by what is printed before it; when an inline equation took some of
+those glyphs (it stands in the text as a placeholder) the context is cut from its left, and what is
+left of it has to stand right after a placeholder's end, down to nothing left (the mark right after
+the placeholder). It still has to be found exactly once, and not as the end of a number. A short
+tail of the context found anywhere else in the text is no evidence: one digit of it and the mark
+can also stand inside a placeholder's own name, and the link would land in the equation
+(`_mark_spots`).
+
 A raised number is set off from the word it touches where the glyphs are cut (`_mark_notes`,
 `SET_OFF_FLAG`), not by repairing the string afterwards: the mark that opens a note's own text
 ("2 We built"), a mark in the body that a link names, and a raised digit that ends a heading (a
@@ -2007,24 +2086,139 @@ of a sentence or run in before its text is not one. A line that begins "Keywords
 words -" or "Index Terms -" starts a block of its own (`_KEYWORDS_LINE`, in `_runs`). There
 are no roles and no `keywords` role.
 
-**Algorithms (WS2.6 b).** The lines under a line that opens "Algorithm 2" are read as one
-block, `Element.preformatted`, when at least `ALGORITHM_MIN_ROWS` (3) of them follow, at
-least `ALGORITHM_MIN_WORDS` (2) of them begin with a step word (for, if, else, while, repeat,
-until, end, return, input, output, require, ensure, function, procedure, do, then ...),
-each line in one column and one size and within 2.2 lines of the one above (`_algorithm_groups`).
-A line belongs to the block if it begins with a step word, holds an assignment ("count = 0",
-"c <- 0", `:=`), is a line of math, or starts further right than the first step; the first
-line that is none of these ends the block. The caption stays a block of its own. The text has
-one line to a step and the step's indent level (its distance from the leftmost step in units
-of the smallest step between two left edges) as `ALGORITHM_INDENT` (2) spaces per level
-(`_indents`, `_paragraph_pieces`). Unlike program code its inline math stays math: a math
-row inside it becomes text, the formulas in it are inline equations as in any paragraph, and
-`assemble.code_block` writes them with the equation markup. In the Word file a code block
-that holds an equation is written as lines of a paragraph (pandoc would flatten the
-equation to its characters), the indentation as no-break spaces (`export_docx._lines_of`).
-Not read: an algorithm set under a rule only (no "Algorithm n" line), line numbers beside
-the steps (they make every step start at one edge, so the indentation is lost), and a step
-that wraps to a second line at the left edge.
+**Algorithms (WS2.6 b, O-050).** An algorithm is read as one block, `Element.preformatted`, from
+its steps (`_algorithm_groups`, `_scan`, `_is_algorithm`). Under a line that opens "Algorithm 2"
+it takes at least `ALGORITHM_MIN_ROWS` (3) lines, `ALGORITHM_MIN_WORDS` (2) of them beginning with
+a step word (for, if, else, while, repeat, until, end, return, input, output, require, ensure,
+function, procedure, do, then ...), and one that opens or closes a block (or
+`ALGORITHM_MIN_NUMBERS` (2) numbered steps). Lines that all run on from one to the
+next (each reaches the right edge or stops where the next line's first word no longer fits) are a
+paragraph that opens "Algorithm 2 shows ..." and are left as one (`_reads_on`). Steps that carry
+line numbers are not asked this, nor the proof for a line that runs on below: both are for lines
+with fewer than `ALGORITHM_MIN_NUMBERS` numbers (one is no numbering: the heading of the next
+section, "4 Results", has one). A line that
+opens "Algorithm 2 is ..." or "Algorithm 1 shows ..." is a sentence and no caption
+(`_CAPTION_SENTENCE`: a list of the words such a sentence goes on with, so "Algorithm 2 computes
+..." is still read as a caption). The lines under a caption before its first block word (Input,
+Initialize ...) are steps. One that the next line runs on from (the first word of the next line
+would not have fitted on it: `_stops_short`) is a long step when a step stands over it and,
+under it, a step word on a line that ends short of the right edge ("Choose a start vector b.",
+the long line, "repeat"; the line of a paragraph goes on to a "for ..." that runs to the
+margin). Any other (a long first line, a long line that wraps into a second one, a long line
+over a loop line that reaches the margin) may be a long step ("Initialize the table of
+counts ..." set out to the margin) or the running text under a float's caption, so the lines
+must then show more: one step set further right under a line that opens a block and ends as
+one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
+A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
+lines that start more than `ALGORITHM_SET_IN` (6) em apart prove nothing: a line that far right
+is a display equation of the text, centered in the column ("... as follows:" over "v = d / t"),
+and a closing line that far left of it is the sentence going on ("until the last word is read").
+With no caption line (one under a rule, a box or nothing) it takes more proof:
+`ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
+a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
+the numbered lines of a manuscript and the questions of an exam all start at one place), or no
+numbers, an indent ladder of three left edges and something only code holds (a formula, an
+assignment, an "end", a block word on a line that ends in "do", "then" or a colon). A bullet is
+never a step. A number written as a list writes it ("1.", "2)") is no step where there is no
+caption; under one it is, and the lines must then show one step set inside another (`_nested`):
+pseudo-code typed with a word processor's automatic numbers is one block with its indentation,
+and "Algorithm 5.1 (Euclid)" written as numbered sentences stays a list. Two lines whose
+numbers differ in length ("9." and "10.") prove nothing: typed with no tab stop, the longer
+number sets its words a digit further right. A caption here is a line that opens "Algorithm" and
+a number: under "Procedure 2 ...", "Algorithm: Scan a verse" or "Algorithm A (...)" pseudo-code
+numbered "1." is still a list, with no indentation and its "count = count + 1" step not an
+item of its own. The lines are in one column and one size, within
+`ALGORITHM_MAX_PITCH` (2.2) lines
+of the one above, and each begins with a step word or a line number, holds an assignment
+("count = 0", "c <- 0", `:=`), is a line of math, or starts further right than the first step; a
+line that is none of these ends the block. The caption stays a block of its own. The text has one
+line to a step, indented `ALGORITHM_INDENT` (2) spaces per level. Where the steps have no numbers,
+a line in lower case under one that ran to the right edge is the rest of that step, but not under
+a line that opens a block (it begins with a block word and ends in "do", "then" or a colon: "for
+each w do"; an "Input: ... :" line opens none), and not when it holds an assignment. Where the
+lines of the column are not set to a right margin (`_RightEdges.firm`: the longest lines end
+more than an em past the edge that a quarter of the lines reach, as on any page set ragged and
+on a page of little but the algorithm), a line inside a block that starts where the step above
+it starts is the next step ("put a tea bag in the cup", "wait three minutes"); where the edge
+is a margin it is the rest of the step, as algorithms set with no hanging indent wrap. The
+shape is the same in both and the rule guesses: on a ragged page a step that wraps with no
+hanging indent stays in its two lines (all its words are there), and on a page set to a margin
+a short step under one that reaches the margin is joined to it. A step that goes on for more
+than `ALGORITHM_RUN_ON` (2) lines is a paragraph (the text that goes on under an algorithm in
+the middle of a sentence): the rows end before it. Lines hung under their step, set further
+right than where it starts, do not count, so an "Input:" line goes on for as long as it needs.
+
+Line numbers ("3:", "12") are cut off the words and written in a gutter, right-aligned in front
+of the step ("3:   if x then"). The levels come from where the words start, not from the numbers,
+and the steps must carry consecutive numbers (`_Steps.expect`), so a numbered list of sentences, a
+table with a line-number column and line numbers in a page margin (which no step follows) are not
+taken. Up to `ALGORITHM_PREAMBLE` (4) lines (Input, Output) may come before the first number. A
+step that goes on in a second line (the line before it ran to within `ALGORITHM_WRAPPED` (3) em of
+the column's right edge, and the new line has no number, does not start with a capital or a step
+word) is joined to its step; a word broken by a hyphen across the wrap is mended. A line with no
+number right of the numbers (a step that broke early, a comment on a line of its own) is joined
+too when the next number is within `ALGORITHM_BETWEEN` (2) rows below it. A bit of math or
+small print the text layer cut off a line (`ALGORITHM_SAME_LINE`) is a piece of that line, and rows
+the page lists out of order are put back in the order of their lines.
+
+A display equation between two steps ends the rows there; the algorithm goes on at the next step
+within `ALGORITHM_REACH` (16) lines (`_after_equation`) as a second block: the step with the next
+number, or, with no numbers, a step word, an assignment written with an arrow or ":=", or one
+written with "=" inside a block that is still open (right of the leftmost step, under a "for"
+or an "if" that no "end" has closed) and set either where a step above it starts (within a
+quarter em) or, when the last step before the equation opened the block, anywhere right of
+that step (the equation is the first thing the loop holds). A "where d = 12 is ..." after the
+equation is the text going on, at the left edge or set in as the first line of a paragraph
+is. Under an algorithm with a block no "end" closes, such a sentence is still taken wherever
+it starts within a quarter em of the start of any step above it (a paragraph indent equal to
+one or two step indents), or right of a last step that opens a block; its paragraph is then a
+second block. The levels are those
+of the whole algorithm, so the second block keeps the indentation it had, the line numbers
+continue, and the equation keeps its crop and its place in the order. A formula of one line that
+is a step by itself is not such an equation: it is a line of the block and its formulas are
+inline equations. Not built: an algorithm that goes over a page break is read page by page, so
+the part on the second page is a block only when it proves itself an algorithm with no caption,
+with levels of its own; typed pseudo-code in a proportional font with two-digit line numbers
+gets its levels from where each line's words start, which the wider number shifts; and where
+the caption ends within `ALGORITHM_WRAPPED` (3) em of the column's right edge (a page that holds
+only an algorithm, a narrow column), a first step with no step word is read as the second line
+of the caption. Algorithms still lost (independent reviews 9, finding 1, and 10, findings 2
+to 5): under a long first line in plain words, steps that show no nesting in the way asked
+above, which are a flat algorithm (no line set further right), one whose loop lines end in no
+"do", "then" or colon unless a short "return x" or an "end" is set back to the left, a loop
+that holds two formula lines or more (a display equation of several lines is not a step) and
+a loop whose only line is a formula set more than 6 em to the right. The same pages with a
+short first line are read as algorithms, and so are those with the long line second when it
+is one line with a step word under it that ends short. Other long lines after the first ask
+for the same nesting: a long step that wraps into a second line (hung or not), two long steps
+one after the other, a long step over "count = 0" or over a loop line that reaches the
+margin; with flat steps under them these are paragraphs. Pseudo-code numbered "1." under a
+caption whose only nesting is between lines 9 and 10 is a list. An "=" step that is the first
+of its block after an equation is not picked up when the line that opens the block wraps
+into a second line that starts where it does.
+Known wrong reads, all prose
+taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
+under a last step that reaches the right edge is taken into the block (lines hung under a
+step are the step's); the bold heading of the next section ("4 Results ...") right under an
+algorithm is taken as its last line (and with four lines or fewer the levels of the steps shift
+too); the running text under a float's
+caption, when two numbered lines follow it, is one block with them; under a float's caption, a
+line that opens "for" and ends in a colon over a display equation that starts within 6 em of
+it (a wide equation, a narrow column, equations set flush left), and a short line, then a
+paragraph of two lines whose second line opens with a step word ("for every word of the
+verse."), then a paragraph that opens "If"; a paragraph that opens
+"Algorithm 2 computes ..." or with another verb not on the list; two
+short paragraphs that open "For ..." and "If ..." right under a float's caption; a sentence
+that opens "Then", "For" or "If" right after a display equation that follows an algorithm; a
+loop line with no "do" or colon that reaches the right edge takes the first line of its body;
+and a manuscript page with line numbers, indented paragraphs and a line that opens "until".
+Unlike program code an
+algorithm's inline math stays math: a math row inside it becomes text, the formulas in it are
+inline equations as in any paragraph, and `assemble.code_block` writes them with the equation
+markup. In the Word file a code block that holds an equation is written as lines of a paragraph
+(pandoc would flatten the equation to its characters), the indentation and the gap after a line
+number as no-break spaces (`export_docx._lines_of`). A monospaced listing is code, read before
+this, and its line numbers are not taken apart.
 
 **Monospaced quotations (WS2.6 c).** A block of monospaced lines that has none of the
 punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier followed by
@@ -2166,7 +2360,9 @@ the pass cannot read stays a kept image exactly as described here.
   `Element.text`, Listen, Word, EPUB and the other outputs at the row. They, and the spans
   under 2 pt, are painted text and not the mark of an OCR layer, so they do not count toward
   calling the page a scan under a text layer: a typed page with a long white sentence stays
-  a typed page. The glyph reads for
+  a typed page. The stored page type keeps their count (`unseen_chars`, written when above 0, 0 for
+a record stored before it), so the review screen counts the hidden text of a kept page as its
+notice does (`PageType.left_out_chars`). The glyph reads for
   an equation's line (`line_glyphs`) and the text pass (`page_glyphs`) do not look at the
   render: they skip only the spans of the first three kinds above, as they skip covered
   ones.
@@ -2188,7 +2384,19 @@ nothing. The turn is in the document the readers open, not in the PDF file: layo
 the page's `PageTypeResult.turn` (not in the stored page type) and says it with the notice
 `page_turned` (information, one per page, listed under "Handled in this file": "N pages saved
 sideways in the PDF and turned upright to be read"), so the pictures of the page, which show
-the turned page, are accounted for.
+the turned page, are accounted for. A job read before the notice existed has no such line, and
+nothing else differs: its elements are stored in the turned frame, and every later reader of the
+file turns the page again by itself, so the stored page type need not keep the turn.
+
+Which typed pages with hidden text are worth a look was measured on the corpus (212 PDFs: the
+uploads, the real-world sets and the layout gold; counts only): ten files had a typed page with 3 or
+more hidden characters, 38 pages in all. 32 pages had under 400 (a stamp repeated on every page,
+a few labels, words printed on the page as well, text under a picture), and the largest of them
+had 317. The other 6 pages, all in one file, had 484 to 2,767 each, mostly words that are not on
+the page, beside drawings made of hundreds of paths and, on four of them, almost no visible text:
+a text layer for words drawn as shapes. That is the case that holds the job; below 400 the line
+stays optional. The tool that would keep such a page's hidden words was not built (docs/layout.md
+"Not built", `CHANGELOG.md`).
 
 **Page types.** `page_type.classify` reads the rawdict and the drawings layout already
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
@@ -2199,7 +2407,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 | Kind | What it is | What the app does |
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
-| `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
+| `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count, or `hidden_text_check` (required) from `page_type.HIDDEN_BLOCK` (400) characters on |
 | `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
@@ -2413,7 +2621,8 @@ work, groups the kept images with one reason into one decision (`Fix.group_key`
 "pg-" + the first one's id: a 20-page handwritten file asks once), and stores the
 content-free records on `DocumentResult.page_types` (docs/output.md). Notices:
 `ocr_text_layer_ignored` (review "none") for the hidden characters of a kept page,
-`hidden_text_ignored` (optional) for those of a typed page, and one per kept image with
+`hidden_text_ignored` (optional) for those of a typed page, `hidden_text_check` (required, and
+held at "Ready" by `states._HOLDS`) when that page has 400 or more of them, and one per kept image with
 its reason (required: its decision is the image's fix).
 
 **At upload** (`page_type.document_refusal`, in the probe child): the text of every page
@@ -2979,6 +3188,8 @@ inventing emphasis:
 
 Headings, program code (`preformatted`) and glossary entries get none; `Element.bold` stays the
 whole-line evidence heading detection uses. Corpus counts (996 files) are in the changelog.
+The Word and LaTeX readers write the same runs from what the source says, with the same 70% rule
+(docs/output.md "From a Word or LaTeX source").
 
 ### Highlighted words (SW51c, `CONTENT_RUNS`)
 
@@ -3031,8 +3242,16 @@ the point) and 90% of its columns must be inked, since a vector figure can keep 
 sample in its drawings that its clip hides, and a reader who sees no line sees no deleted
 text. Only marks that cross glyphs are rendered. And an inline equation the page strikes
 through (a majority of its glyphs struck) is a run that is its marker alone (`deleted_runs`).
-What is not found, named: a struck table cell (cells carry no runs) and a struck display
-equation (equation elements carry no runs). `layout.page_paint` still lists marks that the
+A struck table cell and a struck display equation carry no runs (a cell has no offsets into
+glyphs, an equation is read by a model), so the strike cannot be kept; the table or equation
+gets the optional notice `struck_not_kept` (`text_pass.struck_not_kept`, with `CONTENT_RUNS`
+on), which says the words read as plain text. An equation counts when most of its glyphs are
+struck (a fraction bar or a line over a symbol also crosses glyphs); a table when a mark as
+short as a cell (an annotation, or a drawn rule under 60% of the table's width) crosses two
+letters or digits of the table's own size. On the tracked PDFs (332 files, 2,598 pages) the
+first rule found 54 tables and equations, all but the 4 tables bars and borders, and the 4 were
+borders and marks over small glyphs; with the size and width tests none is left, so the
+rule is measured on generated pages only. `layout.page_paint` still lists marks that the
 page clips away or covers (`layout.py`, `page_paint`: it reads `get_cdrawings()` without the
 clip entries), which is why the text pass renders the ones that matter.
 
@@ -3080,8 +3299,9 @@ and lines, FreeText), and drops them. It is applied where the page's drawings ar
 `layout/document.py` `_read_page` (the one list that figure, handwriting and ink detection use), and
 the slide-mark pass of the same file. The hidden-text check still sees every drawing
 (`classify(covers=...)`): a box drawn over a line is a fake redaction. A pen stroke (Ink) is kept: it is
-handwriting. Known limits: a drawing of the page itself that was painted last and lies inside such a box is dropped
-with them; the budgeted ink probe (`page_type._probe_ink`) and `ink_strokes.extract_ink` read the unfiltered list.
+handwriting. The budgeted ink probe (`page_type._probe_ink`) and `ink_strokes.extract_ink` (the strokes sent to
+the reader of a handwritten page) read the list through the same function. Known limit: a drawing of
+the page itself that was painted last and lies inside such a box is dropped with them.
 
 ### Rules near a baseline, blanks, boxes and form fields (SW36, SW39)
 

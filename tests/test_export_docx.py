@@ -70,6 +70,7 @@ PAGE = (
     "<figcaption>Figure 1</figcaption></figure>"
     '<details class="figure-description"><summary>Description of Figure 1</summary>'
     "<p>A single dot where the axes cross.</p></details>"
+    f'<div class="decorative"><img src="{DATA_URI}" alt="" width="1" height="1"></div>'
     "<figure><p>A picture left out, in words.</p><figcaption>Figure 2</figcaption></figure>"
     '<img src="https://example.org/remote.png" alt="a remote picture">'
     "<ol><li>one</li><li>two<ul><li>nested</li></ul></li></ol>"
@@ -168,6 +169,16 @@ def test_every_picture_has_alt_text_and_never_its_address(made):
 
 
 # --------------------------------------------------------------------- one page with everything
+
+
+def test_a_decoration_is_marked_decorative_for_word_and_a_described_picture_is_not(page):
+    export, document = page
+    marks = {
+        pic.get("descr"): pic.find(f".//{{{ed.ADEC}}}decorative") is not None
+        for pic in (i.find(f"{WP}docPr") for i in drawings(document))
+    }
+    assert marks == {"A dot at the origin": False, "": True}
+    assert export.images == 1  # a decoration is not a picture with alt text
 
 
 def test_a_table_has_a_header_row_and_a_caption(page):
@@ -295,12 +306,14 @@ def test_a_file_that_lacks_an_equation_is_refused(tmp_path):
 
 def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
     """A poem's `<br>` is a line break; an algorithm (a code block with a formula in a step)
-    is lines of a paragraph with its indentation, and its formula an Office equation."""
+    is lines of a paragraph with its line numbers and indentation, and its formula an
+    Office equation."""
     html = (
         '<html lang="en"><head><title>T</title></head><body><main><h1>T</h1>'
         "<p>Whose woods these are<br>His house is in the village</p>"
-        "<pre><code>for each word do\n  if x then\n    <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
-        "\n  end if\nend for</code></pre>"
+        "<pre><code>1: for each word do\n2:   if x then\n"
+        "3:     <math><mi>c</mi><mo>=</mo><mn>0</mn></math>"
+        "\n4:   end if\n5: end for</code></pre>"
         '<aside aria-label="Sidebar"><p>Set apart.</p></aside>'
         "<blockquote><p>Quoted.</p></blockquote></main></body></html>"
     )
@@ -312,7 +325,7 @@ def test_kept_line_ends_and_an_algorithm_with_maths_are_written_as_lines():
     # A sidebar and a quotation keep a style of their own in Word, so neither reads as body text.
     assert re.search(r'w:val="Sidebar".*?Set apart', xml, re.S)
     assert re.search(r'w:val="BlockText".*?Quoted', xml, re.S)
-    assert "\N{NO-BREAK SPACE}" * 4 + "<m:oMath>" in xml.replace(
+    assert "3:" + "\N{NO-BREAK SPACE}" * 5 + "<m:oMath>" in xml.replace(
         "</w:t></w:r><m:oMath>", "<m:oMath>"
     )
 

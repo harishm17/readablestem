@@ -23,6 +23,7 @@ from readablestem.pipeline.layout.page import (
 from readablestem.pipeline.layout.shared import CODE_MONO_SHARE, _Block, _Context, _PageBlocks
 
 NOT_ANALYSED = "drawings_not_analysed"
+TABLES_NOT_SEARCHED = "tables_not_searched"
 
 
 def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str]) -> list[Notice]:
@@ -36,6 +37,13 @@ def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str
     ]
 
 
+def _not_searched_notices(pages: list[int]) -> list[Notice]:
+    """A page whose table search the document's time for it refused
+    (`tables.DetectorBudget`) may have a table read as text: "Worth checking", and it holds
+    the job back from "Ready" (`web.states`)."""
+    return [make(TABLES_NOT_SEARCHED, page=number) for number in pages]
+
+
 def _hidden_text_notices(
     types: dict[int, page_type.PageTypeResult], kept: dict[int, str]
 ) -> list[Notice]:
@@ -43,7 +51,7 @@ def _hidden_text_notices(
     types"): on a page kept as an image, the tablet's or OCR program's guesses that were
     not used (`ocr_text_layer_ignored`, review "none"); on a typed page, invisible or
     covered words that were left out (`hidden_text_ignored`, "optional": if students need
-    them, the instructor adds them)."""
+    them, the instructor adds them; `hidden_text_check`, "required", from a paragraph on)."""
     notices = []
     for number, kind in sorted(types.items()):
         hidden = kind.text.left_out
@@ -52,7 +60,9 @@ def _hidden_text_notices(
         if number in kept:
             notices.append(make("ocr_text_layer_ignored", page=number, count=hidden))
         else:
-            notices.append(make("hidden_text_ignored", page=number, count=hidden))
+            big = hidden >= page_type.HIDDEN_BLOCK
+            code = "hidden_text_check" if big else "hidden_text_ignored"
+            notices.append(make(code, page=number, count=hidden))
     return notices
 
 

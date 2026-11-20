@@ -43,7 +43,7 @@
     <li class="fix-card">
       <h4>{{ example.title }}</h4>
       <figure class="crop">
-        <img src="/jobs/{{ job.id }}/crops/{{ example.element_id }}.png" alt="The equation as printed in your PDF">
+        <img src="/jobs/{{ job.id }}/crops/{{ example.element_id }}.png"{% if example.crop_size %} width="{{ example.crop_size[0] }}" height="{{ example.crop_size[1] }}"{% endif %} alt="The equation as printed in your PDF">
       </figure>
       <div class="fix-body">
         <div>

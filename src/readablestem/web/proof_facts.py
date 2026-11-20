@@ -204,11 +204,13 @@ def settings_line(
     """What the run's settings were. Only a result file stamped with the production profile's
     hash may say the run used the live service's settings; a stamp that differs is refused."""
     from readablestem.ops import profile
+    from readablestem.web.dates import format_day
 
+    when = format_day(date)
     stamp = results.get(PROFILE_KEY)
     if stamp is None:
         return (
-            f"It ran on {date} with version {pipeline}. The file did not record its settings, "
+            f"It ran on {when} with version {pipeline}. The file did not record its settings, "
             "and some of the live service's settings have changed since, so these numbers "
             "describe that run, not today's service."
         )
@@ -217,7 +219,7 @@ def settings_line(
             "the result file was run under settings that are not the production profile's: "
             "it cannot go on a public page"
         )
-    return f"It ran on {date} with version {pipeline} and the settings the live service uses."
+    return f"It ran on {when} with version {pipeline} and the settings the live service uses."
 
 
 def parse_numbers(report: str, results: dict) -> dict[str, str]:

@@ -22,7 +22,9 @@ Who reads it:
   "development settings" (`readablestem eval ... --profile production` runs under it).
 
 The hash is a sha256 over the sorted behaviour settings and image facts, so reordering the file
-or editing a comment does not change it, and a changed value or image fact does.
+or editing a comment does not change it, and a changed value or image fact does. A row's
+`reason` and `eval` (why production has the value, and the report that measured it) are not in
+it either: /admin shows them next to the setting.
 """
 
 from __future__ import annotations
@@ -77,6 +79,11 @@ class Profile:
     sources: dict[str, str]  # field name -> where the value came from
     operations: frozenset[str]  # field names that are named only
     image_facts: dict[str, str] = field(default_factory=dict)
+    # Why production has the value ("not stated" where the repository gives no reason), and the
+    # repository path of the report that measured it or "none". Only on the rows that switch a
+    # behaviour or pick a model; neither is part of the hash.
+    reasons: dict[str, str] = field(default_factory=dict)
+    evals: dict[str, str] = field(default_factory=dict)
 
     @property
     def sha256(self) -> str:
@@ -153,6 +160,8 @@ def parse(text: str) -> Profile:
         sources={name.lower(): str(row["source"]) for name, row in rows.items()},
         operations=frozenset(name.lower() for name in data.get("operations", [])),
         image_facts={k: str(v) for k, v in data.get("image_facts", {}).items()},
+        reasons={name.lower(): str(row["reason"]) for name, row in rows.items() if "reason" in row},
+        evals={name.lower(): str(row["eval"]) for name, row in rows.items() if "eval" in row},
     )
 
 
@@ -239,6 +248,40 @@ def _first_line(*command: str) -> str:
     return lines[0].strip() if done.returncode == 0 and lines else UNKNOWN
 
 
+@cache
+def tool_version(program: str, flag: str) -> str:
+    """The first line a program prints for its version flag; "none" when it is not here."""
+    return _first_line(program, flag) if shutil.which(program) else ABSENT
+
+
+@cache
+def font_versions() -> str:
+    """The fonts a rendered page is drawn with (the packages `docs/development.md` names),
+    as the package manager has them; "unknown" where there is no package manager."""
+    if not shutil.which("dpkg-query"):
+        return UNKNOWN
+    try:
+        done = subprocess.run(
+            [
+                "dpkg-query",
+                "-W",
+                "-f",
+                "${Package}=${Version}\\n",
+                "fonts-noto-core",
+                "fonts-liberation",
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+            check=False,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return UNKNOWN
+    return (
+        " ".join(sorted(line for line in done.stdout.splitlines() if line.split("=")[-1])) or ABSENT
+    )
+
+
 def measure_image_facts() -> dict[str, str]:
     """What this machine carries, for the image build. A program that is missing is "none";
     a fact this function cannot measure stays "unknown"."""
@@ -267,8 +310,8 @@ def measure_image_facts() -> dict[str, str]:
         "tex": tex,
         # Not a build argument on main: nothing can measure it yet.
         "install_tex_witness": UNKNOWN,
-        "latexml": _first_line("latexml", "--VERSION") if shutil.which("latexml") else ABSENT,
-        "pandoc": _first_line("pandoc", "--version") if shutil.which("pandoc") else ABSENT,
+        "latexml": tool_version("latexml", "--VERSION"),
+        "pandoc": tool_version("pandoc", "--version"),
         "libreoffice": "present" if shutil.which("soffice") else ABSENT,
         "lxml": lxml,
         "tex_names": str(names) if names else ABSENT,

@@ -41,6 +41,7 @@ from readablestem.core.types import (
     Status,
 )
 from readablestem.pipeline import checked, checked_words
+from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
 from readablestem.web import exam, job_page
 from readablestem.web.database import as_utc
@@ -248,6 +249,8 @@ class Record:
     failed_checks: list[CheckRow] = field(default_factory=list)
     open_items: list[ItemRef] = field(default_factory=list)
     not_checked: list[str] = field(default_factory=list)
+    # What was found and converted, as the job page's "Handled in this file" says it.
+    handled: list[str] = field(default_factory=list)
     # What the instructor did by hand that the tool did not propose, as it stands now.
     by_hand: dict[str, int] = field(default_factory=dict)
     left_out_pages: list[int] = field(default_factory=list)  # 1-based
@@ -546,13 +549,15 @@ def build(
     exam_mode: bool,
     downloaded_formats: list[str] | None = None,
     state: Any = None,
+    scan_cost: str = "",
 ) -> Record:
     """The record from a finished job's parts. `edits` are its `ReviewEdit` rows (any
     order); `who` maps a user id to the name shown for them; `state` is the job's
     `states.State`, whose label and gap notes the record prints. `who` and `file_who` map a
     user id to the words that name the person on the page and in the CSV (`shares.names_of`).
     `review_url` is the review screen's address for a reader who may open it, else None: the
-    items the record names are links to it."""
+    items the record names are links to it. `scan_cost`: what reading scanned pages uses, said
+    with the reasons that point to that option."""
     elements = {e.id: e for e in result.elements}
     fixes: dict[str, Fix] = {}
     for fix in result.fixes:
@@ -603,7 +608,7 @@ def build(
             item=labels.get(p.element_id)
             or KIND_LABELS.get(elements[p.element_id].kind, p.kind.title()),
             page=p.page if summary.origin == "pdf" else None,  # a source has no pages
-            why=explain_reason(fix.reason).text
+            why=explain_reason(fix.reason, scan_cost=scan_cost).text
             if (fix := fixes.get(p.element_id)) is not None and fix.reason
             else "",
             ref=ref(
@@ -646,6 +651,7 @@ def build(
         failed_checks=failed,
         open_items=open_items,
         not_checked=not_checked_list(result, summary),
+        handled=[line.text for line in job_page.handled_lines(notice_rules.current(result))],
         by_hand=by_hand_counts(result),
         left_out_pages=sorted(o.page + 1 for o in result.omitted),
         left_out_blocks=[
@@ -688,7 +694,7 @@ def safe_cell(value: object) -> str:
 def to_csv(record: Record) -> str:
     """The record as one CSV table (UTF-8; the route adds a byte order mark so Excel reads
     the letters right). Each row has a `section`: document, summary, decision, open,
-    not_converted, check, not_checked."""
+    not_converted, check, not_checked, handled."""
     out = io.StringIO()
     writer = csv.writer(out, lineterminator="\r\n")
     # Who decided is a column only in the owner's file: a person the document was shared with
@@ -711,13 +717,15 @@ def to_csv(record: Record) -> str:
 
     row("document", "Title", detail=record.title)
     row("document", "File name", detail=record.filename)
-    row("document", "Pages", detail=record.pages)
+    if record.checked.origin == "pdf":  # a source has no pages: its reading counts one
+        row("document", "Pages", detail=record.pages)
     row("document", "Converted on", when=iso_when(record.converted_at))
     if record.csv_actors:
         row("document", "Converted by", by=record.owner)
     row("document", "Tool", detail=record.tool)
     row("document", "Language", detail=record.language)
-    row("document", "Exam or quiz", detail=exam.words(record.exam_mode))
+    if record.checked.origin == "pdf":  # a source has no pictures to describe: no choice
+        row("document", "Exam or quiz", detail=exam.words(record.exam_mode))
     row("document", "Record made on", when=iso_when(record.made_at))
     row("document", "Reference", detail=record.job_ref)
     if record.state:
@@ -765,4 +773,6 @@ def to_csv(record: Record) -> str:
         row("check", ch.code, tool_had=ch.severity, decision="Did not pass", detail=ch.text)
     for line in record.not_checked:
         row("not_checked", detail=line)
+    for line in record.handled:
+        row("handled", detail=line)
     return out.getvalue()

@@ -88,7 +88,10 @@ def _write_check(engine) -> str:
     return "ok"
 
 
-def canary_days(session, days: int = 7) -> dict[str, dict[str, str] | None]:
+CANARY_DAYS = 7  # how far back the admin looks for a canary's latest result
+
+
+def canary_days(session, days: int = CANARY_DAYS) -> dict[str, dict[str, str] | None]:
     """The latest result of each daily canary (`ops.canary.run_daily`) in the last `days` days:
     {"decisions": {"day": ..., "status": ...}, "claude": ...}, None for one with no result (it
     is off here, or has not run). Read from the day's counts, so it is the same whichever of the
@@ -140,6 +143,7 @@ def ops_report(ctx: AppContext) -> tuple[bool, dict[str, object]]:
         "stale": stale,
         "storage": stored,
         "canaries": canaries,
+        "canary_days": CANARY_DAYS,
         "sandbox": ctx.sandbox.public(),
         "worker": _worker_check(ctx),
         # The production profile's hash (ops/profile.py): it names no setting and no value,

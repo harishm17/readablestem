@@ -1,0 +1,6 @@
+# What `railway up` leaves out of the upload, besides what .gitignore names.
+# A checkout that coding agents work in holds their worktrees under .claude/ (15 GB on the
+# development box, 2026-11-19), and the upload of such a checkout failed although .gitignore
+# names .claude/worktrees/.
+.claude/
+.git/

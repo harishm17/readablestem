@@ -44,7 +44,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from readablestem.core.types import EquationFix, TableCell, TableGrid
+from readablestem.core.types import Element, EquationFix, Kind, TableCell, TableGrid
 from readablestem.pipeline.equation_step import read_latex
 from readablestem.pipeline.safe_html import (
     Display,
@@ -322,6 +322,14 @@ class _Writer:
             mathml = self.math(cell.mathml)
             if mathml is not None:
                 return mathml
+        if cell.runs:  # a Word or LaTeX cell's bold, italic and code, written as the text's are
+            from readablestem.pipeline.inline_text import render_inline_text  # it imports us
+
+            holder = Element(
+                id="cell", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 0, 0), order=0,
+                text=cell.text, runs=cell.runs,
+            )  # fmt: skip
+            return render_inline_text(cell.text, element=holder, equation=lambda _id: None)
         return escape_text(cell.text)
 
     def words_and_maths(self, cell: TableCell) -> str | None:

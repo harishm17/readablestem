@@ -242,7 +242,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
 def _settings() -> Any:
     from readablestem.config import get_settings
 
-    return get_settings()
+    return get_settings().model_copy(update={"table_search_unlimited": True})
 
 
 def _settings_for(args: argparse.Namespace) -> Any:
@@ -1454,6 +1454,7 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
 
 def _calibrate_probes_in(args: argparse.Namespace, rec: Any) -> int:
     from readablestem.eval import calibration as cal
+    from readablestem.eval import run_record
     from readablestem.eval.pipeline_eval import load_gold, write_items
 
     gold_dir = args.gold or _default(GOLD_DIR)
@@ -1492,6 +1493,7 @@ def _calibrate_probes_in(args: argparse.Namespace, rec: Any) -> int:
         images=images,
     )
     report["judge"] = judge.describe()
+    report["provenance"] = run_record.provenance()
     _finish_recording(rec, args, report)
     if args.out:
         _write_json(report, args.out)

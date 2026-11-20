@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.13 as of 2026-11-19; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.14 as of 2026-11-19; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,14 +43,14 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.13 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.14 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
 **What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
 report is held to its baseline only when this pipeline version made it (`eval gate
 --require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
-so CI's `eval-gate` job gates those two, re-made at 0.5.13. Equations, figures and document
+so CI's `eval-gate` job gates those two, re-made at 0.5.14. Equations, figures and document
 need a paid run: their latest and baseline reports are historical records of the 0.5.0
 system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
 the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
@@ -666,7 +666,13 @@ the differences are listed under the table, and so are the settings of the repor
 production does not use. A report of a run that called no model that has no `flags` is refused
 (re-make it with `eval pipeline`; the two commands are in `eval/reproduce.py`); a report of a model run made before the field
 existed is not refused for that, since its pipeline version already is. Add a switch of either
-kind to the list when a change makes it decide what is asked or accepted. Tolerances live in `data/eval/tolerances.json`; an entry with only
+kind to the list when a change makes it decide what is asked or accepted. A numeric module constant of a `*_step.py` module,
+or of a module `GUARDED_CONSTANTS` already names, that is neither in `GUARDED_CONSTANTS` nor in
+`UNGUARDED_CONSTANTS` with its reason fails `tests/test_eval_gate.py`, which reads the modules'
+own names with no parser of its own: a new bar is a decision made when it is added. It sees a
+constant of a module, not a number written inside a function or a bar held in a dict or tuple.
+A few entries say "NOT YET GUARDED": they decide a request or a bar, and guarding them makes the
+two committed no-model reports stale, so it waits for the batch that makes them again. Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -720,6 +726,7 @@ the ones `eval gate` checks.
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
 | `metrics` | per task, as above |
 | `cost`, `latency_ms` | as above |
+| `provenance` | what made the report: `commit` and `clean` (false when the tree had changes), `pipeline_version`, `render_version` and `tools` (`pandoc`, `latexml`, `pymupdf`, `fonts`: the Noto and Liberation packages the pages are drawn with). One helper makes it (`run_record.provenance`), and every report builder calls it: `eval pipeline` (all tasks), `eval tables`, the measured records (`eval cost`, `speed`, `burden`, `order`, `outputs`, `say-once`, `parsing-bench`), the ledger and the page audit. A report made before it has none; the gate reads it as "not stamped" and prints `Made by: ...` to stderr either way. A report copied by `eval promote` keeps the provenance of the run that made it |
 | `recording` | a real run only: `run` (`<set>/runs/<timestamp>`), `sha` (commit, `+dirty` when the tree had changes) and `files` kept there: "Runs keep their recordings" |
 
 `--items PATH` also writes one JSON line per item (per page for headings and document),
@@ -1546,12 +1553,13 @@ lower ends of its 95% intervals, and decide whether CI gates on the committed
 
 ```
 uv run readablestem gold fetch --set tables --date 2026-10-08     # only to refresh the gold
-uv run readablestem eval pipeline --task tables --mode local --items .local/eval/tables-local.jsonl
+uv run readablestem eval pipeline --task tables --mode local   # writes data/eval/latest-tables-local.json
 uv run readablestem eval pipeline --task tables --mode model --max-usd 1.00
 uv run readablestem eval gate --current data/eval/latest-tables-local.json
 ```
 
-`--styles grid,norules` prints fewer styles, `--no-authored` leaves the authored documents
+`--items FILE` also writes the per-document rows as JSONL (the local mode needs none: the
+report holds the figures). `--styles grid,norules` prints fewer styles, `--no-authored` leaves the authored documents
 out, `--limit N` takes the first N documents (a page's three prints are next to each
 other). Printing needs Chromium and the OpenStax page XHTML in `.cache/openstax` (`gold
 fetch` fills it); figure images download once into `.cache/eval/images`. A local run
@@ -3093,16 +3101,22 @@ being changed. Its record keeps totals and names no page, `--records`, `--from` 
 `--against` are refused for it, and a failing page is not looked at.
 
 `layout-dev-1` (60 documents, 267 pages;
-`data/eval/order-layout-dev-1.json`), the student page:
+`data/eval/order-layout-dev-1.json`, made at 0.5.14), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 73 | 34 | 38 (39) | 42 (52) | 46 (102) | 0 of 0 | 32 | 17 |
-| selfmade | 40 | 18 | 9 | 4 (8) | 6 (32) | 14 (39) | 0 of 5 | 17 | 12 |
-| textbook | 108 | 58 | 2 | 103 (143) | 44 (123) | 8 (31) | 0 of 0 | 49 | 6 |
-| all | 267 | 149 | 45 | 145 (190) | 92 (207) | 68 (172) | 0 of 5 | 98 | 35 |
+| paper | 119 | 62 | 28 | 36 (37) | 44 (57) | 43 (56) | 0 of 0 | 41 | 17 |
+| selfmade | 40 | 18 | 9 | 4 (8) | 7 (35) | 14 (31) | 0 of 5 | 18 | 12 |
+| textbook | 108 | 57 | 34 | 17 (17) | 40 (201) | 11 (34) | 0 of 0 | 54 | 7 |
+| all | 267 | 137 | 71 | 57 (62) | 91 (293) | 68 (121) | 0 of 5 | 113 | 36 |
 
-The element list reads 150 of 267 of these pages right.
+The element list reads 138 of 267 of these pages right. The record before this one (0.5.10)
+had 149 pages right and 45 faultless: since then running heads, feet and page numbers are
+read on 57 pages and not 145, and 17 pages that were right are not (12 of papers, 5 of
+textbooks; 5 others became right), with more blocks cut (293, from 207; in textbooks 201,
+from 123) and more broken (113, from 98). The 17 pages were lost between 0.5.10 and 0.5.13
+(0.5.13 reads 137 right and 69 faultless; 0.5.14 changes two pages to faultless and loses
+none); which change lost them has not been traced.
 `layout-heldout-1` has not been scored.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
@@ -3304,6 +3318,14 @@ request fails its element, and that decision would be the recording's, not the
 conversion's. A record kept before decisions were measured is "not measured", not a
 document that asks nothing.
 
+**Equations and table math not compared.** The record also says how many equations (and how
+many tables with math in a cell) the check against the page could not compare, by cause
+(`not_compared` in the record, a table in the printed report): `no_characters`,
+`no_usable_characters`, `unmapped_characters`, `bold_letter`. The check is a passed one, so it
+never shows as a decision; this is where it can be counted. A table cell of math writes the
+same passed check (`table.math_not_compared`) with the same causes (and `no_local_grid` or
+`grid_not_aligned` when the page's own text has no grid to hold the cell against), and no card.
+
 **The bar** (`--against RECORD`): the whole set and every page kind with at least 10 pages
 ask for no more decisions a page than in the earlier record (`--allowance`, 0 by default).
 Two records are compared only when they are of the same documents and measured the same
@@ -3312,8 +3334,17 @@ number of uploads.
 | Exit | When |
 |---|---|
 | 0 | the bar is met, or no record was given |
-| 1 | the set or a page kind asks for more than before; the lines name each |
+| 1 | the set or a page kind asks for more than before, or a decision of band 1 or 2 became optional; the lines name each |
 | 2 | not judged: other documents, or a different number of uploads measured (with `--same`: no upload was measured) |
+
+**A decision that became optional.** The count cannot see a risky decision turned into a note.
+Each upload's row in a record also holds its decisions' elements with their bands (`asked`)
+and the elements whose fix is optional (`optional`). Against an earlier record that holds
+them, the bar fails when an element that was a decision of band 1 or 2 is optional now, and
+names it (`upload element`). Element ids can move when a reader changes, so a line naming an
+element that no longer means the same thing is read, not trusted. A record made before the
+rows held these (`data/eval/burden-corpus.json` is one until it is made again) is compared by
+the counts alone and the output says "The band check was not made".
 
 **Fewer is not better by itself.** A change that stops asking about something wrong lowers
 this figure and raises the errors nobody is told about. The bar is read with the counts of
@@ -3341,13 +3372,13 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.13 by
-`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 58 decisions,
-0.496 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.14 by
+`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 57 decisions,
+0.487 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
 capitals, equation numbers and kept line ends) make the pipeline ask questions the
-recording does not hold, so 30 uploads are left out for 1,326 answers missing, among them the
-equation-heavy ones (`w_notes_6042_ch2` 646, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 76,
+recording does not hold, so 30 uploads are left out for 1,324 answers missing, among them the
+equation-heavy ones (`w_notes_6042_ch2` 644, `w_slides_60001_lec10` 98, `r17_arxiv_ligo` 76,
 `w_solutions_1802` 64). The decisions a page of the records are not comparable: the dense
 mathematics that carried most of the load in 0.5.10 is the part now left out. Against the
 0.5.11 record (2026-11-18, 45 uploads, 70 decisions), the 42 uploads in both ask the same;
@@ -3355,7 +3386,15 @@ mathematics that carried most of the load in 0.5.10 is the part now left out. Ag
 and 2 answers missing) and `w_mixed_slides+image_pages` came back. Against the 0.5.12 record the same 43 uploads are
 measured and each asks the same decisions: the list, block-start and page-join changes of
 0.5.13 moved elements only on uploads that were already left out (28 more answers missing on
-seven of them). **A paid recording of the
+seven of them). Against the 0.5.13 record the same 43 uploads are measured and 42 ask the
+same decisions: `r06_labsafety_5310` asks none where it asked one, because a bulleted line
+on its second page that was read as a heading and sent for a decision ("reads like a
+sentence") is a list item now. The same 30 uploads are left out, and one of them
+(`w_notes_6042_ch2`) has two answers fewer missing. The record also lists, for each upload,
+the elements that ask for a decision (`asked`) and the ones a reviewer may look at
+(`optional`), and counts the formulas accepted with nothing to hold them against
+(`not_compared`: 2 of the 52 equations, both for want of usable characters; no decision is
+asked for these). **A paid recording of the
 answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
 the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.
@@ -3780,8 +3819,23 @@ guard against a hang (`INK_GUARD_S`, 60 s a page), so which pages are read for h
 no longer depends on how fast the machine is. Measured again that day, that upload kept its
 page at a quarter of the speed under the old budget too, so the loss itself was not
 reproduced; what the test shows is that a clock ten times faster or slower gives the same
-document. The table search's time limit was not reached by any corpus upload at a quarter of
-the speed; it is listed in the clock table and gets its own fact with the table work.
+document.
+
+The table search (WS5.14) is the other clock that can change a page, and no count of work
+can replace it: its cost is inside PyMuPDF and its layout package, and nothing on the page
+before the search predicts it. Its limit is the CPU time of the thread that searches
+(`time.thread_time`), so a machine that is only busy does not reach it, and a stop writes
+`table_search` with `time_limit` for each page it cut short and the notice
+`tables_not_searched` on that page (tables.md, "Which pages are looked at", has the sizing).
+No corpus upload reached it at a quarter of the speed. The regression test in
+`tests/test_determinism.py` plants a sleep of two seconds in each search under a limit a wall
+clock would pass on the first page and the result does not change by a byte; the same file
+with no time left gets the facts and the notices and no table on its first page, and with
+`TABLE_SEARCH_UNLIMITED` it gets its table. Evals and replays run the search without the
+limit (`TABLE_SEARCH_UNLIMITED`, set by `measure.replay_settings` and by every
+`readablestem eval` command), so no score depends on the machine. A replay in which the
+search stopped anyway is not measured: its upload ends with the error `table_search_stopped`,
+which every report lists.
 
 Not covered: a document long enough to reach the limits by its size. The corpus's longest
 upload is short of that, so a 100-page math-heavy document converted under several CPU

@@ -13,12 +13,15 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
 - A table is a grid with spans. Its header rows are exact only when the rows are marked "repeat as
   header row"; a table with only the style's first-row flag gets one header row as a proposal
   (a warning check, `source.header_unmarked`), and a table whose rows are all headers gets one.
-  The grid's `header_source` is "source" for those and "none" for a table with no header row at all
-  (accepted as before: turning that into a decision is a review load this item left to a person).
+  The grid's `header_source` is "source" for those and "none" for a table with no header row at all,
+  which is the required choice a PDF table with no header has (`ltx_reader.headers_to_choose`).
+  A table too large for a grid is a list, one item a row; a formula in it is an equation of the
+  item like any other, and the table is a required notice (`word_table_flattened`).
 - A footnote or endnote is written where its mark is, as the LaTeX path writes a note. A link is
-  a link when it is a web or mail address; a link to a bookmark on a heading is an internal link
-  to that heading (pandoc keeps a bookmark only on a heading, and the words of a `REF` field
-  are plain text), and a link to any other bookmark is its words. Struck text is kept
+  a link when it is a web or mail address (in a note too: the working copy keeps the address a
+  note's own relationships hold, `docx_package`); a link to a bookmark on a heading is an
+  internal link to that heading (pandoc keeps a bookmark only on a heading, and the words of a
+  `REF` field are plain text), and a link to any other bookmark is its words. Struck text is kept
   and marked deleted; superscripts and subscripts are runs.
 - An equation typed in Word (`m:oMath`) is the LaTeX pandoc reads from it, checked by the same
   `check_latex` as any LaTeX the product accepts and written to MathML by the pipeline's one
@@ -81,6 +84,7 @@ from readablestem.source import docx_package, figures
 from readablestem.source.ltx_reader import (
     BOX,
     CHARS_PER_PAGE,
+    COLOUR_NOTICE,
     FORMULA_UNREAD,
     MAX_DEPTH,
     MAX_ELEMENTS,
@@ -91,8 +95,10 @@ from readablestem.source.ltx_reader import (
     ReadError,
     Reading,
     equation_fix,
+    headers_to_choose,
     link_internal,
     needs_decision,
+    style_runs,
 )
 
 Display = Literal["block", "inline"]
@@ -101,6 +107,7 @@ BOXES_NOTICE = "word_text_boxes"  # optional: text boxes read where they are anc
 HEADERS_NOTICE = "word_headers_footers"  # optional: running heads left out
 OBJECTS_NOTICE = "word_objects"  # required: SmartArt, charts, embedded objects: not in the file
 CHANGES_NOTICE = "word_tracked_changes"  # required: changes were read as accepted
+FLATTENED_NOTICE = "word_table_flattened"  # required: a table too large for a grid is a list
 RTL_NOTICE = "word_rtl_text"  # optional: right-to-left paragraphs, in reading order, shown as LTR
 NOTICE_CODES = (
     HIDDEN_NOTICE,
@@ -108,6 +115,7 @@ NOTICE_CODES = (
     HEADERS_NOTICE,
     OBJECTS_NOTICE,
     CHANGES_NOTICE,
+    FLATTENED_NOTICE,
     RTL_NOTICE,
 )
 FLAT_CHECK = "source.flat_equation"
@@ -138,6 +146,7 @@ class Report:
     pictures: int = 0
     pictures_authored_alt: int = 0
     pictures_unread: int = 0
+    tables_flattened: int = 0  # tables too large for a grid, written as one list item per row
     captions: int = 0
     extra_words: int = 0  # words the tree has that the file's own pass does not
     kinds: Counter[str] = field(default_factory=Counter)
@@ -272,11 +281,12 @@ class _Reader:
 
     def _heading(self, level: int, inlines: list[Any], name: str = "") -> None:
         element = self._new(Kind.HEADING, text="", bold=True)
-        text, _, formulas = self._inline_text(inlines, owner=None)
+        text, spans, formulas = self._inline_text(inlines, owner=None)
         if not text:
             self._drop(element)
             return
         element.text = text
+        self._apply_spans(element, spans, links_only=True)
         if name:  # pandoc names a heading's bookmark by the heading's id
             self.ids.setdefault(name, element.id)
         self._heading_fix(element, level, text)
@@ -378,13 +388,22 @@ class _Reader:
                 elif kind == "Image":
                     self.loose.append(item)
                 elif kind == "Note":
-                    note, _, _ = self._inline_text(
+                    note, note_spans, _ = self._inline_text(
                         _note_inlines(content), owner=None, depth=level + 1
                     )
                     if note:
-                        emit(f" (note: {note})")
+                        emit(" (note: ")
+                        spans.extend(
+                            (kind, length + a, length + b, extra)
+                            for kind, a, b, extra in note_spans
+                            if kind in ("uri", "ref")
+                        )
+                        emit(f"{note})")
                 elif kind == "Code":
+                    start = length
                     emit(content[1])
+                    if length > start:
+                        spans.append(("code", start, length, None))
                 elif kind == "Quoted":
                     left, right = _QUOTES.get(content[0].get("t", ""), ("", ""))
                     emit(left)
@@ -409,6 +428,12 @@ class _Reader:
                             spans.append(("sub", start, length, None))
                         elif kind == "Strikeout":
                             spans.append(("deleted", start, length, None))
+                        elif kind == "Strong":
+                            spans.append(("strong", start, length, None))
+                        elif kind == "Emph":
+                            spans.append(("emphasis", start, length, None))
+                        elif kind == "Span" and "mark" in content[0][1]:
+                            spans.append(("highlight", start, length, None))
 
         visit(inlines, depth)
         raw = "".join(parts)
@@ -425,11 +450,22 @@ class _Reader:
                 shifted.append((kind, a2, b2, extra))
         return text, shifted, formulas
 
-    def _apply_spans(self, element: Element, spans: list[tuple[str, int, int, object]]) -> None:
+    def _apply_spans(
+        self,
+        element: Element,
+        spans: list[tuple[str, int, int, object]],
+        *,
+        links_only: bool = False,
+    ) -> None:
+        """The runs and links of `spans` on `element`'s text; with `links_only`, the links
+        alone (a heading's words are bold already)."""
         text = element.text or ""
         markers = [(m.start(), m.end()) for m in INLINE_MARKER_RE.finditer(text)]
+        if not links_only:
+            for run in style_runs(text, spans):
+                inline.add(element, run)
         for kind, start, end, extra in spans:
-            if start >= end or end > len(text):
+            if start >= end or end > len(text) or (links_only and kind not in ("uri", "ref")):
                 continue
             if any(a < start < b or a < end < b for a, b in markers):
                 continue  # a span may not start or end inside an inline marker
@@ -454,7 +490,6 @@ class _Reader:
         fix, failed = equation_fix(element, cleaned, mathml, failed, display)
         if failed:
             report.math_failed += 1
-            self.out.errors += 1
         else:
             report.math_converted += 1
             if _is_flat(cleaned):
@@ -602,6 +637,7 @@ class _Reader:
                     "review": "optional",
                 }
             )
+        fix = headers_to_choose(fix, grid)
         pictures, self.loose = self.loose, []
         if pictures:
             fix = needs_decision(fix, TABLE_PICTURE)
@@ -626,11 +662,11 @@ class _Reader:
                 for dr in range(row_span):
                     for dc in range(col_span):
                         taken.add((r + dr, c + dc))
-                text, latex, mathml = self._cell(cell[4])
+                text, latex, mathml, runs = self._cell(cell[4])
                 cells.append(
                     TableCell(
                         row=r, col=c, row_span=row_span, col_span=col_span,
-                        text=text, latex=latex, mathml=mathml,
+                        text=text, latex=latex, mathml=mathml, runs=runs,
                     )
                 )  # fmt: skip
                 c += col_span
@@ -664,41 +700,67 @@ class _Reader:
                     bounded.append(TableCell(row=r, col=c))
         return TableGrid(rows=height, cols=width, cells=bounded, caption=caption, source="local")
 
-    def _cell(self, blocks: list[Any]) -> tuple[str, str | None, str | None]:
-        """(text, latex, mathml) of a cell: its paragraphs joined by a space. A cell that holds
-        maths is also written as LaTeX with its words in `\\text{}`, when that converts."""
+    def _cell(self, blocks: list[Any]) -> tuple[str, str | None, str | None, list[Run]]:
+        """(text, latex, mathml, runs) of a cell: its paragraphs joined by a space. A cell that
+        holds maths is also written as LaTeX with its words in `\\text{}`, when that
+        converts, and has no runs."""
         words: list[str] = []
         pieces: list[str] = []
+        styled: list[tuple[str, int, int, object]] = []
         has_math = False
+        shown = 0
         for inlines in _paragraph_inlines(blocks):
-            text, _, _ = self._inline_text(inlines, owner=None)
+            text, spans, _ = self._inline_text(inlines, owner=None)
+            if text:
+                shift = shown + 1 if shown else 0
+                styled += [(k, a + shift, b + shift, e) for k, a, b, e in spans]
+                shown = shift + len(text)
             words.append(text)
             for item in _flat(inlines):
                 if item.get("t") == "Math":
                     has_math = True
         text = " ".join(w for w in words if w)
         if not has_math:
-            return text, None, None
+            return text, None, None, style_runs(text, styled)
         for inlines in _paragraph_inlines(blocks):
             pieces.append(_latex_of(inlines))
         latex = " ".join(p for p in pieces if p).strip()
         cleaned, mathml, failed = self._convert(latex, "inline")
         if failed or not mathml:
             self.report.math_failed += 1
-            return text, None, None
+            return text, None, None, []
         self.report.math_converted += 1
-        return text, cleaned, mathml
+        return text, cleaned, mathml, []
 
     def _flatten(self, rows: list[Any]) -> None:
-        """A table too large for a grid: one list item per row."""
+        """A table too large for a grid: one list item per row, its cells joined by " | ". A
+        formula in a cell is an equation of the item, read and checked as any other formula, so
+        a student is never read TeX source; the table itself is a required notice
+        (`FLATTENED_NOTICE`), as it is no longer a table."""
+        self.report.tables_flattened += 1
+        bar: list[Any] = [{"t": "Space"}, {"t": "Str", "c": "|"}, {"t": "Space"}]
         for row in rows:
-            texts = [self._cell(cell[4])[0] for cell in row[1]]
-            text = " | ".join(t for t in texts if t)
-            if text:
-                element = self._new(
-                    Kind.LIST_ITEM, text=text, list_marker=None, list_ordered=False, list_level=1
-                )
-                self.chars += len(element.text or "")
+            cells: list[list[Any]] = []
+            for cell in row[1]:
+                inlines: list[Any] = []
+                for paragraph in _paragraph_inlines(cell[4]):
+                    inlines += [{"t": "Space"}, *paragraph] if inlines else paragraph
+                if _plain(inlines):
+                    cells.append(inlines)
+            if not cells:
+                continue
+            joined = [*cells[0]]
+            for inlines in cells[1:]:
+                joined += [*bar, *inlines]
+            element = self._new(
+                Kind.LIST_ITEM, text="", list_marker=None, list_ordered=False, list_level=1
+            )
+            text, spans, _ = self._inline_text(joined, owner=element)
+            element.text = text
+            self._apply_spans(element, spans)
+            self.chars += len(text)
+            if not text.strip() and self.out.elements[-1] is element:
+                self._drop(element)
 
     # ------------------------------------------------------------------ figures
 
@@ -1086,10 +1148,14 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
         out.notices.append(make(CHANGES_NOTICE, count=changes))
     if facts.hidden_runs:
         out.notices.append(make(HIDDEN_NOTICE, count=facts.hidden_runs))
+    if facts.coloured:  # pandoc keeps no colour, so the file's is counted from its package
+        out.notices.append(make(COLOUR_NOTICE, count=facts.coloured))
     if facts.text_boxes:
         out.notices.append(make(BOXES_NOTICE, count=facts.text_boxes))
     if facts.headers_footers:
         out.notices.append(make(HEADERS_NOTICE, count=facts.headers_footers))
+    if report.tables_flattened:
+        out.notices.append(make(FLATTENED_NOTICE, count=report.tables_flattened))
     if facts.rtl_paragraphs:
         out.notices.append(make(RTL_NOTICE, count=facts.rtl_paragraphs))
     objects = facts.smartart + facts.charts + facts.embedded

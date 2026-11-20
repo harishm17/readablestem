@@ -37,6 +37,7 @@ def test_every_setting_is_in_the_profile_or_named_as_operations_and_railway_name
     assert set(shipped.settings) | shipped.operations == fields
     assert not set(shipped.settings) & shipped.operations
     assert shipped.settings.keys() == shipped.sources.keys()
+    assert all((ROOT / path).exists() for path in shipped.evals.values() if path != "none")
     declared = set(re.findall(r'"([A-Z][A-Z0-9_]+)"', (ROOT / ".railway/railway.ts").read_text()))
     assert {name.upper() for name in shipped.settings} <= declared
     # Until the owner has read the dashboard, the values are the repository's own statements.

@@ -162,6 +162,9 @@ def pictures_sentence(s: CheckedSummary) -> str:
     if s.origin == "pdf":
         shown = "is shown as a picture" if k == 1 else "are shown as pictures"
         shown += " of the original"
+    elif s.origin == "docx":  # Word has no LaTeX: the tool made it from Word's own equation
+        shown = "is shown as LaTeX" if k == 1 else "are shown as LaTeX"
+        shown += " that this tool made from the Word file"
     else:
         shown = "is shown as it was written" if k == 1 else "are shown as they were written"
         shown += f" in the {source_noun(s.origin)}"
@@ -402,7 +405,7 @@ def finish_sentence(s: CheckedSummary, *, owner: bool = True) -> str:
             return "The tool flagged nothing in this file for review, and nobody has reviewed it."
         text = "Nobody has reviewed this file yet."
     else:
-        when = f", the last on {s.reviewed_on:%B} {s.reviewed_on.day}" if s.reviewed_on else ""
+        when = f", the last on {long_date(s.reviewed_on)}" if s.reviewed_on else ""
         flagged = plural(s.flagged, "flagged part")
         text = (
             f"You reviewed {s.load.decided} of {flagged}{when}."

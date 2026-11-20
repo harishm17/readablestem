@@ -110,6 +110,9 @@ LINK_KINDS = (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING)
 RUNNING_KINDS = (Kind.PARAGRAPH, Kind.LIST_ITEM)
 
 MIN_GLYPH_OVERLAP = 0.5  # share of a glyph's box inside a link rectangle to be linked
+STRUCK_RULE_SHARE = 0.6  # a drawn mark this share of a table's width is a border, not a strike
+STRUCK_SIZE_SHARE = 0.8  # struck glyphs smaller than this share of the median size do not count
+STRUCK_CELL_CHARS = 2  # letters or digits struck in a table for `struck_not_kept`
 BOX_SLACK = 1.5  # pt: a glyph belongs to an element when its centre is this close to its box
 TARGET_SLACK = 2.0  # pt: a destination point this close to an element's box is on it
 TARGET_X_SLACK = 6.0  # pt: ... and this close in x is in its column
@@ -1532,6 +1535,57 @@ def deleted_runs(
     return [Run(start=start, end=end, kind="deleted") for start, end in merged]
 
 
+def _struck_cell_words(element: Element, glyphs: Sequence[Glyph], near: Sequence[Strike]) -> bool:
+    """A table has struck words when a mark as short as a cell (an annotation, or a drawn rule
+    under 60% of the table's width: a border that runs into small glyphs is no strike) crosses
+    `STRUCK_CELL_CHARS` letters or digits of the table's own size (a raised mark or a
+    subscript is smaller)."""
+    width = element.bbox[2] - element.bbox[0]
+    marks = [s for s in near if s.annotation or s.bbox[2] - s.bbox[0] < STRUCK_RULE_SHARE * width]
+    sizes = sorted(g.size for g in glyphs if g.size)
+    if not marks or not sizes:
+        return False
+    full = sizes[len(sizes) // 2] * STRUCK_SIZE_SHARE
+    struck = struck_glyphs(glyphs, marks)
+    return (
+        sum(glyphs[i].c.isalnum() and glyphs[i].size >= full for i in struck) >= STRUCK_CELL_CHARS
+    )
+
+
+def struck_not_kept(
+    elements: Sequence[Element], aligner: _Aligner, strikes: Mapping[int, Sequence[Strike]]
+) -> list[Notice]:
+    """`struck_not_kept` for each table and each display equation the page strikes through.
+
+    Neither carries runs (a table's cells and an equation read by a model have no offsets
+    into glyphs), so the strike would be lost without a word. An equation a paragraph holds
+    as an inline marker is not one: its strike is a run of that paragraph (`deleted_runs`).
+    The same bar-like marks that strike words (a fraction bar, a line over a symbol) also
+    cross the glyphs of equations, so an equation counts as struck only when most of its
+    glyphs are (as for an inline equation); a table when a short mark crosses words of its own
+    size (`_struck_cell_words`).
+    """
+    inline = {m.group(1) for e in elements for m in INLINE_MARKER_RE.finditer(e.text or "")}
+    out: list[Notice] = []
+    for element in elements:
+        if element.kind not in (Kind.TABLE, Kind.EQUATION) or element.id in inline:
+            continue
+        near = [
+            s for s in strikes.get(element.page, ()) if _overlaps(s.bbox, element.bbox, BOX_SLACK)
+        ]
+        if not near:
+            continue
+        glyphs = aligner.glyphs_in(element)
+        struck = struck_glyphs(glyphs, near)
+        if element.kind is Kind.EQUATION:
+            kept = bool(struck) and len(struck) * 2 > len(glyphs)
+        else:
+            kept = _struck_cell_words(element, glyphs, near)
+        if kept:
+            out.append(make("struck_not_kept", page=element.page, element_id=element.id))
+    return out
+
+
 # ============================================================================ language
 
 
@@ -1801,6 +1855,8 @@ def annotate(
     elif coloured:  # found, not kept: say so once, with how many passages
         notices.append(make("colour_used", count=sum(len(r) for r in coloured.values())))
     notices.extend(notice_rules.from_runs(updated))
+    if runs:
+        notices.extend(struck_not_kept(updated, aligner, pdf.strikes))
     if form := sum(len(v) for v in pdf.fields.values()):
         notices.append(make("form_fields", count=form))
     notices.extend(lang_notices)

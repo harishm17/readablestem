@@ -71,6 +71,7 @@ from readablestem.core.types import (
 )
 from readablestem.pipeline import assemble_tables, decoration
 from readablestem.pipeline.notices import KEPT_IMAGE_CODES, cut_off_pages
+from readablestem.pipeline.safe_html import sanitize_mathml
 
 # Kinds of a part shown as a picture, as `checked_words.KIND_WORDS` names them: a page (or
 # handwriting) kept as an image is a figure in the data model but not in words.
@@ -256,6 +257,13 @@ def _kept(fix: Fix | None) -> bool:
     return fix is None or fix.status in KEPT_ORIGINAL_STATUSES
 
 
+def _page_accepts(mathml: str) -> bool:
+    """Whether the page writes this MathML as math: the renderer's own sanitizer
+    (`assemble.converted_mathml`) decides, and a refusal shows the picture. Display does not
+    change what it accepts."""
+    return bool(mathml.strip()) and sanitize_mathml(mathml, display="block") is not None
+
+
 def converted(
     elements: Sequence[Element],
     fixes: Iterable[Fix],
@@ -278,7 +286,7 @@ def converted(
         page = element.page + 1
         if element.kind is Kind.EQUATION:
             counts["equations"] += 1
-            if not _kept(fix) and fix and fix.equation and fix.equation.mathml.strip():
+            if not _kept(fix) and fix and fix.equation and _page_accepts(fix.equation.mathml):
                 counts["equations_mathml"] += 1
             else:
                 pictures.append(Picture(element.id, "equation", page, as_text=origin != "pdf"))

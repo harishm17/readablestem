@@ -18,7 +18,11 @@ no CSRF token (it is a GET like the other downloads, for the owner only).
 
 from __future__ import annotations
 
+import contextlib
+import hashlib
+import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -26,9 +30,16 @@ from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from readablestem.core.types import DocumentResult
-from readablestem.pipeline import assemble, checked_words, combine, language, output_chars
-from readablestem.web import ranges
+from readablestem.core.types import DocumentResult, Fix
+from readablestem.pipeline import (
+    assemble,
+    checked_words,
+    combine,
+    decoration,
+    language,
+    output_chars,
+)
+from readablestem.web import export_store, ranges
 from readablestem.web.db import Blob, Job, JobStatus, utcnow
 
 # A part's file name is "<name> (pages 31-59).pdf" (`web.routes.parts.part_filename`).
@@ -143,10 +154,60 @@ def combined_html(
             select(Blob).where(Blob.job_id == item.job.id, Blob.kind == "crop")
         ).all()
         crops = {b.element_id: b.content for b in blobs if b.element_id}
+        # A part stored before decorations were settled is settled as its own page is when it
+        # is made again (`review.rerender_html`), so a decoration reads the same in both.
+        first: dict[str, Fix] = {}
+        for fix in result.fixes:
+            first.setdefault(fix.element_id, fix)
+        decoration.settle(result.elements, first, crops, kept=assemble.KEPT_IMAGE_WORDS)
         parts.append(combine.Part(result, crops, item.pages))
     title = title_of(kept[0].job)
     contact = next((k.job.contact_line for k in kept if k.job.contact_line), None)
     return combine.combine(parts, title=title, contact=contact, math_alttext=math_alttext), title
+
+
+def combined_file(
+    session: Session,
+    kept: list[KeptPart],
+    file_type: str,
+    *,
+    math_alttext: bool | None = None,
+    make: Callable[[str, str], bytes],
+) -> bytes:
+    """The combined file as `file_type` ("html", or what `make(html, title)` builds), built
+    once for these parts and kept like the other exports (`web.export_store`) on the first
+    part. The key is the first part's version and `RENDER_VERSION`, and a digest of the title,
+    the setting, and each part's id, version, pages and stored result, so a new decision, a
+    release, a part added, deleted or made again each build once more. It is deleted with any
+    part of the group (`ops.retention.delete_jobs`). Raises what `combined_html` and `make`
+    raise; nothing is kept then."""
+    title = title_of(kept[0].job)
+    contact = next((k.job.contact_line for k in kept if k.job.contact_line), None)
+    parts = [
+        "{}:{}:{}:{}".format(
+            k.job.id,
+            k.job.result_version or 0,
+            ",".join(map(str, k.pages)),
+            hashlib.sha256(json.dumps(k.job.result_json, sort_keys=True).encode()).hexdigest(),
+        )
+        for k in kept
+    ]
+    options = "|".join([*parts, str(math_alttext), contact or ""])
+
+    def build() -> bytes:
+        html, _ = combined_html(session, kept, math_alttext=math_alttext)
+        return html.encode("utf-8") if file_type == "html" else make(html, title)
+
+    return export_store.get_or_build(
+        lambda: contextlib.nullcontext(session),
+        kept[0].job.id,
+        kept[0].job.result_version or 0,
+        export_store.COMBINED + file_type,
+        "",
+        title,
+        build,
+        options,
+    )
 
 
 def number_part_pages(job: Job, result: DocumentResult) -> bool:

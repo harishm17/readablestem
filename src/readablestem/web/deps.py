@@ -26,8 +26,10 @@ from readablestem.source import intake as source_intake
 from readablestem.source import pandoc as pandoc_step
 from readablestem.web import (
     analytics,
+    bulk_accept,
     dev_only,
     office_convert,
+    provider_health,
     recipients,
     report_item,
     retention,
@@ -45,7 +47,7 @@ from readablestem.web.security import CARRIES_SECRET
 from readablestem.web.spend import DbSpendGuard
 from readablestem.web.uploads import UploadGate
 from readablestem.web.worker import ClientFactory, Converter, Worker
-from readablestem.web.worker_rows import RowReader
+from readablestem.web.worker_rows import RowReader, write_web_provider
 
 CSRF_FIELD = "csrf_token"
 SESSION_USER = "uid"
@@ -91,6 +93,15 @@ class AppContext:
         """The AI service as the worker's recent requests saw it: this process's own memory
         when the worker is a thread here, the worker process's `ops_heartbeat` row when not."""
         return HEALTH if self.rows is None else self.rows.provider()
+
+    def record_provider_call(self, outcome: str) -> None:
+        """A model request made in this (web) process ended with `outcome`: a reread. Inline,
+        `HEALTH` is the very memory the status page reads. With a worker service it is
+        written to this process's own provider row, which `RowReader.provider` adds to the
+        worker's."""
+        HEALTH.record(outcome)
+        if self.rows is not None:
+            write_web_provider(self.factory, HEALTH)
 
     @property
     def dev_login_enabled(self) -> bool:
@@ -528,8 +539,13 @@ def render(
         "one_file": uploads.one_file(ctx.settings),
         # What a LaTeX project zip may be, and how many characters of LaTeX count as a page.
         "project_zip": uploads.zip_limits(),
+        **uploads.latex_limits(),
         "chars_per_page": f"{source_intake.CHARS_PER_PAGE:,}",
         "retention_hours": ctx.settings.retention_hours,
+        "week_days": retention.WEEK_DAYS,
+        # How many documents a bulk-accept page lists, and the span the status page counts.
+        "bulk_page_size": bulk_accept.PAGE_SIZE,
+        "provider_window_minutes": int(provider_health.WINDOW_S // 60),
         "retention_rules": retention.rules_line(ctx.settings),
         "opt_in_days": ctx.settings.opt_in_retention_days,
         # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.

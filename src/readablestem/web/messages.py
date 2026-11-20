@@ -30,8 +30,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     (
         "source.macro",
         "unknown_command",
-    ): "The LaTeX source uses a command this tool does not know, so this equation could "
-    "not be read from it: correct the LaTeX or reject it.",
+    ): "This formula could not be read from the source file as it is (it uses a command this "
+    "tool does not know, or a form it cannot convert): correct it or reject it.",
     # LaTeX source (readablestem.source.ltx_reader): what a table, heading or figure shows
     # that LaTeX could not read, or a picture that left its table cell
     (
@@ -412,11 +412,14 @@ AXE_RULE_MESSAGE = (
 REASON_MESSAGES: dict[str, str] = {
     # Equation and figure steps
     "low_confidence": "The model was not sure enough to make a proposal, so write one "
-    "yourself or reject it to keep the original from the PDF.",
+    "yourself or reject it to keep the original.",
     "not_equation": "The model judged that this is not an equation: if it is, type the LaTeX, "
     "and if not, reject it to keep the original.",
-    "invalid_latex": "The model's LaTeX failed a required check (listed below), so correct it "
-    "or reject it to keep the image.",
+    # An equation read from a PDF, and a formula of a LaTeX or Word source that could not be
+    # converted and has no proposal of ours (`source.ltx_reader.equation_fix`): the same words
+    # are true of both, so they name neither the model nor the image.
+    "invalid_latex": "The LaTeX for this equation failed a required check (listed below), so "
+    "correct it or reject it to keep the original.",
     "invalid_alt": "The model's alt text failed a required check (listed below), so write new "
     "alt text or reject it to keep the figure flagged.",
     # f"model_{outcome}" for every models.base Outcome: no usable answer from any attempt
@@ -503,9 +506,16 @@ NOTICE_MESSAGES: dict[str, str] = {
     "guessed from the page ({count} characters) was not used.",
     "drawings_not_analysed": "The drawings on this page were not analyzed, so handwriting on "
     "it may be missing: compare the page with the original.",
+    "tables_not_searched": "The search for tables was cut short on this page, because the "
+    "time this document has for it ran out, so a table here may be read as plain text: compare "
+    "the page with the original.",
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",
+    "hidden_text_check": "This page has a lot of text ({count} characters) that cannot be seen "
+    "when the page is shown or printed, so it was left out. It may be words the page needs, "
+    "such as text drawn as shapes: compare the page with the original. If students need it, "
+    "add it to your source file and upload that again.",
     "file_cut_off": "This file looks cut off: its last pages are empty, so the rest is not in "
     "the converted file. Upload a fresh copy, or continue with the pages before them.",
     "file_repaired": "This PDF was damaged, and the tool had to repair it to open it. Check "
@@ -520,12 +530,21 @@ NOTICE_MESSAGES: dict[str, str] = {
     "colour_used": "Passages printed in color: {count}. The converted file does not keep "
     "color. If a color carries a meaning here (for example, answers in red), say that "
     "meaning in words.",
+    "table_header_missing": "This table goes on from the page before, but its columns could not "
+    "be given the header of the first part, so a screen reader cannot name them. Check the "
+    "table and set its header row.",
+    "table_header_carried": "This table goes on from the page before and has no header row "
+    "of its own, so students get it with the header row of the part before it. Check that it "
+    "is the same table. If it is not, set this table's own header row.",
     "colour_only": "A figure tells things apart by color alone, so add labels or patterns "
     "that do not depend on seeing the color.",
     "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
     "could not be kept and is written on the line, so check it reads right.",
     "struck_text": "Text struck through on the page is kept, shown struck through and read "
     "out as deleted: if students no longer need it, take it out with the page tools.",
+    "struck_not_kept": "Something in this table or equation is struck through on the page. The "
+    "converted file cannot show that here, so it reads as ordinary text: check it against the "
+    "PDF, and take out what students no longer need.",
     "form_fields": "This PDF is a fillable form. Its fields are written out as text (a blank, a "
     "box with its state, or the value filled in), and the converted file cannot be filled in: "
     "keep the PDF for students who need to fill it in.",
@@ -602,6 +621,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "not in this file.",
     "word_objects": "Diagrams, charts or embedded objects in the Word file: {count}. They "
     "are not in this file, so describe them or add them again as pictures.",
+    "word_table_flattened": "Tables in the Word file that are too large to keep as a table: "
+    "{count}. Each is written as a list, one item for each row, so a student does not get its "
+    "columns. Check them, or split the table in Word and upload the file again.",
     "word_rtl_text": "Right-to-left paragraphs in the Word file: {count}. Their words are in "
     "reading order, but this file shows them left to right.",
     "word_tracked_changes": "Tracked changes (insertions and deletions) that nobody accepted "
@@ -764,8 +786,17 @@ def source_item_notes(result: DocumentResult) -> dict[str, str]:
     return notes
 
 
-def explain_reason(reason: str) -> Explained:
+# The two reasons that point to the scan option: what reading such pages uses is added to them
+# (`outcome.image_pages_cost_offered`), as everywhere else the option is offered.
+SCAN_OPTION_REASONS = ("handwritten_page", "scanned_page")
+
+
+def explain_reason(reason: str, *, scan_cost: str = "") -> Explained:
+    """The sentence for a stored reason. `scan_cost`: what reading scanned or handwritten
+    pages uses, added to the reasons that tell the person to ask for them to be read."""
     text = REASON_MESSAGES.get(reason)
+    if text is not None and scan_cost and reason in SCAN_OPTION_REASONS:
+        text = f"{text} {scan_cost}"
     return Explained(text or UNKNOWN_REASON_MESSAGE, reason, known=text is not None)
 
 

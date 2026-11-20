@@ -14,6 +14,13 @@
 # differing setting (log line `profile_mismatch`, /admin) and still starts. With `confirmed =
 # true` a difference refuses the start.
 #
+# Each setting that turns a behaviour on or off, or picks a model, may carry two more fields:
+# `reason` (one sentence: why production has this value) and `eval` (the repository path of the
+# report or registration that measured it, or "none"). Where the repository states no reason
+# the row says "not stated"; nobody has filled one in from memory. They are shown on /admin and
+# are not part of the hash. There is no owner field: one person, the project owner, owns every
+# switch in this file.
+#
 # A setting whose value is None in config.py is written "unset". MAIN_MODEL and CHEAP_MODEL are
 # the values config.py resolves them to under MODEL_PROVIDER=anthropic.
 #
@@ -55,6 +62,7 @@ operations = [
   "MAX_UPLOAD_MB",
   "MAX_LARGE_UPLOAD_MB",
   "MAX_SOURCE_PAGES",
+  "TABLE_SEARCH_UNLIMITED",
   "SOFFICE_PATH",
   "OFFICE_TIMEOUT_S",
   "SOURCE_SANDBOX_MAX_TOTAL_MB",
@@ -114,11 +122,11 @@ operations = [
 ]
 
 [settings]
-MODEL_PROVIDER = { value = "anthropic", source = "docs/deploy-railway.md:133-134 at 693cca24, set by hand (written 2026-10-14); docs/web.md:85, 2026-11-04" }
-MAIN_MODEL = { value = "claude-opus-5-5", source = "config.py _resolve_models: ANTHROPIC_MAIN_MODEL under MODEL_PROVIDER=anthropic; data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
-CHEAP_MODEL = { value = "claude-haiku-5-5", source = "config.py _resolve_models: ANTHROPIC_CHEAP_MODEL under MODEL_PROVIDER=anthropic; data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
-ANTHROPIC_MAIN_MODEL = { value = "claude-opus-5-5", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
-ANTHROPIC_CHEAP_MODEL = { value = "claude-haiku-5-5", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
+MODEL_PROVIDER = { value = "anthropic", source = "docs/deploy-railway.md:133-134 at 693cca24, set by hand (written 2026-10-14); docs/web.md:85, 2026-11-04", reason = "not stated", eval = "none" }
+MAIN_MODEL = { value = "claude-opus-5-5", source = "config.py _resolve_models: ANTHROPIC_MAIN_MODEL under MODEL_PROVIDER=anthropic; data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04", reason = "not stated", eval = "none" }
+CHEAP_MODEL = { value = "claude-haiku-5-5", source = "config.py _resolve_models: ANTHROPIC_CHEAP_MODEL under MODEL_PROVIDER=anthropic; data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04", reason = "not stated", eval = "none" }
+ANTHROPIC_MAIN_MODEL = { value = "claude-opus-5-5", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04", reason = "not stated", eval = "none" }
+ANTHROPIC_CHEAP_MODEL = { value = "claude-haiku-5-5", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04", reason = "not stated", eval = "none" }
 ANTHROPIC_EFFORT_MAIN = { value = "medium", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
 ANTHROPIC_EFFORT_CHEAP = { value = "low", source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
 ANTHROPIC_EFFORT_EQUATION = { value = "unset", source = "not stated; code default" }
@@ -127,76 +135,76 @@ ANTHROPIC_EFFORT_PAGE_MATH = { value = "unset", source = "not stated; code defau
 ANTHROPIC_EFFORT_PAGE_WITNESS = { value = "unset", source = "not stated; code default" }
 ANTHROPIC_EFFORT_PAGE_AUDIT = { value = "unset", source = "not stated; code default (the page audit runs in no job yet)" }
 ANTHROPIC_EFFORT_IMAGE_PAGES = { value = "unset", source = "not stated; code default" }
-ANTHROPIC_NOTICE_IN_SYSTEM = { value = true, source = "not stated; code default" }
-EQUATION_CONTEXT_ON_ESCALATION = { value = false, source = "not stated; code default" }
-EQUATION_LINE_CONTEXT = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:111, on since 2026-11-03" }
-EQUATION_GLYPH_CHECKS = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:117, on since 2026-11-03" }
-EQUATION_GLYPH_RECONCILE = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:125, on since 2026-11-04" }
-LAYOUT_DISPLAY_GROUPING = { value = false, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:130" }
-REGION_TREE = { value = "off", source = "not stated; code default (new in feat/region-tree, off until a re-recording, docs/layout.md \"The region tree\")" }
-FONT_CODE_TABLES = { value = true, source = "not stated; code default (new in fix/font-code-tables 3db4e23c, no value set in Railway per docs/deploy-railway.md, 2026-11-11)" }
-FLAG_POLICY = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:139, on since 2026-11-03" }
+ANTHROPIC_NOTICE_IN_SYSTEM = { value = true, source = "not stated; code default", reason = "The same answers on the development sets and 6-10% less per call once the cache is warm.", eval = "docs/eval.md" }
+EQUATION_CONTEXT_ON_ESCALATION = { value = false, source = "not stated; code default", reason = "not stated", eval = "none" }
+EQUATION_LINE_CONTEXT = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:111, on since 2026-11-03", reason = "On fresh4 it raised 14 of the 15 papers and lowered none.", eval = "docs/eval-equation-round3.md" }
+EQUATION_GLYPH_CHECKS = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:117, on since 2026-11-03", reason = "Checks a reading that reaches past the box, and each letter's style, against the PDF's own glyphs; measured on recorded runs with no model call.", eval = "docs/eval-equation-glyph-checks.md" }
+EQUATION_GLYPH_RECONCILE = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:125, on since 2026-11-04", reason = "Corrects a reading from the PDF's own glyphs where they are plain; measured on the 25 development papers.", eval = "docs/eval-dev-baseline-2026-11-03.md" }
+LAYOUT_DISPLAY_GROUPING = { value = false, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:130", reason = "Off because the merges can cost points where the gold lists rows separately, and turning it on needs a pipeline version bump.", eval = "docs/eval-dev-baseline-2026-11-03.md" }
+REGION_TREE = { value = "off", source = "not stated; code default (new in feat/region-tree, off until a re-recording, docs/layout.md \"The region tree\")", reason = "Off because a changed box changes a crop, so the recorded answers of the pages it moves stop matching; turning it on comes with a re-recording and a pipeline version bump.", eval = "none" }
+FONT_CODE_TABLES = { value = true, source = "not stated; code default (new in fix/font-code-tables 3db4e23c, no value set in Railway per docs/deploy-railway.md, 2026-11-11)", reason = "Reads the codes of symbol and TeX fonts as what the font draws; off keeps only the two old private-use bullet rules.", eval = "none" }
+FLAG_POLICY = { value = true, source = "docs/web.md:62 at 693cca24, stated 2026-11-04; config.py:139, on since 2026-11-03", reason = "A calibrated rule that only adds required decisions for accepted equations that look like the readings that turned out wrong.", eval = "docs/eval-flag-policy.md" }
 FIGURE_MODEL_MAX_EDGE_PX = { value = "unset", source = "not stated; code default" }
-EQUATION_DISPLAY_FIRST_CHEAP = { value = false, source = "not stated; code default" }
+EQUATION_DISPLAY_FIRST_CHEAP = { value = false, source = "not stated; code default", reason = "not stated", eval = "none" }
 ACCEPT_CONFIDENCE_BY_MODEL = { value = {}, source = "not stated; code default" }
-ANTHROPIC_REFUSAL_FALLBACK = { value = true, source = "not stated; code default" }
+ANTHROPIC_REFUSAL_FALLBACK = { value = true, source = "not stated; code default", reason = "A request a safety classifier declines is re-run by Anthropic on the model it recommends, not returned as a refusal.", eval = "none" }
 AUTO_ACCEPT_CONFIDENCE = { value = 0.85, source = "not stated; code default" }
 ABSTAIN_CONFIDENCE = { value = 0.4, source = "not stated; code default" }
-DECISIONS_MODEL = { value = "gpt-6-luna", source = "not stated; code default" }
-DECISIONS_FIGURE_VERIFY = { value = false, source = "railway variables as recorded for the audit server of 2026-11-09; does nothing while MODEL_PROVIDER=anthropic (.railway/railway.ts:98)" }
+DECISIONS_MODEL = { value = "gpt-6-luna", source = "not stated; code default", reason = "Only gpt-6-luna serves the Decisions API.", eval = "docs/decisions/0005-decisions-api.md" }
+DECISIONS_FIGURE_VERIFY = { value = false, source = "railway variables as recorded for the audit server of 2026-11-09; does nothing while MODEL_PROVIDER=anthropic (.railway/railway.ts:98)", reason = "Does nothing while MODEL_PROVIDER=anthropic, because the Decisions API is OpenAI's; written false so the plan stays empty.", eval = "none" }
 DECISIONS_FIGURE_FLAG_BELOW = { value = 0.5, source = "not stated; code default" }
-DECISIONS_EQUATION_SHADOW = { value = false, source = "railway variables as recorded for the audit server of 2026-11-09; does nothing while MODEL_PROVIDER=anthropic (.railway/railway.ts:98)" }
+DECISIONS_EQUATION_SHADOW = { value = false, source = "railway variables as recorded for the audit server of 2026-11-09; does nothing while MODEL_PROVIDER=anthropic (.railway/railway.ts:98)", reason = "Does nothing while MODEL_PROVIDER=anthropic, because the Decisions API is OpenAI's; written false so the plan stays empty.", eval = "none" }
 DECISIONS_EQUATION_FLAG_AT = { value = 0.2, source = "not stated; code default" }
-CLAUDE_SECOND_CHECK = { value = "off", source = ".railway/railway.ts:136-138 and docs/deploy-railway.md:163 at 693cca24, off since 2026-11-09" }
-CLAUDE_CHECK_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }
+CLAUDE_SECOND_CHECK = { value = "off", source = ".railway/railway.ts:136-138 and docs/deploy-railway.md:163 at 693cca24, off since 2026-11-09", reason = "On the first real-model walkthrough (2026-11-09) the shadow check changed no output and cost about 16% of the spend.", eval = "none" }
+CLAUDE_CHECK_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default", reason = "It must not be the model that read the page for the check to be independent, and sonnet is neither the main nor the cheap model.", eval = "none" }
 CLAUDE_CHECK_EFFORT = { value = "low", source = "not stated; code default" }
-CLAUDE_CHECK_SCOPE = { value = "accepted", source = "not stated; code default" }
+CLAUDE_CHECK_SCOPE = { value = "accepted", source = "not stated; code default", reason = "The proposals that reach a student without a person's decision are what a second look is for.", eval = "none" }
 # Word and PowerPoint uploads work only where the image has the converter. Before an image
 # that has it goes to production: equations typed as plain text are lost and the pages say
 # "Your PDF" for a Word source (audit findings F-030, F-060).
-OFFICE_INPUT_ENABLED = { value = true, source = "not stated; code default" }
-MATH_READER_CLAUDE_ENABLED = { value = false, source = "not stated; code default" }
-MATH_READER_CLAUDE_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default" }
+OFFICE_INPUT_ENABLED = { value = true, source = "not stated; code default", reason = "not stated", eval = "none" }
+MATH_READER_CLAUDE_ENABLED = { value = false, source = "not stated; code default", reason = "A reader sends a crop to a model provider, so a production start is refused while one is on and the privacy notice does not name that provider.", eval = "docs/math-readers.md" }
+MATH_READER_CLAUDE_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default", reason = "not stated", eval = "none" }
 MATH_READER_CLAUDE_EFFORT = { value = "medium", source = "not stated; code default" }
-MATH_READER_OPENAI_ENABLED = { value = false, source = "not stated; code default" }
-MATH_READER_OPENAI_MODEL = { value = "gpt-6-luna", source = "not stated; code default" }
-MATH_READER_LOCAL_ENABLED = { value = false, source = "docs/deploy-railway.md:170 at 693cca24, written 2026-11-03" }
-IMAGE_PAGES_SECOND_READER = { value = "off", source = "docs/deploy-railway.md:170 at 693cca24, written 2026-11-03" }
-FEATURE_TABLES = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
-FEATURE_LONG_DESCRIPTIONS = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
-FEATURE_COLOUR = { value = false, source = "docs/web.md:59 at 693cca24, stated 2026-11-04 (not among the flags turned on)" }
-CONTENT_RUNS = { value = true, source = "turned on 2026-11-18 (content model WS16.1, F-509) after the measurement in docs/layout.md 'Struck text'; code default; off is the old shadow rollout: struck runs counted in the trace, not written" }
-FEATURE_NOTATION_MEMORY = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04" }
-FEATURE_PAGE_MATH = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
-PAGE_MATH_MODEL = { value = "unset", source = "not stated; code default" }
-PAGE_MATH_AGREEMENT_LIFT = { value = true, source = "not stated; code default" }
+MATH_READER_OPENAI_ENABLED = { value = false, source = "not stated; code default", reason = "A reader sends a crop to a model provider, so a production start is refused while one is on and the privacy notice does not name that provider.", eval = "docs/math-readers.md" }
+MATH_READER_OPENAI_MODEL = { value = "gpt-6-luna", source = "not stated; code default", reason = "not stated", eval = "none" }
+MATH_READER_LOCAL_ENABLED = { value = false, source = "docs/deploy-railway.md:170 at 693cca24, written 2026-11-03", reason = "Needs the local reader's model files in the image (0.6 GB, INSTALL_MATH_READER), which production does not build.", eval = "docs/math-readers.md" }
+IMAGE_PAGES_SECOND_READER = { value = "off", source = "docs/deploy-railway.md:170 at 693cca24, written 2026-11-03", reason = "Only the local reader runs in the hosted conversion child, and its model files are not in the production image.", eval = "docs/eval-handwriting.md" }
+FEATURE_TABLES = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04", reason = "The owner's decision of 2026-10-21 after the development-set measurement: real tables for about $0.007 each, where off keeps a table as an image with a required decision.", eval = "docs/tables.md" }
+FEATURE_LONG_DESCRIPTIONS = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04", reason = "Long descriptions and data tables for charts are what a blind student needs from a figure, at about twice the cost of a figure.", eval = "docs/eval-figures-long.md" }
+FEATURE_COLOUR = { value = false, source = "docs/web.md:59 at 693cca24, stated 2026-11-04 (not among the flags turned on)", reason = "No eval has turned it on.", eval = "none" }
+CONTENT_RUNS = { value = true, source = "turned on 2026-11-18 (content model WS16.1, F-509) after the measurement in docs/layout.md 'Struck text'; code default; off is the old shadow rollout: struck runs counted in the trace, not written", reason = "On since the struck-text measurement (F-509); off is the old shadow rollout that counts struck runs in the trace and does not write them.", eval = "docs/layout.md" }
+FEATURE_NOTATION_MEMORY = { value = true, source = "docs/web.md:59 at 693cca24, stated 2026-11-04; docs/deploy-railway.md:201 at 693cca24, 2026-11-04", reason = "A course's second chapter reads its notation hints.", eval = "none" }
+FEATURE_PAGE_MATH = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04", reason = "Off until a fresh held-out set says it helps.", eval = "docs/eval-page-math.md" }
+PAGE_MATH_MODEL = { value = "unset", source = "not stated; code default", reason = "not stated", eval = "none" }
+PAGE_MATH_AGREEMENT_LIFT = { value = true, source = "not stated; code default", reason = "not stated", eval = "none" }
 PAGE_MATH_MAX_OUTPUT_TOKENS = { value = 4096, source = "not stated; code default" }
 PAGE_MATH_UNCONFIRMED_FACTOR = { value = 1.0, source = "not stated; code default" }
-FEATURE_PAGE_WITNESS = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04" }
-PAGE_WITNESS_MODEL = { value = "claude-opus-5-5", source = "not stated; code default" }
+FEATURE_PAGE_WITNESS = { value = false, source = "data/realworld/PREREGISTRATION-FRESH5.md:183-192 at 693cca24, read from the deployment 2026-11-04", reason = "The development run found no accuracy gain.", eval = "docs/eval-equation-round5.md" }
+PAGE_WITNESS_MODEL = { value = "claude-opus-5-5", source = "not stated; code default", reason = "not stated", eval = "none" }
 PAGE_WITNESS_MAX_OUTPUT_TOKENS = { value = 12288, source = "not stated; code default" }
-PAGE_AUDIT_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default (the page audit runs in no job yet)" }
+PAGE_AUDIT_MODEL = { value = "claude-sonnet-5-5", source = "not stated; code default (the page audit runs in no job yet)", reason = "not stated", eval = "none" }
 PAGE_AUDIT_MAX_OUTPUT_TOKENS = { value = 1500, source = "not stated; code default (the page audit runs in no job yet)" }
-FEATURE_IMAGE_PAGES = { value = true, source = "docs/web.md:83 and docs/deploy-railway.md:201 at 693cca24, stated 2026-11-04" }
-FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-railway.md:166 at 693cca24, on since 2026-11-04 13:53 UTC" }
+FEATURE_IMAGE_PAGES = { value = true, source = "docs/web.md:83 and docs/deploy-railway.md:201 at 693cca24, stated 2026-11-04", reason = "Only offers the option; a job converts scanned and handwritten pages when its owner ticks it, at a measured $0.106 to $0.136 a page.", eval = "docs/eval-image-pages.md" }
+FEATURE_LATEX_SOURCE = { value = true, source = "docs/web.md:78 and docs/deploy-railway.md:166 at 693cca24, on since 2026-11-04 13:53 UTC", reason = "Accepted as 'build it, sandboxed' and turned on once the sandbox probe passed on the deployed image.", eval = "docs/decisions/0008-latex-source.md" }
 # Before this is turned on: a zip with one unsupported file is refused whole, a .txt is
 # dropped without a word, a Mac zip brings extra entries, and the batch page offers
 # "Download all" for one file (audit findings F-029, F-100).
-FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04" }
-FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04" }
-FEATURE_WORD_SOURCE = { value = false, source = "not stated; code default" }
-FEATURE_CLASS_LINK = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done" }
-FEATURE_COURSE_GRANTS = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done" }
-IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default" }
+FEATURE_BATCH_ZIP = { value = false, source = "docs/web.md:80 and docs/deploy-railway.md:167 at 693cca24, stated 2026-11-04", reason = "Kept off until real course sources (zips of projects) have been tried.", eval = "none" }
+FEATURE_BEAMER_SOURCE = { value = false, source = "docs/web.md:79 and docs/deploy-railway.md:168 at 693cca24, stated 2026-11-04", reason = "Kept off until a few real decks have been converted and read.", eval = "none" }
+FEATURE_WORD_SOURCE = { value = false, source = "not stated; code default", reason = "Kept off until real Word files have been read both ways.", eval = "none" }
+FEATURE_CLASS_LINK = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done", reason = "Kept off until the privacy, terms and limits pages say what a link holder can see and a takedown contact exists.", eval = "none" }
+FEATURE_COURSE_GRANTS = { value = false, source = "not stated; code default, off until the list in docs/deploy-railway.md is done", reason = "Kept off until the public pages say who can see a document.", eval = "none" }
+IMAGE_PAGES_MODEL = { value = "unset", source = "not stated; code default", reason = "not stated", eval = "none" }
 IMAGE_PAGES_DPI = { value = 200, source = "not stated; code default" }
-IMAGE_PAGES_OMISSION_CHECK = { value = true, source = "not stated; code default" }
-IMAGE_PAGES_MATHS_ALWAYS_REQUIRED = { value = true, source = "not stated; code default" }
-IMAGE_PAGES_RECOVER_OMISSIONS = { value = true, source = "not stated; code default" }
-IMAGE_PAGES_VECTOR_CROPS = { value = false, source = "not stated; code default" }
-IMAGE_PAGES_VECTOR_CHECKS = { value = true, source = "not stated; code default" }
-IMAGE_PAGES_SECOND_READING = { value = false, source = "not stated; code default" }
-IMAGE_PAGES_ACCEPT_AGREED = { value = false, source = "not stated; code default" }
-MATHML_ALTTEXT = { value = false, source = "not stated; code default" }
+IMAGE_PAGES_OMISSION_CHECK = { value = true, source = "not stated; code default", reason = "not stated", eval = "none" }
+IMAGE_PAGES_MATHS_ALWAYS_REQUIRED = { value = true, source = "not stated; code default", reason = "The page reader's 'high' is not trustworthy on handwriting, and the option's promise is that every item is checked.", eval = "docs/eval-handwriting.md" }
+IMAGE_PAGES_RECOVER_OMISSIONS = { value = true, source = "not stated; code default", reason = "Reads a stretch the first reading left out from a picture of just that part, so it is converted and not only flagged.", eval = "none" }
+IMAGE_PAGES_VECTOR_CROPS = { value = false, source = "not stated; code default", reason = "Off until measured: the model read clean vector renders no better than scans (0.595 against 0.662 exact, n=74).", eval = "docs/eval-handwriting.md" }
+IMAGE_PAGES_VECTOR_CHECKS = { value = true, source = "not stated; code default", reason = "Each check only adds a reason or an omission note; the maths stays a required decision.", eval = "docs/eval-handwriting.md" }
+IMAGE_PAGES_SECOND_READING = { value = false, source = "not stated; code default", reason = "Off until the measurement in the handwriting report decides.", eval = "docs/eval-handwriting.md" }
+IMAGE_PAGES_ACCEPT_AGREED = { value = false, source = "not stated; code default", reason = "not stated", eval = "none" }
+MATHML_ALTTEXT = { value = false, source = "not stated; code default", reason = "Off until a person has checked it with NVDA and MathCAT (and ideally JAWS and VoiceOver): some screen readers read it in place of the maths structure.", eval = "none" }
 PAGE_IMAGE_CACHE_MB = { value = 32, source = "not stated; code default" }
 
 # What the production image carries, written by the image build (`readablestem ops image-facts

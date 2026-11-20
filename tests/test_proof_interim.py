@@ -88,9 +88,12 @@ def test_the_development_numbers_the_report_cites_are_in_the_development_report(
     assert "precision 0.5556 and recall 0.7778" in REPORT.read_text(encoding="utf-8")
 
 
-def test_the_readme_numbers_are_the_reports_numbers():
-    """The numbers the README quotes from the held-out run are the ones in PROOF.md."""
-    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+def test_the_results_page_numbers_are_the_reports_numbers():
+    """The numbers docs/results.md and the README quote from the held-out run are PROOF.md's."""
+    readme = (ROOT / "docs" / "results.md").read_text(encoding="utf-8")
+    brief = (ROOT / "README.md").read_text(encoding="utf-8")
+    for shown in ("0.504", "0.961", "0.971", "1.76 required decisions"):
+        assert shown in brief, shown
     proof = (ROOT / "PROOF.md").read_text(encoding="utf-8")
     pairs = {
         "0.504": "0.5037",  # ReadableSTEM, equations through the whole pipeline

@@ -226,7 +226,32 @@ _BREAKS = re.compile(rf"(?:\s*{BREAK})+\s*")
 _PAUSE = re.compile(rf"([.,;:!?])?{BREAK}")
 
 
+# Raised and lowered text (`<sup>`, `<sub>`) inside text: the start and end of each, kept in the
+# text until `_words` has the whole of it, because whether "end superscript" is said depends on
+# what follows ("cm3 and", "cm3." need none, "x2y" does). A page reads "cm3" and "H2O" as
+# written; Listen says which digits are raised or lowered.
+_SCRIPT_WORDS = {"\ue001": "superscript", "\ue003": "subscript"}
+_SCRIPT_END = {"\ue002": "end superscript", "\ue004": "end subscript"}
+_ORDINAL = re.compile(r"(\d)\ue001(st|nd|rd|th)\ue002")
+_SCRIPT_MARK = re.compile("[\ue001-\ue004]")
+_SCRIPT_ENDS_TEXT = re.compile(r"[\ue002\ue004](?=[\s.,;:!?)\]\ue001\ue003]|$)")
+_SCRIPT_END_MARK = re.compile("[\ue002\ue004]")
+
+
+def _script_words(text: str) -> str:
+    """The words for the raised and lowered runs of `text`: none for the ending of an ordinal
+    ("10th"), "superscript" or "subscript" before the run, and "end superscript" or "end
+    subscript" after it when text goes on right behind it."""
+    if "\ue001" not in text and "\ue003" not in text:
+        return text
+    text = _ORDINAL.sub(r"\1\2", text)
+    text = _SCRIPT_ENDS_TEXT.sub("", text)
+    text = _SCRIPT_END_MARK.sub(lambda m: f" {_SCRIPT_END[m.group(0)]} ", text)
+    return _SCRIPT_MARK.sub(lambda m: f" {_SCRIPT_WORDS[m.group(0)]} ", text)
+
+
 def _words(text: str) -> str:
+    text = _script_words(text)
     text = _BREAKS.sub(BREAK, _SPACE.sub(" ", text)).strip(f" {BREAK}")
     text = _PAUSE.sub(lambda m: f"{m.group(1) or ','} ", text)
     return _BEFORE_PUNCT.sub(r"\1", _SPACE.sub(" ", text).strip())
@@ -262,10 +287,17 @@ def _xml(node: Node | str) -> str:
 
 
 class _Transcript:
-    def __init__(self, builder: _Builder, speeches: Mapping[str, str] | None, max_rows: int):
+    def __init__(
+        self,
+        builder: _Builder,
+        speeches: Mapping[str, str] | None,
+        max_rows: int,
+        picture_url: Callable[[str], str] | None = None,
+    ):
         self.ids = builder.ids
         self.speeches = speeches or {}
         self.max_rows = max_rows
+        self.picture_url = picture_url
         self.items: list[Item] = []
         self.lang = ""
         self.full = False
@@ -387,6 +419,11 @@ class _Transcript:
         if tag == "hr":
             return ""
         inner = self._children_text(node, depth)
+        # A raised link is a footnote's mark: "link 1" is its whole name, as before.
+        marks_a_note = any(not isinstance(c, str) and c.tag == "a" for c in node.children)
+        if tag in ("sup", "sub") and not marks_a_note:
+            opening, closing = ("\ue001", "\ue002") if tag == "sup" else ("\ue003", "\ue004")
+            return f"{opening}{inner}{closing}"
         if node.has_class("flagged-inline"):
             self._held.add("not-converted")
             return f" {_words(inner)}, not converted "
@@ -689,7 +726,7 @@ class _Transcript:
 
     # ---------------------------------------------------------------- pictures
 
-    def picture(self, node: Node, role: str = LISTEN_LABELS["image"]) -> None:
+    def picture(self, node: Node, role: str = LISTEN_LABELS["image"], owner: str = "") -> None:
         alt = _words(node.get("alt"))
         if self._flagged:
             return self.add(
@@ -700,7 +737,7 @@ class _Transcript:
             return  # decorative: a screen reader skips it
         self.add(
             role, alt or NO_DESCRIPTION, "figure", say=f"{role}: {alt or NO_DESCRIPTION}",
-            thing=_thing_picture(node),
+            thing=_thing_picture(node, owner, self.picture_url),
         )  # fmt: skip
 
     def figure(self, node: Node, depth: int) -> None:
@@ -710,7 +747,7 @@ class _Transcript:
             if child.tag == "figcaption":
                 self.paragraph(self.inline(child), "caption", LISTEN_LABELS["caption"])
             elif child.tag == "img":
-                self.picture(child, _FIGURE)
+                self.picture(child, _FIGURE, node.get("id"))
             elif not self._hidden(child):
                 self.block(child, depth + 1)
 
@@ -794,6 +831,8 @@ class _Transcript:
 
 MAX_THING_ROWS = 40  # table rows shown beside the transcript; the student page has them all
 MAX_THING_IMAGE = 150_000  # characters of a picture's data: URI kept; a bigger one is not copied
+# What the panel says of a picture too large to copy that has no address to load it from.
+THING_ON_STUDENT_PAGE = "This picture is on the student page."
 _THING_TAGS = frozenset(
     {"em", "strong", "i", "b", "sub", "sup", "code", "br", "span", "caption", "thead", "tbody",
      "tfoot", "tr", "th", "td", "table", "p"}
@@ -810,13 +849,25 @@ def _thing_math(math: Node) -> str:
     return str(try_sanitize_mathml(_xml(math)) or "")
 
 
-def _thing_picture(node: Node) -> str:
-    """The picture as an <img>, when it is small enough to carry twice (its bytes are in the
-    page already; a large one is left to the student page)."""
+def _thing_picture(
+    node: Node, owner: str = "", picture_url: Callable[[str], str] | None = None
+) -> str:
+    """The picture as an <img>. A small one is copied (it is carried twice in the page). A large
+    one is not: when `picture_url` gives an address for the figure it belongs to (`owner`, the
+    element its crop is stored under), the panel loads it from there; otherwise the panel says
+    the picture is on the student page. A loaded one is `loading="lazy"`: a narrow window does
+    not draw the panel, and then the picture is not fetched either."""
     src = node.get("src")
-    if not src.startswith("data:image/") or len(src) > MAX_THING_IMAGE:
+    if not src.startswith("data:image/"):
         return ""
-    return f'<img src="{escape(src, quote=True)}" alt="{escape(node.get("alt"), quote=True)}">'
+    lazy = ""
+    if len(src) > MAX_THING_IMAGE:
+        src = picture_url(owner) if owner and picture_url else ""
+        if not src:
+            return f"<p>{THING_ON_STUDENT_PAGE}</p>"
+        lazy = ' loading="lazy"'
+    alt = escape(node.get("alt"), quote=True)
+    return f'<img src="{escape(src, quote=True)}" alt="{alt}"{lazy}>'
 
 
 def _thing_html(node: Node | str, budget: list[int]) -> str:
@@ -965,15 +1016,22 @@ def _span(value: str) -> int:
 
 
 def build_transcript(
-    html: str, speeches: Mapping[str, str] | None = None, *, max_rows: int = MAX_TABLE_ROWS
+    html: str,
+    speeches: Mapping[str, str] | None = None,
+    *,
+    max_rows: int = MAX_TABLE_ROWS,
+    picture_url: Callable[[str], str] | None = None,
 ) -> list[Item]:
     """The listening transcript of a converted document's HTML, in reading order.
 
     `speeches`: element id -> the stored spoken reading of an equation (the string the review
     screen shows as "Read aloud roughly as"), so the transcript says what the review screen
-    says; an equation without one is read from its `alttext` or its MathML."""
+    says; an equation without one is read from its `alttext` or its MathML.
+
+    `picture_url`: figure element id -> the address its picture can be loaded from, or "" for
+    none; the side panel uses it for a picture too large to copy into the page."""
     builder = parse(html)
-    transcript = _Transcript(builder, speeches, max_rows)
+    transcript = _Transcript(builder, speeches, max_rows, picture_url)
     root = next(
         (c for c in builder.root.children if isinstance(c, Node) and c.tag == "html"), builder.root
     )
@@ -1044,6 +1102,7 @@ def transcript_for(
     version: int,
     html: str,
     speeches: Callable[[], Mapping[str, str]] | Mapping[str, str] | None = None,
+    picture_url: Callable[[str], str] | None = None,
 ) -> list[Item]:
     """`build_transcript`, kept per (job, result version, the file's digest). The digest
     guards a file that changed without a version bump. `speeches` may be a function, called
@@ -1054,7 +1113,7 @@ def transcript_for(
     found = CACHE.get(key)
     if found is None:
         said = speeches if isinstance(speeches, Mapping) or speeches is None else speeches()
-        found = build_transcript(html, said)
+        found = build_transcript(html, said, picture_url=picture_url)
         CACHE.put(key, found)
     return found
 

@@ -45,6 +45,7 @@ from readablestem.pipeline.page_type import (
     PAGE_MAX_PATHS,
     InkBudget,
     InkOverrun,
+    without_annotation_art,
 )
 
 BBox = tuple[float, float, float, float]
@@ -211,14 +212,15 @@ def extract_ink(
     max_strokes: int = MAX_STROKES,
 ) -> PageInk:
     """Strokes, regions and what was dropped for one page. `drawings` is
-    `page.get_cdrawings()` when the caller has it already. `budget` is the ink-analysis
+    `page.get_cdrawings()` without what annotations paint (`without_annotation_art`),
+    when the caller has the list already. `budget` is the ink-analysis
     budget (`InkBudget`, a fresh one when not given: it is counted per page, so a fresh one
     reads a page as the conversion did), checked in every phase and loop; over a cap or the
     budget the result is empty with `analysed` False and its `cause`."""
     if budget is None:
         budget = InkBudget()
     if drawings is None:
-        drawings = page.get_cdrawings()
+        drawings = without_annotation_art(page, page.get_cdrawings())
     result = PageInk()
     if len(drawings) > max_paths or sum(len(d.get("items") or ()) for d in drawings) > max_items:
         result.analysed, result.cause = False, INK_WORK

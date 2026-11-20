@@ -475,8 +475,8 @@ def statement_of(web, job_id: str) -> dict[str, object]:
                 "state": "Ready",
                 "job": "3 equations are shown as LaTeX text, not written so that screen readers "
                 "can read them aloud.",
-                "note": "3 parts could not be converted and are shown as they were written in "
-                "the Word file",
+                "note": "3 parts could not be converted and are shown as LaTeX that this tool "
+                "made from the Word file",
                 "notice": "Part 1 not converted: equation",
                 "summary": "0 of 3 equations are MathML.",
                 "csv": {

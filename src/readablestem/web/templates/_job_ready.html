@@ -51,6 +51,7 @@
     <li class="route" id="route-word">
       <h4>Word</h4>
       <p><a class="button-secondary" href="/jobs/{{ job.id }}/download.docx">Download as Word (.docx)</a></p>
+      {% include "_word_as_words.html" %}
     </li>
     {% endif %}
     <li class="route" id="route-epub">
@@ -66,11 +67,15 @@
   {# T3-3: one file from the finished parts of a long source (GET /jobs/{id}/combine,
      web/combine.py). Only on a part, and only when two or more finished parts are kept. #}
   {% if job.part_label and job.combinable > 1 and job.is_owner %}
-  <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine parts</a> into one
-    HTML file: the {{ job.combinable }} finished parts of this file that you still have,
-    in page order. A part you deleted, or one that is not finished or still has a decision
-    to make, is left out and the file names the missing pages. The same file as
+  <p class="canvas-download"><a href="/jobs/{{ job.id }}/combine">Combine the {{ job.combinable }} ready parts{% if job.combine_left_out %} (leaves out {{ job.combine_left_out }}){% endif %}</a>
+    into one HTML file, in page order. A part you deleted, or one that is not finished or
+    still has a decision to make, is left out and the file names the missing pages. See
+    <a href="/jobs/{{ job.id }}/combine/parts">each part and what it needs</a>. The same file as
     {% if word_export|default(false) %}<a href="/jobs/{{ job.id }}/combine?format=docx">Word (.docx)</a> or {% endif %}<a href="/jobs/{{ job.id }}/combine?format=epub">EPUB</a>.</p>
+  {% elif job.part_label and job.is_owner and job.parts|length > 1 %}
+  <p class="canvas-download">Combining needs at least two ready parts; {{ job.combinable }} {{ "is" if job.combinable == 1 else "are" }}
+    ready now ({{ job.combine_left_out }} of this file's parts {{ "is" if job.combine_left_out == 1 else "are" }} not).
+    See <a href="/jobs/{{ job.id }}/combine/parts">each part and what it needs</a>.</p>
   {% endif %}
 
   {% if job.is_owner %}

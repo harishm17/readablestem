@@ -187,10 +187,13 @@ def _page_files() -> list[Path]:
 
 
 # The repository's own writing: the README, DESIGN.md, the other top-level notes and docs/.
-# CHANGELOG.md is history and quotes the old words on purpose.
-DOC_FILES = [p for p in sorted(ROOT.glob("*.md")) if p.name != "CHANGELOG.md"] + sorted(
-    (ROOT / "docs").rglob("*.md")
-)
+# CHANGELOG.md and its older part in docs/ are history and quote the old words on purpose.
+_HISTORY = {"CHANGELOG.md", "changelog-archive.md"}
+DOC_FILES = [
+    p
+    for p in [*sorted(ROOT.glob("*.md")), *sorted((ROOT / "docs").rglob("*.md"))]
+    if p.name not in _HISTORY
+]
 # In prose a bare "tick" or "ticks" is also an axis tick or a pen stroke, which US English
 # keeps; the checkbox forms (ticked, ticking, unticked) are still caught.
 _BRITISH_DOCS = re.compile(BRITISH.pattern.replace("tick|ticks|", ""), re.IGNORECASE)

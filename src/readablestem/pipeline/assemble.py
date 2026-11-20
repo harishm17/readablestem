@@ -67,6 +67,7 @@ from readablestem.core.types import (
     Kind,
     Link,
     Status,
+    TableGrid,
 )
 from readablestem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from readablestem.pipeline import (
@@ -116,7 +117,12 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # said once (the visible label is hidden from a screen reader when the alt text says it); an
 # equation of a Word or LaTeX file shown as its LaTeX is not called a picture, and its link
 # names no page; the speech rules for scripts and accents changed.
-RENDER_VERSION = 9
+# 10: a table that goes on from the page before is written with that part's header rows; the
+# finish sentence's date has its year; a sidebar's name; every code block that can scroll and
+# every wide table is a tab stop, a script inside a script keeps a readable size, and a very wide
+# equation is not cut on paper; the words for a Word file's equations; the speech rules for
+# bars and for raised and lowered text.
+RENDER_VERSION = 10
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -151,7 +157,7 @@ class Stamp:
     @property
     def date_text(self) -> str:
         """The day written out in full, with no time ("November 10, 2026")."""
-        return f"{self.day:%B} {self.day.day}, {self.day.year}"
+        return checked_words.long_date(self.day)
 
     @property
     def line(self) -> str:
@@ -300,6 +306,8 @@ def with_medium(html: str, medium: str) -> str:
 
 
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
+# In a draft, where the student's file links to the instructor's contact line (`instructor_link`).
+DRAFT_CONTACT_NOTE = "In the student's file, a link here goes to the document's contact line."
 # A draft (`mark_draft`): a file that left the tool with decisions still open says so before
 # anything else, and its head says so to a program (SW21). An honesty claim: one string.
 DRAFT_STATE_META = '<meta name="readablestem-state" content="draft">'
@@ -311,6 +319,8 @@ DRAFT_CLASS = "draft-mark"
 EQUATION_NOTE = "Shown as an image of the original."
 # The same for a formula of a LaTeX source, shown as it was written (no picture).
 EQUATION_WRITTEN_NOTE = "Shown as it was written in LaTeX."
+# A formula of a Word file has no LaTeX in the file: the tool made it from Word's equation.
+EQUATION_MADE_NOTE = "Shown as LaTeX that this tool made from the Word equation."
 FIGURE_NOTE = "This figure has no text description yet."
 # Said once, in the notice at the top, when any part is not converted: the explanation that
 # each box used to repeat. What to do ("ask your instructor for a version you can read") is
@@ -724,6 +734,25 @@ def _scroller_attrs(mathml: str, label: str | None) -> str:
     return f' tabindex="0" role="group" aria-label="{_escape(name)}"'
 
 
+# A kept picture that is its box's own child keeps its size under 40 em and the box scrolls
+# sideways (`student_sheet.NARROW`). One narrower than this fits the narrowest column (320 px
+# less the page's and the box's padding), so it needs no tab stop, as a short equation has none.
+WIDE_PICTURE_PX = 240
+_IMG_WIDTH = re.compile(r'\swidth="(\d+)"')
+
+
+def _picture_scroller_attrs(body: str) -> str:
+    """The tab stop and name of a kept picture's box when its picture can be wider than the
+    box ("" otherwise). A keyboard user can only scroll a box that takes focus (axe
+    `scrollable-region-focusable`), as for equations (`_scroller_attrs`)."""
+    if not body.startswith("<img"):
+        return ""  # a figure's picture shrinks with the column, and text wraps
+    width = _IMG_WIDTH.search(body[: body.find(">") + 1])
+    if width and int(width.group(1)) < WIDE_PICTURE_PX:
+        return ""
+    return ' tabindex="0" role="group" aria-label="Original picture"'
+
+
 # An equation estimated at least this wide (em of the maths font) may not fit a sheet: at
 # Letter and 150% the text column is about 22 em of it. On paper it is scaled to fit the
 # column down to 70% of its size; wider than that it keeps 70% and the page prints a note
@@ -881,6 +910,25 @@ def _one_wrapper_each(chunks: list[str]) -> list[str]:
                 break
         else:
             out.append(chunk)
+    return out
+
+
+def _name_sidebars(chunks: list[str]) -> list[str]:
+    """Sidebars are told apart by a screen reader's list of regions: when a page has more than
+    one, each is "Sidebar 2 of 3" and not the same "Sidebar". A sidebar holds only paragraphs
+    (only a paragraph takes the role), so there is no heading of its own to name it by."""
+    opening = _ROLE_WRAP["aside"][0]
+    total = sum(chunk.startswith(opening) for chunk in chunks)
+    if total < 2:
+        return chunks
+    out: list[str] = []
+    seen = 0
+    for chunk in chunks:
+        if chunk.startswith(opening):
+            seen += 1
+            named = f'<aside aria-label="{ASIDE_LABEL} {seen} of {total}">'
+            chunk = named + chunk[len(opening) :]
+        out.append(chunk)
     return out
 
 
@@ -1059,6 +1107,8 @@ class _Renderer:
         default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID, NOTICE_ID, NOTICE_TITLE_ID, LEFT_OUT_ID}
     )
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
+    # A table that goes on from the page before, with that table's header rows on top.
+    carried: dict[str, TableGrid] = field(default_factory=dict)
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
     outline: Outline = field(default_factory=Outline)
     # CSS a feature added for this document (`add_style`), by name.
@@ -1185,7 +1235,8 @@ class _Renderer:
 
     def instructor_link(self, element: Element, reason: str) -> str:
         """A link that writes to the instructor about one thing not converted, or "" when the
-        owner gave no contact line (the note then says only "Ask your instructor"). The subject
+        owner gave no contact line (the note then says only "Ask your instructor"). In a draft
+        (`CHECKER`) it is a sentence saying where the student's file has the link. The subject
         names the document and the thing by kind and page ("Equation on page 3"); nothing of
         its content is in the link, and the message body is empty (`contact_link`)."""
         if element.kind is Kind.EQUATION:
@@ -1204,7 +1255,12 @@ class _Renderer:
         else:
             what = f"{noun.capitalize()} on {where.lower()}" if where else noun.capitalize()
         text = "{verb} your instructor about this " + noun
-        return contact_link(self.contact, self.titles.text, what, text) or ""
+        link = contact_link(self.contact, self.titles.text, what, text)
+        if link is not None and self.audience == CHECKER:
+            # The person who checks the draft is not the student, and "your instructor" may be
+            # themself: no link to write with; they are told what the student's file has here.
+            return DRAFT_CONTACT_NOTE
+        return link or ""
 
     def link_attrs(self, link: Link) -> str:
         """The mark of a footnote is a `doc-noteref`; the first one for a note also gets the
@@ -1311,7 +1367,9 @@ class _Renderer:
         if element.kind is Kind.FIGURE:
             return self.figure(element)
         if element.kind is Kind.TABLE:
-            return assemble_tables.render_table_element(element, self.fixes.get(element.id), self)
+            return assemble_tables.render_table_element(
+                element, self.fixes.get(element.id), self, self.carried.get(element.id)
+            )
         return ""
 
     def paragraph(self, element: Element, text: str) -> str:
@@ -1509,7 +1567,10 @@ class _Renderer:
             self.original(element, self.image_alt(element, equation_alt(element, self.audience)))
             + label
         )
-        note = EQUATION_NOTE if self.has_picture(element) else EQUATION_WRITTEN_NOTE
+        if self.has_picture(element):
+            note = EQUATION_NOTE
+        else:
+            note = EQUATION_MADE_NOTE if self.origin == "docx" else EQUATION_WRITTEN_NOTE
         return self.flag_block(element, reason, original, "Not converted.", note)
 
     def picture_size(self, element: Element, png: bytes | None) -> str:
@@ -1696,6 +1757,7 @@ class _Renderer:
         # beside it is for the eye, as an unconverted inline equation's is (`inline_equation`).
         # Without a picture (the original's text, or none) the label is what says it.
         hidden = ' aria-hidden="true"' if _alt_says_label(body, label) else ""
+        attrs += _picture_scroller_attrs(body)
         return (
             f'<div class="flagged"{attrs}>{body}'
             f'<p class="flag-note {AUTHORED_CLASS}" role="note">'
@@ -2113,8 +2175,9 @@ def render_html(
 
     `pipeline_version` is the version of the pipeline that converted the result the page is
     made from (`DocumentResult.pipeline_version`), which the generator tag names beside the
-    version of this code, since the two differ when a stored result is rendered again; None
-    (a page made from several results) names only this code.
+    version of this code, since the two differ when a stored result is rendered again; a page
+    joined from several results names each version its parts were converted at
+    (`combine.Joined.pipeline_version`); None names only this code.
 
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
@@ -2183,7 +2246,8 @@ def render_html(
         table_math.cell_equation_ids(ordered) & set(equations)  # written in their table's cell
     )
     renderer.unread_parts = _unread_parts(ordered, first_fix, renderer.placed)
-    body = renderer.fill_backlinks(renderer.render_all(ordered))
+    renderer.carried = assemble_tables.carry_headers(ordered, first_fix)[0]
+    body = _name_sidebars(renderer.fill_backlinks(renderer.render_all(ordered)))
     kept_pages = [
         e.page
         for e in ordered

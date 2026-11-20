@@ -31,6 +31,7 @@ from typing import TYPE_CHECKING, Any
 import jinja2
 
 from readablestem.web import office_convert, reports
+from readablestem.web.dates import format_day
 from readablestem.web.events import (
     EVENT_RETENTION_DAYS,
     MAX_SHARE,
@@ -116,7 +117,7 @@ class Material:
 
     @property
     def stated_text(self) -> str:
-        return f"{self.stated:%B} {self.stated.day}, {self.stated.year}" if self.stated else ""
+        return format_day(self.stated)
 
 
 # Every kind of material a conversion or a review sends to a model, in the order the lists
@@ -218,8 +219,10 @@ MATERIALS: tuple[Material, ...] = (
         label="Pictures of regions and table cells you ask to have read on the review screen",
         vendor=(),
         # Sent since the review actions were built (T3-5, T3-11), and first named on its own
-        # on this day; before, only as "images of those parts of the page".
-        stated=date(2026, 11, 11),
+        # in the release that went live on this day (pull request 172; the sentence was
+        # written on 2026-11-11, but the privacy page a visitor could read did not carry it
+        # before the release). Before, only as "images of those parts of the page".
+        stated=date(2026, 11, 19),
     ),
 )
 
@@ -309,9 +312,22 @@ def material_context(settings: Settings) -> dict[str, Any]:
     }
 
 
+def listen_kept_documents() -> int:
+    """How many documents' places the Listen page keeps in the browser (`KEEP` in
+    static/listen.js): the notice says it, so it reads it."""
+    from readablestem.web.app import STATIC_DIR
+
+    found = re.search(r"var KEEP = (\d+);", (STATIC_DIR / "listen.js").read_text("utf-8"))
+    if found is None:
+        raise RuntimeError("static/listen.js has no `var KEEP = <number>;` line")
+    return int(found.group(1))
+
+
 def privacy_context(settings: Settings, *, tracer_on: bool = False) -> dict[str, Any]:
     """The variables /privacy renders with (besides the page-wide ones `deps.render` adds,
     which `notice_text` supplies for itself)."""
+    from readablestem.web.app import SESSION_MAX_AGE_S
+
     return {
         # The page names Langfuse only when traces are actually sent there, and usage events
         # only when they are recorded.
@@ -334,7 +350,15 @@ def privacy_context(settings: Settings, *, tracer_on: bool = False) -> dict[str,
         # LaTeX source uploads: the route narrows this to "and the sandbox probe passed"; the
         # launch checks read the setting, which is what a start would turn on.
         "latex_source": settings.feature_latex_source,
+        # A .docx read from the file itself and kept as uploaded (the route narrows it, as for
+        # LaTeX source).
+        "word_source": settings.feature_word_source,
         "week_days": WEEK_DAYS,
+        # What the notice says of the sign-in cookie and the form tokens (`app.SESSION_MAX_AGE_S`)
+        # and of Listen's places kept in the browser. The backups' days stay typed in the notice:
+        # they are the host's schedule, checked against `offices.BACKUP_DAYS`.
+        "session_days": SESSION_MAX_AGE_S // 86400,
+        "listen_keep": listen_kept_documents(),
         # Totals of review outcomes are read only above these counts (`events.outcome_cells`).
         "outcome_min_accounts": MIN_ACCOUNTS,
         "outcome_min_documents": MIN_DOCUMENTS,

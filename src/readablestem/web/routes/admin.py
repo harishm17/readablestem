@@ -184,7 +184,14 @@ def admin_context(request: Request) -> dict[str, Any]:
             "name": shipped.name,
             "hash": shipped.short_hash,
             "confirmed": shipped.confirmed,
-            "differs": shipped.differences(ctx.settings),
+            "differs": [
+                {
+                    "name": name,
+                    "reason": shipped.reasons.get(name.lower()),
+                    "eval": shipped.evals.get(name.lower()),
+                }
+                for name in shipped.differences(ctx.settings)
+            ],
         },
         "usage": usage,
         "usage_columns": {"day": events.DAY_COLUMNS, "person": events.PERSON_COLUMNS},

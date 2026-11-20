@@ -111,6 +111,7 @@ TERM_GRID_COLS = 3  # percents"), in at least this many columns (two are label |
 TERM_MIN_LETTERS = 3  # every term has a word this long: "H", "kg", "m" are not terms
 TOP_BAND = 0.07  # top share of the page where running headers live (as layout)
 CONTINUED_TOL = 0.03  # column edges of a continued table match within this share of width
+HEADERLESS_TOL = 2  # x CONTINUED_TOL when the part before has a header and this part has none
 SNAP = 2.0  # x font size: a table box grows to the rules drawn this close around it
 THIN_IMAGE = 1.6  # an image this thin is a rule (as RULE_THICKNESS in layout)
 DOUBLE_RULE = 4.0  # two rules this close are one double rule
@@ -176,24 +177,43 @@ PREFILTER_LINES = 3
 MAX_DETECTOR_ITEMS = 30_000
 # A document's time budget for slow detections. Pages differ too much in cost to tell by
 # what is drawn on them (a lecture slide with 200 pen-stroke paths of curves: 15 s, a page
-# with 800 stroked paths of lines: 9 s, a page of 30,000 items of lines: 0.5 s), so the
-# time is counted: each detection longer than DETECTOR_FREE_S (a page with a table takes
-# under a second; 3 s leaves room for a slow core) draws the part beyond it from
-# DETECTOR_EXCESS_S, and once that is used up the rest of the document's pages get no
-# proposals. A document that stays within it reads exactly as without the budget.
+# with 800 stroked paths of lines: 9 s, a page of 30,000 items of lines: 0.5 s), and nothing
+# countable on the page before the search predicts it (the cost is inside PyMuPDF and its
+# layout package), so the time is counted. It is the CPU time of the thread that runs the
+# search (`time.thread_time`): a thread waiting for a core or for the PDF lock spends none of
+# it, so a busy machine does not count against the document.
+# Each search longer than DETECTOR_FREE_S (a page with a table takes under a second) draws
+# the part beyond it from DETECTOR_EXCESS_S. Once that is used up, the document's remaining
+# pages get no proposals from the layout model and no continued table (`find_continued`);
+# their own rules and aligned text still propose. That is a time limit, so it says so: layout
+# lists the pages (`DetectorBudget.refused`, `Layout.tables_not_searched`), the conversion
+# writes the "not finished" fact `table_search` with `time_limit` for each, and each page
+# carries the notice `tables_not_searched`. A document that stays within it reads exactly as
+# without the budget; evals and replays run without it (`TABLE_SEARCH_UNLIMITED`). Sized from
+# the recorded searches of two sets of papers so that none is stopped at four times their cost
+# (`eval.table_search`: the first stop comes at 4.85 times; 60 s of wall time, the limit
+# before, stopped 2 of 70 and 1 of 91 at twice).
+# Not counted: the work onnxruntime does on its own threads when it may use more than one
+# CPU; on those papers wall time over thread CPU time was 1.02 on a quiet machine.
 DETECTOR_FREE_S = 3.0
-DETECTOR_EXCESS_S = 60.0
+DETECTOR_EXCESS_S = 360.0
 
 
 class DetectorBudget:
-    """What is left of a document's slow-detection time (`DETECTOR_EXCESS_S`)."""
+    """What is left of a document's slow-search CPU time (`DETECTOR_EXCESS_S`), and how many
+    searches it refused once that was used up (`refused`)."""
 
-    def __init__(self, excess_s: float = DETECTOR_EXCESS_S, free_s: float = DETECTOR_FREE_S):
-        self.left = excess_s
-        self.free = free_s
+    def __init__(self, excess_s: float | None = None, free_s: float | None = None) -> None:
+        self.left = DETECTOR_EXCESS_S if excess_s is None else excess_s
+        self.free = DETECTOR_FREE_S if free_s is None else free_s
+        self.refused = 0
 
     def open(self) -> bool:
-        return self.left > 0
+        """May a search start? A refusal is counted: the page it was for is not searched."""
+        if self.left > 0:
+            return True
+        self.refused += 1
+        return False
 
     def spend(self, seconds: float) -> None:
         self.left -= max(0.0, seconds - self.free)
@@ -357,6 +377,7 @@ class PageTable:
     paths: set[int]  # indices into the page's paths (rules and cell shading)
     reasons: list[str]
     at_top: bool = False  # nothing but the running header above it on its page
+    at_foot: bool = False  # nothing but the running footer under it on its page
     column_edges: list[float] = field(default_factory=list)  # for continued tables
     caption_above: bool = False  # its caption is printed above it (`_attach_captions`)
     layout_grid: bool = False  # text set out in boxes (`is_layout_grid`): data only if captioned
@@ -660,7 +681,7 @@ def propose(page: pymupdf.Page, budget: DetectorBudget | None = None) -> list[Pr
     if items > MAX_DETECTOR_ITEMS:
         _warn_once("detector_items", "table detection skipped on a page with too many drawn items")
         return []
-    started = time.perf_counter()
+    started = time.thread_time()  # this thread's CPU time: a busy machine costs none of it
     with _pdf_lock(), _quiet_stdout() as captured:
         try:
             finder = page.find_tables(union=True, refine=True)
@@ -670,7 +691,7 @@ def propose(page: pymupdf.Page, budget: DetectorBudget | None = None) -> list[Pr
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
             if budget is not None:
-                budget.spend(time.perf_counter() - started)
+                budget.spend(time.thread_time() - started)
         if captured:
             log.info("table detection: %d PyMuPDF messages dropped", len(captured))
         if finder is None:
@@ -2736,6 +2757,7 @@ def _find_in(
         table.lines |= _claimed_lines(view, table.bbox)
         table.paths = _claimed_paths(paths, table.bbox)
         table.at_top = _at_top(view, table)
+        table.at_foot = _at_foot(view, table)
     inside = set().union(*(table.lines for table in tables)) if tables else set()
     for table in tables:
         if _edge_text(view, table, inside):
@@ -3618,6 +3640,22 @@ def _at_top(view: _PageView, table: PageTable) -> bool:
     return True
 
 
+def _at_foot(view: _PageView, table: PageTable) -> bool:
+    """Nothing but running-footer text under the table (or its caption) in its part of the
+    page's width: a table that goes on to the next page is the last thing of its page."""
+    boxes = [table.bbox, *(view.lines[i].bbox for i in table.lines if i < len(view.lines))]
+    left, right = min(b[0] for b in boxes), max(b[2] for b in boxes)
+    foot = max(b[3] for b in boxes)
+    band = (1 - TOP_BAND) * view.height
+    for i, line in enumerate(view.lines):
+        if i in table.lines or line.vertical:
+            continue
+        x0, y0, x1, y1 = line.bbox
+        if y0 >= foot and x0 < right and x1 > left and (y0 + y1) / 2 < band:
+            return False
+    return True
+
+
 def _row_cells(grid: TableGrid, row: int) -> list[TableCell] | None:
     """The cells of `row`, one per column left to right, when every one is a plain 1 x 1
     cell anchored there (no span reaches into or out of it); else None."""
@@ -3723,11 +3761,13 @@ def join_split_row(previous: PageTable, table: PageTable) -> bool:
 
 def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
     """Is `table` the rest of `previous` (the last table of the page before)? Same number
-    of columns, column edges in the same places, and nothing above it on its page. Both
-    must be data tables (a grid of terms goes on from nothing)."""
+    of columns, column edges in the same places, nothing above it on its page and nothing
+    under `previous` on its own (a table with text under it has ended: the next page's is
+    another table, and would be given this one's header). Both must be data tables (a grid
+    of terms goes on from nothing)."""
     if not (previous.grid.is_data and table.grid.is_data):
         return False
-    if not table.at_top or previous.grid.cols != table.grid.cols:
+    if not (table.at_top and previous.at_foot) or previous.grid.cols != table.grid.cols:
         return False
     if table.caption and table.caption_above and _new_caption(table.caption):
         return False  # "Table 1.4 ..." over the same header: another table (a caption
@@ -3736,6 +3776,10 @@ def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
     if len(a) != len(b) or not a:
         return False
     tolerance = CONTINUED_TOL * page_width
+    if previous.grid.header_rows and not table.grid.header_rows:
+        # A header printed once is wider than the figures under it, so the part with the
+        # header has its columns cut further out than the rows that go on without it.
+        tolerance *= HEADERLESS_TOL
     return all(abs(x - y) <= tolerance for x, y in zip(a, b, strict=True))
 
 
@@ -3760,11 +3804,11 @@ def find_continued(
     """The part of `previous` that a page break carried to the top of this page, when the
     detector did not find it: see `_continued_in`. Never raises (one content-free warning);
     None when `found` already holds a table where it would sit."""
+    if not _may_continue(lines, previous):
+        return None  # (before the budget: a page with nothing to look for is not refused)
     if budget is not None and not budget.open():
         return None
-    if not _may_continue(lines, previous):
-        return None
-    started = time.perf_counter()
+    started = time.thread_time()
     try:
         view = _PageView.of(page, lines, paths)
         table = _continued_in(view, previous, clean)
@@ -3772,7 +3816,7 @@ def find_continued(
         log.warning("continued table detection failed on a page: %s", type(exc).__name__)
         return None
     if budget is not None:
-        budget.spend(time.perf_counter() - started)
+        budget.spend(time.thread_time() - started)
     if table is None or any(_overlaps(table.bbox, other.bbox) for other in found):
         return None
     return table

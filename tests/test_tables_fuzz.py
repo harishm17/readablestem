@@ -86,7 +86,9 @@ def outcome(index: int) -> tuple[str, int]:
         return "timeout", index
     if result.returncode < 0:
         return f"signal{-result.returncode}", index
-    if result.returncode != 0 or not result.stdout.startswith(b"ok"):
+    # "ok" is the last thing written: MuPDF prints its own complaints ("unhandled font type")
+    # on the same stream before it.
+    if result.returncode != 0 or not result.stdout.endswith(b"ok"):
         return f"exit{result.returncode}", index
     return "ok", index
 

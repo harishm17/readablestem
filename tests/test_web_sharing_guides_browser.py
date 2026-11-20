@@ -218,3 +218,34 @@ def test_the_contents_links_move_focus_to_their_headings_and_fit_320_px(
         violations = axe_violations(page, axe_source)
         assert not violations, describe(violations)
     context.close()
+
+
+def test_removing_a_person_asks_first_and_works_from_the_keyboard(
+    site, browser, finished_job, axe_source
+):
+    """Remove only asks: the question has its own "No, keep them" and a separate destructive
+    stop, passes axe, and its button (reached by keyboard) takes the access away."""
+    person = "pat@example.org"
+    context, page = open_as(browser, site, f"/jobs/{finished_job}/share")
+    page.locator("#share-email").fill(person)
+    page.get_by_role("button", name="Share", exact=True).click()
+    remove = page.get_by_role("button", name=f"Remove {person}")
+    remove.focus()
+    page.keyboard.press("Enter")
+    page.wait_for_selector(".confirm-actions")
+    assert person in page.locator("h1").inner_text()
+    violations = axe_violations(page, axe_source)
+    assert not violations, describe(violations)
+    # "No, keep them" is a plain link back and the person is still there.
+    page.get_by_role("link", name="No, keep them").focus()
+    page.keyboard.press("Enter")
+    page.wait_for_url(f"**/jobs/{finished_job}/share")
+    page.get_by_role("button", name=f"Remove {person}").focus()
+    page.keyboard.press("Enter")
+    page.get_by_role("link", name="No, keep them").focus()
+    page.keyboard.press("Shift+Tab")  # the destructive button is the stop before it
+    assert page.evaluate("document.activeElement.textContent.trim()") == f"Remove {person}"
+    page.keyboard.press("Enter")
+    page.wait_for_url(f"**/jobs/{finished_job}/share")
+    assert page.get_by_role("button", name=f"Remove {person}").count() == 0
+    context.close()

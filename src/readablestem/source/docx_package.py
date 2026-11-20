@@ -25,6 +25,9 @@ working copy or into `Facts`:
 
 - hidden text (`w:vanish`, in the run, its character style or its paragraph style) is taken out
   of the working copy and counted, so that pandoc cannot print it;
+- text set in a fixed-pitch font (or a character style that sets one) is given the character
+  style "Verbatim Char", the one style pandoc reads as code, and counted;
+- coloured passages (a run's own colour, links left out) are counted: pandoc keeps no colour;
 - the header rows a table is marked with (`w:tblHeader`) ride through pandoc on the table's
   style id (`HEADER_STYLE`): pandoc reads a table's `firstRow` look as a header too, and the
   reader must tell a mark from a default;
@@ -114,9 +117,18 @@ _OMATH = f"{{{M}}}oMath"
 _DELETED = (f"{{{W}}}del", f"{{{W}}}moveFrom")
 _NOBREAK_HYPHEN = f"{{{W}}}noBreakHyphen"
 _BR, _CR = f"{{{W}}}br", f"{{{W}}}cr"
+_RFONTS, _COLOR = f"{{{W}}}rFonts", f"{{{W}}}color"
+_HYPERLINK, _STYLE_ID, _STYLE_NAME = f"{{{W}}}hyperlink", f"{{{W}}}styleId", f"{{{W}}}name"
+_STRIKES, _BASED_ON = (f"{{{W}}}strike", f"{{{W}}}dstrike"), f"{{{W}}}basedOn"
+CODE_STYLE = "VerbatimChar"  # the id of "Verbatim Char", which pandoc reads as code
+# "Monotype Corsiva" is a script face named for its foundry, not a fixed-pitch one
+_MONO = re.compile(
+    r"mono(?!type)|courier|consolas|menlo|monaco|lucida console|andale|typewriter", re.I
+)
 # a tab, a break and the mark of a note each stand between two words in the reading
 _BREAKS = (f"{{{W}}}tab", _BR, _CR, f"{{{W}}}footnoteReference", f"{{{W}}}endnoteReference")
 _FALSE = {"0", "false", "off"}
+_FACES = ("ascii", "hAnsi", "cs")
 
 
 # --------------------------------------------------------------------------- the gate
@@ -201,6 +213,8 @@ class Facts:
 
     hidden_runs: int = 0
     hidden_words: int = 0
+    code_runs: int = 0  # runs set in a fixed-pitch font, read as code
+    coloured: int = 0  # passages printed in a colour of their own (run colour, not a link)
     text_boxes: int = 0
     headers_footers: int = 0  # header and footer parts the working copy leaves out
     smartart: int = 0
@@ -280,6 +294,8 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
         facts.charts = sum(1 for n in names if re.fullmatch(r"word/charts/chart[^/]*\.xml", n))
         facts.smartart = sum(1 for n in names if re.fullmatch(r"word/diagrams/data[^/]*\.xml", n))
         hidden_styles = _hidden_styles(archive, names)
+        code_styles = _code_styles(archive, names)
+        struck_styles = _struck_styles(archive, names)
         out: dict[str, bytes] = {}
         out["[Content_Types].xml"] = _read_bytes(archive, "[Content_Types].xml", 1 << 20)
         out["_rels/.rels"] = _filter_rels(
@@ -291,6 +307,9 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
                 continue
             root = _parse(archive, name, MAX_PART_BYTES)
             _hide(root, hidden_styles, facts)
+            _keep_strikes(root, struck_styles, code_styles)
+            _mark_code(root, code_styles, facts)
+            facts.coloured += _coloured(root)
             _count(root, facts, main=name == "word/document.xml")
             if name == "word/document.xml":
                 _mark_tables(root, facts)
@@ -298,6 +317,8 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
         for name in ("word/styles.xml", "word/numbering.xml"):
             if name in names:
                 out[name] = _read_bytes(archive, name, MAX_SMALL_PART_BYTES)
+        if facts.code_runs and "word/styles.xml" in names:
+            out["word/styles.xml"] = _with_code_style(out["word/styles.xml"])
         rels_name = "word/_rels/document.xml.rels"  # a file made by a chat export has none
         rels = (
             _read_bytes(archive, rels_name, office.MAX_RELS_BYTES)
@@ -309,6 +330,16 @@ def prepare(data: bytes, census: Census | None = None) -> Prepared:
         out["word/_rels/document.xml.rels"] = _filter_rels(
             rels, "word", _KEPT_REL_TYPES, names, keep_present=out.keys()
         )
+        for notes in ("footnotes", "endnotes"):  # a note's own links name their address here
+            rels_name = f"word/_rels/{notes}.xml.rels"
+            if f"word/{notes}.xml" in out and rels_name in names:
+                out[rels_name] = _filter_rels(
+                    _read_bytes(archive, rels_name, office.MAX_RELS_BYTES),
+                    "word",
+                    {"hyperlink"},
+                    names,
+                    keep_present=out.keys(),
+                )
     facts.equations = _equations_of(out)
     return Prepared(working=_zip(out), facts=facts, census=census, _original=data)
 
@@ -405,6 +436,149 @@ def _hidden_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
             if props is not None and _is_on(props.find(_VANISH)):
                 hidden.add(style.get(f"{{{W}}}styleId", ""))
     return hidden
+
+
+def _is_mono(props: ET.Element | None) -> bool:
+    """Do these run properties set a fixed-pitch font?"""
+    fonts = props.find(_RFONTS) if props is not None else None
+    return fonts is not None and any(_MONO.search(fonts.get(f"{{{W}}}{a}", "")) for a in _FACES)
+
+
+def _code_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
+    """Ids of the character styles that set a fixed-pitch font."""
+    if "word/styles.xml" not in names:
+        return set()
+    root = _parse(archive, "word/styles.xml", MAX_SMALL_PART_BYTES)
+    return {
+        style.get(_STYLE_ID, "")
+        for style in root.iter(f"{{{W}}}style")
+        if style.get(f"{{{W}}}type") == "character" and _is_mono(style.find(_RPR))
+    }
+
+
+def _struck_styles(archive: zipfile.ZipFile, names: set[str]) -> set[str]:
+    """Ids of the character styles that strike their text through, with one line or two: by
+    their own setting, or that of the style they are based on."""
+    if "word/styles.xml" not in names:
+        return set()
+    root = _parse(archive, "word/styles.xml", MAX_SMALL_PART_BYTES)
+    own: dict[str, bool | None] = {}  # None: the style says nothing, so its base decides
+    base: dict[str, str] = {}
+    for style in root.iter(f"{{{W}}}style"):
+        if style.get(f"{{{W}}}type") != "character":
+            continue
+        name = style.get(_STYLE_ID, "")
+        own[name] = _struck(style.find(_RPR))
+        based = style.find(_BASED_ON)
+        base[name] = based.get(_VAL, "") if based is not None else ""
+
+    def struck(name: str, seen: frozenset[str] = frozenset()) -> bool:
+        if name not in own or name in seen:
+            return False
+        said = own[name]
+        return said if said is not None else struck(base[name], seen | {name})
+
+    return {name for name in own if struck(name)}
+
+
+def _struck(props: ET.Element | None) -> bool | None:
+    """Do these run properties strike the text through (`w:strike`, or `w:dstrike` for two
+    lines)? None when they say nothing about it."""
+    marks = [] if props is None else [m for m in map(props.find, _STRIKES) if m is not None]
+    return any(_is_on(m) for m in marks) if marks else None
+
+
+def _keep_strikes(root: ET.Element, struck_styles: set[str], code_styles: set[str]) -> None:
+    """Write every strike the way pandoc reads one: `w:strike` on the run itself. Pandoc does
+    not read a double strike (`w:dstrike`), so "~~x = 5~~" set that way came out as live text;
+    and a struck run in a code style came out as code, which carries no strike, so the style
+    goes (a struck "x = 5" read as live code is the answer the author took back). A run whose
+    character style strikes it gets the strike itself, so it holds when `_mark_code` gives the
+    run another style."""
+    for run in root.iter(_R):
+        props = run.find(_RPR)
+        if props is None:
+            continue
+        style = props.find(_RSTYLE)
+        said = _struck(props)
+        if said is None:
+            said = style is not None and style.get(_VAL, "") in struck_styles
+        if not said:
+            continue
+        for tag in _STRIKES:
+            for mark in props.findall(tag):
+                props.remove(mark)
+        ET.SubElement(props, _STRIKES[0])
+        if style is not None and style.get(_VAL, "") in code_styles | {CODE_STYLE}:
+            props.remove(style)
+
+
+def _mark_code(root: ET.Element, code_styles: set[str], facts: Facts) -> None:
+    """Give each run set in a fixed-pitch font the style `CODE_STYLE`. A run struck through
+    (`_keep_strikes` has written each strike on its run) keeps what it has: code carries no
+    strike."""
+    for run in root.iter(_R):
+        props = run.find(_RPR)
+        if props is None or not _text_of(run).strip():
+            continue
+        if _struck(props):
+            continue
+        style = props.find(_RSTYLE)
+        if _is_mono(props) or (style is not None and style.get(_VAL, "") in code_styles):
+            if style is None:
+                style = ET.Element(_RSTYLE)
+                props.insert(0, style)
+            style.set(_VAL, CODE_STYLE)
+            facts.code_runs += 1
+
+
+def _with_code_style(styles: bytes) -> bytes:
+    """The styles part with the character style `CODE_STYLE` ("Verbatim Char") in it."""
+    root = SafeET.fromstring(styles, forbid_dtd=True)
+    if not any(s.get(_STYLE_ID) == CODE_STYLE for s in root.iter(f"{{{W}}}style")):
+        style = ET.SubElement(
+            root, f"{{{W}}}style", {f"{{{W}}}type": "character", _STYLE_ID: CODE_STYLE}
+        )
+        ET.SubElement(style, _STYLE_NAME, {_VAL: "Verbatim Char"})
+    return _tostring(root)
+
+
+def _coloured(root: ET.Element) -> int:
+    """How many passages are printed in a colour of their own: the words of runs next to each
+    other that share a colour a reader would tell from body text (`text_pass.is_run_colour`),
+    left out where the run is a link (a link has its own colour)."""
+    from readablestem.pipeline.text_pass import is_run_colour
+
+    passages = 0
+
+    def runs(node: ET.Element, linked: bool):
+        for child in node:
+            if child.tag == _P or child.tag in _DELETED:
+                continue
+            if child.tag == _R:
+                yield child, linked
+            else:
+                yield from runs(child, linked or child.tag == _HYPERLINK)
+
+    for paragraph in root.iter(_P):
+        current = None
+        for run, linked in runs(paragraph, False):
+            if not any(c.isalnum() for c in _text_of(run)):
+                continue
+            value = ""
+            props = run.find(_RPR)
+            colour = props.find(_COLOR) if props is not None else None
+            if colour is not None and not linked:
+                value = colour.get(_VAL, "").lstrip("#")
+            if len(value) == 6 and re.fullmatch(r"[0-9A-Fa-f]{6}", value):
+                rgb = (int(value[0:2], 16), int(value[2:4], 16), int(value[4:6], 16))
+                value = value.lower() if is_run_colour(rgb, None) else ""
+            else:
+                value = ""
+            if value and value != current:
+                passages += 1
+            current = value
+    return passages
 
 
 def _is_on(node: ET.Element | None) -> bool:

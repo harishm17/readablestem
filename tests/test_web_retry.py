@@ -28,6 +28,7 @@ from fixtures.web.support import (
 from image_page_support import block, scan_pdf, text
 from readablestem.config import ConfigError
 from readablestem.core.types import (
+    ConversionOptions,
     DocumentResult,
     Element,
     Fix,
@@ -170,9 +171,10 @@ def fixes_json(result: DocumentResult) -> list[dict]:
 # --------------------------------------------------------------------------- cancel
 
 
-def test_a_document_canceled_before_it_starts_gives_its_pages_back_and_counts_them_again(site):
+def test_canceling_gives_the_pages_back_only_before_a_worker_began_the_document(site):
     """Cancel on a waiting document stops it at once and returns the pages counted at upload;
-    "Convert it" queues it again without using a try, and counts the pages again."""
+    "Convert it" queues it again without using a try, and counts the pages again. Cancel on one
+    a worker began asks it to stop and returns nothing (what `PAGES_RULE` says)."""
     job_id = job_id_from(upload(site.browser, PDF.read_bytes(), filename="waiting.pdf"))
     counted = site.pages_used()
     assert counted > 0
@@ -197,6 +199,23 @@ def test_a_document_canceled_before_it_starts_gives_its_pages_back_and_counts_th
         f"{page}/cancel", data={"csrf_token": csrf_from(site.bob.get("/app").text)}
     )
     assert other.status_code == 404
+    # One a worker began is asked to stop; its pages stay counted.
+    begun = job_id_from(upload(site.browser, PDF.read_bytes(), filename="begun.pdf"))
+    before = site.pages_used()
+    with session_scope(site.ctx.factory) as session:
+        row = session.get(Job, begun)
+        assert row is not None
+        row.status, row.attempts = "running", 1
+    begun_page = f"/jobs/{begun}"
+    assert (
+        site.browser.post(
+            f"{begun_page}/cancel",
+            data={"csrf_token": csrf_from(site.browser.get(begun_page).text)},
+        ).status_code
+        == 303
+    )
+    assert site.job(begun).cancel_requested_at is not None
+    assert site.pages_used() == before
 
 
 # --------------------------------------------------------------------------- a new version
@@ -280,6 +299,20 @@ def test_a_cache_gives_back_finished_steps_and_the_model_is_not_asked_again(site
     )
     assert site.state["asked"] == [] and Cache.hits == len(kept)
     assert fixes_json(second.result) == fixes_json(first.result)
+    # Exam mode is read by the figure step alone: a document converted again as an exam
+    # keeps its equation and table answers and asks again only about its figures.
+    kinds = {f.element_id: f.kind for f in first.result.fixes}
+    figures = sum(kinds.get(element_id) is Kind.FIGURE for element_id in kept)
+    Cache.hits = 0
+    pipeline_run.convert_pdf(
+        PDF.read_bytes(),
+        settings=settings,
+        client=client(),
+        concurrency=1,
+        step_cache=Cache(),
+        options=ConversionOptions(exam_mode=True),
+    )
+    assert Cache.hits == len(kept) - figures
 
 
 # --------------------------------------------------------------------------- a run that dies

@@ -159,11 +159,10 @@ jobs:
         run: uv sync --locked --all-extras --group browser
       # The Word export (tests/test_export_docx.py, test_web_exports.py) runs pandoc; the
       # tests skip without it, so the step checks it is there.
+      # The version production runs (3.1.11.1), not the runner's distribution package (3.1.3):
+      # fetched by exact version and checked against a sha256 (.github/actions/pandoc).
       - name: Install pandoc (Word export tests)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends pandoc
-          pandoc --version | head -n 1
+        uses: ./.github/actions/pandoc
       # Includes tests/test_gold_sample.py: known-correct LaTeX must match the gold sample.
       # On 3.12 the Postgres tests also run, against the embedded pgserver. The suite is
       # split by `--shard` (tests/_sharding.py): files are dealt to the shards by recorded
@@ -524,8 +523,11 @@ jobs:
       # The fonts the eval renderer and the browser tests name (eval/render.py: Noto Sans
       # Math, Liberation Serif). Without them Chromium falls back to other fonts and the
       # printed PDFs differ from the ones the tests were written against.
-      - name: Install the fonts the printed test pages use, and pandoc (the Word button)
-        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation pandoc
+      - name: Install the fonts the printed test pages use
+        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
+      # pandoc for the Word button: the version production runs, as in the pytest job.
+      - name: Install pandoc (the Word button)
+        uses: ./.github/actions/pandoc
       # Four shards (`--shard`, by recorded duration), each with -n 3 on the 4-core runner:
       # each worker runs its own Chromium, and `--dist loadfile` keeps a file's tests on one
       # worker so its module-scoped server and browser start once. Every server binds its

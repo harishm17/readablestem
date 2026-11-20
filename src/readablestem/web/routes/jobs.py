@@ -1872,6 +1872,16 @@ def job_page_context(
     context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     context["word_export"] = export_docx.available()  # the Word button needs pandoc
+    # How many equations the Word file written for this version has as words, not as Word
+    # equations: known once the file was made (`export_store.NOTE_KIND`), said beside its link.
+    # None until then; a page opened before that cannot show the number and says so.
+    context["word_as_words"] = 0
+    context["word_as_words_known"] = True
+    if context["word_export"]:
+        with session_scope(get_ctx(request).factory) as session:
+            counted = export_store.note_of(session, job_id, job.result_version, "docx")
+        context["word_as_words"] = counted or 0
+        context["word_as_words_known"] = counted is not None
     # When "Keep for 7 days" would delete it (None: the button is not offered). Only a state
     # with something to keep offers it (F-316).
     keeps = job.state is not None and job.state.keeps
@@ -2503,9 +2513,19 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
             return head_reply(
                 exports.media_type(file_type), head_name.removesuffix(".html") + "." + file_type
             )
+        title = combine_rules.title_of(kept[0].job)
+        name = download_filename(f"{title} combined", job.part_group or job.id)
+        media = "text/html; charset=utf-8"
+        if file_type != "html":
+            name = name.removesuffix(".html") + "." + file_type
+            media = exports.media_type(file_type)
         try:
-            html, title = combine_rules.combined_html(
-                session, kept, math_alttext=ctx.settings.mathml_alttext
+            body = combine_rules.combined_file(
+                session,
+                kept,
+                file_type,
+                math_alttext=ctx.settings.mathml_alttext,
+                make=lambda html, title: exports.make_file(file_type, html, title),
             )
         except combine_rules.combine.CombineError as exc:
             log_event(logger, "combine_failed", code=exc.code)
@@ -2516,30 +2536,22 @@ def combine_parts(request: Request, job_id: str, user: UserDep, format: str = "h
                 "document, and you can download them one by one.",
                 context={"job_id": job.id},
             ) from None
-        name = download_filename(f"{title} combined", job.part_group or job.id)
-        body: str | bytes = html
-        media = "text/html; charset=utf-8"
-        if file_type != "html":
-            try:
-                body = exports.make_file(file_type, html, title)
-            except exports.Busy:
-                raise exports.busy_page() from None
-            except (export_docx.DocxExportError, export_epub.CanvasExportError) as exc:
-                log_event(
-                    logger,
-                    "combine_export_failed",
-                    file_type=file_type,
-                    code=getattr(exc, "code", "image_type"),
-                )
-                raise PageError(
-                    409,
-                    "These parts cannot be made as that file type",
-                    "The joined file could not be made as Word or EPUB. The HTML file is still "
-                    "available, and each part is its own document.",
-                    context={"job_id": job.id},
-                ) from None
-            name = name.removesuffix(".html") + "." + file_type
-            media = exports.media_type(file_type)
+        except exports.Busy:
+            raise exports.busy_page() from None
+        except (export_docx.DocxExportError, export_epub.CanvasExportError) as exc:
+            log_event(
+                logger,
+                "combine_export_failed",
+                file_type=file_type,
+                code=getattr(exc, "code", "image_type"),
+            )
+            raise PageError(
+                409,
+                "These parts cannot be made as that file type",
+                "The joined file could not be made as Word or EPUB. The HTML file is still "
+                "available, and each part is its own document.",
+                context={"job_id": job.id},
+            ) from None
         taken = [k.job.id for k in kept]
         for item in kept:
             retention.restart_clock(item.job, ctx.settings)

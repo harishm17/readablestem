@@ -7,7 +7,7 @@
 {% from "_leave_out.html" import leave_out_forms with context %}
 {% from "_hear.html" import hear_button %}
 {% from "components/notices.html" import notice_box %}
-{% from "_crop.html" import crop_image %}
+{% from "_crop.html" import crop_image, region_image %}
 {% block head %}<script src="{{ static_url('listen.js') }}" defer></script>{% endblock %}
 
 {% macro saved_notice(n) %}
@@ -235,7 +235,7 @@
     <ul class="group-crops" aria-label="Some of the copies in the PDF">
       {% for c in hg.crops %}
       <li><figure>
-        <img class="region-image" loading="lazy" src="/jobs/{{ job.id }}/regions/{{ c.element_id }}.png" alt="“{{ hg.text }}” on page {{ c.page }} of the PDF, with the lines around it.">
+        {{ region_image("/jobs/" ~ job.id ~ "/regions/" ~ c.element_id ~ ".png", "“" ~ hg.text ~ "” on page " ~ c.page ~ " of the PDF, with the lines around it.", hg.region_sizes.get(c.element_id), "the copy on page " ~ c.page, lazy=true) }}
         <figcaption>Page {{ c.page }}</figcaption>
       </figure></li>
       {% endfor %}
@@ -406,11 +406,13 @@
           {% endfor %}
         </select>
       </div>
+      {% if has_pages %}
       <div class="field">
         <label for="filter-page">Page</label>
         <input type="number" id="filter-page" name="page" class="input-short" min="1" max="{{ page_count }}" inputmode="numeric" autocomplete="off" aria-describedby="filter-page-hint"{% if decision_filter.page %} value="{{ decision_filter.page }}"{% endif %}>
         <p class="hint" id="filter-page-hint">1 to {{ page_count }}. Leave it empty for every page.</p>
       </div>
+      {% endif %}
     </div>
     <div class="button-row">
       <button type="submit" class="button-secondary">Show these decisions</button>

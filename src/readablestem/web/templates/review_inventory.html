@@ -57,7 +57,7 @@
 {% if not inv.families %}
 <section class="symbols-empty" aria-labelledby="symbols-empty-title">
   <h2 id="symbols-empty-title">No symbols to change yet</h2>
-  <p>Symbols appear once handwritten equations have been read, so one misread symbol can be changed everywhere. This document has none. Check “Convert scanned or handwritten pages” when you upload.</p>
+  <p>Symbols appear once handwritten equations have been read, so one misread symbol can be changed everywhere. This document has none. Check “Convert scanned or handwritten pages” when you upload. {{ image_pages_cost|default("") }}</p>
   <figure class="symbols-example">
     <figcaption>Example, not part of your document</figcaption>
     <div class="symbols-example-card">

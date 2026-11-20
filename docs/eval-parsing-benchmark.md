@@ -24,32 +24,36 @@ page text, no file from the benchmark, no home path).
   spelled out, invisible characters removed, the ellipsis and `''` as the benchmark writes them.
 - Run 2 and run 3 converted all 747 pages from scratch; see "Repeat" below.
 
-## Scores (pipeline 0.5.13, 747 pages, 3,846 checks listed, $0)
+## Scores (pipeline 0.5.14, 747 pages, 3,846 checks listed, $0)
 
-Measured on 2026-11-19 at commit `3b177567`. The first record (pipeline 0.5.11, 2026-11-18) is
-the second number of each pair.
+Measured on 2026-11-19 at commit `709a023f`. The interval is the 95 % Wilson interval of the
+checks run. The two columns after it are the records before this one (pipeline 0.5.13 at
+`3b177567`, 2026-11-19, and the first record, pipeline 0.5.11, 2026-11-18).
 
-| Category | Ours (checks run) | At 0.5.11 | Run of listed | Dropped |
-|---|---|---|---|---|
-| multi_column (order) | 69.2 (708) | 68.8 (705) | 884 | 176 scans |
-| headers_footers (absent) | 34.5 (632) | 32.5 (636) | 753 | 121 scans |
-| long_tiny_text (present) | 37.3 (83) | 37.3 (83) | 442 | 359 scans |
-| table_tests (table) | 66.6 (857) | 51.8 (857) | 1,020 | 163 scans |
-| baseline (not blank, no repeats) | 100.0 (586) | 99.0 (586) | 747 | 161 scans |
-| arxiv_math, old_scans_math | not run at $0 | not run | 2,927 and 458 | equations are read by a model |
-| old_scans | not run | not run | 526 | scans: a model reads the picture |
+| Category | Ours (checks run) | 95 % interval | At 0.5.13 | At 0.5.11 | Run of listed | Dropped |
+|---|---|---|---|---|---|---|
+| multi_column (order) | 69.2 (490 of 708) | 65.7 to 72.5 | 69.2 (708) | 68.8 (705) | 884 | 176 scans |
+| headers_footers (absent) | 38.6 (244 of 632) | 34.9 to 42.5 | 34.5 (632) | 32.5 (636) | 753 | 121 scans |
+| long_tiny_text (present) | 37.3 (31 of 83) | 27.7 to 48.1 | 37.3 (83) | 37.3 (83) | 442 | 359 scans |
+| table_tests (table) | 66.6 (571 of 857) | 63.4 to 69.7 | 66.6 (857) | 51.8 (857) | 1,020 | 163 scans |
+| baseline (not blank, no repeats) | 100.0 (586 of 586) | 99.3 to 100.0 | 100.0 (586) | 99.0 (586) | 747 | 161 scans |
+| arxiv_math, old_scans_math | not run at $0 | | not run | not run | 2,927 and 458 | equations are read by a model |
+| old_scans | not run | | not run | not run | 526 | scans: a model reads the picture |
 
-The table score rose as the corner-square fix below measured on the two halves (571 checks
-pass, 444 before); no category fell. The sections under "Failures by cause" were
-read on the 0.5.11 run, and the counts in their headings are that run's.
+From 0.5.13 to 0.5.14 only headers_footers moved (26 more checks pass: the head and foot of a
+one-page file found by their shape, as narrowed after review; see "A head and foot found by
+their shape" below). The other four categories pass and fail the same number of checks. The
+table score rose from 0.5.11 to 0.5.13 as the corner-square fix below measured on the two
+halves (571 checks pass, 444 before); no category fell. The sections under "Failures by
+cause" were read on the 0.5.11 run, and the counts in their headings are that run's.
 
 Dropped checks are in the score of no category; the record also holds each score with the
-dropped checks counted as failed (55.4, 29.0, 7.0, 56.0, 78.4). Of the 161 dropped pages, 60 are
+dropped checks counted as failed (55.4, 32.4, 7.0, 56.0, 78.4). Of the 161 dropped pages, 60 are
 scans with no text layer, 72 are scans with an OCR layer (the product reads such a page from its
 picture and does not use the layer, so at $0 there is no output), 3 are drawings with no text and
 26 are typed otherwise but hold only pictures (image-only pages). long_tiny_text keeps 83 of 442
 checks (13 of 62 pages), so its score is a thin sample. 599 of the 747 pages asked a model for
-something (equations 2,862, figures 1,172, tables 530, image pages 264); at $0 those parts are
+something (equations 2,854, figures 1,174, tables 530, image pages 264); at $0 those parts are
 left as the text path makes them.
 
 Published scores of other tools (README; their full runs, all categories): olmOCR 79.4 / 93.4 /
@@ -95,6 +99,51 @@ product reads alone stays in the text, and this is the way the benchmark gives i
 document it would be removed by repeats. The product's claim (furniture is removed) therefore
 holds for documents and not for one-page uploads; the plan's repeat rule does not cover them.
 New cause; it holds for 29 of the 44.
+
+**A head and foot found by their shape (2026-11-19, `_MarginFilter.by_shape`).** A page that is
+a file of its own has no second page to repeat on, so its head and foot are found by what they
+look like: a stack of at most 4 lines in the outer 12 % of the page, a line clear of the rest of
+the text, nothing set as a heading, and a page number (digits or "Page 3 of 9") at the start or
+end of one of its lines (docs/layout.md, "Running headers"). Run of all 747 pages at the same
+settings ($0, `eval parsing-bench`), before and after on the same tree:
+
+| Category | Before | After | Note |
+|---|---|---|---|
+| headers_footers | 34.5 (218 of 632) | 51.4 (325 of 632) | 107 more checks pass |
+| multi_column | 69.2 (490 of 708) | 69.1 (492 of 712) | 4 more checks ran (one page was read as a scan in the first run and not in the second, with or without the rule); 2 order checks fail that passed, see below |
+| table_tests | 66.6 (571 of 857) | 66.6 (571 of 857) | none changed |
+| long_tiny_text | 37.3 (31 of 83) | 37.3 (31 of 83) | none changed |
+| baseline | 100.0 (586) | 100.0 (587) | the page above |
+
+The two multi_column checks are the order checks of two pages of one journal article whose
+"before" text is the article's running head (its title, with the page number on the same line):
+the benchmark's gold counts that head as text, and the same kind of line is a "must be absent"
+head in headers_footers. A head with a page number beside it is furniture by this rule on
+every page of every file; the benchmark disagrees with itself on this one document. The rule
+took 112 rows that a headers_footers check names, 0 rows of any table, order or present check
+other than those two pages, and 0 rows of table_tests (66 rows there are heads, feet and page
+numbers the checks do not name). Of the 307 headers_footers checks that still fail (150
+pages): 144 are on pages with no page number at an edge (an ISSN, a DOI, a copyright line,
+"Downloaded from": not taken, because a flyer's contact line has the same shape); 145 are on
+pages that have one and are left for another reason (a stack of more than 4 lines, a foot
+under a table or a list that runs on, a head set in a heading size, a number in the middle of
+a line); 13 are lines further in than 12 % of the page; 5 have no furniture line left. For
+88 of the 307 (48 pages), the other edge of the page is the one found: a journal's head at
+the top and the page number at the foot. That would be a second rule, a head with no number of
+its own taken because the foot proves the page was cut from a paginated file. It is not built:
+a single page keeps a draft stamp or title at its top, whatever is at its foot, by a test
+that stays, and the rule is not measured against the gold sets.
+
+**The rule as it shipped (pipeline 0.5.14).** The rule above also took the lines of a one-page
+quiz that end in a number ("Name: ... 20", "Quiz 3: Limits and continuity ... Points: 25"),
+which an independent review found. Lines with words now go only with a number that says it is
+a page's ("Page 3", "Page 3 of 9", "3 of 9"); a page number alone on its line goes as before
+(docs/layout.md, "Running headers"). Run of all 747 pages at commit `709a023f`: headers_footers
+38.6 (244 of 632, 95 % interval 34.9 to 42.5), between the 34.5 of 0.5.13 (218) and the 51.4
+of the rule as first built (325). The 81 checks given back are journal heads with a bare page
+number beside the name, which this rule cannot tell from a quiz's own lines. multi_column
+(490 of 708), table_tests, long_tiny_text and baseline are as at 0.5.13. Not built, to be
+measured: taking such lines when they are set smaller than the body text.
 
 ### long_tiny_text: 52 failed of 83
 

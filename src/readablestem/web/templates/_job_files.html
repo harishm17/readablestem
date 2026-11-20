@@ -2,6 +2,7 @@
 {# The other file types of a finished document, as list items for a plain list of links: Word
    (needs pandoc on the server) and EPUB. The owner has them under "Where will you post it?". #}
 {% if word_export|default(false) %}
-<li id="route-word"><a class="button-secondary" href="/jobs/{{ job.id }}/download.docx">Download as Word (.docx)</a></li>
+<li id="route-word"><a class="button-secondary" href="/jobs/{{ job.id }}/download.docx">Download as Word (.docx)</a>
+  {% include "_word_as_words.html" %}</li>
 {% endif %}
 <li id="route-epub"><a class="button-secondary" href="/jobs/{{ job.id }}/download.epub">Download as EPUB</a></li>

@@ -77,7 +77,7 @@ from readablestem.core.types import (
 from readablestem.eval import equations_chem as chem_score
 from readablestem.eval import equations_symbols as sym
 from readablestem.eval import equations_v2 as v2
-from readablestem.eval import gate, prose_classes, prose_wer, table_maths
+from readablestem.eval import gate, prose_classes, prose_wer, run_record, table_maths
 from readablestem.eval import image_pages as image_pages_eval
 from readablestem.eval import judge as judge_mod
 from readablestem.eval import verifier_metrics as vm
@@ -1140,7 +1140,7 @@ def _eval_headings(
         fixes: list[Fix] = []
         pdf_pages = 0
         try:
-            analysed = layout.analyze(pdf)
+            analysed = layout.analyze(pdf, table_search_limited=False)
             fixes = heading_step.heading_fixes(analysed.elements)
             pdf_pages = analysed.page_count
             predicted = predicted_headings(fixes)
@@ -2378,6 +2378,8 @@ def build_report(
         "profile": run_profile.stamp(cfg.settings),
         # The values of the switches that decide what is asked and accepted (`eval.gate`).
         "flags": gate.guarded_flags(cfg.settings),
+        # What made the report: the commit, the versions of the code and of the programs.
+        "provenance": run_record.provenance(),
         "prompt_versions": _prompt_versions(task, items),
         "models": models,
         "models_used": used,

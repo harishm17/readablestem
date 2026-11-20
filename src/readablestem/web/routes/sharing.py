@@ -3,10 +3,12 @@
 Three owner-only routes: the page that lists who has access (`GET /jobs/{id}/share`), adding
 a person or changing their right (`POST /jobs/{id}/share`), and removing one
 (`POST /jobs/{id}/share/{share_id}/revoke`). Both POSTs are CSRF-checked and work without
-JavaScript. Nothing is sent to the person: the page shows the document's address for the
-owner to copy (a "Copy link" button with script, a selectable field without), and when the
-document will be deleted, which ends every share. The address works for nobody who is not signed
-in with the shared address.
+JavaScript. The Remove button's POST answers with the question "Remove <address>?" and removes
+only with `confirm=yes` (as on the course People section and the admin Block), so no address is
+in a URL. Nothing is sent to the person: the page shows the document's address for the owner to
+copy (a "Copy link" button with script, a selectable field without), and when the document will
+be deleted, which ends every share. The address works for nobody who is not signed in with the
+shared address.
 
 No address is written to a log, a flash notice (it lives in the session cookie) or an event.
 
@@ -232,13 +234,30 @@ def add_share(
 
 @router.post("/jobs/{job_id}/share/{share_id}/revoke", dependencies=[Depends(require_csrf)])
 @submit_once("share.revoke")
-def revoke_share(request: Request, job_id: str, share_id: str, user: UserDep) -> Response:
-    """Take a person's access away. It stops on their next request."""
+def revoke_share(
+    request: Request,
+    job_id: str,
+    share_id: str,
+    user: UserDep,
+    confirm: Annotated[str, Form()] = "",
+) -> Response:
+    """Take a person's access away; it stops on their next request. Only with `confirm=yes`:
+    the "Remove" button gets the question first, as the answer to this POST."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = job_access(session, job_id, user, OWNER, lock=True)
         owned_id = job.id
-        removed = shares.revoke(session, owned_id, share_id)
+        row = next((s for s in shares.shares_of(session, owned_id) if s.id == share_id), None)
+        if row is not None and confirm != "yes":
+            context = {
+                "job_id": owned_id,
+                "doc_title": _title(job),
+                "share_id": row.id,
+                "email": row.email,
+                "role": shares.ROLE_WORDS[row.role],
+            }
+            return render(request, "share_remove_confirm.html", context)
+        removed = row is not None and shares.revoke(session, owned_id, row.id)
     if removed:
         log_event(logger, "share_revoked", job_id=owned_id)
     # Not there (often a second click on Remove): the access is gone either way, so the

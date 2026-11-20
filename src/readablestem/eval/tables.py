@@ -75,7 +75,7 @@ import pymupdf
 from readablestem.config import Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget
 from readablestem.core.types import ConversionOptions, Element, Fix, Kind, TableGrid
-from readablestem.eval import gate, ted
+from readablestem.eval import gate, run_record, ted
 from readablestem.eval import pipeline_eval as pe
 from readablestem.eval.equations import MathMLError, canonical, normalize
 from readablestem.models.base import VisionClient
@@ -1464,7 +1464,7 @@ def _document_item(cfg: TablesConfig, doc: TableDocument, pdf: bytes) -> dict:
         "pages_differ_from_reference": differ,
     }
     try:
-        found = layout.analyze(pdf)
+        found = layout.analyze(pdf, table_search_limited=False)
     except layout.LayoutError as exc:  # the pipeline could not read it: nothing found
         rows, false, extra = score_documents(golds, [])
         return (
@@ -1678,6 +1678,7 @@ def build_report(
         "pipeline_version": run.PIPELINE_VERSION,
         "profile": run_profile.stamp(cfg.settings),
         "flags": gate.guarded_flags(cfg.settings),
+        "provenance": run_record.provenance(),
         "prompt_versions": _prompt_versions(items),
         "models": {"main": cfg.settings.main_model, "cheap": cfg.settings.cheap_model},
         "models_used": sorted({m for i in items for m in i.get("models", [])}),
@@ -1802,7 +1803,7 @@ def real_document_metrics(real_dir: Path) -> dict | None:
             continue
         pdf = path.read_bytes()
         try:
-            found = layout.analyze(pdf)
+            found = layout.analyze(pdf, table_search_limited=False)
         except layout.LayoutError as exc:
             errors[exc.code] += 1
             continue

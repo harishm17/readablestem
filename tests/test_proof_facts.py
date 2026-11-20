@@ -59,11 +59,14 @@ def pages(tmp_path_factory):
         return {path: anon.get(path).text for path in paths}
 
 
-def test_no_public_page_or_readme_summary_states_a_retired_figure(pages):
+def test_no_public_page_or_results_summary_states_a_retired_figure(pages):
+    results = (ROOT / "docs/results.md").read_text(encoding="utf-8")
+    summary = results[results.index("## Latest registered result: fresh5") :]
+    summary = summary[: summary.index("\n## ", 10)]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    summary = readme[readme.index("### Latest registered result: fresh5") :]
-    summary = summary[: summary.index("### ", 10)]
-    texts = [*pages.values(), summary, (ROOT / "docs/vendor-information.md").read_text("utf-8")]
+    brief = readme[readme.index("## Results") : readme.index("## How it works")]
+    vendor = (ROOT / "docs/vendor-information.md").read_text("utf-8")
+    texts = [*pages.values(), summary, brief, vendor]
     for text in texts:
         for figure in proof_facts.RETIRED:
             assert figure not in text, figure

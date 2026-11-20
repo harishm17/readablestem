@@ -272,7 +272,7 @@
 <div class="compare table-compare" role="group" aria-labelledby="tbl-title-{{ eid }}">
   <h3 id="tbl-title-{{ eid }}" class="part-label">{% if t.proposal %}The table in the PDF, and rebuilt{% elif t.local %}The table in the PDF, and the grid read from it{% else %}The table in the PDF{% endif %}</h3>
   <p class="cmp-label">In the PDF</p>
-  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
+  {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}"{% if p.region_size %} width="{{ p.region_size[0] }}" height="{{ p.region_size[1] }}"{% endif %} alt="{{ p.region_alt }}"><a class="enlarge-link" href="{{ p.region_url }}" data-enlarge target="_blank" rel="noopener">Enlarge<span class="visually-hidden"> the PDF image of {{ name }}</span></a>{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
   {% if t.proposal %}
   <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
   {{ table_box(t.proposal, "Proposed " ~ name) }}

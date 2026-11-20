@@ -292,7 +292,23 @@ log = logging.getLogger(__name__)
 # (the paragraph is plain again) and refuses a result that holds the notice code
 # `block_omitted` (a paragraph left out), so the roll-back limit of 0.5.12 stands
 # (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.13"
+# 0.5.14 (2026-11-19): one raise for the wave after 0.5.13 (CHANGELOG.md has each change). What
+# a PDF's result holds moves: a one-page file keeps no bare page number and no "Page 3 of 9"
+# line; equation numbers left in the text or made paragraphs go to their equations, and the mark
+# that ends a fraction stays with it; more of the footnotes a file names are found and linked;
+# lettered titles, "(i)" after "(h)" and option lists; a table that goes on from the page before
+# is marked and written with that part's header row; an algorithm with line numbers, wrapped
+# steps or an equation in it is one or two code blocks with the numbers set apart; the table
+# search stops on CPU time; text painted where nobody can see it is left out and counted
+# (`PageStats.unseen_chars`). A Word or LaTeX file's result: bold, italic and code in table
+# cells (`TableCell.runs`), struck code stays struck, a table with no header marking is a
+# required choice. New notice codes: `table_header_missing`, `table_header_carried`,
+# `struck_not_kept`, `hidden_text_check`, `tables_not_searched`, `word_table_flattened`.
+# Results from 0.5.10 to 0.5.13 load unchanged and their page is made again
+# (`assemble.RENDER_VERSION` 10). 0.5.13 opens a 0.5.14 result (it has no words for the new
+# notice lines and drops a cell's runs), so the roll-back limit stays at 0.5.12
+# (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.14"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -559,6 +575,24 @@ def _behaviour(settings: Settings) -> str:
     return json.dumps(values, separators=(",", ":"))
 
 
+# The conversion options each step reads (`pipeline.options.current()`), by the kind it
+# handles. A step's key holds these and no others, so a choice a step never reads (exam
+# mode, for an equation or a table) leaves its stored answers findable. A step that starts
+# to read another option names it here, or it would be given an answer made without it.
+_STEP_OPTIONS: dict[Kind, tuple[str, ...]] = {
+    Kind.EQUATION: ("notation", "notation_memory"),  # `notation_memory.entries_in_force`
+    Kind.TABLE: ("tables",),  # `table_step.rebuild`
+    Kind.FIGURE: ("exam_mode", "long_descriptions"),  # `figure_step.describe`
+}
+
+
+def _options_read(kind: Kind, options: ConversionOptions) -> str:
+    names = _STEP_OPTIONS.get(kind)
+    if names is None:
+        return options.model_dump_json()
+    return json.dumps(options.model_dump(mode="json", include=set(names)), sort_keys=True)
+
+
 def step_key(
     element: Element,
     png: bytes,
@@ -570,14 +604,15 @@ def step_key(
     checked against the answer), the picture, the nearby text sent with it, the conversion
     options (notation, exam mode, feature flags), every behaviour setting (models, efforts,
     switches) and the conversion code with its prompts (`code_identity`). Equal keys mean
-    the same question, asked and handled the same way. A recorded model answer is keyed by
+    the same question, asked and handled the same way. Of the options, the key holds those
+    the element's step reads (`_STEP_OPTIONS`). A recorded model answer is keyed by
     its question alone (`models.question`); this key is for a finished fix."""
     parts = [
         code_identity(),
         element.model_dump_json(exclude={"id", "order"}),
         hashlib.sha256(png).hexdigest(),
         context_text or "",
-        options.model_dump_json(),
+        _options_read(element.kind, options),
         _behaviour(settings),
     ]
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
@@ -1647,6 +1682,8 @@ def _page_math_pass(
             )
             if settings.region_tree == "on":
                 grouping["region_tree"] = True
+            if settings.table_search_unlimited:
+                grouping["table_search_limited"] = False
             try:
                 doc = layout.analyze(
                     pdf_bytes,
@@ -1888,6 +1925,8 @@ def _convert(
     # (`page_type.InkBudget`).
     ink_late: dict[int, str] = {}
     strokes_late: dict[int, str] = {}
+    # Pages the table search's CPU time for the document refused (tables.DetectorBudget).
+    tables_late: set[int] = set()
     # The page-level passes ask through the job's kept answers when it has any.
     page_client: VisionClient = (
         client if step_cache is None else _PageAnswers(client, step_cache, settings)
@@ -1908,6 +1947,11 @@ def _convert(
                 extra["display_grouping"] = True
             if settings.region_tree == "on":
                 extra["region_tree"] = True
+            if settings.table_search_unlimited:
+                extra["table_search_limited"] = False
+            if stage_progress is not None:
+                # the table search is most of the layout's time: its pages are the count
+                extra["on_page"] = lambda done, total: _send(stage_progress, "layout", done, total)
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,
@@ -1915,6 +1959,7 @@ def _convert(
                 **extra,
             )
             ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
+            tables_late.update(getattr(doc, "tables_not_searched", None) or ())
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
@@ -1933,6 +1978,7 @@ def _convert(
                 )
                 # (the pass lays the plan over a second layout run, which types the pages again)
                 ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
+                tables_late.update(getattr(doc, "tables_not_searched", None) or ())
             if collector is not None and options.page_witness:
                 watch.stage("page_witness")
                 witnessed, witness_summary = _page_witness_pass(
@@ -2136,6 +2182,7 @@ def _convert(
             )
         stops += step_facts.ink_stopped(step_facts.PAGE_TYPE, ink_late)
         stops += step_facts.ink_stopped(step_facts.INK_STROKES, strokes_late)
+        stops += step_facts.pages_capped(step_facts.TABLE_SEARCH, sorted(tables_late), "time_limit")
         # The say-once measure, in shadow (SW60): a page whose words an element does not say
         # is noted, with its share, in the conversion's own record and nowhere a person sees.
         # A page kept whole as a picture, or read from one, has its own decision.

@@ -59,6 +59,7 @@ from readablestem.web import (
     marks,
     notation,
     notice_places,
+    outcome,
     page_edits,
     page_images,
     queue,
@@ -66,13 +67,17 @@ from readablestem.web import (
 from readablestem.web.assets import asked_for
 from readablestem.web.compare import (
     COMPARE_PX_PER_PT,
+    FIGURE_REGION_ZOOM,
+    HEADING_REGION_ZOOM,
+    TABLE_REGION_ZOOM,
     CompareGeometry,
     EquationCompare,
     Suggestion,
-    band_clip,
     compare_equation,
     compare_geometry,
     context_clip,
+    region_clip,
+    region_pixels,
     suggest_fix,
 )
 from readablestem.web.db import Blob, session_scope
@@ -115,6 +120,7 @@ from readablestem.web.review import (
     item_labels,
     item_numbers,
 )
+from readablestem.web.routes.edits import region_crop_pixels
 from readablestem.web.routes.jobs import NOT_FOUND, element_ref, job_access, require_done
 from readablestem.web.routes.review import (
     GROUP_FLASH,
@@ -128,6 +134,8 @@ from readablestem.web.routes.review import (
     _item,
     _load_result,
     _load_versioned,
+    decider_names,
+    name_decider,
     page_group_view,
     stale_notice,
     times_phrase,
@@ -141,10 +149,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
-HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
-FIGURE_REGION_ZOOM = 2.0
-TABLE_REGION_ZOOM = 2.0
-TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
 # A notice about text, as the `note` of an address: "link_text_unclear:p3-e4".
 NOTE_KEY = re.compile(r"^[a-z_]{1,40}:[A-Za-z0-9_-]{1,64}$")
 EXCERPT_CHARS = 400  # of a paragraph a notice is about, shown in its panel
@@ -157,7 +161,6 @@ SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
 FIGURE_NUMBER = re.compile(r"\s*(?:figure|fig\.?)\s*(\d+(?:\.\d+)?)", re.IGNORECASE)
 SAID_HERE = "\ue000"  # stands for the equation in hand while a paragraph is cut into sentences
 LINES_BOTH = "Choose both lines, or leave both empty and give the four edges."
-MAX_TEXT_LINES = 120  # lines of text the page tools list for one page
 LINE_CHARS = 80  # of a line, in that list
 MARK_WORDS_CHARS = 60  # of an item's first words, in the list of a page's marks
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
@@ -281,6 +284,7 @@ class AddTool:
     kind: str = ""  # "picture" or "equation" once chosen
     values: dict[str, str] = field(default_factory=dict)  # left, top, right, bottom, alt
     preview_url: str | None = None  # step 2: the region as it would be cut
+    preview_size: tuple[int, int] | None = None  # its size in pixels (width, height)
     errors: dict[str, str] = field(default_factory=dict)  # "region", "addalt", "add"
     change_href: str | None = None  # back to step 1 with the same numbers
     open: bool = False
@@ -307,7 +311,6 @@ class PageTools:
     opens: bool = False  # the tools are shown open (something was just done or refused)
     error: str = ""
     lines: list[TextLine] = field(default_factory=list)
-    lines_cut: int = 0  # lines not listed (a very long page)
     editor: TextEditor | None = None
     add: AddTool = field(default_factory=AddTool)
 
@@ -414,6 +417,7 @@ class Panel:
     other: OtherReading | None = None
     region_url: str | None = None  # the item with the page around it
     region_alt: str = ""
+    region_size: tuple[int, int] | None = None  # its size in pixels (width, height), about
     # Text read from an image of a page: the page tools with this paragraph open to change.
     change_href: str | None = None
     show_on_page: str | None = None
@@ -598,12 +602,17 @@ def _first_note(fix: Fix, compare: EquationCompare | None = None) -> str:
     return "Accepted with a note."
 
 
-def _why(fix: Fix, compare: EquationCompare | None) -> str | None:
+def _first_lower(words: str) -> str:
+    """`words` to run on in a sentence: its first letter lower case, a person's name kept."""
+    return words[:1].lower() + words[1:]
+
+
+def _why(fix: Fix, compare: EquationCompare | None, scan_cost: str = "") -> str | None:
     """The one sentence that says what to look at."""
     if compare is not None and compare.summary:
         return compare.summary
     if fix.reason:
-        return explain_reason(fix.reason).text
+        return explain_reason(fix.reason, scan_cost=scan_cost).text
     for check in fix.failed_checks:
         return explain_check(check).text
     if fix.pending and fix.confidence is not None:
@@ -639,6 +648,7 @@ class SplitBuilder:
         self.places = heading_places(self.result)
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
+        self.scan_cost = outcome.image_pages_cost_offered(get_ctx(request).settings)
         self.page_count = _page_count(self.view.page_count, self.result)
         self.omitted = set(self.result.omitted_pages)
         self.items: dict[str, ReviewItem] = {}
@@ -649,6 +659,8 @@ class SplitBuilder:
         self.first_fix: dict[str, Fix] = {}
         for fix in self.result.fixes:
             self.first_fix.setdefault(fix.element_id, fix)
+        # Who decided what, read once and only when a reviewer decided something.
+        self._deciders: dict[str, str] | None = None
         # Notices with their names and places (T3-7), those the optional checks list.
         self.notes = [
             p
@@ -657,6 +669,16 @@ class SplitBuilder:
         ]
 
     # ------------------------------------------------------------------ helpers
+
+    def region_size(self, element: Element, kind: Kind) -> tuple[int, int] | None:
+        """About how big the region picture of this item is, in pixels, so its place is kept
+        while it loads (`compare.region_pixels`)."""
+        return region_pixels(
+            element,
+            kind,
+            self.sizes.get(element.page),
+            max_side_px=page_images.REGION_MAX_SIDE_PX,
+        )
 
     def item(self, fix: Fix) -> ReviewItem:
         if fix.element_id not in self.items:
@@ -670,6 +692,15 @@ class SplitBuilder:
                 self.labels.get(fix.element_id),
                 tied=self.tied,
             )
+            if self.items[fix.element_id].by_you:
+                if self._deciders is None:
+                    self._deciders = decider_names(
+                        self.request,
+                        self.job_id,
+                        self.user,
+                        {f.element_id for f in self.result.fixes if f.decided_by_reviewer},
+                    )
+                name_decider(self.items[fix.element_id], self._deciders.get(fix.element_id))
         return self.items[fix.element_id]
 
     def url(
@@ -814,7 +845,8 @@ class SplitBuilder:
                 panel.status, panel.status_class = "Needs your decision", "pill-required"
             else:
                 states = {self.item(f).status_label for f in decision.fixes}
-                panel.status = "Decided: " + ", ".join(sorted(states)).lower().capitalize()
+                said = ", ".join(_first_lower(s) for s in sorted(states))
+                panel.status = f"Decided: {said[:1].upper()}{said[1:]}"
                 if any(f.element_id in self.view.carried_ids for f in decision.fixes):
                     panel.status += ", carried over from the earlier version"
                 panel.status_class = "pill-done"
@@ -906,15 +938,18 @@ class SplitBuilder:
                 round((clip[3] - clip[1]) * COMPARE_PX_PER_PT, 1),
             )
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_size = self.region_size(element, fix.kind)
             outlined = ", the symbol to check outlined" if compare.pdf_marks else ""
             panel.region_alt = f"{item.label} in the PDF, with the words around it{outlined}."
         elif fix.kind is Kind.FIGURE and element is not None:
             panel.evidence = self.evidence(fix, element, item, panel)
         elif fix.kind is Kind.HEADING and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_size = self.region_size(element, fix.kind)
             panel.region_alt = f"{item.label} in the PDF, with the lines around it."
         elif fix.kind in TEXT_FIX_KINDS and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+            panel.region_size = self.region_size(element, fix.kind)
             panel.region_alt = f"{item.label} in the PDF, as it is on the page."
             if page:
                 panel.change_href = review_url(
@@ -927,6 +962,7 @@ class SplitBuilder:
         elif fix.kind is Kind.TABLE:
             if element is not None:
                 panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+                panel.region_size = self.region_size(element, fix.kind)
                 panel.region_alt = f"{item.label} in the PDF, outlined, with the lines around it."
             # The card lists every finding itself; the line above it says only why there
             # is no rebuilt table (not once the reviewer gave it one: the grid read from
@@ -934,9 +970,9 @@ class SplitBuilder:
             rebuilt = item.table is not None and item.table.in_document
             listed = fix.failed_checks or (item.table and item.table.problems)
             if (fix.reason and not rebuilt) or not (fix.reason or listed):
-                panel.why = _why(fix, None)
+                panel.why = _why(fix, None, self.scan_cost)
             return
-        panel.why = _why(fix, panel.compare)
+        panel.why = _why(fix, panel.compare, self.scan_cost)
 
     # ------------------------------------------------------------------ evidence in words
 
@@ -1062,8 +1098,9 @@ class SplitBuilder:
             if page
             else None
         )
-        if self.elements.get(lead.element_id) is not None:
+        if (lead_element := self.elements.get(lead.element_id)) is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{lead.element_id}.png"
+            panel.region_size = self.region_size(lead_element, lead.kind)
             where = f" on page {page}" if page else ""
             panel.region_alt = f"The first one{where}, with the lines around it."
         pages = sorted({p for f in decision.fixes if (p := self.page_of(f))})
@@ -1091,6 +1128,7 @@ class SplitBuilder:
         crop = self.item(lead).crop_url
         if crop is not None:
             panel.region_url = crop
+            panel.region_size = self.crop_ids.get(lead.element_id)
             name = self.labels.get(lead.element_id, "The first one")
             panel.region_alt = f"{name} as it is in the PDF."
         panel.group_pages = [
@@ -1151,7 +1189,11 @@ class SplitBuilder:
             elif tier == "optional":
                 tag, name = "Note", f"{label}, optional check"
             else:
-                tag, name, tier = "✓", f"{label}, {self.item(fix).status_label.lower()}", "accepted"
+                tag, name, tier = (
+                    "✓",
+                    f"{label}, {_first_lower(self.item(fix).status_label)}",
+                    "accepted",
+                )
             boxes.append(
                 Box(
                     fix.element_id,
@@ -1234,14 +1276,10 @@ class SplitBuilder:
         held = [b.element for b in self.result.left_out_blocks if b.element.page == index]
         listed = sorted([*texts, *held], key=lambda e: e.order)
         left_out = {e.id for e in held}
-        # A line left out is listed however far down its page it is: the list is its way back.
-        shown = listed[:MAX_TEXT_LINES]
-        shown += [e for e in listed[MAX_TEXT_LINES:] if e.id in left_out]
-        for element in shown:
+        for element in listed:
             line = self.text_line(element, current=element.id == change)
             line.left_out = element.id in left_out
             tools.lines.append(line)
-        tools.lines_cut = len(listed) - len(shown)
         editing = next((e for e in self.result.elements if e.id == change), None)
         if editing is not None and editing.kind in TEXT_KINDS and editing.page == index:
             tools.editor = self.text_editor(editing)
@@ -1349,7 +1387,7 @@ class SplitBuilder:
             for error in invalid[1].errors:
                 tool.errors[error.field_id.split("-", 1)[0]] = error.message
         size = self.sizes.get(number - 1)
-        texts = self.page_texts(number - 1)[:MAX_TEXT_LINES]
+        texts = self.page_texts(number - 1)
         tool.lines = [self.text_line(e) for e in texts]
         tool.after, tool.before = add.get("after", ""), add.get("before", "")
         if tool.kind and (tool.after or tool.before) and size is not None:
@@ -1374,12 +1412,13 @@ class SplitBuilder:
         edges = [tool.values[k] for k in ("left", "top", "right", "bottom")]
         if tool.kind and any(edges) and size is not None and "region" not in tool.errors:
             try:
-                page_edits.region_box(
+                box = page_edits.region_box(
                     size, edges[0], edges[1], edges[2], edges[3], field_id("region", str(number))
                 )
             except ReviewInvalid as exc:
                 tool.errors["region"] = exc.errors[0].message
             else:
+                tool.preview_size = region_crop_pixels(box)
                 query = urlencode({k: tool.values[k] for k in ("left", "top", "right", "bottom")})
                 tool.preview_url = f"/jobs/{self.job_id}/pages/{number}/region.png?{query}"
         if tool.preview_url is not None:
@@ -2107,8 +2146,8 @@ def _render_region(
     size: tuple[float, float] | None,
     kept: tuple[str, str] | None = None,
 ) -> bytes:
+    clip = region_clip(element, fix.kind, size)
     if fix.kind is Kind.EQUATION:
-        clip = context_clip(element, size)
         geometry: CompareGeometry = compare_geometry(
             element, clip, max_side_px=page_images.REGION_MAX_SIDE_PX
         )
@@ -2129,22 +2168,20 @@ def _render_region(
             element.page,
             zoom=HEADING_REGION_ZOOM,
             max_side=page_images.REGION_MAX_SIDE_PX,
-            clip=band_clip(element, size),
+            clip=clip,
             box=element.bbox,
             snap=True,
             cache_as=kept,
         )
-    x0, y0, x1, y1 = element.bbox
     if fix.kind is Kind.TABLE:
         # The table outlined, with a little page round it snapped to whole lines: its
         # caption above comes in whole, and no line of text is cut at an edge.
-        m = TABLE_REGION_MARGIN
         return page_images.render_region(
             pdf,
             element.page,
             zoom=TABLE_REGION_ZOOM,
             max_side=page_images.REGION_MAX_SIDE_PX,
-            clip=(x0 - m, y0 - m, x1 + m, y1 + m),
+            clip=clip,
             box=element.bbox,
             snap=True,
             cache_as=kept,
@@ -2154,6 +2191,6 @@ def _render_region(
         element.page,
         zoom=FIGURE_REGION_ZOOM,
         max_side=page_images.REGION_MAX_SIDE_PX,
-        clip=(x0 - 4, y0 - 4, x1 + 4, y1 + 4),
+        clip=clip,
         cache_as=kept,
     )

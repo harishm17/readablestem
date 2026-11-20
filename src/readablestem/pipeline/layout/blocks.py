@@ -59,6 +59,7 @@ from readablestem.pipeline.layout.shared import (
     _Block,
     _CharInfo,
     _Context,
+    _face,
     _Figure,
     _Inline,
     _Marker,
@@ -94,6 +95,9 @@ REASON_ABSTRACT = "abstract label"
 # A capital letter alone on a line in the sequence of an index or a glossary (`_letter_rows`):
 # a heading one level under the section it is in (`heading_levels`).
 REASON_LETTER = "letter heading"
+# "A. Reinforcement Learning" set in bold or italic on a line of its own (IEEE's subsections):
+# one level under the section it is in, like a letter of an index.
+REASON_LETTERED = "lettered title"
 REASON_LIST_NUMBER = "list-style number"
 
 # "2.3 Speed", "Chapter 2: Motion", "IV. Results", "A) Units". Letters and roman numerals
@@ -482,6 +486,75 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
     if prev.bold != row.bold:
         return False
     return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
+
+
+MAX_LETTERED_TITLE_WORDS = 12
+
+
+def _capital(row: _Row) -> int:
+    """The place in the alphabet of the capital letter the row's marker is ("A." is 1), else 0."""
+    marker = row.marker
+    if marker is None or marker.option is not None:
+        return 0  # the options of a grid are a list whatever they are set in
+    return ord(marker.text[0]) - 64 if len(marker.text) == 2 and marker.text[0].isupper() else 0
+
+
+def _mark_lettered_titles(rows: list[_Row]) -> None:
+    """Set `_Row.lettered_title` on the rows that are a title of the shape "A. Problem
+    Descriptions": 2 to 12 words that start with a capital letter and a full stop, set, all of
+    them, in bold or in italics, and not ending like a sentence or a clause.
+
+    The type alone does not tell a title from an item: the options of a question are set in
+    italics too, and the right answer of a key in bold. A title stands apart from what is under
+    it, so the next row of its column is not text in its own face, and has no marker unless it
+    opens a numbering ("A. Experimental Settings" over "1) Datasets: ..."). And it does not go
+    on from the letter before: when the nearest marker above it in its column is that letter,
+    with nothing between them but that item's own lines, the row is the next item of a list."""
+    for i, row in enumerate(rows):
+        value, face = _capital(row), _face(row)
+        words = row.clean.split()
+        if not value or not face or not 2 <= len(words) <= MAX_LETTERED_TITLE_WORDS:
+            continue
+        if row.clean[-1:] in ".,;:":
+            continue
+        under = next((r for r in rows[i + 1 :] if r.column == row.column), None)
+        if under is None or (under.kind == "text" and _face(under) == face):
+            continue
+        if under.marker is not None and not _opens_numbering(under.marker):
+            continue
+        between: set[str] = set()
+        for above in reversed(rows[:i]):
+            if above.column != row.column:
+                continue
+            if above.marker is None:
+                between.add(_face(above))
+                continue
+            if value > 1 and _capital(above) == value - 1 and between <= {_face(above)}:
+                break  # the next item of the list that letter is in
+            row.lettered_title = True
+            break
+        else:
+            row.lettered_title = True
+
+
+def _opens_numbering(marker: _Marker) -> bool:
+    """Is the marker the first of a numbered series ("1)", "1.")?"""
+    parsed = _ordered_marker(marker.text) if marker.ordered else None
+    return parsed is not None and marker_readings(parsed[1]) == (("decimal", 1),)
+
+
+def _lettered_title(row: _Row) -> bool:
+    """Is the row a title that starts with a capital letter and a full stop, set in bold or in
+    italics (`_mark_lettered_titles`)?"""
+    return row.lettered_title
+
+
+def _opens_with_bullet(row: _Row) -> bool:
+    """Does the row's text open with a bullet glyph? A bold line that does is an item of a list
+    ("• E1 reaction"), not a title; a bullet drawn beside the row is not in its text, and a
+    label such as "Solution" set after one stays what it was."""
+    marker = row.marker
+    return marker is not None and not marker.ordered and marker.end > marker.start
 
 
 # `Element.reasons` of a table of contents' entry (a list item): the link step looks for
@@ -874,76 +947,596 @@ _STEP_WORD = re.compile(
     r"|continue)\b",
     re.IGNORECASE,
 )
-_ASSIGNMENT = re.compile(r"\u2190|:=|<-|[+\-*/]?=|\+\+")  # "c <- 0", "count = 0", "i++"
+# The words that open or close a block (a loop, a branch, a procedure).
+_BLOCK_WORD = re.compile(
+    r"(?:for(?:\s?each|\s?all)?|if|else(?:\s?if)?|elif|while|repeat|until|end(?:\s\w+)?|return"
+    r"|procedure|function|loop)\b",
+    re.IGNORECASE,
+)
+# A step that closes a block ("end for", "end", "until ...") or hands back the result.
+_CLOSER = re.compile(
+    r"(?:end(?:\s?(?:if|for|while|function|procedure|loop|foreach|repeat|do))?[;.]?"
+    r"|until\b.*|return\b(?:\s+\S+){0,4}[;.]?)",
+    re.IGNORECASE,
+)
+_ASSIGNMENT = re.compile(r"←|:=|<-|[+\-*/]?=|\+\+")  # "c <- 0", "count = 0", "i++"
+_ARROW = re.compile(r"←|:=|<-")  # an assignment no sentence holds
+_CLOSES = re.compile(r"(?:end|until)\b", re.IGNORECASE)  # a line that closes a block
+_GOES_ON = re.compile(r"(?:else|elif|return)", re.IGNORECASE)  # a block word that opens none
+# A line that opens a block ends here: what follows it is the block, not the rest of the line.
+_OPENS = re.compile(r".*(?:\b(?:do|then|else|repeat|begin|loop)|[:{])", re.IGNORECASE | re.DOTALL)
+# A sentence about an algorithm, not its caption ("Algorithm 2 is the faster ...", "Algorithm 1
+# shows how ..."): a caption goes on with a name, a stop or nothing.
+_CAPTION_SENTENCE = re.compile(
+    r"(?i:algorithm)\s+\d+(?:\.\d+)*\s+(?:is|are|was|were|has|have|can|will|does|shows?|gives?"
+    r"|uses?|takes?|runs?|we|it|that|which|below|above)\b"
+)
 ALGORITHM_MIN_ROWS = 3  # steps under the caption that make an algorithm
 ALGORITHM_MIN_WORDS = 2  # of them, steps that begin with a step word ("for", "end if", "return")
+ALGORITHM_MIN_NUMBERS = 2  # or, with no loop or branch in it, numbered steps
+ALGORITHM_BARE_ROWS = 4  # steps of an algorithm with no caption
+ALGORITHM_BARE_WORDS = 3  # ... of them, steps that begin with a step word (one closes a block)
 ALGORITHM_MAX_PITCH = 2.2  # x font size: step to step
 ALGORITHM_INDENT = 2  # spaces written for one indent level
+ALGORITHM_PREAMBLE = 4  # lines (Input, Output ...) that may come before the first numbered step
+ALGORITHM_REACH = 16  # lines: how far a display equation may push the next step down the page
+ALGORITHM_NUMBER_GAP = 0.25  # em: the gap that sets a line number apart from a step with no blank
+ALGORITHM_SAME_LINE = 0.6  # x font size: rows this close in baseline are on one line
+ALGORITHM_WRAPPED = 3  # em: a line that ends this close to the right edge goes on in the next
+ALGORITHM_SMALL = 0.6  # x the size of the steps: the smallest a step ("Output: ...") may be set
+ALGORITHM_MAX_DEPTH = 12
+ALGORITHM_RUN_ON = 2  # lines a step with no number may go on for: more is a paragraph
+ALGORITHM_BETWEEN = 2  # lines with no number that may stand between two numbered steps
+ALGORITHM_SET_IN = 6  # em: two lines that start further apart are text and a centered equation
 
 
-def _algorithm_groups(rows: Sequence[_Row]) -> dict[int, int]:
-    """The steps of an algorithm, by `id(row)`, with the number of the algorithm they are in.
+def _line_number(row: _Row) -> tuple[int, str, int] | None:
+    """The line number a row starts with ("3:", "12", "4."): its value, as printed, and the
+    index of the first character after it and its blanks. None for a row that starts with
+    anything else, and for digits run into the word after them."""
+    chars = row.chars
+    first = 0
+    while first < len(chars) and chars[first].blank:
+        first += 1
+    end = first
+    while end < len(chars) and chars[end].c in "0123456789":
+        end += 1
+    if not 0 < end - first <= 3:
+        return None
+    value = int("".join(c.c for c in chars[first:end]))
+    if end < len(chars) and chars[end].c in ":.)":
+        end += 1
+    text = end
+    while text < len(chars) and chars[text].blank:
+        text += 1
+    if text >= len(chars):
+        return None
+    if text == end and chars[text].x0 - chars[end - 1].x1 < ALGORITHM_NUMBER_GAP * row.size:
+        return None
+    return value, "".join(c.c for c in chars[first:end]), text
 
-    The rows after a line that opens "Algorithm 3" (a caption; the line stays its own
-    block): in one column and one size, a line pitch apart, each one starting with a
-    step word (for, if, while, end, return, input, output ...), or an assignment ("count =
-    0"), or a line of maths (a step that is a formula: "c <- c + 1"), or further right
-    than the first step (what a loop or a branch holds, so a wrapped step stays with its
-    step). The first line that is none of these ends the group. Fewer than
-    `ALGORITHM_MIN_ROWS` steps, or `ALGORITHM_MIN_WORDS` of them with a step word, is a
-    sentence that begins "Algorithm 1 ..." and not a caption. Its maths rows become text,
-    so a formula stays a formula inside its line (an inline equation)."""
+
+def _step_text(row: _Row, number: tuple[int, str, int] | None) -> str:
+    """What a step says, without its line number."""
+    if number is None:
+        return row.clean
+    return _clean("".join(c.c for c in row.chars[number[2] :]))
+
+
+def _opens_block(text: str) -> bool:
+    """Does a step that reads `text` open a block (a loop, a branch, a procedure)?"""
+    return _BLOCK_WORD.match(text) is not None and _CLOSER.fullmatch(text) is None
+
+
+def _wraps_on(prev: _Row, edges: _RightEdges) -> bool:
+    """Does the line `prev` run to the right edge of its column, so that its sentence goes on
+    in the next line?"""
+    return prev.x1 >= edges.of(prev) - ALGORITHM_WRAPPED * prev.size
+
+
+def _stops_short(row: _Row, following: _Row | None, edges: _RightEdges) -> bool:
+    """Is `row` a line of its own: the first word of the line after it would still have fitted
+    on it (or nothing follows it in its column)? A line a sentence runs through is not."""
+    if following is None or following.column != row.column or following.kind != "text":
+        return True
+    return row.x1 + 0.25 * row.size + _first_word(following) <= edges.of(row)
+
+
+def _listed(number: tuple[int, str, int] | None) -> bool:
+    """Is a line number written as a list writes its items ("1." or "2)")? Such a number
+    proves no step: the steps must show it, one set inside another (`_nested`)."""
+    return number is not None and number[1][-1] in ".)"
+
+
+class _Steps:
+    """The rows of one algorithm as `_algorithm_groups` collects them."""
+
+    def __init__(self, anchor: _Row, caption: _Row | None, last: _Row | None) -> None:
+        self.anchor = anchor  # sets the column and the size: the first step, once there is one
+        self.caption = caption
+        self.rows: list[_Row] = []
+        self.wraps: set[int] = set()  # rows that go on the line of the one before
+        self.pieces: set[int] = set()  # rows that are a bit of the line they stand on
+        self.numbers: dict[int, tuple[int, str, int] | None] = {}
+        self.expect: int | None = None  # the line number the next step has, once they are numbered
+        self.number_x = 0.0  # where the numbers stand
+        self.frontier = last.baseline if last else None  # lowest baseline taken so far
+        self.blocked = False  # a step that opens or closes a block was taken
+        self.ran_on = False  # a line before the first block word that the next one runs on from
+
+    def number(self, row: _Row) -> tuple[int, str, int] | None:
+        if id(row) not in self.numbers:
+            self.numbers[id(row)] = _line_number(row)
+        return self.numbers[id(row)]
+
+    def above(self, row: _Row) -> _Row | None:
+        """The line of the algorithm just above `row`: its rightmost row."""
+        rows = [g for g in self.rows if g.baseline < row.baseline - 0.4 * self.anchor.size]
+        if not rows:
+            return None
+        top = max(g.baseline for g in rows)
+        line = [g for g in rows if abs(g.baseline - top) <= 0.3 * self.anchor.size]
+        return max(line, key=lambda g: g.x1)
+
+    def line(self, row: _Row) -> list[_Row]:
+        """The rows taken that stand on the line of `row` (one of them), left to right."""
+        near = 0.3 * self.anchor.size
+        return sorted(
+            (g for g in self.rows if abs(g.baseline - row.baseline) <= near), key=lambda g: g.x0
+        )
+
+    def on_line(self, row: _Row) -> bool:
+        """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?"""
+        return any(
+            abs(row.baseline - g.baseline) <= ALGORITHM_SAME_LINE * self.anchor.size
+            and row.x0 > g.x0
+            for g in self.rows[-4:]
+        )
+
+
+def _step_kind(
+    row: _Row, steps: _Steps, edges: _RightEdges, following: _Row | None, soon: bool
+) -> str | None:
+    """How `row` goes with the algorithm collected so far: "number" (a step with the next
+    line number), "step", "wrap" (the line before goes on in it), "piece" (a bit of the line
+    before: math or small print the text layer set in a row of its own), or None (it does
+    not belong). `following` is the row after it and `soon` says that the step with the next
+    line number is one of the rows just below."""
+    anchor, caption, group = steps.anchor, steps.caption, steps.rows
+    region = row.region
+    free = row.kind == "math" and (region is None or not (region.forced or region.labels))
+    single = free and (region is None or len(region.rows) == 1)
+    if group and (row.kind == "math" or row.size < anchor.size - 0.5) and steps.on_line(row):
+        return "piece"
+    if row.column != anchor.column:
+        return None
+    number = steps.number(row)
+    # The item of a list is no step: a bullet anywhere, and a "1." or "2)" with no caption over
+    # it (under one, `_is_algorithm` asks such numbers for a step set inside another).
+    if (row.marker is not None or _listed(number)) and (number is None or caption is None):
+        return None
+    if number is None and _ALGORITHM_CAPTION.match(row.clean):
+        return None  # the caption of another algorithm (what came before only named this one)
+    lead = number is not None or _STEP_WORD.match(row.clean) is not None
+    small = ALGORITHM_SMALL <= row.size / anchor.size <= 1.05
+    if abs(row.size - anchor.size) > 0.5 and not (lead and small):
+        return None
+    if steps.expect is not None:
+        if number is not None and number[0] == steps.expect:
+            return "number" if row.kind == "text" or free else None
+        above = steps.above(row)
+        if row.kind != "text" or number is not None or above is None:
+            return None
+        # The rest of a step: after a line that ran to the right edge, or (a line that broke
+        # early, a comment on a line of its own) right of the numbers with the next number
+        # just below.
+        between = soon and row.x0 > steps.number_x + 0.5 * anchor.size
+        return "wrap" if _wraps_on(above, edges) or between else None
+    early = caption is not None or not group
+    if number is not None and early and len(group) <= ALGORITHM_PREAMBLE:
+        return "number" if row.kind == "text" or free else None
+    if row.kind != "text":
+        return "step" if single and group else None
+    above = steps.above(row)
+    first = group[0] if group else row
+    inside = row.x0 > first.x0 + 0.5 * row.size  # what a loop or a branch holds
+    if (  # the rest of a sentence, which starts in lower case
+        above is not None
+        and number is None
+        and _wraps_on(above, edges)
+        and not row.clean[:1].isupper()
+        and not _STEP_WORD.match(row.clean)
+        and _ASSIGNMENT.search(row.clean) is None
+    ):
+        line = steps.line(above)
+        head = line[0]
+        # Not what a "for ... do" line holds; and, where the lines are not set to a right
+        # margin (text set ragged, or a page of little but the algorithm: the edge is only
+        # where the longer lines end), not the next step inside a block, set where the step
+        # above it starts.
+        opens = _BLOCK_WORD.match(head.clean) and _OPENS.fullmatch(above.clean.rstrip())
+        went_on = any(id(g) in steps.wraps for g in line)
+        beside = inside and not went_on and abs(row.x0 - head.x0) <= 0.25 * row.size
+        if not opens and not (beside and not edges.firm(above)):
+            return "wrap"
+    if lead or _ASSIGNMENT.search(row.clean) is not None or inside:
+        return "step"
+    # The lines before the first block word of a captioned algorithm ("Initialize ...",
+    # "Choose ..."), unless the caption is a sentence ("Algorithm 1 ... ."). One that the next
+    # line runs on from is a long step when a step stands over it and, under it, a step word
+    # on a line that ends short of the right edge ("repeat": a paragraph's line goes on to
+    # it); any other may be a long step or a line of a paragraph, and `_is_algorithm` then
+    # asks the steps for more proof.
+    sentence = (
+        caption is not None and caption.clean.rstrip()[-1:] in ".?!" and len(caption.clean) > 40
+    )
+    if caption is None or steps.blocked or sentence:
+        return None
+    between = (
+        bool(group)
+        and following is not None
+        and _STEP_WORD.match(following.clean) is not None
+        and not _wraps_on(following, edges)
+    )
+    if not _stops_short(row, following, edges) and not between:
+        steps.ran_on = True
+    return "step"
+
+
+def _resumes(row: _Row, steps: _Steps) -> bool:
+    """Is `row` the step an algorithm goes on with after a display equation: the step with
+    the next line number, at the numbers' place; or, when the steps have none, a step no
+    further left than the steps before: a step word, an assignment written with an arrow or
+    ":=", or one written with "=" inside a block that is still open, set where a step above
+    it starts or right of the line that opened the block, when that is the last step ("where
+    d = 12 is ..." after the last step is the text going on, at the left edge or set in as
+    a paragraph's first line is, unless that is just where a step starts)?"""
+    anchor = steps.anchor
+    if row.column != anchor.column or abs(row.size - anchor.size) > 0.5:
+        return False
+    if steps.expect is not None:
+        number = steps.number(row)
+        return (
+            number is not None
+            and number[0] == steps.expect
+            and abs(row.x0 - steps.number_x) <= 1.5 * anchor.size
+        )
+    left = min(r.x0 for r in steps.rows)
+    if row.kind != "text" or row.x0 < left - 0.5 * anchor.size:
+        return False
+    if _STEP_WORD.match(row.clean) is not None or _ARROW.search(row.clean) is not None:
+        return True
+    half = 0.5 * anchor.size
+    inside = row.x0 > left + half and _open_blocks(steps) > 0
+    level = any(abs(row.x0 - r.x0) <= 0.5 * half for r in steps.rows)
+    last = steps.rows[-1]
+    first = _opens_block(last.clean) and row.x0 > last.x0 + half
+    return inside and (level or first) and _ASSIGNMENT.search(row.clean) is not None
+
+
+def _after_equation(rows: Sequence[_Row], at: int, steps: _Steps) -> int | None:
+    """Where an algorithm goes on after a display equation in one of its steps: the index of
+    the row that `_resumes`, when what lies between is math (and, in a numbered algorithm,
+    the lines that go with it: a "where ...", an indented piece) and the row is within
+    `ALGORITHM_REACH` lines of the last step. None when no such row follows."""
+    group, anchor = steps.rows, steps.anchor
+    if not group or steps.frontier is None:
+        return None
+    numbered = steps.expect is not None
+    left = min(r.x0 for r in group)
+    reach = steps.frontier + ALGORITHM_REACH * anchor.size
+    math = False
+    for index in range(at, len(rows)):
+        row = rows[index]
+        if row.baseline > reach:
+            return None
+        if _resumes(row, steps):
+            return index if math else None
+        if row.kind == "math":
+            math = True
+        elif not numbered or row.x0 <= left + 0.5 * anchor.size:
+            return None
+    return None
+
+
+def _scan(
+    rows: Sequence[_Row], first: int, caption: _Row | None, edges: _RightEdges, code: dict[int, int]
+) -> tuple[_Steps, int] | None:
+    """The rows from `first` on that are the steps of one algorithm, or None. The second
+    value is the index to go on from."""
+    steps = _Steps(caption or rows[first], caption, rows[first - 1] if caption else None)
+    index = first
+    since = run = 0  # where the last step starts in the group, and the lines it has gone on for
+    while index < len(rows):
+        row = rows[index]
+        group = steps.rows
+        frontier = steps.frontier
+        size = steps.anchor.size
+        number = steps.number(row)
+        # A step with the next line number may stand a line farther: rows that the page lists out
+        # of order (one with tall brackets before the line above it) push it down.
+        far = ALGORITHM_MAX_PITCH + (1.0 if number and number[0] == steps.expect else 0.0)
+        near = frontier is None or -2.0 * size <= row.baseline - frontier <= far * size
+        free = id(row) not in code
+        following = rows[index + 1] if index + 1 < len(rows) else None
+        soon = steps.expect is not None and any(
+            _resumes(r, steps) for r in rows[index + 1 : index + 1 + ALGORITHM_BETWEEN]
+        )
+        kind = _step_kind(row, steps, edges, following, soon) if near and free else None
+        if kind is None:
+            resume = _after_equation(rows, index, steps) if free else None
+            if resume is None:
+                break
+            index = resume
+            steps.frontier = max(steps.frontier or 0.0, rows[resume].baseline - 1.0)
+            continue
+        if kind == "number" and number is not None:
+            if steps.expect is None:
+                steps.number_x = row.x0
+            steps.expect = number[0] + 1
+        if kind == "wrap":
+            steps.wraps.add(id(row))
+            # A line hung under its step (set right of where the step starts) is the step's
+            # however long it goes on: a paragraph's lines start where its second line does.
+            if row.x0 <= group[since].x0 + 0.5 * size:
+                run += 1
+            if steps.expect is None and run > ALGORITHM_RUN_ON:
+                del group[since:]  # a paragraph that began with a step word, not a step
+                break
+        elif kind != "piece":
+            since, run = len(group), 0
+        if kind == "piece":
+            steps.pieces.add(id(row))
+        else:
+            steps.frontier = row.baseline if frontier is None else max(frontier, row.baseline)
+            if not group:
+                steps.anchor = row
+            if row.kind == "text" and _BLOCK_WORD.match(_step_text(row, number)):
+                steps.blocked = True
+        group.append(row)
+        index += 1
+    return (steps, index) if steps.rows else None
+
+
+def _reads_on(steps: _Steps, edges: _RightEdges) -> bool:
+    """Do the lines collected run on from one to the next like the lines of a paragraph: each
+    but the last reaches the right edge, or stops where the next line's first word no longer
+    fits (text set ragged)?"""
+    lines = [r for r in steps.rows if id(r) not in steps.pieces]
+    return all(
+        _wraps_on(row, edges) or row.x1 + 0.25 * row.size + _first_word(following) > edges.of(row)
+        for row, following in pairwise(lines)
+    )
+
+
+def _open_blocks(steps: _Steps) -> int:
+    """The blocks the steps taken so far have opened and not closed: lines that begin "for",
+    "if", "while" ... less those that begin "end" or "until"."""
+    count = 0
+    for row in steps.rows:
+        if row.kind != "text":
+            continue
+        text = _step_text(row, steps.number(row))
+        if _CLOSES.match(text):
+            count -= 1
+        elif _BLOCK_WORD.match(text) and not _GOES_ON.match(text):
+            count += 1
+    return count
+
+
+def _nested(
+    steps: _Steps, texts: Sequence[tuple[_Row, tuple[int, str, int] | None]], said: bool = False
+) -> bool:
+    """Does one step stand inside another: right of the line just above it, which opens a
+    block, or, closing one, left of the line just above it? (The numbered lines of a
+    manuscript and the questions of an exam start at one place, but for the first line of a
+    paragraph.) With `said`, the line that opens the block must say so where it ends ("do",
+    "then", a colon): a sentence that begins "For" does not. Two numbered lines whose numbers
+    differ in length ("9." and "10.") prove nothing, nor do two lines that start more than
+    `ALGORITHM_SET_IN` em apart (a display equation of the text, centered in the column, and
+    the sentence going on under it)."""
+    half = 0.5 * steps.anchor.size
+
+    def at(row: _Row, number: tuple[int, str, int] | None) -> float:
+        return row.chars[number[2]].x0 if number is not None else row.x0
+
+    for (above, n_above), (row, n_row) in pairwise(texts):
+        if n_above is not None and n_row is not None and len(n_above[1]) != len(n_row[1]):
+            continue  # "9." to "10.": with no tab stop the longer number moves its words right
+        upper, lower = _step_text(above, n_above), _step_text(row, n_row)
+        opens = _opens_block(upper) and not (said and _OPENS.fullmatch(upper.rstrip()) is None)
+        set_in = at(row, n_row) - at(above, n_above)
+        far = ALGORITHM_SET_IN * steps.anchor.size
+        if opens and half < set_in <= far:
+            return True
+        if _CLOSER.fullmatch(lower) and -far <= set_in < -half:
+            return True
+    return False
+
+
+def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
+    """Do the rows collected make an algorithm? Under a caption: `ALGORITHM_MIN_ROWS` of them,
+    `ALGORITHM_MIN_WORDS` with a step word, and one that opens or closes a block (or
+    `ALGORITHM_MIN_NUMBERS` that carry line numbers); and, with fewer line numbers than that,
+    a line that stops where the next line's first word would still have fitted (the lines of
+    a paragraph that opens "Algorithm 1 shows ..." all run on, and some begin with "for" or
+    "if"). Two shapes that prose has too must show one step set inside another (`_nested`):
+    numbers written as a list writes them ("1.", "2)": a textbook's algorithm in numbered
+    sentences is a list), and, with fewer than `ALGORITHM_MIN_NUMBERS` line numbers, a line
+    before the first block word that the next line runs on from (`_step_kind`: a long first
+    step, or a paragraph under a figure's caption), where the line that opens the block must
+    also end as one does ("do", "then", a colon) and the step inside it may be a formula on
+    a line of its own. With no
+    caption the proof is more: `ALGORITHM_BARE_ROWS` rows, `ALGORITHM_BARE_WORDS` with a step
+    word, one that closes a block, none of them the item of a list ("1." or "2)"), and either
+    consecutive line numbers with one step set inside another (`_nested`: the numbered lines
+    of a manuscript and the questions of an exam start at one place), or no line numbers at
+    all, an indent ladder and something only code holds (a formula, an assignment, an "end",
+    or a block word on a line that ends in "do", "then" or a colon: the indented lines of a
+    poem or an outline hold none)."""
+    rows = [r for r in steps.rows if id(r) not in steps.wraps and id(r) not in steps.pieces]
+    lines = [(r, steps.number(r)) for r in rows]
+    texts = [(r, n) for r, n in lines if r.kind == "text"]
+    words = sum(_STEP_WORD.match(r.clean) is not None for r, _ in texts)
+    blocks = sum(_BLOCK_WORD.match(_step_text(r, n)) is not None for r, n in texts)
+    marks = [n for n in (steps.number(r) for r in rows) if n is not None]
+    numbers = marks if steps.expect is not None else []  # a list's numbers were not followed
+    if steps.caption is not None:
+        # One number is no numbering: the heading of the next section ("4 Results") has one.
+        numbered = len(numbers) >= ALGORITHM_MIN_NUMBERS
+        return (
+            len(steps.rows) >= ALGORITHM_MIN_ROWS
+            and words >= ALGORITHM_MIN_WORDS
+            and (blocks >= 1 or numbered)
+            and (numbered or not _reads_on(steps, edges))
+            and (not any(_listed(n) for n in marks) or _nested(steps, texts))
+            and (numbered or not steps.ran_on or _nested(steps, lines, said=True))
+        )
+    closing = any(_CLOSER.fullmatch(_step_text(r, n)) for r, n in texts)
+    ladder = len({round(r.x0 / (0.5 * r.size)) for r in rows}) >= 3
+    coded = any(r.kind == "math" for r in rows) or any(
+        _ASSIGNMENT.search(text) is not None
+        or re.match(r"end\b", text, re.IGNORECASE) is not None
+        or (_BLOCK_WORD.match(text) is not None and _OPENS.fullmatch(text.rstrip()) is not None)
+        for text in (_step_text(r, n) for r, n in texts)
+    )
+    return (
+        len(rows) >= ALGORITHM_BARE_ROWS
+        and words >= ALGORITHM_BARE_WORDS
+        and closing
+        and (
+            (len(numbers) >= ALGORITHM_BARE_ROWS and _nested(steps, texts))
+            or (not marks and ladder and coded)
+        )
+    )
+
+
+def _lines(steps: _Steps) -> list[list[_Row]]:
+    """The rows of one algorithm as its lines, top to bottom: rows on one baseline make one
+    line, left to right, and a piece (a bit of math or small print) joins the line it is
+    nearest to."""
+    whole = sorted(
+        (r for r in steps.rows if id(r) not in steps.pieces), key=lambda r: (r.baseline, r.x0)
+    )
+    lines: list[list[_Row]] = []
+    for row in whole:
+        near = ALGORITHM_SAME_LINE * steps.anchor.size / 2
+        if lines and abs(row.baseline - lines[-1][0].baseline) <= near:
+            lines[-1].append(row)
+        else:
+            lines.append([row])
+    for row in (r for r in steps.rows if id(r) in steps.pieces):
+        nearest = min(lines, key=lambda line: abs(line[0].baseline - row.baseline))
+        nearest.append(row)
+    return [sorted(line, key=lambda r: r.x0) for line in lines]
+
+
+def _algorithm_groups(
+    rows: Sequence[_Row], edges: _RightEdges, code: dict[int, int]
+) -> tuple[dict[int, int], list[_Row]]:
+    """The steps of the algorithms among `rows`, by `id(row)`, with the number of the algorithm
+    they are in; and `rows` with each algorithm's rows in the order of its lines.
+
+    An algorithm is found under a line that opens "Algorithm 3" (a caption; the line stays its
+    own block, and a second line of it is no step), or, with more proof (`_is_algorithm`), by
+    its steps alone. Its rows are in one column and one size, a line pitch apart, each one
+    starting with a step word (for, if, while, end, return, input, output ...), or an
+    assignment ("count = 0"), or a line of math (a step that is a formula: "c <- c + 1"), or
+    further right than the first step (what a loop or a branch holds). Under a caption the
+    lines before the first block word (Input, Initialize ...) are steps too (one that the
+    next line runs on from asks `_is_algorithm` for more proof, but for one with a step over
+    it and, under it, a step word on a short line); a line that opens "Algorithm
+    2 is ..." is a sentence, not a caption (`_CAPTION_SENTENCE`); a bullet is no step
+    anywhere, and a "1." or "2)" is one only under a caption. Where the steps have no numbers,
+    a line in lower case under one that ran to the right edge is the rest of that step,
+    unless the line above opens a block ("for ... do"), the line holds an assignment, or it
+    stands inside a block where the step above starts and the lines of the page are not set
+    to a right margin (`_RightEdges.firm`: there the two are taken for two steps, and a step
+    that wraps with no hanging indent stays in its lines). A step that goes on for more than
+    `ALGORITHM_RUN_ON` lines, not counting lines hung under it (set further right than where
+    it starts), is a paragraph and ends the rows before it. When the steps
+    carry line numbers ("3:", "12") each has the next number and a row with none is the rest of
+    the step before it (a line that ran to the right edge, or a short line or a comment right
+    of the numbers with the next number within `ALGORITHM_BETWEEN` rows), which stays on its
+    line; the
+    numbers are cut off the text (`_Row.algo_number`), so the indent is the step's own, not
+    the number's. A display equation in a step ends the rows there and the algorithm goes on
+    in the next step below it, as a block of its own, with the equation and its place in the
+    order as they were. Math rows become text, so a formula stays a formula inside its line
+    (an inline equation)."""
     found: dict[int, int] = {}
+    order = list(rows)
     index = 0
     while index < len(rows):
-        caption = rows[index]
+        start = index
         index += 1
-        if caption.kind != "text" or not _ALGORITHM_CAPTION.match(caption.clean):
+        row = rows[start]
+        if row.kind != "text" or id(row) in code:
             continue
-        group: list[_Row] = []
-        for row in rows[index:]:
-            prev = group[-1] if group else caption
-            if (
-                row.column != caption.column
-                or abs(row.size - caption.size) > 0.5
-                or not 0.5 * prev.size
-                <= row.baseline - prev.baseline
-                <= ALGORITHM_MAX_PITCH * prev.size
+        captions = _ALGORITHM_CAPTION.match(row.clean) and not _CAPTION_SENTENCE.match(row.clean)
+        caption = row if captions else None
+        first = start + 1 if caption else start
+        if caption is not None:
+            while (  # the caption runs on into a second line
+                first < len(rows)
+                and rows[first].kind == "text"
+                and rows[first].column == caption.column
+                and _line_number(rows[first]) is None
+                and not _STEP_WORD.match(rows[first].clean)
+                and _wraps_on(rows[first - 1], edges)
+                and abs(rows[first].x0 - caption.x0) <= row.size
             ):
-                break
-            region = row.region
-            maths = row.kind == "math" and (
-                region is None or not (region.forced or region.labels or len(region.rows) != 1)
-            )
-            step = row.kind == "text" and (
-                _STEP_WORD.match(row.clean) is not None or _ASSIGNMENT.search(row.clean) is not None
-            )
-            further = bool(group) and row.x0 > group[0].x0 + 0.5 * row.size
-            if not (maths or step or (further and row.kind == "text")):
-                break
-            group.append(row)
-        words = sum(r.kind == "text" and _STEP_WORD.match(r.clean) is not None for r in group)
-        if len(group) >= ALGORITHM_MIN_ROWS and words >= ALGORITHM_MIN_WORDS:
-            for row in group:
-                row.kind, row.region = "text", None
-                found[id(row)] = id(group[0])
-            index += len(group)
-    return found
+                first += 1
+        elif _line_number(row) is None and not _BLOCK_WORD.match(row.clean):
+            continue
+        if first >= len(rows):
+            continue
+        scan = _scan(rows, first, caption, edges, code)
+        if scan is None or not _is_algorithm(scan[0], edges):
+            continue
+        steps, index = scan
+        for member in steps.rows:
+            member.kind, member.region = "text", None
+            found[id(member)] = id(steps.rows[0])
+        _place(steps, order)
+    return found, order
 
 
-def _indents(rows: Sequence[_Row]) -> list[int]:
-    """The indent level of each row: its distance from the leftmost row, in steps of the
-    smallest distance between two different left edges."""
-    left = min(r.x0 for r in rows)
-    edges = sorted({round(r.x0 - left, 1) for r in rows})
-    steps = [b - a for a, b in pairwise(edges) if b - a >= 0.5 * rows[0].size]
-    unit = min(steps) if steps else 0.0
-    if unit <= 0:
-        return [0] * len(rows)
-    return [min(ALGORITHM_MAX_DEPTH, round((r.x0 - left) / unit)) for r in rows]
-
-
-ALGORITHM_MAX_DEPTH = 12
+def _place(steps: _Steps, order: list[_Row]) -> None:
+    """Set the levels, line numbers and joins of the rows of one algorithm, and put them in
+    `order` (the page's rows) in the order of their lines, in the places they hold."""
+    size = steps.anchor.size
+    lines = _lines(steps)
+    numbered = steps.expect is not None
+    leads: list[tuple[_Row, float]] = []
+    for line in lines:
+        lead = line[0]
+        number = steps.number(lead) if numbered else None
+        if number is not None:
+            lead.algo_number, lead.algo_start = number[1], number[2]
+        leads.append((lead, lead.chars[lead.algo_start].x0 if number is not None else lead.x0))
+        for row in line[1:]:
+            row.algo_join = True
+        if id(lead) in steps.wraps:  # the rest of a step goes on its line
+            lead.algo_join = True
+    # The levels are the steps' own: a wrapped line or a line before the numbers say nothing.
+    own = [
+        (lead, x)
+        for lead, x in leads
+        if id(lead) not in steps.wraps and (lead.algo_start or not numbered)
+    ]
+    xs = [x for _, x in own or leads]
+    left = min(xs)
+    edge_list = sorted({round(x - left, 1) for x in xs})
+    gaps = [b - a for a, b in pairwise(edge_list) if b - a >= 0.5 * size]
+    unit = min(gaps) if gaps else 0.0
+    for lead, x in leads:
+        level = round((x - left) / unit) if unit > 0 else 0
+        lead.algo_level = max(0, min(ALGORITHM_MAX_DEPTH, level))
+    members = {id(r) for r in steps.rows}
+    slots = [i for i, r in enumerate(order) if id(r) in members]
+    for slot, row in zip(slots, [r for line in lines for r in line], strict=True):
+        order[slot] = row
 
 
 _ABSTRACT_LABEL = re.compile(r"abstract[.:]?", re.IGNORECASE)
@@ -1560,9 +2153,10 @@ def _rtl_words(row: _Row) -> int:
 def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]:
     runs: list[_Run] = []
     code = _code_groups(rows)
-    steps = {k: v for k, v in _algorithm_groups(rows).items() if k not in code}
+    steps, rows = _algorithm_groups(rows, _RightEdges(rows), code)
     code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
     rows = _option_grids(rows, ctx, code, document=document)
+    _mark_lettered_titles(rows)
     scored: dict[int, list[_Row]] = {}  # a points label, by the run of the line it scores
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
@@ -1627,6 +2221,15 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
+            if (
+                geometric
+                and len(run.rows) == 1
+                and _lettered_title(prev)
+                and _face(row) != _face(prev)
+            ):  # the title and the text under it are two blocks, not one list item
+                run.block_end = True
+                runs.append(_Run([row], row.kind, block_start=True))
+                continue
             if geometric and _same_style(prev, row, ctx):
                 run.add(row)
                 continue
@@ -1793,7 +2396,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
             bold=False,
             code=True,
             algo=True,
-            indents=_indents(rows),
+            indents=[r.algo_level for r in rows],
         )
     if run.code:
         return _Block(
@@ -1849,6 +2452,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and len(text) <= MAX_BOLD_HEADING_CHARS
         and letters >= 2
         and _title_like(text)
+        and not _opens_with_bullet(rows[0])
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif (
@@ -1862,6 +2466,8 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
+    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
+        heading = [REASON_LETTERED]
     if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
         # step like any display equation, and the page keeps its real headings.
@@ -1932,6 +2538,17 @@ def _join_text(rows: Sequence[_Row], *, marked: bool = False, document: _Documen
             out += separator
         out += text
     return _clean(out)
+
+
+def _joined(
+    line: list[str | _Inline], step: list[str | _Inline], *, document: _Document
+) -> list[str | _Inline]:
+    """`step` as it goes on after `line`: a word broken at the end of the line is mended
+    (`_line_break`), anything else is joined with a space."""
+    if line and step and isinstance(line[-1], str) and isinstance(step[0], str):
+        line[-1], separator = _line_break(line[-1], step[0], document=document)
+        return [separator, *step]
+    return [" ", *step]
 
 
 def _line_break(before: str, after: str, *, document: _Document = _PLAIN) -> tuple[str, str]:
@@ -2161,6 +2778,11 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
         first, marker = rows[0], block.marker
         rows[0] = _Row(first.chars[: marker.start] + first.chars[marker.end :], column=first.column)
         _carry_page_math(first, rows[0], marker.end, marker.start)
+    if block.algo:  # the line numbers are cut off the steps and written in a column of their own
+        for i, row in enumerate(rows):
+            if row.algo_start:
+                rows[i] = _Row(row.chars[row.algo_start :], column=row.column)
+                _carry_page_math(row, rows[i], row.algo_start)
     letters = _BoldLetters.start()
     steps: list[list[str | _Inline]] = []
     for row in rows:
@@ -2227,8 +2849,16 @@ def _paragraph_pieces(block: _Block, *, document: _Document) -> list[str | _Inli
             continue
         _append_row(pieces, row_pieces, document=document, keep_line=block.lines)
     if block.algo:  # one line to a step, its level as leading spaces; its maths stays maths
-        for depth, step in zip(block.indents, steps, strict=True):
-            pieces.extend([*(["\n"] if pieces else []), " " * (ALGORITHM_INDENT * depth), *step])
+        width = max((len(r.algo_number) for r in block.rows), default=0)
+        lines: list[list[str | _Inline]] = []
+        for row, depth, step in zip(block.rows, block.indents, steps, strict=True):
+            if row.algo_join and lines:
+                lines[-1].extend(_joined(lines[-1], step, document=document))
+                continue
+            gutter = row.algo_number.rjust(width) + " " if width else ""
+            lines.append([gutter + " " * (ALGORITHM_INDENT * depth), *step])
+        for line in lines:
+            pieces.extend([*(["\n"] if pieces else []), *line])
         return pieces
     return _strip_teacher_tags(_tidy(pieces))
 

@@ -61,6 +61,10 @@ PAGE = (
     "<figcaption>Figure 1</figcaption></figure>"
     '<details class="figure-description"><summary>Description</summary><p>A dot.</p></details>'
     "<p>Air &amp; water<br>second line</p>"
+    '<aside aria-label="Sidebar 1 of 2"><p>A note set apart.</p><p>Its second paragraph.</p>'
+    "</aside>"
+    "<blockquote><p>A quotation.</p></blockquote>"
+    '<aside aria-label="Sidebar 2 of 2"><p>Another note.</p></aside>'
     "<script>alert(1)</script></main></body></html>"
 )
 

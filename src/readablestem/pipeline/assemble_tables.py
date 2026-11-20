@@ -22,6 +22,11 @@ lands here and not in `assemble.py`. It writes:
   note (never colour alone). `data-reason` says why ("table_not_rebuilt" when rebuilding
   tables is off, a step's reason, or "no_fix" / "no_output" from assembly).
 
+A table that goes on from the page before (`REASON_CONTINUED`) is written with the header rows
+of the part before it, when it has none of its own and the columns are the same
+(`carry_headers`), so a screen reader names the columns of every part. The stored grids are
+not changed: the header rows are added when the page is written.
+
 A table's caption (`Element.caption`, copied to `TableGrid.caption`) and its cells are
 plain text: layout puts no inline-equation markers in them (maths in a cell is
 `TableCell.latex`/`mathml`), so both are written escaped.
@@ -34,12 +39,23 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections.abc import Iterable, Mapping
 from typing import Protocol
 
-from readablestem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, TableCell, TableGrid
+from readablestem.core.types import (
+    KEPT_ORIGINAL_STATUSES,
+    MAX_TABLE_ROWS,
+    Element,
+    Fix,
+    Kind,
+    TableCell,
+    TableGrid,
+    grid_problems,
+)
 from readablestem.pipeline import student_sheet
 from readablestem.pipeline.safe_html import escape_text
 from readablestem.pipeline.table_html import render_table
+from readablestem.pipeline.tables import REASON_CONTINUED
 
 _NOT_ID = re.compile(r"[^A-Za-z0-9_.:\-]")
 
@@ -241,12 +257,81 @@ def _scroll_attrs(grid: TableGrid, prefix: str) -> str:
     return f' role="group" {name} tabindex="0"'
 
 
-def render_table_element(element: Element, fix: Fix | None, ctx: RenderContext) -> str:
+def _row_said(grid: TableGrid, row: int) -> list[str]:
+    cells = sorted((c for c in grid.cells if c.row == row), key=lambda c: c.col)
+    return [" ".join(c.text.split()) for c in cells]
+
+
+def _under_header(before: TableGrid, grid: TableGrid) -> TableGrid | None:
+    """`grid` with the header rows of `before` above it, all of them; None when that would
+    not make a valid grid of the same columns (a different number of columns, a header that
+    `grid` already repeats without marking it, a table too tall)."""
+    rows = before.header_rows
+    top = [c for c in before.cells if c.row < rows]
+    if before.cols != grid.cols or grid.rows + rows > MAX_TABLE_ROWS:
+        return None
+    if any(c.row + c.row_span > rows for c in top):
+        return None  # a header cell that reaches into the body: all of it or none
+    if all(_row_said(before, r) == _row_said(grid, r) for r in range(min(rows, grid.rows))):
+        return None  # its own header again, not marked as one: a second would repeat it
+    # What is carried is the text and meaning of the cells: not where they stood on the other
+    # page, and not the equation element that reads one (it stays with the first part).
+    carried = [c.model_copy(update={"bbox": None, "equation_id": None}) for c in top]
+    cells = [*carried, *(c.model_copy(update={"row": c.row + rows}) for c in grid.cells)]
+    out = grid.model_copy(
+        update={
+            "rows": grid.rows + rows,
+            "cells": cells,
+            "header_rows": rows,
+            "header_source": before.header_source,
+        }
+    )
+    return None if grid_problems(out) else out
+
+
+def carry_headers(
+    elements: Iterable[Element], fixes: Mapping[str, Fix]
+) -> tuple[dict[str, TableGrid], list[Element]]:
+    """The header rows of a table carried into the parts that go on from it: (the grid each
+    part is written with, by element id; the parts that have no header and could not be
+    given one). A part is a table element marked `REASON_CONTINUED`, written as a table, with
+    no header row of its own. The table it goes on from is the last table of the page before,
+    as written, so a table of three pages carries its header to the third from the second.
+    Where the part before has no header row nothing is carried and nothing is said: the whole
+    table has none. `elements` in reading order."""
+    last_on_page: dict[int, TableGrid | None] = {}
+    carried: dict[str, TableGrid] = {}
+    refused: list[Element] = []
+    for element in elements:
+        if element.kind is not Kind.TABLE:
+            continue
+        grid = rebuilt_grid(fixes.get(element.id))
+        before = last_on_page.get(element.page - 1)
+        if (
+            grid is not None
+            and REASON_CONTINUED in element.reasons
+            and before is not None
+            and before.header_rows
+            and not grid.header_rows
+        ):
+            joined = _under_header(before, grid)
+            if joined is None:
+                refused.append(element)
+            else:
+                carried[element.id] = grid = joined
+        last_on_page[element.page] = grid
+    return carried, refused
+
+
+def render_table_element(
+    element: Element, fix: Fix | None, ctx: RenderContext, carried: TableGrid | None = None
+) -> str:
+    """`carried`: the grid with the header rows of the part before it (`carry_headers`)."""
     written = text_grid(fix)
     if written is not None:
         caption = written.caption or element.caption
         return f"<div{ctx.id_attr(element.id)}>{text_html(written, caption)}</div>"
-    grid = rebuilt_grid(fix)
+    grid = carried or rebuilt_grid(fix)
     if grid is not None:
         ctx.add_style("table", student_sheet.TABLE)
         prefix = id_prefix(element.id)

@@ -84,9 +84,21 @@ ROWS: tuple[CheckLine, ...] = (
     _page("page_turned", "none", "a page saved sideways, turned to read it", "handled"),
     _page("ocr_text_layer_ignored", "none", "hidden text on a page kept as an image"),
     _page(
+        "tables_not_searched",
+        "optional",
+        "the table search stopped by its time limit",
+        not_checked=True,
+    ),
+    _page(
         "hidden_text_ignored",
         "optional",
         "hidden or covered words on a typed page",
+        not_checked=True,
+    ),
+    _page(
+        "hidden_text_check",
+        "required",
+        "a paragraph or more of hidden or covered words on a typed page",
         not_checked=True,
     ),
     _page("scripts_flattened", "optional", "a block with raised or lowered text written flat"),
@@ -94,9 +106,24 @@ ROWS: tuple[CheckLine, ...] = (
     _page("code_block", "none", "layout: program code kept as plain text", "handled"),
     # --- derived from the fixes and the text as they stand now (`pipeline.notices.current`)
     _page("table_not_rebuilt", "required", "a table fix kept as the image of the original"),
+    _page(
+        "table_header_missing",
+        "optional",
+        "a table that goes on from the page before, with no header row to carry over",
+    ),
+    _page(
+        "table_header_carried",
+        "optional",
+        "a table that goes on from the page before, written with that part's header row",
+    ),
     _page("colour_only", "optional", "a figure that tells things apart by color alone"),
     _page("long_description_missing", "optional", "a chart or diagram without a long description"),
     _page("struck_text", "optional", "words the page strikes through, kept and marked"),
+    _page(
+        "struck_not_kept",
+        "optional",
+        "struck words in a table or an equation, which the converted file shows plain",
+    ),
     _page("option_labels", "required", "answer options run together in one block"),
     _page("rtl_text", "required", "right-to-left words in the order the PDF gives them"),
     # --- the text pass
@@ -148,6 +175,9 @@ ROWS: tuple[CheckLine, ...] = (
         not_checked=True,
     ),
     _document("word_tracked_changes", "required", "Word reader: tracked changes taken as accepted"),
+    _document(
+        "word_table_flattened", "required", "Word reader: a table too large for a grid, as a list"
+    ),
     _document("word_rtl_text", "optional", "Word reader: right-to-left paragraphs"),
     # --- a source job (LaTeX or Word read from the file, `source.report`)
     _document("source_error", "required", "LaTeX reported a formula it could not read"),

@@ -1739,6 +1739,7 @@ def _edit_cell(
         if text == cell.text:
             raise ReviewInvalid([FieldError(fid, "This is the text the cell has already.")], values)
         edited.text = text
+        edited.runs = []  # the source's bold and italic belonged to the old words
     # Text typed into an empty cell of the header rows or column is a header too.
     if edited.header is None and not edited.is_empty:
         if edited.row < grid.header_rows:
@@ -1888,6 +1889,7 @@ def rerender_html(
     filename: str = "",
     audience: str = "student",
     stamp: Stamp | None = None,
+    notice: str | None = None,
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
     `audience` "checker" makes a draft's page in the checker's words (`assemble.CHECKER`);
@@ -1937,6 +1939,7 @@ def rerender_html(
         fixes=result.fixes,
         crops=crops,
         source_note=None,
+        notice=notice,
         checked_on=checked_on,
         pages=result.stats.pages or None,
         math_alttext=math_alttext,

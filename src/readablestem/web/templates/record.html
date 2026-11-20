@@ -21,12 +21,12 @@
   <dl class="summary-list">
     <div><dt>Title</dt><dd>{{ record.title }}</dd></div>
     <div class="summary-long"><dt>File name</dt><dd>{{ record.filename|breakable }}</dd></div>
-    <div><dt>Pages</dt><dd>{{ record.pages }}</dd></div>
+    {% if record.checked.origin == "pdf" %}<div><dt>Pages</dt><dd>{{ record.pages }}</dd></div>{% endif %}
     <div><dt>Converted on</dt><dd>{{ long_when(record.converted_at) or "Not recorded" }}</dd></div>
     <div><dt>Converted by</dt><dd>{{ record.owner }}</dd></div>
     <div><dt>Tool</dt><dd>{{ record.tool }}</dd></div>
     <div><dt>Language</dt><dd>{{ record.language }}</dd></div>
-    <div><dt>Exam or quiz</dt><dd>{{ exam_words.on if record.exam_mode else exam_words.off }}</dd></div>
+    {% if record.checked.origin == "pdf" %}<div><dt>Exam or quiz</dt><dd>{{ exam_words.on if record.exam_mode else exam_words.off }}</dd></div>{% endif %}
     <div><dt>Record made on</dt><dd>{{ long_when(record.made_at) }}</dd></div>
     <div><dt>Reference</dt><dd>{{ record.job_ref }}</dd></div>
     {% if record.state %}<div><dt>State</dt><dd>{{ record.state }}</dd></div>{% endif %}
@@ -117,6 +117,15 @@
     {% for line in record.not_checked %}<li>{{ line }}</li>{% endfor %}
   </ul>
 </section>
+
+{% if record.handled %}
+<section aria-labelledby="record-handled">
+  <h2 id="record-handled">Handled in this file</h2>
+  <ul>
+    {% for line in record.handled %}<li>{{ line }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
 
 <section aria-labelledby="record-settings">
   <h2 id="record-settings">What the instructor set</h2>

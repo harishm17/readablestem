@@ -18,7 +18,7 @@
     {% endfor %}
   </ul>
   {% endif %}
-  {% if (job.error_code or "").startswith("source_") and state.key.startswith("stopped") %}
+  {% if (job.error_code or "").startswith("source_") and state.key.startswith("stopped") and (job.error_detail or {}).get("kind") != "docx" %}
   <p class="hint"><a href="/help/latex">What this message means</a></p>
   {% endif %}
   {# What of a finished job was not converted, beside its open decisions (a partly

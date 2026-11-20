@@ -145,6 +145,10 @@ class Settings(BaseSettings):
     # the recorded model answers of the pages it moves stop matching, and turning it on
     # comes with a re-recording and a `PIPELINE_VERSION` bump.
     region_tree: Literal["off", "on"] = "off"
+    # The table search without its time limit (pipeline.tables.DetectorBudget), for evals and
+    # replays only (eval.measure.replay_settings): a score must not depend on how busy the
+    # machine was. A job keeps the limit; a page it stops is listed in the job's facts.
+    table_search_unlimited: bool = False
     # The codes of symbol and TeX fonts read as what the font draws, by the font's name
     # (`pipeline/font_codes.py`, docs/layout.md): Symbol, Wingdings, MT-Extra and the APS
     # math font, TeX's ligatures and accents at control codes, and a glyph that starts several

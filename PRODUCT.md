@@ -34,7 +34,7 @@ The converted output and the review step are shown, not claimed: the site shows 
 - Two-tone focus ring (dark outline with yellow halo) is kept as is.
 
 ## Evidence on Hand
-- Held-out and development results in `PROOF.md` and `README.md`, with sample sizes; reports under `proof/`.
+- Held-out and development results in `PROOF.md` and `docs/results.md` (the README has the short version), with sample sizes; reports under `proof/`.
 - A stored real conversion with its source PDF: `src/readablestem/web/demo/` (OpenStax Physics 2.3, untagged PDF).
 - No testimonials, customer names or press exist; none may be invented.
 

@@ -162,8 +162,13 @@ def stage_lines(progress: dict[str, Any] | None) -> list[StageLine]:
     layout = events.get("layout")
     if layout is not None:
         pages = _count(layout, "total")
-        read = "Reading the layout" + (f": {plural(pages, 'page')}" if pages else "")
-        lines.append(StageLine(read, "done" if _finished(layout) else "now"))
+        if pages and not _finished(layout):  # the table search's pages, while it runs
+            done = _count(layout, "done")
+            read = f"Reading the layout: {done} of {plural(pages, 'page')}"
+            lines.append(StageLine(read, "now", done, pages))
+        else:
+            read = "Reading the layout" + (f": {plural(pages, 'page')}" if pages else "")
+            lines.append(StageLine(read, "done" if _finished(layout) else "now"))
         counts = layout.get("counts") if isinstance(layout.get("counts"), dict) else {}
         found = [
             plural(n, one, many)
@@ -351,6 +356,7 @@ class Example:
     pdf_reading: str  # document content: for the owner's eyes only, never logged
     html_reading: str
     lost: str
+    crop_size: tuple[int, int] | None = None  # its picture's size in pixels
 
 
 @dataclass(frozen=True)
@@ -459,7 +465,9 @@ def _lost_sentence(parts: list[str]) -> str:
     return sentence[0].upper() + sentence[1:]
 
 
-def _examples(result: DocumentResult) -> list[Example]:
+def _examples(
+    result: DocumentResult, crop_sizes: dict[str, tuple[int, int] | None] | None = None
+) -> list[Example]:
     """Up to four equations whose text layer loses the most, display ones first."""
     refresh_readings(result)
     fixes = _first_fixes(result)
@@ -487,6 +495,7 @@ def _examples(result: DocumentResult) -> list[Example]:
             pdf_reading=pdf_reading(element.text or ""),
             html_reading=fix.equation.speech,
             lost=_lost_sentence(parts),
+            crop_size=(crop_sizes or {}).get(element.id),
         )
         block = 1 if element.display == "block" else 0
         scored.append((len(parts), block, -element.order, example))
@@ -675,7 +684,11 @@ def _language_row(facts: SourceFacts, result: DocumentResult) -> Row:
     return Row("hear the right language", pdf, html)
 
 
-def before_after(result: DocumentResult, summary: CheckedSummary | None = None) -> Card | None:
+def before_after(
+    result: DocumentResult,
+    summary: CheckedSummary | None = None,
+    crop_sizes: dict[str, tuple[int, int] | None] | None = None,
+) -> Card | None:
     """The card, or None for results measured before source facts existed. Its equation
     row and the start of its structure rows ("Yes", or "In the converted parts" when a part
     is a picture or a page is left out) are the summary's (`pipeline.checked_words`)."""
@@ -709,7 +722,7 @@ def before_after(result: DocumentResult, summary: CheckedSummary | None = None) 
     tail = [_title_row(facts, result), _language_row(facts, result)]
     rows += tail[::-1] if language_needs_check(result) else tail
     kept = [row for row in rows if row is not None][:MAX_ROWS]
-    return Card(kept, _examples(result), tagged=bool(facts.tagged))
+    return Card(kept, _examples(result, crop_sizes), tagged=bool(facts.tagged))
 
 
 # --------------------------------------------------------------------------- notices
@@ -807,10 +820,9 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
     labels = item_labels(result)
     elements = {e.id: e for e in result.elements}
     lists = NoticeLists()
-    handled: Counter[str] = Counter()
-    for notice in notice_rules.current(result):
+    current = notice_rules.current(result)
+    for notice in current:
         if notice_rules.section(notice) == "handled":
-            handled[notice.code] += notice.count
             continue
         line = _line(notice, fixes, labels, elements)
         if notice.code == "source_error" and (names := _unknown_commands(result)):
@@ -844,10 +856,22 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
         else:
             lists.not_handled.append(line)
     lists.not_handled = _one_line_per_kept_page(lists.not_handled, fixes, labels)
+    lists.handled = handled_lines(current)
+    return lists
+
+
+def handled_lines(notices: Iterable[Notice]) -> list[HandledLine]:
+    """What was found and converted, one line for each kind with its total: the job page's
+    "Handled in this file" and the review record's. `notices` is `notice_rules.current(result)`."""
+    handled: Counter[str] = Counter()
+    for notice in notices:
+        if notice_rules.section(notice) == "handled":
+            handled[notice.code] += notice.count
+    lines = []
     for code, count in handled.items():
         one, many, done = HANDLED_MESSAGES[code]
-        lists.handled.append(HandledLine(code, count, f"{plural(count, one, many)}: {done}"))
-    return lists
+        lines.append(HandledLine(code, count, f"{plural(count, one, many)}: {done}"))
+    return lines
 
 
 def _unknown_commands(result: DocumentResult) -> tuple[str, ...]:
@@ -1063,7 +1087,12 @@ def found_sentence(result: DocumentResult) -> str:
     return f"Found {found} on {pages}." if found else f"Read {pages}."
 
 
-def page_data(result: DocumentResult, last_decision: date | None, filename: str = "") -> PageData:
+def page_data(
+    result: DocumentResult,
+    last_decision: date | None,
+    filename: str = "",
+    crop_sizes: dict[str, tuple[int, int] | None] | None = None,
+) -> PageData:
     from readablestem.web import queue
 
     counts = breakdown(result.fixes, result.notices)
@@ -1075,7 +1104,7 @@ def page_data(result: DocumentResult, last_decision: date | None, filename: str 
         counts=counts,
         checked=summary,
         found=found_sentence(result),
-        card=before_after(result, summary),
+        card=before_after(result, summary, crop_sizes),
         notices=notices,
         language=language_line(result),
         lang=result.lang,
