@@ -171,16 +171,17 @@ sentence of its own.
 
 *The stored page and its pictures, and what the step records cost to load* (measured 2026-11-19 on the
 same documents). The `jobs.html` column holds figure and page pictures as base64 PNG or JPEG. It is
-0.05 to 1.0 times the document's other stored bytes in all fifteen documents (the
+0.04 to 0.98 times the document's other stored bytes in all fourteen documents (the
 scanned 100 pages: 0.22; the dense 100: 0.31), never the "more than twice" that would make it
 worth storing the page without them and putting them back at download. In the dense 100 pages the
 page is 11.3 MB with its 667 pictures (the largest 766 KB as base64) and 7.1 MB without; making it
 from the stored crops took 3.7 to 3.9 s with the pictures and 1.2 to 1.6 s without (turning every
 crop to base64 is 0.02 s of that), and 19.8 s and 4.0 s for the scanned 100 pages. The files kept after
 a download (Word, EPUB, Canvas, cartridge; `web/export_store.py`, `MAX_BYTES` 32 MiB) were 8.0 to
-8.4 MB each for the dense 100 pages and 17.3 MB each for the scanned 100 (no kept file of any of
-the fifteen documents was over 32 MiB; the scanned document's Word file was not made at all:
-pandoc failed after 48 s). One picture alone cannot pass 32 MiB: the largest is a scanned
+8.4 MB each for the dense 100 pages and 17.3 MB each for the scanned 100, the two largest documents
+(downloaded for those two and one corpus document; no other document's page passes 3.1 MB, so
+none of their files comes near 32 MiB; the scanned document's Word file was not made at all: pandoc
+failed after 48 s). One picture alone cannot pass 32 MiB: the largest is a scanned
 page's crop (2.3 MB stored) and the crops are capped at 2048 px, 2576 px for a page kept as an image
 (`image_page.MAX_SIDE_PX`), which as a 2576 px square of noise is 19.9 MB, 26.5 MB as base64. So
 nothing is stored differently.
