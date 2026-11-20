@@ -1933,6 +1933,9 @@ def _convert(
                 extra["region_tree"] = True
             if settings.table_search_unlimited:
                 extra["table_search_limited"] = False
+            if stage_progress is not None:
+                # the table search is most of the layout's time: its pages are the count
+                extra["on_page"] = lambda done, total: _send(stage_progress, "layout", done, total)
             doc = layout.analyze(
                 pdf_bytes,
                 pages=pages,

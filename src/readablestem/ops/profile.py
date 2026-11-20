@@ -22,7 +22,9 @@ Who reads it:
   "development settings" (`readablestem eval ... --profile production` runs under it).
 
 The hash is a sha256 over the sorted behaviour settings and image facts, so reordering the file
-or editing a comment does not change it, and a changed value or image fact does.
+or editing a comment does not change it, and a changed value or image fact does. A row's
+`reason` and `eval` (why production has the value, and the report that measured it) are not in
+it either: /admin shows them next to the setting.
 """
 
 from __future__ import annotations
@@ -77,6 +79,11 @@ class Profile:
     sources: dict[str, str]  # field name -> where the value came from
     operations: frozenset[str]  # field names that are named only
     image_facts: dict[str, str] = field(default_factory=dict)
+    # Why production has the value ("not stated" where the repository gives no reason), and the
+    # repository path of the report that measured it or "none". Only on the rows that switch a
+    # behaviour or pick a model; neither is part of the hash.
+    reasons: dict[str, str] = field(default_factory=dict)
+    evals: dict[str, str] = field(default_factory=dict)
 
     @property
     def sha256(self) -> str:
@@ -153,6 +160,8 @@ def parse(text: str) -> Profile:
         sources={name.lower(): str(row["source"]) for name, row in rows.items()},
         operations=frozenset(name.lower() for name in data.get("operations", [])),
         image_facts={k: str(v) for k, v in data.get("image_facts", {}).items()},
+        reasons={name.lower(): str(row["reason"]) for name, row in rows.items() if "reason" in row},
+        evals={name.lower(): str(row["eval"]) for name, row in rows.items() if "eval" in row},
     )
 
 

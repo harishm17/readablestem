@@ -162,8 +162,13 @@ def stage_lines(progress: dict[str, Any] | None) -> list[StageLine]:
     layout = events.get("layout")
     if layout is not None:
         pages = _count(layout, "total")
-        read = "Reading the layout" + (f": {plural(pages, 'page')}" if pages else "")
-        lines.append(StageLine(read, "done" if _finished(layout) else "now"))
+        if pages and not _finished(layout):  # the table search's pages, while it runs
+            done = _count(layout, "done")
+            read = f"Reading the layout: {done} of {plural(pages, 'page')}"
+            lines.append(StageLine(read, "now", done, pages))
+        else:
+            read = "Reading the layout" + (f": {plural(pages, 'page')}" if pages else "")
+            lines.append(StageLine(read, "done" if _finished(layout) else "now"))
         counts = layout.get("counts") if isinstance(layout.get("counts"), dict) else {}
         found = [
             plural(n, one, many)

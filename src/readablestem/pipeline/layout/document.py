@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from functools import partial
 from typing import Any
 
@@ -130,6 +130,7 @@ def analyze(
     display_grouping: bool = False,
     region_tree: bool = False,
     table_search_limited: bool = True,
+    on_page: Callable[[int, int], None] | None = None,
 ) -> Layout:
     """Elements of the given 0-based pages (all by default), ids "p{page+1}-e{index}".
 
@@ -156,6 +157,11 @@ def analyze(
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
     search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
     machine.
+
+    `on_page(done, total)`: told how many of the pages have had their table search, the pass
+    that takes most of the time (`done` is below `total` throughout: the caller marks the
+    layout finished). Called outside the page guard, so an exception from it (a cancelled
+    job) stops the run.
     """
     with _LOCK:
         _quiet_mupdf()
@@ -175,6 +181,7 @@ def analyze(
                         region_tree=region_tree,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
                     ),
+                    on_page,
                 )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
@@ -306,6 +313,7 @@ def _analyze_document(
     selected: list[int],
     page_math: Any,
     document: _Document,
+    on_page: Callable[[int, int], None] | None = None,
 ) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
@@ -394,7 +402,10 @@ def _analyze_document(
     guard.on_purpose = {n for n in kept if n not in text_kept}
     guard.settle()
     not_searched: list[int] = []  # pages the table search's time limit refused
-    for number in guard.live(selected):
+    searched = guard.live(selected)
+    for done, number in enumerate(searched):
+        if on_page is not None:
+            on_page(done, len(searched))
         with guard(number):
             if number in kept and number not in text_kept:
                 frags[number], paths[number], found[number] = [], [], []

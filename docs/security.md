@@ -679,11 +679,51 @@ same way before any step reads them, so a job, `readablestem convert` and the ev
 with the same code whatever the file passed before, and a PDF figure of a LaTeX project over
 the page budget is left without a picture (`source/figures.py`).
 
-Not bounded by it: how many times a page draws the same form. A form is counted once per
-page, but each `Do` runs it again: a 1.9 KB file whose page draws a 1 MB form 300 times is
-taken, and the upload probe spends 4.9 s on it (2026-11-11). Bounding it needs the drawing
-operators counted, which means scanning the page's content for them; until then the
-probe's 30 s limit and the job's time limit are what stop a larger one.
+**A real paper over the page budget** (measured 2026-11-19 on a public 23-page, 11.8 MB paper
+from the development set, the one real file the corpus work found refused by it). One page
+inflates to 71.5 MiB (the next largest 2.9 MiB; the document 77.5 MiB, under its budget). The
+page holds one content stream, two forms that inflate to about 31 and 41 MiB, 8 pictures and
+18 fonts, no annotations. The check that refuses it is the page budget of
+`content_budget.check`, reached first from the upload probe (`web/pdf_probe.py`) and again from
+`layout.analyze`; the person is told what every `content_too_large` file is told ("...is too
+large to read: a page of it, or the file as a whole, holds far more drawing instructions than a
+course document does. Save it as a PDF again (Print to PDF makes a simpler file), or split it
+into parts, and upload that."). The smallest budget that accepts it is 72 MiB, and the count
+itself is cheap there (the probe's check passes in 0.2 s, 64 MB), but a second limit then
+stops the page: the layout step's own child process (`access.PROBE_MEMORY_BYTES`, 768 MB plus
+twice the file) refuses it as `too_complex` ("the PDF needs more memory than a page may use"),
+and at 1024 MB the child dies ("could not be rendered"). With both raised (72 MiB and 1536 MB)
+`layout.analyze` of the document took 102 to 106 s on one CPU of that box and the converting
+process peaked at 1.32 GB, with a 1.12 GB child beside it: well past the 0.4 to 0.9 GB that
+docs/deploy-railway.md plans for one conversion. The budget stays at 32 MiB. A budget that
+admits this paper would have to come with a memory plan for the layout child.
+
+Not bounded by the budget, and what stops each (measured 2026-11-19 on a box running 3 to 5
+times slower than normal, with generated files; times are as measured there):
+
+- **One form drawn many times.** A form is counted once per page, but each `Do` runs it
+  again. A 1 MB form of white space drawn 300 times (5.4 KB file) took the upload probe 11.5 s,
+  600 times 21.8 s, 1000 times 38.1 s, with 69 MB of memory in every case. The probe's own
+  limit stops it: past `INSPECT_TIMEOUT_S` (30 s) the upload is refused as `unreadable`
+  ("could not be opened. It may be damaged."), and the address-space cap of 768 MB bounds
+  memory. A file the probe takes is converted inside the job's time limit (180 s and 30 s a
+  page): the 600-draw file took 141.8 s in a conversion with the model steps stubbed (child
+  peak 105 MB), and a slower one ends with the time-limit message. Bounding the draws
+  themselves needs the drawing operators counted, which means scanning every page's content
+  for them; the three limits above are what stop a larger file until then.
+- **A stored document opened on the review screen.** The page picture is made from the stored
+  upload in the probe's child (`web/page_images.py`), which has the same 768 MB cap and its
+  own time limit, `RENDER_TIMEOUT_S` (20 s). The same 600-draw file took 9.0 s and 78 MB; the
+  1000-draw file took 14.2 s, though the upload refuses it. A render past the limit gives
+  "The image could not be made." (503) for that picture and leaves the review screen working.
+  A stored document was taken by the probe first, so its render is no longer than its probe.
+- **MuPDF's repair path.** A file with no usable cross-reference table is rebuilt by
+  scanning for objects, including every object stream. A file that lists 80,000 objects took
+  the probe 11.6 s and 85 MB; 200,000 objects (451 KB), 4 million objects in one stream
+  (9.3 MB) and 4 million across 2,000 streams (17 MB) did not finish in 40 s and were
+  killed at the probe's 30 s limit in the app: refused as `unreadable`, with memory
+  under 90 MB at the point of the kill. The upload size limit and the probe's time limit and
+  address-space cap are the bounds; no code of its own.
 
 ### Hostile-input set
 

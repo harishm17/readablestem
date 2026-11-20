@@ -17,6 +17,7 @@ from readablestem.core.types import Element, Fix, Kind, ProgressEvent, Status
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step, figure_step, layout, run
 from readablestem.pipeline.layout import Layout
+from readablestem.web import job_page
 from readablestem.web import worker as worker_module
 from readablestem.web.db import Job, JobStatus, session_scope
 from readablestem.web.worker import JobCancelled
@@ -56,7 +57,12 @@ def accepted(element, png, *, client, settings, context_text=None) -> Fix:
 
 @pytest.fixture
 def fake_steps(monkeypatch):
-    monkeypatch.setattr(layout, "analyze", lambda pdf, *, pages=None, max_pages=None: document())
+    def analyze(pdf, *, pages=None, max_pages=None, on_page=None):
+        for done in range(2):  # the pages whose table search is done, as `layout.analyze` tells
+            on_page(done, 2)
+        return document()
+
+    monkeypatch.setattr(layout, "analyze", analyze)
     monkeypatch.setattr(layout, "crop", lambda pdf, element, **kw: png())
     monkeypatch.setattr(equation_step, "transcribe", accepted)
     monkeypatch.setattr(figure_step, "describe", accepted)
@@ -79,11 +85,23 @@ def test_a_scanned_page_counts_as_done_before_any_model_work(fake_steps, monkeyp
     two_pages = document()
     two_pages.elements = [e for e in two_pages.elements if e.page == 0]
     two_pages.kept_pages = {1: "scanned_page"}  # layout keeps page 2 as its image
-    monkeypatch.setattr(layout, "analyze", lambda pdf, *, pages=None, max_pages=None: two_pages)
+    monkeypatch.setattr(
+        layout, "analyze", lambda pdf, *, pages=None, max_pages=None, on_page=None: two_pages
+    )
     events = events_of()
     figures = [(e.done, e.total) for e in events if e.stage == "figures"]
     assert figures[0] == (1, 2)  # the scanned page's figure is decided already
     assert figures[-1] == (2, 2)
+
+
+def test_the_layout_counts_its_pages_until_it_is_done(fake_steps):
+    layout_events = [(e.done, e.total) for e in events_of() if e.stage == "layout"]
+    assert layout_events[0] == (0, 0)  # started
+    assert layout_events[1:-1] == [(0, 2), (1, 2)]  # never finished before the layout is
+    assert layout_events[-1] == (2, 2)
+    mid = {"stages": {"layout": {"stage": "layout", "done": 1, "total": 2}}}
+    (line,) = job_page.stage_lines(mid)
+    assert (line.state, line.done, line.total) == ("now", 1, 2)  # the page's progress bar
 
 
 # --------------------------------------------------------------------------- the worker
