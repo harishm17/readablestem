@@ -30,8 +30,8 @@ that where the two differ the tool can ask a person instead of trusting either.
 
 | Reader | Setting | Key | What makes it differ from the page pass |
 |---|---|---|---|
-| `claude` | `MATH_READER_CLAUDE_ENABLED`, `MATH_READER_CLAUDE_MODEL` (default `claude-sonnet-5-5`), `MATH_READER_CLAUDE_EFFORT` | `ANTHROPIC_API_KEY` | Another model than the page pass's, its own instructions (`prompt.CLAUDE_INSTRUCTIONS`: structure first, each symbol settled before the whole, the pairs handwriting confuses), and different input: one tight high-resolution crop with no page picture and no document text |
-| `openai` | `MATH_READER_OPENAI_ENABLED`, `MATH_READER_OPENAI_MODEL` (default `gpt-6-luna`) | `OPENAI_API_KEY` | A different model family; sent with `store: false` like every OpenAI request here |
+| `claude` | `MATH_READER_CLAUDE_ENABLED`, `MATH_READER_CLAUDE_MODEL` (default: `math_reader_claude_model` in `config.py`), `MATH_READER_CLAUDE_EFFORT` | `ANTHROPIC_API_KEY` | Another model than the page pass's, its own instructions (`prompt.CLAUDE_INSTRUCTIONS`: structure first, each symbol settled before the whole, the pairs handwriting confuses), and different input: one tight high-resolution crop with no page picture and no document text |
+| `openai` | `MATH_READER_OPENAI_ENABLED`, `MATH_READER_OPENAI_MODEL` (default: `math_reader_openai_model` in `config.py`) | `OPENAI_API_KEY` | A different model family; sent with `store: false` like every OpenAI request here |
 | `local` | `MATH_READER_LOCAL_ENABLED`, `MATH_READER_LOCAL_DIR`, `MATH_READER_LOCAL_THREADS` (default 2), `MATH_READER_LOCAL_TIME_S` (default 20) | none | A small image-to-LaTeX model that is not a language model and has no prompt (TexTeller, below); runs in this process, so nothing is sent anywhere. See "The local reader" |
 
 Both are built by hand over HTTP (`transport.py`) rather than through the step clients, which

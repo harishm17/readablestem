@@ -324,7 +324,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `reason:<code>` | `Fix.reason`, e.g. `reason:low_confidence`, `reason:budget_daily` |
 | same | `call:<model>:outcome:<outcome>` | every model call attempt, e.g. `call:gpt-6-luna:outcome:timeout` |
 | same | `call:fallback` | calls made on the other model after a failure |
-| same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `claude-haiku-5-5` answer sent to `claude-opus-5-5` in production, or `gpt-6-luna` to `gpt-6.1-sol` on the OpenAI pair) |
+| same | `call:escalated` | fixes re-asked on a different model without a failure (a low-confidence answer from the cheap model sent to the main model; the models are in `config.py`) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
 | same | `tier:<tier>` | fixes by review tier as the pipeline left them (`required`, `optional`, `none`; `Fix.review`) |
 | same | `tier:<tier>:<reason>` | why each required or optional fix has its tier: each failed check code, its `Fix.reason`, `heading.repeated_label` for a member of a group of repeated headings, or `below_accept` when only the confidence held it back (`core.triage.tier_reasons`) |

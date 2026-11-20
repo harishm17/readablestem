@@ -1,0 +1,13 @@
+{# How a document is deleted, and what deleting does not reach: the security page and the
+   downloadable retention summary (retention_summary.html) both include this, so the two cannot
+   differ. `backup_days` is in the context of both. #}
+<ul>
+  <li>A document past its time answers “not found” at once, and an hourly job deletes it and
+    what was made from it. “Delete now” removes the same rows at once, after a confirm page.</li>
+  <li>Deleting an account removes the person's documents, courses, events and sign-in. A
+    scrambled fingerprint of the address stays until the next day so the day's limits do not
+    reset, and one line of a one-way hash of the account id and the time stays so a restored
+    backup can delete the account again.</li>
+  <li>Not reached by deleting: database backups keep a copy for about {{ backup_days }} days,
+    and the model provider's own retention is its own.</li>
+</ul>

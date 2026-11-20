@@ -104,16 +104,8 @@
 {% call table_scroll("How long a document is kept") %}
 {% include "_retention_table.html" %}
 {% endcall %}
-<ul>
-  <li>A document past its time answers “not found” at once, and an hourly job deletes it and
-    what was made from it. “Delete now” removes the same rows at once, after a confirm page.</li>
-  <li>Deleting an account removes the person's documents, courses, events and sign-in. A
-    scrambled fingerprint of the address stays until the next day so the day's limits do not
-    reset, and one line of a one-way hash of the account id and the time stays so a restored
-    backup can delete the account again.</li>
-  <li>Not reached by deleting: database backups keep a copy for about {{ backup_days }} days,
-    and the model provider's own retention (see above) is its own.</li>
-</ul>
+{% include "_deletion_rules.html" %}
+<p><a href="/privacy/retention" download>Download this as a one-page retention summary</a> for a disability or privacy office.</p>
 
 <h2 id="access">Sign-in and who can see a document</h2>
 <ul>

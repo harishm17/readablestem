@@ -31,6 +31,8 @@ def test_actions_are_pinned_to_commit_shas(path):
         if line.strip().removeprefix("- ").startswith("uses:")
     ]
     for ref in uses:  # uptime.yml needs none: curl is on the runner
+        if ref.startswith("./.github/actions/"):
+            continue  # a file of this very commit (pandoc's checksum), not another repository's
         assert PINNED.match(ref), f"{path.name}: not pinned to a SHA with a tag comment: {ref}"
 
 

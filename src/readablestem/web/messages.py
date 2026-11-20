@@ -30,8 +30,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     (
         "source.macro",
         "unknown_command",
-    ): "The LaTeX source uses a command this tool does not know, so this equation could "
-    "not be read from it: correct the LaTeX or reject it.",
+    ): "This formula could not be read from the source file as it is (it uses a command this "
+    "tool does not know, or a form it cannot convert): correct it or reject it.",
     # LaTeX source (readablestem.source.ltx_reader): what a table, heading or figure shows
     # that LaTeX could not read, or a picture that left its table cell
     (
@@ -412,11 +412,14 @@ AXE_RULE_MESSAGE = (
 REASON_MESSAGES: dict[str, str] = {
     # Equation and figure steps
     "low_confidence": "The model was not sure enough to make a proposal, so write one "
-    "yourself or reject it to keep the original from the PDF.",
+    "yourself or reject it to keep the original.",
     "not_equation": "The model judged that this is not an equation: if it is, type the LaTeX, "
     "and if not, reject it to keep the original.",
-    "invalid_latex": "The model's LaTeX failed a required check (listed below), so correct it "
-    "or reject it to keep the image.",
+    # An equation read from a PDF, and a formula of a LaTeX or Word source that could not be
+    # converted and has no proposal of ours (`source.ltx_reader.equation_fix`): the same words
+    # are true of both, so they name neither the model nor the image.
+    "invalid_latex": "The LaTeX for this equation failed a required check (listed below), so "
+    "correct it or reject it to keep the original.",
     "invalid_alt": "The model's alt text failed a required check (listed below), so write new "
     "alt text or reject it to keep the figure flagged.",
     # f"model_{outcome}" for every models.base Outcome: no usable answer from any attempt

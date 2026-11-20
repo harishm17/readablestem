@@ -3,8 +3,6 @@
    (needs pandoc on the server) and EPUB. The owner has them under "Where will you post it?". #}
 {% if word_export|default(false) %}
 <li id="route-word"><a class="button-secondary" href="/jobs/{{ job.id }}/download.docx">Download as Word (.docx)</a>
-  {% if word_as_words|default(0) %}
-  <p class="hint" id="word-as-words">{{ word_as_words }} {{ "equation" if word_as_words == 1 else "equations" }} of the Word file {{ "is" if word_as_words == 1 else "are" }} written as words, not as Word {{ "equation" if word_as_words == 1 else "equations" }}, and marked so in the file. {{ "It is" if word_as_words == 1 else "They are" }} complete on the web page.</p>
-  {% endif %}</li>
+  {% include "_word_as_words.html" %}</li>
 {% endif %}
 <li id="route-epub"><a class="button-secondary" href="/jobs/{{ job.id }}/download.epub">Download as EPUB</a></li>

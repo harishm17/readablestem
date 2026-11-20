@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased: what the pages promise, and leftovers of the Word and export work (branch fix/page-promises-and-leftovers)
+
+- The pages rule (`web/quota.py`, `PAGES_RULE`) says what cancel does: a document canceled before it
+  starts, or stopped for being only scans or handwriting, gives its pages back that day; any other
+  failed or deleted document does not. A canceled document a worker had begun keeps its pages
+  (`test_canceling_gives_the_pages_back_only_before_a_worker_began_the_document`).
+- The checker's draft says "In the student's file, a link here writes to your contact line." where the
+  student's file has the instructor link on a flag note, instead of carrying the link
+  (`assemble.DRAFT_CONTACT_NOTE`). A draft is never stored; no student file changes.
+- The pages read the limits and days they state from the setting or constant that holds them
+  (LaTeX help, the review help's page size, the status window, the admin canary window, the
+  retention days on the account, upload and landing pages), so a change to one moves the page.
+- The privacy notice has claims the launch check ties to their code or setting: source files, the
+  conversion result, Listen's kept documents, the sign-in days, the takedown address and a LaTeX
+  build (`ops.launch.privacy_claim_problems`). The retention summary is a download for an
+  office (`/privacy/retention`), written from the same settings, data list, recipients and deletion
+  rules as the notice and `/security`.
+- CI installs pandoc 3.1.11.1 from the upstream release by exact version and sha256
+  (`.github/actions/pandoc`), the version production runs, in both jobs that need it.
+- Docs name no model, price or version a file in the code already holds; they point to it
+  (`config.py`, `ops/production.profile.toml`, `models/pricing.py`, `ops/limits.py`).
+- The review reasons for a formula a Word or LaTeX source could not convert, and for a figure the
+  model could not describe, no longer speak of a PDF or an image the item never had.
+- The record leaves out "Pages" for a Word or LaTeX source (it showed the reading's one placeholder
+  page), in the page and the CSV.
+- A job page opened before the Word file was first made says what the file does with an equation
+  Word cannot take and that the count shows when the page is opened again (no new polling).
+- Combined files (Combine parts) have their own count of 3 on the first part, so they do not push
+  that part's Word, EPUB, Canvas or Cartridge files out of the kept set (`export_store.MAX_COMBINED`).
+  No stored page, result or model request changes; no `RENDER_VERSION` or `PIPELINE_VERSION` raise.
+
 ## Unreleased: the page and the exports, leftovers (branch fix/output-leftovers)
 
 - The count of equations written as MathML (the student note, the job page, the record and its

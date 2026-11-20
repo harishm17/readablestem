@@ -26,7 +26,7 @@ screen is for.
 **Status.** Beta, built and maintained by Harish Manoharan. Anyone with a Google account can sign
 in at https://readablestem.com (the beta runs `SIGNUP_MODE=open`; the code's default is
 `allowlist`, invitation only), with daily limits for new accounts.
-The pipeline is version 0.5.13 (`PIPELINE_VERSION`). Questions go to hello@readablestem.com.
+The pipeline's version is `PIPELINE_VERSION` in `src/readablestem/pipeline/run.py`. Questions go to hello@readablestem.com.
 
 ## What it does
 
@@ -100,7 +100,7 @@ flowchart LR
   L --> E[Equations: crop, LaTeX, checks against the text layer, MathML, speech text]
   L --> F[Figures: classify, short alt text, checks]
   E & F --> R[Router: cheap model for simple inline equations, main model otherwise, escalation on doubt]
-  R --> M[Anthropic Claude API: claude-haiku-5-5 and claude-opus-5-5; second check on claude-sonnet-5-5, off by default]
+  R --> M[Anthropic Claude API: the cheap and main models set in config.py; second check off by default]
   H & E & F --> A[Assemble one HTML file and a report]
   A --> C[Static and axe-core checks]
   A --> V[Review screen: accept, edit or reject]

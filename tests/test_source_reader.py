@@ -4,6 +4,7 @@ tests/test_source_convert.py."""
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -699,3 +700,26 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
     assert found(last) == [("crossref", "Theorem 1")]
     assert last.links[0].target_id == theorem.id and not theorem.links
     assert found(back) == [("internal", "Motion")] and back.links[0].target_id == heading.id
+
+
+@needs_pandoc
+def test_a_word_equation_that_fails_the_checks_is_explained_in_words_true_of_a_file():
+    """The review item of a formula no check accepts says what happened to a source, not to a
+    page: no model, picture, PDF or page it never had."""
+    from readablestem.web.messages import explain_check, explain_reason
+
+    body = (
+        "<w:p><m:oMathPara><m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant>"
+        "</m:oMath></m:oMathPara></w:p>"
+    )
+    reading = read_word(word(body))
+    [equation] = [e for e in reading.elements if e.kind is Kind.EQUATION]
+    fix = reading.fixes[equation.id]
+    assert fix.review == "required" and fix.status in (Status.FAILED, Status.NEEDS_REVIEW)
+    said = [explain_check(c).text for c in fix.failed_checks]
+    if fix.reason:
+        said.append(explain_reason(fix.reason).text)
+    assert said
+    for sentence in said:
+        words = set(re.findall(r"[A-Za-z']+", sentence))
+        assert not {"model", "model's", "image", "PDF", "page"} & words

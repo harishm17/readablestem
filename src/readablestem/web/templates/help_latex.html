@@ -42,13 +42,13 @@
 <h2 id="what">What you can upload</h2>
 <ul>
   <li><strong>One file:</strong> a <code>.tex</code> file, with no other files. It must be a
-    complete document: a document class and a document body. A <code>.tex</code> file over 4 MB
+    complete document: a document class and a document body. A <code>.tex</code> file over {{ tex_file_limit }}
     is refused, and so is a zip whose <code>.tex</code> and other text files add up to over
-    24 MB.</li>
+    {{ tex_total_limit }}.</li>
   <li><strong>A zip of the project:</strong> up to {{ project_zip }}. Put in the main file and
     everything it reads: other <code>.tex</code> files, pictures, <code>.bib</code> and
     <code>.bbl</code> files, and your own <code>.sty</code> and <code>.cls</code> files. Folders
-    inside the zip are fine, to a path of eight names at most.</li>
+    inside the zip are fine, to a path of {{ zip_depth }} names at most.</li>
   <li><strong>Pictures:</strong> PNG, JPEG, GIF and PDF. A file with any other extension
     (EPS, SVG, another zip) makes the whole upload refused.</li>
   <li><strong>Left out without a word:</strong> what a TeX run leaves behind, such as
@@ -75,9 +75,9 @@
   <li><strong>“could not be opened as a zip file”.</strong> The zip is damaged or has a
     password. Zip the project again without a password.</li>
   <li><strong>“is too big or has too many files”.</strong> A project zip may be up to
-    {{ project_zip }}. A folder counts as a file, a file in the zip may be up to 50 MB, and a
+    {{ project_zip }}. A folder counts as a file, a file in the zip may be up to {{ zip_member_limit }}, and a
     member that unpacks to far more than it takes zipped is refused as well. A single
-    <code>.tex</code> file over 4 MB gets this message too. Remove what the document does not
+    <code>.tex</code> file over {{ tex_file_limit }} gets this message too. Remove what the document does not
     use.</li>
   <li><strong>“has a file with a path or a link this tool will not open”.</strong> The zip
     holds an absolute path, a drive letter, <code>..</code>, a backslash, a name used twice, a
