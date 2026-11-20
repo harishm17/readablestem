@@ -2081,12 +2081,20 @@ the site is built, with the same component and the same script).
   **Layout (F-465).** The transcript has the reading width (`--prose-max`) with the role as a
   small line above the text. In a window 64rem or wider a second column (`.listen-thing`)
   draws the selected item itself: the equation as MathML (`Item.thing`, from the same parsed
-  MathML the reading is made from), a table's first 40 rows, or a picture when its data is under
-  150,000 characters (a larger picture is left to the student page, so a page never carries its
-  images twice). It is filled by `listen.js` from the `<template data-listen-thing>` in the
+  MathML the reading is made from), a table's first 40 rows, or a picture. A picture whose data
+  is under 150,000 characters is copied into the row; a larger one is not (a page would carry
+  its images twice): the panel loads it from `/jobs/{id}/crops/{figure id}.png`, the crop the
+  student page's figure was cut from, which the same people may load (view access, as for the
+  page), and where there is no such address (the demo) it says "This picture is on the student
+  page." It is filled by `listen.js` from the `<template data-listen-thing>` in the
   item's row when the place changes, and it is `aria-hidden`, never takes focus and is not a
-  live region, so a screen reader hears the item once, from the transcript; a narrow window has
-  no second column. Every item also has a link, "Student page", to its place on `/jobs/{id}/view`
+  live region, so a screen reader hears the item once, from the transcript. A narrow window has
+  no second column, by decision (WS23.4): below 64rem the item would have to go above or under
+  the line being read, and at 320, 390 and 768 px (100% and 200% zoom) a figure is 890 to
+  1,030 px wide at its own size, so it either shrinks until its writing cannot be read or
+  becomes a second scroll area, a table can be 40 rows tall, and the transport that sticks
+  already takes 58 to 106 px of a short window; the transcript already says in words what the
+  item is, and the "Student page" link opens it. Every item also has a link, "Student page", to its place on `/jobs/{id}/view`
   (`Item.anchor`: the id of the element the item came from, else the nearest element before it
   that has one, else the top of the page); the demo and the showcase pages have no student page
   and show no link.
