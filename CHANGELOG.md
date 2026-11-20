@@ -22,7 +22,8 @@
   made. The kept record `data/eval/burden-corpus.json` is one of those and is not made again.
 - Tests: the account deletion sent twice with one request token answers "deleted" both times.
   The two TeX compiles (`gold/safe_tex.py`, `source/tex_compile.py`) say in their docstrings why
-  there are two and which a new caller uses.
+  there are two and which a new caller uses. The Landlock busy-text test accepts `source_timeout`:
+  on a loaded machine LaTeXML ran out of its 120 s (2 of 20 runs failed that way).
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 
