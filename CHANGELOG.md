@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: leftovers of the source readers (branch fix/source-reader-leftovers)
+
+- A LaTeX source that makes LaTeXML say a command calls itself stops with its own sentence,
+  `source_loop`, instead of the general "could not be converted" (a self-call) or the wrong "a
+  brace is not closed" (a nest that never closes: `\def\a{{\a}}`). It names the command when
+  LaTeXML does, says trying again will not help, and says to compile the file on one's own computer
+  and look for the command (`source/report.py` `LOOPS`, `web/views.py`). Measured on six
+  sources: a self-call or double call ends in 2 s and a nest in 1 s; two commands calling each
+  other and a counter loop run to the 120 s limit and stop as `source_timeout`; a growing list
+  stops at the 512 MB limit in 20 s with Perl's "Out of memory" and is `source_failed`, and so does
+  a source of 766 KB: nothing in the log tells those apart, so they are left as they were. No
+  process is left behind in any of them.
+- A link inside a heading, and inside a footnote, of a Word or LaTeX source is kept like one in a
+  paragraph (before, the words stayed plain). A Word footnote's web address was dropped by the
+  working copy of the file (the footnotes part's own relationships were left out) and is kept now.
+  Links in a table cell and a caption stay plain words: neither has a place for a link
+  (`TableCell`, `Element.caption`).
+- Two spaces from two parts of a LaTeX paragraph no longer shift the links and runs after them by
+  one character (the reader squashed them after it had counted the offsets).
+- A picture in the middle of a LaTeX sentence between two letters no longer joins the words around
+  it ("Press[icon]to start" read "Pressto start"); the picture is still a figure straight after the
+  paragraph.
+
 ## Unreleased: what the pages promise, and leftovers of the Word and export work (branch fix/page-promises-and-leftovers)
 
 - The pages rule (`web/quota.py`, `PAGES_RULE`) says what cancel does: a document canceled before it

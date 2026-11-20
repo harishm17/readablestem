@@ -1045,7 +1045,13 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `DocumentResult.source_report` with the error nodes the reader found (`SourceReport`). A loss
   outside a formula stops the job (`source.report.stop`): `source_missing_file` (an `\input` or
   `\include` that is not in the upload, or a `\bibliography` whose `.bib` is not: the one error of
-  `latexmlpost` that stops a job), `source_syntax_error` (an unclosed brace or environment,
+  `latexmlpost` that stops a job), `source_loop` (LaTeXML itself says a command calls itself:
+  "expands into itself", or Perl's or LaTeXML's "deep" or "excessive recursion" for a nest that
+  never closes; the sentence names the command when LaTeXML does, and says that trying again
+  will not help and to look for the command on one's own computer; a loop LaTeXML does not name,
+  like two commands calling each other, or one that only grows, is told from a very large source
+  by nothing in the log and ends at the time or memory limit as `source_timeout` or
+  `source_failed`), `source_syntax_error` (an unclosed brace or environment,
   with its file and line; or a `^`, `_`, `&` or `#` in running text, named with what to write
   instead), `source_unsupported_class` / `source_unsupported_package` (no binding,
   and the document used what it defines; a `.sty` in the upload is not read either; a class read
