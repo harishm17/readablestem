@@ -129,6 +129,7 @@ def analyze(
     page_math: Any = None,
     display_grouping: bool = False,
     region_tree: bool = False,
+    join_panels: bool = False,
     table_search_limited: bool = True,
     on_page: Callable[[int, int], None] | None = None,
 ) -> Layout:
@@ -153,6 +154,10 @@ def analyze(
     `region_tree` (`REGION_TREE`, off): the page's columns are found by a tree of regions built
     from the unmerged lines ("The region tree" in docs/layout.md). Off, the output is what it
     was before the tree existed.
+
+    `join_panels` (`LAYOUT_JOIN_PANELS`, off): the figures that share one caption and stand side
+    by side or in a grid are one figure, and the panel marks beside it are its labels ("Panels
+    of one figure" in docs/layout.md). Off, the output is what it was before the rule existed.
 
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
     search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
@@ -179,6 +184,7 @@ def analyze(
                     _Document(
                         grouping=display_grouping,
                         region_tree=region_tree,
+                        panels=join_panels,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
                     ),
                     on_page,

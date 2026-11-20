@@ -62,6 +62,7 @@ from readablestem.pipeline.layout.figures import (
     _cluster,
     _connected,
     _fragment_figures,
+    _join_panels,
     _label_owners,
     _line_chain,
     _merge_figures,
@@ -498,6 +499,10 @@ def _page_blocks(
         if block.kind == Kind.EQUATION and region is not None:
             _add_rules(block, region.rules)
     _attach_captions(blocks, figures, document=document)
+    if document.panels:
+        taken = {b.text: b.bbox for b in blocks if b.kind == "attached" and b.text is not None}
+        figures = _join_panels(figures, taken, rows, ctx, document=document)
+        blocks = [b for b in blocks if not (b.rows and all(r.absorbed for r in b.rows))]
     captions = [b.bbox for b in blocks if b.kind == "attached"]
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:

@@ -50,6 +50,8 @@ def _convert(entry: str, image_pages: bool, exam: bool) -> dict[str, Any]:
         )
         if settings.region_tree == "on":
             grouping["region_tree"] = True
+        if settings.layout_join_panels:
+            grouping["join_panels"] = True
         grouping["table_search_limited"] = False
         doc = layout.analyze(pdf, max_pages=settings.max_pages_per_job, **grouping)
     except Exception as exc:

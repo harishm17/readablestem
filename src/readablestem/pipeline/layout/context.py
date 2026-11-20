@@ -42,6 +42,8 @@ class _Document:
     `grouping`: `analyze(display_grouping=...)`.
     `region_tree`: `analyze(region_tree=...)`: the pages are read with a tree of regions
     (`regions.py`) in place of one gutter.
+    `panels`: `analyze(join_panels=...)`: the panels of one captioned figure are one figure
+    (`figures._join_panels`).
     `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector
     (`tables.DetectorBudget`) may still spend on this document. Only `_read_page` and
     `_claim_tables` use them, and they take the document of the call: `_PLAIN` is for the
@@ -53,6 +55,7 @@ class _Document:
     whole_words: frozenset[str] = frozenset()
     grouping: bool = False
     region_tree: bool = False
+    panels: bool = False
     ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)
     detector: tables.DetectorBudget = field(default_factory=tables.DetectorBudget)
 

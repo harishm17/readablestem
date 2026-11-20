@@ -1682,6 +1682,8 @@ def _page_math_pass(
             )
             if settings.region_tree == "on":
                 grouping["region_tree"] = True
+            if settings.layout_join_panels:
+                grouping["join_panels"] = True
             if settings.table_search_unlimited:
                 grouping["table_search_limited"] = False
             try:
@@ -1947,6 +1949,8 @@ def _convert(
                 extra["display_grouping"] = True
             if settings.region_tree == "on":
                 extra["region_tree"] = True
+            if settings.layout_join_panels:
+                extra["join_panels"] = True
             if settings.table_search_unlimited:
                 extra["table_search_limited"] = False
             if stage_progress is not None:
