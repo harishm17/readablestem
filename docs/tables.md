@@ -233,8 +233,10 @@ rules above.
    never invented.
 8. **Continued tables.** A table split across pages stays two tables. The second gets the
    reason `"continued from previous page"` when it has the same columns (left edges within
-   3 % of the page width) as the last table of the page before and nothing but a running
-   header above it. When the page break split a row (Word and browsers break a tall row;
+   3 % of the page width, 6 % when the part before has a header and this part has none: a
+   header printed once is wider than the figures, so the first part's columns are cut further
+   out than the rows that go on) as the last table of the page before and nothing but a
+   running header above it. When the page break split a row (Word and browsers break a tall row;
    the gold's orders-of-magnitude table ends "... the edges of the known" on one page
    and "universe" on the next), `join_split_row` joins the end back: the first row after
    any header rows repeated from the table before is the end of that table's last row

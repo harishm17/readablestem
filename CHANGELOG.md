@@ -10,6 +10,12 @@
   `table_header_missing` ("Worth checking") says it has no header row. The stored tables and the
   table step's request are unchanged, so recorded answers still match. `RENDER_VERSION` is owed a
   raise: a stored page with a continued table is written differently.
+- A part that goes on with no header after a first part whose header was printed once was not
+  marked "continued from previous page": the header is wider than the figures, so the first
+  part's column edges sat up to 21 pt from the next page's. The edges may now differ by 6 % of
+  the page width (3 % otherwise) when the part before has a header and this part has none. A
+  different column count is still not marked. `PIPELINE_VERSION` is owed a raise for a document
+  that has one.
 - Paragraphs cut at a page break: three more cases are joined, each on evidence that the sentence
   cannot end there. A paragraph whose block began in the other column of its page and ends the
   page in a column's body text; a paragraph that ends on a comma or a semicolon, whatever letter

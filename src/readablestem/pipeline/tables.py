@@ -111,6 +111,7 @@ TERM_GRID_COLS = 3  # percents"), in at least this many columns (two are label |
 TERM_MIN_LETTERS = 3  # every term has a word this long: "H", "kg", "m" are not terms
 TOP_BAND = 0.07  # top share of the page where running headers live (as layout)
 CONTINUED_TOL = 0.03  # column edges of a continued table match within this share of width
+HEADERLESS_TOL = 2  # x CONTINUED_TOL when the part before has a header and this part has none
 SNAP = 2.0  # x font size: a table box grows to the rules drawn this close around it
 THIN_IMAGE = 1.6  # an image this thin is a rule (as RULE_THICKNESS in layout)
 DOUBLE_RULE = 4.0  # two rules this close are one double rule
@@ -3755,6 +3756,10 @@ def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
     if len(a) != len(b) or not a:
         return False
     tolerance = CONTINUED_TOL * page_width
+    if previous.grid.header_rows and not table.grid.header_rows:
+        # A header printed once is wider than the figures under it, so the part with the
+        # header has its columns cut further out than the rows that go on without it.
+        tolerance *= HEADERLESS_TOL
     return all(abs(x - y) <= tolerance for x, y in zip(a, b, strict=True))
 
 
