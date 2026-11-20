@@ -614,19 +614,19 @@ def _vector_figures(
 def _sentence_between(
     rows: Sequence[_Row], box: BBox, figure: BBox, *, document: _Document
 ) -> bool:
-    """Is there a line of prose (at least SENTENCE_WORDS words) inside the union of `box` and
-    `figure` that is in neither? A label or a tick label is never that long. Not when `box`
-    is in a row of its own (a glyph drawn as an outline in a line of text): that line is the
-    drawing's, and it joins the figure as it always did."""
-    if any(_centre_inside(box, r.bbox) for r in rows if r.kind == "text" and not r.vertical):
-        return False
-    union = _union([box, figure])
+    """Is there a line of prose (at least SENTENCE_WORDS words) in the gap between `box` and
+    `figure`, one above the other with the line wholly between them? A label or a tick label
+    is never that long, and a glyph drawn as an outline in a line of text is level with the
+    line's other words, not apart from them."""
     return any(
         r.kind == "text"
         and not r.vertical
-        and _centre_inside(r.bbox, union)
-        and not _centre_inside(r.bbox, box)
-        and not _centre_inside(r.bbox, figure)
+        and (
+            (box[3] <= r.bbox[1] and r.bbox[3] <= figure[1])
+            or (figure[3] <= r.bbox[1] and r.bbox[3] <= box[1])
+        )
+        and max(box[0], figure[0]) < r.bbox[2]
+        and r.bbox[0] < min(box[2], figure[2])
         and _prose_words(r, _CharInfo.of(r, document=document)) >= SENTENCE_WORDS
         for r in rows
     )

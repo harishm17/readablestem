@@ -1901,9 +1901,9 @@ math by the document's evidence; the equation step's own tiers then decide it.
   force arrows, each thin and 20 pt off its box, were separate small drawings that
   joined the box only within 12 pt: a small drawing joins a figure within
   `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves, unless a line of
-  prose (`SENTENCE_WORDS`, 6 words or more) lies between the two, in neither
-  (`_sentence_between`; not for a drawing that is inside a row of its own, a glyph drawn as
-  an outline in a line of text): a dark tab with its label inside ("EXAMPLE 5.2") a few points over
+  prose (`SENTENCE_WORDS`, 6 words or more) lies wholly in the gap between the two and
+  overlaps both sideways (`_sentence_between`; a glyph drawn as an outline in a line of
+  text has no such line between it and the figure): a dark tab with its label inside ("EXAMPLE 5.2") a few points over
   a sentence and a grid joined the grid's figure, whose crop took the label and the
   sentence (O-388, 2026-11-20); such a drawing goes to the page's leftover drawings. A
   circuit's parts were not found as labels, see the label rule above.
