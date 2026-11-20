@@ -455,7 +455,17 @@ def _limit_end(chars: list[_Char], classes: list[str], script: list[bool], j: in
         return j
     before = chars[j - 1]
     low = min(c.x0 for c in chars[j:m])
-    return m if low < before.x1 - 0.2 * before.size else j
+    if low >= before.x1 - 0.2 * before.size:
+        return j
+    # Only a maths word has a limit set ("argmin", "lim"); the letters of "as" with a stray
+    # character of the line below between them are still two letters of maths.
+    start, end = j, m
+    while start > 0 and classes[start - 1] == "L" and not script[start - 1]:
+        start -= 1
+    while end < n and classes[end] == "L" and not script[end]:
+        end += 1
+    word = "".join(chars[k].c for k in (*range(start, j), *range(m, end))).lower()
+    return m if word in _MATH_WORDS else j
 
 
 def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[bool]) -> int:

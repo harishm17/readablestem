@@ -154,7 +154,7 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
             continue
         info = _CharInfo.of(line)
         counted = [i for i, c in enumerate(line.chars) if not c.blank and c.c not in ",.;:"]
-        if sum(info.mathy(i) for i in counted) < NUMBERED_SHARE * len(counted):
+        if not counted or sum(info.mathy(i) for i in counted) < NUMBERED_SHARE * len(counted):
             continue
         edge = min(r.x0 for r in rows if r.kind == "text" and r.column == line.column)
         if line.x0 - edge < NUMBERED_INDENT * line.size:

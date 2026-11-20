@@ -148,9 +148,12 @@ def test_a_number_at_the_right_edge_is_never_a_paragraph_of_its_own():
 
 
 FULL_LINES = [
-    "The two bounds that the argument needs are stated in the next display, and the reader should keep in",
-    "mind that every constant in them comes from the setting of the second section, where the sample size",
-    "and the number of the parameters were fixed once and for all before any of the estimates were made:",
+    "The two bounds that the argument needs are stated in the next display, and the reader "
+    "should keep in",
+    "mind that every constant in them comes from the setting of the second section, where "
+    "the sample size",
+    "and the number of the parameters were fixed once and for all before any of the "
+    "estimates were made:",
 ]
 
 
@@ -203,7 +206,12 @@ def test_a_number_that_the_row_around_it_hides_is_still_the_equations_label(fill
     """Four ways the number stayed in the equation's text or became a paragraph: a word of
     the maths split by its limit, words in the line, a number set closer than a font size,
     and a number set under the display."""
-    elements = analyze(one_page(lambda page: (prose(page, 190, "and that is all."), fill(page)))).elements
+
+    def page_with(page):
+        fill(page)
+        prose(page, 190, "and that is all.")
+
+    elements = analyze(one_page(page_with)).elements
     [equation] = equations(elements)
     assert equation.display == "block"
     assert equation.equation_label == "(106)"
