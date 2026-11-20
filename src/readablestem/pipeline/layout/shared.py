@@ -447,9 +447,7 @@ def _word_lengths(
         for k in members:
             lengths[k] = 1 if italic_variables else len(members)
             maths_word[k] = (
-                named
-                or word in _MATH_WORDS
-                or (document.inline_joins and word in _MORE_MATH_WORDS)
+                named or word in _MATH_WORDS or (document.inline_joins and word in _MORE_MATH_WORDS)
             )
         i = j
     return lengths, maths_word
