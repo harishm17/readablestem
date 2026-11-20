@@ -8,9 +8,10 @@ from __future__ import annotations
 
 import pymupdf
 
-from readablestem.core.types import Kind
+from readablestem.core.types import ConversionOptions, Kind
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.heading_step import heading_fixes
+from readablestem.pipeline import options as run_options
 from readablestem.pipeline.layout import analyze
 
 BODY = 11.0
@@ -363,6 +364,19 @@ def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
         assert any(  # a paragraph still, its two values inline equations
             (e.text or "").startswith("where ") and not e.preformatted for e in elements
         )
+
+    # A bold letter in a step that waits for evidence (notation memory) is put back as a plain
+    # letter: the lines stay as they were, one to a step, and keep their indentation.
+    def bold_letter(page):
+        y = algorithm(page, 100)
+        end = 72 + pymupdf.get_text_length(ALGORITHM[0][1], fontname="helv", fontsize=BODY)
+        page.insert_text((end + 4, 100 + 14), "W", fontsize=BODY, fontname="hebo")
+        return y
+
+    with run_options.using(ConversionOptions(notation_memory=True)):
+        (step,) = [e for e in analyze(page_of(bold_letter)).elements if e.preformatted]
+    assert step.text.split("\n")[3:5] == ["  if w is stressed then", "    count = count + 1"]
+    assert step.text.split("\n")[0] == "input: a line of verse W"
 
 
 def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
