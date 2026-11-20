@@ -161,6 +161,19 @@ def test_a_render_that_raises_is_a_page_with_no_picture():
     assert result.reads[0].outcome == "no_image"
 
 
+def test_the_pass_tells_how_many_pages_are_finished_as_it_goes():
+    # O-396: the job page was silent for the whole pass (47 s on a scanned 100-page document)
+    pdf = scan_pdf(3)
+    pages = renders(pdf, [0, 1, 2])
+    pages[1] = lambda: None  # a page with no picture is finished too
+    told: list[tuple[int, int]] = []
+    result = image_page.run(
+        fake(GOOD), settings(), pages, concurrency=1, on_page=lambda d, t: told.append((d, t))
+    )
+    assert sorted(result.reads) == [0, 1, 2]
+    assert told[-1] == (3, 3) and [d for d, _ in told] == sorted({d for d, _ in told})
+
+
 def test_a_budget_refusal_stops_the_pass_and_the_pages_before_it_stay():
     pdf = scan_pdf(3)
     guard = InMemorySpendGuard(cap_usd=0.02)

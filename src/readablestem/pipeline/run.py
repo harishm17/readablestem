@@ -1824,6 +1824,7 @@ def _image_pages_pass(
     observer: Callable[[ModelCall], None] | None,
     measured: list[CallFact],
     step_cache: StepCache | None = None,
+    stage_progress: StageProgressFn | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept pages `pages` (`image_page.kept_reads`) from a picture of each (ADR 0007).
 
@@ -1849,7 +1850,18 @@ def _image_pages_pass(
         for number in pages
     }
     with _span(tracer, "image_pages", pages=len(pages)) as span:
-        result = image_page.run(recording, settings, renders, concurrency=concurrency)
+        result = image_page.run(
+            recording,
+            settings,
+            renders,
+            concurrency=concurrency,
+            # the pages read are the layout's pages on the job page, as the table search's are
+            on_page=(
+                None
+                if stage_progress is None
+                else lambda done, total: _send(stage_progress, "layout", done, total)
+            ),
+        )
         for number, read in result.reads.items():
             read.vector = vector.get(number)  # (empty when both vector settings are off)
         if (
@@ -2042,6 +2054,7 @@ def _convert(
                     observer=call_observer,
                     step_cache=step_cache,
                     measured=measured,
+                    stage_progress=stage_progress,
                 )
                 watch.stage("layout")
                 for number in image_built:
