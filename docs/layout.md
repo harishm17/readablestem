@@ -40,11 +40,11 @@ Element conventions:
   `display_grouping` does not join keep a number each, or none. A bracketed number set less
   than a font size from its equation (a `multline`'s, `CLOSE_NUMBER_GAP` at the least) is cut
   off when it ends at the right edge of its column's text and what stands before it reads as
-  maths on its own (`_closes_display`); elsewhere it stays in the equation's text. A number
+  math on its own (`_closes_display`); elsewhere it stays in the equation's text. A number
   that stands under the right end of its equation, not beside it, is its label when nothing
-  stands between them (`_number_under`, `_line_over_number`), and a line of maths with a few
+  stands between them (`_number_under`, `_line_over_number`), and a line of math with a few
   words in it ("... for every n > 0") is a display when such a number stands beside it
-  (`_promote_numbered_lines`). A number left of the maths, at the column's margin
+  (`_promote_numbered_lines`). A number left of the math, at the column's margin
   ("(10.18)" in front of the equation), is not read as a label yet.
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
