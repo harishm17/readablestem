@@ -603,16 +603,19 @@ def _mark_series_items(rows: list[_Row]) -> None:
         if row.in_series:
             continue
         between: set[str] = set()
+        lines = 0
         for above in reversed(rows[:i]):
             if above.column != row.column:
                 continue
             if above.marker is None:
                 between.add(_face(above))
+                lines += 1
                 continue
             row.in_series = (
                 above.marker.ordered
                 and _next_in_series(above.marker, marker)
                 and between <= {_face(above)}
+                and (face != "" or lines == 0)  # lines in the text's face may be a section's
             )
             break
 
