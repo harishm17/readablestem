@@ -271,8 +271,9 @@ ALGORITHM = [
 
 
 def algorithm(page, y: float, steps=ALGORITHM, caption="Algorithm 1 Count stressed syllables"):
-    page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
-    y += 14
+    if caption:
+        page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
+        y += 14
     for level, text in steps:
         page.insert_text((72 + 11 * level, y), text, fontsize=BODY, fontname="helv")
         y += 14
@@ -301,18 +302,46 @@ HANDOUT = [
 ]
 
 
+# A first step in plain words that runs to the right edge, before the first loop.
+LONG_FIRST = [
+    (0, "Initialize the table of counts with a zero for every word that the verse can hold in it"),
+    (0, "for each word w in the line do"),
+    (1, "count = count + stress(w)"),
+    (0, "end for"),
+    (0, "return count"),
+]
+
+
+def fraction(page, y: float) -> float:
+    """A display equation with a fraction bar: v = d / t."""
+    page.insert_text((280, y + 14), "v =", fontsize=12)
+    page.insert_text((306, y + 6), "d", fontsize=12)
+    page.draw_line((302, y + 10), (316, y + 10), width=0.6)
+    page.insert_text((306, y + 23), "t", fontsize=12)
+    return y + 40
+
+
+# Blocks shown by their indentation alone: no line closes them.
+NO_END = [
+    (0, "count = 0"),
+    (0, "for each word w in the line do"),
+    (1, "if w is stressed then"),
+    (2, "count = count + 1"),
+    (0, "return count"),
+]
+
+
 def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
-    for listed in (ALGORITHM, LONG_LOOP, HANDOUT):
+    for listed in (ALGORITHM, LONG_LOOP, HANDOUT, LONG_FIRST, NO_END):
 
         def fill(page, listed=listed):
             y = 100.0 if listed is HANDOUT else running(page, 100, RUNNING)
             y = algorithm(page, y + 10, listed)
-            # A display equation of the text, and the sentence going on after it.
-            page.insert_text((280, y + 14), "v =", fontsize=12)
-            page.insert_text((306, y + 6), "d", fontsize=12)
-            page.draw_line((302, y + 10), (316, y + 10), width=0.6)
-            page.insert_text((306, y + 23), "t", fontsize=12)
-            prose(page, y + 50, "where d = 12 is the length of the verse and t = 3 its count.")
+            # A display equation of the text, and the sentence going on after it (on one page
+            # set in from the left, as the first line of a paragraph is).
+            y = fraction(page, y)
+            where = "where d = 12 is the length of the verse and t = 3 its count."
+            running(page, y + 10, where, indent=15.0 if listed is ALGORITHM else 0.0)
 
         elements = analyze(page_of(fill)).elements
         steps = [e for e in elements if e.preformatted]
@@ -385,7 +414,7 @@ NUMBERED = [
 
 
 def numbered_algorithm(
-    page, y: float, steps=NUMBERED, caption="Algorithm 2 Scan a verse", wrapped=None
+    page, y: float, steps=NUMBERED, caption="Algorithm 2 Scan a verse", wrapped=None, stop=":"
 ):
     """Steps numbered "1:", "2:" in a left gutter, indented by level; a step listed in `wrapped`
     goes on at the left edge of the text on a second line."""
@@ -393,7 +422,7 @@ def numbered_algorithm(
         page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
         y += 14
     for n, (level, text) in enumerate(steps, 1):
-        page.insert_text((72, y), f"{n}:", fontsize=BODY - 1, fontname="helv")
+        page.insert_text((72, y), f"{n}{stop}", fontsize=BODY - 1, fontname="helv")
         page.insert_text((95 + 11 * level, y), text, fontsize=BODY, fontname="helv")
         y += 14
         if wrapped and n in wrapped:
@@ -414,17 +443,23 @@ NUMBERED_LINES = [
 
 
 def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_without_a_caption():
-    for caption in ("Algorithm 2 Scan a verse", None):
+    # The last one is numbered as a word processor numbers a list ("1."), under its caption.
+    for caption, stop in (
+        ("Algorithm 2 Scan a verse", ":"),
+        (None, ":"),
+        ("Algorithm 2 Scan a verse", "."),
+    ):
 
-        def fill(page, caption=caption):
+        def fill(page, caption=caption, stop=stop):
             y = prose(page, 100, "The scan of a verse is listed in")
             y = prose(page, y, "Algorithm 2.")  # a sentence's last line, not a caption
-            y = numbered_algorithm(page, y, caption=caption)
+            y = numbered_algorithm(page, y, caption=caption, stop=stop)
             prose(page, y + 10, "The count is printed after the last word.")
 
         elements = analyze(page_of(fill)).elements
         steps = [e for e in elements if e.preformatted]
-        assert len(steps) == 1 and steps[0].text.split("\n") == NUMBERED_LINES
+        assert len(steps) == 1
+        assert steps[0].text.split("\n") == [n.replace(":", stop, 1) for n in NUMBERED_LINES]
         assert caption is None or any(e.text == caption for e in elements)
 
 
@@ -449,6 +484,81 @@ def test_a_step_that_wraps_back_to_the_left_edge_stays_one_step():
     )
 
 
+def justified(page, y: float, text: str = " ".join([LONG] * 3)) -> float:
+    """A paragraph set to both margins (72 to 540), 14 pt a line: nine lines of `LONG`."""
+    rect = pymupdf.Rect(72, y, 540, y + 130)
+    left = page.insert_textbox(
+        rect, text, fontsize=BODY, fontname="helv", lineheight=14 / BODY, align=3
+    )
+    assert left >= 0
+    return y + 14 * 9 + 12
+
+
+def broken(page, y: float, text: str, x: float = 72.0, hang: float = 0.0) -> float:
+    """One step that runs over several lines: each is as long as the right margin (540) lets
+    it be, and the lines after the first start `hang` further right."""
+    line = ""
+    for word in text.split():
+        if line and pymupdf.get_text_length(f"{line} {word}", "helv", BODY) > 540 - x:
+            page.insert_text((x, y), line, fontsize=BODY, fontname="helv")
+            x, hang, y, line = x + hang, 0.0, y + 14, word
+        else:
+            line = f"{line} {word}".strip()
+    page.insert_text((x, y), line, fontsize=BODY, fontname="helv")
+    return y + 14
+
+
+def test_a_step_with_no_number_may_run_over_several_lines_and_text_under_the_last_is_no_step():
+    title = "Algorithm 1 Count stressed syllables"
+    given = (
+        "input: a line of verse with the marks that the first reader made over each of its words "
+        "while the verse was read out in class, and a list of the words that the second reader "
+        "took to be strong when the same verse was read out again a week later by one who had not "
+        "seen the marks or the printed text of the poem before that day"
+    )
+    append = (
+        "append the word w to the list of the words that the second reader keeps beside the "
+        "printed text of the poem and checks"
+    )
+
+    def hung(page):  # an "input:" line that goes on for three lines set under it, further right
+        y = justified(page, 100)
+        y = prose(page, y, title) - 8
+        y = broken(page, y, given, hang=11)
+        y = algorithm(page, y, ALGORITHM[1:], caption=None)
+        justified(page, y)
+
+    def flush(page):  # a step in a loop that goes on where it started, on a page set to a margin
+        y = justified(page, 100)
+        y = algorithm(page, y, ALGORITHM[1:3])
+        y = broken(page, y - 10, append, x=83)
+        y = algorithm(page, y, [(1, "mark w as read"), *ALGORITHM[6:]], caption=None)
+        justified(page, y)
+
+    resumed = (
+        "for the whole poem, which is what the second method of this chapter needs when the verse "
+        "is long and the reader has no time to scan it by hand, so that the count of the first "
+        "method is kept beside the text and is used again later in the chapter, where the two "
+        "methods are set side by side and the cost of each one is worked out for the three poems "
+        "of the book."
+    )
+
+    def under(page):  # the text goes on right under the block, in the middle of a sentence
+        y = algorithm(page, 100) - 4
+        y = broken(page, y, resumed)
+        justified(page, y + 12)
+
+    listed = ["  " * level + text for level, text in ALGORITHM]
+    for fill, lines in (
+        (hung, [given, *listed[1:]]),
+        (flush, [*listed[1:3], "  " + append, "  mark w as read", *listed[6:]]),
+        (under, listed),
+    ):
+        elements = analyze(page_of(fill)).elements
+        assert [e.text.split("\n") for e in elements if e.preformatted] == [lines]
+    assert resumed in [e.text for e in elements]
+
+
 def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_levels():
     def fill(page):
         y = prose(page, 100)
@@ -459,11 +569,7 @@ def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_
             page.insert_text((95 + 11 * level, y), text, fontsize=BODY, fontname="helv")
             y += 14
             if n == 3:  # a display equation with a fraction bar sits between steps 3 and 4
-                page.insert_text((280, y + 14), "v =", fontsize=12)
-                page.insert_text((306, y + 6), "d", fontsize=12)
-                page.draw_line((302, y + 10), (316, y + 10), width=0.6)
-                page.insert_text((306, y + 23), "t", fontsize=12)
-                y += 40
+                y = fraction(page, y)
         prose(page, y + 10, "The count is printed after the last word.")
 
     elements = analyze(page_of(fill)).elements
@@ -475,6 +581,20 @@ def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_
     assert [e.text.split("\n") for e in elements if e.preformatted] == [
         NUMBERED_LINES[:3],
         NUMBERED_LINES[3:],
+    ]
+
+    def plain(page):  # no line numbers, and the step after the equation is written with "="
+        y = running(page, 100, RUNNING)
+        y = algorithm(page, y + 10, [*ALGORITHM[1:3], (1, "set the speed to")]) - 10
+        y = fraction(page, y) + 10
+        for level, text in [(1, "count = count + v"), (0, "end for"), (0, "return count")]:
+            page.insert_text((72 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        prose(page, y + 20, "The count is printed after the last word.")
+
+    assert [e.text.split("\n") for e in analyze(page_of(plain)).elements if e.preformatted] == [
+        ["count = 0", "for each word w in the line do", "  set the speed to"],
+        ["  count = count + v", "end for", "return count"],
     ]
 
 

@@ -19,32 +19,69 @@
   0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
+## Unreleased: fixes after the second review of the algorithm blocks (review 8)
+
+The review ran 73 probe pages on the code before and after the review-7 fixes. Four of the new
+rules lost real algorithms that the first version kept as one block. Fixed here
+(`layout/blocks.py`), each with a case in `tests/test_structure.py` that fails without it:
+
+- **A long first step is a step.** Under a caption, a line in plain words before the first loop
+  ("Initialize the table of counts ...") that ran to the right edge lost the whole algorithm:
+  every such line had to stop short. The lines before the first block word are steps again.
+  Where the next line runs on from one of them, the block must show one step set further right
+  under a line that opens a block and ends as one does ("do", "then", a colon), which the
+  running text under a float's caption does not.
+- **Pseudo-code numbered "1." or "1)" under a caption is one block with its indentation.** It
+  was a list with no indentation and a stray paragraph. Such numbers are steps under a caption
+  when one step is set inside another; "Algorithm 5.1 (Euclid)" in numbered sentences is still
+  a list, and with no caption such numbers are still a list's.
+- **A step may go on for as many hanging lines as it needs.** An "Input:" line or a step in a
+  loop that went on for three lines set under it dropped the algorithm. Lines set further right
+  than where their step starts no longer count toward the two-line limit, which is there for
+  the text that goes on right under an algorithm.
+- **A step written with "=" resumes after a display equation** when it stands inside a block
+  that is still open ("count = count + v" under a "for" that no "end" has closed). The
+  algorithm was lost, or its tail became a paragraph. "where d = 12 is ..." after the last
+  step is still the text going on.
+- The limit on lines a step runs on for and the margin test (`_RightEdges.firm`) had no test:
+  each has one now.
+- Left, and written in docs/layout.md (all read the same before and after the review-7 fixes):
+  prose that opens "Algorithm 2 computes ..." or with another verb not on the sentence list;
+  two short paragraphs that open "For" and "If" right under a float's caption; a sentence that
+  opens "Then", "For" or "If" right after an equation that follows an algorithm; a loop line
+  with no "do" or colon that reaches the right edge takes the first line of its body; a
+  manuscript page with line numbers, indented paragraphs and a line that opens "until"; and,
+  on a page not set to a right margin, a step wrapped with no hanging indent stays in two lines
+  (on a page set to one, a short step under a step that reaches the margin is joined to it).
+
 ## Unreleased: fixes after the independent review of the algorithm blocks (review 7)
 
 The review ran probe pages on the code before and after the algorithm change. Numbered
 algorithms read better; prose and lists near an "Algorithm n" line, and algorithms with no
 numbers, read worse than before it. Fixed here (`layout/blocks.py`):
 
-- **Prose under an "Algorithm n" line stays prose.** A line that opens "Algorithm 2 is ..." or
-  "Algorithm 1 shows ..." is a sentence, not a caption (`_CAPTION_SENTENCE`). The lines under a
-  caption before its first block word are steps only when each is a line of its own
-  (`_stops_short`), so the running text under a float's caption ("Algorithm 2 Overview of the
-  method", the algorithm itself a picture) is not taken, and neither is the text that goes on
-  under an algorithm.
-- **A list is not an algorithm.** The item of a list ("1.", "2)", a bullet) is never a step,
-  under a caption or without one: "Algorithm 5.1 (Euclid)" written as four numbered sentences is
-  four list items again. With no caption, numbered lines must hold one step inside another
-  (`_nested`), so exam questions numbered "1 If ...", "2 For ..." and the numbered lines of a
-  manuscript are paragraphs again; lines with no numbers must hold something only code has (a
+- **Prose under an "Algorithm n" line stays prose, in the shapes probed.** A line that opens
+  "Algorithm 2 is ..." or "Algorithm 1 shows ..." is a sentence, not a caption
+  (`_CAPTION_SENTENCE`, a list of such words: other verbs are not caught). The running text
+  under a float's caption ("Algorithm 2 Overview of the method", the algorithm itself a
+  picture) is not taken, and neither is the text that goes on under an algorithm. (The rule
+  first written for this, that each line before the first block word stop short, lost real
+  algorithms; review 8 above replaced it.)
+- **A list is not an algorithm.** "Algorithm 5.1 (Euclid)" written as four numbered sentences
+  is four list items again (a bullet is never a step; for "1." and "2)" see review 8 above).
+  With no caption, numbered lines must hold one step inside another (`_nested`), so exam
+  questions numbered "1 If ...", "2 For ..." and the numbered lines of a manuscript whose
+  lines start at one place are paragraphs again; lines with no numbers must hold something only code has (a
   formula, an assignment, an "end", a block word on a line that ends in "do", "then" or a
   colon), so a poem's indented lines are not taken.
 - **A loop line keeps its body on the next line.** Where the steps have no numbers, the line
   under one that ran to the right edge was glued to it ("for each word w in the line do count =
   count + stress(w)"). It is not the rest of the line above when that line opens a block or
-  when it holds an assignment; and, on a page of little but the algorithm, where the right edge
-  is only where the longer steps end (`_RightEdges.firm`), when it stands inside a block where
-  the step above starts ("put a tea bag in the cup and pour the water", "wait three minutes").
-  A step that goes on for more than two lines is a paragraph and ends the rows before it.
+  when it holds an assignment; and, where the lines are not set to a right margin
+  (`_RightEdges.firm`: any page set ragged, and a page of little but the algorithm), when it
+  stands inside a block where the step above starts ("put a tea bag in the cup and pour the
+  water", "wait three minutes"). A step that goes on for more than two lines is a paragraph
+  and ends the rows before it.
 - The eight public files the algorithm change touched read the same before and after these
   fixes (elements compared one by one), so what that change gained is kept.
 - **The text after an equation is not the algorithm going on.** After a display equation an

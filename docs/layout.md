@@ -2095,19 +2095,24 @@ function, procedure, do, then ...), and one that opens or closes a block (or
 next (each reaches the right edge or stops where the next line's first word no longer fits) are a
 paragraph that opens "Algorithm 2 shows ..." and are left as one (`_reads_on`). A line that
 opens "Algorithm 2 is ..." or "Algorithm 1 shows ..." is a sentence and no caption
-(`_CAPTION_SENTENCE`). The lines under a caption before its first block word (Input, Initialize
-...) are steps only when each is a line of its own: the first word of the next line would still
-have fitted on it (`_stops_short`), so the running text under a float's caption is not taken.
-After the first such line, one that runs to the edge with a step word under it is a long step
-("Observe s in accordance with the initial state distribution", then "for k = 0, 1, ... do").
+(`_CAPTION_SENTENCE`: a list of the words such a sentence goes on with, so "Algorithm 2 computes
+..." is still read as a caption). The lines under a caption before its first block word (Input,
+Initialize ...) are steps. One that the next line runs on from (the first word of the next line
+would not have fitted on it: `_stops_short`) may be a long first step ("Initialize the table of
+counts ..." set out to the margin) or the running text under a float's caption, so the lines
+must then show more: one step set further right under a line that opens a block and ends as
+one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
 a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
 the numbered lines of a manuscript and the questions of an exam all start at one place), or no
 numbers, an indent ladder of three left edges and something only code holds (a formula, an
-assignment, an "end", a block word on a line that ends in "do", "then" or a colon). The item of a
-list ("1.", "2)", a bullet) is never a step, with a caption or without: "Algorithm 5.1 (Euclid)"
-written as numbered sentences stays a list. The lines are in one column and one size, within
+assignment, an "end", a block word on a line that ends in "do", "then" or a colon). A bullet is
+never a step. A number written as a list writes it ("1.", "2)") is no step where there is no
+caption; under one it is, and the lines must then show one step set inside another (`_nested`):
+pseudo-code typed with a word processor's automatic numbers is one block with its indentation,
+and "Algorithm 5.1 (Euclid)" written as numbered sentences stays a list. The lines are in one
+column and one size, within
 `ALGORITHM_MAX_PITCH` (2.2) lines
 of the one above, and each begins with a step word or a line number, holds an assignment
 ("count = 0", "c <- 0", `:=`), is a line of math, or starts further right than the first step; a
@@ -2115,13 +2120,18 @@ line that is none of these ends the block. The caption stays a block of its own.
 line to a step, indented `ALGORITHM_INDENT` (2) spaces per level. Where the steps have no numbers,
 a line in lower case under one that ran to the right edge is the rest of that step, but not under
 a line that opens a block (it begins with a block word and ends in "do", "then" or a colon: "for
-each w do"; an "Input: ... :" line opens none), and not when it holds an assignment. On a page
-of little but the algorithm the right edge is only where its longer steps end
-(`_RightEdges.firm`: the longest lines of the column end more than an em past it), and there a
-line inside a block that starts where the step above it starts is the next step ("put a tea bag
-in the cup", "wait three minutes"); where the edge is a margin it is the rest of the step, as
-algorithms set with no hanging indent wrap. A step that goes on for more than `ALGORITHM_RUN_ON`
-(2) lines is a paragraph: the rows end before it.
+each w do"; an "Input: ... :" line opens none), and not when it holds an assignment. Where the
+lines of the column are not set to a right margin (`_RightEdges.firm`: the longest lines end
+more than an em past the edge that a quarter of the lines reach, as on any page set ragged and
+on a page of little but the algorithm), a line inside a block that starts where the step above
+it starts is the next step ("put a tea bag in the cup", "wait three minutes"); where the edge
+is a margin it is the rest of the step, as algorithms set with no hanging indent wrap. The
+shape is the same in both and the rule guesses: on a ragged page a step that wraps with no
+hanging indent stays in its two lines (all its words are there), and on a page set to a margin
+a short step under one that reaches the margin is joined to it. A step that goes on for more
+than `ALGORITHM_RUN_ON` (2) lines is a paragraph (the text that goes on under an algorithm in
+the middle of a sentence): the rows end before it. Lines hung under their step, set further
+right than where it starts, do not count, so an "Input:" line goes on for as long as it needs.
 
 Line numbers ("3:", "12") are cut off the words and written in a gutter, right-aligned in front
 of the step ("3:   if x then"). The levels come from where the words start, not from the numbers,
@@ -2138,15 +2148,25 @@ the page lists out of order are put back in the order of their lines.
 
 A display equation between two steps ends the rows there; the algorithm goes on at the next step
 within `ALGORITHM_REACH` (16) lines (`_after_equation`) as a second block: the step with the next
-number, or, with no numbers, a step word or an assignment written with an arrow or ":=" (a
-"where d = 12 is ..." after the equation is the text going on). The levels are those
+number, or, with no numbers, a step word, an assignment written with an arrow or ":=", or one
+written with "=" inside a block that is still open (right of the leftmost step, under a "for"
+or an "if" that no "end" has closed; a "where d = 12 is ..." after the equation is the text
+going on). The levels are those
 of the whole algorithm, so the second block keeps the indentation it had, the line numbers
 continue, and the equation keeps its crop and its place in the order. A formula of one line that
 is a step by itself is not such an equation: it is a line of the block and its formulas are
 inline equations. Not built: an algorithm that goes over a page break is read page by page, so
 the part on the second page is a block only when it proves itself an algorithm with no caption,
-with levels of its own; and typed pseudo-code in a proportional font with two-digit line numbers
-gets its levels from where each line's words start, which the wider number shifts. Unlike program code an
+with levels of its own; typed pseudo-code in a proportional font with two-digit line numbers
+gets its levels from where each line's words start, which the wider number shifts; and on a
+page that holds only an algorithm, a first step with no step word is read as the second line of
+the caption. Known wrong reads, all prose taken for steps (independent review 8, findings 5 and
+7): a paragraph that opens "Algorithm 2 computes ..." or with another verb not on the list; two
+short paragraphs that open "For ..." and "If ..." right under a float's caption; a sentence
+that opens "Then", "For" or "If" right after a display equation that follows an algorithm; a
+loop line with no "do" or colon that reaches the right edge takes the first line of its body;
+and a manuscript page with line numbers, indented paragraphs and a line that opens "until".
+Unlike program code an
 algorithm's inline math stays math: a math row inside it becomes text, the formulas in it are
 inline equations as in any paragraph, and `assemble.code_block` writes them with the equation
 markup. In the Word file a code block that holds an equation is written as lines of a paragraph
