@@ -723,3 +723,60 @@ def test_a_word_equation_that_fails_the_checks_is_explained_in_words_true_of_a_f
     for sentence in said:
         words = set(re.findall(r"[A-Za-z']+", sentence))
         assert not {"model", "model's", "image", "PDF", "page"} & words
+
+
+@needs_pandoc
+def test_a_word_files_bold_italic_and_code_are_runs_and_its_colour_is_counted():
+    def run(words: str, props: str = "") -> str:
+        return f"<w:r><w:rPr>{props}</w:rPr><w:t xml:space='preserve'>{words}</w:t></w:r>"
+
+    mono = '<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas"/>'
+    bold, italic = "<w:b/>", "<w:i/>"
+    body = (
+        "<w:p>"
+        + run("Do ")
+        + run("not", bold)
+        + run(" open it, read ")
+        + run("twice ", italic)
+        + run("slowly", bold + italic)
+        + run(" and run ")
+        + run("make test", mono)
+        + run(" in the ")
+        + run("red", '<w:color w:val="FF0000"/>')
+        + run(" part, a ")
+        + run("link", '<w:color w:val="0563C1"/>').join(
+            ["<w:hyperlink w:anchor='x'>", "</w:hyperlink>"]
+        )
+        + "</w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr>'
+        + run("A heading ")
+        + run("bold", bold)
+        + "</w:p>"
+        "<w:p>" + run("Set whole in bold, so the block's own style.", bold) + "</w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="ListParagraph"/><w:numPr><w:ilvl w:val="0"/>'
+        '<w:numId w:val="1"/>'
+        "</w:numPr></w:pPr>"
+        + run("Bring a ")
+        + run("calculator", bold)
+        + "</w:p>"
+        + _cells("Item|Note", "Quiz|closed book", marked=True).replace(
+            "<w:r><w:t>closed book</w:t></w:r>", run("closed", bold) + run(" book")
+        )
+    )
+    reading = read_word(word(body))
+    first, heading, whole = reading.elements[:3]
+    assert [((first.text or "")[r.start : r.end], r.kind) for r in first.runs] == [
+        ("not", "strong"),
+        ("twice slowly", "emphasis"),
+        ("slowly", "strong"),
+        ("make test", "code"),
+    ]
+    assert not heading.runs and not whole.runs  # a heading is not bold text; a whole block is not
+    [item] = [e for e in reading.elements if e.kind.value == "list_item"]
+    assert [(item.text or "")[r.start : r.end] for r in item.runs] == ["calculator"]
+    [table] = [e for e in reading.elements if e.table]
+    assert [c.text[r.start : r.end] for c in table.table.cells for r in c.runs] == ["closed"]
+    # pandoc keeps no colour: the passages are counted from the file, the link's own colour not
+    assert [(n.code, n.count) for n in reading.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]

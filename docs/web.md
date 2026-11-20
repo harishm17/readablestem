@@ -838,7 +838,8 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
   start numbers, tables with spans and a header row only when the author marked one (an unmarked
   first row is a proposal with a check), pictures with the author's alt text (accepted without
   a model; a picture without text goes to the figure step), footnotes (in the text, as a note),
-  links, super- and subscripts, the title style, captions, and every equation typed in Word
+  links, super- and subscripts, bold, italic, fixed-pitch and highlighted words as runs
+  (docs/output.md "From a Word or LaTeX source"), the title style, captions, and every equation typed in Word
   (`m:oMath`): pandoc writes LaTeX, which goes through `read_latex`, `check_latex` and
   `safe_latex_to_mathml` and then to the same fix a LaTeX equation gets. One that cannot be
   converted is shown as its LaTeX and is a required decision (the equation element is listed
@@ -848,7 +849,9 @@ pandoc or no passing sandbox probe (the same condition as LaTeX source).
 - **Where pandoc is wrong or silent**: hidden text (printed by pandoc) is removed in the working
   copy and counted (`word_hidden_text`); the language of a run (dropped by pandoc) is read from
   `w:lang`, the document language is the most common one; headers and footers (dropped) are
-  counted (`word_headers_footers`, optional); a default table style (read as a header row by
+  counted (`word_headers_footers`, optional); color (dropped) is counted from the file's runs
+  (`colour_used`, optional); a font set on a run, not in a style (dropped), makes a run "Verbatim
+  Char" when it is fixed-pitch; a default table style (read as a header row by
   pandoc) is told from a marked header row; SmartArt, charts and embedded objects (silent) are
   counted as the required notice `word_objects`; the Title style, which pandoc moves to its
   metadata (with Subtitle, Author, Date and Abstract), is the title and a level 1 heading, the

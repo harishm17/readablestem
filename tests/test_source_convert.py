@@ -514,3 +514,28 @@ def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_
     # the count the job page keeps ("links kept of N in the file") is the file's own: the \href
     # and the \ref, not the typed addresses and the numbers that were guessed
     assert sum(k.kind in ("uri", "internal") for e in result.elements for k in e.links) == 2
+
+
+def test_bold_italic_and_code_the_source_states_are_runs_and_colour_is_counted():
+    result = convert("emphasis")
+    paragraph = next(e for e in result.elements if (e.text or "").startswith("Do not"))
+    assert [((paragraph.text or "")[r.start : r.end], r.kind) for r in paragraph.runs] == [
+        ("not", "strong"),
+        ("twice slowly", "emphasis"),
+        ("slowly", "strong"),
+        ("make test", "code"),
+        ("ls -l", "code"),
+    ]
+    theorem = next(e for e in result.elements if "bounded" in (e.text or ""))
+    assert [(theorem.text or "")[r.start : r.end] for r in theorem.runs] == ["sequence"]
+    items = [e for e in result.elements if e.kind is Kind.LIST_ITEM]
+    assert [(items[0].text or "")[r.start : r.end] for r in items[0].runs] == ["calculator"]
+    assert items[1].runs == []  # a block set whole in one style makes no run
+    table = next(e for e in result.elements if e.table)
+    assert [c.text[r.start : r.end] for c in table.table.cells for r in c.runs] == ["closed"]
+    assert "<strong>closed</strong> book" in result.html
+    # colour is kept only with its setting on: off, the notice says how many passages
+    assert [(n.code, n.count) for n in result.notices if n.code == "colour_used"] == [
+        ("colour_used", 1)
+    ]
+    assert not any(e.colour_runs for e in result.elements)

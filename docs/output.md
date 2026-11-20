@@ -1294,6 +1294,10 @@ A text edit that changes struck words takes the run off, and the edit's message 
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
 last run.
 
+A strike on a table or a display equation cannot be kept (a cell and an equation read by a
+model have no runs): that table or equation gets the optional notice `struck_not_kept`, and
+the words read as plain text.
+
 ### Bold, italic and fixed-pitch words (F-510)
 
 Words a PDF sets in bold, in italic or in a fixed-pitch face inside a paragraph or list item
@@ -1318,8 +1322,32 @@ fixed-pitch stack). Word keeps bold, italic and a "Verbatim Char" style for code
 and Listen are written from the same HTML. A text edit moves the runs with the words that did
 not change and takes off those whose words did, without a message (it is only the look of
 the words). Runs come from the text pass (docs/layout.md "Bold, italic and fixed-pitch
-words"); a Word or LaTeX source has none yet. `CONTENT_RUNS` off finds and counts them
-(`strong_runs`, `emphasis_runs`, `code_runs` in the trace) and writes none.
+words"); a Word or LaTeX source says them outright and gets the same runs (below).
+`CONTENT_RUNS` off finds and counts them (`strong_runs`, `emphasis_runs`, `code_runs` in the
+trace) and writes none.
+
+#### From a Word or LaTeX source
+
+The Word reader takes `Strong` and `Emph` from pandoc's reading of the file (a run's `w:b`
+and `w:i`, or a style that sets them), the highlight a Word run carries as `highlight`, and
+`code` from the character style "Verbatim Char" and from a run whose own font is fixed-pitch
+(Courier, Consolas, Menlo and the like: the package step gives such a run the style, because
+pandoc drops a direct font). The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
+`\emph`, `\textit`, `\texttt`, `\verb`). Both use the PDF path's rules: a style on 70% or more
+of a block's characters is the block's own and makes no run (a bold heading, a whole italic
+theorem body, a header cell set in bold), a run never holds an inline equation or a blank
+edge, and it needs a letter or a digit. An `\emph` inside a theorem's italic body is a run
+(the words stand out against the italic). Headings, program code and glossary entries get
+none. Nothing is guessed from looks: a heading style is not bold text. A table cell of a Word
+or LaTeX table that holds no math keeps its runs (`TableCell.runs`, offsets into the cell's
+text) and the table is written with the same tags: `<td><strong>closed</strong> book</td>`. A
+cell edit in the review screen drops them, like a text edit that changes words.
+
+Color of a Word or LaTeX source follows the PDF path: a passage in a real color is counted,
+and with `FEATURE_COLOUR` off the job gets one `colour_used` notice with the count. The Word
+reader counts it from the file's own runs (a run's `w:color`; not a hyperlink's, not "auto")
+and never carries it, so `colour_used` is raised whatever the flag says; the LaTeX reader keeps
+color runs only with the flag on and strips and counts them otherwise.
 
 ### Highlighted text (SW51c)
 

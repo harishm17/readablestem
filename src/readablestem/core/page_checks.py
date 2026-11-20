@@ -103,6 +103,11 @@ ROWS: tuple[CheckLine, ...] = (
     _page("colour_only", "optional", "a figure that tells things apart by color alone"),
     _page("long_description_missing", "optional", "a chart or diagram without a long description"),
     _page("struck_text", "optional", "words the page strikes through, kept and marked"),
+    _page(
+        "struck_not_kept",
+        "optional",
+        "struck words in a table or an equation, which the converted file shows plain",
+    ),
     _page("option_labels", "required", "answer options run together in one block"),
     _page("rtl_text", "required", "right-to-left words in the order the PDF gives them"),
     # --- the text pass

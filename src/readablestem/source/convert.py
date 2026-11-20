@@ -59,6 +59,9 @@ from readablestem.source import report as source_report
 from readablestem.web import archive_intake as arc
 from readablestem.web.isolated_convert import ConversionFailed
 
+# The runs CONTENT_RUNS switches (a source reader makes these; "break" is not one of them).
+CONTENT_RUNS = frozenset({"deleted", "strong", "emphasis", "code", "highlight"})
+
 log = logging.getLogger(__name__)
 
 # Result of the conversion, for the job's record: the origin and the LaTeXML run's budget.
@@ -414,15 +417,22 @@ def _finish(
     )
     for element in elements:  # a source has no pages to number (the reading's are estimates)
         element.page = 0
-    # Struck text (`\\sout`) is written with CONTENT_RUNS (on by default); off, it is counted,
-    # as the PDF text pass counts it (`text_pass.apply`).
+    # Struck, bold, italic and code text is written with CONTENT_RUNS (on by default); off, it
+    # is counted, as the PDF text pass counts it (`text_pass.apply`). Coloured text is kept
+    # only with FEATURE_COLOUR: with it off it is counted and the notice `colour_used` says so.
     struck = sum(r.kind == "deleted" for e in elements for r in e.runs)
+    coloured = sum(len(e.colour_runs) for e in elements)
     with pipeline._span(tracer, "runs", deleted_runs=struck, written=options.content_runs):
-        if not options.content_runs and struck:
+        if not options.content_runs and any(
+            r.kind in CONTENT_RUNS for e in elements for r in e.runs
+        ):
             elements = [
-                e.model_copy(update={"runs": [r for r in e.runs if r.kind != "deleted"]})
+                e.model_copy(update={"runs": [r for r in e.runs if r.kind not in CONTENT_RUNS]})
                 for e in elements
             ]
+        if not options.colour and coloured:
+            elements = [e.model_copy(update={"colour_runs": []}) for e in elements]
+            reading.notices.append(make(ltx_reader.COLOUR_NOTICE, count=coloured))
     page_list = [0]
     counts = Counter(e.kind.value for e in elements)
     pipeline._send(stage_progress, "layout", 1, 1, dict(counts))
