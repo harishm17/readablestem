@@ -3101,16 +3101,22 @@ being changed. Its record keeps totals and names no page, `--records`, `--from` 
 `--against` are refused for it, and a failing page is not looked at.
 
 `layout-dev-1` (60 documents, 267 pages;
-`data/eval/order-layout-dev-1.json`), the student page:
+`data/eval/order-layout-dev-1.json`, made at 0.5.14), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 73 | 34 | 38 (39) | 42 (52) | 46 (102) | 0 of 0 | 32 | 17 |
-| selfmade | 40 | 18 | 9 | 4 (8) | 6 (32) | 14 (39) | 0 of 5 | 17 | 12 |
-| textbook | 108 | 58 | 2 | 103 (143) | 44 (123) | 8 (31) | 0 of 0 | 49 | 6 |
-| all | 267 | 149 | 45 | 145 (190) | 92 (207) | 68 (172) | 0 of 5 | 98 | 35 |
+| paper | 119 | 62 | 28 | 36 (37) | 44 (57) | 43 (56) | 0 of 0 | 41 | 17 |
+| selfmade | 40 | 18 | 9 | 4 (8) | 7 (35) | 14 (31) | 0 of 5 | 18 | 12 |
+| textbook | 108 | 57 | 34 | 17 (17) | 40 (201) | 11 (34) | 0 of 0 | 54 | 7 |
+| all | 267 | 137 | 71 | 57 (62) | 91 (293) | 68 (121) | 0 of 5 | 113 | 36 |
 
-The element list reads 150 of 267 of these pages right.
+The element list reads 138 of 267 of these pages right. The record before this one (0.5.10)
+had 149 pages right and 45 faultless: since then running heads, feet and page numbers are
+read on 57 pages and not 145, and 17 pages that were right are not (12 of papers, 5 of
+textbooks; 5 others became right), with more blocks cut (293, from 207; in textbooks 201,
+from 123) and more broken (113, from 98). The 17 pages were lost between 0.5.10 and 0.5.13
+(0.5.13 reads 137 right and 69 faultless; 0.5.14 changes two pages to faultless and loses
+none); which change lost them has not been traced.
 `layout-heldout-1` has not been scored.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)

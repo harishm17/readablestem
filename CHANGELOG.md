@@ -16,7 +16,9 @@
   Stored results load unchanged and their pages are made again. No migration.
   `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
   `data/eval/burden-corpus.json` and `data/eval/parsing-bench-olmocr.json` are re-made at
-  0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
+  0.5.14, and so is `data/eval/order-layout-dev-1.json` (137 of 267 pages right and 71
+  faultless; the 0.5.10 record had 149 and 45, and docs/eval.md says what moved and that 17
+  pages were lost by 0.5.13); the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
 ## Unreleased: fixes after the fourth and fifth reviews of the algorithm blocks (reviews 10 and 11)
