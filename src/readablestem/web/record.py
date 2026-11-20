@@ -63,7 +63,9 @@ from readablestem.web.review import (
     UNDO_ACTION,
     WITNESS_KEY,
     WRITE_KEY,
+    is_kept_image,
     item_labels,
+    reject_keeps,
 )
 
 STATEMENT = (
@@ -289,6 +291,7 @@ def _page_of(elements: dict[str, Element], element_id: str) -> int | None:
 
 # What "reject" kept, by the kind of item: the picture of an equation, a table or text read from
 # an image, or a figure left without a description. Any other kind keeps the original.
+# `_reject_words` puts the two cases the kind does not tell before it.
 REJECT_WORDS = {
     "equation": strings.KEPT_AS_IMAGE,
     "table": strings.KEPT_AS_IMAGE,
@@ -297,11 +300,25 @@ REJECT_WORDS = {
 }
 
 
-def _decision_words(edit: Any, kind: str = "") -> str:
-    """What the decision was, in words, from the stored action and the marks its `after` keeps."""
+def _reject_words(fix: Fix | None, element: Element | None, origin: str) -> str:
+    """What a reviewer's "reject" kept for this item, in the words the review screen gives its
+    state (`routes.review.reject_words`): a page kept as an image is an image whatever its
+    kind, and a formula of a source with no picture is left as written."""
+    if fix is None:
+        return strings.KEPT_ORIGINAL
+    if is_kept_image(fix):
+        return strings.KEPT_AS_IMAGE
+    if reject_keeps(origin, fix, element) == "written":
+        return strings.LEFT_AS_WRITTEN
+    return REJECT_WORDS.get(fix.kind.value, strings.KEPT_ORIGINAL)
+
+
+def _decision_words(edit: Any, rejected: str = "") -> str:
+    """What the decision was, in words, from the stored action and the marks its `after` keeps.
+    `rejected`: what a reject kept for this item (`_reject_words`)."""
     action = str(edit.action)
-    if action == "reject" and kind in REJECT_WORDS:
-        return REJECT_WORDS[kind]
+    if action == "reject" and rejected:
+        return rejected
     after = edit.after if isinstance(edit.after, dict) else {}
     if action == "accept" and after.get(BULK_KEY):
         kind = after[BULK_KEY]
@@ -606,7 +623,7 @@ def build(
                 item=item,
                 page=page_edit if page_edit is not None else _page_of(elements, edit.element_id),
                 tool_had=TOOL_STATUS_WORDS.get(str(before), str(before)),
-                decision=_decision_words(edit, kind),
+                decision=_decision_words(edit, _reject_words(fix, element, result.origin)),
                 by=who.get(edit.user_id, owner),
                 by_file=file_who.get(edit.user_id, owner),
                 refs=(ref(item, edit.element_id),),

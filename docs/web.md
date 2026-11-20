@@ -2985,8 +2985,8 @@ image itself without script).
   says why in one more sentence ("The tool tried to read page 3 from an image, but the model's
   answer could not be used."; `reading_note`, from the page's `ImagePageRecord.outcome`, a code
   per page, never text), shows the
-  first page's image and the pages it is on, and has one button, **Keep the page images,
-  marked “Not converted”** (each one's Keep as image, `web.review.apply_page_group`),
+  first page's image and the pages it is on, and has one button, **Keep as image** (each one's Keep as image,
+  `web.review.apply_page_group`),
   with the hint "To make them accessible, type them up (for example in LaTeX or Word) and
   upload the typed version." (for pages of drawings or writing nothing could be read
   from, "describe it in your source file (for example as a figure with a description)").

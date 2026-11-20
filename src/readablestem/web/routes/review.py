@@ -260,7 +260,7 @@ REJECT_WORDS = {
         strings.KEEP_WITHOUT_DESCRIPTION,
         "The figure stays, marked “Needs a description”; screen readers get no description.",
         "Kept without a description, marked “Needs a description”.",
-        "Left without a description by you",
+        strings.KEPT_WITHOUT_DESCRIPTION,
     ),
 }
 BOLD_TEXT_WORDS = RejectWords(
@@ -289,7 +289,7 @@ AS_WRITTEN_WORDS = RejectWords(
     strings.LEAVE_AS_WRITTEN,
     "Students see the LaTeX as it was written, marked “Not converted”.",
     "Left as written, marked “Not converted”.",
-    "Left as written by you",
+    strings.LEFT_AS_WRITTEN,
 )
 
 
@@ -653,7 +653,7 @@ class PageGroupView:
     explain: str  # what students get
     hint: str  # what to do to make them accessible
     hidden: str  # the hidden text that was not used, as a count; "" when none
-    button: str  # "Keep the page images, marked “Not converted”"
+    button: str  # "Keep as image"
     members: list[ReviewItem]  # the ones still waiting, reading order
     pages: list[int]  # 1-based, of every member
     size: int

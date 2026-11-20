@@ -302,7 +302,7 @@ accurate.
    - `privacy.html:127-128`: "No one else. We do not use your uploads to train models, sell them or
      share them beyond the services named here." needs to say that the owner may publish a copy and
      that the page sets no cookie and keeps no record of who opened it, only a count.
-   - `terms.html:14` ("Look at the output before you post it") and `terms.html:53-55` ("process
+   - `terms.html:14` ("Review the output before you post it") and `terms.html:53-55` ("process
      material you are not allowed to share") should name publishing by link next to sharing.
 4. **Know what the link does not do** (so the pages above can say it): its address is in the URL, so
    a browser history, a proxy or a log that records URLs holds it (the app's own logs record the

@@ -518,7 +518,7 @@ SUMMARY_TOOL = "Made by ReadableSTEM, a tool that assists with accessibility."
 SUMMARY_UNKNOWN = f"{SUMMARY_TOOL} This file does not record what was converted or reviewed."
 # Written to the person who checks a file, not to its readers: only a draft's page carries it
 # (`assemble.render_html(audience="checker")`), never the student file or an export of it.
-CHECK_BEFORE_USE = "Look at it before students use it."
+CHECK_BEFORE_USE = "Review it before students use it."
 
 
 def export_summary(s: CheckedSummary, for_checker: bool = False) -> str:

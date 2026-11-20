@@ -566,6 +566,11 @@ def test_a_kept_page_stays_a_marked_image_after_its_group_decision(env):
     listing = text_of(page)
     assert "Page 2: Kept as image (your choice)" in listing and "Page 2, page 2" not in listing
     assert "Kept as an image, marked “Not converted”" in listing
+    # The record names the decision as the review screen does: an image was kept, not a
+    # figure left without a description.
+    record = text_of(env.browser.get(f"/jobs/{job_id}/record").text)
+    assert "Kept as image (your choice)" in record
+    assert "Kept without a description" not in record
     # The review screen shows the page with its group, never a figure form.
     split = env.browser.get(f"/jobs/{job_id}/review?item=p3-e0").text
     assert 'name="decorative"' not in split and 'name="alt"' not in split

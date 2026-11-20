@@ -28,6 +28,7 @@ KEPT_ORIGINAL = "Kept the original (your choice)"
 KEEP_WITHOUT_DESCRIPTION = "Keep without a description"
 KEPT_WITHOUT_DESCRIPTION = "Kept without a description (your choice)"
 LEAVE_AS_WRITTEN = "Leave as written"
+LEFT_AS_WRITTEN = "Left as written (your choice)"
 
 # What a person may look at, and the tool's own word for the lowest severity.
 ITEM = "item"
