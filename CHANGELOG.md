@@ -77,8 +77,10 @@ And in the Word reader (`source/docx_package.py`), after the same review:
   counted as furniture and nothing more. Lines with words now go only with a number that says
   it is a page's ("Page 3", "Page 3 of 9", "3 of 9"); a page number alone on its line goes as
   before. A journal's head with a bare page number beside its name stays on a one-page file.
-  Parsing benchmark (olmOCR-bench, headers_footers, no model, 266 pages): 38.6, between the
-  34.5 of pipeline 0.5.13 as deployed and the 51.4 of the rule as first built; the difference
+  Parsing benchmark (olmOCR-bench, headers_footers, no model, 266 pages, measured again at
+  the wave's last commit): 38.6 (244 of 632 checks, 95 % interval 34.9 to 42.5), between the
+  34.5 (218) of pipeline 0.5.13 as deployed and the 51.4 (325) of the rule as first built;
+  the other four categories pass the same number of checks as at 0.5.13; the difference
   is the heads this rule can no longer tell from a quiz's own lines. Not built, to be
   measured: taking such lines when they are set smaller than the body text.
 - **A struck-through run in a fixed-pitch font stays struck** (`source/docx_package.py`). The
