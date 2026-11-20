@@ -14,6 +14,7 @@ arrived at; read them by question, not front to back.
 | What is in the file that comes out | [output.md](output.md) |
 | To run, test and extend it | [development.md](development.md) |
 | Why a choice was made | [decisions/](decisions/) |
+| What changed, release by release | [../CHANGELOG.md](../CHANGELOG.md), and before pipeline 0.5.13 [changelog-archive.md](changelog-archive.md) |
 
 On this page: [Results and how they are measured](#results-and-how-they-are-measured) ·
 [Evaluation reports](#evaluation-reports) · [How it is built](#how-it-is-built) ·

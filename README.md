@@ -183,7 +183,7 @@ eval regression gate that compares each tracked metric with the committed baseli
 | [`migrations/`](migrations/), `alembic.ini` | The database schema |
 | `Dockerfile`, [`.railway/`](.railway/), [`deploy/`](deploy/) | The container, the Railway project as code, and the Cloud Run alternative |
 | [`PRODUCT.md`](PRODUCT.md), [`DESIGN.md`](DESIGN.md) | The product brief and the design system of the web app |
-| [`CHANGELOG.md`](CHANGELOG.md) | Every change, by pipeline version |
+| [`CHANGELOG.md`](CHANGELOG.md) | Every change, by pipeline version (before 0.5.13: [`docs/changelog-archive.md`](docs/changelog-archive.md)) |
 
 ## Limits
 
