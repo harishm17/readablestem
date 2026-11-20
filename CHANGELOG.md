@@ -10,9 +10,9 @@ test:
   written right after it, so a figure, a note or a footnote that follows it on its first page
   stood under the next page's marker (`pipeline/assemble.py`, `owed_marks`; two pages of
   `ax_hepth_240306652`). They are written before the next element on one of those pages.
-- A small drawing that holds a line of text of its own (a tab with its label) is no part of
-  the figure near it (`layout/figures.py`): the figure's crop took the tab and the sentence
-  under it (`os_introductory_statistics_2e` page 2).
+- A small drawing does not join a figure within reach when a line of prose of six words or
+  more lies between them (`layout/figures.py`, `_sentence_between`): the figure's crop took a
+  tab ("EXAMPLE 5.2") and the sentence under it (`os_introductory_statistics_2e` page 2).
 
 The student page changes for a document with such a paragraph or tab; stored results load
 unchanged and their pages are made again. `PIPELINE_VERSION` and `RENDER_VERSION` are not
