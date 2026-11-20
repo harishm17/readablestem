@@ -2101,13 +2101,17 @@ opens "Algorithm 2 is ..." or "Algorithm 1 shows ..." is a sentence and no capti
 (`_CAPTION_SENTENCE`: a list of the words such a sentence goes on with, so "Algorithm 2 computes
 ..." is still read as a caption). The lines under a caption before its first block word (Input,
 Initialize ...) are steps. One that the next line runs on from (the first word of the next line
-would not have fitted on it: `_stops_short`) is a long step when a step stands over it and a
-step word under it ("Choose a start vector b.", the long line, "repeat"). Any other, so a long
-first line, may be a long first step ("Initialize the table of
+would not have fitted on it: `_stops_short`) is a long step when a step stands over it and,
+under it, a step word on a line that ends short of the right edge ("Choose a start vector b.",
+the long line, "repeat"; the line of a paragraph goes on to a "for ..." that runs to the
+margin). Any other (a long first line, a long line that wraps into a second one, a long line
+over a loop line that reaches the margin) may be a long step ("Initialize the table of
 counts ..." set out to the margin) or the running text under a float's caption, so the lines
 must then show more: one step set further right under a line that opens a block and ends as
 one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
-A formula on a line of its own counts as a step here (a loop whose body is "b <- A b").
+A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"), but not
+one set more than `ALGORITHM_SET_IN` (6) em right of the line over it: that is a display
+equation of the text, centred in the column ("... as follows:" over "v = d / t").
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
 a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
@@ -2160,10 +2164,13 @@ A display equation between two steps ends the rows there; the algorithm goes on 
 within `ALGORITHM_REACH` (16) lines (`_after_equation`) as a second block: the step with the next
 number, or, with no numbers, a step word, an assignment written with an arrow or ":=", or one
 written with "=" inside a block that is still open (right of the leftmost step, under a "for"
-or an "if" that no "end" has closed) and set where a step above it starts. A "where d = 12 is
-..." after the equation is the text going on, at the left edge or set in as the first line of
-a paragraph is; only a sentence set in by just the indent of a step, under an algorithm with a
-block no "end" closes, is still taken. The levels are those
+or an "if" that no "end" has closed) and set either where a step above it starts (within a
+quarter em) or, when the last step before the equation opened the block, anywhere right of
+that step (the equation is the first thing the loop holds). A "where d = 12 is ..." after the
+equation is the text going on, at the left edge or set in as the first line of a paragraph
+is. Under an algorithm with a block no "end" closes, such a sentence is still taken wherever
+it starts within a quarter em of the start of any step above it (a paragraph indent equal to
+one or two step indents), or right of a last step that opens a block. The levels are those
 of the whole algorithm, so the second block keeps the indentation it had, the line numbers
 continue, and the equation keeps its crop and its place in the order. A formula of one line that
 is a step by itself is not such an equation: it is a line of the block and its formulas are
@@ -2173,15 +2180,25 @@ with levels of its own; typed pseudo-code in a proportional font with two-digit 
 gets its levels from where each line's words start, which the wider number shifts; and where
 the caption ends within `ALGORITHM_WRAPPED` (3) em of the column's right edge (a page that holds
 only an algorithm, a narrow column), a first step with no step word is read as the second line
-of the caption. Algorithms still lost (independent review 9, finding 1): under a long first
-line in plain words, steps that show no nesting in the way asked above, which are a flat
-algorithm (no line set further right), one whose loop lines end in no "do", "then" or colon
-unless a short "return x" or an "end" is set back to the left, and a loop that holds two
-formula lines or more (a display equation of several lines is not a step). The same pages with
-a short first line, or with the long line second, are read as algorithms. Known wrong reads, all prose
-taken for steps (independent reviews 8, findings 5 and 7, and 9, finding 5): text set in under
-a last step that reaches the right edge is taken into the block (lines hung under a step are
-the step's); a paragraph that opens "Algorithm 2 computes ..." or with another verb not on the list; two
+of the caption. Algorithms still lost (independent reviews 9, finding 1, and 10, findings 2
+to 5): under a long first line in plain words, steps that show no nesting in the way asked
+above, which are a flat algorithm (no line set further right), one whose loop lines end in no
+"do", "then" or colon unless a short "return x" or an "end" is set back to the left, a loop
+that holds two formula lines or more (a display equation of several lines is not a step) and
+a loop whose only line is a formula set more than 6 em to the right. The same pages with a
+short first line are read as algorithms, and so are those with the long line second when it
+is one line with a step word under it that ends short. Other long lines after the first ask
+for the same nesting: a long step that wraps into a second line (hung or not), two long steps
+one after the other, a long step over "count = 0" or over a loop line that reaches the
+margin; with flat steps under them these are paragraphs. Pseudo-code numbered "1." under a
+caption whose only nesting is between lines 9 and 10, typed with no tab stop, is a list.
+Known wrong reads, all prose
+taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
+under a last step that reaches the right edge is taken into the block (lines hung under a
+step are the step's); the bold heading of the next section ("4 Results ...") right under an
+algorithm of four lines or fewer is taken as its last line; the running text under a float's
+caption, when two numbered lines follow it, is one block with them; a paragraph that opens
+"Algorithm 2 computes ..." or with another verb not on the list; two
 short paragraphs that open "For ..." and "If ..." right under a float's caption; a sentence
 that opens "Then", "For" or "If" right after a display equation that follows an algorithm; a
 loop line with no "do" or colon that reaches the right edge takes the first line of its body;

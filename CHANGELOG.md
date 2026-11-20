@@ -19,6 +19,43 @@
   0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
+## Unreleased: fixes after the fourth review of the algorithm blocks (review 10)
+
+The review ran 48 pages of its own on the review-9 fixes, with the 171 pages of the three
+reviews before it. The five fixes held on the pages they were made for; three of the new rules
+were wider or narrower than they should be. Fixed here (`layout/blocks.py`), each with a case
+in `tests/test_structure.py` that fails without it:
+
+- **"=" after an equation, as the first step of its block.** The rule from review 9 (the line
+  must start where a step above it starts) lost the second half of an algorithm whose loop
+  holds a display equation first and an "=" step after it: no step above stands at that level
+  yet. The line may now also stand right of the last step when that step opened the block.
+- **A long step needs a short line under it.** Under a float's caption, the last line of the
+  paragraph the float cut, then a paragraph whose second line opens "for" and runs to the
+  margin, was a block: the first line of that paragraph passed as a long step. The step word
+  under a long step must now be on a line that ends short of the right edge (as "repeat" does);
+  with no step word under it, the line is still asked for the nesting proof.
+- **A centred formula is no nested step.** Running text with a line that opens "for" and ends
+  in a colon ("... as follows:") over a display equation was a block: the formula counted as
+  a step set inside the "for". A formula more than 6 em right of the line over it no longer
+  counts. Formula lines are read for this proof only under a long line in plain words; the
+  two other checks for nesting (numbers written "1.", and no caption) read text lines again,
+  as before review 9.
+- Corrected in the review-9 section below and in docs/layout.md: a long line after the first
+  is a long step only when it is one line with a step word under it that ends short (a long
+  step that wraps, two long steps in a row, one over "count = 0" or over a loop line that
+  reaches the margin still need the nesting proof, and flat they are paragraphs); and "none is
+  a block on the released version either" said nothing, since the released version reads no
+  algorithm as a block (all of them are paragraphs or lists there).
+- Left, and written in docs/layout.md: a loop under a long first line whose only line is a
+  formula set more than 6 em to the right is two paragraphs; pseudo-code numbered "1." whose
+  only nesting is between lines 9 and 10, typed with no tab stop, is a list; a sentence with
+  "=" after an equation is still taken where it starts within a quarter em of the start of any
+  step above it, or right of a last step that opens a block, under an algorithm with a block
+  no "end" closes; the bold heading of the next section right under an algorithm of four lines
+  or fewer is taken as its last line; and running text under a float's caption with two
+  numbered lines after it is one block.
+
 ## Unreleased: fixes after the third review of the algorithm blocks (review 9)
 
 The review ran the 73 probe pages again, 57 of its own and 11 public papers with algorithms on
@@ -30,16 +67,18 @@ open again in narrow shapes. Fixed here (`layout/blocks.py`), each with a case i
 - **A long step after the first is a step.** "Choose a start vector b.", a line in plain words
   out to the margin, then "repeat" or a loop with no "do": the review-8 fix asked such a page
   for nested steps and, finding none, dropped the algorithm (the version before kept it). A
-  line that the next one runs on from, with a step over it and a step word under it, is a long
-  step again and asks for no more proof.
+  line that the next one runs on from, with a step over it and a step word under it (on a line
+  that ends short of the right edge: review 10), is a long step again and asks for no more
+  proof.
 - **A loop that holds one formula shows the nesting.** Under a long first line the proof was
   read off the text lines only, so "for t = 1 to T do" with "b <- A b" under it proved nothing
   and the algorithm was two paragraphs. A formula on a line of its own counts as a step in
-  that check, for numbered steps too.
+  that check.
 - **"=" after a display equation resumes only where a step starts.** A sentence set in as a
   paragraph's first line ("where d = 12 is ...", "Let d = 12 be ...") under an algorithm with a
   block no "end" closes was a second block, and the first block's levels changed. The line
-  must now start where a step above it starts.
+  must now start where a step above it starts (or, since review 10, right of a last step that
+  opened the block).
 - **One number is no numbering.** The text under a float's caption followed by the heading "4
   Results ..." was one block with the heading in it: one numbered line switched off the two
   checks that tell a paragraph from steps. They are skipped only from two line numbers up.
@@ -49,9 +88,9 @@ open again in narrow shapes. Fixed here (`layout/blocks.py`), each with a case i
 - Left, and written in docs/layout.md: under a long *first* line in plain words, a flat
   algorithm, one whose loop lines end in no "do", "then" or colon (unless a short "return x" or
   an "end" is set back to the left) and a loop that holds two formula lines or more are still
-  paragraphs (none is a block on the released version either); text set in under a last step
+  paragraphs; text set in under a last step
   that reaches the right edge is taken into the block; a sentence with "=" after an equation,
-  set in by just the indent of a step under an algorithm with a block no "end" closes, is
+  set in by the indent of a step under an algorithm with a block no "end" closes, is
   still taken; where the caption ends within 3 em of the right edge of its column, a first
   step with no step word is read as the caption's second line; and a caption is a line that
   opens "Algorithm" and a number, so under "Procedure 2 ..." or "Algorithm A (...)" pseudo-code

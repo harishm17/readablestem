@@ -987,6 +987,7 @@ ALGORITHM_SMALL = 0.6  # x the size of the steps: the smallest a step ("Output: 
 ALGORITHM_MAX_DEPTH = 12
 ALGORITHM_RUN_ON = 2  # lines a step with no number may go on for: more is a paragraph
 ALGORITHM_BETWEEN = 2  # lines with no number that may stand between two numbered steps
+ALGORITHM_SET_IN = 6  # em: a formula further right of the line over it is a centred equation
 
 
 def _line_number(row: _Row) -> tuple[int, str, int] | None:
@@ -1020,6 +1021,11 @@ def _step_text(row: _Row, number: tuple[int, str, int] | None) -> str:
     if number is None:
         return row.clean
     return _clean("".join(c.c for c in row.chars[number[2] :]))
+
+
+def _opens_block(text: str) -> bool:
+    """Does a step that reads `text` open a block (a loop, a branch, a procedure)?"""
+    return _BLOCK_WORD.match(text) is not None and _CLOSER.fullmatch(text) is None
 
 
 def _wraps_on(prev: _Row, edges: _RightEdges) -> bool:
@@ -1157,15 +1163,21 @@ def _step_kind(
         return "step"
     # The lines before the first block word of a captioned algorithm ("Initialize ...",
     # "Choose ..."), unless the caption is a sentence ("Algorithm 1 ... ."). One that the next
-    # line runs on from is a long step when a step stands over it and a step word under it;
-    # any other may be a long step or a line of a paragraph, and `_is_algorithm` then asks
-    # the steps for more proof.
+    # line runs on from is a long step when a step stands over it and, under it, a step word
+    # on a line that ends short of the right edge ("repeat": a paragraph's line goes on to
+    # it); any other may be a long step or a line of a paragraph, and `_is_algorithm` then
+    # asks the steps for more proof.
     sentence = (
         caption is not None and caption.clean.rstrip()[-1:] in ".?!" and len(caption.clean) > 40
     )
     if caption is None or steps.blocked or sentence:
         return None
-    between = bool(group) and following is not None and _STEP_WORD.match(following.clean)
+    between = (
+        bool(group)
+        and following is not None
+        and _STEP_WORD.match(following.clean) is not None
+        and not _wraps_on(following, edges)
+    )
     if not _stops_short(row, following, edges) and not between:
         steps.ran_on = True
     return "step"
@@ -1176,8 +1188,9 @@ def _resumes(row: _Row, steps: _Steps) -> bool:
     the next line number, at the numbers' place; or, when the steps have none, a step no
     further left than the steps before: a step word, an assignment written with an arrow or
     ":=", or one written with "=" inside a block that is still open, set where a step above
-    it starts ("where d = 12 is ..." after the last step is the text going on, at the left
-    edge or set in as a paragraph's first line is)?"""
+    it starts or right of the line that opened the block, when that is the last step ("where
+    d = 12 is ..." after the last step is the text going on, at the left edge or set in as
+    a paragraph's first line is, unless that is just where a step starts)?"""
     anchor = steps.anchor
     if row.column != anchor.column or abs(row.size - anchor.size) > 0.5:
         return False
@@ -1193,9 +1206,12 @@ def _resumes(row: _Row, steps: _Steps) -> bool:
         return False
     if _STEP_WORD.match(row.clean) is not None or _ARROW.search(row.clean) is not None:
         return True
-    inside = row.x0 > left + 0.5 * anchor.size and _open_blocks(steps) > 0
-    level = any(abs(row.x0 - r.x0) <= 0.25 * anchor.size for r in steps.rows)
-    return inside and level and _ASSIGNMENT.search(row.clean) is not None
+    half = 0.5 * anchor.size
+    inside = row.x0 > left + half and _open_blocks(steps) > 0
+    level = any(abs(row.x0 - r.x0) <= 0.5 * half for r in steps.rows)
+    last = steps.rows[-1]
+    first = _opens_block(last.clean) and last.kind == "text" and row.x0 > last.x0 + half
+    return inside and (level or first) and _ASSIGNMENT.search(row.clean) is not None
 
 
 def _after_equation(rows: Sequence[_Row], at: int, steps: _Steps) -> int | None:
@@ -1316,7 +1332,8 @@ def _nested(
     manuscript and the questions of an exam start at one place, but for the first line of a
     paragraph.) With `said`, the line that opens the block must say so where it ends ("do",
     "then", a colon): a sentence that begins "For" does not. Two numbered lines whose numbers
-    differ in length ("9." and "10.") prove nothing."""
+    differ in length ("9." and "10.") prove nothing, nor does a formula more than
+    `ALGORITHM_SET_IN` em right of the line over it (a display equation of the text)."""
     half = 0.5 * steps.anchor.size
 
     def at(row: _Row, number: tuple[int, str, int] | None) -> float:
@@ -1326,10 +1343,10 @@ def _nested(
         if n_above is not None and n_row is not None and len(n_above[1]) != len(n_row[1]):
             continue  # "9." to "10.": with no tab stop the longer number moves its words right
         upper, lower = _step_text(above, n_above), _step_text(row, n_row)
-        opens = _BLOCK_WORD.match(upper) is not None and _CLOSER.fullmatch(upper) is None
-        if said and _OPENS.fullmatch(upper.rstrip()) is None:
-            opens = False
-        if opens and at(row, n_row) > at(above, n_above) + half:
+        opens = _opens_block(upper) and not (said and _OPENS.fullmatch(upper.rstrip()) is None)
+        set_in = at(row, n_row) - at(above, n_above)
+        centred = row.kind != "text" and set_in > ALGORITHM_SET_IN * steps.anchor.size
+        if opens and set_in > half and not centred:
             return True
         if _CLOSER.fullmatch(lower) and at(row, n_row) < at(above, n_above) - half:
             return True
@@ -1342,13 +1359,13 @@ def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
     `ALGORITHM_MIN_NUMBERS` that carry line numbers); and, with fewer line numbers than that,
     a line that stops where the next line's first word would still have fitted (the lines of
     a paragraph that opens "Algorithm 1 shows ..." all run on, and some begin with "for" or
-    "if"). Two shapes that prose has too must show one step set inside another (`_nested`,
-    over the text lines and the formulas on lines of their own): numbers written as a list
-    writes them ("1.", "2)": a textbook's algorithm in numbered sentences is a list), and,
-    with fewer than `ALGORITHM_MIN_NUMBERS` line numbers, a line before the first block word
-    that the next line runs on from (`_step_kind`: a long first step, or a paragraph under a
-    figure's caption), where the line that opens the block must also end as one does ("do",
-    "then", a colon). With no
+    "if"). Two shapes that prose has too must show one step set inside another (`_nested`):
+    numbers written as a list writes them ("1.", "2)": a textbook's algorithm in numbered
+    sentences is a list), and, with fewer than `ALGORITHM_MIN_NUMBERS` line numbers, a line
+    before the first block word that the next line runs on from (`_step_kind`: a long first
+    step, or a paragraph under a figure's caption), where the line that opens the block must
+    also end as one does ("do", "then", a colon) and the step inside it may be a formula on
+    a line of its own. With no
     caption the proof is more: `ALGORITHM_BARE_ROWS` rows, `ALGORITHM_BARE_WORDS` with a step
     word, one that closes a block, none of them the item of a list ("1." or "2)"), and either
     consecutive line numbers with one step set inside another (`_nested`: the numbered lines
@@ -1357,7 +1374,7 @@ def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
     or a block word on a line that ends in "do", "then" or a colon: the indented lines of a
     poem or an outline hold none)."""
     rows = [r for r in steps.rows if id(r) not in steps.wraps and id(r) not in steps.pieces]
-    lines = [(r, steps.number(r)) for r in rows]  # a formula on a line of its own is a step too
+    lines = [(r, steps.number(r)) for r in rows]
     texts = [(r, n) for r, n in lines if r.kind == "text"]
     words = sum(_STEP_WORD.match(r.clean) is not None for r, _ in texts)
     blocks = sum(_BLOCK_WORD.match(_step_text(r, n)) is not None for r, n in texts)
@@ -1371,7 +1388,7 @@ def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
             and words >= ALGORITHM_MIN_WORDS
             and (blocks >= 1 or numbered)
             and (numbered or not _reads_on(steps, edges))
-            and (not any(_listed(n) for n in marks) or _nested(steps, lines))
+            and (not any(_listed(n) for n in marks) or _nested(steps, texts))
             and (numbered or not steps.ran_on or _nested(steps, lines, said=True))
         )
     closing = any(_CLOSER.fullmatch(_step_text(r, n)) for r, n in texts)
@@ -1387,7 +1404,7 @@ def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
         and words >= ALGORITHM_BARE_WORDS
         and closing
         and (
-            (len(numbers) >= ALGORITHM_BARE_ROWS and _nested(steps, lines))
+            (len(numbers) >= ALGORITHM_BARE_ROWS and _nested(steps, texts))
             or (not marks and ladder and coded)
         )
     )
@@ -1426,8 +1443,8 @@ def _algorithm_groups(
     assignment ("count = 0"), or a line of math (a step that is a formula: "c <- c + 1"), or
     further right than the first step (what a loop or a branch holds). Under a caption the
     lines before the first block word (Input, Initialize ...) are steps too (one that the
-    next line runs on from, but for a line with a step over it and a step word under it,
-    asks `_is_algorithm` for more proof); a line that opens "Algorithm
+    next line runs on from asks `_is_algorithm` for more proof, but for one with a step over
+    it and, under it, a step word on a short line); a line that opens "Algorithm
     2 is ..." is a sentence, not a caption (`_CAPTION_SENTENCE`); a bullet is no step
     anywhere, and a "1." or "2)" is one only under a caption. Where the steps have no numbers,
     a line in lower case under one that ran to the right edge is the rest of that step,

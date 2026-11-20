@@ -401,22 +401,51 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
             "the|poem, and the two are listed side by side.",
         )
 
-    def float_caption(page, heading=None):
+    def float_caption(page, text=(steps,), heading=None, formula=None):
         # A picture's caption, the running text under it in paragraphs (or the next heading).
         y = running(page, 100, RUNNING)
         page.draw_rect(pymupdf.Rect(120, y, 480, y + 100), width=0.8)
         page.draw_line((140, y + 20), (460, y + 80), width=1.5)
         y = prose(page, y + 114, "Algorithm 2 Overview of the method") - 8
-        y = running(page, y, steps, pitch=14) - 8
+        for part in text:
+            y = running(page, y, part, pitch=14) - 8
         if heading:
             page.insert_text((72, y + 6), heading, fontsize=BODY, fontname="hebo")
             y += 28
+        if formula:  # a display equation of the text, and the sentence going on under it
+            page.insert_text((250, y + 8), formula, fontsize=BODY, fontname="helv")
+            y = running(page, y + 24, "if the reader stops at a word, the count starts again.") - 8
         running(page, y, RUNNING, pitch=14, indent=0 if heading else 15)
 
     def before_a_heading(page):
-        float_caption(page, "4 Results for the long verse")
+        float_caption(page, heading="4 Results for the long verse")
 
-    for page in (fill, paragraph, sentence, float_caption, before_a_heading):
+    def after_a_short_line(page):  # the last line of the paragraph that the picture cut
+        passes = (
+            "The first pass reads the verse from left to right and keeps the count of the stresses "
+            "that fall|for every word, and the second pass sets the marks of the printed text over "
+            "the words.|If the two counts differ, a third reader is asked."
+        )
+        float_caption(page, text=("The two passes are shown above.", passes))
+
+    def a_paragraph_of_two_lines(page):  # under the short line, and its second line is short
+        first = (
+            "The first pass reads the verse from left to right and keeps the count of the stresses "
+            "that fall|on every word of the verse."
+        )
+        second = "For every word the second pass sets a mark over it."
+        third = "If the two counts differ, a third reader is asked."
+        float_caption(page, text=("The two passes are shown above.", first, second, third))
+
+    def over_a_formula(page):  # a line that opens "for" and ends in a colon, a formula under it
+        shown = (
+            "The figure shows the two passes of the method, the first for the count and the second "
+            "one|for the marks of the printed text, which give the speed of the verse as follows:"
+        )
+        float_caption(page, text=(shown,), formula="v = d / t")
+
+    pages = (fill, paragraph, sentence, float_caption, before_a_heading, after_a_short_line)
+    for page in (*pages, a_paragraph_of_two_lines, over_a_formula):
         assert not [e for e in analyze(page_of(page)).elements if e.preformatted]
 
 
@@ -601,19 +630,24 @@ def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_
         NUMBERED_LINES[3:],
     ]
 
-    def plain(page):  # no line numbers, and the step after the equation is written with "="
-        y = running(page, 100, RUNNING)
-        y = algorithm(page, y + 10, [*ALGORITHM[1:3], (1, "set the speed to")]) - 10
-        y = fraction(page, y) + 10
-        for level, text in [(1, "count = count + v"), (0, "end for"), (0, "return count")]:
-            page.insert_text((72 + 11 * level, y), text, fontsize=BODY, fontname="helv")
-            y += 14
-        prose(page, y + 20, "The count is printed after the last word.")
+    # No line numbers, and the step after the equation is written with "=": under a step of
+    # the loop, then as the first thing the loop holds.
+    for lead in ([(1, "set the speed to")], []):
 
-    assert [e.text.split("\n") for e in analyze(page_of(plain)).elements if e.preformatted] == [
-        ["count = 0", "for each word w in the line do", "  set the speed to"],
-        ["  count = count + v", "end for", "return count"],
-    ]
+        def plain(page, lead=lead):
+            y = running(page, 100, RUNNING)
+            y = algorithm(page, y + 10, [*ALGORITHM[1:3], *lead]) - 10
+            y = fraction(page, y) + 10
+            for level, text in [(1, "count = count + v"), (0, "end for"), (0, "return count")]:
+                page.insert_text((72 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+                y += 14
+            prose(page, y + 20, "The count is printed after the last word.")
+
+        blocks = [e.text.split("\n") for e in analyze(page_of(plain)).elements if e.preformatted]
+        assert blocks == [
+            ["count = 0", "for each word w in the line do", *("  " + text for _, text in lead)],
+            ["  count = count + v", "end for", "return count"],
+        ]
 
     def body(page):  # a loop that holds one formula, after a long first step in plain words
         y = running(page, 100, RUNNING)
