@@ -377,6 +377,7 @@ class PageTable:
     paths: set[int]  # indices into the page's paths (rules and cell shading)
     reasons: list[str]
     at_top: bool = False  # nothing but the running header above it on its page
+    at_foot: bool = False  # nothing but the running footer under it on its page
     column_edges: list[float] = field(default_factory=list)  # for continued tables
     caption_above: bool = False  # its caption is printed above it (`_attach_captions`)
     layout_grid: bool = False  # text set out in boxes (`is_layout_grid`): data only if captioned
@@ -2756,6 +2757,7 @@ def _find_in(
         table.lines |= _claimed_lines(view, table.bbox)
         table.paths = _claimed_paths(paths, table.bbox)
         table.at_top = _at_top(view, table)
+        table.at_foot = _at_foot(view, table)
     inside = set().union(*(table.lines for table in tables)) if tables else set()
     for table in tables:
         if _edge_text(view, table, inside):
@@ -3638,6 +3640,22 @@ def _at_top(view: _PageView, table: PageTable) -> bool:
     return True
 
 
+def _at_foot(view: _PageView, table: PageTable) -> bool:
+    """Nothing but running-footer text under the table (or its caption) in its part of the
+    page's width: a table that goes on to the next page is the last thing of its page."""
+    boxes = [table.bbox, *(view.lines[i].bbox for i in table.lines if i < len(view.lines))]
+    left, right = min(b[0] for b in boxes), max(b[2] for b in boxes)
+    foot = max(b[3] for b in boxes)
+    band = (1 - TOP_BAND) * view.height
+    for i, line in enumerate(view.lines):
+        if i in table.lines or line.vertical:
+            continue
+        x0, y0, x1, y1 = line.bbox
+        if y0 >= foot and x0 < right and x1 > left and (y0 + y1) / 2 < band:
+            return False
+    return True
+
+
 def _row_cells(grid: TableGrid, row: int) -> list[TableCell] | None:
     """The cells of `row`, one per column left to right, when every one is a plain 1 x 1
     cell anchored there (no span reaches into or out of it); else None."""
@@ -3743,11 +3761,13 @@ def join_split_row(previous: PageTable, table: PageTable) -> bool:
 
 def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
     """Is `table` the rest of `previous` (the last table of the page before)? Same number
-    of columns, column edges in the same places, and nothing above it on its page. Both
-    must be data tables (a grid of terms goes on from nothing)."""
+    of columns, column edges in the same places, nothing above it on its page and nothing
+    under `previous` on its own (a table with text under it has ended: the next page's is
+    another table, and would be given this one's header). Both must be data tables (a grid
+    of terms goes on from nothing)."""
     if not (previous.grid.is_data and table.grid.is_data):
         return False
-    if not table.at_top or previous.grid.cols != table.grid.cols:
+    if not (table.at_top and previous.at_foot) or previous.grid.cols != table.grid.cols:
         return False
     if table.caption and table.caption_above and _new_caption(table.caption):
         return False  # "Table 1.4 ..." over the same header: another table (a caption
