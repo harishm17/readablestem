@@ -497,6 +497,10 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
     (link,) = layout_module._footnote_links([held, note], marks)[0].links
     assert (held.text or "")[link.start : link.end] == "1"
     assert link.start == (held.text or "").index(".1 Next") + 1
+    # ... and a tail of the context is looked for only after one, never inside its name
+    inside = body.model_copy(update={"text": "aim to map ⟦p1-e21⟧ across them", "links": []})
+    marks = {note.id: layout_module._FootnoteMark(body.id, "here K > 2", "1")}
+    assert layout_module._footnote_links([inside, note], marks)[0].links == []
 
 
 def named_footnote_pdf() -> bytes:

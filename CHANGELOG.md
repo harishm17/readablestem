@@ -256,8 +256,10 @@
   the second by the line the point lies just under (`_place_by_mark`, `_row_at`).
 - A footnote's mark was not linked to the note when an inline equation had taken the glyphs just
   before it, or the mark itself (a mark beside a letter in a math font). The mark's glyphs are
-  not read as maths, and the context that finds the mark in the text is cut down to the placeholder
-  of the equation (`_mark_spots`, `NOTE_MARK_FLAG`).
+  not read as math, and the context that finds the mark in the text is cut down to the placeholder
+  of the equation (`_mark_spots`, `NOTE_MARK_FLAG`). The cut context counts only right after a
+  placeholder's end: found anywhere else, a one-digit tail and the mark matched inside a
+  placeholder's own name on one paper and would have put the link in the equation.
 - Docs: docs/layout.md "Footnotes".
 
 ## Unreleased: fixes after the independent review of this batch (branch fix/review-5)

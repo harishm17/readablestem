@@ -1945,8 +1945,11 @@ paragraph of the next column in with it. The glyphs of a note's mark (the ones i
 the ones that open the note's own line) are never read as math (`NOTE_MARK_FLAG`, `_char_class`),
 so a mark beside a letter in a math font is not made an inline equation with it. The mark is found
 again in the element's text by what is printed before it; when an inline equation took some of
-those glyphs (it stands in the text as a placeholder) the context is cut from its left, down to the
-placeholder itself, and still has to be found exactly once, and not as the end of a number
+those glyphs (it stands in the text as a placeholder) the context is cut from its left, and what is
+left of it has to stand right after a placeholder's end, down to nothing left (the mark right after
+the placeholder). It still has to be found exactly once, and not as the end of a number. A short
+tail of the context found anywhere else in the text is no evidence: one digit of it and the mark
+can also stand inside a placeholder's own name, and the link would land in the equation
 (`_mark_spots`).
 
 A raised number is set off from the word it touches where the glyphs are cut (`_mark_notes`,

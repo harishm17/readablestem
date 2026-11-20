@@ -124,17 +124,21 @@ def _contents_links(elements: list[Element]) -> list[Element]:
 def _mark_spots(text: str, found: _FootnoteMark) -> list[int]:
     """Where in `text` the mark stands, by what is printed just before it. An inline equation
     stands in the text as a placeholder, so the glyphs it took from the line are not there:
-    the context is cut from its left until it is found, down to the placeholder itself. A cut
-    context that ends a number ("0.1") is no place for a mark."""
+    the context is then cut from its left, and what is left of it must stand right after a
+    placeholder's end, down to nothing left (the mark right after the placeholder). A short
+    tail of the context found anywhere else is no evidence: "2" before the mark "1" is also
+    inside a placeholder's name ("p1-e21"). A cut context that ends a number ("0.1") is no place
+    for a mark either."""
     before = found.before
-    contexts = [before[start:] for start in range(len(before)) if before[start:].strip()]
-    for k, context in enumerate([*contexts, "\u27e7"]):
-        spots = [
-            m.end() - len(found.mark)
-            for needle in (context + found.mark, context + " " + found.mark)
-            for m in re.finditer(re.escape(needle), text)
-        ]
-        if spots and k and any(text[at - 2 : at].strip(".,").isdigit() for at in spots):
+    mark = re.escape(found.mark)
+    whole = [m.end() - len(found.mark) for m in re.finditer(re.escape(before) + " ?" + mark, text)]
+    if whole:
+        return whole
+    tails = dict.fromkeys(before[start:].strip() for start in range(1, len(before) + 1))
+    for tail in tails:
+        after_equation = "\u27e7 ?" + re.escape(tail) + (" ?" if tail else "") + mark
+        spots = [m.end() - len(found.mark) for m in re.finditer(after_equation, text)]
+        if any(text[at - 2 : at].strip(".,").isdigit() for at in spots):
             return []
         if spots:
             return spots
