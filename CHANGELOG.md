@@ -20,7 +20,9 @@
   cannot end there. A paragraph whose block began in the other column of its page and ends the
   page in a column's body text; a paragraph that ends on a comma or a semicolon, whatever letter
   the next page starts with; a next page that starts with a citation shut by punctuation
-  ("[12]."). `PIPELINE_VERSION` is owed a raise for a document that has one.
+  ("[12]."). A head that is a "Table N" or "Figure N" caption never joins: the corpus run showed
+  a comma tail joined to a "TABLE VII: ..." line. `PIPELINE_VERSION` is owed a raise for a
+  document that has one.
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 

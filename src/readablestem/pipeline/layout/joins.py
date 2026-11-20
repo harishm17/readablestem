@@ -11,6 +11,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from itertools import pairwise
 
+from readablestem.core.captions import FIGURE_CAPTION, TABLE_CAPTION
 from readablestem.core.types import Kind
 from readablestem.pipeline.layout.blocks import (
     _QUANTITY_WORDS,
@@ -363,9 +364,12 @@ def _goes_on(
     start = next((p for p in first.pieces if not isinstance(p, str) or p.strip()), None)
     if not isinstance(start, str) or _ends_sentence(last.pieces):
         return False
+    head_text = start.lstrip()
+    if TABLE_CAPTION.match(head_text) or FIGURE_CAPTION.match(head_text):
+        return False  # a caption set at the top of the page is not the end of a sentence
     if not (
-        start.lstrip()[:1].islower()
-        or _CITATION_THEN_PUNCTUATION.match(start.lstrip())
+        head_text[:1].islower()
+        or _CITATION_THEN_PUNCTUATION.match(head_text)
         or _ends_open(last.pieces)
     ):
         return False
