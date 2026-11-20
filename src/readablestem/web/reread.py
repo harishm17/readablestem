@@ -36,8 +36,8 @@ the route locks the job afterwards, to check that nothing changed meanwhile, and
 the answer. Nothing here is logged but a category code.
 
 Each request that is really sent also tells the AI service's status how it ended
-(`AppContext.record_provider_call`), as the worker's requests do: a reread is the only model call the
-web process makes, and when the provider is down it is the reader's first sign.
+(`AppContext.record_provider_call`), as the worker's requests do: a reread is the only model
+call the web process makes, and when the provider is down it is the reader's first sign.
 """
 
 from __future__ import annotations

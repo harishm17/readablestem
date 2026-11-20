@@ -146,7 +146,7 @@ def test_a_decision_of_a_high_band_that_became_optional_fails_the_bar(tmp_path, 
             )
         ]
 
-    before, after = tmp_path / "before.json", tmp_path / "after.json"
+    before = tmp_path / "before.json"
     two = lecture(asks=[("p1-e2", 2), ("p3-e1", 4)], optional=[])
     assert burden("--from", records(tmp_path, "a", two), "--out", before) == 0
     # Band 4 becomes optional: the count falls, and that is allowed.
