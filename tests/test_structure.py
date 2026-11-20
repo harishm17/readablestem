@@ -378,6 +378,25 @@ def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
     assert step.text.split("\n")[3:5] == ["  if w is stressed then", "    count = count + 1"]
     assert step.text.split("\n")[0] == "input: a line of verse W"
 
+    # The index of a tall expression hangs a little under the end of its step (the text layer
+    # sets it apart): it is part of that step, and the steps after it stay in the block.
+    def hanging(page):
+        page.insert_text((72, 100), "Algorithm 3 Estimate a value", fontsize=BODY, fontname="helv")
+        y = 114.0
+        for text in ("1: Set the start value.", "2: for k = 0 to M do", "3: Set a = b + c."):
+            page.insert_text((72, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        small = "4: y = SGDstep(x, z"  # a step set smaller than the others, an index under its end
+        page.insert_text((72, y - 4), small, fontsize=8, fontname="helv")
+        end = 72 + pymupdf.get_text_length(small, fontname="helv", fontsize=8)
+        page.insert_text((end - 8, y + 3.5), "1:T).", fontsize=8, fontname="symb")
+        for text in ("5: Stop if the criteria are met.", "6: end for"):
+            page.insert_text((72, y + 18), text, fontsize=BODY, fontname="helv")
+            y += 14
+
+    (step,) = [e for e in analyze(page_of(hanging)).elements if e.preformatted]
+    assert [line[:2] for line in step.text.split("\n")] == ["1:", "2:", "3:", "4:", "5:", "6:"]
+
 
 def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
     def fill(page):

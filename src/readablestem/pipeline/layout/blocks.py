@@ -982,6 +982,8 @@ ALGORITHM_PREAMBLE = 4  # lines (Input, Output ...) that may come before the fir
 ALGORITHM_REACH = 16  # lines: how far a display equation may push the next step down the page
 ALGORITHM_NUMBER_GAP = 0.25  # em: the gap that sets a line number apart from a step with no blank
 ALGORITHM_SAME_LINE = 0.6  # x font size: rows this close in baseline are on one line
+ALGORITHM_HANG = 0.7  # x font size: how far under a line's end a bit of math (a subscript) hangs
+ALGORITHM_HANG_AT = 1.5  # em: ... and how far left of the line's end it may start
 ALGORITHM_WRAPPED = 3  # em: a line that ends this close to the right edge goes on in the next
 ALGORITHM_SMALL = 0.6  # x the size of the steps: the smallest a step ("Output: ...") may be set
 ALGORITHM_MAX_DEPTH = 12
@@ -1086,10 +1088,19 @@ class _Steps:
         )
 
     def on_line(self, row: _Row) -> bool:
-        """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?"""
+        """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?
+        Rows on one baseline are; so is one that hangs under the end of the line, a little lower
+        than the line (the subscripts of a tall expression are set apart in the text layer)."""
+        size = self.anchor.size
         return any(
-            abs(row.baseline - g.baseline) <= ALGORITHM_SAME_LINE * self.anchor.size
-            and row.x0 > g.x0
+            row.x0 > g.x0
+            and (
+                abs(row.baseline - g.baseline) <= ALGORITHM_SAME_LINE * size
+                or (
+                    0 < row.baseline - g.baseline <= ALGORITHM_HANG * size
+                    and row.x0 >= g.x1 - ALGORITHM_HANG_AT * size
+                )
+            )
             for g in self.rows[-4:]
         )
 
@@ -1324,32 +1335,31 @@ def _open_blocks(steps: _Steps) -> int:
     return count
 
 
-def _nested(
-    steps: _Steps, texts: Sequence[tuple[_Row, tuple[int, str, int] | None]], said: bool = False
-) -> bool:
-    """Does one step stand inside another: right of the line just above it, which opens a
-    block, or, closing one, left of the line just above it? (The numbered lines of a
-    manuscript and the questions of an exam start at one place, but for the first line of a
-    paragraph.) With `said`, the line that opens the block must say so where it ends ("do",
-    "then", a colon): a sentence that begins "For" does not. Two numbered lines whose numbers
-    differ in length ("9." and "10.") prove nothing, nor do two lines that start more than
-    `ALGORITHM_SET_IN` em apart (a display equation of the text, centered in the column, and
-    the sentence going on under it)."""
+def _nested(steps: _Steps, texts: Sequence[tuple[_Row, tuple[int, str, int] | None]]) -> bool:
+    """Does one step stand inside another? From the indent alone: some line is set right of the
+    line just above it, and a later line is set back left of the line just above it. The
+    numbered lines of a manuscript and the questions of an exam start at one place; the first
+    line of a paragraph is set in and the next goes back out, so a text of two paragraphs shows
+    this too, and the callers ask for more with it (a caption, step words, a block word). No
+    word of the lines is read: a sentence that begins "For" and a block that opens with no "do"
+    or "then" are told apart by the indent. Two numbered lines whose numbers differ in length
+    ("9." and "10.") prove nothing, nor do two lines that start more than `ALGORITHM_SET_IN` em
+    apart (a display equation of the text, centered in the column, and the sentence going on
+    under it)."""
     half = 0.5 * steps.anchor.size
+    far = ALGORITHM_SET_IN * steps.anchor.size
 
     def at(row: _Row, number: tuple[int, str, int] | None) -> float:
         return row.chars[number[2]].x0 if number is not None else row.x0
 
+    went_in = False
     for (above, n_above), (row, n_row) in pairwise(texts):
         if n_above is not None and n_row is not None and len(n_above[1]) != len(n_row[1]):
             continue  # "9." to "10.": with no tab stop the longer number moves its words right
-        upper, lower = _step_text(above, n_above), _step_text(row, n_row)
-        opens = _opens_block(upper) and not (said and _OPENS.fullmatch(upper.rstrip()) is None)
         set_in = at(row, n_row) - at(above, n_above)
-        far = ALGORITHM_SET_IN * steps.anchor.size
-        if opens and half < set_in <= far:
-            return True
-        if _CLOSER.fullmatch(lower) and -far <= set_in < -half:
+        if half < set_in <= far:
+            went_in = True
+        elif went_in and -far <= set_in < -half:
             return True
     return False
 
@@ -1390,7 +1400,7 @@ def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
             and (blocks >= 1 or numbered)
             and (numbered or not _reads_on(steps, edges))
             and (not any(_listed(n) for n in marks) or _nested(steps, texts))
-            and (numbered or not steps.ran_on or _nested(steps, lines, said=True))
+            and (numbered or not steps.ran_on or _nested(steps, lines))
         )
     closing = any(_CLOSER.fullmatch(_step_text(r, n)) for r, n in texts)
     ladder = len({round(r.x0 / (0.5 * r.size)) for r in rows}) >= 3
