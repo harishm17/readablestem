@@ -19,6 +19,44 @@
   0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
+## Unreleased: fixes after the third review of the algorithm blocks (review 9)
+
+The review ran the 73 probe pages again, 57 of its own and 11 public papers with algorithms on
+the code before and after the review-8 fixes: 16 of the 73 read better, none worse, and the
+papers read the same. One of those fixes was not complete and three review-7 fixes had come
+open again in narrow shapes. Fixed here (`layout/blocks.py`), each with a case in
+`tests/test_structure.py` that fails without it:
+
+- **A long step after the first is a step.** "Choose a start vector b.", a line in plain words
+  out to the margin, then "repeat" or a loop with no "do": the review-8 fix asked such a page
+  for nested steps and, finding none, dropped the algorithm (the version before kept it). A
+  line that the next one runs on from, with a step over it and a step word under it, is a long
+  step again and asks for no more proof.
+- **A loop that holds one formula shows the nesting.** Under a long first line the proof was
+  read off the text lines only, so "for t = 1 to T do" with "b <- A b" under it proved nothing
+  and the algorithm was two paragraphs. A formula on a line of its own counts as a step in
+  that check, for numbered steps too.
+- **"=" after a display equation resumes only where a step starts.** A sentence set in as a
+  paragraph's first line ("where d = 12 is ...", "Let d = 12 be ...") under an algorithm with a
+  block no "end" closes was a second block, and the first block's levels changed. The line
+  must now start where a step above it starts.
+- **One number is no numbering.** The text under a float's caption followed by the heading "4
+  Results ..." was one block with the heading in it: one numbered line switched off the two
+  checks that tell a paragraph from steps. They are skipped only from two line numbers up.
+- **"9." to "10." is no indent.** Eleven numbered sentences under "Algorithm 5.1 (Euclid)" were
+  a block when item 9 opened "If": typed with no tab stop, "10." sets its words a digit further
+  right. Two lines whose numbers differ in length no longer prove a step set inside another.
+- Left, and written in docs/layout.md: under a long *first* line in plain words, a flat
+  algorithm, one whose loop lines end in no "do", "then" or colon (unless a short "return x" or
+  an "end" is set back to the left) and a loop that holds two formula lines or more are still
+  paragraphs (none is a block on the released version either); text set in under a last step
+  that reaches the right edge is taken into the block; a sentence with "=" after an equation,
+  set in by just the indent of a step under an algorithm with a block no "end" closes, is
+  still taken; where the caption ends within 3 em of the right edge of its column, a first
+  step with no step word is read as the caption's second line; and a caption is a line that
+  opens "Algorithm" and a number, so under "Procedure 2 ..." or "Algorithm A (...)" pseudo-code
+  numbered "1." is still a list.
+
 ## Unreleased: fixes after the second review of the algorithm blocks (review 8)
 
 The review ran 73 probe pages on the code before and after the review-7 fixes. Four of the new
@@ -29,8 +67,9 @@ rules lost real algorithms that the first version kept as one block. Fixed here
   ("Initialize the table of counts ...") that ran to the right edge lost the whole algorithm:
   every such line had to stop short. The lines before the first block word are steps again.
   Where the next line runs on from one of them, the block must show one step set further right
-  under a line that opens a block and ends as one does ("do", "then", a colon), which the
-  running text under a float's caption does not.
+  under a line that opens a block and ends as one does ("do", "then", a colon), or a closing
+  line set back to the left, which the running text under a float's caption does not. (Review
+  9 found shapes this still lost: the entry above.)
 - **Pseudo-code numbered "1." or "1)" under a caption is one block with its indentation.** It
   was a list with no indentation and a stray paragraph. Such numbers are steps under a caption
   when one step is set inside another; "Algorithm 5.1 (Euclid)" in numbered sentences is still
@@ -42,10 +81,12 @@ rules lost real algorithms that the first version kept as one block. Fixed here
 - **A step written with "=" resumes after a display equation** when it stands inside a block
   that is still open ("count = count + v" under a "for" that no "end" has closed). The
   algorithm was lost, or its tail became a paragraph. "where d = 12 is ..." after the last
-  step is still the text going on.
+  step is still the text going on when it starts at the left edge or every block is closed
+  (review 9 found it taken when set in under a block with no "end": the entry above).
 - The limit on lines a step runs on for and the margin test (`_RightEdges.firm`) had no test:
   each has one now.
-- Left, and written in docs/layout.md (all read the same before and after the review-7 fixes):
+- Left, and written in docs/layout.md (all but the last read the same before and after the
+  review-7 fixes; the last changed with them):
   prose that opens "Algorithm 2 computes ..." or with another verb not on the sentence list;
   two short paragraphs that open "For" and "If" right under a float's caption; a sentence that
   opens "Then", "For" or "If" right after an equation that follows an algorithm; a loop line

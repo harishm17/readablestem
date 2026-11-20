@@ -330,18 +330,29 @@ NO_END = [
     (0, "return count"),
 ]
 
+# The same with no "do" or "then" either, and a long second step in plain words.
+LONG_SECOND = [
+    (0, "Set the count to zero."),
+    LONG_FIRST[0],
+    (0, "for each word w in the line"),
+    (1, "if w is stressed"),
+    (2, "count = count + 1"),
+    (0, "output the count of the line"),
+]
+
 
 def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
-    for listed in (ALGORITHM, LONG_LOOP, HANDOUT, LONG_FIRST, NO_END):
+    for listed in (ALGORITHM, LONG_LOOP, HANDOUT, LONG_FIRST, NO_END, LONG_SECOND):
 
         def fill(page, listed=listed):
             y = 100.0 if listed is HANDOUT else running(page, 100, RUNNING)
             y = algorithm(page, y + 10, listed)
-            # A display equation of the text, and the sentence going on after it (on one page
+            # A display equation of the text, and the sentence going on after it (on two pages
             # set in from the left, as the first line of a paragraph is).
             y = fraction(page, y)
             where = "where d = 12 is the length of the verse and t = 3 its count."
-            running(page, y + 10, where, indent=15.0 if listed is ALGORITHM else 0.0)
+            set_in = listed is ALGORITHM or listed is NO_END
+            running(page, y + 10, where, indent=15.0 if set_in else 0.0)
 
         elements = analyze(page_of(fill)).elements
         steps = [e for e in elements if e.preformatted]
@@ -390,15 +401,22 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
             "the|poem, and the two are listed side by side.",
         )
 
-    def float_caption(page):  # a picture's caption, the running text under it in paragraphs
+    def float_caption(page, heading=None):
+        # A picture's caption, the running text under it in paragraphs (or the next heading).
         y = running(page, 100, RUNNING)
         page.draw_rect(pymupdf.Rect(120, y, 480, y + 100), width=0.8)
         page.draw_line((140, y + 20), (460, y + 80), width=1.5)
         y = prose(page, y + 114, "Algorithm 2 Overview of the method") - 8
         y = running(page, y, steps, pitch=14) - 8
-        running(page, y, RUNNING, pitch=14, indent=15)
+        if heading:
+            page.insert_text((72, y + 6), heading, fontsize=BODY, fontname="hebo")
+            y += 28
+        running(page, y, RUNNING, pitch=14, indent=0 if heading else 15)
 
-    for page in (fill, paragraph, sentence, float_caption):
+    def before_a_heading(page):
+        float_caption(page, "4 Results for the long verse")
+
+    for page in (fill, paragraph, sentence, float_caption, before_a_heading):
         assert not [e for e in analyze(page_of(page)).elements if e.preformatted]
 
 
@@ -556,7 +574,7 @@ def test_a_step_with_no_number_may_run_over_several_lines_and_text_under_the_las
     ):
         elements = analyze(page_of(fill)).elements
         assert [e.text.split("\n") for e in elements if e.preformatted] == [lines]
-    assert resumed in [e.text for e in elements]
+        assert fill is not under or resumed in [e.text for e in elements]
 
 
 def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_levels():
@@ -596,6 +614,17 @@ def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_
         ["count = 0", "for each word w in the line do", "  set the speed to"],
         ["  count = count + v", "end for", "return count"],
     ]
+
+    def body(page):  # a loop that holds one formula, after a long first step in plain words
+        y = running(page, 100, RUNNING)
+        first = (0, LONG_FIRST[0][1] + " today")  # to the right edge of the text above
+        loop = [(0, "for each word w in the line do"), (1, "b <- A b"), (0, "end for")]
+        y = algorithm(page, y + 10, [first, *loop, NO_END[4]])
+        running(page, y + 10, RUNNING)
+
+    (block,) = [e.text.split("\n") for e in analyze(page_of(body)).elements if e.preformatted]
+    assert block[1] == "for each word w in the line do"
+    assert block[2].startswith("  ") and block[3:] == ["end for", "return count"]
 
 
 def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():
@@ -638,11 +667,20 @@ def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():
         y = prose(page, y, "Algorithm 5.1 (Euclid)") - 8
         items = [
             "If b is zero, stop: the greatest common divisor is a.",
-            "For any other b, divide a by b and call the remainder r.",
-            "If r is not zero, replace a by b and b by r.",
-            "Return to step 1.",
+            "For any other b, divide a by b.",
+            "Call the remainder r.",
+            "Write r under b.",
+            "Check the sign of r.",
+            "Replace a by b.",
+            "Replace b by r.",
+            "Write the new pair down.",
+            "If r is not zero, go back to step 2.",  # "10." sets its words a digit further right
+            "Stop: the answer is a.",
+            "Return to the caller.",
         ]
-        y = numbered(page, y, items, ".")
+        for n, text in enumerate(items, 1):  # no tab stop: the words follow the number
+            page.insert_text((72, y), f"{n}. {text}", fontsize=BODY, fontname="helv")
+            y += 14
         prose(page, y + 10, "The pair gets smaller at every pass.")
 
     def questions(page):  # numbers with no stop, and first words that are step words
