@@ -361,7 +361,14 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         ],
     )
     if verdict is not None:
+        # The reasons and the notes come first and the verdict is the last line printed, so a
+        # long line above it (the settings, a list of the places that differ) cannot hide it.
         lines.append("")
+        if verdict.judged and not verdict.bands_checked:
+            lines.append(
+                "The band check was not made: no upload holds its decisions' bands in both "
+                "records, so a decision of band 1 or 2 that became optional would not show."
+            )
         if not verdict.judged:
             lines.append(f"The bar was not judged: {verdict.why}.")
         elif verdict.met and verdict.same:
@@ -369,11 +376,6 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         elif verdict.met:
             lines.append("The bar is met: no page kind asks for more decisions than before.")
         else:
-            lines.append("The bar is NOT met:")
             lines += [f"  {line}" for line in verdict.more]
-        if verdict.judged and not verdict.bands_checked:
-            lines.append(
-                "The band check was not made: no upload holds its decisions' bands in both "
-                "records, so a decision of band 1 or 2 that became optional would not show."
-            )
+            lines.append("The bar is NOT met.")
     return "\n".join(lines)

@@ -807,38 +807,22 @@ column. So write migrations in two releases (add the new thing, ship code that u
 remove the old thing later), and treat rolling back past a destructive migration as a
 backup restore (or a forward fix).
 
-Stored results are the other limit. A release reads the results that releases up to its
-own pipeline version stored, not newer ones: the 0.4.0 results have table elements and
-fixes (`Kind.TABLE`, made whatever `FEATURE_TABLES` says), which a release before 0.4.0
-(such as `9ad41db`) refuses to load. Rolled back below 0.4.0, every job with a detected
-table returns 500 on its job page and review screens (the download still works) until
-traffic goes forward again; jobs without tables, and the schema, are fine. Roll back
-below 0.4.0 only for a short time, or not at all.
+Stored results are the other limit. A release reads the results that earlier releases stored,
+not always the ones a later release stores. A newer release can store a value the older code
+does not know: an element or fix kind, a notice code, a link kind, a run kind, a block role or a
+source origin. The older release then does one of two things with it. It ignores it (a role it
+has no word for loads as a plain paragraph), or it refuses to load the result, and the job page
+and the review screens of that document answer 500 until traffic goes forward again (the download
+still works). Which of the two a release does is written beside the value where it is
+introduced, in the comments of `pipeline/run.py` that go with `PIPELINE_VERSION`, and under
+the version's heading in `CHANGELOG.md`.
 
-The same limit stands at 0.5.12. A result it stores can hold values the release before
-it (0.5.10) refuses to load: a link of kind `typed` (an address typed in the text), the
-notice codes that are new (`colour_used`, `struck_text`, `annotations_read`,
-`source_not_compared` and others), the run kinds, and the origin `docx`. A rollback below
-0.5.12 is safe only until the first document is converted, or converted again, by the new
-release: after that each such document returns 500 on its job page and review screens
-until traffic goes forward again. Once anything has been converted, fix forward.
-
-0.5.13 adds to it. A result in which a reviewer left one paragraph out holds the notice code
-`block_omitted`, which 0.5.12 refuses to load (500 on that document), and 0.5.12 does not
-know the paragraph was taken out. A paragraph made a sidebar or a quotation loads in 0.5.12
-as a plain paragraph: the role is ignored, not refused. So a rollback from 0.5.13 to 0.5.12
-is safe until a reviewer has left a paragraph out; below 0.5.12 the limit above applies.
-
-0.5.14 adds no limit of its own. A result it stores can hold six notice codes that 0.5.13 does
-not have (`table_header_missing`, `table_header_carried`, `struck_not_kept`,
-`hidden_text_check`, `tables_not_searched`, `word_table_flattened`), bold, italic and code runs
-in a Word or LaTeX table's cells, and a page's count of unseen characters. 0.5.13 opens such a
-result: the job page, the review screen, the record and the student page all answered 200 for
-a stored result holding all six codes (run against 0.5.13 on 2026-11-19). Its job page lists
-each of the six as "Something in this file may need a look.", since it has no words for them;
-it writes the cells without their runs and makes the student page again with its own rules.
-So a rollback from 0.5.14 to 0.5.13 is safe; what a reviewer loses is the words of those check
-lines until traffic goes forward again.
+So the rule for a rollback is: roll back across a release that adds such a value only before the
+first document has been converted, or converted again, by the newer release. After that, fix
+forward. A rollback across releases that add only values the older code ignores or reads
+safely is safe at any time; what a reviewer loses is the words of the newest check lines until
+traffic goes forward again. Before you roll back, read the changelog entries of the releases
+in between.
 
 If data has to come back, restore a backup (this overwrites the instance's current
 data):

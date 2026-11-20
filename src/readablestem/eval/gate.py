@@ -388,6 +388,7 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "MIN_OUTPUT_TOKENS",
         "MAX_OUTPUT_TOKENS",
         "NOTE_CODES",
+        "NUMERIC_SHARE",
     ),
     "readablestem.pipeline.heading_step": (
         "ACCEPT_AT",
@@ -402,27 +403,44 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "MAX_CONTEXT_ENTRIES",
         "MAX_CONTEXT_CHARS",
     ),
-    "readablestem.pipeline.page_math": ("CONTEXT_CHARS", "DEFAULT_EFFORT"),
-    "readablestem.pipeline.page_math_reconcile": ("CONSISTENT_FROM",),
+    "readablestem.pipeline.page_math": (
+        "CONTEXT_CHARS",
+        "DEFAULT_EFFORT",
+        "MIN_PAGE_CHARS",
+    ),
+    "readablestem.pipeline.page_math_reconcile": (
+        "CONSISTENT_FROM",
+        "RULE_MARGIN",
+        "ATTACHED_LETTERS",
+    ),
     "readablestem.pipeline.page_witness": (
         "DEFAULT_EFFORT",
         "IMAGE_DPI",
         "IMAGE_MAX_SIDE_PX",
         "MAX_WINDOWS",
         "MIN_MATH_GLYPHS",
+        "SPLIT_MIN_ROWS",
     ),
-    "readablestem.pipeline.witness_reconcile": ("MATH_SHARE", "OVERLAP_SHARE", "TIE_BELOW"),
+    "readablestem.pipeline.witness_reconcile": (
+        "MATH_SHARE",
+        "OVERLAP_SHARE",
+        "TIE_BELOW",
+        "MIN_GLYPH",
+    ),
     "readablestem.pipeline.image_page": (
         "MAX_SIDE_PX",
         "MAX_OUTPUT_TOKENS",
         "DEFAULT_EFFORT",
         "AGREED_CONFIDENCE",
         "CONFIDENCE_VALUE",
+        "RECOVERY_MARGIN",
     ),
     "readablestem.pipeline.image_page_check": (
         "CROPS_PER_REQUEST",
         "MAX_CROPS_PER_PAGE",
         "MAX_OUTPUT_TOKENS",
+        "CROP_MARGIN_PX",
+        "MIN_CROP_HEIGHT_PX",
     ),
     "readablestem.pipeline.validate": ("MAX_LATEX_CHARS", "ALT_WARN_CHARS", "ALT_MAX_CHARS"),
     "readablestem.pipeline.tables": ("CROP_DPI", "CROP_PAD"),
@@ -462,27 +480,15 @@ UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
         "MAX_TABLE_COLS": _SAFETY_LIMIT,
         "MAX_TABLE_ROWS": _SAFETY_LIMIT,
         "TEXT_LAYER_MISMATCH_BELOW": "imported from `equation_step`, where it is guarded",
-        "NUMERIC_SHARE": "NOT YET GUARDED: which grids count as a grid of numbers; guard it "
-        "when the two no-model reports are made again",
     },
     "readablestem.pipeline.page_math": {
         "MAX_OUTPUT_TOKENS": _DEFAULT_OF_A_SETTING,
-        "MIN_PAGE_CHARS": "NOT YET GUARDED: a page with less text is not sent; guard it when "
-        "the two no-model reports are made again",
         "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
-    },
-    "readablestem.pipeline.page_math_reconcile": {
-        "RULE_MARGIN": "NOT YET GUARDED: geometry of which rules belong to a placed region",
-        "ATTACHED_LETTERS": "NOT YET GUARDED: how many glued letters count as part of a span",
     },
     "readablestem.pipeline.page_witness": {
         "CONTEXT_CHARS": _AS_ITS_SETTING,
         "MIN_PAGE_CHARS": _AS_ITS_SETTING,
-        "SPLIT_MIN_ROWS": "NOT YET GUARDED: when a window that ran out is split again",
         "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
-    },
-    "readablestem.pipeline.witness_reconcile": {
-        "MIN_GLYPH": "NOT YET GUARDED: the least a glyph's size can be when a tolerance is taken",
     },
     "readablestem.pipeline.image_page": {
         "SPEECH_VERSION": _VERSION_NUMBER,
@@ -495,11 +501,6 @@ UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
         "INK_PAD_PX": "geometry of a block's box on the page picture",
         "MARKER_WIDTH": "geometry of a list marker beside a formula",
         "MARKER_GAP": "geometry of a list marker beside a formula",
-        "RECOVERY_MARGIN": "NOT YET GUARDED: how far the picture of a left-out stretch is grown",
-    },
-    "readablestem.pipeline.image_page_check": {
-        "CROP_MARGIN_PX": "NOT YET GUARDED: how far a request's cut-out is grown",
-        "MIN_CROP_HEIGHT_PX": "NOT YET GUARDED: the least height of a request's cut-out",
     },
 }
 

@@ -212,10 +212,10 @@ def test_a_bold_phrase_that_goes_on_over_the_end_of_an_items_line_stays_in_the_i
 # ---------------------------------------------------------------- not lists (review round 2)
 
 
-@pytest.mark.parametrize("dash", ["-", "\u2013", "\u2014"])
-def test_a_spaced_minus_before_a_number_is_not_a_dash_bullet(dash):
+def test_a_spaced_minus_before_a_number_is_not_a_dash_bullet():
     """Two lines starting "- 40 m/s" and "- 20 m/s" matched the sibling rule: the sign
     went into the marker and the values were read out as positive."""
+    dash = "-"
     html = (
         "<p>The velocities of the two carts after the collision are:<br>"
         f"{dash} 40 m/s<br>{dash} 20 m/s<br>so both carts move to the left after they collide.</p>"

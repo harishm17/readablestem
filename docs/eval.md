@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-19 | 0.5.14 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-20 | 0.5.14 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -671,8 +671,9 @@ or of a module `GUARDED_CONSTANTS` already names, that is neither in `GUARDED_CO
 `UNGUARDED_CONSTANTS` with its reason fails `tests/test_eval_gate.py`, which reads the modules'
 own names with no parser of its own: a new bar is a decision made when it is added. It sees a
 constant of a module, not a number written inside a function or a bar held in a dict or tuple.
-A few entries say "NOT YET GUARDED": they decide a request or a bar, and guarding them makes the
-two committed no-model reports stale, so it waits for the batch that makes them again. Tolerances live in `data/eval/tolerances.json`; an entry with only
+Every constant that decides a request or a bar is guarded, so adding one to `GUARDED_CONSTANTS` makes the
+two committed no-model reports stale until they are made again (`make reproduce-rerun` writes
+them, or the two `eval pipeline` commands in `eval/reproduce.py`). Tolerances live in `data/eval/tolerances.json`; an entry with only
 `name` and `limit` adjusts a default. The tables task also has absolute floors, checked
 with or without a baseline (see "Tables": "Gate").
 
@@ -3336,6 +3337,8 @@ number of uploads.
 | 0 | the bar is met, or no record was given |
 | 1 | the set or a page kind asks for more than before, or a decision of band 1 or 2 became optional; the lines name each |
 | 2 | not judged: other documents, or a different number of uploads measured (with `--same`: no upload was measured) |
+
+The last line printed is the verdict ("The bar is met: ...", "The bar is NOT met." or "The bar was not judged: ..."); the lines that say where it fails, and the note that the band check was not made, stand above it.
 
 **A decision that became optional.** The count cannot see a risky decision turned into a note.
 Each upload's row in a record also holds its decisions' elements with their bands (`asked`)

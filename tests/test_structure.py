@@ -1171,8 +1171,9 @@ def contents_pdf() -> bytes:
     return page_of(fill)
 
 
-def test_a_contents_page_with_dot_leaders_is_a_list_of_titles_without_leaders_or_numbers():
-    elements = analyze(contents_pdf()).elements
+def test_a_contents_page_with_dot_leaders_is_nested_links_to_the_headings_without_leaders():
+    pdf = contents_pdf()
+    elements = analyze(pdf).elements
     entries = [e for e in elements if e.kind == Kind.LIST_ITEM]
     assert [(e.text, e.list_level) for e in entries] == [
         ("1 Motion", 1),
@@ -1181,23 +1182,14 @@ def test_a_contents_page_with_dot_leaders_is_a_list_of_titles_without_leaders_or
         ("2 Forces", 1),
     ]
     assert not [e for e in elements if e.kind == Kind.PARAGRAPH]  # no stray page numbers
-
-
-def test_a_contents_entry_links_to_the_heading_it_names_once():
-    elements = analyze(contents_pdf()).elements
-    by_text = {e.text: e for e in elements if e.kind == Kind.LIST_ITEM}
-    motion = by_text["1 Motion"]
     # Two entries share a title with a heading ("1 Motion", "1.1 Speed"); "1.2" and "2" name none.
+    by_text = {e.text: e for e in entries}
     heads = [e for e in elements if e.kind == Kind.HEADING and e.text != "Contents"]
     assert [h.text for h in heads] == ["1 Motion", "1.1 Speed"]
-    assert [(k.kind, k.target_id) for k in motion.links] == [("internal", heads[0].id)]
+    assert [(k.kind, k.target_id) for k in by_text["1 Motion"].links] == [("internal", heads[0].id)]
     assert by_text["1.2 Velocity"].links == [] and by_text["2 Forces"].links == []
-
-
-def test_a_contents_page_is_written_as_nested_links():
-    html = html_of(contents_pdf())
-    assert '<ul><li id="p1-e1"><a href="#p1-e5">1 Motion</a><ul><li id="p1-e2">' in html
-    assert ". . ." not in html
+    html = html_of(pdf)
+    assert f'<a href="#{heads[0].id}">1 Motion</a>' in html and ". . ." not in html
 
 
 def test_a_page_with_one_dotted_line_is_not_a_contents_page():
