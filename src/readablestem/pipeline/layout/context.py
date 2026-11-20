@@ -40,6 +40,8 @@ class _Document:
     (`hyphens.document_spellings`), for the hyphen at the end of a line: pairs it hyphenates
     inside a line, words it writes whole.
     `grouping`: `analyze(display_grouping=...)`.
+    `inline_joins`: `analyze(inline_joins=...)`: the rules that keep the whole inline formula in one
+    run (docs/layout.md "The box holds the whole inline formula").
     `region_tree`: `analyze(region_tree=...)`: the pages are read with a tree of regions
     (`regions.py`) in place of one gutter.
     `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector
@@ -52,6 +54,7 @@ class _Document:
     compounds: frozenset[str] = frozenset()
     whole_words: frozenset[str] = frozenset()
     grouping: bool = False
+    inline_joins: bool = False
     region_tree: bool = False
     ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)
     detector: tables.DetectorBudget = field(default_factory=tables.DetectorBudget)

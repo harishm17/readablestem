@@ -48,6 +48,8 @@ def _convert(entry: str, image_pages: bool, exam: bool) -> dict[str, Any]:
         grouping: dict[str, Any] = (
             {"display_grouping": True} if settings.layout_display_grouping else {}
         )
+        if settings.layout_inline_joins:
+            grouping["inline_joins"] = True
         if settings.region_tree == "on":
             grouping["region_tree"] = True
         grouping["table_search_limited"] = False

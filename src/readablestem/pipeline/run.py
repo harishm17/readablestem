@@ -1680,6 +1680,8 @@ def _page_math_pass(
             grouping: dict[str, Any] = (
                 {"display_grouping": True} if settings.layout_display_grouping else {}
             )
+            if settings.layout_inline_joins:
+                grouping["inline_joins"] = True
             if settings.region_tree == "on":
                 grouping["region_tree"] = True
             if settings.table_search_unlimited:
@@ -1945,6 +1947,8 @@ def _convert(
             extra: dict[str, Any] = {} if collector is None else {"page_math": collector}
             if settings.layout_display_grouping:
                 extra["display_grouping"] = True
+            if settings.layout_inline_joins:
+                extra["inline_joins"] = True
             if settings.region_tree == "on":
                 extra["region_tree"] = True
             if settings.table_search_unlimited:
