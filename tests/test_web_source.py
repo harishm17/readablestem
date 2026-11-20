@@ -512,9 +512,11 @@ def test_with_the_word_switch_on_a_docx_is_read_from_the_file_and_not_made_into_
         said = " ".join(page.split())
         assert "not compared with its printed pages" in said
         assert READY_ALL not in said
-        assert (
-            "not compared with its printed pages" in client.get(f"/jobs/{job_id}/record.csv").text
-        )
+        sheet = client.get(f"/jobs/{job_id}/record.csv").text
+        assert "not compared with its printed pages" in sheet
+        # a file has no pages: the record does not count its reading's one as a page
+        assert "document,Pages" not in sheet
+        assert "<dt>Pages</dt>" not in client.get(f"/jobs/{job_id}/record").text
         assert client.get(f"/jobs/{job_id}/review/list").status_code == 200
         # the notice says the Word file is kept as uploaded, and deleting removes every copy
         assert "the Word .docx file" in " ".join(client.get("/privacy").text.split())

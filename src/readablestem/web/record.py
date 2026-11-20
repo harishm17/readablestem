@@ -713,7 +713,8 @@ def to_csv(record: Record) -> str:
 
     row("document", "Title", detail=record.title)
     row("document", "File name", detail=record.filename)
-    row("document", "Pages", detail=record.pages)
+    if record.checked.origin == "pdf":  # a source has no pages: its reading counts one
+        row("document", "Pages", detail=record.pages)
     row("document", "Converted on", when=iso_when(record.converted_at))
     if record.csv_actors:
         row("document", "Converted by", by=record.owner)
