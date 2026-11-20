@@ -131,7 +131,7 @@ sudo apt-get install -y fonts-noto-core fonts-liberation     # the fonts the pri
 
 A live run can be made with Claude instead: `--provider anthropic` (with `ANTHROPIC_API_KEY`
 in place of `OPENAI_API_KEY`; `--main-model` and `--cheap-model` choose the models, default
-`claude-opus-5-5` and `claude-haiku-5-5`). `--out` is then required, so that `PROOF.md`, the
+the Anthropic models in `config.py`). `--out` is then required, so that `PROOF.md`, the
 report of the committed OpenAI recording, is not overwritten, and `--record` should name a
 folder of its own:
 
@@ -331,9 +331,9 @@ readablestem proof --set heldout-2026-10 --add-systems parsers
 `--arms` limits them, and `--chat-runs N` makes N runs of each arm instead of the arm's own
 number (the recorded run says how many were made, and the report reads that). The arms can be
 added in steps, each with its own cap (an arm already in the recorded run is never run again):
-`--provider anthropic` records the Purdue prompt on `claude-opus-5-5` (`chatbot-opus-purdue`,
-the primary arm) and on `claude-haiku-5-5` (`chatbot-haiku-purdue`), and judges the figure
-descriptions with `claude-opus-5-5` (no refusal fallback), through the Messages API with the
+`--provider anthropic` records the Purdue prompt on the main model (`chatbot-opus-purdue`,
+the primary arm) and on the cheap model (`chatbot-haiku-purdue`), and judges the figure
+descriptions with the main model (no refusal fallback), through the Messages API with the
 same PDF, page images and prompt (`proof/chatbot.py`). With `--batch` the Claude arms and the figure judge go through the Message Batches API
 (half the price, answered when the batch ends; `proof/chatbot_batch.py`): the same message per
 section, each record keeping `cost_usd` at list price and adding `billed_usd`. The chatbot recipe repeats `niche/chatbot-runs` of the research

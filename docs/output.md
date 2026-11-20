@@ -889,7 +889,7 @@ and label are unchanged. The evaluations that read the PDF's text back out of th
 (`assemble.equation_alt_text`) strip both forms. In a document in another language the alt
 text is marked `lang="en"`, as the other fixed words are. The page's `generator` tag names the
 pipeline that converted the result the page is made from beside the version of the code
-(`ReadableSTEM 0.1.0, pipeline 0.5.13`), so a stored file made again still says which pipeline
+(`ReadableSTEM <package version>, pipeline <PIPELINE_VERSION>`), so a stored file made again still says which pipeline
 converted it; a page made from several results names only the code.
 
 - The flag is a dashed border **and** a text label, never color alone (WCAG 1.4.1). The

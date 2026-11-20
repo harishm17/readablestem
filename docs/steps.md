@@ -17,8 +17,8 @@ an optional note (`"optional"`).
 ```mermaid
 flowchart LR
   C[crop PNG] --> R{route}
-  R -->|inline, text layer <= 25 chars| L[gpt-6-luna]
-  R -->|display or long| S[gpt-6.1-sol]
+  R -->|inline, text layer <= 25 chars| L[cheap model]
+  R -->|display or long| S[main model]
   L -->|confidence < auto-accept or error check| S
   L & S --> V[clean LaTeX -> check_latex -> safe_latex_to_mathml -> check_mathml]
   V --> X[text-layer cross-check]
@@ -734,7 +734,7 @@ layout's. Measurements: [eval-page-math.md](eval-page-math.md).
 ## Page witness and the glyph-checked second reading (equations; `FEATURE_PAGE_WITNESS`, off)
 
 With the flag on, one call per math page (`pipeline/page_witness.py`, prompt `page_witness`, model
-`PAGE_WITNESS_MODEL`, default `claude-opus-5-5`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS` 12,288, timeout `PAGE_WITNESS_TIMEOUT_S` 240 s (a timeout is charged its whole worst-case reservation), effort
+`PAGE_WITNESS_MODEL`, default in `config.py`, output limit `PAGE_WITNESS_MAX_OUTPUT_TOKENS`, timeout `PAGE_WITNESS_TIMEOUT_S` (a timeout is charged its whole worst-case reservation), effort
 `ANTHROPIC_EFFORT_PAGE_WITNESS`, default medium) reads every formula on the page from the page image and the
 numbered text-layer rows, table cells, captions and figure labels included. Each formula is anchored by a quote
 of its text-layer row(s); `page_math.locate` and `page_math.verify` decide whether the quote holds, so a formula
@@ -1057,8 +1057,8 @@ note: the output keeps MathML only, so a missing reading aid changes nothing a s
 `pipeline/table_step.py` (`rebuild`, prompt `table.md`), behind `FEATURE_TABLES`; the
 full description is in [tables.md](tables.md). In short:
 
-- Same shape as equations: gpt-6-luna reads the crop first (router fallback on API
-  errors), gpt-6.1-sol is asked once when a check fails or the answer says the crop is
+- Same shape as equations: the cheap model reads the crop first (router fallback on API
+  errors), the main model is asked once when a check fails or the answer says the crop is
   not a data table, and the better answer is kept. Spend goes through the same
   `JobBudget` reservations; `BudgetExceeded` propagates.
 - The answer is rows of cells (text, LaTeX for math cells, header flags, spans), placed
@@ -1157,7 +1157,7 @@ An answer that cannot be used is never a pass. The verdict keeps the key of the 
 asked (`models.question`: pictures, listing, prompt, model, effort, reply format), so it
 is tied to the exact input it was given, and two runs of one input can be compared.
 
-**Model and money.** `PAGE_AUDIT_MODEL` (default `claude-sonnet-5-5`) at low effort
+**Model and money.** `PAGE_AUDIT_MODEL` (default in `config.py`) at low effort
 (`ANTHROPIC_EFFORT_PAGE_AUDIT` overrides), `PAGE_AUDIT_MAX_OUTPUT_TOKENS` 1,500. Before a
 request is sent its worst case is priced (the whole input at the full price and the whole
 output limit): over `PAGE_AUDIT_MAX_USD_PER_PAGE` (default $0.10) the page is
@@ -1325,7 +1325,7 @@ decorative rules were added; the prompt versions have changed since.
 
 ADR 0005 (accepted by Harish, 2026-10-08). After a step has made its fix, a second model
 is asked fixed questions about the proposal through the OpenAI Decisions API
-(`POST /v1/decisions`, gpt-6-luna), which answers with probabilities instead of text. It
+(`POST /v1/decisions`, the cheap model), which answers with probabilities instead of text. It
 never generates anything and never replaces the checks above; it only ranks. Its
 probabilities are not calibrated, so they are compared with thresholds from settings and
 never shown to a reader as a confidence. Wording, as everywhere: "a second automated
@@ -1422,7 +1422,7 @@ screen's optional note work unchanged. It asks a Claude model that did not read 
 with an audit prompt, whether the proposal matches the image.
 
 **Independent of the first pass** in three ways: a different model (`CLAUDE_CHECK_MODEL`,
-claude-sonnet-5-5; the first pass is claude-haiku-5-5 and claude-opus-5-5, and
+a default in `config.py`; the first pass is the cheap and main models, and
 `anthropic_effort_for` gives it its own effort `CLAUDE_CHECK_EFFORT`, low); a different
 prompt (`models/prompts/check_figure.md`, `check_equation.md`: "you audit text someone else
 wrote", the image first, no confidence field to echo); and it never sees the first pass's

@@ -489,7 +489,7 @@ flattened exponent (10⁵ is "105" in most text layers).
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Table | `cheap_model` (gpt-6-luna), through `router.call_with_fallback` (an outage falls back to the main model) | the answer is unusable, says it is not a data table, or fails any check except the spacing note and `no_pdf_text` (a second reading cannot change those) |
+| Table | `cheap_model`, through `router.call_with_fallback` (an outage falls back to the main model) | the answer is unusable, says it is not a data table, or fails any check except the spacing note and `no_pdf_text` (a second reading cannot change those) |
 
 The escalation is one main-model call with no fallback (its fallback would be the cheap
 model again). The main model's answer is kept unless it produced nothing, only the cheap
