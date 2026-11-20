@@ -151,8 +151,8 @@ def analyze(
     `display_grouping` (`LAYOUT_DISPLAY_GROUPING`, off): the rules of "One printed display, one
     element" in docs/layout.md. Off, the output is what it was before they existed.
 
-    `inline_joins` (`LAYOUT_INLINE_JOINS`, off): the rules of "The box holds the whole inline
-    formula" in docs/layout.md. Off, the output is what it was before they existed.
+    `inline_joins` (`LAYOUT_INLINE_JOINS`, off): the rules of "Inline formulas kept whole"
+    in docs/layout.md. Off, the output is what it was before they existed.
 
     `region_tree` (`REGION_TREE`, off): the page's columns are found by a tree of regions built
     from the unmerged lines ("The region tree" in docs/layout.md). Off, the output is what it

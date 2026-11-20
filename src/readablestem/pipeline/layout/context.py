@@ -41,7 +41,7 @@ class _Document:
     inside a line, words it writes whole.
     `grouping`: `analyze(display_grouping=...)`.
     `inline_joins`: `analyze(inline_joins=...)`: the rules that keep the whole inline formula in one
-    run (docs/layout.md "The box holds the whole inline formula").
+    run (docs/layout.md "Inline formulas kept whole").
     `region_tree`: `analyze(region_tree=...)`: the pages are read with a tree of regions
     (`regions.py`) in place of one gutter.
     `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector

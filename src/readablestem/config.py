@@ -138,9 +138,9 @@ class Settings(BaseSettings):
     # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped in the
     # change that enables it.
     layout_display_grouping: bool = False
-    # The box holds the whole inline formula (`layout.analyze(inline_joins=True)`, docs/layout.md):
-    # a maths word and its operand ("a mod n"), a label before a formula ("H0:"), part labels
-    # inside a run, and a colon inside a bracket no longer end an inline formula. Off: output is
+    # Inline formulas kept whole (`layout.analyze(inline_joins=True)`, docs/layout.md "Inline
+    # formulas kept whole"): a maths word and its operand ("a mod n"), a label before a formula
+    # ("H0:") and a colon inside a bracket no longer end an inline formula. Off: output is
     # byte-identical to before. Production's value is in the profile. Turning it on moves
     # equation boxes, so the recorded answers of the pages it moves stop matching, and
     # PIPELINE_VERSION must be bumped in the change that enables it.
