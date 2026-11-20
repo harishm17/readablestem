@@ -1047,7 +1047,7 @@ math font, stay math.
      (or sits right over) a big operator (sum, product, integral, union, intersection),
      centered on it and no wider than twice its sign.
 
-  Measured on the 21 development papers (`tools/boxscore_dev.py`, 11,258 formulas, display
+  Measured on the 21 development papers (a development box score kept outside the repository; 11,258 formulas, display
   class 1,004): whole 80.0% with the switch off, 83.9% with rules 1 to 3, and with 4, 5 and 6
   added one after the other 88.4% (rule 4: 46 formulas made whole, 1 broken: an inline formula
   that a display's box now reaches), 89.8% (rule 5: 14, none broken) and 89.9% (rule 6: 1,
