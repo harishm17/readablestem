@@ -1529,7 +1529,8 @@ checked, the day of the last decision and the version.
 - "Every part the tool found was converted." is the sentence for a whole job, never
   "Everything was converted": ink the tool did not find is not counted until page facts exist.
   A LaTeX source whose reader left words or pictures unread (`checked.unread_of`, from
-  `SourceReport.unread_words` and `unread_pictures`, SW42.4) is not whole either: the student
+  `SourceReport.unread_words` and `unread_pictures`, SW42.4; a Word file's reader leaves a
+  report with those two counts only when it left something unread) is not whole either: the student
   note and its opening notice say "14 words of the LaTeX source could not be read and are not
   in this file", the owner's lines say they "were not read", and the record says "No".
 - The job page's pictures line, notes line, structure-checks line and "What was checked, and
