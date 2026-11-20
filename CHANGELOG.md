@@ -11,6 +11,9 @@
   levels, the equation keeping its crop and its place. Numbered lists, tables with a line-number
   column, margin line numbers and monospaced listings are not taken. Four fields on `_Row`
   (`algo_level`, `algo_number`, `algo_start`, `algo_join`) carry the result.
+- A paragraph that opens "Algorithm 2 shows ..." or has "Algorithm 2." at the start of a line is
+  not an algorithm when some of its lines begin with "for" or "if": lines that all run on from
+  one to the next are prose (`_reads_on`).
 - Word export (`export_docx._lines_of`): the gap after a line number is no-break spaces too.
 - PIPELINE_VERSION and RENDER_VERSION are not raised here; a raise is owed (stored documents with
   an algorithm change their block text).

@@ -291,7 +291,21 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
         prose(page, y, "Each word is checked once, and the count is kept at the end.")
         prose(page, y + 22, "The result is then compared with the reader's own marks.")
 
-    assert not [e for e in analyze(page_of(fill)).elements if e.preformatted]
+    def paragraph(page):  # its lines run on, and three of them begin with a step word
+        lines = (
+            "We now turn to the second method, which is faster on long poems and is the one "
+            "listed below in|Algorithm 2. The scan is run once over the whole verse and the "
+            "marks are kept in a table that|for every word holds the count of its stressed "
+            "syllables, so the reader can check the result,|if the reader wants to, against the "
+            "marks in the printed edition of the poem that we used here|while the scan is still "
+            "running on the next verse."
+        )
+        for n, line in enumerate(lines.split("|")):
+            page.insert_text((72, 100 + 13.5 * n), line, fontsize=BODY, fontname="helv")
+        prose(page, 190, "The count is printed after the last word of the verse is read.")
+
+    for page in (fill, paragraph):
+        assert not [e for e in analyze(page_of(page)).elements if e.preformatted]
 
 
 NUMBERED = [

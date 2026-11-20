@@ -2078,7 +2078,9 @@ its steps (`_algorithm_groups`, `_scan`, `_is_algorithm`). Under a line that ope
 it takes at least `ALGORITHM_MIN_ROWS` (3) lines, `ALGORITHM_MIN_WORDS` (2) of them beginning with
 a step word (for, if, else, while, repeat, until, end, return, input, output, require, ensure,
 function, procedure, do, then ...), and one that opens or closes a block (or
-`ALGORITHM_MIN_NUMBERS` (2) numbered steps). With no caption line (one under a rule, a box or
+`ALGORITHM_MIN_NUMBERS` (2) numbered steps). Lines with no numbers that all run on from one to the
+next (each reaches the right edge or stops where the next line's first word no longer fits) are a
+paragraph that opens "Algorithm 2 shows ..." and are left as one (`_reads_on`). With no caption line (one under a rule, a box or
 nothing) it takes more proof: `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a
 step word, a step that closes a block, and either every line numbered ("3:", not the "1." or "2)"
 of a list) or no numbers and an indent ladder of three left edges; a line with a list marker

@@ -1201,13 +1201,26 @@ def _scan(
     return (steps, index) if steps.rows else None
 
 
-def _is_algorithm(steps: _Steps) -> bool:
+def _reads_on(steps: _Steps, edges: _RightEdges) -> bool:
+    """Do the lines collected run on from one to the next like the lines of a paragraph: each
+    but the last reaches the right edge, or stops where the next line's first word no longer
+    fits (text set ragged)?"""
+    lines = [r for r in steps.rows if id(r) not in steps.pieces]
+    return all(
+        _wraps_on(row, edges) or row.x1 + 0.25 * row.size + _first_word(following) > edges.of(row)
+        for row, following in pairwise(lines)
+    )
+
+
+def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
     """Do the rows collected make an algorithm? Under a caption: `ALGORITHM_MIN_ROWS` of them,
     `ALGORITHM_MIN_WORDS` with a step word, and one that opens or closes a block (or
-    `ALGORITHM_MIN_NUMBERS` that carry line numbers). With no caption the proof is a numbered
-    list of steps, or an indent ladder, and more of it: `ALGORITHM_BARE_ROWS` rows,
-    `ALGORITHM_BARE_WORDS` with a step word, one that closes a block, and none of them the item
-    of a list ("1." or "2)")."""
+    `ALGORITHM_MIN_NUMBERS` that carry line numbers); and, with no numbers, a line that stops
+    where the next line's first word would still have fitted (the lines of a paragraph that
+    opens "Algorithm 1 shows ..." all run on, and some begin with "for" or "if"). With no
+    caption the proof is a numbered list of steps, or an indent ladder, and more of it:
+    `ALGORITHM_BARE_ROWS` rows, `ALGORITHM_BARE_WORDS` with a step word, one that closes a
+    block, and none of them the item of a list ("1." or "2)")."""
     rows = [r for r in steps.rows if id(r) not in steps.wraps and id(r) not in steps.pieces]
     texts = [(r, steps.number(r)) for r in rows if r.kind == "text"]
     words = sum(_STEP_WORD.match(r.clean) is not None for r, _ in texts)
@@ -1218,6 +1231,7 @@ def _is_algorithm(steps: _Steps) -> bool:
             len(steps.rows) >= ALGORITHM_MIN_ROWS
             and words >= ALGORITHM_MIN_WORDS
             and (blocks >= 1 or len(numbers) >= ALGORITHM_MIN_NUMBERS)
+            and (bool(numbers) or not _reads_on(steps, edges))
         )
     closing = any(_CLOSER.fullmatch(_step_text(r, n)) for r, n in texts)
     ladder = len({round(r.x0 / (0.5 * r.size)) for r in rows}) >= 3
@@ -1298,7 +1312,7 @@ def _algorithm_groups(
         if first >= len(rows):
             continue
         scan = _scan(rows, first, caption, edges, code)
-        if scan is None or not _is_algorithm(scan[0]):
+        if scan is None or not _is_algorithm(scan[0], edges):
             continue
         steps, index = scan
         for member in steps.rows:
