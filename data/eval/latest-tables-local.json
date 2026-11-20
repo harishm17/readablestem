@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task": "tables",
   "mode": "local",
-  "date": "2026-11-19",
+  "date": "2026-11-20",
   "pipeline_version": "0.5.14",
   "profile": {
     "name": "development settings",
@@ -179,9 +179,12 @@
     "pipeline.image_page.DEFAULT_EFFORT": "low",
     "pipeline.image_page.MAX_OUTPUT_TOKENS": 6144,
     "pipeline.image_page.MAX_SIDE_PX": 2576,
+    "pipeline.image_page.RECOVERY_MARGIN": 15,
     "pipeline.image_page_check.CROPS_PER_REQUEST": 8,
+    "pipeline.image_page_check.CROP_MARGIN_PX": 14,
     "pipeline.image_page_check.MAX_CROPS_PER_PAGE": 40,
     "pipeline.image_page_check.MAX_OUTPUT_TOKENS": 3000,
+    "pipeline.image_page_check.MIN_CROP_HEIGHT_PX": 48,
     "pipeline.layout.access.CROP_PAD": 2.0,
     "pipeline.layout.access.LINE_BAND": 0.8,
     "pipeline.layout.access.LINE_MARK": [
@@ -195,12 +198,16 @@
     "pipeline.notation_memory.MAX_CONTEXT_ENTRIES": 24,
     "pipeline.page_math.CONTEXT_CHARS": 7600,
     "pipeline.page_math.DEFAULT_EFFORT": "medium",
+    "pipeline.page_math.MIN_PAGE_CHARS": 4,
+    "pipeline.page_math_reconcile.ATTACHED_LETTERS": 4,
     "pipeline.page_math_reconcile.CONSISTENT_FROM": 0.8,
+    "pipeline.page_math_reconcile.RULE_MARGIN": 2.0,
     "pipeline.page_witness.DEFAULT_EFFORT": "medium",
     "pipeline.page_witness.IMAGE_DPI": 200,
     "pipeline.page_witness.IMAGE_MAX_SIDE_PX": 2576,
     "pipeline.page_witness.MAX_WINDOWS": 3,
     "pipeline.page_witness.MIN_MATH_GLYPHS": 3,
+    "pipeline.page_witness.SPLIT_MIN_ROWS": 6,
     "pipeline.run.CONTEXT_CHARS": 600,
     "pipeline.table_step.BASE_OUTPUT_TOKENS": 2048,
     "pipeline.table_step.MAX_OUTPUT_TOKENS": 16384,
@@ -211,6 +218,7 @@
       "whitespace_differs",
       "written_as_text"
     ],
+    "pipeline.table_step.NUMERIC_SHARE": 0.5,
     "pipeline.table_step.OUTPUT_TOKENS_PER_SLOT": 40,
     "pipeline.tables.CROP_DPI": 144,
     "pipeline.tables.CROP_PAD": 4.0,
@@ -218,12 +226,13 @@
     "pipeline.validate.ALT_WARN_CHARS": 150,
     "pipeline.validate.MAX_LATEX_CHARS": 2000,
     "pipeline.witness_reconcile.MATH_SHARE": 0.4,
+    "pipeline.witness_reconcile.MIN_GLYPH": 1.0,
     "pipeline.witness_reconcile.OVERLAP_SHARE": 0.5,
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "c11dd3461bbe90c1e66fb052bf561d234001295a",
-    "clean": true,
+    "commit": "c04ee4a307ee44129431a93f660e832b8fbdac5d",
+    "clean": false,
     "pipeline_version": "0.5.14",
     "render_version": 10,
     "tools": {
@@ -469,8 +478,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 4609.0,
-    "p95": 10622.799999999985,
+    "p50": 5858.0,
+    "p95": 13741.599999999979,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }
