@@ -39,7 +39,7 @@ sentences written here were not true. Fixed (`layout/blocks.py`), each with a ca
   margin, was a block: the first line of that paragraph passed as a long step. The step word
   under a long step must now be on a line that ends short of the right edge (as "repeat" does);
   with no step word under it, the line is still asked for the nesting proof.
-- **A centred formula is no nested step.** Running text with a line that opens "for" and ends
+- **A centered formula is no nested step.** Running text with a line that opens "for" and ends
   in a colon ("... as follows:") over a display equation was a block: the formula counted as
   a step set inside the "for". A line more than 6 em right of the line over it no longer
   counts, and (review 11) nor does a closing line more than 6 em left of the line over it: "The

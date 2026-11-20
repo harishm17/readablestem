@@ -987,7 +987,7 @@ ALGORITHM_SMALL = 0.6  # x the size of the steps: the smallest a step ("Output: 
 ALGORITHM_MAX_DEPTH = 12
 ALGORITHM_RUN_ON = 2  # lines a step with no number may go on for: more is a paragraph
 ALGORITHM_BETWEEN = 2  # lines with no number that may stand between two numbered steps
-ALGORITHM_SET_IN = 6  # em: two lines that start further apart are text and a centred equation
+ALGORITHM_SET_IN = 6  # em: two lines that start further apart are text and a centered equation
 
 
 def _line_number(row: _Row) -> tuple[int, str, int] | None:
@@ -1333,7 +1333,7 @@ def _nested(
     paragraph.) With `said`, the line that opens the block must say so where it ends ("do",
     "then", a colon): a sentence that begins "For" does not. Two numbered lines whose numbers
     differ in length ("9." and "10.") prove nothing, nor do two lines that start more than
-    `ALGORITHM_SET_IN` em apart (a display equation of the text, centred in the column, and
+    `ALGORITHM_SET_IN` em apart (a display equation of the text, centered in the column, and
     the sentence going on under it)."""
     half = 0.5 * steps.anchor.size
 

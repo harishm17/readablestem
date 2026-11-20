@@ -2111,7 +2111,7 @@ must then show more: one step set further right under a line that opens a block 
 one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
 A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
 lines that start more than `ALGORITHM_SET_IN` (6) em apart prove nothing: a line that far right
-is a display equation of the text, centred in the column ("... as follows:" over "v = d / t"),
+is a display equation of the text, centered in the column ("... as follows:" over "v = d / t"),
 and a closing line that far left of it is the sentence going on ("until the last word is read").
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
