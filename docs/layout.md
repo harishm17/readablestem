@@ -2109,9 +2109,10 @@ over a loop line that reaches the margin) may be a long step ("Initialize the ta
 counts ..." set out to the margin) or the running text under a float's caption, so the lines
 must then show more: one step set further right under a line that opens a block and ends as
 one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
-A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"), but not
-one set more than `ALGORITHM_SET_IN` (6) em right of the line over it: that is a display
-equation of the text, centred in the column ("... as follows:" over "v = d / t").
+A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
+lines that start more than `ALGORITHM_SET_IN` (6) em apart prove nothing: a line that far right
+is a display equation of the text, centred in the column ("... as follows:" over "v = d / t"),
+and a closing line that far left of it is the sentence going on ("until the last word is read").
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
 a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
@@ -2170,7 +2171,8 @@ that step (the equation is the first thing the loop holds). A "where d = 12 is .
 equation is the text going on, at the left edge or set in as the first line of a paragraph
 is. Under an algorithm with a block no "end" closes, such a sentence is still taken wherever
 it starts within a quarter em of the start of any step above it (a paragraph indent equal to
-one or two step indents), or right of a last step that opens a block. The levels are those
+one or two step indents), or right of a last step that opens a block; its paragraph is then a
+second block. The levels are those
 of the whole algorithm, so the second block keeps the indentation it had, the line numbers
 continue, and the equation keeps its crop and its place in the order. A formula of one line that
 is a step by itself is not such an equation: it is a line of the block and its formulas are
@@ -2191,13 +2193,20 @@ is one line with a step word under it that ends short. Other long lines after th
 for the same nesting: a long step that wraps into a second line (hung or not), two long steps
 one after the other, a long step over "count = 0" or over a loop line that reaches the
 margin; with flat steps under them these are paragraphs. Pseudo-code numbered "1." under a
-caption whose only nesting is between lines 9 and 10, typed with no tab stop, is a list.
+caption whose only nesting is between lines 9 and 10 is a list. An "=" step that is the first
+of its block after an equation is not picked up when the line that opens the block wraps
+into a second line that starts where it does.
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a
 step are the step's); the bold heading of the next section ("4 Results ...") right under an
-algorithm of four lines or fewer is taken as its last line; the running text under a float's
-caption, when two numbered lines follow it, is one block with them; a paragraph that opens
+algorithm is taken as its last line (and with four lines or fewer the levels of the steps shift
+too); the running text under a float's
+caption, when two numbered lines follow it, is one block with them; under a float's caption, a
+line that opens "for" and ends in a colon over a display equation that starts within 6 em of
+it (a wide equation, a narrow column, equations set flush left), and a short line, then a
+paragraph of two lines whose second line opens with a step word ("for every word of the
+verse."), then a paragraph that opens "If"; a paragraph that opens
 "Algorithm 2 computes ..." or with another verb not on the list; two
 short paragraphs that open "For ..." and "If ..." right under a float's caption; a sentence
 that opens "Then", "For" or "If" right after a display equation that follows an algorithm; a

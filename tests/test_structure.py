@@ -401,7 +401,9 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
             "the|poem, and the two are listed side by side.",
         )
 
-    def float_caption(page, text=(steps,), heading=None, formula=None):
+    goes_on = "if the reader stops at a word, the count starts again."
+
+    def float_caption(page, text=(steps,), heading=None, formula=None, then=goes_on):
         # A picture's caption, the running text under it in paragraphs (or the next heading).
         y = running(page, 100, RUNNING)
         page.draw_rect(pymupdf.Rect(120, y, 480, y + 100), width=0.8)
@@ -414,7 +416,7 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
             y += 28
         if formula:  # a display equation of the text, and the sentence going on under it
             page.insert_text((250, y + 8), formula, fontsize=BODY, fontname="helv")
-            y = running(page, y + 24, "if the reader stops at a word, the count starts again.") - 8
+            y = running(page, y + 24, then) - 8
         running(page, y, RUNNING, pitch=14, indent=0 if heading else 15)
 
     def before_a_heading(page):
@@ -444,9 +446,16 @@ def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
         )
         float_caption(page, text=(shown,), formula="v = d / t")
 
+    def a_formula_then_until(page):  # the sentence goes on under its formula with "until"
+        speed = (
+            "The figure shows the two passes of the method, the first for the count and the second "
+            "one|for the marks of the printed text. The speed of the verse is"
+        )
+        float_caption(page, text=(speed,), formula="v = d / t", then="until the last word is read.")
+
     pages = (fill, paragraph, sentence, float_caption, before_a_heading, after_a_short_line)
-    for page in (*pages, a_paragraph_of_two_lines, over_a_formula):
-        assert not [e for e in analyze(page_of(page)).elements if e.preformatted]
+    for page in (*pages, a_paragraph_of_two_lines, over_a_formula, a_formula_then_until):
+        assert not [e for e in analyze(page_of(page)).elements if e.preformatted], page.__name__
 
 
 NUMBERED = [

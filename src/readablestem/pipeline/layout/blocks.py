@@ -987,7 +987,7 @@ ALGORITHM_SMALL = 0.6  # x the size of the steps: the smallest a step ("Output: 
 ALGORITHM_MAX_DEPTH = 12
 ALGORITHM_RUN_ON = 2  # lines a step with no number may go on for: more is a paragraph
 ALGORITHM_BETWEEN = 2  # lines with no number that may stand between two numbered steps
-ALGORITHM_SET_IN = 6  # em: a formula further right of the line over it is a centred equation
+ALGORITHM_SET_IN = 6  # em: two lines that start further apart are text and a centred equation
 
 
 def _line_number(row: _Row) -> tuple[int, str, int] | None:
@@ -1210,7 +1210,7 @@ def _resumes(row: _Row, steps: _Steps) -> bool:
     inside = row.x0 > left + half and _open_blocks(steps) > 0
     level = any(abs(row.x0 - r.x0) <= 0.5 * half for r in steps.rows)
     last = steps.rows[-1]
-    first = _opens_block(last.clean) and last.kind == "text" and row.x0 > last.x0 + half
+    first = _opens_block(last.clean) and row.x0 > last.x0 + half
     return inside and (level or first) and _ASSIGNMENT.search(row.clean) is not None
 
 
@@ -1332,8 +1332,9 @@ def _nested(
     manuscript and the questions of an exam start at one place, but for the first line of a
     paragraph.) With `said`, the line that opens the block must say so where it ends ("do",
     "then", a colon): a sentence that begins "For" does not. Two numbered lines whose numbers
-    differ in length ("9." and "10.") prove nothing, nor does a formula more than
-    `ALGORITHM_SET_IN` em right of the line over it (a display equation of the text)."""
+    differ in length ("9." and "10.") prove nothing, nor do two lines that start more than
+    `ALGORITHM_SET_IN` em apart (a display equation of the text, centred in the column, and
+    the sentence going on under it)."""
     half = 0.5 * steps.anchor.size
 
     def at(row: _Row, number: tuple[int, str, int] | None) -> float:
@@ -1345,10 +1346,10 @@ def _nested(
         upper, lower = _step_text(above, n_above), _step_text(row, n_row)
         opens = _opens_block(upper) and not (said and _OPENS.fullmatch(upper.rstrip()) is None)
         set_in = at(row, n_row) - at(above, n_above)
-        centred = row.kind != "text" and set_in > ALGORITHM_SET_IN * steps.anchor.size
-        if opens and set_in > half and not centred:
+        far = ALGORITHM_SET_IN * steps.anchor.size
+        if opens and half < set_in <= far:
             return True
-        if _CLOSER.fullmatch(lower) and at(row, n_row) < at(above, n_above) - half:
+        if _CLOSER.fullmatch(lower) and -far <= set_in < -half:
             return True
     return False
 

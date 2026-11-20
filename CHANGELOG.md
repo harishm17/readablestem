@@ -19,12 +19,14 @@
   0.5.14; the golden pages and the stored demo page are written again at render 10. Roll back:
   0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
-## Unreleased: fixes after the fourth review of the algorithm blocks (review 10)
+## Unreleased: fixes after the fourth and fifth reviews of the algorithm blocks (reviews 10 and 11)
 
-The review ran 48 pages of its own on the review-9 fixes, with the 171 pages of the three
+Review 10 ran 48 pages of its own on the review-9 fixes, with the 171 pages of the three
 reviews before it. The five fixes held on the pages they were made for; three of the new rules
-were wider or narrower than they should be. Fixed here (`layout/blocks.py`), each with a case
-in `tests/test_structure.py` that fails without it:
+were wider or narrower than they should be. Review 11 ran 75 more pages on the fixes for those
+three: the code could go in, two of the fixes closed their finding only in part, and three
+sentences written here were not true. Fixed (`layout/blocks.py`), each with a case in
+`tests/test_structure.py` that fails without it:
 
 - **"=" after an equation, as the first step of its block.** The rule from review 9 (the line
   must start where a step above it starts) lost the second half of an algorithm whose loop
@@ -37,8 +39,10 @@ in `tests/test_structure.py` that fails without it:
   with no step word under it, the line is still asked for the nesting proof.
 - **A centred formula is no nested step.** Running text with a line that opens "for" and ends
   in a colon ("... as follows:") over a display equation was a block: the formula counted as
-  a step set inside the "for". A formula more than 6 em right of the line over it no longer
-  counts. Formula lines are read for this proof only under a long line in plain words; the
+  a step set inside the "for". A line more than 6 em right of the line over it no longer
+  counts, and (review 11) nor does a closing line more than 6 em left of the line over it: "The
+  speed of the verse is", the equation, "until the last word is read." was a block too.
+  Formula lines are read for this proof only under a long line in plain words; the
   two other checks for nesting (numbers written "1.", and no caption) read text lines again,
   as before review 9.
 - Corrected in the review-9 section below and in docs/layout.md: a long line after the first
@@ -47,13 +51,20 @@ in `tests/test_structure.py` that fails without it:
   reaches the margin still need the nesting proof, and flat they are paragraphs); and "none is
   a block on the released version either" said nothing, since the released version reads no
   algorithm as a block (all of them are paragraphs or lists there).
-- Left, and written in docs/layout.md: a loop under a long first line whose only line is a
-  formula set more than 6 em to the right is two paragraphs; pseudo-code numbered "1." whose
-  only nesting is between lines 9 and 10, typed with no tab stop, is a list; a sentence with
+- Left, and written in docs/layout.md. Algorithms lost: a loop under a long first line whose
+  only line is a formula set more than 6 em to the right is paragraphs; pseudo-code numbered
+  "1." whose only nesting is between lines 9 and 10 is a list; an "=" step first in its block
+  after an equation is not picked up when the line that opens the block wraps into a second
+  line that starts where it does. Prose still taken for steps under a float's caption (the
+  two fixes above close their shapes only in part): a line that opens "for" and ends in a
+  colon over a display equation that starts within 6 em of it (a wide equation, a narrow
+  column, equations set flush left); and a short line, a paragraph of two lines whose second
+  line opens with a step word and is short, then a paragraph that opens "If". Also: a
+  paragraph with
   "=" after an equation is still taken where it starts within a quarter em of the start of any
   step above it, or right of a last step that opens a block, under an algorithm with a block
-  no "end" closes; the bold heading of the next section right under an algorithm of four lines
-  or fewer is taken as its last line; and running text under a float's caption with two
+  no "end" closes; the bold heading of the next section right under an algorithm
+  is taken as its last line; and running text under a float's caption with two
   numbered lines after it is one block.
 
 ## Unreleased: fixes after the third review of the algorithm blocks (review 9)
