@@ -17,6 +17,12 @@ It takes no lock: a caller that must hold `convert.GATE_NAME` (one source progra
 holds it. It does not build the document: a caller that has only a formula brings its own
 preamble, and one that has a project brings the project's. Two passes for references are two
 calls.
+
+There are two TeX compiles in the repository, on purpose. This is the product's: a single
+`pdflatex` pass in the product's sandbox (bubblewrap or Landlock), so a caller in the product
+uses it. `gold.safe_tex.compile_tex` is development only (it needs bubblewrap, runs `latexmk` for
+as many passes as a document needs, and also runs `xelatex` and Tectonic), and could not be made
+to call this one without changing the documents the gold sets build.
 """
 
 from __future__ import annotations
