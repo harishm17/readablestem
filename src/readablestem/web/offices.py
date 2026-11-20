@@ -24,6 +24,9 @@ BACKUP_DAYS = 6
 PAGE_PATH = "/for-accessibility-offices"
 SUMMARY_PATH = "/for-accessibility-offices/summary"
 SUMMARY_FILENAME = "readablestem-for-accessibility-offices.html"
+# The downloadable summary of what is kept, for how long, who receives it and how it is deleted.
+RETENTION_PATH = "/privacy/retention"
+RETENTION_FILENAME = "readablestem-retention-summary.html"
 SUMMARY_CSS = Path(__file__).resolve().parent / "static" / "offices-summary.css"
 
 

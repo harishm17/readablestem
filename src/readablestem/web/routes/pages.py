@@ -248,6 +248,26 @@ def for_accessibility_offices_summary(request: Request) -> Response:
     )
 
 
+@router.get(offices.RETENTION_PATH)
+def retention_summary(request: Request) -> Response:
+    """What is kept, for how long, who receives it and how it is deleted, as a self-contained
+    HTML file to download or print. Written from the data list, the retention table and the
+    deletion rules the privacy notice and the security page are written from (web.offices)."""
+    ctx = get_ctx(request)
+    context = offices.offices_context(ctx.settings, tracer_on=ctx.tracer is not None)
+    context["as_of"] = format_day(utcnow())
+    context["style_tag"] = offices.summary_style_tag()
+    return render(
+        request,
+        "retention_summary.html",
+        context,
+        headers={
+            "Content-Security-Policy": VIEW_CSP,
+            "Content-Disposition": f'attachment; filename="{offices.RETENTION_FILENAME}"',
+        },
+    )
+
+
 @router.get("/limits")
 def limits(request: Request) -> Response:
     return public_page(request, "limits.html", limits_context(request))
