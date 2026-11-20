@@ -396,6 +396,16 @@ def test_lines_of_a_reference_list_that_start_with_initials_are_not_a_lettered_l
 
     assert not items(analyze(one_page(fill)).elements)
 
+    def alphabetical(page):  # sorted by surname, the first initials run on by chance
+        lines = [
+            "M. Zhang, S. Agarwal and K. Slama, Training language models",
+            "N. Lampe and M. Riedmiller, Learning to act",
+            "O. Horgan and J. Quan, Deep q-learning from demonstrations",
+        ]
+        write(page, 72, 100, lines)
+
+    assert not items(analyze(one_page(alphabetical)).elements)
+
 
 def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_its_item():
     # The second title opens like a surname and a comma, and a line that starts with an
