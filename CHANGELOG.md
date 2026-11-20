@@ -8,8 +8,8 @@
   access as the transcript), so the Listen page does not grow by the picture. Where there is no
   crop to point at, the panel says "This picture is on the student page." The limit is not raised.
   In the 73 stored pages measured, 32 of 810 pictures (16 pages) are over the limit, 11.7 million
-  characters in all; copying them would have taken those pages' Listen page from a median of
-  140 KB to 186 KB. No stored document changes.
+  characters in all. The loaded picture is `loading="lazy"`, so a narrow window, which does not
+  draw the panel, does not fetch it. No stored document changes.
   (`test_a_picture_too_large_to_copy_is_loaded_from_its_crop_by_whoever_may_see_the_page`)
 - The Listen side item stays for windows of 64 rem and wider (WS23.4). Measured at 320, 390 and
   768 px, a figure is 890 to 1,030 px wide at its own size, a table can have 40 rows, and the

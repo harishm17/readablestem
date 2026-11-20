@@ -855,15 +855,19 @@ def _thing_picture(
     """The picture as an <img>. A small one is copied (it is carried twice in the page). A large
     one is not: when `picture_url` gives an address for the figure it belongs to (`owner`, the
     element its crop is stored under), the panel loads it from there; otherwise the panel says
-    the picture is on the student page."""
+    the picture is on the student page. A loaded one is `loading="lazy"`: a narrow window does
+    not draw the panel, and then the picture is not fetched either."""
     src = node.get("src")
     if not src.startswith("data:image/"):
         return ""
+    lazy = ""
     if len(src) > MAX_THING_IMAGE:
         src = picture_url(owner) if owner and picture_url else ""
         if not src:
             return f"<p>{THING_ON_STUDENT_PAGE}</p>"
-    return f'<img src="{escape(src, quote=True)}" alt="{escape(node.get("alt"), quote=True)}">'
+        lazy = ' loading="lazy"'
+    alt = escape(node.get("alt"), quote=True)
+    return f'<img src="{escape(src, quote=True)}" alt="{alt}"{lazy}>'
 
 
 def _thing_html(node: Node | str, budget: list[int]) -> str:

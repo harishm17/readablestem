@@ -110,7 +110,7 @@ def test_a_picture_too_large_to_copy_is_loaded_from_its_crop_by_whoever_may_see_
     crop = f"/jobs/{site.job_id}/crops/p1-e4.png"
     for who in (site.owner, site.viewer):
         body = who.get(f"/jobs/{site.job_id}/listen").text
-        assert f'<img src="{crop}" alt="A rising line.">' in body and big not in body
+        assert f'<img src="{crop}" alt="A rising line."' in body and big not in body
         assert who.get(crop).status_code == 200
     assert site.stranger.get(crop).status_code == 404
 
