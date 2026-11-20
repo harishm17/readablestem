@@ -61,6 +61,13 @@ def test_arguments_defaults_and_nesting_expand():
     assert "yy" in body
 
 
+def test_a_macro_argument_after_a_control_word_is_not_glued_to_it():
+    # `\lVert#1` with the argument `A` is `\lVert A`, never the unknown command `\lVertA`
+    table = tex.MacroTable()
+    text = table.expand(table.read("\\newcommand{\\nrm}[1]{\\lVert#1\\rVert} $\\nrm{A}$"))
+    assert "\\lVert A\\rVert" in text
+
+
 def test_declare_math_operator_becomes_operatorname():
     body, _ = body_of_paper_a()
     assert "\\operatorname{Var}(X)" in body

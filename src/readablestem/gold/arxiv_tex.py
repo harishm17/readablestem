@@ -187,6 +187,7 @@ class Macro:
 
 
 _CMD_NAME = re.compile(r"\\([A-Za-z@]+|.)")
+_ENDS_IN_COMMAND = re.compile(r"\\[A-Za-z@]+\Z")
 _CONTROL_WORD = re.compile(r"\\([A-Za-z@]+)")
 _DEFINERS = re.compile(
     r"\\(?P<kind>newcommand|renewcommand|providecommand|DeclareRobustCommand|DeclareMathOperator"
@@ -430,11 +431,16 @@ class MacroTable:
                 pos += 1
         body = macro.body
         if "#" in body:
-            body = re.sub(
-                r"#(\d)",
-                lambda m: args[int(m.group(1)) - 1] if int(m.group(1)) <= len(args) else "",
-                body,
-            )
+
+            def fill(m: re.Match[str]) -> str:
+                arg = args[int(m.group(1)) - 1] if int(m.group(1)) <= len(args) else ""
+                # TeX ends the control word before a parameter: `\lVert#1` with `A` is the
+                # command `\lVert` and then `A`, never the unknown command `\lVertA`.
+                if arg[:1].isalpha() and _ENDS_IN_COMMAND.search(body, 0, m.start()):
+                    return " " + arg
+                return arg
+
+            body = re.sub(r"#(\d)", fill, body)
         return body, pos
 
 
