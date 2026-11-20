@@ -140,6 +140,32 @@ and 7 of 73 uploads, all in list levels, markers and the headings named above.
   277 readable public files go from 1,611 to 1,320 and the 28 corpus files' from 456 to 405,
   with every caption kept (517 and 145). Turning it on moves figure crops, so it needs a
   `PIPELINE_VERSION` bump and the recorded figure answers of the pages it moves made again.
+## Unreleased: reading order with the region tree on (O-012, O-013, O-014)
+
+Measured with the tree on and no model, on `layout-dev-1` and the 91 corpus gold pages, with
+the one fix below: 156 of 267 development pages right (137 off) and 79 faultless (71 off), none
+made wrong; 83 of 91 corpus pages right (71 off) and 42 faultless (37 off), one made wrong
+(`e1_mc_columns` page 1: a line with a mark at the right edge joins the columns of the choices
+above it, a cause named, not built). The
+`REGION_TREE` setting stays off in the code and in the production profile, so every result the
+pipeline makes is unchanged (corpus hash runs, `analyze` and `full`: 0 differences). Built
+(`layout/entries.py`, one case in `tests/test_region_tree.py`):
+
+- **A paragraph is no glossary entry.** Rule 10 read a run as hanging when its first line stood
+  right of the rest, so a paragraph whose first line is indented, under a heading or the last
+  page's tail that runs to the edge, had its lines split off as entries. A line before the first
+  that runs to the right edge (within a size and a half) is a paragraph going on, so the run no
+  longer hangs. It took 10 splits and 18 cuts out of the development pages; it costs one glossary
+  entry whose last line runs to the edge (`sm_glossary_a` page 1, wrong with the tree off as well).
+  With the tree on only.
+
+Not built, with the count: vector figures as items (O-013, O-014: measured as items, one page
+faultless again and no reading order changed, but generated pages with a drawing between two
+columns read worse), rule 13 and rule 12's page check (no counted page asks), and a narrower
+channel rule for `e1_mc_columns` page 1 (it fixed that page and made four development pages
+wrong). No
+`PIPELINE_VERSION` or `RENDER_VERSION` change is owed: the switch is off, so no stored result
+differs. No migration.
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

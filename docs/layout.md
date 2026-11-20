@@ -411,7 +411,14 @@ column last. A `grid` is a set of labeled cells read in label order. The items c
 unmerged line fragments, the page's raster pictures (they occupy space), the rectangles drawn
 round text, and the tables found on the page (`_claim_tables` takes their cells and captions out
 of the fragments before the rows are made, so a table is one item with the box of its cells and
-its caption, like a picture). A vector figure is not an item: its drawings are read later.
+its caption, like a picture). A vector figure is not an item: its drawings are read later. It was
+tried as one (the reader's `_vector_figures` boxes, cut like a picture) and measured on the 267
+development pages and the 91 corpus gold pages: no page's reading order changed, and one page
+(`ax_qbionc_240307089` page 8) was faultless again, because two lines were no longer merged
+across the figure. On generated pages with a drawing between two columns of short lines it read
+worse (the rows of the two columns alternated, as they do with the tree on for a narrow raster
+picture there), so the code was not kept. A figure between narrow columns has to be cut like a
+column first.
 
 **The cuts.**
 
@@ -450,13 +457,18 @@ its caption, like a picture). A vector figure is not an item: its drawings are r
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
 10. Entry lists: a line at the first line's edge starts a new paragraph when the run hangs (a
-    glossary), or when both open with a section number or a bold term.
+    glossary: the line before it ends short of the right edge by a size and a half, because a
+    line that runs to the edge is a paragraph going on, under a heading or the last page's
+    tail, with its first line indented), or when both open with a section number or a bold
+    term.
 12. Numbered runs, the reordering only: where a run of six or more numbered labels is out of
     sequence, the column-by-column reading is used if it makes the run consecutive.
 
 Rules 4 (a foot heading), 7 (the question rule) and 11 (labels given back to the text) were
 built, measured and taken out: leaving each out changed no page of the development sets, or
-adding it changed none. Rule 13 was not ported, and rule 12's page check was not built.
+adding it changed none. Rule 13 was not ported, and rule 12's page check was not built: of the pages still wrong with the
+tree on (1 of the corpus gold pages made wrong, below, and none of the development pages), none
+asks for them.
 
 **How it is wired.** `RegionTree` stands where the gutter stood: `order._Ordering` is a protocol,
 `Gutter` is `tuple | _Ordering | None`, and `order._reading_order` hands the boxes to
@@ -470,13 +482,31 @@ gutter as with the tree off, so a rule that heads one column is never the blank 
 other; the tables found on the page (`_claim_tables`) are handed to the tree as boxes.
 
 **Measured** (`eval order --set layout-dev-1` and the corpus gold pages, no model, scored on
-the elements): 267 development pages, 141 right off, 163 on (22 made right, none made wrong; 154
-on, 9 made wrong, before the five fixes below); 91 corpus gold pages, 70 right off, 82 on (12
-made right, none made wrong). Added alone on top
-of rules 1 to 8: rule 9 made 1 page right, rule 10 made 8, rule 12 made 1, none made one wrong.
-Leaving one of rules 1 to 8 out (pages that stop being right / pages that become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4 and 7 0/0. Speed: 0.575
-(off) and 0.578 s per page (on) on a quiet box; in the runs after the five fixes, with the box
-busy, on took 0.90 of off's time (0.91 before them).
+the elements; 2026-11-20, 0.5.14): 267 development pages, 137 right off, 156 on (19 made right,
+none made wrong), 71 faultless off and 79 on (9 gained one, 1 lost: `ax_qbionc_240307089` page 8
+has two lines merged across a gutter, a fault the page did not have off); 91 corpus gold pages,
+71 right off, 83 on (13 made right, 1 made wrong), 37 faultless off and 42 on. The page made
+wrong is `e1_mc_columns` page 1: the last line of a block of choices in two columns has a mark at
+the right edge, and its text reaches the gutter, so the band shares only the 9 pt that are left of
+the gutter's 30 and the line joins the choices' columns. Keeping an overlap only when half of the
+narrower channel is left fixed it and made four development pages wrong (a 10 to 18 pt channel
+cut from 21 to 65 pt is a gutter on those pages), so it was not built. Rule 10's hanging test
+(the line before the first ends a size and a half short of the edge) mended no page's status:
+it took 10 splits and 18 cuts out of the development pages (a paragraph whose first line is
+indented, under a heading or the last page's tail, was read as a glossary), and it costs one
+glossary entry whose last line runs to the edge (`sm_glossary_a` page 1: 157 pages right before
+it and 156 after; the page is wrong off as well). The earlier measurement (0.5.13 pages, 141 right
+off, 163 on) is not comparable: the record was made again at 0.5.14. Added alone on top
+of rules 1 to 8 (that measurement): rule 9 made 1 page right, rule 10 made 8, rule 12 made 1,
+none made one wrong. Leaving one of rules 1 to 8 out (pages that stop being right / pages that
+become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4
+and 7 0/0. Speed: 0.575 (off) and 0.578 s per page (on) on a quiet box; in the runs after the
+five fixes, with the box busy, on took 0.90 of off's time (0.91 before them).
+
+The order numbers alone do not say whether to turn it on. With the tree on, the replayed result
+of 24 of the 73 corpus uploads changes (`hashrun.py full`, 2026-11-20), and a changed box changes
+a crop, so the recorded answers of the pages it moves stop matching: turning it on comes with a
+re-recording and a version bump.
 
 **The nine pages the first measurement made wrong** (154 right on, 9 right off and wrong on) are
 right again (163 right on, 22 made right, none made wrong; the corpus gold pages are unchanged at
