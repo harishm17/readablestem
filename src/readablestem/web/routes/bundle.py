@@ -202,7 +202,7 @@ def _zip_response(
         raise PageError(
             409,
             "Nothing to download yet",
-            "None of these documents is ready to share. A document is ready when it has "
+            "None of these documents is ready to post. A document is ready when it has "
             "finished converting and no decision is left to make. Nothing was downloaded.",
         )
     _count_downloads(request, user, downloaded, file_type)

@@ -140,7 +140,7 @@ def _next_step(rows: list[dict[str, Any]]) -> dict[str, str]:
         many = len(decide) > 1
         return {
             "text": f"{_word(len(decide), 'document needs', 'documents need')} your decisions "
-            "before sharing.",
+            "before posting.",
             "href": f"/jobs/{decide[0]['id']}/review",
             "label": "Review the first one" if many else "Review it",
         }

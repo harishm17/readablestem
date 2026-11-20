@@ -116,7 +116,7 @@ def _add(archive: zipfile.ZipFile, name: str, raw: bytes) -> None:
 def _contents(bundle: Bundle) -> str:
     lines = [
         f"These are the {_FILE_WORDS[bundle.file_type]} of the documents that were ready to",
-        "share when you downloaded them. Put each one in your course as a file and link it",
+        "post when you downloaded them. Put each one in your course as a file and link it",
         "where the PDF was; do not paste it into a page editor.",
         "",
     ]
