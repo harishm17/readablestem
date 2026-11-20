@@ -679,6 +679,25 @@ same way before any step reads them, so a job, `readablestem convert` and the ev
 with the same code whatever the file passed before, and a PDF figure of a LaTeX project over
 the page budget is left without a picture (`source/figures.py`).
 
+**A real paper over the page budget** (measured 2026-11-19 on a public 23-page, 11.8 MB paper
+from the development set, the one real file the corpus work found refused by it). One page
+inflates to 71.5 MiB (the next largest 2.9 MiB; the document 77.5 MiB, under its budget). The
+page holds one content stream, two forms that inflate to about 31 and 41 MiB, 8 pictures and
+18 fonts, no annotations. The check that refuses it is the page budget of
+`content_budget.check`, reached first from the upload probe (`web/pdf_probe.py`) and again from
+`layout.analyze`; the person is told what every `content_too_large` file is told ("...is too
+large to read: a page of it, or the file as a whole, holds far more drawing instructions than a
+course document does. Save it as a PDF again (Print to PDF makes a simpler file), or split it
+into parts, and upload that."). The smallest budget that accepts it is 72 MiB, and the count
+itself is cheap there (the probe's check passes in 0.2 s, 64 MB), but a second limit then
+stops the page: the layout step's own child process (`access.PROBE_MEMORY_BYTES`, 768 MB plus
+twice the file) refuses it as `too_complex` ("the PDF needs more memory than a page may use"),
+and at 1024 MB the child dies ("could not be rendered"). With both raised (72 MiB and 1536 MB)
+`layout.analyze` of the document took 102 to 106 s on one CPU of that box and the converting
+process peaked at 1.32 GB, with a 1.12 GB child beside it: well past the 0.4 to 0.9 GB that
+docs/deploy-railway.md plans for one conversion. The budget stays at 32 MiB. A budget that
+admits this paper would have to come with a memory plan for the layout child.
+
 Not bounded by the budget, and what stops each (measured 2026-11-19 on a box running 3 to 5
 times slower than normal, with generated files; times are as measured there):
 
