@@ -818,6 +818,13 @@ the print build waits for WS21.1):
   equation is wider than the paper. It is complete on the web page." The note is generated
   content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
   The rules of each width step are added to the stylesheet only when an equation has it.
+  Measured (O-094): of the 123 display equations in 73 stored pages, 54 carry the classes and the
+  widest is 1.29 times the sheet's text width on screen, which the 70% floor covers (it reaches
+  1.43 times), so none is cut on paper; the estimate runs wide, and the note shows for 2 that fit.
+  A landscape page for an equation beyond the floor (`@page` with a name, `page:` on the
+  equation) prints in Chromium for an equation up to about 2.2 times the column, but container
+  queries and `cqw` are evaluated against the portrait width there, so the scale and the note are
+  wrong, and an equation left to overflow shrinks the whole sheet (to 9 pt). It was not built.
 - A picture is never wider than the sheet (`max-width: 100%`) on paper, and on screen while the
   window is wider than 40 em.
 

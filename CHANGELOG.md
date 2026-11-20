@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: Listen's side panel for a large picture, and very wide equations on paper (branch fix/wide-print-and-listen-column)
+
+- Listen (`web/listen.py`, `web/routes/listen.py`): a picture whose data is over `MAX_THING_IMAGE`
+  (150,000 characters) is no longer dropped from the side panel. The panel loads it from the crop
+  route the student page already serves (`/jobs/{job_id}/crops/{element_id}.png`, the same view
+  access as the transcript), so the Listen page does not grow by the picture. Where there is no
+  crop to point at, the panel says "This picture is on the student page." The limit is not raised.
+  In the 73 stored pages measured, 32 of 810 pictures (16 pages) are over the limit, 11.7 million
+  characters in all; copying them would have taken those pages' Listen page from a median of
+  140 KB to 186 KB. No stored document changes.
+  (`test_a_picture_too_large_to_copy_is_loaded_from_its_crop_by_whoever_may_see_the_page`)
+- The Listen side item stays for windows of 64 rem and wider (WS23.4). Measured at 320, 390 and
+  768 px, a figure is 890 to 1,030 px wide at its own size, a table can have 40 rows, and the
+  sticky transport takes 58 to 106 px, so no narrow layout is added. The reasons are in `docs/web.md`.
+- A very wide equation on paper (O-094, SW45 rule 6) is not changed: a named landscape page
+  prints in Chromium, but the equation's scale and note are decided by container queries that see
+  the portrait width, and on pages made by the assembler it still cut the equation. `docs/output.md`
+  ("On paper") records the measurements. The stylesheet, the stored pages and `RENDER_VERSION` are
+  unchanged.
+
 ## Unreleased: what the pages promise, and leftovers of the Word and export work (branch fix/page-promises-and-leftovers)
 
 - The pages rule (`web/quota.py`, `PAGES_RULE`) says what cancel does: a document canceled before it
