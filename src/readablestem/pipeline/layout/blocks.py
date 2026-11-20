@@ -3077,11 +3077,18 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure], *, document: 
         if c_index in used_captions or figures[f_index].caption is not None:
             continue
         figures[f_index].caption = blocks[c_index].text
+        # A raised run is written in superscript characters (`Element.caption_marked`, as a
+        # table caption's is); `caption` stays the flat text the figure step is sent. A lowered
+        # run has no such form: it stays flat, and the notice says so.
         figures[f_index].flat_scripts = any(
-            kind for row in blocks[c_index].rows for kind in _script_kinds(row, document=document)
+            kind == "sub"
+            for row in blocks[c_index].rows
+            for kind in _script_kinds(row, document=document)
         )
         pieces = _paragraph_pieces(blocks[c_index], document=document)
-        if any(isinstance(piece, _Inline) for piece in pieces):
+        if any(isinstance(piece, _Inline) for piece in pieces) or any(
+            isinstance(piece, str) and script_marks.SUP_OPEN in piece for piece in pieces
+        ):
             figures[f_index].caption_pieces = pieces
             figures[f_index].caption_size = blocks[c_index].font_size
         used_captions.add(c_index)

@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: a raised digit in a figure caption stays raised
+
+- A figure caption was written from a plain string, so "10⁸" came out "108" and "CP³" came out
+  "CP3" with only a notice that some script was flat. A raised run in a caption is now written in
+  superscript characters, as a table cell's and a table caption's are
+  (`script_marks.raised_characters`, used by `layout/blocks.py` and `tables._marked`): the page
+  has them in `Element.caption_marked`, and `Element.caption` keeps the flat text the figure
+  step is sent. Only a lowered run in a caption is still written flat and flagged
+  (`scripts_flattened`).
+- Listen says superscript characters as it says a raised run: "10 superscript 8".
+- An equation shown as an image because it was not converted has the warning that exponents run
+  together in its alt text when layout boxed a power of ten ("108" was given as the equation).
+- No recording or request changes (the figure and equation steps are sent what they were). A
+  stored result loads unchanged and keeps its old caption until the file is converted again.
+  The pages a layout change like this one reaches need a `PIPELINE_VERSION` raise when the wave
+  is released. No migration.
+
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"

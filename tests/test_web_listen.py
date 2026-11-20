@@ -303,3 +303,14 @@ def test_raised_and_lowered_text_says_which_it_is_except_an_ordinal():
         "On the 10th it was 19.3 g/cm superscript 3 and SO subscript 4 superscript 2-; "
         "read x subscript 1 end subscript y link 1." in said(items)
     )
+
+
+def test_superscript_characters_are_said_as_a_raised_run_is():
+    """A table cell or a caption has "10⁸" as characters, not a <sup>: it says the same words."""
+    items = listen.build_transcript(
+        doc(
+            '<main><figure><img alt="Counts" src="a.png">'
+            "<figcaption>Figure 4: About 10⁸ cells of CP³.</figcaption></figure></main>"
+        )
+    )
+    assert "Figure 4: About 10 superscript 8 cells of CP superscript 3." in said(items)

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import logging
 import re
+import unicodedata
 from collections import OrderedDict
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field, replace
@@ -36,6 +37,7 @@ from html.parser import HTMLParser
 from threading import Lock
 
 from readablestem.core.types import Kind
+from readablestem.pipeline import script_marks
 from readablestem.web.mathml import try_sanitize_mathml
 from readablestem.web.messages import KIND_LABELS, LISTEN_LABELS
 
@@ -251,6 +253,10 @@ def _script_words(text: str) -> str:
 
 
 def _words(text: str) -> str:
+    # Superscript characters (a table cell's or a caption's "10⁸") are said as a <sup> is.
+    text = script_marks.RAISED_RUN.sub(
+        lambda m: f"\ue001{unicodedata.normalize('NFKC', m[0])}\ue002", text
+    )
     text = _script_words(text)
     text = _BREAKS.sub(BREAK, _SPACE.sub(" ", text)).strip(f" {BREAK}")
     text = _PAUSE.sub(lambda m: f"{m.group(1) or ','} ", text)

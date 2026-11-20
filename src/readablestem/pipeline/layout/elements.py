@@ -309,7 +309,7 @@ def _page_elements(
                     parts.append(inline_marker(child_id))
                 else:
                     parts.append(piece)
-            caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
+            caption_marked = " ".join(script_marks.as_characters("".join(parts)).split())
         table = block.table if kind is Kind.TABLE else None
         if table is not None and block.cell_inlines:
             # A cell that is one formula is an inline equation of the table: its id goes

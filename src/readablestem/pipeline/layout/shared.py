@@ -689,7 +689,8 @@ class _Figure:
     paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
-    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths.
+    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths
+    # or a raised run.
     caption_pieces: list[str | _Inline] | None = None
     caption_size: float | None = None
     xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)

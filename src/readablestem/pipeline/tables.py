@@ -74,7 +74,7 @@ from readablestem.core.types import (
     TableGrid,
     grid_problems,
 )
-from readablestem.pipeline import hyphens, table_model
+from readablestem.pipeline import hyphens, script_marks, table_model
 
 if TYPE_CHECKING:
     import numpy as np
@@ -768,27 +768,6 @@ class _Word:
         self.marked = self.marked or self.text
 
 
-# Superscript forms; a raised run with a character not here is written "^(...)".
-_SUPERSCRIPTS = {
-    **dict(
-        zip(
-            "0123456789",
-            "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079",
-            strict=True,
-        )
-    ),
-    "+": "\u207a",
-    "-": "\u207b",
-    "\u2212": "\u207b",  # minus sign
-    "\u2013": "\u207b",  # en dash: some fonts print a raised minus as one
-    "=": "\u207c",
-    "(": "\u207d",
-    ")": "\u207e",
-    "n": "\u207f",
-    "i": "\u2071",
-}
-
-
 def _raised(chars: Sequence[GlyphLike]) -> set[int]:
     """Indexes (into `chars`, one visual line, left to right) of the superscript glyphs:
     smaller than the full-size glyph before them (after them at the start of the line)
@@ -834,10 +813,7 @@ def _marked(chars: Sequence[GlyphLike], raised: Sequence[bool]) -> str:
         while j < len(chars) and raised[j]:
             j += 1
         run = "".join(c.c for c in chars[i:j])
-        if all(ch in _SUPERSCRIPTS for ch in run):
-            out.append("".join(_SUPERSCRIPTS[ch] for ch in run))
-        else:
-            out.append(f"^({run})" if len(run) > 1 else f"^{run}")
+        out.append(script_marks.raised_characters(run))
         i = j
     return "".join(out)
 
