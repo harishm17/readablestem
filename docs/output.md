@@ -1156,8 +1156,9 @@ SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></s
 
 The text itself is unchanged (`H2O`), so search and copy read as before. A run is skipped
 when it would start inside an inline equation's marker or overlap another. What cannot be
-carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
-written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+carried (a lowered run in a figure caption or a table cell, a script with nothing before it) is
+written flat, and the notice `scripts_flattened` ("Worth checking") says where. A raised run in
+a caption is written in superscript characters ("10⁸"), as a table cell's is.
 
 The page, Word and the EPUB keep the raised or lowered run as `<sup>`, `<sub>` or Word's own
 superscript and subscript, which a screen reader reads as plain characters ("g/cm3"). Listen

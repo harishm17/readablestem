@@ -689,7 +689,8 @@ class _Figure:
     paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
-    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths.
+    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths
+    # or a raised run.
     caption_pieces: list[str | _Inline] | None = None
     caption_size: float | None = None
     xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)
@@ -803,8 +804,7 @@ class _Block:
     # Raised or lowered text this block's element cannot carry (`Element.script_runs`): it is
     # written flat, and a notice says so (`scripts_flattened`).
     flat_scripts: bool = False
-    # headings and captions: `text` with its raised and lowered runs marked
-    marked: str | None = None
+    marked: str | None = None  # headings: `text` with its raised and lowered runs marked
     # Display equations placed by the page math pass: its LaTeX, and "span" or "layout".
     page_latex: str | None = None
     page_status: PageStatus | None = None

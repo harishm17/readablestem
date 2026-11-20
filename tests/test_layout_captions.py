@@ -89,7 +89,9 @@ def test_a_raised_digit_in_a_figure_caption_stays_raised_and_a_lowered_one_is_fl
         )
     )
     figure = next(e for e in raised.elements if e.kind is Kind.FIGURE)
-    assert figure.caption == "Figure 4: About 10⁸ cells of the group CP³ in the sample."
+    assert figure.caption_marked == "Figure 4: About 10⁸ cells of the group CP³ in the sample."
+    # What the figure step is sent does not change.
+    assert figure.caption == "Figure 4: About 108 cells of the group CP3 in the sample."
     assert not [n for n in raised.notices if n.code == "scripts_flattened"]
 
     lowered = analyze(

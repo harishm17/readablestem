@@ -1483,9 +1483,19 @@ this section describes.
   of `E°cell`) are still given a kind when something stands before them: written raised they
   read better than flat.
 - **Flagged when flat** (`scripts_flattened`, optional "Worth checking"): raised or lowered
-  glyphs left with no base, those in a figure caption, and lowered glyphs in a table (a
-  table cell keeps raised marks as superscript characters, `tables._marked`, and not lowered
-  ones).
+  glyphs left with no base, lowered glyphs in a figure caption, and lowered glyphs in a table
+  (a table cell keeps raised marks as superscript characters, `tables._marked`, and not
+  lowered ones).
+- **Raised digits in a caption**: a caption is a plain string with nowhere to hold a script
+  run, so a raised run in it is written in superscript characters, as a table cell's and a
+  table caption's are (`script_marks.raised_characters`: "10⁸", "CP³"; a run with a character
+  that has no superscript form is written "^(...)"). A figure caption was written "108" and
+  "CP3" and only flagged; the page now has the raised form in `Element.caption_marked`, and
+  `Element.caption` stays the flat text the figure step is sent, so no recorded request stops
+  matching. Listen says superscript characters as a `<sup>` is said ("10
+  superscript 8"). A power of ten in a TeX paper is part of an inline equation (`power of
+  ten`); if that equation is not converted, its alt text begins with the warning that
+  exponents run together in the characters, as it does for any equation with a raised part.
 
 Not done: lowered text in table cells (the cell text stays flat, the notice says so);
 a script that is part of a word the text layer splits across rows.
