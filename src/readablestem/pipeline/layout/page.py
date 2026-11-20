@@ -42,6 +42,7 @@ from readablestem.pipeline.layout.display import (
     _contiguous_regions,
     _equation_regions,
     _mark_case_rows,
+    _promote_numbered_lines,
     _split_braced_systems,
     _split_exercise_numbers,
     _split_labels,
@@ -421,7 +422,8 @@ def _page_blocks(
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_exercise_numbers(
-        _split_braced_systems(_split_labels(rows), document=document), document=document
+        _split_braced_systems(_split_labels(rows, document=document), document=document),
+        document=document,
     )
     _mark_notes(rows, number, page_rect.height, ctx)
     for row in rows:
@@ -433,6 +435,7 @@ def _page_blocks(
     _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
+    _promote_numbered_lines(rows)
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []

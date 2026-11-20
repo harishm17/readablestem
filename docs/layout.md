@@ -37,8 +37,15 @@ Element conventions:
   that has no number yet and is not level with a numbered line; a number that fits none
   stays text. A number of one column does not go to the math of the other when text of its
   own column stands within two lines of it. Equation pieces that
-  `display_grouping` does not join keep a number each, or none. A number set less than a
-  font size from its equation (a `multline`'s) is not cut off and stays in the equation's text.
+  `display_grouping` does not join keep a number each, or none. A bracketed number set less
+  than a font size from its equation (a `multline`'s, `CLOSE_NUMBER_GAP` at the least) is cut
+  off when it ends at the right edge of its column's text and what stands before it reads as
+  math on its own (`_closes_display`); elsewhere it stays in the equation's text. A number
+  that stands under the right end of its equation, not beside it, is its label when nothing
+  stands between them (`_number_under`, `_line_over_number`), and a line of math with a few
+  words in it ("... for every n > 0") is a display when such a number stands beside it
+  (`_promote_numbered_lines`). A number left of the math, at the column's margin
+  ("(10.18)" in front of the equation), is not read as a label yet.
 - **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
   a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
   `text` does not include the marker.

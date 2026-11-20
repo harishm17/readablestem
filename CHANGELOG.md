@@ -432,6 +432,25 @@
   A bullet drawn beside the row (a label such as "Solution") changes nothing.
 - No change to a prompt, a model or the version numbers: a PDF's lists, headings and levels
   change, so the next pipeline raise is owed.
+## Unreleased: equation numbers that stayed in the text or became paragraphs (branch fix/equation-number-leftovers)
+
+- A word of the math split by a limit set under it ("argmin" with the limit under it, read in
+  x order as "argm", limit, "in") was read as prose, so the whole line, and the number beside it,
+  became a paragraph. `shared._limit_end` reads the word on past the limit, and `argmin` and
+  `argmax` are math words (`_word_lengths`, `figures._prose_spans`). On public paper
+  2407.13734 this was why "(39)", "(42)" and "(45)" were paragraphs of their own.
+- A line of math with a few English words in it ("for every n greater than zero") that has an
+  equation number beside it is a display equation now, so the number is its label
+  (`display._promote_numbered_lines`; only when the line is mostly math and stands in from
+  the column's text edge).
+- A bracketed number set closer than a font size to a display that fills its column, or a
+  number set right-aligned under its equation, was left in the equation's text or became a
+  paragraph; it is the label now (`display._closes_display`, `_number_clearance`,
+  `_line_over_number`, `drawings._number_under`). The crop of such an equation no longer holds
+  its number, so its request to a model changes with the new picture.
+- Not changed: a number set left of the math at the margin ("(10.18)" in 2412.12319), a number
+  that belongs to a group of lines each starting with a word, and symbolic tags as
+  cross-reference targets (none in the development parts).
 
 ## Unreleased: fixes after the independent review of this batch (branch fix/review-5)
 
