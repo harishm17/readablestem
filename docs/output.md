@@ -454,8 +454,11 @@ document in another language marks it `lang="en"`).
   page. The id is by the page's position in the PDF (`pagebreak-N`, N from 1), so it never
   repeats. A marker is written before the first block of each page that has any, never
   inside a block of text: a paragraph that runs over a page boundary is one element and
-  stays whole (layout joins it), a list that runs over one keeps one `<ul>` and the marker
-  stands at the start of the item that begins the page, and the same for a glossary entry. A
+  stays whole (layout joins it) and the markers of the pages it runs into are written before
+  the next element that is on one of them (not right after it: a figure or note that follows
+  it on its first page stays under that page's marker), a list that runs over one keeps one
+  `<ul>` and the marker stands at the start of the item that begins the page, and the same
+  for a glossary entry. A
   document with blocks on one page only has none. The words of a marker are one of:
   "Page 12" for a printed label; "PDF page 5" for a page without one, when any page of the
   document has one (so two different pages never both read "Page 5"); "Page 5" (the position

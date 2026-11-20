@@ -1900,8 +1900,11 @@ math by the document's evidence; the equation step's own tiers then decide it.
   (`thin_ruler`, `_vector_figures`; a table's header rule alone stays a rule). A free-body diagram's
   force arrows, each thin and 20 pt off its box, were separate small drawings that
   joined the box only within 12 pt: a small drawing joins a figure within
-  `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves. A circuit's
-  parts were not found as labels, see the label rule above.
+  `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves, unless it holds
+  a line of text of its own: a dark tab with its label inside ("EXAMPLE 5.2") a few points
+  over a sentence and a grid joined the grid's figure, whose crop took the label and the
+  sentence (O-388, 2026-11-20); such a drawing goes to the page's leftover drawings. A
+  circuit's parts were not found as labels, see the label rule above.
 - **A drawing made of text fragments** (`_fragment_figures`, WS2.9a): the labels of a drawn
   structure, circuit or diagram whose strokes are too short and plain for a drawing cluster
   were written as dozens of loose paragraphs and one-symbol equations, each its own
