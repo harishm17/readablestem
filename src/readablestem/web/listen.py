@@ -254,7 +254,9 @@ def _script_words(text: str) -> str:
 
 def _words(text: str) -> str:
     # Superscript characters (a table cell's or a caption's "10⁸") are said as a <sup> is.
-    text = script_marks.RAISED_RUN.sub(lambda m: f"{unicodedata.normalize('NFKC', m[0])}", text)
+    text = script_marks.RAISED_RUN.sub(
+        lambda m: f"\ue001{unicodedata.normalize('NFKC', m[0])}\ue002", text
+    )
     text = _script_words(text)
     text = _BREAKS.sub(BREAK, _SPACE.sub(" ", text)).strip(f" {BREAK}")
     text = _PAUSE.sub(lambda m: f"{m.group(1) or ','} ", text)
