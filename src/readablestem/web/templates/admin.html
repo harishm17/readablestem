@@ -319,7 +319,7 @@
   {% if profile.differs %}
   <p>Settings that differ from the profile now:</p>
   <ul>
-    {% for name in profile.differs %}<li><code>{{ name }}</code></li>{% endfor %}
+    {% for row in profile.differs %}<li><code>{{ row.name }}</code>{% if row.reason %}: {{ row.reason }}{% if row.eval and row.eval != "none" %} Measured in <code>{{ row.eval }}</code>.{% else %} No eval.{% endif %}{% endif %}</li>{% endfor %}
   </ul>
   {% else %}
   <p>Every behavior setting matches the profile.</p>

@@ -223,6 +223,12 @@ profile's hash to an admin (the public `/healthz/ops` gives the status word only
 writes the image facts (`readablestem ops image-facts --write`, Dockerfile), which changes that
 hash with what the image carries.
 
+A row of the profile that switches a behavior or picks a model may carry `reason` (one sentence,
+why production has that value) and `eval` (the repository path of the report that measured it,
+or `none`); "not stated" means the repository gives no reason. /admin shows both next to each
+setting that differs. They are not in the hash, and the file's header says one person owns every
+switch.
+
 `FONT_CODE_TABLES` is new: on by default in code, with no value set in Railway (the profile says
 so). Set it to `false` on `web`, and in the profile, to go back to the old private-use bullet rules
 without a deploy; element text changes on documents with symbol fonts, so their stored step answers

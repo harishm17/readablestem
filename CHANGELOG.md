@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: operations and storage, measured (branch fix/operations-and-storage)
+
+- Production profile: each setting that switches a behavior or picks a model has a `reason`
+  (one sentence) and an `eval` (the repository path of the report that measured it, or `none`).
+  Where the repository gives no reason the row says "not stated" (17 rows). /admin shows both
+  next to a setting that differs. The profile's hash is unchanged (`90c66bc8ef67`): neither field
+  is in it. No stored document, page or model request changes.
+
 ## Unreleased: the page and the exports, leftovers (branch fix/output-leftovers)
 
 - The count of equations written as MathML (the student note, the job page, the record and its
