@@ -2523,7 +2523,10 @@ From top to bottom:
    There is no percentage and no finish time. The batch page includes the same part
    ("Uploaded 4 minutes ago.", slow after 15 minutes).
 2. **The steps**, outside the live region and polled on their own: "Reading the layout:
-   16 pages", "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
+   16 pages" (while the layout runs, "Reading the layout: 7 of 16 pages" with the step's
+   progress bar: the pages whose table search is done, the part of the layout that takes
+   most of its time, told by `layout.analyze(on_page=...)` through the same stage events as
+   the other steps), "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
    and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
    "Building the HTML file", "Running the structure checks", each "(done)" or "(in
    progress)". Without JavaScript the page shows them as they were when it loaded, with

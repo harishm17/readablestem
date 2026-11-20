@@ -7,6 +7,12 @@
   Where the repository gives no reason the row says "not stated" (17 rows). /admin shows both
   next to a setting that differs. The profile's hash is unchanged (`90c66bc8ef67`): neither field
   is in it. No stored document, page or model request changes.
+- Job page: while the layout runs (the longest silent stretch of a conversion: for a 100-page
+  public-paper document 89 s of 167 s, the other steps' longest 9 s, measured 2026-11-19 on a
+  loaded box) the first line reads "Reading the layout: 7 of 16 pages" with the step's own progress
+  bar. `layout.analyze` takes `on_page(done, total)`, called before each page's table search; it
+  goes through the same stage events and the same 2 s write limit as every other step. No new
+  polling. Nothing a conversion writes changes.
 
 ## Unreleased: the page and the exports, leftovers (branch fix/output-leftovers)
 
