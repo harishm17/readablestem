@@ -130,6 +130,16 @@ Measured at this commit, $0: headings eval (`eval pipeline --task headings --fak
 of 267 pages right, as before. The corpus hash against `f490ac60` differs in 20 public files
 (11 of layout-dev-1, 3 realworld, 6 repository files, counted by what `hashrun analyze` lists)
 and 7 of 73 uploads, all in list levels, markers and the headings named above.
+## Unreleased: the panels of one figure (off)
+
+- New setting `LAYOUT_JOIN_PANELS` (off in code, in `.env.example` and in the production
+  profile; the output is byte-identical to before when it is off, so no `PIPELINE_VERSION`
+  bump until it is turned on). On, the panels printed under one caption are one figure
+  (`layout/figures.py`, `_join_panels`: docs/layout.md "Panels of one figure") and a panel
+  letter or part mark of one or two characters near a figure is its label. The figures of the
+  277 readable public files go from 1,611 to 1,320 and the 28 corpus files' from 456 to 405,
+  with every caption kept (517 and 145). Turning it on moves figure crops, so it needs a
+  `PIPELINE_VERSION` bump and the recorded figure answers of the pages it moves made again.
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

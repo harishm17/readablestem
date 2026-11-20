@@ -1958,6 +1958,29 @@ math by the document's evidence; the equation step's own tiers then decide it.
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).
+- **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code and in
+  production; bump `PIPELINE_VERSION` when it is turned on). A figure printed as panels
+  (a), (b), (c) under one caption was found as one figure for each panel, and only the one
+  nearest the caption took the caption (`_attach_captions`), so the others were figures
+  with a picture and no words: a reader got one description for each panel and the caption
+  on one of them. With the switch on, a figure that holds a caption takes the captionless
+  figures that stand in a row or a column with it (gap at most `PANEL_GAP` = 3.5 body
+  sizes from the panels it holds, not at a corner), under the caption's width and on the
+  caption's side of it, until none does; a line of text among the panels ends the join,
+  and the short label rows among them (panel letters, axis words) do not. The rows among
+  the panels are claimed as labels again, and a row of one or two characters ("A", "b",
+  "3", "n") within `PANEL_MARK_REACH` = 2.5 body sizes of any figure's box is a label of
+  it (panel letters and the names of a drawing's parts stand at a corner, beyond the one
+  reach of `_label_owners`), unless it is a word ("to", "of") or the start of a list item.
+  Measured (2026-11-20, the 277 readable public files: the repository's, the layout gold
+  and the real-world dev and fresh sets; and the 28-file corpus): captionless figures
+  standing beside a captioned one, 285 in 59 files public and 30 in 3 files corpus; with
+  the switch on the figures go from 1,611 to 1,320 public and from 456 to 405 corpus, and
+  the captioned figures stay 517 and 145. Not joined, by the same rules: 83 candidates in
+  24 public files and 3 in 2 corpus files (a paragraph between, another caption's figure,
+  a gap wider than the reach). The other half of the fault, an axis label or a part mark
+  found as a figure of its own (`drawing_fragments`), is on no file of either set (0
+  figures), so nothing was built for it. Off, the output is byte-identical to before.
 - **Shapes that vanished** (WS6.15, 2026-11-18). A timeline's ruler (a long thin line
   with ticks, 5 pt tall) fell under the 24 pt a figure needs on both sides, so it was a
   small drawing; no label was held for it and the paragraph's block took its labels, so

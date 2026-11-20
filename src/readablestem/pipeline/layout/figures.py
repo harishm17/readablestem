@@ -1455,6 +1455,105 @@ def _claim_labels(
             figure.bbox = _union([figure.drawing, *(r.bbox for r in figure.labels)])
 
 
+PANEL_GAP = 3.5  # body sizes: furthest apart two panels of one figure stand
+PANEL_MARK_REACH = 2.5  # body sizes: furthest from a figure's box a one- or two-letter mark may be
+PANEL_MARK_CHARS = 2  # a panel mark ("A", "b", "3") is this many characters or fewer
+
+
+def _join_panels(
+    figures: list[_Figure],
+    captions: dict[str, BBox],
+    rows: Sequence[_Row],
+    ctx: _Context,
+    *,
+    document: _Document,
+) -> list[_Figure]:
+    """The panels of one figure are one figure ("Panels of one figure" in docs/layout.md).
+
+    A figure that holds a caption (`captions`: the box of each caption text a figure took)
+    takes the figures without one that stand beside it, above it or below it, within PANEL_GAP
+    body sizes of the panels it holds already, on its caption's side of the caption and under
+    its width, until none does. Only the caption's nearest figure had it, so the other panels
+    were figures with a picture and no words: a reader got one description for each of them
+    and the caption on one. A line of text among the panels (a paragraph that runs between two
+    pictures) ends the join. The rows among the panels are then claimed as labels
+    (`_claim_labels`), and a row of one or two characters within PANEL_MARK_REACH body sizes
+    of any figure's box ("A", "b", "3", "n") is a label of it too (panel letters and the names
+    of a drawing's parts stand at a corner, beyond the reach of `_label_owners`), unless it is
+    a word ("to", "of") or the start of a list item."""
+    joined: set[int] = set()
+    reach = PANEL_GAP * ctx.body
+    for host in figures:
+        box = captions.get(host.caption) if host.caption is not None else None
+        if box is None or host.equation or id(host) in joined:
+            continue
+        below = box[1] >= host.bbox[3] - 2.0  # the caption stands under the figure
+        group = [host]
+        union = host.bbox
+        grew = True
+        while grew:
+            grew = False
+            for other in figures:
+                if other is host or other in group or other.caption is not None or other.equation:
+                    continue
+                if id(other) in joined:
+                    continue
+                dx = max(0.0, other.bbox[0] - union[2], union[0] - other.bbox[2])
+                dy = max(0.0, other.bbox[1] - union[3], union[1] - other.bbox[3])
+                if dx > reach or dy > reach or (dx > 0 and dy > 0):
+                    continue  # too far, or only at a corner: not a row or a column of panels
+                middle = (other.bbox[0] + other.bbox[2]) / 2
+                if not box[0] - reach <= middle <= box[2] + reach:
+                    continue  # beside the caption's column, not under it
+                if (other.bbox[3] > box[1] + 2.0) if below else (other.bbox[1] < box[3] - 2.0):
+                    continue  # on the other side of the caption
+                grown = _union([union, other.bbox])
+                if any(
+                    not r.absorbed
+                    and not CAPTION.match(r.clean)
+                    and not _short_label(r)
+                    and _mostly_in(r.bbox, grown)
+                    and not _mostly_in(r.bbox, union)
+                    and not _mostly_in(r.bbox, other.bbox)
+                    for r in rows
+                ):
+                    continue  # text between the panels
+                group.append(other)
+                union = grown
+                grew = True
+        for other in group[1:]:
+            joined.add(id(other))
+            host.images += other.images
+            host.paths += other.paths
+            host.members.extend(other.members)
+            host.labels.extend(other.labels)
+        if len(group) > 1:
+            host.xref = 0
+            host.drawing = _union([f.drawing for f in group])
+            host.bbox = _union([f.bbox for f in group])
+    kept = [f for f in figures if id(f) not in joined]
+    if joined:
+        _claim_labels(kept, rows, ctx, document=document)  # the rows among the panels
+    for figure in kept:
+        if figure.equation:
+            continue
+        near = _pad(figure.bbox, PANEL_MARK_REACH * ctx.body)
+        for row in rows:
+            if (
+                not row.absorbed
+                and not row.vertical
+                and len(row.clean) <= PANEL_MARK_CHARS
+                and row.clean.lower() not in _PROSE_TWO_LETTER
+                and not _starts_like_item(row)
+                and _inside(row.bbox, near)
+            ):
+                row.absorbed = True
+                figure.labels.append(row)
+        if figure.labels:
+            figure.bbox = _union([figure.bbox, *(r.bbox for r in figure.labels)])
+    return kept
+
+
 FRAGMENT_CHARS = 3  # a text row of this many characters or fewer is a fragment
 MIN_FRAGMENT_ROWS = 12  # fragments in a region that is a drawing
 FRAGMENT_REACH = 3.0  # body sizes between the fragments of one region

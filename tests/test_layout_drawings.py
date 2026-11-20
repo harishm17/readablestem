@@ -651,3 +651,40 @@ def test_a_structure_of_atom_labels_and_short_bonds_is_one_figure_to_decide_on()
     assert _holds(figure, area)
     assert layout.REASON_DRAWING_FRAGMENTS in figure.reasons
     assert "NH2" not in _text_of(out) and "Acceleration is" in _text_of(out)
+
+
+def _panel(page, x0: float, top: float, mark: str, w=140, h=100) -> None:
+    """One plot panel: two axes, a curve, ticks, and its letter at the corner."""
+    _lines(page, [[(x0, top), (x0, top + h)], [(x0, top + h), (x0 + w, top + h)]], width=1.2)
+    _path(page, [_curve(lambda x: top + h - 0.004 * (x - x0) ** 2, x0, x0 + w, 40)], colour=BLUE)
+    _lines(page, [[(x0 + 30 * k, top + h), (x0 + 30 * k, top + h + 4)] for k in range(6)])
+    for k in range(0, 6, 2):
+        _label(page, (x0 + 30 * k - 3, top + h + 14), str(k), 8)
+    _label(page, (x0 - 22, top - 2), mark, 12)
+
+
+def test_panels_under_one_caption_are_one_figure_when_they_are_joined():
+    # The caption took the figure nearest to it, and the other panel stood as a picture with
+    # no words, a description of its own and its letter a paragraph.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    top = y + 40
+    _panel(page, 100, top, "A")
+    _panel(page, 270, top, "B")
+    _label(
+        page,
+        (100, top + 140),
+        "Figure 3: Height of the ball in two runs, one thrown softly (A) and one hard (B).",
+        10,
+    )
+    _running_text(page, top + 180, 1, start=2)
+    pdf = doc.tobytes()
+    apart = _figures(layout.analyze(pdf))
+    assert len(apart) == 2 and sum(f.caption is not None for f in apart) == 1
+    out = layout.analyze(pdf, join_panels=True)
+    (figure,) = _figures(out)
+    assert _holds(figure, (78, top - 10, 410, top + 114))
+    assert figure.caption and figure.caption.startswith("Figure 3")
+    assert "A" not in _text_of(out).split() and "B" not in _text_of(out).split()
+    assert "Acceleration is" in _text_of(out)
