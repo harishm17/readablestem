@@ -14,7 +14,11 @@ mark; 139 found and 135 linked now) and a count of the algorithm shapes on the 2
   limit and a running footer ("12 Authors") were notes. A note now opens with the whole mark
   that is printed raised above, and goes on in words: 14 false notes on 4 papers, 0 now. One
   note of that shape is lost: the "Mathematics Subject Classification" line of one paper,
-  which was a note only because a "2" stood raised somewhere above.
+  which was a note only because a "2" stood raised somewhere above. The corpus hash also
+  showed one false note gone on a page of an algebra textbook, and the signs of an author-note
+  line (a dagger and a double dagger after an e-mail address, still inside the paragraph
+  under them) are now flat text with an optional `scripts_flattened` notice instead of two
+  one-sign equations.
 - **A note that opens "In fact" is not indium.** The mark and the word after it were read as a
   nuclide (`6 In`) and became an equation inside the note: 2 papers. A footnote's mark is no
   mass number. In a file that names no footnotes, the mark in the text before a math letter
