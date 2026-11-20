@@ -28,7 +28,7 @@ from builders import load
 
 pytestmark = pytest.mark.workflow
 
-READY = "Ready to share"
+READY = "Ready to post"
 
 
 @pytest.fixture(scope="module")
@@ -111,7 +111,7 @@ def test_wf19_a_file_cut_off_is_not_ready_until_the_owner_answers_and_the_studen
     site: harness.ReplaySite, made: Callable[[str, bytes], str]
 ) -> None:
     """F-505. A six-page PDF cut in the middle opens only after repair, with pages 4 to 6 empty:
-    the page asks before it says "Ready to share", and the student file says the pages are not
+    the page asks before it says "Ready to post", and the student file says the pages are not
     there before and after the owner continues. A file with a damaged cross-reference table
     that repairs with content on every page asks nothing."""
     files = load()
@@ -127,7 +127,7 @@ def test_wf19_a_file_cut_off_is_not_ready_until_the_owner_answers_and_the_studen
         f"/jobs/{cut}/cut-off", data={"csrf_token": harness.token(site.browser, f"/jobs/{cut}")}
     )
     assert sent.status_code == 303
-    assert state(site, cut) == "Ready"  # may be shared, but never "Ready to share"
+    assert state(site, cut) == "Ready"  # may be shared, but never "Ready to post"
     page = harness.words(site.page(f"/jobs/{cut}").xpath("//main")[0])
     assert "Pages 4 to 6 of the PDF are empty" in page and "Every part the tool found" not in page
     assert told in student_text(site, cut).lower()

@@ -2581,11 +2581,11 @@ def export_failed_words(version: str, code: str) -> str:
     if code == export_canvas.NOT_TEXT:
         return (
             f"The {version} could not be made from this document. The HTML file is still "
-            "available from the job page."
+            "available from the document page."
         )
     return (
         f"It has a picture in a form the {version} cannot hold. The HTML file is still "
-        "available from the job page."
+        "available from the document page."
     )
 
 

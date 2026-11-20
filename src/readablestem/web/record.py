@@ -43,7 +43,7 @@ from readablestem.core.types import (
 from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
-from readablestem.web import exam, job_page
+from readablestem.web import exam, job_page, strings
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_when, machine_date
 from readablestem.web.messages import (
@@ -63,12 +63,14 @@ from readablestem.web.review import (
     UNDO_ACTION,
     WITNESS_KEY,
     WRITE_KEY,
+    is_kept_image,
     item_labels,
+    reject_keeps,
 )
 
 STATEMENT = (
     "This record lists what the tool did to this document, what a person decided and when, "
-    "which parts were not converted, and which structure checks ran. It does not say that "
+    "which items were not converted, and which structure checks ran. It does not say that "
     "the document meets any standard or law, and nobody at the tool has looked at the "
     "document. The accessibility office makes that judgment."
 )
@@ -80,7 +82,7 @@ KEEP_NOTE = (
 ACTION_WORDS = {
     "accept": "Accepted",
     "edit": "Edited",
-    "reject": "Rejected, original kept",
+    "reject": strings.KEPT_ORIGINAL,
     "add_data_table": "Added a data table",
     # Edits no decision on a proposal covers (T3-5, T3-16).
     "describe": "Described the image in words",
@@ -90,7 +92,8 @@ ACTION_WORDS = {
     "leave_out_block": "Left a paragraph out of the student file",
     "restore_block": "Put a paragraph left out back into the student file",
     "add_figure": "Added a picture the tool missed, with the person's own alt text",
-    "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
+    "add_equation": "Marked an equation the tool missed; the tool read it and a person looked at "
+    "it",
     "omit_page": "Left the page out of the student file and of the review",
     "restore_page": "Put the page back into the student file and the review",
     "read_again": "Had the tool read the equation again",
@@ -114,7 +117,7 @@ RELABEL_WORDS = (
     "stayed waiting for a decision."
 )
 MAX_NAMED_EQUATIONS = 6
-MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, then saved"
+MODEL_READ_WORDS = "Table cell read by the model at the person's request, then saved"
 # What a carried edit was (web.carry_edits.CARRIED_KEY).
 CARRIED_EDIT_WORDS = {
     "text": "change to the words of the text",
@@ -286,9 +289,36 @@ def _page_of(elements: dict[str, Element], element_id: str) -> int | None:
     return element.page + 1 if element is not None else None
 
 
-def _decision_words(edit: Any) -> str:
-    """What the decision was, in words, from the stored action and the marks its `after` keeps."""
+# What "reject" kept, by the kind of item: the picture of an equation, a table or text read from
+# an image, or a figure left without a description. Any other kind keeps the original.
+# `_reject_words` puts the two cases the kind does not tell before it.
+REJECT_WORDS = {
+    "equation": strings.KEPT_AS_IMAGE,
+    "table": strings.KEPT_AS_IMAGE,
+    "paragraph": strings.KEPT_AS_IMAGE,
+    "figure": strings.KEPT_WITHOUT_DESCRIPTION,
+}
+
+
+def _reject_words(fix: Fix | None, element: Element | None, origin: str) -> str:
+    """What a reviewer's "reject" kept for this item, in the words the review screen gives its
+    state (`routes.review.reject_words`): a page kept as an image is an image whatever its
+    kind, and a formula of a source with no picture is left as written."""
+    if fix is None:
+        return strings.KEPT_ORIGINAL
+    if is_kept_image(fix):
+        return strings.KEPT_AS_IMAGE
+    if reject_keeps(origin, fix, element) == "written":
+        return strings.LEFT_AS_WRITTEN
+    return REJECT_WORDS.get(fix.kind.value, strings.KEPT_ORIGINAL)
+
+
+def _decision_words(edit: Any, rejected: str = "") -> str:
+    """What the decision was, in words, from the stored action and the marks its `after` keeps.
+    `rejected`: what a reject kept for this item (`_reject_words`)."""
     action = str(edit.action)
+    if action == "reject" and rejected:
+        return rejected
     after = edit.after if isinstance(edit.after, dict) else {}
     if action == "accept" and after.get(BULK_KEY):
         kind = after[BULK_KEY]
@@ -462,7 +492,7 @@ def notice_not_checked(result: DocumentResult) -> list[str]:
     """The lines of the result that say something is not in the file or was not checked (the rows
     of `core.page_checks` with `not_checked`: words left out, pages whose drawings were not
     analysed, a source never compared with a compiled copy), one sentence per code: the job
-    page lists them under "Not handled" or "Worth checking", and the record, which says "every
+    page lists them under "Not handled" or "Worth a look", and the record, which says "every
     part the tool found was converted", says them too. A page-level line names its pages, and a
     count in the sentence is the total."""
     out = []
@@ -593,7 +623,7 @@ def build(
                 item=item,
                 page=page_edit if page_edit is not None else _page_of(elements, edit.element_id),
                 tool_had=TOOL_STATUS_WORDS.get(str(before), str(before)),
-                decision=_decision_words(edit),
+                decision=_decision_words(edit, _reject_words(fix, element, result.origin)),
                 by=who.get(edit.user_id, owner),
                 by_file=file_who.get(edit.user_id, owner),
                 refs=(ref(item, edit.element_id),),
@@ -733,7 +763,7 @@ def to_csv(record: Record) -> str:
     if record.downloaded is not None:
         row("document", "File types downloaded", detail=", ".join(record.downloaded) or "None")
     c = record.counts
-    row("summary", "Parts found", detail=c.items)
+    row("summary", "Items found", detail=c.items)
     for kind, n in record.by_kind.items():
         row("summary", f"Found: {kind}", detail=n)
     row("summary", "Accepted by the tool, no decision from a person", detail=c.accepted)

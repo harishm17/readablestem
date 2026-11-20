@@ -1,7 +1,7 @@
 """Notices that follow from the fixes, and one list of notices for the job page.
 
 A notice (`core.types.Notice`) is something the job page lists beyond the review
-decisions: "Not handled in this file" (review "required" or "none") and "Worth checking"
+decisions: "Not handled in this file" (review "required" or "none") and "Worth a look"
 (review "optional"). It never adds a decision: when one is needed, the decision is the
 fix with the same `element_id`, and only fixes count.
 
@@ -109,7 +109,7 @@ DERIVED_CODES = frozenset(
 # (a footnote kept where it falls, a block of program code kept as code) are counted under
 # "Handled in this file", never listed as left out (F-043): `HANDLED_CODES`.
 # The language is a check on the document (SW20a): the owner confirms or changes it before the
-# file is "Ready to share" (`web.states`), whatever `review` an older stored notice has:
+# file is "Ready to post" (`web.states`), whatever `review` an older stored notice has:
 # `LANGUAGE_CODES`, the table's rows that are always listed as not handled.
 LANGUAGE_CODES = NOT_HANDLED_CODES
 
@@ -145,7 +145,7 @@ def continue_cut_off(result: DocumentResult) -> DocumentResult:
 
 def section(notice: Notice) -> Section:
     """ "Handled in this file" for what was found and converted (`HANDLED_CODES`), "Not
-    handled in this file" for the other required and none, "Worth checking" for optional."""
+    handled in this file" for the other required and none, "Worth a look" for optional."""
     row = TABLE.get(notice.code)
     if row is not None and row.section is not None:
         return row.section
@@ -263,7 +263,7 @@ def current(result: DocumentResult) -> list[Notice]:
 
 
 def from_runs(elements: Iterable[Element]) -> list[Notice]:
-    """`struck_text` for each element with struck runs, counting them ("Worth checking",
+    """`struck_text` for each element with struck runs, counting them ("Worth a look",
     never a decision: the words are kept and marked, and whether students need them at all
     is the instructor's call)."""
     return [

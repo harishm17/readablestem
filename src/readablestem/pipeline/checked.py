@@ -4,7 +4,7 @@ Five surfaces used to write their own sentence about what was converted, checked
 reviewed, each from the facts it happened to hold: the student note said "Your instructor
 checked the parts the tool was unsure about" whatever the instructor did (an "Accept
 anyway", a picture kept, optional notes nobody opened), and the job page fell through to
-"Ready to share. Everything was converted." when it knew only that no outcome code, open
+"Ready to post. Everything was converted." when it knew only that no outcome code, open
 decision or image count was set. Each surface now asks `summarize` and prints what
 `pipeline.checked_words` makes of the answer; none composes such a sentence itself, so two
 surfaces cannot disagree.

@@ -338,7 +338,7 @@ def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     assert '<a href="#latex-p1-e3">' in response.text  # error summary links to the field
     # Explained in words that name the problem; the code is for the Details, not here.
     assert (
-        "Your LaTeX was not saved. \\bad is not a command this tool supports: check for a "
+        "Your LaTeX was not saved. \\bad is not a command this tool supports: look for a "
         "typo, or write it another way." in unescape(response.text)
     )
     assert "(latex.allowed_commands: unknown_command)" not in response.text
@@ -798,7 +798,7 @@ def _undo(env):
 
 
 def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(web):
-    """An abstained equation's card offers Read again, a picture with the reviewer's
+    """An abstained equation's card offers a new model reading, a picture with the reviewer's
     description and Not an equation. Each stores its own decision, the rendered output says
     the same, and Undo puts the stored result back as it was."""
     from readablestem.models.fake import FakeVisionClient
@@ -829,9 +829,9 @@ def test_an_equation_with_no_proposal_has_three_choices_each_stored_and_undone(w
     before = held()
     mine = card(review_page(web), "p1-e5")
     assert 'value="reread"' in mine and 'value="not_equation"' in mine
-    assert "Keep as a picture with my description" in mine
+    assert "Keep as image with my description" in mine
 
-    # Read again: a proposal where there was none, on the same item, still waiting.
+    # Read again (the model): a proposal where there was none, on the same item, still waiting.
     assert post(web, "p1-e5", action="reread").status_code == 303
     read = result(web).fix_for("p1-e5")
     assert read is not None and read.pending and read.equation is not None

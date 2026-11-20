@@ -29,6 +29,29 @@
   With the switch off nothing changes; no version bump, nothing to migrate.
 - Gold: a macro argument that starts with a letter, put after a control word in the body
   (`\lVert#1` with `A`), keeps a space between them (`gold/arxiv_tex.py`).
+## Unreleased: one word for each concept (SW22)
+
+- Every screen, message, record, export and email now uses one word for one concept, and the
+  labels more than one place says are read from the new `web/strings.py` (the Jinja global
+  `strings`). **Check** names only an automatic check the tool ran; what a person may look
+  at is an **item** ("Optional items", "Worth a look", and the verb is "look at" or
+  "compare"). **Item** is one thing the tool handled; **part** is only a page range of an
+  upload, so the button is "Convert the missing items". **Post** is putting the finished file
+  where students get it ("Ready to post", "before you post it"); **share** is giving named
+  people access. **Document**, never "job", on the pages, in the routes' own messages and in
+  the help pages. **Keep as image** is the one label (the page groups, the describe box, the
+  review card), and the record and the status say "Kept as image (your choice)". "Ask the
+  model to read it again" and "Model reads today: N of M" name the model read. The sample
+  document has one label ("Open the sample document") and the public page is "the demo".
+  The browser's own are "notifications". The consent box reads "Also let ReadableSTEM look
+  at the results" (30 days; nothing about the choice changed). The AI service is "the model"
+  except on the status page's provider line. The review details no longer print the raw
+  reason and check codes.
+- The student file's own words changed in the same pass (the "not converted" line, the
+  legend, the note on a table or equation kept as an image, the record's headings), so a
+  document made before this change keeps the old words until it is made again.
+  `RENDER_VERSION` is owed a raise (not made here). No model request changed, no migration,
+  no stored result or hash changed, and no new model read or cost.
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

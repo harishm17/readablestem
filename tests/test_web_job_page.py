@@ -154,7 +154,7 @@ def test_failed_checks_of_the_html_file_are_listed(web):
     assert "2 of 3 structure checks did not pass" in text
     assert "Must be fixed: The headings skip a level" in text
     assert "heading_skip" not in text and "html.heading_order" not in text  # no codes (T1-11)
-    assert "Worth checking: An equation does not say" in text
+    assert "Worth a look: An equation does not say" in text
 
 
 def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):

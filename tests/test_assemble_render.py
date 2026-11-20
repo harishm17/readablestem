@@ -498,8 +498,8 @@ def test_the_student_note_ends_main_and_speaks_to_students(sample_html):
     assert ABOUT_WORDING in note and CONTACT in note
     assert "2 of its 5 equations are written so that screen readers can read them aloud" in note
     # Decisions are still open: the 2 a person made are counted, the 4 still open are not.
-    assert "Your instructor reviewed 2 of 6 parts the tool flagged." in note
-    assert "4 parts could not be converted and are shown as pictures of the original" in note
+    assert "Your instructor reviewed 2 of 6 items the tool flagged." in note
+    assert "4 items could not be converted and are shown as pictures of the original" in note
     assert "<p>Test note.</p>" in note
     for word in ("needs review", "rejected", "accepted", "reviewer", "checked"):
         assert word not in note.lower(), word
@@ -515,10 +515,10 @@ def test_the_note_says_reviewed_with_the_date_once_a_person_decided():
     fixes[1].status, fixes[1].reviewed = Status.ACCEPTED, True
     done = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
                        checked_on=date(2026, 10, 9))  # fmt: skip
-    said = "<p>Your instructor reviewed 1 of 1 part the tool flagged, on October 9, 2026.</p>"
+    said = "<p>Your instructor reviewed 1 of 1 item the tool flagged, on October 9, 2026.</p>"
     assert said in about(done)
     undated = render(elements, fixes)
-    assert "<p>Your instructor reviewed 1 of 1 part the tool flagged.</p>" in about(undated)
+    assert "<p>Your instructor reviewed 1 of 1 item the tool flagged.</p>" in about(undated)
 
 
 def test_about_section_without_fixes_and_defaults():

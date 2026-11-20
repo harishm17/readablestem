@@ -54,8 +54,8 @@
   <li><strong>Handwritten notes and scanned pages are converted only when you ask.</strong>
     Check “Convert scanned or handwritten pages” when you upload. Each such page is then read
     from its picture, which is slower (about 20 to 30 seconds a page) and uses more of the
-    server's budget than a typed page, and <strong>you check every converted equation and
-    table</strong> before you share the file; the original page stays in the file, behind “Show
+    server's budget than a typed page, and <strong>you review every converted equation and
+    table</strong> before you post the file; the original page stays in the file, behind “Show
     the original page”, and the page says it was read from a picture, so small errors are
     possible. {{ image_pages_cost }} A tool can misread handwriting and small symbols. On 24
     pages of real handwriting that were not used to build the feature, 57% of the equations
@@ -75,7 +75,7 @@
     handwriting counts as scanned or handwritten too. Handwriting on a typed page is kept as
     an image too.</li>
   {% endif %}
-  <li><strong>Two-column pages</strong> convert less well than single-column notes: check the
+  <li><strong>Two-column pages</strong> convert less well than single-column notes: look at the
     reading order.</li>
   <li><strong>Links.</strong> A link over a picture or a drawing, or in a figure's caption, is
     not kept. Link text is kept as printed, even when it says nothing on its own (“click
@@ -86,12 +86,12 @@
   <li><strong>Language.</strong> You can choose the language when you upload; otherwise it is worked out
     from the text, which needs about 100 letters of prose. When the text is too short to say, the
     language the PDF states is used, and failing that English is assumed. An assumed or mixed
-    language has to be confirmed on the job page before the file counts as ready to share. A
+    language has to be confirmed on the document page before the file counts as ready to post. A
     passage in another language is marked only when it is a whole paragraph or list item.</li>
   <li><strong>Comments and attached files.</strong> A comment someone added to the PDF (a sticky
     note, or a note on a highlight) is included as a paragraph that starts “Note on the page:”.
-    Some comments are written for the instructor and not for students, so check them before you
-    share the file. Files attached inside the PDF are not converted: the job page names them.</li>
+    Some comments are written for the instructor and not for students, so look at them before you
+    post the file. Files attached inside the PDF are not converted: the document page names them.</li>
 </ul>
 </details>
 
@@ -106,7 +106,7 @@
     text under a drawn shape that only partly covers it, very small text, and OCR text
     that is visible on the page.</li>
   <li><strong>Math in headings</strong> stays as plain characters in the
-    text, not as MathML equations: check how it reads.</li>
+    text, not as MathML equations: look at how it reads.</li>
   <li><strong>The checks look at structure, not meaning.</strong> Every file is checked for
     structure (language, title, headings, lists, image text alternatives). The full axe-core
     accessibility test runs on our own test documents, not on yours, and nothing here
@@ -167,7 +167,7 @@
     end (0.50). Given each equation on its own, about two in
     three were right (0.68). Headings: F1 0.96, with every matched heading at the right level.
     (F1 is a score out of 1 that counts both headings missed and headings invented.) Figure
-    descriptions: 97% passed a model judge, a second AI model asked whether each description is
+    descriptions: 97% passed a model judge, a second model asked whether each description is
     right (not yet checked by people). Decisions it asked for: about 1.8 per page; it
     asked about only a third of the equations that were wrong.</li>
   <li><strong>Research papers typeset with LaTeX, held out</strong> (15 arXiv papers, 71

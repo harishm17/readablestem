@@ -25,7 +25,7 @@
   <li><strong>A zip:</strong> zip the whole project folder, with every file the document reads.</li>
   <li><strong>Stopped:</strong> the tool stops rather than give students raw code or missing
     text. The message says what to fix.</li>
-  <li><strong>Finished with parts missing:</strong> the page lists them under “Not handled in
+  <li><strong>Finished with items missing:</strong> the page lists them under “Not handled in
     this file”.</li>
 </ul>
 
@@ -35,7 +35,7 @@
   ("refused", "When the upload is refused"),
   ("stopped", "When the conversion stops"),
   ("not-read", "Classes and packages it does not read"),
-  ("wrong", "When it finishes but a part is wrong or missing"),
+  ("wrong", "When it finishes but an item is wrong or missing"),
   ("pdf", "When the PDF is the better way")
 ]) }}
 
@@ -156,12 +156,12 @@
     such as <code>\selectlanguage</code> or <code>\foreignlanguage</code>, stops with
     “which this tool cannot read yet”.</li>
   <li><strong>Any other class or package:</strong> it is passed to the converter. If errors
-    follow, the job stops and names what it could not read. The tool reads the literal
+    follow, the conversion stops and names what it could not read. The tool reads the literal
     <code>\documentclass</code> and <code>\usepackage</code> lines. One written through a macro
     is not caught at upload.</li>
 </ul>
 
-<h2 id="wrong">When it finishes but a part is wrong or missing</h2>
+<h2 id="wrong">When it finishes but an item is wrong or missing</h2>
 <p>The tool does not stop for these. It asks you, or it says what is missing. Open the document
   and see the <a href="/help/review">review help</a> for how the decisions work.</p>
 <ul>
@@ -178,10 +178,10 @@
     picture is, or accept the table as it is.</li>
   <li><strong>A formula shown as LaTeX code in a table, heading or caption.</strong> The item
     becomes a decision: correct it, or accept it as it is.</li>
-  <li><strong>Parts it could not read.</strong> The document's page says “This tool could not
+  <li><strong>Items it could not read.</strong> The document's page says “This tool could not
     read part of the LaTeX source”, with the words and pictures that are not in the file,
     listed under “Not handled in this file”. The document is “Partly converted”, not “Ready to
-    share”. Check that the file reads well without them before you share it, or upload the PDF.</li>
+    post”. Look at whether the file reads well without them before you post it, or upload the PDF.</li>
 </ul>
 
 <h2 id="pdf">When the PDF is the better way</h2>

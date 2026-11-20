@@ -229,7 +229,7 @@
       {{ table_fields("split") }}
       <button type="submit" name="action" value="reject" class="{{ 'button' if only else 'button-secondary' }}"{% if not only %} data-tone="quiet"{% endif %} data-role="reject" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
     {% endcall %}
-    <p class="hint" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.consequence }}{% else %}The image stays, marked “not converted”; screen readers cannot read its cells.{% endif %}</p>
+    <p class="hint" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.consequence }}{% else %}The image stays, marked “Not converted”; screen readers cannot read its cells.{% endif %}</p>
   </div>
   {% if not (t.proposal and t.needs_headers) %}{{ not_a_table(item, "split") }}{% endif %}
 </div>
@@ -283,7 +283,7 @@
   <p class="hint">Read from the PDF's own text, without a model. Compare it with the image.</p>
   {% if t.local_flat %}{{ flat_hint() }}{% endif %}
   {% else %}
-  <p class="cmp-none">No rebuilt table: the document shows the image, marked “not converted”.</p>
+  <p class="cmp-none">No rebuilt table: the document shows the image, marked “Not converted”.</p>
   {% endif %}
 </div>
 {{ table_findings(item) }}
@@ -312,7 +312,7 @@
 <p class="hint">Read from the PDF's own text and lines, without a model. Compare it with the image before you use it.</p>
 {% if t.local_flat %}{{ flat_hint() }}{% endif %}
 {% else %}
-<p>No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
+<p>No rebuilt table: the document shows the image of the table, marked “Not converted”.</p>
 {% endif %}
 {% if t.findings %}
 <p class="part-label">What the checks found</p>

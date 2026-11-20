@@ -88,10 +88,10 @@
   <h2 id="sample-heading">Try a sample first</h2>
   <p>A real conversion to review (OpenStax <em>Physics</em> 2.3, CC BY 4.0). Uses none of your pages.</p>
   {% if sample_job %}
-  <p><a class="button-secondary" href="/jobs/{{ sample_job }}">Open your sample document</a></p>
+  <p><a class="button-secondary" href="/jobs/{{ sample_job }}">{{ strings.OPEN_SAMPLE }}</a></p>
   {% else %}
   {% call form("upload.sample", "/sample", {"class": "inline-form"}) %}
-    <button type="submit" class="button">Open the sample document</button>
+    <button type="submit" class="button">{{ strings.OPEN_SAMPLE }}</button>
   {% endcall %}
   {% endif %}
 </section>

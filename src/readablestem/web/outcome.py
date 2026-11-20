@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 from readablestem.core.types import PageType
 from readablestem.pipeline import page_type
 from readablestem.pipeline.checked_words import source_noun
+from readablestem.web import strings
 
 if TYPE_CHECKING:
     from readablestem.config import Settings
@@ -148,8 +149,8 @@ def unread_message(result_json: dict[str, Any] | None) -> str:
     return (
         f"This tool could not read part of the {noun}: {unread_phrase(words, pictures)} "
         f"from it {'is' if one else 'are'} not in the file, as listed under “Not handled in "
-        f"this file” below. Check that the file reads well without {'it' if one else 'them'} "
-        "before you share it, or upload the PDF instead."
+        f"this file” below. Look at whether the file reads well without {'it' if one else 'them'} "
+        "before you post it, or upload the PDF instead."
     )
 
 
@@ -230,13 +231,13 @@ def outage_message(result_json: dict[str, Any] | None, *, offered: bool = True) 
         return ""
     n, total, kinds = outage
     text = (
-        f"The AI service did not answer for {n} of {total} {kinds}, so they were not "
+        f"The model did not answer for {n} of {total} {kinds}, so they were not "
         f"converted. Nothing is wrong with your PDF. {KEPT}"
     )
     if offered:
         text += (
-            " Use “Convert the missing parts” below, now or later: only those parts are sent "
-            "again, and it does not use up your daily pages."
+            f" Use “{strings.CONVERT_MISSING_ITEMS}” below, now or later: only those items "
+            "are sent again, and it does not use up your daily pages."
         )
     return text
 
@@ -253,8 +254,8 @@ def budget_message(result_json: dict[str, Any] | None, code: str, *, offered: bo
         text += f" {KEPT}"
         if offered:
             text += (
-                " After 00:00 UTC use “Convert the missing parts” below to convert them: only "
-                "those parts are sent again, and it does not use up your daily pages."
+                f" After 00:00 UTC use “{strings.CONVERT_MISSING_ITEMS}” below to convert "
+                "them: only those items are sent again, and it does not use up your daily pages."
             )
         return text
     return (

@@ -358,7 +358,7 @@ def second_reader_problem(settings: Settings) -> str | None:
 def launch_blockers(
     repo_root: Path | None = None, *, settings: Settings | None = None
 ) -> list[str]:
-    """Plain-language list of unfinished items, empty when the beta is ready to share."""
+    """Plain-language list of unfinished items, empty when the beta is ready to post."""
     items: list[str] = []
     if settings is not None:
         items.extend(_settings_items(settings))

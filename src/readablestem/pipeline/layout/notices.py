@@ -29,7 +29,7 @@ TABLES_NOT_SEARCHED = "tables_not_searched"
 def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str]) -> list[Notice]:
     """A page read for its text whose drawings were not analysed (`page_type.InkBudget`: a
     count of work ran out, or the clock guard fired) may hold handwriting nobody looked for:
-    "Worth checking". A page kept whole as its image has a notice and a decision of its own."""
+    "Worth a look". A page kept whole as its image has a notice and a decision of its own."""
     return [
         make(NOT_ANALYSED, page=number)
         for number, kind in sorted(types.items())
@@ -39,7 +39,7 @@ def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str
 
 def _not_searched_notices(pages: list[int]) -> list[Notice]:
     """A page whose table search the document's time for it refused
-    (`tables.DetectorBudget`) may have a table read as text: "Worth checking", and it holds
+    (`tables.DetectorBudget`) may have a table read as text: "Worth a look", and it holds
     the job back from "Ready" (`web.states`)."""
     return [make(TABLES_NOT_SEARCHED, page=number) for number in pages]
 

@@ -32,7 +32,7 @@
   {% if not cl.address %}<p class="hint">The address was shown once, when the link was made. If you lost it, make a new link.</p>{% endif %}
   <p class="hint">This document is kept until {{ retain_until|utc }}. A link keeps its document to the link's last day and {{ cl.after }}.</p>
   {% if cl.out_of_date %}
-  <p id="class-link-stale">The published copy is version {{ cl.published }}. Your document is now version {{ cl.current }}.{% if not cl.ready %} Finish checking it to publish the new version.{% endif %}</p>
+  <p id="class-link-stale">The published copy is version {{ cl.published }}. Your document is now version {{ cl.current }}.{% if not cl.ready %} Finish reviewing it to publish the new version.{% endif %}</p>
   {% endif %}
   <div class="share-actions">
     {% if cl.can_update %}
@@ -71,7 +71,7 @@
     <button type="submit" class="button">{% if cl.link and cl.link.kept %}Make a new link{% else %}Make the link{% endif %}</button>
   {% endcall %}
   {% else %}
-  <p class="hint" id="class-link-not-ready">A class link can be made once this document is ready, with nothing left to check.</p>
+  <p class="hint" id="class-link-not-ready">A class link can be made once this document is ready, with nothing left to look at.</p>
   {% endif %}
 </section>
 {% endif %}

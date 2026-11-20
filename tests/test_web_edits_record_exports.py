@@ -102,7 +102,7 @@ def test_the_record_lists_every_new_kind_of_decision_with_who_and_when(review):
         "Changed the words of the text": "Paragraph",
         "Made a heading of a paragraph": None,
         "Added a picture the tool missed, with the person's own alt text": None,
-        "Marked an equation the tool missed; the tool read it and a person checked": None,
+        "Marked an equation the tool missed; the tool read it and a person looked at it": None,
         "Described the image in words": None,
         "Left the page out of the student file and of the review": "Page 2",
     }
@@ -139,7 +139,7 @@ def test_clean_tables_accepted_together_and_a_cell_read_by_the_model_are_marked(
     decisions = [r["decision"] for r in rows]
     bulk = "Accepted, together with the other clean tables, in one action"
     assert decisions.count(bulk) == 2
-    assert "Table cell read by the AI service at the person's request, then saved" in decisions
+    assert "Table cell read by the model at the person's request, then saved" in decisions
     assert all(r["by"] == "the owner" for r in rows)
 
 

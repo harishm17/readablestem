@@ -49,7 +49,7 @@
   {# What the code does (T1-8): the
      24-hour and 7-day clocks restart on every review decision, language, title or contact
      change, and download; "Keep for 7 days" on the job page makes a 24-hour document a
-     7-day one, counted from that moment; the "let us look" choice is 30 days from upload and does not restart. #}
+     7-day one, counted from that moment; the "let ReadableSTEM look" choice is 30 days from upload and does not restart. #}
   <li>If neither box is checked on the upload form (the default, unless you saved {{ week_days }} days in
     <a href="/account#account-keep">Account</a>), all of it is deleted automatically
     <strong>{{ retention_hours }} hours</strong> after you last worked on it: after your
@@ -60,7 +60,7 @@
     <strong>{{ week_days }} days</strong> after you last worked on it instead. Nobody else looks at it.
     "Keep for {{ week_days }} days" on the document's page does the same later, and shows the day it
     will then be deleted.</li>
-  <li>If you also check "Also let us look at the results ({{ opt_in_days }} days)", it is
+  <li>If you also check "{{ strings.OPT_IN_LABEL }} ({{ opt_in_days }} days)", it is
     deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time the people
     who run ReadableSTEM may look at the conversion results to find and fix mistakes in the
     tool. Both boxes
@@ -73,7 +73,7 @@
   <li>A file that is too large to convert at once (a PDF{% if office_on %}, or for a Word or PowerPoint file the PDF made from it{% endif %}) is kept, as stored, while you choose which
     pages to convert. It is deleted <strong>{{ retention_hours }} hours</strong> after you
     uploaded it, when you discard it, or once every page has been sent to be converted.
-    Nothing is sent to an AI service until you choose the pages. The sample document is
+    Nothing is sent to the model until you choose the pages. The sample document is
     a recorded conversion of a published textbook section, not your file: it is deleted on the
     same schedule as your own documents.</li>
   {# The one submit rule (web/forms.py, `request_tokens`): deleted at sign-out, with the

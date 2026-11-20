@@ -24,7 +24,7 @@
   <li><strong>Mistakes:</strong> after each decision, <strong>Undo</strong> takes it back.</li>
   <li><strong>Done:</strong> the screen says “All decisions made.” The checks look at the
     structure of the file, not at whether it says what you meant, so read the student version
-    and listen to it before you share.</li>
+    and listen to it before you post.</li>
 </ul>
 
 {% from "_contents.html" import contents %}
@@ -35,7 +35,7 @@
   ("keys", "Keyboard shortcuts"),
   ("many", "Accept many at once"),
   ("tools", "Change a page"),
-  ("optional", "Optional checks"),
+  ("optional", "Optional items"),
   ("undecided", "Decisions you leave open"),
   ("ready", "When the document is ready to post")
 ]) }}
@@ -51,7 +51,7 @@
     buttons. Links take you to the previous and the next decision.</li>
   <li><strong>The page.</strong> It is headed “Page 4 of 12” and shows the original page as an
     image with a mark on each item. A mark is a link to its item. The key above the page says
-    what the marks mean: “Needs your decision”, “Same decision, other page”, “Optional check”
+    what the marks mean: “Needs your decision”, “Same decision, other page”, “Optional item”
     and “Accepted”. “Show accepted” and “Hide accepted” turn the accepted marks on and off.
     “Previous page” and “Next page” move through the pages, and a list of pages says which
     have decisions to make.</li>
@@ -88,7 +88,7 @@
     differing meaning.</li>
   <li>When the checks point to one repair, a first button offers it. It saves the change and
     checks again.</li>
-  <li><strong>Read again</strong> reads the picture once more and replaces the proposal.
+  <li><strong>{{ strings.READ_AGAIN }}</strong> has the model read the picture once more and replaces the proposal.
     <strong>Not an equation</strong> gives it back to the page as text, as the PDF has it.
     Each appears only when it can be used.</li>
   <li><strong>Edit the LaTeX</strong> opens a box. <strong>Save edit</strong> checks your LaTeX
@@ -140,7 +140,7 @@
     <strong>Change this cell</strong>, then <strong>Save cell</strong>.
     <strong>Read this cell with the model</strong> reads one cell again and checks what it
     reads like a typed edit.</li>
-  <li><strong>Keep as image</strong> shows students a picture marked “not converted”.
+  <li><strong>Keep as image</strong> shows students a picture marked “Not converted”.
     Screen readers get no table.</li>
   <li>When two or more tables wait with nothing found wrong, a button
     <strong>Accept all N clean tables</strong> (with the number) accepts them in one step.
@@ -172,7 +172,7 @@
     <strong>Looks right</strong> and a button that keeps the original, named for what it does
     (for text read from an image, “Keep as image”). <strong>Change the words</strong> opens the
     page tools (below).</li>
-  <li>A note titled “Worth checking” says that something in a paragraph may need a look, such as
+  <li>A note titled “Worth a look” says that something in a paragraph may need a look, such as
     a link or a line. Nothing holds up the document: change the words if you agree, or leave
     it.</li>
 </ul>
@@ -221,7 +221,7 @@
   back. Anything that failed a check or was flagged stays for you. Undo reverses the whole step.</p>
 
 <h2 id="tools">Change a page</h2>
-<p>Under the optional checks, a disclosure named “Change page 4” (with the current page number)
+<p>Under the optional items, a disclosure named “Change page 4” (with the current page number)
   has three tools. On the document's page, the link <strong>Fix something on a page</strong>
   opens the same tools for page 1 even when no decision is waiting. After a change here, the
   screen offers <strong>Undo this change</strong>.</p>
@@ -244,14 +244,14 @@
     and the line it ends before. <strong>Show the part I described</strong>
     shows it cut out before anything is added. Then <strong>Add the picture</strong> (with its
     alt text) or <strong>Read it as an equation</strong>. The tool reads the equation and you
-    check it as a decision. <strong>Change the region</strong> goes back to the numbers.</li>
+    look at it as a decision. <strong>Change the region</strong> goes back to the numbers.</li>
   <li><strong>Leave this page out.</strong> For a blank page or a cover. The page is left out
     of the student file and of the review, and the file says that it is not there. Nothing is
     deleted: <strong>Put page N back</strong> restores it. The last page left in a file stays.</li>
 </ul>
 
-<h2 id="optional">Optional checks</h2>
-<p>“Optional checks (N)” lists items the tool accepted for you, each with a small note.
+<h2 id="optional">Optional items</h2>
+<p>“Optional items (N)” lists items the tool accepted for you, each with a small note.
   Nothing needs doing unless you disagree: choose one to open it and change it. “Your
   decisions (N)” lists what you decided.</p>
 
@@ -264,27 +264,27 @@
   <li>On the document's page the status says how many decisions need you before you give it to
     students, and the main button is <strong>Review</strong>.</li>
   <li>If you try to download it anyway, a page asks first: “Download a draft of ...?” It says
-    what students would get: for each undecided part, the tool's suggestion as it is, and parts
+    what students would get: for each undecided item, the tool's suggestion as it is, and items
     kept as images marked “Not converted”. You can <strong>Review N decisions first</strong>
     or <strong>Download the draft anyway</strong>.</li>
   <li>A draft's file name ends in “-draft”, and the file opens with the line “Draft: 2
     decisions are still open. Not for students.”</li>
   <li>A person you shared the document with to view only is never given the draft. They are
-    told that the owner is still checking.</li>
+    told that the owner is still reviewing.</li>
 </ul>
 
 <h2 id="ready">When the document is ready to post</h2>
 <ul>
   <li>The review line says “All decisions made.” and the decision area shows the finish line
-    with a state, for example “Ready to share”, “Ready” or “Partly converted”, and a sentence
+    with a state, for example “Ready to post”, “Ready” or “Partly converted”, and a sentence
     on what was reviewed. The same state is on the document's page.</li>
-  <li>“Ready to share” means no decision is open, and the page says “Every part the tool found
-    was converted.” “Ready” and “Partly converted” say what remains, such as parts kept as pictures, pages left
+  <li>“Ready to post” means no decision is open, and the page says “Every item the tool found
+    was converted.” “Ready” and “Partly converted” say what remains, such as items kept as pictures, pages left
     out, or parts of a LaTeX source it could not read. The page says what it is.</li>
-  <li>When the document can be shared, the screen offers <strong>Download the HTML
+  <li>When the document can be posted, the screen offers <strong>Download the HTML
     file</strong>, <strong>Preview the student version</strong> and <strong>Listen as a
     student</strong>. Read the student version through once and listen to it. The checks look at the structure of
-    the file, not at whether each part says what you meant.</li>
+    the file, not at whether each item says what you meant.</li>
   <li>Then see <a href="/help/posting">posting the file in your course</a>.</li>
 </ul>
 

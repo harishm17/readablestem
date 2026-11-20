@@ -1022,12 +1022,12 @@ class Notice(BaseModel):
     logged and counted after the document is deleted; the one exception is `names` below.
 
     `review` places it on the job page: "required" and "none" are listed under "Not
-    handled in this file", "optional" under "Worth checking". A notice never adds a
+    handled in this file", "optional" under "Worth a look". A notice never adds a
     decision of its own: when something needs one (`review="required"`, e.g. a table
     kept as an image), the decision is the `Fix` with the same `element_id`, and only
     fixes count towards `DocumentStats.required_decisions`. A required notice no fix
     stands behind (open tracked changes in a Word file, right-to-left text, answer options run
-    together) keeps the job at "Ready", never "Ready to share": `web.states` lists those codes.
+    together) keeps the job at "Ready", never "Ready to post": `web.states` lists those codes.
     """
 
     code: str

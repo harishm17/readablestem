@@ -253,7 +253,7 @@ def test_every_page_can_be_walked_with_the_tab_key(
 
 
 OUTPUT_PAGES = [
-    ("demo conversion", "/demo", None),
+    ("the demo", "/demo", None),
     ("student version", "/jobs/{ready}/view", ALICE),
 ]
 
@@ -398,7 +398,7 @@ def test_the_whole_review_is_decided_and_undone_by_keyboard_with_focus_on_the_ne
     lands_on_heading("Decision 3 of 3")
     tab_to(page, "^Make bold text")
     activate(page)
-    lands_on_heading("Ready to share")
+    lands_on_heading("Ready to post")
     # Undo is a button in the notice; focus goes back to the decision it reopened.
     tab_to(page, "^Undo")
     activate(page)
@@ -601,7 +601,7 @@ def test_a_saves_nothing_on_a_page_card_and_says_the_choice_needs_a_press(site, 
     page = context.new_page()
     setup_sign_in(page, site.base, ALICE)
     to_the_decision(page, site, course)
-    keep = page.get_by_role("button", name=re.compile("^Keep the page images?, marked"))
+    keep = page.get_by_role("button", name=re.compile("^Keep as image"))
     assert keep.count() == 1
     url = page.url
     page.keyboard.press("a")

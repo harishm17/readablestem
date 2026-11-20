@@ -1491,7 +1491,7 @@ this section describes.
   that are not a script of upright text (the 2 of `(a + b)2` after a line break, the `cell`
   of `E°cell`) are still given a kind when something stands before them: written raised they
   read better than flat.
-- **Flagged when flat** (`scripts_flattened`, optional "Worth checking"): raised or lowered
+- **Flagged when flat** (`scripts_flattened`, optional "Worth a look"): raised or lowered
   glyphs left with no base, lowered glyphs in a figure caption, and lowered glyphs in a table
   (a table cell keeps raised marks as superscript characters, `tables._marked`, and not
   lowered ones).
@@ -2523,7 +2523,7 @@ The decisions in the rules, with the measured values next to each threshold in t
   a hang: 60 s a page (`INK_GUARD_S`), about 40 times the slowest corpus page. Such a page says
   `ink_not_analysed`, and its stored page type says why (`ink_cause`: `work` or `time`); the
   conversion writes a "not finished" fact for it (`page_type`, `work_budget` or `time_limit`),
-  and a page read for its text gets the notice `drawings_not_analysed` ("Worth checking"), so
+  and a page read for its text gets the notice `drawings_not_analysed` ("Worth a look"), so
   the job page does not say "Everything was converted". A page not analyzed with less than a
   line of typed text is kept as its image beside that text; with a line or more it is read as
   before (its drawings are figures for the figure model), unless a drawing fills the page,
@@ -3109,7 +3109,7 @@ The document's language (`DocumentResult.lang`, `lang_source`):
 4. else "en": source "default" and the notice `lang_assumed`.
 
 No language holding 60 % of the letters adds `lang_mixed`. `lang_assumed` and
-`lang_mixed` are required checks (`web.states`): the job is not "Ready to share" until the
+`lang_mixed` are required checks (`web.states`): the job is not "Ready to post" until the
 owner confirms or changes the language on the job page
 (`text_pass.set_document_language`, source "user"). `lang_detected` stays optional.
 

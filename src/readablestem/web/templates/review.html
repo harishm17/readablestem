@@ -29,7 +29,7 @@
 {% macro group_counts(g) %}
 {%- if g.needs_review %}{{ g.needs_review }} {{ "needs" if g.needs_review == 1 else "need" }} review, {% endif -%}
 {%- if g.not_converted %}{{ g.not_converted }} not converted, {% endif -%}
-{%- if g.optional %}{{ g.optional|length }} with an optional check, {% endif -%}
+{%- if g.optional %}{{ g.optional|length }} with an optional item, {% endif -%}
 {{ g.done|length }} accepted or decided
 {%- endmacro %}
 
@@ -55,7 +55,7 @@
 {# A table's findings are with its proposal (each names the part of the table it is about). #}
 {% if item.checks and not (item.table and item.table.findings) %}
 <div class="explained">
-  <p><strong>{% if item.second_check %}Optional check (worth a look; it does not hold up the document):{% elif item.optional %}Optional check (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
+  <p><strong>{% if item.second_check %}{{ strings.OPTIONAL_ITEM }} (worth a look; it does not hold up the document):{% elif item.optional %}{{ strings.OPTIONAL_ITEM }} (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
   <ul class="check-list">
     {% for check in item.checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>
@@ -109,7 +109,7 @@
     {% endif %}
     {% if item.data_table and item.data_table_offered %}
     <p class="part-label">Optional: a data table for this chart</p>
-    <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
+    <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you look at them.</p>
     <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
     {% elif item.data_table %}
     <p class="part-label">Data table, as students will get it</p>
@@ -363,7 +363,7 @@
 {% macro list_tools() %}
 <details class="list-tools" id="list-tools"{% if decision_filter.active %} open{% endif %}>
   <summary>Sections{% if remaining > 1 %}, filter{% endif %}{% if bulk_offers %} and accepting many at once{% endif %}</summary>
-  {% if second_checks %}<p class="hint">A second automated check found a possible mismatch between alt text and image in some optional checks: worth a look, but it can be wrong.</p>
+  {% if second_checks %}<p class="hint">A second automated check found a possible mismatch between alt text and image in some optional items: worth a look, but it can be wrong.</p>
   {% endif %}
   <nav class="review-toc" aria-labelledby="review-toc-title">
     <h3 id="review-toc-title">Sections</h3>
@@ -374,7 +374,7 @@
           <li><a href="{{ parts.link('group-' ~ g.slug) }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
           {% endfor %}
         </ul>{% endif %}</li>
-      <li><a href="{{ parts.link('optional-checks') }}">Optional checks</a>: {{ optional|length + note_rows|length }}</li>
+      <li><a href="{{ parts.link('optional-checks') }}">{{ strings.OPTIONAL_ITEMS }}</a>: {{ optional|length + note_rows|length }}</li>
       <li><a href="{{ parts.link('decided') }}">Your decisions</a>: {{ mine|length }}</li>
       <li><a href="{{ parts.link('accepted') }}">Accepted automatically</a>: {{ auto|length }}</li>
       {% if has_pages %}<li><a href="{{ parts.link('page-changes') }}">Page changes</a></li>{% endif %}
@@ -440,7 +440,7 @@
   {% endif %}
   <p>{% if remaining %}<strong>{{ remaining }} {{ "decision" if remaining == 1 else "decisions" }} left:</strong>
     {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left to decide.{% endif %}{% if optional %}
-    {{ counted(optional|length, "optional check", "optional checks") }} below{% if second_checks %}, {{ second_checks }} worth a look{% endif %}.{% endif %}</p>
+    {{ counted(optional|length, "optional item", "optional items") }} below{% if second_checks %}, {{ second_checks }} worth a look{% endif %}.{% endif %}</p>
   {% if stopping_line %}<p class="stopping-line">{{ stopping_line }}</p>{% endif %}
   <p class="list-links">{% if has_pages %}<a href="/jobs/{{ job.id }}/review">Review screen</a>
     {% endif %}    {% if symbols_offer %}<a href="/jobs/{{ job.id }}/symbols?view=list">Symbols</a>
@@ -512,7 +512,7 @@
 
 {% if parts.shows("optional-checks", "optional", "notes") %}
 <section id="optional-checks" class="review-section" aria-labelledby="optional-checks-title" tabindex="-1">
-  <h2 id="optional-checks-title">Optional checks ({{ optional|length + note_rows|length }})</h2>
+  <h2 id="optional-checks-title">{{ strings.OPTIONAL_ITEMS }} ({{ optional|length + note_rows|length }})</h2>
   {% if optional %}
   {% if second_checks %}
   {% set small = optional|length - second_checks %}
@@ -522,14 +522,14 @@
   {% endif %}
   {% if optional_shown %}
   <details class="done-group"{% if optional_open %} open{% endif %}>
-    <summary>Show {% if optional_shown|length != optional|length %}{{ optional_shown|length }} of the {% else %}the {% endif %}{{ counted(optional|length, "optional check", "optional checks") }}</summary>
+    <summary>Show {% if optional_shown|length != optional|length %}{{ optional_shown|length }} of the {% else %}the {% endif %}{{ counted(optional|length, "optional item", "optional items") }}</summary>
     <ol class="fix-list done-list">
       {% for item in optional_shown %}{{ folded_item(item, true) }}{% endfor %}
     </ol>
   </details>
   {% endif %}
   {% elif not note_rows %}
-  <p>There are no optional checks.</p>
+  <p>There are no optional items.</p>
   {% endif %}
   {# T3-7: notes about a link, a line or a figure, each with its place on the review screen. #}
   {% if notes_shown %}

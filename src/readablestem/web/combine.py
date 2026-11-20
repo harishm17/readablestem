@@ -128,14 +128,14 @@ def language_check(kept: list[KeptPart]) -> str:
             f"The language of {checked_words.plural(waiting, 'part')} was assumed or could not be "
             f"settled, so the combined file reads {'it' if waiting == 1 else 'them'} in {name}. "
             f"Open the {'part' if waiting == 1 else 'parts'} for {listed}, then confirm the "
-            "language before you share the file: a screen reader reads each passage in the "
+            "language before you post the file: a screen reader reads each passage in the "
             "voice of its language."
         )
     if check == "split":
         return (
             f"The parts are in different languages and no language has most of them, so the "
-            f"combined file is set to {name}; each part is read in its own language. Check each "
-            "part's language before you share the file."
+            f"combined file is set to {name}; each part is read in its own language. Look at each "
+            "part's language before you post the file."
         )
     return ""
 

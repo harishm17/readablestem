@@ -482,7 +482,7 @@ def test_a_course_pdf_with_kept_pages_is_reported_and_decided_once_per_reason(en
     split = text_of(env.browser.get(f"/jobs/{job_id}/review").text)
     assert "Decision 1 of 2" in split
     assert "Pages 2 and 3 are handwritten." in split
-    assert "Keep the page images, marked “Not converted”" in split
+    assert "Keep as image" in split
     assert "type them up (for example in LaTeX or Word)" in split
     assert "Hidden text in the PDF" in split and "52 characters" in split
 
@@ -552,7 +552,7 @@ def test_the_list_view_keeps_the_group_and_refuses_anything_but_keep(env):
     assert kept.status_code == 303 and "/review/list?at=" in kept.headers["location"]
     listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "Needs your decision (1)" in listing
-    assert "Kept by you" in listing  # the scanned page, in "Your decisions"
+    assert "Kept as image (your choice)" in listing  # the scanned page, in "Your decisions"
     assert _post(env, job_id, "pg-nothing", "reject", "split").status_code == 404
 
 
@@ -564,8 +564,13 @@ def test_a_kept_page_stays_a_marked_image_after_its_group_decision(env):
     # Under "Your decisions" each page says what it is now; no alt text, no Decorative.
     assert 'name="decorative"' not in page and 'name="alt"' not in page
     listing = text_of(page)
-    assert "Page 2: Kept by you" in listing and "Page 2, page 2" not in listing
+    assert "Page 2: Kept as image (your choice)" in listing and "Page 2, page 2" not in listing
     assert "Kept as an image, marked “Not converted”" in listing
+    # The record names the decision as the review screen does: an image was kept, not a
+    # figure left without a description.
+    record = text_of(env.browser.get(f"/jobs/{job_id}/record").text)
+    assert "Kept as image (your choice)" in record
+    assert "Kept without a description" not in record
     # The review screen shows the page with its group, never a figure form.
     split = env.browser.get(f"/jobs/{job_id}/review?item=p3-e0").text
     assert 'name="decorative"' not in split and 'name="alt"' not in split

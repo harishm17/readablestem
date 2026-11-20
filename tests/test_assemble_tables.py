@@ -113,7 +113,7 @@ def test_a_table_not_rebuilt_keeps_its_image_flagged():
     assert "<table>" not in html and TABLE_CSS not in html
     assert all(c.passed for c in static_checks(html))
     # The student note says how many parts are pictures.
-    assert "1 part could not be converted and is shown as a picture of the original" in html
+    assert "1 item could not be converted and is shown as a picture of the original" in html
 
 
 @pytest.mark.parametrize(

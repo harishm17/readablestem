@@ -1,4 +1,4 @@
-"""Download all: one zip of the documents that are ready to share (T3-4, `web.bundle`).
+"""Download all: one zip of the documents that are ready to post (T3-4, `web.bundle`).
 
 `GET /app/download` is every ready document of the person, `GET /courses/{id}/download` the
 ones converted for one course. Both are plain GETs for the owner, like a single download: no
@@ -202,7 +202,7 @@ def _zip_response(
         raise PageError(
             409,
             "Nothing to download yet",
-            "None of these documents is ready to share. A document is ready when it has "
+            "None of these documents is ready to post. A document is ready when it has "
             "finished converting and no decision is left to make. Nothing was downloaded.",
         )
     _count_downloads(request, user, downloaded, file_type)

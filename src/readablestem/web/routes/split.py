@@ -12,10 +12,10 @@ decision first):
   Save edit and Reject post to the same route as the list view (`routes/review.py`),
   which redirects to the next decision still open (`?item=<key>`), where the decision's
   heading takes focus and says what just changed;
-- the optional checks (accepted automatically with a note), folded;
+- the optional items (accepted automatically with a note), folded;
 - the page the decision is on, as an image rendered on demand from the upload
   (`web.page_images`), with every fix on it marked: a numbered box per decision still
-  open, a quieter "Note" box per optional check, and the accepted ones only on request
+  open, a quieter "Note" box per optional item, and the accepted ones only on request
   ("Show accepted"). Each mark is a link to its item.
 
 Everything is a link or a form, so it works without JavaScript (`static/app.js` only
@@ -63,6 +63,7 @@ from readablestem.web import (
     page_edits,
     page_images,
     queue,
+    strings,
 )
 from readablestem.web.assets import asked_for
 from readablestem.web.compare import (
@@ -154,7 +155,7 @@ NOTE_KEY = re.compile(r"^[a-z_]{1,40}:[A-Za-z0-9_-]{1,64}$")
 EXCERPT_CHARS = 400  # of a paragraph a notice is about, shown in its panel
 # Elements with words of their own that the page tools can change (T3-5).
 TEXT_KINDS = frozenset({Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING})
-IMAGE_ONLY = "This can only be checked against the page image."
+IMAGE_ONLY = "This can only be compared with the page image."
 NO_TEXT_ROUTES = frozenset({"vision_page", "nothing"})  # where a page's content comes from
 MAX_EVIDENCE_CHARS = 300  # of a sentence shown as evidence
 SENTENCE_END = re.compile(r"(?<=[.!?])\s+")
@@ -164,10 +165,10 @@ LINES_BOTH = "Choose both lines, or leave both empty and give the four edges."
 LINE_CHARS = 80  # of a line, in that list
 MARK_WORDS_CHARS = 60  # of an item's first words, in the list of a page's marks
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
-# The kinds the review screen shows (marks, optional checks, items): its groups.
+# The kinds the review screen shows (marks, optional items, items): its groups.
 REVIEW_KINDS = frozenset(GROUP_KINDS)
 
-# Short notes for the folded list of optional checks (the card itself has the full
+# Short notes for the folded list of optional items (the card itself has the full
 # sentence from web.messages). Codes without one use the full sentence.
 SHORT_NOTES = {
     "style_cosmetic": "A letter's style differs slightly; the meaning is the same.",
@@ -180,7 +181,8 @@ SHORT_NOTES = {
     "heading.list_like": "Starts like a list item.",
     "too_long": "The alt text is long.",
     "redundant_prefix": "The alt text starts with words like “image of”.",
-    "second_check_mismatch": "Worth a look: a second automated check doubts the alt text.",
+    "second_check_mismatch": f"{strings.WORTH_A_LOOK}: a second automated check doubts the "
+    "alt text.",
 }
 
 # --------------------------------------------------------------------------- view model
@@ -302,7 +304,7 @@ class AddTool:
 @dataclass
 class PageTools:
     """What can be changed on the page shown (T3-5, T3-16): the page tools under the
-    optional checks. Content-free except for what the owner's own page holds."""
+    optional items. Content-free except for what the owner's own page holds."""
 
     number: int  # 1-based
     omitted: bool  # the page is left out of the student file and of the review
@@ -327,7 +329,7 @@ class StepLink:
 
 @dataclass
 class OptionalLine:
-    """One item in a folded list ("Optional checks", "Your decisions"), named by what it
+    """One item in a folded list ("Optional items", "Your decisions"), named by what it
     is as well as its number (UX review MF15)."""
 
     label: str  # "Equation 7, page 3"
@@ -341,7 +343,7 @@ class OptionalLine:
 class ReadyView:
     """The review screen's finish line (no decision open): what the job page says."""
 
-    title: str  # the state's label (`web.states`): "Ready to share", "Ready", "Partly ..."
+    title: str  # the state's label (`web.states`): "Ready to post", "Ready", "Partly ..."
     sentence: str  # what remains, or what was not converted ("" when nothing does)
     finish: str  # what people reviewed (`pipeline.checked_words.finish_sentence`)
     notes: str  # the optional notes nobody opened, never counted as reviewed ("" when none)
@@ -388,7 +390,7 @@ class Evidence:
 class Panel:
     """The decision (or item) shown on the right."""
 
-    mode: str  # "decision", "item" (an optional check or accepted item) or "done"
+    mode: str  # "decision", "item" (an optional item or accepted item) or "done"
     title: str
     subtitle: str = ""
     status: str = ""  # in words; the pill's colour only repeats it
@@ -661,7 +663,7 @@ class SplitBuilder:
             self.first_fix.setdefault(fix.element_id, fix)
         # Who decided what, read once and only when a reviewer decided something.
         self._deciders: dict[str, str] | None = None
-        # Notices with their names and places (T3-7), those the optional checks list.
+        # Notices with their names and places (T3-7), those the optional items list.
         self.notes = [
             p
             for p in notice_places.places(self.result, self.labels)
@@ -731,7 +733,7 @@ class SplitBuilder:
     # ------------------------------------------------------------------ selection
 
     def select(self, key: str) -> tuple[queue.Decision | None, Fix | None]:
-        """The decision named by `key`, or an item outside the queue (an optional check or
+        """The decision named by `key`, or an item outside the queue (an optional item or
         an accepted item), or the first decision still open. `key` may be an element's
         stable id (`core.uid`); one that names nothing is not looked for by place."""
         if key and uid.is_uid(key):
@@ -784,9 +786,9 @@ class SplitBuilder:
         )
         panel = Panel(
             mode="notice",
-            title="Worth checking",
+            title=strings.WORTH_A_LOOK,
             subtitle=f"Page {page}",
-            status="Optional check",
+            status=strings.OPTIONAL_ITEM,
             status_class="pill-optional",
             notice=card,
             why=card.sentence,
@@ -799,7 +801,7 @@ class SplitBuilder:
         return panel
 
     def notice_lines(self, page: int | None = None) -> list[OptionalLine]:
-        """The notices listed with the optional checks: which link or line, and where."""
+        """The notices listed with the optional items: which link or line, and where."""
         found = [p for p in self.notes if page is None or p.notice.page == page - 1]
         rows = notice_places.rows(self.job_id, found, self.url())
         return [OptionalLine(r.label, r.sentence, r.href, r.what) for r in rows]
@@ -808,7 +810,7 @@ class SplitBuilder:
 
     def ready(self) -> ReadyView:
         """The finish line once no decision is open, in the job's state (`web.states`), as
-        the job page says it: "Ready to share", or "Partly converted" with what was not."""
+        the job page says it: "Ready to post", or "Partly converted" with what was not."""
         from readablestem.pipeline import checked, checked_words
         from readablestem.web import states
 
@@ -818,7 +820,7 @@ class SplitBuilder:
             facts = states.Facts.of(job)
         summary = checked.of_result(self.result, reviewed_on=when)
         state = states.state_of(facts, states.counts_of(summary))
-        # "Ready to share" says it all; "Ready" and "Partly converted" say what remains.
+        # "Ready to post" says it all; "Ready" and "Partly converted" say what remains.
         said = state.key in {"partly_converted", "ready_remains"}
         return ReadyView(
             title=state.label,
@@ -874,7 +876,7 @@ class SplitBuilder:
             tier = _tier(fix)
             panel = Panel(
                 mode="item",
-                title="Optional check" if tier == "optional" else self.item(fix).status_label,
+                title=strings.OPTIONAL_ITEM if tier == "optional" else self.item(fix).status_label,
             )
             panel.status = (
                 "Accepted, with a note" if tier == "optional" else self.item(fix).status_label
@@ -939,7 +941,7 @@ class SplitBuilder:
             )
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_size = self.region_size(element, fix.kind)
-            outlined = ", the symbol to check outlined" if compare.pdf_marks else ""
+            outlined = ", the symbol to look at outlined" if compare.pdf_marks else ""
             panel.region_alt = f"{item.label} in the PDF, with the words around it{outlined}."
         elif fix.kind is Kind.FIGURE and element is not None:
             panel.evidence = self.evidence(fix, element, item, panel)
@@ -1187,7 +1189,7 @@ class SplitBuilder:
                     name = f"{what}, needs your decision ({of})"
                 tag = str(decision.number)
             elif tier == "optional":
-                tag, name = "Note", f"{label}, optional check"
+                tag, name = "Note", f"{label}, optional item"
             else:
                 tag, name, tier = (
                     "✓",
@@ -1213,7 +1215,7 @@ class SplitBuilder:
             if not place.key or notice.page != index or notice.element_id in placed:
                 continue  # only a notice about text, once for its paragraph
             placed.add(notice.element_id or "")
-            name = f"Page {number}, optional check: " + explain_notice(notice).text
+            name = f"Page {number}, optional item: " + explain_notice(notice).text
             if place.names:
                 name += " " + ", ".join(f"“{n}”" for n in place.names)
             is_current = place.key == current_note
@@ -1498,7 +1500,7 @@ class SplitBuilder:
     def decided_lines(self) -> list[OptionalLine]:
         """What the reviewer decided, apart from what was accepted for them (UX review
         MF14): each decision of the queue the reviewer made, then any other item they
-        changed (an optional check edited, say), in page and reading order."""
+        changed (an optional item edited, say), in page and reading order."""
         out: list[OptionalLine] = []
         seen: set[str] = set()
         for decision in self.queue:
@@ -1628,7 +1630,7 @@ def split_page(
 ) -> Response:
     """`page_mode`: "Fix something on a page" (WS19.6): the page's tools are the first panel,
     under the heading "Page N", with no decision (so none of another page) before them; the
-    optional checks of that page follow."""
+    optional items of that page follow."""
     builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted, loaded=loaded)
     builder.page_mode = page_mode
     place = None if page_mode else builder.note(note)

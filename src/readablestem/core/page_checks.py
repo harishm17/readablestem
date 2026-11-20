@@ -11,7 +11,7 @@ The tier is the notice's `review`, in the vocabulary of `core.triage`:
 
 - "required": not handled in this file, the instructor decides or confirms before sharing;
   `web.states` says which of them hold a finished job at "Ready";
-- "optional": a check, listed under "Worth checking";
+- "optional": a check, listed under "Worth a look";
 - "none": information with no decision (what was left out or kept, counted).
 
 `not_checked` marks a line that says something is not in the file or was not checked (words
@@ -22,7 +22,7 @@ the tool found was converted" is never the record's only word on it.
 `section` says where the line is listed when that does not follow from the tier: "handled"
 for what was found and converted (a footnote kept where it falls: information, never listed
 as left out), "not_handled" for a check that is always listed there whatever tier an older
-stored line has (the language). None: "optional" is "Worth checking", the others "Not handled
+stored line has (the language). None: "optional" is "Worth a look", the others "Not handled
 in this file" (`pipeline.notices.section`).
 
 The words are in `web.messages.NOTICE_MESSAGES` (and `HANDLED_MESSAGES` for the handled

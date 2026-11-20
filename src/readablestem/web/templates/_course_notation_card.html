@@ -6,6 +6,6 @@
 {% if course_notation.unseen %}
 {% set letters = course_notation.unseen %}
 <p class="hint">The PDF’s text does not show which letters are bold, and the proposal has a
-  plain {{ letters|join(", ") }}: check {{ "it" if letters|length == 1 else "them" }} in the image.</p>
+  plain {{ letters|join(", ") }}: look at {{ "it" if letters|length == 1 else "them" }} in the image.</p>
 {% endif %}
 {% endif %}

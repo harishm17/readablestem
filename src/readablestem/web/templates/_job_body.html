@@ -120,7 +120,7 @@
   {% if state.gaps %}
   {% call notice_box("warning", id="partial-note") %}
     {% for gap in state.gaps %}
-    <p><strong>{{ gap.title }}:</strong> part of this document was not converted. Those parts
+    <p><strong>{{ gap.title }}:</strong> part of this document was not converted. Those items
       stay as images marked “Not converted”.</p>
     {% endfor %}
     {% if job.is_owner %}{% include "_job_retry.html" %}{% endif %}

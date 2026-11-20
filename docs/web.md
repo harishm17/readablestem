@@ -94,7 +94,7 @@ value and where that value came from. This page does not repeat those values.
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (defaults in `config.py`), the workspace id an organization-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `MODEL_ANSWERS_FILE`, `MODEL_ANSWERS_OFFLINE`, `MODEL_ANSWERS_REKEY`, `MODEL_ANSWERS_LIVE_USD` | Dev and test only: the real client sits behind a JSON-lines file of recorded answers (`eval/answers.py`, the format `eval pipeline --answers` uses). `MODEL_ANSWERS_REKEY=true` reads a file recorded before 2026-11-11 through its older keys and writes each row found that way again under the new one (docs/eval.md, "Recorded answers"). A recorded request is answered from the file at no cost; any other is asked and appended, so a walkthrough or browser test pays for each answer once. With `MODEL_ANSWERS_OFFLINE=true` a missing answer is refused instead of asked, so a replay spends nothing. `MODEL_ANSWERS_LIVE_USD` is the most one process may pay for answers the file lacks: once that is spent a missing answer is refused in the same way, and replayed answers do not count. A replay also needs no room under `DAILY_SPEND_CAP_USD`: uploads and the worker are not held back by the headroom a live call needs (`web.spend.conversion_headroom_usd`), so a copy of the server with a $0.01 cap still converts. Conversions and review-screen re-reads are both recorded. With the Claude second check on (`CLAUDE_SECOND_CHECK`), its answers go into the same file (step `check`) and replay from it, offline as well; a verdict the file lacks comes back as an unanswered check, with no call. Ignored with `FAKE_MODELS`; refused in production. Keep the file outside the repository |
-| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let us look at the results (`web/retention.py`) |
+| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let ReadableSTEM look at the results (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`, compared in constant time. Required in production, at least 32 characters, or the purge would never run; the route also guards the daily paid canaries. Every call counts against the cron rate limit, wrong tokens included |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval (an upload or a new part wakes the worker at once, so this is only the wait between looks at an idle queue) |
 | `WORKER_MODE`, `WORKER_SLOTS` | `inline` (the default): the web process starts the worker thread, as above. `service`: the web process starts none and only `readablestem worker` converts, `WORKER_SLOTS` jobs at once (default 1; the web process's own thread is always one). The web process then reads the worker's liveness, the AI service's health and the sandbox probe from `ops_heartbeat` rows. docs/deploy-railway.md, "The worker as its own service" |
@@ -147,7 +147,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
 | POST `/jobs` | signed in | Upload of one file or up to 30 (10 for an account made by open sign-up), or a zip of documents: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/batch/{id}` (the batch page) for several or for a zip of documents ("Uploads and limits") |
 | GET `/app/batch/{id}` | owner | The batch page: each document of one upload with its status now, a live summary line, the large files waiting for their pages and the files not uploaded; polled by htmx while anything is unfinished (204 while unchanged); 404 for anyone else's, a stale and a malformed id ("Zip of documents and the batch page") |
-| GET `/app/batch/{id}/download` | owner | One zip of that batch's documents that are ready to share (finished, no decision open); 409 when none is; 404 as above |
+| GET `/app/batch/{id}/download` | owner | One zip of that batch's documents that are ready to post (finished, no decision open); 409 when none is; 404 as above |
 | GET `/app/upload/{id}` | owner | The old address of the answer to an upload of several files: 303 to `/app/batch/{id}` for the owner, 404 for anyone else |
 | GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all"); `?format=docx` or `?format=epub` makes the zip of Word or EPUB files (400 for any other value, 503 for Word without pandoc) |
 | POST `/sample` | signed in | Opens the person's sample document, made from the recorded conversion; 303 to its job page ("The sample document") |
@@ -164,7 +164,7 @@ the owner shared the document with by email has it if their right is that one or
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | POST `/jobs/{id}/title`, `/jobs/{id}/contact` | owner | Change the document's title or its contact line (CSRF-checked, not rate limited; the HTML is made again) |
 | POST `/jobs/{id}/keep` | owner | "Keep for 7 days": the deletion time becomes seven days from now; 429 and nothing changed when it would put the person over the 40 kept documents |
-| POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
+| POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing items" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | view | The HTML as an attachment |
 | GET `/jobs/{id}/combine` | owner | One HTML file from the finished parts of this document's source that the person still keeps, in page order ("Combining the parts of a long source" in docs/output.md). A GET like "Download all" (no token; each part in the file restarts its deletion clock and counts as downloaded; a part with a decision open is held back; `?format=docx` or `?format=epub` gives the joined file as Word or EPUB, recorded in that file type); with fewer than two such parts it answers 200 with the combine page below instead of a file; 404 for another person's or an expired document |
 | GET `/jobs/{id}/combine/parts` | owner | The combine page (`templates/combine.html`, `views.combine_view`): always 200 for a part of a file converted in parts. A row per part the person keeps, in page order, with its state as the list words it (`web/states.py`), the open decisions and a Review link to the first open one (the review screen's own queue), then "Combine the N ready parts (leaves out M)" with the Word and EPUB links, or what is still needed when fewer than two are ready. Linked from every part's page (`_job_parts.html`); 404 for another person's, expired or non-part document |
@@ -178,7 +178,7 @@ the owner shared the document with by email has it if their right is that one or
 | GET `/jobs/{id}/view` | view | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/listen` | view | "Listen as a student": the transcript of what a screen reader roughly says for the converted file, with an optional player ("Listen as a student", below); 409 until the job is done; no POST |
 | GET `/jobs/{id}/crops/{element_id}.png` | view | Original image of one equation, figure or table |
-| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `mode=page` (with `page=`) is "Fix something on a page" (WS19.6): the page's tools are the first panel under the heading "Page N", no decision is shown above them, and the optional checks of that page follow; `add`, `left`, `top`, `right`, `bottom` describe a region to add |
+| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | review | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `mode=page` (with `page=`) is "Fix something on a page" (WS19.6): the page's tools are the first panel under the heading "Page N", no decision is shown above them, and the optional items of that page follow; `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list?kind=&page=&part=&at=` | review | "All items as a list": every fix, grouped by kind, 25 cards a view; `kind` (`equations`, `figures`, ...) and `page` (1-based) narrow "Needs your decision" ("Review at scale" below); `part` (1-based) picks the view and `at` (an item, heading group or section id) picks the view that holds it |
 | GET `/jobs/{id}/accept/{equations\|figures}?view=` | owner | The list of what "Accept equations that passed every check" or "Accept figures with generated alt text" would accept, its count, one page of it (`?page=`, 20 items) and the form that does it; with nothing to accept it says why and names the next step (the first of that kind still waiting, else the next decision) (404 for another kind) |
 | POST `/jobs/{id}/accept/{equations\|figures}` | owner | Accept every item of the page the list shows (`ids`; with none, every candidate), as one write (CSRF, review `version` checked: 409 and nothing accepted when the document changed since the list was drawn); one Undo takes them all back |
@@ -462,7 +462,7 @@ What the open tier changes, and where:
   `quota_days.rereads` by one conditional UPDATE (`quota.try_consume_reread`) before the
   read starts, like pages, and given back (`quota.give_back_reread`) when the read comes back
   with nothing or is refused after it was counted (pages are not given back). Every model read
-  from review (a region marked as an equation, a table cell read as math, "Read again" on an
+  from review (a region marked as an equation, a table cell read as math, "Ask the model to read it again" on an
   equation) goes through `reread.read_equation`, so one place counts them; adding a picture
   costs no model call and is not counted. Invited
   accounts have no allowance beyond the rate limits.
@@ -701,10 +701,10 @@ that builds no tree, on the parts the preflight already read, under the same siz
 defusedxml parser; a part that is not well formed gives partial counts. What it holds, and what
 each count is for: `tracked_insertions` and `tracked_deletions` (Word: `w:ins` and `w:del`, outside
 `mc:Fallback`) make the *required* notice `office_tracked_changes` (count = both), so a Word file
-with open changes is "Ready", never "Ready to share", with the sentence "Tracked changes ... Accept
+with open changes is "Ready", never "Ready to post", with the sentence "Tracked changes ... Accept
 or reject them in Word, then upload the file again"; `speaker_notes` (slides whose notes hold text),
 `hidden_slides` and `comments` make *optional* notices (`office_speaker_notes`,
-`office_hidden_slides`, `office_comments`, "Worth checking"), because the PDF export leaves each
+`office_hidden_slides`, `office_comments`, "Worth a look"), because the PDF export leaves each
 of them out; `typed_equations` (OMML equations, Word and PowerPoint) is the job page's "How this
 file was read" sentence (they are read as pictures of the PDF page, like any equation in a PDF);
 `units` (slides, or the pages Word states) is built for a later charge and nothing reads it yet.
@@ -771,7 +771,7 @@ what is unavailable and offers the PDF route (LaTeX source on a server that cann
 "Compile it to a PDF and choose that here instead").
 
 Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days"
-(`keep`; deleted 7 days after the last activity) and "Also let us look at the results (30 days)" (`share`; implies
+(`keep`; deleted 7 days after the last activity) and "Also let ReadableSTEM look at the results (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
 `jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
 The Account page has "Keep new documents for 7 days by default" (`users.keep_week_default`,
@@ -970,7 +970,7 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   covers: `SourceReport.unread_words`, `unread_pictures` and the first 12 words. Either above 0
   adds the required notice `source_unread`, whose line on the job page gives the counts and the
   first words, and the finished job has the gap note "Parts not read" (`states.gaps_of`), so
-  it is "Partly converted" and never "Ready to share".
+  it is "Partly converted" and never "Ready to post".
   Three more lines go through `core.page_checks` (`convert._source_lines`): `source_unplaced`
   (required: LaTeX reported errors the reader could not tie to a place, counted; the job is held
   at "Ready" with its sentence), `source_figure_missing` (required: pictures the source names
@@ -1149,7 +1149,7 @@ file goes through (`_place_files`: the probe, the page quota, the caps):
 **The batch page** (`GET /app/batch/{id}`, `batch.html`, `_batch_rows.html`): the answer to an upload of
 several files or a zip of documents (a zip of documents is answered by it even when it held one). One row per
 document in the order sent, with its state as it is now (`documents.DocumentRow`, from "Job states" below: "Waiting",
-"Converting: 2 of 5 pages done", "Needs your decisions: 3 decisions to make" with a Review link, "Ready to share" with a
+"Converting: 2 of 5 pages done", "Needs your decisions: 3 decisions to make" with a Review link, "Ready to post" with a
 Download link, a stop with "Try again" while a try is left, "Deleted on Nov 11, 2026"), then
 the large files waiting for their pages and the files not uploaded. `#batch-summary` is a **polite live
 region** (`role="status"`) with the counts in one sentence ("5 documents: 2 ready to download, 1 needs your
@@ -1246,7 +1246,7 @@ than one zip holds the link counts what the zip has, "Download 25 of 34 ready do
 limit and how many with decisions open are left out, and lists the others (the zip takes the newest first), so each can be downloaded from its own page; the Word link says "the newest 10" likewise)
 (`web/bundle.py`, `web/routes/bundle.py`):
 
-- Only a document that is **ready to share** goes in (finished, no decision open). One with
+- Only a document that is **ready to post** goes in (finished, no decision open). One with
   decisions open is a draft, and the single download asks first; the zip leaves such documents
   out and says so in its `contents.txt`.
 - Names are the single download's (`slug-of-the-title-<id6>.html`), so two documents called
@@ -1499,8 +1499,8 @@ offer and the admin queue (F-213).
 | `stopped_limit` | Stopped: too large for one conversion | the job's own caps, out of memory | Needs you | Upload it again |
 | `stopped_unknown` | Stopped | a missing or unknown code; names the step it stopped in | Needs you | Try again (N left) |
 | `needs_decisions` | Needs your decisions | finished, decisions open | Needs you | Review |
-| `partly_converted` | Partly converted | finished, none open, a gap note | Ready | Convert the missing parts, or Download |
-| `ready` | Ready to share | finished, none open, no gap note, and the summary says ready (below) | Ready | Download, Share |
+| `partly_converted` | Partly converted | finished, none open, a gap note | Ready | Convert the missing items, or Download |
+| `ready` | Ready to post | finished, none open, no gap note, and the summary says ready (below) | Ready | Download, Share |
 | `ready_remains` | Ready | finished, none open, no gap note, but a part is a picture, a page is left out or a structure check failed: the message says which | Ready | Download, Share |
 | `sample` | Sample | the recorded sample | its state's | Open |
 | `deleted` | Deleted on Nov 11, 2026 | past its deletion time (the batch page) | Needs you | Upload it again |
@@ -1537,7 +1537,7 @@ checked, the day of the last decision and the version.
   are shown as LaTeX text, not written so that screen readers can read them aloud."). The
   gate is the same either way: an equation a screen reader gets as raw LaTeX is not converted.
   With no summary (a caller that passes
-  none) the job is never "Ready to share". The documents list reads the result of every
+  none) the job is never "Ready to post". The documents list reads the result of every
   finished job with no decision open to get this label; a job with decisions open needs only
   its stored count.
 - "Every part the tool found was converted." is the sentence for a whole job, never
@@ -1727,7 +1727,7 @@ script.
 ## After a download (`web/feedback.py`)
 
 Under the job page's download link (`templates/_after_download.html`): with decisions
-open, under the draft link in `job.html`; once the file is ready to share, at the end
+open, under the draft link in `job.html`; once the file is ready to post, at the end
 of "Put it in your course" in `_job_ready.html`, whose own line already links
 `/help/posting` ("How to post it in your course", so the partial leaves its link out
 there: `posting_link=false`). It has a link to `/help/posting` and two optional
@@ -1738,6 +1738,38 @@ used (`app.js`); without JavaScript they show on the next visit, once the server
 recorded the download. Answers are stored as `will_post` and `minutes_saved` events,
 once per document (a second answer keeps the first). An error (text in the minutes box)
 shows on `/jobs/{id}/feedback` with an error summary and what was typed kept.
+
+## One word for one concept (`web/strings.py`)
+
+Every screen, message, export and email uses one word for each concept, and the labels and
+terms that more than one template or module says are read from `web/strings.py` (templates
+read it as the `strings` global; Python modules import it). The words:
+
+- **check** names only an automatic check the tool ran on the file ("All 15 checks passed").
+  What a person may look at is an **item** ("Decisions to make (3)", "Optional items (47)").
+  The verb in advice is "look at" or "compare"; the lowest severity is "Worth a look".
+- **item** is one thing in the document that the tool handled and a person can decide: an
+  equation, a figure, a table, a heading. **Part** means only a page range of a large upload
+  ("Convert these parts"), so the button for what was not converted is "Convert the missing
+  items".
+- **post** puts the finished file where students get it ("Ready to post"). **Share** gives
+  named people access inside ReadableSTEM. The consent box says "Also let ReadableSTEM look at
+  the results", never "share".
+- **model read** is one request to the model to read something again: the action is "Ask the
+  model to read it again" and the allowance line is "Model reads today: N of M". "The AI
+  service" is kept only for the status page's line about the provider answering.
+- **sample** is the practice document in the app ("Open the sample document"); **demo** is the
+  public page `/demo`; **example** is a worked example in the showcase.
+- **document**, never "job", in anything a person reads. **Notification** is the browser's;
+  **notes** are the list on the document page.
+- **Keep as image** is the one label for keeping the original picture, and the record says
+  "Kept as image (your choice)". Status words are sentence case and come from `web/states.py`
+  ("Not converted").
+
+`web/strings.py` does not copy the words that already have one home: `web/states.py`,
+`web/signin_words.py`, `web/exam.py`, `web/messages.py`, `web/quota.py` (`allowance_phrase`,
+`PAGES_RULE`) and `web/dates.py`. The words are not tested for wording; the
+review and job-page route tests look for what each control does.
 
 ## Times
 
@@ -2012,7 +2044,7 @@ lines for the office to sign. Every kind of change a person can make is a row wi
 when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a paragraph made a sidebar or a quotation (or given
 back as neither), a picture added, an equation marked (the tool read it, a person checked), an image described in
 words, a page left out or put back; clean tables accepted together in one action and a table
-cell read by the AI service at the person's request (marks in the `ReviewEdit`'s `after`,
+cell read by the model at the person's request (marks in the `ReviewEdit`'s `after`,
 `review.BULK_KEY` and `MODEL_READ_KEY`); and what was carried over from an earlier version. The
 summary counts the pictures and equations added, the images described and the pages left out,
 and "not checked" says that the tool checked a description's form and not what it says. The
@@ -2152,7 +2184,7 @@ the site is built, with the same component and the same script).
   browser does not tell the page whether it runs on the device. A "Hear this" button does the
   same with its own press. The sentences are in `WORDS` at the top of `static/listen.js`.
 - **Where it is offered.** The job page (beside "Preview the student version", and as the
-  "Check how it sounds" step of "Before you share"), the review screen's finish line and list,
+  "Check how it sounds" step of "Before you post"), the review screen's finish line and list,
   the demo's note, the showcase examples, `/help/posting#listen`. On the review screen (split
   view, list view and "accept many") a **Hear this** button beside an equation plays the
   proposal's reading and then how the PDF's text layer reads (`speech_diff.read_text_layer`);
@@ -2355,13 +2387,13 @@ document.
 - **Outcome codes on finished jobs** (`worker.result_outcome`; status `done`, results
   available, but incomplete). They are gap notes of the job's state (`states.gaps_of`,
   words from `web/outcome.py`): the state is "Needs your decisions" while any decision is
-  open, else "Partly converted", never "Ready to share". A note with nothing in it is not
+  open, else "Partly converted", never "Ready to post". A note with nothing in it is not
   shown (F-319: never "0 of N were not converted"). `ops.aggregate` counts them as
   `job error:<code>`:
 
   | Code | Cause | What the user is told |
   |---|---|---|
-  | `budget_daily` | The daily cap ran out part way | Note "Stopped early": N of M equations and figures not converted, originals kept; "Convert the missing parts" after 00:00 UTC |
+  | `budget_daily` | The daily cap ran out part way | Note "Stopped early": N of M equations and figures not converted, originals kept; "Convert the missing items" after 00:00 UTC |
   | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | Note "Stopped early": split the PDF |
   | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with drawings or writing nothing could be read from), or handwriting on typed pages kept as images | Note "Pages kept as pictures": which pages are handwritten, scanned or unread, or have handwriting on typed text; that the HTML keeps it (or each one) as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
   | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
@@ -2371,7 +2403,7 @@ document.
   not answer for N of M ..."; read from the stored result on the job page; nothing is
   stored on the job, and it goes away once enough of them are filled in). Each of those
   items is an open decision, so the lists, which read no result, show the job as "Needs
-  your decisions". "Convert the missing parts" on that page tries it again ("Trying a
+  your decisions". "Convert the missing items" on that page tries it again ("Trying a
   document again", below).
 
   A finished LaTeX source job with no code whose reader left words or pictures unread
@@ -2400,7 +2432,7 @@ a dead end:
 | The document | The button | Why |
 |---|---|---|
 | Failed with `timeout`, `lease_expired`, `conversion_unavailable`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` ("Stopped: not caused by your file"), or with a code this version does not know ("Stopped", which names the step it stopped in) | "Try again (N left)" | Stopped by something that is not about the file, or not known to be. The file's own stops (a handwritten or scanned file, `no_content`), the limits (`budget_job_*`, `conversion_oom`) and a removed account are not offered a retry: it would stop the same way. With no tries left the state is "Stopped", says how many times it was tried, and offers only "Upload it again as a new document" (F-315) |
-| Finished with `budget_daily`, or converted while the AI service was down | "Convert the missing parts" | Only the parts that were not converted are sent again |
+| Finished with `budget_daily`, or converted while the model was not answering | "Convert the missing items" | Only the items that were not converted are sent again |
 
 `POST /jobs/{id}/retry` (owner only, CSRF, rate limits `retry` per address and `retry_user`
 per person) puts the **same job** back in the queue: `queued`, `jobs.retries` plus one,
@@ -2575,7 +2607,7 @@ From top to bottom:
    plain form with an optional course number ("For Canvas (zip with images)", one sentence
    of help) with the Common Cartridge link under it, both stated as not yet tried in a
    live course. "Word" (only when pandoc is installed) and "EPUB" are plain links. Then
-   "Before you share" once (read the student version through and listen to it; the notes,
+   "Before you post" once (read the student version through and listen to it; the notes,
    optional; what is not handled), then the two questions after a download ("After a
    download"). Deleting is a quiet button at the end of the page.
 
@@ -2605,7 +2637,7 @@ From top to bottom:
    analyzed, LaTeX errors with no place, a source not compared with a compiled copy) are also
    listed by the review record and its CSV under what was not checked
    (`record.notice_not_checked`).
-4. **Not handled in this file**, **Worth checking** and **Handled in this file**:
+4. **Not handled in this file**, **Worth a look** and **Handled in this file**:
    `pipeline.notices.current(result)` (notices derived again from the fixes as they are now,
    plus the stored ones of other codes). "Not handled" holds only what the result records as
    found and not converted; footnotes and code blocks, which are converted, are counted under
@@ -2622,7 +2654,7 @@ From top to bottom:
    A paragraph or list item flagged `rtl_text` or `option_labels` has a decision of its own
    (`notices.text_decisions`, reason `text.rtl_order` or `text.option_labels`): its notice is
    derived from that decision while it waits and is gone once it is made, so the job is
-   "Needs your decisions" and then "Ready to share" like any other. Its review card shows the
+   "Needs your decisions" and then "Ready to post" like any other. Its review card shows the
    words as the PDF gives them (`dir="auto"`, the element's `lang`) and "Looks right"; a
    result stored before has the bare notice and keeps the job at "Ready"
    (`states._HOLDS`). A decision on the same words carries over to a revised upload
@@ -2632,7 +2664,7 @@ From top to bottom:
    handwritten pages and the scanned page", never "groups of repeated figures"), and the
    waiting items say why they make fewer decisions ("pages kept as images for the same
    reason are decided together"). The finish line's heading is the status box's label:
-   **Ready to share** only when the summary says so ("What was checked" above), else
+   **Ready to post** only when the summary says so ("What was checked" above), else
    "Ready" with what remains, or "Partly converted", as on the review screen.
 5. **What changed for a screen-reader user** (Beta 1 of the feature review), shown for
    results with `source_facts` (older ones have no card): up to 7 rows "Can a
@@ -2659,7 +2691,7 @@ From top to bottom:
    T1-11): "Decisions to make" and "Decisions made" ("Decisions still open" for a person who can only view it), counted as on the review
    screen and in My documents (a group of repeated headings is one decision). A heading
    made bold text is a decision, never "shown as an image" (`job_page.shown_as_image`),
-   so it does not keep a job from "Ready to share". Items are not counted, and
+   so it does not keep a job from "Ready to post". Items are not counted, and
    there is no model cost, internal code or confidence here (cost is on `/admin`). One
    line says how many parts were accepted by the tool with an optional note nobody has
    opened (not reviewed), with a link to them. Then
@@ -2694,7 +2726,7 @@ From top to bottom:
    "Pages 4 to 6 of the PDF are empty ... so the rest is not in this file"), the student note
    says the pages are not in the file, and the EPUB, Word file, Canvas README, the record and
    Listen say it from the same summary. A repaired file with content on every page, or with
-   empty pages only in the middle, gets the optional line `file_repaired` ("Worth checking");
+   empty pages only in the middle, gets the optional line `file_repaired` ("Worth a look");
    a file MuPDF did not repair raises nothing, whatever blank pages it has.
 8. **For students** (`web/routes/job_settings.py`, `web/titles.py`): the title students
    hear (T1-7) and a contact line (T1-17). The title field starts with the stored
@@ -2752,7 +2784,7 @@ revised version", the finish notice's markup, link targets) and
 `tests/test_web_scale_browser.py` (the new controls from the keyboard, axe at 1280 and 320 px,
 forced colors, reduced motion, target sizes, the finish notice; `browser` marker),
 `tests/test_web_review_messages.py` (every code has a sentence),
-`tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
+`tests/test_web_review_triage.py` (decisions, optional items, heading groups),
 `tests/test_web_review_browser.py` and `tests/test_web_review_triage_browser.py`.
 The review edits (T3-5, T3-7, T3-11, T3-16, below): `tests/test_web_edit_page.py` (the
 words, a heading made, a picture or an equation added, the model's read under its caps),
@@ -2953,8 +2985,8 @@ image itself without script).
   says why in one more sentence ("The tool tried to read page 3 from an image, but the model's
   answer could not be used."; `reading_note`, from the page's `ImagePageRecord.outcome`, a code
   per page, never text), shows the
-  first page's image and the pages it is on, and has one button, **Keep the page images,
-  marked “Not converted”** (each one's Keep as image, `web.review.apply_page_group`),
+  first page's image and the pages it is on, and has one button, **Keep as image** (each one's Keep as image,
+  `web.review.apply_page_group`),
   with the hint "To make them accessible, type them up (for example in LaTeX or Word) and
   upload the typed version." (for pages of drawings or writing nothing could be read
   from, "describe it in your source file (for example as a figure with a description)").
@@ -2988,7 +3020,7 @@ sentence and code. Previous and next decision links close the card. After Accept
 edit or the "Reject" button the form redirects (303) to the next decision still open
 after this one (`queue.next_open`, wrapping round), or to the done state, the finish
 line as the job page says it (`SplitBuilder.ready`, from the job's state and
-the summary): **Ready to share** or **Ready** with what remains ("2 tables are shown as
+the summary): **Ready to post** or **Ready** with what remains ("2 tables are shown as
 images that screen readers cannot read."), after the finish line ("You reviewed 3 of 5
 flagged parts, the last on October 9."), then **Download the
 HTML file**, "Preview the student version", a line on reading it through before sharing
@@ -3050,7 +3082,7 @@ undone, so Undo is not offered for them. The list view offers "Undo the last dec
 same way.
 
 **Your decisions apart** (MF14) **and lines that name their item** (MF15). Below the
-optional checks, "Your decisions (N)" (folded) lists what the reviewer decided, in the
+optional items, "Your decisions (N)" (folded) lists what the reviewer decided, in the
 queue's order, then any other item they changed: "Equation 1, page 1 *ω* Edited by you.",
 "Repeated heading, 3 times “Teacher Support” All 3 were made bold text." Each line of
 both folded lists says what the item is, not only its number: a heading's words, the
@@ -3103,7 +3135,7 @@ counts itself on the job, inside its transaction after the row is locked
 (`web.review.bump_result_version`, `jobs.result_version`), and every review form, in both
 views, carries the number its page was drawn at (`version`). What refuses a form depends on
 what it acts on (`routes.review.refuse_stale`). A write on one item (a decision, an edit, an
-item's words, "Read again"), on a group's members or on the items of a many-item action (accept
+item's words, "Ask the model to read it again"), on a group's members or on the items of a many-item action (accept
 many, accept the clean tables, relettering a symbol) is refused only when a write since the
 page was drawn changed one of those items; the writes since are read from the `ReviewEdit`
 rows, which record the number each write made, so no form field or column is added, and the
@@ -3164,11 +3196,11 @@ content"); it moves focus to the decision's heading, and from there the first co
 the decision is at most three Tab stops on (five from the top of the page). Focus after a
 decision, an error and a refused stale write is described above.
 
-**Optional checks (M)**, folded, below the decision: each a link ("Equation 2, page 1")
+**Optional items (M)**, folded, below the decision: each a link ("Equation 2, page 1")
 and a short note ("A letter's style differs slightly; the meaning is the same."; for a
 style the PDF's text cannot show, "The proposal has a double-struck ℝ, a style the PDF's
 text cannot show."). Opening
-one shows it in the decision's place ("Optional check", "Accepted, with a note"), still
+one shows it in the decision's place ("Optional item", "Accepted, with a note"), still
 editable, with a link back to the decision at hand.
 
 **The page** (left on a wide screen, sticky, below on a phone). "Page 1 of 16", the pages
@@ -3183,7 +3215,7 @@ the page is marked by a link to it:
 | A decision still open | solid frame, numbered disc beside it (the decision's number) | "1: Equation 5, needs your decision (1 of 3)" |
 | A heading group's heading on another page than the one its decision counts on ("Same decision, other page") | thinner frame, the number in an outlined disc | "1: Heading 24, “Teacher Support”, repeated heading, part of decision 1 of 3 (first on page 1)" |
 | The selected one | thicker blue frame, blue disc, `aria-current` | the same |
-| An optional check | dashed frame; "Note" label on hover, focus or selection | "Note: Equation 2, optional check" |
+| An optional item | dashed frame; "Note" label on hover, focus or selection | "Note: Equation 2, optional item" |
 | Accepted or decided | dotted frame (a check mark on hover, focus or selection), only with "Show accepted" | "Heading 1, accepted automatically" |
 
 So a page whose chip has no "N to decide" never shows a solid decision mark: a group
@@ -3496,20 +3528,20 @@ and an element id; what it is about is worked out again from the result when a p
 for the owner only: the text of each link in the paragraph that says nothing on its own
 ("click here": `text_pass.unclear_link_text`, the rule that made the notice), a figure or table
 by its name in the review ("Figure 1"), a paragraph by its first words. The job page's
-"Not handled" and "Worth checking" lines say it ("The link text: “here”.") and link to **See it
-on the page**. On the review screen the notices are listed with the optional checks (after the
+"Not handled" and "Worth a look" lines say it ("The link text: “here”.") and link to **See it
+on the page**. On the review screen the notices are listed with the optional items (after the
 fixes with notes; the count includes them), each line a link to its place: a figure's or
 table's own panel, or the **panel of a notice about text** (`?note=<code>:<element id>`): the
 sentence, the link text, the words around it and **Change the words** (the page tools below).
-The paragraph is marked on the page image like an optional check (a dashed "Note" frame in
+The paragraph is marked on the page image like an optional item (a dashed "Note" frame in
 `marks.css`, laid out apart from the fixes' marks and under them, so a paragraph never takes a
 click from an equation inside it). A notice that is a decision of its own (a table or a page kept
-as an image) stays in the queue, not in the optional checks, and a whole-document notice (the
+as an image) stays in the queue, not in the optional items, and a whole-document notice (the
 language) stays on the job page. The list view has the same lines under "Notes on links, text
 and figures".
 
 **The page tools** (T3-5, T3-16; `web/page_edits.py`, `routes/edits.py`,
-`templates/_page_tools.html`). Under the optional checks, a folded "Change page N" (open after
+`templates/_page_tools.html`). Under the optional items, a folded "Change page N" (open after
 an edit or an error, and when `tools=1`) with, in this order:
 
 - *Change the words, make a line a heading, set a paragraph apart, or leave it out.* Every paragraph, list item and heading of the
@@ -3554,7 +3586,7 @@ an edit or an error, and when `tools=1`) with, in this order:
   The honesty rule is the left-out page's: the student file's note counts them ("One paragraph
   or list item on page 3 of the original PDF was left out of this file.", the same sentence and
   anchor as for pages, `checked_words.left_out_sentence`, also in a combined document), so the
-  job is "Ready", not "Ready to share", while any is out (`CheckedSummary.all_found_converted`,
+  job is "Ready", not "Ready to post", while any is out (`CheckedSummary.all_found_converted`,
   as for a page); the job page lists the notice `block_omitted` (one per page, with the count);
   the record's row says "Left a paragraph out of the student file" with the words taken out
   (`record._left_out_words`, up to 400 characters), by whom and when, and its not-checked list
@@ -3635,7 +3667,7 @@ links are one folded disclosure at the top of that section ("Sections, filter an
 at once"; open while a filter is in use; "Review at scale" below). With more than one decision
 in a kind each is a compact row and the first is open.
 
-**Parts.** The list is one sequence (decisions by kind, optional checks and their notes, "Your
+**Parts.** The list is one sequence (decisions by kind, optional items and their notes, "Your
 decisions", "Accepted automatically", the page links) cut into views of 25 cards
 (`routes/review.py` `PART_CARDS`; a heading group counts as its copies, a note or page link as a
 fifth). A view is about 130 KB and 4,100 DOM nodes on a document of 300 items (it was 1.3 MB and
@@ -3656,7 +3688,7 @@ works on the whole document, not on the view (below).
    and inside each kind the higher risk band first, then page and reading order (the bands are
    below). Each holds the fixes still waiting (needs review, failed and not converted alike).
    N counts decisions: a group of repeated headings is one.
-2. **Optional checks (M)**: fixes accepted automatically with a note (`Fix.review ==
+2. **Optional items (M)**: fixes accepted automatically with a note (`Fix.review ==
    "optional"`: a bold subscript, a double-struck R the PDF cannot show, a heading with
    weak evidence, a long alt text), folded into a `<details>`. Each item's summary line is
    its note in plain English (`web/messages.py`); unfolding it shows the full card, which
@@ -3668,7 +3700,7 @@ works on the whole document, not on the view (below).
    looked at if you want", the intro says such figures are worth a look (a wrong alt text
    changes what a screen reader user hears; the check is new and can be wrong, so it does
    not hold up the document), the section's lead counts them apart from the small notes,
-   and their card says "Optional check (worth a look; it does not hold up the document)"
+   and their card says "Optional item (worth a look; it does not hold up the document)"
    instead of "nothing to do unless you disagree" (`core.triage.second_check_note`;
    tests in `tests/test_web_second_check_review.py`).
 3. **Your decisions** and **Accepted automatically**: everything else, folded, what the
@@ -3702,7 +3734,7 @@ decision. A group decision posts to the same route as a single one, with the gro
 
 **Pages kept as images.** The pages (or the handwriting on typed pages) kept as images
 for one reason are one card in "Figures", like the review screen's: which pages, what
-students get, **Keep the page images, marked “Not converted”** and the hint; once kept,
+students get, **Keep as image** and the hint; once kept,
 "Kept as images, marked “Not converted”." It posts to the same route with its group key
 (`pg-` + the first page image's element id); only "reject" (keep) is accepted. Each page
 is named by its page ("Page 2", "Handwriting on page 3"), not counted among the figures:
@@ -3719,7 +3751,7 @@ the last decision still works.
   only repeats it) and the confidence as a word and a number, "Low (45%)" (High from
   85%, the default auto-accept bar; Medium from 60%);
 - why it is here: each failed check and `Fix.reason` as a sentence from
-  `web/messages.py`, its severity in words ("Must be fixed", "Worth checking"), and the
+  `web/messages.py`, its severity in words ("Must be fixed", "Worth a look"), and the
   raw code as a small secondary line for bug reports;
 - for equations and figures, the original crop; for equations, the proposed MathML
   (re-serialised from an allowlisted tree by `web/mathml.py`, never pasted as a string)
@@ -3948,9 +3980,9 @@ existing colors with real borders, so forced-colors mode shows them; nothing ani
 once; failed and not-converted items too, since each needs a decision) and is broken down
 by kind, each linking to the first decision of that kind on the review screen
 (`?item=<key>`; "3 need your decision: 1 equation, 1 figure, 1 group of repeated
-headings."). "Optional checks (accepted; nothing to do)" counts the notes
+headings."). "Optional items (accepted; nothing to do)" counts the notes
 nobody has opened; they never count toward done. When some of them are the second
-automated check's, the label says so: "Optional checks (accepted; nothing required, 1
+automated check's, the label says so: "Optional items (accepted; nothing required, 1
 worth a look)". The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the

@@ -163,7 +163,7 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             503,
             "Word files are not available here",
             "This server cannot make a Word file. The HTML file is still available from the "
-            "job page.",
+            "document page.",
             context={"job_id": job_id},
         )
     html, title, state, version = _source(request, job_id, user, "docx")
@@ -185,7 +185,7 @@ def download_docx(request: Request, job_id: str, user: UserDep) -> Response:
             409,
             "This document cannot be made as a Word file",
             "The Word version could not be made from this document. The HTML file is still "
-            "available from the job page.",
+            "available from the document page.",
             context={"job_id": job_id},
         ) from None
     _recorded(request, user, job_id, state.open_decisions, "docx")
@@ -241,7 +241,7 @@ def checked_format(value: str) -> str:
             503,
             "Word files are not available here",
             "This server cannot make a Word file. The HTML file is still available from the "
-            "job page.",
+            "document page.",
         )
     return value
 

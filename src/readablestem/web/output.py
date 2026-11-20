@@ -72,7 +72,7 @@ NOT_FINISHED = (
     "This document has not finished converting, so there is nothing to show yet.",
 )
 DRAFT_NOT_FOR_VIEWERS = (
-    "The owner is still checking this document",
+    "The owner is still reviewing this document",
     "Nothing of it is shown or offered to download until the owner has made the decisions "
     "still open in it. Come back later.",
 )
