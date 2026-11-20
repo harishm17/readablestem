@@ -134,6 +134,63 @@ cap leaves out because they can be made again). The table figures are what is on
 HTML out of line, so the document totals can add up to more than the tables do. Use the tables
 for "how full is the volume" and the per-document figures for "what does one document cost".
 
+**What a document stores, measured 2026-11-19** (the public samples, five of the instructor
+corpus's longest documents that a job takes (17 to 39 pages; counts and sizes only), and two
+generated 100-page documents; fake model answers; SQLite). Stored bytes per document, in MB:
+
+| Document | Pages | Upload | Crops | HTML | Result | Total | Per page |
+|---|---|---|---|---|---|---|---|
+| Public papers, 4 to 28 pages (5) | 4 to 28 | 0.2 to 0.9 | 0.3 to 7.4 | 0.02 to 2.9 | 0.09 to 1.2 | 0.65 to 12.4 | 160 to 440 KB |
+| Public slide decks (2) | 22, 29 | 0.05 | 0.3 to 0.6 | 0.4 to 0.8 | 0.15 to 0.19 | 1.0 to 1.7 | 45 to 57 KB |
+| Corpus documents (5) | 17 to 39 | 0.07 to 1.8 | 0 to 2.6 | 0.05 to 3.1 | 0.19 to 0.59 | 0.42 to 8.0 | 24 to 270 KB |
+| 100 dense pages from public papers | 100 | 14.5 | 17.3 | 11.3 | 4.3 | 47.5 | 475 KB |
+| 100 scanned pages (150 dpi JPEG) | 100 | 18.3 | 96.1 | 25.5 | 0.17 | 140.0 | 1.4 MB |
+
+Step records are 0 after a finished conversion (`forget_steps`), and a kept or Try-again-able
+one holds 2.7 MB for the dense 100 pages (1,394 rows) and 38 KB for the scanned 100.
+
+The largest row is the `jobs` row of the scanned document (HTML 25.5 MB plus result), then its upload
+blob (18.3 MB); the largest crop is 2.3 MB (a scanned page) and 0.57 MB in the dense document. Bytes
+per page run from 24 KB to 1.4 MB, and the scanned document is the only one that is mostly crops
+(page pictures at up to 2576 px).
+
+*What a per-job cap would be.* The largest document measured stores 140 MB (1.4 MB a page), so a
+cap that refuses none of these with a margin of four is **560 MB a job (5.6 MB a page)**. That is
+above a person's whole allowance (`STORAGE_PER_USER_MB` 300; 250 for the open tier), so a per-job cap
+set where it refuses nothing measured never refuses anything the person's cap would let through:
+it is not built. What it would bound is the growth after the upload, which `storage.check_room`
+does not count (it adds the incoming upload only; a conversion then stores 3 to 14 times the
+upload in these samples, 7.6 times for the scanned 100 pages). The place for a refusal is
+`Worker._write_result` (`web/worker.py`), where the output's crops, HTML and result are known and
+written in one transaction; refusing at upload (`web/intake.py` `store_job`, `web/pending.py`) can
+only judge the upload and the page count. The words a person has today for a full allowance are
+"You are storing X MB of the Y MB you can keep, and <file> would go over it. Delete documents you
+no longer need (My documents, then Delete), then upload <file> again. Nothing was uploaded." They
+say "Nothing was uploaded", which would not be true after a conversion, so a refusal there needs a
+sentence of its own.
+
+*The stored page and its pictures, and what the step records cost to load* (measured 2026-11-19 on the
+same documents). The `jobs.html` column holds figure and page pictures as base64 PNG or JPEG. It is
+0.05 to 1.0 times the document's other stored bytes in all fifteen documents (the
+scanned 100 pages: 0.22; the dense 100: 0.31), never the "more than twice" that would make it
+worth storing the page without them and putting them back at download. In the dense 100 pages the
+page is 11.3 MB with its 667 pictures (the largest 766 KB as base64) and 7.1 MB without; making it
+from the stored crops took 3.7 to 3.9 s with the pictures and 1.2 to 1.6 s without (turning every
+crop to base64 is 0.02 s of that), and 19.8 s and 4.0 s for the scanned 100 pages. The files kept after
+a download (Word, EPUB, Canvas, cartridge; `web/export_store.py`, `MAX_BYTES` 32 MiB) were 8.0 to
+8.4 MB each for the dense 100 pages and 17.3 MB each for the scanned 100 (no kept file of any of
+the fifteen documents was over 32 MiB; the scanned document's Word file was not made at all:
+pandoc failed after 48 s). One picture alone cannot pass 32 MiB: the largest is a scanned
+page's crop (2.3 MB stored) and the crops are capped at 2048 px, 2576 px for a page kept as an image
+(`image_page.MAX_SIDE_PX`), which as a 2576 px square of noise is 19.9 MB, 26.5 MB as base64. So
+nothing is stored differently.
+
+`DbStepCache` (`web/step_cache.py`) loads the job's step records on first use. A finished job has none
+(`forget_steps`) unless a Try again could improve it. Held kept for the dense 100 pages (1,394 rows)
+it loads 2.7 MB in 41 to 61 ms, for the scanned 100 pages 38 KB in 1.4 ms, and each later lookup is
+under 0.03 ms; a re-read of one equation (`web/reread.py`) makes a new cache, so each pays that load, against
+the seconds a model request takes. The load is not worth a change.
+
 ### Large files waiting for their pages
 
 A PDF over the page or size limit is kept as a `pending_uploads` row (`web/pending.py`, docs/web.md

@@ -542,7 +542,7 @@ connection string without the `+psycopg` driver suffix, which `pg_dump` does not
 
 ## Memory, CPU and request size
 
-**Memory.** Measured on the development box, one conversion peaks near 0.5 GB including the web app
+**Memory.** Measured on the development box, a conversion of a document of 6 to 30 pages peaks near 0.5 GB including the web app
 (deploy.md "Sizing": 437-504 MB for 30 dense pages; a 100-page document 494 MB and a 51 MB, 100-page one with a picture on every page 745 MB, resident, for the child alone, measured 2026-11-03). The layout work on a lecture PDF with the new
 limits (merged from `feat/perf-layout`) measured up to about 413 MB for the layout step alone, and a
 page over the drawing limits is no longer read at all. The probe that checks an upload before layout
@@ -551,12 +551,38 @@ has its own address-space cap of 768 MB (a 117 MB, 500-page PDF was probed in 8 
 `PRELOAD_TABLE_MODELS` no longer preloads them in the web process): while a job converts expect the
 web process plus a child of about 0.3-0.5 GB resident. Recommendation:
 **allow 2 GB, expect 0.4 to 0.9 GB resident, and do not set a limit below 1 GB** (an upload is held once while it is read and twice more by the database driver when it is stored, measured with SQLite: so one of 100 MB adds about 300 MB, and `MAX_CONCURRENT_UPLOADS=3` of them 900 MB: 1 GB was enough for 20 MB uploads); with
-`INSTALL_LIBREOFFICE=true` allow 2 GB (LibreOffice adds about 300 MB while a Word or PowerPoint file
-converts); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
+`INSTALL_LIBREOFFICE=true` allow 2 GB (LibreOffice's own process holds about 190 MB while a Word file
+converts and is not running when the child peaks, so the peak is the child's: 0.41 to 0.42 GB, measured
+2026-11-19, below); with `INSTALL_MATH_READER=true` and the reader enabled, a child that has loaded it holds
 about 1.1 GB resident (measured, 74 crops), so allow 2 GB there too. Railway bills memory by use, not by what is allowed, so a higher allowance costs nothing
 until it is used. Railway's Hobby plan lists up to 48 GB per service in its pricing page;
 a service memory limit is a setting only if you want to cap it (Settings > Resource limits, **confirm**). `.railway/railway.ts` configures no memory limit for `web` (nor CPU), so there is none to raise: leave it unset, or if you set one, set **2 GB** for `web` (three 100 MB uploads in memory at once are about 900 MB, plus the 0.5 to 0.9 GB of a conversion).
 Watch the Metrics tab during the first real conversions and the first 500-page upload.
+
+**Measured peaks, 2026-11-19.** On the development box (Python 3.12, 16 cores, load average 14 to 17 from
+other jobs, so times are 3 to 5 times a quiet machine's; memory is not affected). Each figure is the peak
+resident memory (`VmHWM`) of the conversion child, or of the process named, with the real conversion child,
+fake model answers and production's behavior settings; the Word and two-parser runs pinned to one CPU
+(`taskset -c 0`) as `docs/deploy.md` "Sizing" did.
+
+| What was converted | Peak resident memory |
+|---|---|
+| **Word**: three files (a 41 KB handout, a 43 KB lecture, a 147 KB file with equations as pictures) through the app with LibreOffice 26.2 | the conversion child 424, 407 and 406 MB; `soffice.bin` 187 to 193 MB, a 58 MB sandbox helper beside it; everything running at one moment peaked at 411, 399 and 406 MB, less than the child and LibreOffice added together, so LibreOffice is not running when the child peaks; the web process 177 MB |
+| **PowerPoint** | not measured: this box has no Impress (`libreoffice-impress-nogui`, which the Dockerfile installs). Do not read the Word line as PowerPoint's. |
+| **MuPDF and the second parser**: a 28-page paper, layout alone, then layout with PDFium (pypdfium2 5.14, not a dependency yet) reading every character box (56,424 characters, 0.3 to 0.4 s) from the same bytes | 545 and 556 MB with MuPDF alone; 547 and 551 MB with both holding the document: no addition the process peak shows (run to run the figure moves about 10 MB) |
+| **100 dense pages** (public papers: 928 equations, 95 figures, 31 tables, 14.5 MB), one conversion | the child 2.0 to 2.1 GB (three runs); a 28-page paper 0.55 to 0.63 GB |
+
+These correct two figures above. "One conversion peaks near 0.5 GB" holds for 6 to 30 pages and not for a
+dense 100-page document, which needs about 2 GB for the child alone (the 494 and 745 MB figures for 100 pages
+above, measured 2026-11-03, were other documents: what a document holds sets the peak, not its page count). "LibreOffice
+adds about 300 MB" was too high, and it does not add to the peak at all. If you set a memory limit on `web`,
+make it 4 GB, so that a 100-page dense document and the web process fit. The web process does not grow
+with the documents it has converted: twelve conversions of one 6-page document through the worker went from
+209 to 232 MB in the first ten and then stayed there (what Python allocated stayed at 5.0 to 5.2 MB; the rest
+is memory the allocator keeps, 15 to 18 MB of it given back by `malloc_trim`); with SQLite's default page
+cache it grows more (247 to 340 MB over twelve conversions of a 28-page paper), which is the database
+driver's cache, not the app's: Postgres keeps its pages in the server. A test that asks conversion 10 to be
+within 5 % of conversion 1 failed in 3 of 11 runs on this box, so none is kept.
 
 **CPU.** One vCPU is enough (deploy.md: about 20 CPU-seconds for a 30-page document, about 25 for 100 pages and 35 for 100 pages with 51 MB of pictures, measured 2026-11-03 on one CPU with fake models: 31 s and 44 s of wall time). Replicas: 1.
 
