@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: a one-page file keeps no running head, foot or page number (branch fix/one-page-furniture)
+
+- A file of one page has no second page for a running head or foot to repeat on, so the
+  repeat rule found nothing, and a head such as "Journal of Rare Diseases ... Page 6 of 11" with
+  its address line under it, or a foot with its page number, stayed in the text. A page
+  cut from a journal is how the benchmark gives such a page to a reader, and a student's
+  one-page handout carries them just the same. `_MarginFilter.by_shape` now finds them by their
+  shape (`furniture.py`): a stack of at most 4 lines in the outer 12 % of the page, a line's
+  height clear of the rest of the text, none set as a heading, one of them with a page number at
+  its start or end (digits or "Page 3 of 9"; a bare year is not one). A head with no page
+  number of its own (a draft stamp, a title) stays, as before. What goes is counted in the
+  "Left out: furniture" note, as on a longer file, and a page number is no longer lost
+  to the guard of a line mate it had only because the head stayed.
+- A page number alone at the foot or head of a page of any length was missed when the line
+  stood between 7 % and 12 % from the edge (an A4 page's number 90 % down, past the 7 % band
+  of `drops`). The same rule takes it when it stands alone with the edge to itself.
+- Parsing benchmark (olmOCR-bench, no model, 747 pages, pipeline 0.5.13): headers_footers 34.5
+  to 51.4 (325 of 632 checks); table_tests, long_tiny_text and baseline did not change;
+  multi_column 69.2 to 69.1, two order checks of one journal article whose gold counts its
+  running head as text (docs/eval-parsing-benchmark.md). On layout-dev-1 and the corpus gold
+  the pages right (137 of 267, 35 of 45) and the pages that read furniture aloud (57, 8) are
+  the same before and after. Not built, measured: the same rule for files of 2 or 3 pages
+  takes figure labels and a line-number column on 2 of 11 such gold files. No version is
+  raised here: the result of a one-page upload changes, so a release that carries this one owes
+  a `PIPELINE_VERSION` raise.
+
 ## Pipeline 0.5.13, render 9 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.13 and `RENDER_VERSION` is 9: one raise each for every "Unreleased"

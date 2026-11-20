@@ -34,11 +34,18 @@ MARGIN_PLACE_PT = 2.0  # rows of the same side's pages this near in height are i
 MARGIN_SIZE_PT = 0.5  # ... and this near in font size are of one size
 NOTE_MARK_RATIO = 0.85  # x row size: a first character this small is a note's mark
 MARGIN_REFERENCE_PAGES = 24  # pages sampled to decide what repeats
+MARGIN_SHAPE_BAND = 0.12  # top/bottom share of the page where a head or foot is found by shape
+SHAPE_CLEAR = 1.0  # x line height: a head or foot stands this far clear of the text block
+SHAPE_PAGES = 1  # heads with words are found by shape on files of at most this many pages
+SHAPE_LINES = 4  # a head or foot found by shape is at most this many lines
 WATERMARK_RATIO = 2.0  # diagonal text this many times the body size is a watermark
 
 PAGE_NUMBER = re.compile(
     r"^(?:page\s+)?(?:\d{1,4}|[ivxlcdm]{1,7})(?:\s*(?:/|of)\s*\d{1,4})?$", re.IGNORECASE
 )
+
+
+_PAGE_DIGITS = re.compile(r"^(?:page\s+)?\d{1,4}(?:\s*(?:/|of)\s*\d{1,4})?$", re.IGNORECASE)
 
 
 def _norm_margin(text: str) -> str:
@@ -60,6 +67,45 @@ def _margin_zone(row: _Row, height: float) -> str | None:
 
 def _is_page_number(text: str) -> bool:
     return bool(PAGE_NUMBER.match(text.strip(" -\u2013\u2014|")))
+
+
+def _is_page_digits(text: str) -> bool:
+    """A page's number in digits, or "Page 3 of 9": not a roman numeral, which may be a word,
+    and not a bare year, which is a date in a table or a foot."""
+    text = text.strip(" -\u2013\u2014|")
+    if text.isdigit() and 1900 <= int(text) <= 2100:
+        return False
+    return bool(_PAGE_DIGITS.match(text))
+
+
+def _lines_of(rows: Sequence[_Row]) -> list[list[_Row]]:
+    """The rows grouped by the line they stand on (a vertical overlap of half the smaller
+    height), each line left to right."""
+    lines: list[list[_Row]] = []
+    for row in sorted(rows, key=lambda r: r.y0):
+        for line in lines:
+            first = line[0]
+            if min(first.y1, row.y1) - max(first.y0, row.y0) >= 0.5 * min(first.height, row.height):
+                line.append(row)
+                break
+        else:
+            lines.append([row])
+    return [sorted(line, key=lambda r: r.x0) for line in lines]
+
+
+def _ends_in_number(line: Sequence[_Row]) -> bool:
+    """Does the line hold one page number, at its start or its end?"""
+    numbers = [r for r in line if _is_page_digits(r.clean)]
+    return len(numbers) == 1 and (numbers[0] is line[0] or numbers[0] is line[-1])
+
+
+def _line_box(line: Sequence[_Row]) -> BBox:
+    return (
+        min(r.x0 for r in line),
+        min(r.y0 for r in line),
+        max(r.x1 for r in line),
+        max(r.y1 for r in line),
+    )
 
 
 def _row_italic(row: _Row) -> bool:
@@ -106,6 +152,8 @@ class _MarginFilter:
     marks: set[tuple[str, tuple[int, int, int, int]]] = field(default_factory=set)
     # Pictures covering the page that repeat (by xref): a template's background.
     backgrounds: set[int] = field(default_factory=set)
+    # How many pages were looked at: on one page nothing repeats (`by_shape`).
+    pages: int = 0
 
     def drops(self, row: _Row, height: float) -> bool:
         if row.vertical:
@@ -149,6 +197,60 @@ class _MarginFilter:
             place.holds(zone, number, row)
             and (place.numbered or _norm_margin(row.clean) in place.texts)
             for place in self.places
+        )
+
+    def by_shape(self, frags: Sequence[_Row], height: float, out: Collection[int]) -> set[int]:
+        """The ids of the rows of a head or foot found by its shape, where no repeat from page
+        to page can say so. At each edge of the page, the lines that stand together in the
+        outer `MARGIN_SHAPE_BAND` (at most `SHAPE_LINES`, each less than a line from the one
+        before) and then `SHAPE_CLEAR` lines clear of the rest of the page, with none set as a
+        heading, and one of them ending in a page number (digits, or "Page 3 of 9"), are the
+        head or foot of the page. A line of a table, a list or a note has a neighbor a line
+        away, so it never stands clear; a page of nothing but the lines has no text block to
+        be clear of. A page number alone on its line counts on every file (a number set low
+        on a tall page is outside the band of `drops`); lines with words, on files of at most
+        `SHAPE_PAGES` pages: on longer ones the words repeat and `drops` has them."""
+        # A row already taken (a page number the place rule has) is evidence, not a row to take.
+        lines = _lines_of([f for f in frags if not f.vertical])
+        taken: set[int] = set()
+        for top in (True, False):
+            edge = sorted(lines, key=lambda ln: _line_box(ln)[1], reverse=not top)
+            stack = self._stack(edge, height, top)
+            if stack and self._is_furniture_stack(stack):
+                taken.update(id(r) for ln in stack for r in ln if id(r) not in out)
+        return taken
+
+    def _stack(self, edge: list[list[_Row]], height: float, top: bool) -> list[list[_Row]]:
+        """The lines at one edge of the page, outermost first, that stand together and clear
+        of the text block (`by_shape`); none when the text runs on into the page."""
+        stack: list[list[_Row]] = []
+        for line in edge:
+            _, y0, _, y1 = _line_box(line)
+            if stack:
+                _, last0, _, last1 = _line_box(stack[-1])
+                gap = y0 - last1 if top else last0 - y1
+                if gap >= SHAPE_CLEAR * max(y1 - y0, last1 - last0):
+                    return stack  # this line is the start of the text block
+                if len(stack) == SHAPE_LINES:
+                    return []
+            if (
+                (y1 > MARGIN_SHAPE_BAND * height)
+                if top
+                else (y0 < (1 - MARGIN_SHAPE_BAND) * height)
+            ):
+                return []  # the text goes on into the page
+            stack.append(line)
+        return []  # nothing follows: no text block to be clear of
+
+    def _is_furniture_stack(self, stack: list[list[_Row]]) -> bool:
+        """Does one line of the stack end in a page number, and is nothing in it a heading?"""
+        if not any(_ends_in_number(line) for line in stack):
+            return False
+        words = [r for line in stack for r in line if not _is_page_digits(r.clean)]
+        if words and self.pages > SHAPE_PAGES:
+            return False
+        return not any(self.prominent(r) for r in words) and all(
+            r.size < HEADING_SIZE_RATIO * self.body for line in stack for r in line
         )
 
     def furniture_look(self, row: _Row) -> bool:
@@ -330,6 +432,7 @@ def _margin_filter(
         marks=repeated["mark"],
         backgrounds=repeated["picture"],
         body_family=body_family,
+        pages=counted,
     )
     result.places = _repeated_places(band_rows, result, on_side)
     return result

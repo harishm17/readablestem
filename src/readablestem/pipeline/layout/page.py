@@ -152,6 +152,7 @@ def _split_furniture(
     number = cast(int, page.number)
     gone = {id(f) for f in frags if margins.drops(f, height)}
     placed = {id(f) for f in frags if id(f) not in gone and margins.at_place(f, height, number)}
+    gone |= margins.by_shape(frags, height, gone | placed)
     placed -= _attached(frags, placed, gone, height)
     out = gone | placed
     standing = [f for f in frags if id(f) not in out]

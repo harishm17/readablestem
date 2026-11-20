@@ -174,7 +174,18 @@ guards PyMuPDF, its warning store and the caches, nothing else.
    and as big as the body or bigger, so it is not apart from it and stays; a first line of
    the body in the band stays too. A bare page number that shares a line with a line that
    stays (a table cell) is not dropped, and a number set at heading size is a chapter
-   number, not a page number. The
+   number, not a page number. A head or foot that no other page repeats (a one-page file, a
+   page cut from a journal) is found by its shape (`_MarginFilter.by_shape`, since
+   2026-11-19): at an edge of the page, up to 4 lines that stand together in the outer 12 %
+   (each less than a line from the one before) and then a line's height clear of the rest of
+   the page, none set as a heading (1.15 x body or bold), one of them with a page number at
+   its start or end (digits, or `Page 3 of 9`; a bare year is not one). A page number alone on
+   its line is taken on a file of any length (a number 90 % of the way down an A4 page is
+   outside the 7 % band); the lines with words, only when the reference holds one page, since
+   on a longer file their words repeat and the repeat rule has them. A head with no page
+   number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
+   under it a line away, so it never stands clear. What goes is counted as `furniture` left
+   out, as on a longer file. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of

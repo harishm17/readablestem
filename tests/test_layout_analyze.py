@@ -477,6 +477,20 @@ def test_a_single_page_keeps_unrepeated_margin_text_but_drops_the_page_number():
     ]
 
 
+def test_a_single_page_cut_from_a_journal_loses_its_head_and_foot_found_by_their_shape():
+    # No other page repeats them, but the head stands clear of the text and carries "Page 3
+    # of 9", the foot carries a page number; a title line under the head is kept.
+    def fill(page):
+        page.insert_text((72, 30), "Journal of Rare Diseases 2010", fontsize=8)
+        page.insert_text((440, 30), "Page 3 of 9", fontsize=8)
+        page.insert_text((72, 41), "http://www.example.org/content/5/1/10", fontsize=8)
+        write(page, 72, 120, ["The only body paragraph on this page."])
+        page.insert_text((72, 715), "Journal of Rare Diseases", fontsize=8)
+        page.insert_text((300, 715), "11", fontsize=8)  # 90% down: past the band of drops
+
+    assert texts(analyze(one_page(fill)).elements) == ["The only body paragraph on this page."]
+
+
 @pytest.mark.parametrize("turn", [90, 270])
 def test_a_page_saved_sideways_with_no_rotate_is_read_as_the_page_it_shows(turn):
     # A landscape page printed to PDF: every line runs up (or down) the page and /Rotate is 0.
