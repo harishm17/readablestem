@@ -1,5 +1,47 @@
 # Changelog
 
+## Unreleased: headings and lists of an answer key, an agenda, an outline and a reference list
+
+`layout/blocks.py`, `layout/lists.py`, `layout/shared.py`. What a PDF's result holds changes,
+so a raise of `PIPELINE_VERSION` is owed; it is not made here. No migration, no prompt or model
+change. Stored results load unchanged and their pages are made again.
+
+- **A bold or numbered line in a run of its series is an item, not a heading.** The bold option
+  of an answer key ("B. Newton's second law" among upright options), the bold lettered lines of
+  an agenda, and "I." between "H." and "J." of an outline, or "I." and "II." of a question's
+  statements, were headings. `_mark_series_items` sets `_Row.in_series` on a row whose next
+  marker, past its own lines, is the next value of the series, or (set in bold or italics) whose
+  nearest marker above is the value before with nothing between but its own lines. Such a row
+  is not a heading by "bold body-size line" or "standalone numbered line". A section title with
+  text under it is not touched: "III. Gripper design" in a paper stays a heading.
+- **A lettered title that wraps onto a second row of its face is one heading** ("A. Nonlinear
+  System Representation of Boltzmann Soft Q-learning"): the title and its second row are one
+  block, at most 12 words, the second row not ending like a sentence.
+- **A series that starts again right after a cut is a level down.** "(a)" after "1." and a
+  figure, "(i)" after "(a)" and a paragraph, "A." after "1." was the first level again; it is
+  the list of the item above, as it already was when nothing cut it. A decimal "1." starts a
+  list of its own.
+- **A reference list's initials are not a lettered list.** An alphabetical list ("R. Arai, ...",
+  "S. Fujiwara, ...") has the next initial in the next entry; a neighbor that opens like an
+  author line (an initial, a surname and a comma, "et al", "and" before an initial) no longer
+  confirms a marker. "Predation and herbivory", "Mutualism and commensalism" still confirm one
+  another.
+- Not changed: a lettered title ending in a full stop stays an item; a title set in part of
+  its face (1 row, 1 private file) stays an item; a numbered bold question with text under it is
+  a heading as before. `damaged_render_abort.pdf` is a refusal ("unreadable") on main; a test
+  row already holds it.
+- **One-page running heads and feet: measured, nothing built.** Taking stacks that are smaller
+  than the body text at the margin of a one-page file took lines of 213 of the 747
+  benchmark pages; 89 of the 447 lines on 65 pages are content (footnotes, figure captions,
+  table notes, fine print), so the rule is not built (docs/eval-parsing-benchmark.md). The
+  furniture functions are not touched; `headers_footers` stays 38.6 (244 of 632).
+
+Measured at this commit, $0: headings eval (`eval pipeline --task headings --fake`) 121 gold,
+105 predicted, precision 0.914 and recall 0.793, as before; `eval order --set layout-dev-1` 137
+of 267 pages right, as before. The corpus hash against `f490ac60` differs in 20 public files
+(11 of layout-dev-1, 3 realworld, 6 repository files, counted by what `hashrun analyze` lists)
+and 7 of 73 uploads, all in list levels, markers and the headings named above.
+
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"

@@ -388,7 +388,7 @@ def _list_markers(
         return any(
             other is not None
             and _capital_letter(other) == value + step
-            and not _names(other, sure=True)  # an alphabetical reference list has the next initial too
+            and not _names(other, sure=True)  # a reference list has the next initial too
             and (
                 page_of[id(other)] != page_of[id(candidate)]  # a list goes on over a page break
                 or (other.row.column != candidate.row.column and _face(candidate.row) != "")

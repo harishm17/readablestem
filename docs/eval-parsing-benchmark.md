@@ -142,8 +142,23 @@ a page's ("Page 3", "Page 3 of 9", "3 of 9"); a page number alone on its line go
 38.6 (244 of 632, 95 % interval 34.9 to 42.5), between the 34.5 of 0.5.13 (218) and the 51.4
 of the rule as first built (325). The 81 checks given back are journal heads with a bare page
 number beside the name, which this rule cannot tell from a quiz's own lines. multi_column
-(490 of 708), table_tests, long_tiny_text and baseline are as at 0.5.13. Not built, to be
-measured: taking such lines when they are set smaller than the body text.
+(490 of 708), table_tests, long_tiny_text and baseline are as at 0.5.13.
+
+**Small-type heads and feet, measured and not built (2026-11-20).** The line left open above,
+taking a stack of one-page files that is set at least 0.5 pt under the body size, clear of the
+text block, with no page number needed, was run over the same 747 pages ($0, patched in a
+process, not shipped). 213 pages took lines (447 lines). Read: most are furniture (DOIs, journal
+and volume lines, "Downloaded from", copyright and license lines, "by guest on"), and 173 pages
+have a headers_footers absent check that names a line taken. But 89 of the 447 lines, on 65
+pages, read as content: footnotes (three numbered notes of a Spanish report), figure captions
+("Fig. 3. (a, b) TEM images ..."), a table's note ("Stdev. = Standard deviation, CV% = ..."),
+a flyer's fine print, a bullet of a program ("Three panels will be running simultaneously."),
+and lines that a table or order check names (13 on table pages, 4 on multi_column). The same
+shape that finds "jb.asm.org" finds a footnote, so no narrower form of it is built here. On the
+one-page files of the repository's other material the rule took 9 lines on 9 of 56 files, and
+on the private corpus 2 lines on 2 of 3. Candidate (ii), no removal and a notice that lists the
+furniture with a put-back, is not measured: it needs a notice and a way back in the student page,
+which this layout change does not touch.
 
 ### long_tiny_text: 52 failed of 83
 
