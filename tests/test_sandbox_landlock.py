@@ -566,7 +566,10 @@ def test_a_document_that_prints_the_busy_text_is_a_normal_conversion_failure(mon
     finally:
         monkeypatch.undo()
         sandbox.backend.cache_clear()
-    assert caught.value.code in {"source_unreadable", "source_failed"}  # never source_busy
+    # Never source_busy. On a machine under load LaTeXML can use up its 120 s of wall time before it
+    # reads the document: that is source_timeout, a failure of the program and not of the machine's
+    # task limit, so it is no evidence that the printed text was taken for the launcher's message.
+    assert caught.value.code in {"source_unreadable", "source_failed", "source_timeout"}
 
 
 def _launch(tmp_path, code: str, *, adjust: int = 0):

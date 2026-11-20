@@ -20,6 +20,7 @@ from fixtures import office
 from fixtures.web.support import ALICE, WebEnv, csrf_from, fetch, job_id_from, login
 from readablestem.core import sandbox
 from readablestem.core.types import DocumentResult, Kind, Status
+from readablestem.pipeline import checked
 from readablestem.pipeline.checked_words import READY_ALL
 from readablestem.pipeline.run import convert_pdf
 from readablestem.source import envelope, latexml
@@ -557,6 +558,10 @@ def test_what_a_word_file_leaves_a_person_to_decide_is_said_not_left_to_chance(
         + "<w:tbl><w:tblGrid><w:gridCol w:w='2000'/><w:gridCol w:w='2000'/></w:tblGrid>"
         + f"{big}</w:tbl>"
         + "<w:p><m:oMath><m:phant><m:e><m:r><m:t>x</m:t></m:r></m:e></m:phant></m:oMath></w:p>"
+        # four words the reader does not read (a text box of the older kind)
+        + '<w:p><w:r><w:pict><v:shape xmlns:v="urn:schemas-microsoft-com:vml"><v:textbox>'
+        + "<w:txbxContent><w:p><w:r><w:t>Alpha beta gamma delta.</w:t></w:r></w:p>"
+        + "</w:txbxContent></v:textbox></v:shape></w:pict></w:r></w:p>"
     )
     env = WebEnv(tmp_path, feature_word_source=True)
     env.converter = convert_pdf  # ty: ignore[invalid-assignment]
@@ -593,6 +598,11 @@ def test_what_a_word_file_leaves_a_person_to_decide_is_said_not_left_to_chance(
         headed = settled.fix_for(table.element_id)
         assert headed is not None and headed.table is not None and not headed.pending
         assert (headed.table.grid.header_rows, headed.table.grid.header_source) == (1, "reviewer")
+        # the words the reader left unread are counted at conversion and still after the stored
+        # result is loaded and rendered again (O-202)
+        assert checked.unread_of(result) == (4, 0)
+        assert checked.unread_of(settled) == (4, 0)
+        assert checked.of_result(settled).converted.unread_words == 4
         # the large table is a list whose formulas are equations of their row, and says so
         rows = [e for e in result.elements if e.kind is Kind.LIST_ITEM]
         assert len(rows) == 301 and not any("\\" in (r.text or "") for r in rows)

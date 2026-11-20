@@ -247,6 +247,7 @@ class Decision:
     members: int = 1  # the fixes decided together (more than 1: a heading group)
     band: int = 5  # `risk_rank` of its first member
     sources: tuple[str, ...] = (PIPELINE,)  # who raised it, the opener first (`Fix.sources`)
+    element: str | None = None  # the element id of its first member (the same upload, later)
 
 
 def decisions(result: DocumentResult) -> list[Decision]:
@@ -260,6 +261,7 @@ def decisions(result: DocumentResult) -> list[Decision]:
             members=len(unit),
             band=risk_rank(unit[0]),
             sources=tuple(dict.fromkeys(name for fix in unit for name in sources_of(fix))),
+            element=unit[0].element_id,
         )
         for unit in units(fix for fix in result.fixes if tier_for(fix) == "required")
     ]

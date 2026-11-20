@@ -576,7 +576,9 @@ worker as its own service"):
   row is older than 30 seconds (the process is gone or cannot write to the database);
   `not_started` when there is no row. Any one healthy slot makes it `ok`.
 - `/status` and the job page's "AI service not answering" line read the row `provider` (the
-  worker's last requests, written with the beat); `/admin` and `/admin/health` show the sandbox
+  worker's last requests, written with the beat) and the row `provider.web`, which the web
+  process writes after each "Read again" request it sends itself (one write per request, the
+  same times and outcome words, no content), added in time order; `/admin` and `/admin/health` show the sandbox
   probe from the row `sandbox`, which the worker writes after it ran the probe at start-up (the
   web process runs none). LaTeX source stays switched off in effect until that row says `pass`.
 - **Stopping.** SIGTERM or SIGINT: no new job is claimed, the running conversions are cancelled

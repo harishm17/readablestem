@@ -10,11 +10,13 @@ the last `WINDOW_S` seconds and the most recent `MIN_CALLS` all ended in `api_er
 `timeout`. A refusal or an unusable answer is the model's, not an outage, and a single
 failure among successes is noise. One success ends it at once. Per process,
 forgotten on restart (with `WORKER_MODE=service` the worker process writes its requests to an
-`ops_heartbeat` row and the web process reads them, `web.worker_rows`): it is a hint for a
+`ops_heartbeat` row and the web process reads them, `web.worker_rows`; a "Read again" is the web
+process's own request and goes to a row of its own, which the reader adds): it is a hint for a
 status line, never a gate, and it holds only times and outcome words, nothing from a document.
 
 The converter reports each request's `ModelCall` (`convert_pdf(call_observer=)`, passed by
-the worker); the public `/status` page and the job page read `HEALTH`.
+the worker, and by `web.reread` for a "Read again"); the public `/status` page and the job
+page read `HEALTH`.
 """
 
 from __future__ import annotations

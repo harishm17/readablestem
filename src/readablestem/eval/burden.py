@@ -36,6 +36,13 @@ is not better by itself: a fix that stops asking about something wrong lowers th
 and raises the silent errors, which the page audit and the lane evals count. The bar is one
 of two that are read together.
 
+The counts cannot see a decision that is no longer asked because it became optional: the
+count falls, and the risk it stood for is now a note. So each upload's row also holds its
+decisions' elements with their bands (`asked`) and the elements that are optional (`optional`),
+and `judge` fails a record in which an element that was a decision of band 1 or 2 (the bands
+above the review's stopping line, `core.triage.STOP_AFTER_BAND`, that matter most) is optional.
+A record made before the rows held these says so and is compared by the counts alone.
+
 The corpus is a development set, chosen to cover kinds of document and not as a sample of
 what people upload.
 """
@@ -109,14 +116,17 @@ def report(measured: Sequence[Converted]) -> dict[str, Any]:
         for decision in done.decisions or []:
             items[decision["kind"]] += 1
             reasons.update(decision["reasons"])
-        rows.append(
-            {
-                "upload": done.upload,
-                "pages": done.pages,
-                "decisions": sum(counts),
-                "per_page": round(sum(counts) / done.pages, 4),
-            }
-        )
+        row: dict[str, Any] = {
+            "upload": done.upload,
+            "pages": done.pages,
+            "decisions": sum(counts),
+            "per_page": round(sum(counts) / done.pages, 4),
+        }
+        asked = [(d.get("element"), d.get("band")) for d in done.decisions or []]
+        if done.optional is not None and all(e is not None and b is not None for e, b in asked):
+            row["asked"] = [list(pair) for pair in asked]
+            row["optional"] = done.optional
+        rows.append(row)
     pages, decisions = len(every_page), sum(every_page)
     return {
         "uploads": {
@@ -167,10 +177,37 @@ class Verdict:
     why: str = ""
     more: list[str] = field(default_factory=list)  # one line per figure over the allowance
     same: bool = False  # the bar was "the same decisions", and `more` says where they differ
+    # False: no upload had bands in both records, so no decision could be seen moving to optional.
+    bands_checked: bool = False
 
     @property
     def met(self) -> bool:
         return self.judged and not self.more
+
+
+# The bands that must not become optional (`core.triage`: 1 and 2, the riskiest decisions).
+REQUIRED_BANDS = (1, 2)
+
+
+def moved_to_optional(one: dict[str, Any], other: dict[str, Any]) -> tuple[list[str], bool]:
+    """The decisions of band 1 or 2 in `other` (the earlier record's metrics) whose element is
+    optional in `one`, for each upload that holds bands in both, one line each; and whether any
+    upload could be compared."""
+    kept = {row["upload"]: row for row in other["documents"] if "asked" in row}
+    found: list[str] = []
+    compared = False
+    for row in one["documents"]:
+        was = kept.get(row["upload"])
+        if was is None or "optional" not in row:
+            continue
+        compared = True
+        optional = set(row["optional"])
+        for element, band in was["asked"]:
+            if band in REQUIRED_BANDS and element in optional:
+                found.append(
+                    f"{row['upload']} {element}: a decision of band {band} before, optional now"
+                )
+    return found, compared
 
 
 def judge(
@@ -190,6 +227,7 @@ def judge(
     An upload that was not measured now (this machine cannot replay it) is not compared, so a
     machine with fewer recordings than the one that made `before` can still hold the bar."""
     one, other = now["metrics"], before["metrics"]
+    moved, bands_checked = moved_to_optional(one, other)
     if same:
         # The set's hash names the uploads measured, so a machine with fewer recordings has
         # another one; the uploads themselves are what is compared.
@@ -218,7 +256,7 @@ def judge(
                 differ.append(
                     f"{upload}: {now_n} answers missing from the recording, {was_n} in the record"
                 )
-        return Verdict(True, more=differ, same=True)
+        return Verdict(True, more=[*differ, *moved], same=True, bands_checked=bands_checked)
     here = (now.get("split") or {}).get("set_sha256")
     there = (before.get("split") or {}).get("set_sha256")
     if not here or here != there:
@@ -244,7 +282,7 @@ def judge(
                 f"{kind}: {row['per_page']:.3f} decisions a page, {earlier['per_page']:.3f} "
                 f"before (allowed {allowance:+.3f})"
             )
-    return Verdict(True, more=more)
+    return Verdict(True, more=[*more, *moved], bands_checked=bands_checked)
 
 
 def _n(value: float) -> str:
@@ -333,4 +371,9 @@ def render(record: dict[str, Any], verdict: Verdict | None = None, *, worst: int
         else:
             lines.append("The bar is NOT met:")
             lines += [f"  {line}" for line in verdict.more]
+        if verdict.judged and not verdict.bands_checked:
+            lines.append(
+                "The band check was not made: no upload holds its decisions' bands in both "
+                "records, so a decision of band 1 or 2 that became optional would not show."
+            )
     return "\n".join(lines)

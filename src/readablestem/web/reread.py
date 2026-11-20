@@ -34,6 +34,10 @@ Spending is controlled exactly as in the worker, because the money is the same m
 The call is made with no database transaction open and no row locked (it takes seconds);
 the route locks the job afterwards, to check that nothing changed meanwhile, and applies
 the answer. Nothing here is logged but a category code.
+
+Each request that is really sent also tells the AI service's status how it ended
+(`AppContext.record_provider_call`), as the worker's requests do: a reread is the only model
+call the web process makes, and when the provider is down it is the reader's first sign.
 """
 
 from __future__ import annotations
@@ -257,9 +261,15 @@ class _CountsWhenSent:
     A request the record answers never gets here, so it counts nothing. The request itself
     passes on as it is."""
 
-    def __init__(self, inner: VisionClient, count: Callable[[], None]) -> None:
+    def __init__(
+        self,
+        inner: VisionClient,
+        count: Callable[[], None],
+        observe: Callable[[ModelCall], None] | None = None,
+    ) -> None:
         self._inner = inner
         self._count = count
+        self._observe = observe
         self.counted = False
 
     def run(
@@ -268,7 +278,10 @@ class _CountsWhenSent:
         if not self.counted:
             self._count()
             self.counted = True
-        return self._inner.run(request, schema, is_fallback=is_fallback)
+        parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+        if self._observe is not None:
+            self._observe(call)
+        return parsed, call
 
     def __getattr__(self, name: str) -> Any:
         return getattr(self._inner, name)
@@ -328,6 +341,8 @@ def read_equation(
         sending = _CountsWhenSent(
             ctx.client_factory(ctx.settings, budget),
             lambda: _count_against_allowance(request, job.user_id),
+            # How each request ended counts toward the AI service's status, as the worker's do.
+            lambda call: ctx.record_provider_call(call.outcome),
         )
         # A question this document's model has already answered is answered from the record.
         client = _PageAnswers(sending, DbStepCache(ctx.factory, job_id), ctx.settings)

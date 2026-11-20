@@ -102,6 +102,30 @@
   counts as fixed-pitch in a Word file.
 - `CONTENT_RUNS` off takes the runs off a Word or LaTeX table's cells too, as it does off the
   text.
+## Unreleased: records, replays and small guards (branch fix/records-and-small-guards)
+
+- "Read again" counts toward the AI service's status. A reread is the one model request the web
+  process makes itself, and the status row (`/status`, the job page's "AI service not
+  answering" line, `/admin/health`) was written from the worker's requests alone, so rereads that
+  failed because the provider was down left it green. Each request a reread sends now tells
+  `HEALTH` how it ended; with `WORKER_MODE=service` the web process writes the same times and
+  outcome words to the row `provider.web` of `ops_heartbeat` (the worker rewrites `provider`
+  whole at each beat), and the status page adds the two. No content is stored.
+- A Word file's unread words stay on the stored result. The reader counted them and the job's
+  notice said them, but the stored result held no source report for a Word file, so
+  `checked.unread_of` said (0, 0) after the result was loaded again (the review page's student
+  note, the owner's line with the counts). A Word file that left words or pictures unread now
+  keeps a source report with those two counts. Word reading is off by default, so no stored
+  result is affected.
+- `eval burden` fails a record in which a decision of band 1 or 2 of the earlier record is
+  optional now (named by upload and element), which the counts could not see. The rows of a
+  record now hold each decision's element and band and the elements that are optional; a record
+  made before them is compared by the counts alone and the output says the band check was not
+  made. The kept record `data/eval/burden-corpus.json` is one of those and is not made again.
+- Tests: the account deletion sent twice with one request token answers "deleted" both times.
+  The two TeX compiles (`gold/safe_tex.py`, `source/tex_compile.py`) say in their docstrings why
+  there are two and which a new caller uses. The Landlock busy-text test accepts `source_timeout`:
+  on a loaded machine LaTeXML ran out of its 120 s (2 of 20 runs failed that way).
 
 ## Unreleased: speech for bars, raised and lowered text in Listen, names for sidebars
 

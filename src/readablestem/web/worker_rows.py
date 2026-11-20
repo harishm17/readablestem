@@ -42,6 +42,7 @@ logger = logging.getLogger(__name__)
 
 WORKER = "worker."  # + the slot number
 PROVIDER = "provider"
+PROVIDER_WEB = "provider.web"
 SANDBOX = "sandbox"
 BEAT_S = 10.0
 # Three missed beats: the process is gone (or its database writes fail).
@@ -124,8 +125,13 @@ class RowReader:
         return value
 
     def provider(self) -> ProviderHealth:
-        calls = (self._row(PROVIDER) or {}).get("calls") or []
-        return ProviderHealth.from_snapshot([(float(t), bool(failed)) for t, failed in calls])
+        """The worker's requests and the web process's own (the rereads), in time order."""
+        calls = [
+            (float(t), bool(failed))
+            for name in (PROVIDER, PROVIDER_WEB)
+            for t, failed in (self._row(name) or {}).get("calls") or []
+        ]
+        return ProviderHealth.from_snapshot(sorted(calls))
 
     def sandbox(self) -> dict[str, Any] | None:
         return self._row(SANDBOX)
@@ -135,6 +141,16 @@ class RowReader:
             return worker_word(self._factory)
         except Exception:
             return "unreachable"
+
+
+def write_web_provider(factory: sessionmaker[Session], health: ProviderHealth = HEALTH) -> None:
+    """The web process's side of the provider row: the requests its own rereads sent, in a row
+    of their own (the worker rewrites `PROVIDER` whole at each beat). Same content and rules
+    as the worker's row. Never raises: the next reread writes it again."""
+    try:
+        write(factory, PROVIDER_WEB, {"calls": health.snapshot()})
+    except Exception as exc:
+        log_exception(logger, "ops_rows_not_written", exc)
 
 
 class RowWriter:
