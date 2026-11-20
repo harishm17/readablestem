@@ -591,10 +591,12 @@ def _vector_figures(
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
     # a legend's markers a little apart, the force arrows round a free-body diagram's box)
     # are part of it, within LEFTOVER_REACH as `_leftover_drawings` groups them: left out,
-    # its crop missed them.
+    # its crop missed them. A small drawing that holds a line of text (a labelled tab above a
+    # paragraph) is no part of a figure: the figure's crop would swallow the text.
     for box, members in small:
+        holds_text = any(_centre_inside(r.bbox, box) for r in rows)
         for figure in figures:
-            if _within(box, figure.bbox, LEFTOVER_REACH):
+            if not holds_text and _within(box, figure.bbox, LEFTOVER_REACH):
                 figure.bbox = figure.drawing = _union([figure.drawing, box])
                 figure.paths += len(members)
                 figure.members += members
