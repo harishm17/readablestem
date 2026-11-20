@@ -96,6 +96,40 @@ document it would be removed by repeats. The product's claim (furniture is remov
 holds for documents and not for one-page uploads; the plan's repeat rule does not cover them.
 New cause; it holds for 29 of the 44.
 
+**A head and foot found by their shape (2026-11-19, `_MarginFilter.by_shape`).** A page that is
+a file of its own has no second page to repeat on, so its head and foot are found by what they
+look like: a stack of at most 4 lines in the outer 12 % of the page, a line clear of the rest of
+the text, nothing set as a heading, and a page number (digits or "Page 3 of 9") at the start or
+end of one of its lines (docs/layout.md, "Running headers"). Run of all 747 pages at the same
+settings ($0, `eval parsing-bench`), before and after on the same tree:
+
+| Category | Before | After | Note |
+|---|---|---|---|
+| headers_footers | 34.5 (218 of 632) | 51.4 (325 of 632) | 107 more checks pass |
+| multi_column | 69.2 (490 of 708) | 69.1 (492 of 712) | 4 more checks ran (one page was read as a scan in the first run and not in the second, with or without the rule); 2 order checks fail that passed, see below |
+| table_tests | 66.6 (571 of 857) | 66.6 (571 of 857) | none changed |
+| long_tiny_text | 37.3 (31 of 83) | 37.3 (31 of 83) | none changed |
+| baseline | 100.0 (586) | 100.0 (587) | the page above |
+
+The two multi_column checks are the order checks of two pages of one journal article whose
+"before" text is the article's running head (its title, with the page number on the same line):
+the benchmark's gold counts that head as text, and the same kind of line is a "must be absent"
+head in headers_footers. A head with a page number beside it is furniture by this rule on
+every page of every file; the benchmark disagrees with itself on this one document. The rule
+took 112 rows that a headers_footers check names, 0 rows of any table, order or present check
+other than those two pages, and 0 rows of table_tests (66 rows there are heads, feet and page
+numbers the checks do not name). Of the 307 headers_footers checks that still fail (150
+pages): 144 are on pages with no page number at an edge (an ISSN, a DOI, a copyright line,
+"Downloaded from": not taken, because a flyer's contact line has the same shape); 145 are on
+pages that have one and are left for another reason (a stack of more than 4 lines, a foot
+under a table or a list that runs on, a head set in a heading size, a number in the middle of
+a line); 13 are lines further in than 12 % of the page; 5 have no furniture line left. For
+88 of the 307 (48 pages), the other edge of the page is the one found: a journal's head at
+the top and the page number at the foot. That would be a second rule, a head with no number of
+its own taken because the foot proves the page was cut from a paginated file. It is not built:
+a single page keeps a draft stamp or title at its top, whatever is at its foot, by a test
+that stays, and the rule is not measured against the gold sets.
+
 ### long_tiny_text: 52 failed of 83
 
 | Cause | Checks | Step | In the plan |
