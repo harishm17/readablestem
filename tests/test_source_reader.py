@@ -271,6 +271,34 @@ def test_a_picture_in_a_sentence_follows_its_paragraph_and_says_where_it_stood(t
     ]
 
 
+def test_a_picture_in_a_heading_link_or_cell_is_said_where_a_reader_hears_it(tmp_path):
+    (tmp_path / "icon.png").write_bytes(png_bytes())
+    picture = '<img src="icon.png" class="ltx_graphics"/>'
+    named = '<img src="icon.png" alt="Lab logo" class="ltx_graphics"/>'
+    link = '<a href="https://example.com/lab" class="ltx_ref">{}</a>'
+    body = (
+        f'<h2 class="ltx_title ltx_title_section">Setup {picture} steps</h2>'
+        f'<p class="ltx_p">Visit {link.format(picture)} or {link.format(named)} now.</p>'
+        f'<table class="ltx_tabular"><tr><td>Pump {picture}</td><td>{picture}</td></tr></table>'
+    )
+    result = read(body, tmp_path)
+    # a heading's words are its own and the picture follows it; a link that holds only a picture
+    # reads as its alt text, else as its address; a cell of words says a picture stood in it (as
+    # Word's does) and a cell of only a picture stays empty
+    assert kinds(result) == ["heading", "figure", "paragraph", "figure", "figure", "table"] + [
+        "figure",
+        "figure",
+    ]
+    heading, _, paragraph, _, _, table, *_ = result.elements
+    assert heading.text == "Setup steps"
+    assert paragraph.text == "Visit https://example.com/lab or Lab logo now."
+    assert [(paragraph.text[l.start : l.end], l.href) for l in paragraph.links] == [
+        ("https://example.com/lab", "https://example.com/lab"),
+        ("Lab logo", "https://example.com/lab"),
+    ]
+    assert [c.text for c in table.table.cells] == ["Pump (picture below)", ""]
+
+
 def test_a_figure_without_a_usable_picture_is_a_required_decision(tmp_path):
     body = '<div class="ltx_figure"><span class="ltx_ERROR undefined">{tikzpicture}</span></div>'
     result = read(body, tmp_path)

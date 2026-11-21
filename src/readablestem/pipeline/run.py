@@ -66,7 +66,8 @@ Design notes:
   after layout, before any step; it sets `lang`, `lang_source` and its own notices, and
   never fails the conversion.
 - Live progress (`stage_progress`, for the job page): "layout" when analysis starts and
-  again with the pages and the elements found per kind; "equations", "figures" and
+  again with the pages and the elements found per kind; "pages" with the scanned pages read
+  from their pictures (`image_page.run`), on a counter of its own; "equations", "figures" and
   "tables" with how many of each are done, first with their totals and then after every
   element (the receiver decides how often to store them); "assemble" and "checks" as the
   HTML is written and checked. All on the calling thread, content-free.
@@ -1855,11 +1856,12 @@ def _image_pages_pass(
             settings,
             renders,
             concurrency=concurrency,
-            # the pages read are the layout's pages on the job page, as the table search's are
+            # a counter of its own: the layout's count (the table search's pages) is done by
+            # now, and the bar must not step back to this pass's first page
             on_page=(
                 None
                 if stage_progress is None
-                else lambda done, total: _send(stage_progress, "layout", done, total)
+                else lambda done, total: _send(stage_progress, "pages", done, total)
             ),
         )
         for number, read in result.reads.items():

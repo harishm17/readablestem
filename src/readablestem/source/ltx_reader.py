@@ -288,6 +288,24 @@ def _has_words(node: Node) -> bool:
     return False
 
 
+def _picture_link_label(link: Node) -> str | None:
+    """For a link that holds only a picture: the words to give it, which are the picture's
+    alt text, else the address it goes to (a person who hears the link read has nothing else
+    to go by); "" when it goes to a place in the document, which has no words to give. None
+    when the link holds words or no picture."""
+    pictures = [n for n in link.iter() if _is_picture(n)]
+    if not pictures or _has_words(link):
+        return None
+    if alt := next((a for p in pictures if (a := _squash(p.get("alt") or ""))), ""):
+        return alt
+    href = link.get("href") or ""
+    if href.startswith(("http://", "https://")):
+        return href
+    if href.startswith("mailto:"):
+        return href.removeprefix("mailto:")
+    return ""
+
+
 def needs_decision(fix: Fix, code: str) -> Fix:
     """`fix` as a required decision with the failed check `SOURCE_READ_CHECK` `code` (once):
     an accepted item waits for the instructor; a failed one stays failed."""
@@ -614,7 +632,7 @@ class _Reader:
         for child in _children(step):
             classes = _classes(child)
             if "ltx_frame_title" in classes:
-                text, spans = self._inline_text(child, skip_tags=True)
+                text, spans = self._inline_text(child, skip_tags=True, marks=False)
                 if text:
                     level = self.section_level + 1 if self.section_level >= 1 else 2
                     heading = self._new(Kind.HEADING, text=text + note, bold=True)
@@ -653,8 +671,11 @@ class _Reader:
             self.section_level = level
         titled = bool(classes & {"ltx_title_document", "ltx_title_titlepage"})
         notes: list[str] = []  # `\thanks` on the title: a line of its own, not in the title
-        text, spans = self._inline_text(node, skip_tags=True, notes=notes if titled else None)
+        text, spans = self._inline_text(
+            node, skip_tags=True, notes=notes if titled else None, marks=False
+        )
         if not text:
+            self._flush_pictures()  # a heading of only a picture: the picture alone
             return
         element = self._new(Kind.HEADING, text=text, bold=True)
         self._apply_spans(element, spans, links_only=True)
@@ -713,19 +734,24 @@ class _Reader:
         owner: Element | None = None,
         skip_tags: bool = False,
         notes: list[str] | None = None,
+        marks: bool = True,
     ) -> tuple[str, list[tuple[str, int, int, object]]]:
         """The text of `node` with an inline marker where each formula is (formulas become
         equation elements whose parent is `owner`; without an owner their TeX is written in
         the text, and an error node in one is tied to the next element made), and the spans
         (links, raised and lowered runs, struck text) as (kind, start, end, data). A picture
         met here is left for the caller's block (`self.loose`, `_flush_pictures`). A note is
-        written where it stands as " (note: ...)", or, with `notes`, handed to the caller."""
+        written where it stands as " (note: ...)", or, with `notes`, handed to the caller. A
+        picture in a sentence leaves `PICTURE_MARK` where it stood, except with `marks` off (a
+        heading's text is the heading: the picture follows it as a figure of its own)."""
         parts: list[str] = []
         spans: list[tuple[str, int, int, object]] = []
         length = [0]
         self.read.add(id(node))
 
-        beside_words = _has_words(node)  # a picture here stood in a sentence, not on its own
+        # a picture here stood in a sentence, not on its own
+        beside_words = marks and _has_words(node)
+        in_link = [False]  # inside a link that holds only a picture (its words are `label`)
         after_break = [False]  # a kept line end was just written: no space follows it
         gap = [False]  # a picture stood between two letters: the words it cut are two words
 
@@ -781,7 +807,10 @@ class _Reader:
             if _is_picture(item):
                 self.loose.append(item)  # a figure of its own after this block
                 if beside_words:
-                    emit(PICTURE_MARK)  # where it stood, so its absence from the sentence is said
+                    if not in_link[0]:  # a picture link's words are written after it
+                        emit(
+                            PICTURE_MARK
+                        )  # where it stood, so its absence from the sentence is said
                 else:
                     gap[0] = bool(parts) and parts[-1][-1:].isalnum()
                 return
@@ -818,10 +847,25 @@ class _Reader:
                 start = length[0]
                 if item.text:
                     emit(_SPACE.sub(" ", item.text))
+                label = _picture_link_label(item) if beside_words and tag == "a" else None
+                if label is not None:
+                    in_link[0] = True
                 for child in _children(item):
                     visit(child, depth + 1)
                     if child.tail:
                         emit(_SPACE.sub(" ", child.tail))
+                if label is not None:
+                    in_link[0] = False
+                    if (
+                        label
+                    ):  # the link's words, where the picture is not (see `_picture_link_label`)
+                        if parts and parts[-1][-1:].isalnum():
+                            emit(" ")
+                        start = length[0]
+                        emit(label)
+                    else:  # a link inside the document: no words to give it, the mark stays out of it
+                        emit(PICTURE_MARK)
+                        start = length[0]
                 if tag == "a":
                     href = item.get("href") or ""
                     if length[0] > start and href.startswith(("http://", "https://", "mailto:")):
@@ -1785,20 +1829,39 @@ def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
     parts: list[str] = []
     spans: list[tuple[str, int, int, object]] = []
     length = 0
+    beside_words = _has_words(cell)  # a picture in a cell of words leaves the mark (as Word's)
+    in_link = False  # inside a link that holds only a picture (`_picture_link_label`)
 
     def visit(item: Node) -> None:
-        nonlocal length
+        nonlocal length, in_link
         if item.text:
             parts.append(item.text)
             length += len(item.text)
         for child in _children(item):
             start = length
-            if _local(child.tag) == "math":
+            if _is_picture(child):  # a figure of its own after the table (`_table`)
+                if beside_words and not in_link:
+                    parts.append(PICTURE_MARK)
+                    length += len(PICTURE_MARK)
+            elif _local(child.tag) == "math":
                 shown = child.get("alttext") or "".join(child.itertext())
                 parts.append(shown)
                 length += len(shown)
             else:
+                is_link = _local(child.tag) == "a"
+                label = _picture_link_label(child) if beside_words and is_link else None
+                if label is not None:
+                    in_link = True
                 visit(child)
+                if label is not None:
+                    in_link = False
+                    if label and parts and parts[-1][-1:].isalnum():
+                        parts.append(" ")
+                        length += 1
+                    text = label or PICTURE_MARK
+                    parts.append(text)
+                    length += len(text)
+                    start = length - len(label or "")
                 if _local(child.tag) == "a" and length > start:
                     href = child.get("href") or ""
                     if href.startswith(("http://", "https://", "mailto:")):

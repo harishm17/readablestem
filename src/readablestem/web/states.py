@@ -208,6 +208,7 @@ TRY_AGAIN = "You can use “Try again”: what was already converted is kept."
 # The step a conversion stopped in, from its last progress record (F-317).
 STEP_WORDS = {
     "layout": "reading the layout of your PDF",
+    "pages": "reading the scanned pages",
     "equations": "reading the equations",
     "figures": "describing the figures",
     "tables": "looking at the tables",
