@@ -1,5 +1,30 @@
 # Changelog
 
+## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
+
+- Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The
+  list is navigation: Listen says "Navigation, Contents" and reads the entries, as a screen reader
+  does on the student page. A figure's long description is still a collapsed section
+  (`web/listen.py`).
+- The Word export of a scanned 100-page document made no file (a plain page, 409, after 48 s):
+  pandoc holds a picture's `data:` address as a list of characters and the child ran out of its
+  2 GB heap. Pictures are now given to it as files in its private folder
+  (`export_docx._pictures_to_files`); 100 scanned pages (41 MB of page) make a Word file in 18 s
+  with a child that peaks at 0.25 GB, where 40 pages already used 2.2 GB.
+- A scanned document's page-reading pass told the job page nothing for 39 s of 100 pages: each page
+  picture was drawn one after another before any was asked. A page is now asked as soon as its
+  picture is drawn, and the job page counts the pages as they finish ("Reading the layout: 7 of 100
+  pages"); the longest silent stretch in the pass is 15 s (building the pages from the answers).
+- The "wider than the paper" note: measured at five print columns on the 54 equations that carry
+  the print classes (123 equations in all): none is clipped without a note at any, and 0 to 5 are
+  flagged that fit, only on a narrower sheet; at Letter and A4 with Chromium's margins none is
+  flagged. The estimate is not changed (docs/output.md has the table).
+- The landing page's hero has a second column: a real picture of the public demo page, shown
+  whole in a frame, and a click opens the demo. It drops under the text below 60rem
+  (`scripts/hero_screenshot.py`).
+- No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` raise is owed, no migration.
+
 ## Unreleased: a raised digit in a figure caption stays raised
 
 - A figure caption was written from a plain string, so "10⁸" came out "108" and "CP³" came out

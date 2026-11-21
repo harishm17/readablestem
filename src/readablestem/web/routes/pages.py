@@ -52,6 +52,9 @@ def _hero() -> dict[str, object]:
     # How the speech rules read that text layer, for the hero's Play control (the same
     # reading the review screen shows beside an equation).
     data["text_layer_speech"] = read_text_layer(str(data["text_layer"]))
+    # The whole-product picture (scripts/hero_screenshot.py), shown whole at its own size.
+    shot = (STATIC_DIR / "hero" / "product.png").read_bytes()
+    data["product_width"], data["product_height"] = struct.unpack(">II", shot[16:24])
     return data
 
 

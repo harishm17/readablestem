@@ -18,7 +18,10 @@ What this module does around pandoc:
   figure. `<main>` is unwrapped: when a page has one, pandoc reads only what is inside it,
   which would leave out the Contents and a draft's banner (the student note "About this
   version" is inside `<main>`, so every output made from the page has it). A WebP picture
-  becomes a PNG (Word cannot show WebP). The language and the title are set explicitly.
+  becomes a PNG (Word cannot show WebP). A picture is given to pandoc as a file in the child's
+  private folder, not as a `data:` address: pandoc holds an address as a list of characters,
+  about 200 times its size, so a scanned 100-page document (a picture a page) ran the child out
+  of its heap. The language and the title are set explicitly.
 - **In pandoc.** One Lua filter (`data/export_docx.lua`, passed with `--lua-filter`) takes out
   the page-break markers (a Word document has its own pages) and the skip link, and writes a
   figure with no picture as paragraphs.
