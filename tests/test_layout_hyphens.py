@@ -42,7 +42,10 @@ def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_
         "Jones and the rest of the group.",
     ]
     links = [(1, lines[1], address), (2, lines[2].split()[0], address)]
-    links += [(3, "Smith", "https://example.org/people/x"), (4, "Jones", "https://example.org/people/x")]
+    links += [
+        (3, "Smith", "https://example.org/people/x"),
+        (4, "Jones", "https://example.org/people/x"),
+    ]
 
     def converted(linked: bool) -> str:
         doc = pymupdf.open()

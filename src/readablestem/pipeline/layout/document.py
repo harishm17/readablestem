@@ -10,6 +10,7 @@ import math
 import re
 from collections.abc import Callable, Sequence
 from functools import partial
+from itertools import pairwise
 from typing import Any
 
 import pymupdf
@@ -291,7 +292,9 @@ def _link_cuts(doc: pymupdf.Document, rows: dict[int, list[_Row]]) -> hyphens.Li
     cuts: set[tuple[str, str]] = set()
     for number, page_rows in rows.items():
         try:
-            links = [link for link in doc[number].get_links() if link.get("kind") == pymupdf.LINK_URI]
+            links = [
+                link for link in doc[number].get_links() if link.get("kind") == pymupdf.LINK_URI
+            ]
         except (RuntimeError, pymupdf.mupdf.FzErrorBase):
             continue
         by_uri: dict[str, list[pymupdf.Rect]] = {}
@@ -300,7 +303,7 @@ def _link_cuts(doc: pymupdf.Document, rows: dict[int, list[_Row]]) -> hyphens.Li
                 by_uri.setdefault(link["uri"], []).append(link["from"])
         for uri, rects in by_uri.items():
             rects.sort(key=lambda r: (r.y0, r.x0))
-            for above, below in zip(rects, rects[1:], strict=False):
+            for above, below in pairwise(rects):
                 if 0.5 * above.height < below.y0 - above.y0 < 2.5 * above.height:
                     first, second = (_text_in(page_rows, r) for r in (above, below))
                     if cut := hyphens.link_cut(uri, first, second):
@@ -314,7 +317,9 @@ def _text_in(rows: list[_Row], rect: pymupdf.Rect) -> str:
         c
         for row in rows
         for c in row.chars
-        if not c.blank and rect.x0 <= (c.x0 + c.x1) / 2 <= rect.x1 and rect.y0 <= (c.y0 + c.y1) / 2 <= rect.y1
+        if not c.blank
+        and rect.x0 <= (c.x0 + c.x1) / 2 <= rect.x1
+        and rect.y0 <= (c.y0 + c.y1) / 2 <= rect.y1
     ]
     return "".join(c.c for c in sorted(found, key=lambda c: (round(c.baseline), c.x0)))
 
@@ -524,7 +529,9 @@ def _analyze_document(
     document.compounds, document.whole_words = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
     )
-    document.link_cuts = _link_cuts(doc, {n: [*rows, *dropped] for n, (rows, _, dropped) in prepared.items()})
+    document.link_cuts = _link_cuts(
+        doc, {n: [*rows, *dropped] for n, (rows, _, dropped) in prepared.items()}
+    )
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx, guard)
     _letter_rows({n: rows for n, (rows, _, _) in prepared.items()}, ctx)
     forget()

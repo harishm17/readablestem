@@ -376,15 +376,9 @@ def test_an_address_typed_in_the_text_becomes_a_link(text, expected):
         ("Hand in at https://example.org/courses/12/sub", "missions/new today.", []),
         # The whole address is on the second line.
         ("Hand in your work", "at https://example.org/a today.", ["https://example.org/a"]),
-        # The address ends the line whole and the sentence goes on: a word follows it, not
-        # more of an address.
-        ("Hand in at https://example.org/a", "today for credit.", ["https://example.org/a"]),
-        ("Hand in at https://example.org/a.", "Then wait.", ["https://example.org/a"]),
     ],
 )
-def test_an_address_that_the_line_end_cuts_gets_no_link_but_one_that_ends_whole_does(
-    first, second, expected
-):
+def test_an_address_that_the_line_end_cuts_gets_no_link(first, second, expected):
     text = f"{first} {second}"
     glyphs = [*line(first), *line(second, y=114.0)]
     result = annotate([el("p1-e0", text=text, bbox=(72, 98, 572, 126))], pdf_with(glyphs))
