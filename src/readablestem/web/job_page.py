@@ -82,11 +82,12 @@ from readablestem.web.outcome import unread_phrase
 
 StageState = Literal["done", "now"]
 # Stages in the order they run (`core.types.Stage`, without "queued").
-STAGE_ORDER = ("layout", "equations", "figures", "tables", "assemble", "checks")
+STAGE_ORDER = ("layout", "pages", "equations", "figures", "tables", "assemble", "checks")
 # The status box's sentence while a stage runs: one per step, so the live region
 # announces a change per step.
 STAGE_SENTENCES = {
     "layout": "Reading the layout of your PDF.",
+    "pages": "Reading the scanned pages.",
     "equations": "Reading the equations and checking each against your PDF's text.",
     "figures": "Describing the figures.",
     "tables": "Looking at the tables.",
@@ -144,6 +145,8 @@ def current_stage(progress: dict[str, Any] | None) -> str | None:
     for stage in started:
         if stage in ("assemble", "checks"):
             continue
+        if stage == "layout" and "pages" in events and not _count(events[stage], "total"):
+            continue  # a scan has no table search to count: its pages are the work
         if not _finished(events[stage]) and stage != last:
             return stage
     return last
@@ -178,6 +181,14 @@ def stage_lines(progress: dict[str, Any] | None) -> list[StageLine]:
         if _finished(layout):
             text = f"Found {join_words(found)}" if found else "Found no equations or figures"
             lines.append(StageLine(text, "done"))
+    pages = events.get("pages")
+    if pages is not None and _count(pages, "total"):
+        done, total = _count(pages, "done"), _count(pages, "total")
+        if _finished(pages):
+            lines.append(StageLine(f"Read the scanned pages: {plural(total, 'page')}", "done"))
+        else:
+            read = f"Reading the scanned pages: {done} of {plural(total, 'page')}"
+            lines.append(StageLine(read, "now", done, total))
     for stage, verb in (
         ("equations", "read and checked against your PDF's text"),
         ("figures", "described"),

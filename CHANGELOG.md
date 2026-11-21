@@ -263,6 +263,39 @@
   routes (`/title`, `/contact`) and merging them changes what a request does.
 - No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
   `RENDER_VERSION` bump.
+## Unreleased: pictures in LaTeX headings, links and cells; the scanned-page progress counter
+
+An independent review of wave 2b found these (finding 5). Each was reproduced on a small LaTeX
+source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.py`.
+
+- A picture in a LaTeX heading put "(picture below)" into the heading's text, so the outline, the
+  contents and the page title read it. A heading is now its words only; the picture follows it as a
+  figure of its own (a heading of only a picture makes no heading, as before the mark).
+- A link that holds only a picture, in a sentence, had "(picture below)" as its link text. It now
+  reads as the picture's alt text when the source has one, else as the address it goes to: a person
+  who hears the links read learns where it leads, which "(picture below)" never said. A link to a
+  place in the document has no words to give; the mark stands beside it, outside the link. A link
+  of only a picture on a line of its own is left as it was (no mark was written there).
+- A picture in a table cell of words left no mark; it now leaves "(picture below)" in the cell, as
+  a Word cell does. A cell of only a picture stays empty. The table is still a required decision
+  and the picture still follows it.
+- The scanned-page pass sent its progress on the "layout" counter, which the table search had just
+  finished, so the job page's bar stepped back (3 scanned pages: layout 2 of 3, then 1 of 3). The
+  pass now has a counter of its own, "pages" ("Reading the scanned pages: 7 of 20 pages"); the
+  layout's count never moves back. New stage name in `core.types.Stage`, `web/job_page.py`,
+  `web/states.py`, `docs/web.md`.
+- Measured: the 47 LaTeX sources of the repository (48 mains, one an include fragment LaTeXML
+  cannot read alone) read the same before and after, element for element; none of them holds a
+  picture in a heading, a picture-only link or a picture in a cell. The private corpus and the
+  real-world development sets hold no LaTeX source. The fault is found only in sources written
+  the way the reviewer's probe was.
+- Not built: a link of only a picture on a line of its own still loses its address with no word
+  (it never had a mark; giving it text would add a line to every such page); a cell that holds a
+  formula and a picture shows the picture mark in its text but not in its formula reading.
+- No recording or request changes. Stored LaTeX results made earlier keep the old text until the
+  source is converted again; stored progress rows are unchanged (a row has no "pages" until a scan
+  runs). No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed (the output of a PDF is not
+  changed; a LaTeX source made again differs only where it has these shapes), no migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 

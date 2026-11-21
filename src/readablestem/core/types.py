@@ -1624,7 +1624,7 @@ class ConversionOptions(BaseModel):
 
 
 # Stages of a conversion as the job page shows them, in order.
-Stage = Literal["queued", "layout", "equations", "figures", "tables", "assemble", "checks"]
+Stage = Literal["queued", "layout", "pages", "equations", "figures", "tables", "assemble", "checks"]
 
 
 class ProgressEvent(BaseModel):

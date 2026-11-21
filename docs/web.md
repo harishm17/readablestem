@@ -2383,8 +2383,9 @@ document.
   | `internal_error` | Anything else |
 
 - **Live progress.** The converter's `ProgressEvent`s (`convert_pdf(stage_progress=)`:
-  "layout", then "equations", "figures", "tables" with done and total, then "assemble"
-  and "checks"; content-free) are kept per stage and written to `jobs.progress_json` as
+  "layout", "pages" (a scan's pages read from their pictures), then "equations",
+  "figures", "tables" with done and total, then "assemble" and "checks"; content-free) are
+  kept per stage and written to `jobs.progress_json` as
   `{"stages": {stage: event}}`: a stage seen for the first time or just finished at
   once, other updates at most every 2 s (`worker.PROGRESS_WRITE_S`), and only while
   this attempt owns the job (otherwise the next event raises `JobCancelled`). A failed
@@ -2590,9 +2591,12 @@ From top to bottom:
    16 pages" (while the layout runs, "Reading the layout: 7 of 16 pages" with the step's
    progress bar: the pages whose table search is done, the part of the layout that takes
    most of its time, told by `layout.analyze(on_page=...)` through the same stage events as
-   the other steps; then again for the pages a scanned document has read from their pictures,
-   each counted when its answer is back or it has none (`image_page.run(on_page=...)`: a page is
-   asked as soon as its picture is drawn, so the count moves while the next is drawn)), "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
+   the other steps), "Found 21 equations, 7 figures and 52 headings", then, for a scanned
+   document, "Reading the scanned pages: 7 of 20 pages" on a counter of its own (the pages read from
+   their pictures, each counted when its answer is back or it has none
+   (`image_page.run(on_page=...)`: a page is asked as soon as its picture is drawn, so the count
+   moves while the next is drawn); the layout's count is done by then and never steps back),
+   "Equations: 14 of 21 read
    and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
    "Building the HTML file", "Running the structure checks", each "(done)" or "(in
    progress)". Without JavaScript the page shows them as they were when it loaded, with
