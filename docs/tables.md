@@ -185,7 +185,7 @@ rules above.
    long panel titles across it among them, stays as it was. A box it rescued that is no table
    by rules, caption or a stack of rules is asked the page-text, numbered-line and word tests
    of the boxes made here (`_text_block_dropped`), and two columns with no rule and no
-   "Table N" line are no table (labelled questions with a "Part B" line among them). Two
+   "Table N" line are no table (labeled questions with a "Part B" line among them). Two
    things differ for a box read this way, because the strip is weaker evidence than a gap no
    cell crosses. A "Table N" line only names it when it stands
    over the box (a line under a box may be the next table's: an algorithm's frame with the

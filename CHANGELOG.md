@@ -323,7 +323,7 @@ result with `links` on a cell and ignores them (the cell shows its words, no lin
   running text across its columns mean a paragraph was taken in with the table, so it is page
   text. These refuse the two false tables the rule first made (a list of blanks and an
   algorithm's frame) and a table that took in the paragraph under it. Two columns found this
-  way with no rule and no "Table N" line are no table (labelled questions with a "Part B" line
+  way with no rule and no "Table N" line are no table (labeled questions with a "Part B" line
   among them, terms and their meanings under short headings, a dialogue: review 13). Such a
   strip only adds tables: a box it does not make a table is judged as if the strip were not a
   gap, so a ruled table under its caption with long panel titles across it stays one table
