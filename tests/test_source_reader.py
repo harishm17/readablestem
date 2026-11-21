@@ -285,14 +285,21 @@ def test_a_picture_in_a_heading_link_or_cell_is_said_where_a_reader_hears_it(tmp
     # a heading's words are its own and the picture follows it; a link that holds only a picture
     # reads as its alt text, else as its address; a cell of words says a picture stood in it (as
     # Word's does) and a cell of only a picture stays empty
-    assert kinds(result) == ["heading", "figure", "paragraph", "figure", "figure", "table"] + [
-        "figure",
-        "figure",
+    figure = "figure"
+    assert kinds(result) == [
+        "heading",
+        figure,
+        "paragraph",
+        figure,
+        figure,
+        "table",
+        figure,
+        figure,
     ]
     heading, _, paragraph, _, _, table, *_ = result.elements
     assert heading.text == "Setup steps"
     assert paragraph.text == "Visit https://example.com/lab or Lab logo now."
-    assert [(paragraph.text[l.start : l.end], l.href) for l in paragraph.links] == [
+    assert [(paragraph.text[k.start : k.end], k.href) for k in paragraph.links] == [
         ("https://example.com/lab", "https://example.com/lab"),
         ("Lab logo", "https://example.com/lab"),
     ]

@@ -863,7 +863,7 @@ class _Reader:
                             emit(" ")
                         start = length[0]
                         emit(label)
-                    else:  # a link inside the document: no words to give it, the mark stays out of it
+                    else:  # a link to a place here has no words: the mark stands outside it
                         emit(PICTURE_MARK)
                         start = length[0]
                 if tag == "a":

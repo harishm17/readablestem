@@ -1384,7 +1384,15 @@ address in a caption.
 A picture in the middle of a sentence is a figure straight after the block that holds it (the
 output has no place for a picture inside a sentence), and the sentence reads "(picture below)"
 where it stood, so the words do not run together (a picture on its own line leaves nothing). A
-Word source, which is off in production, does the same.
+Word source, which is off in production, does the same. Three places are different in a LaTeX
+source. A heading is its words only: a picture in it follows the heading as a figure and leaves no
+mark in the title, which a reader would hear in the outline and the contents. A link that holds
+only a picture, inside a sentence, is read as the picture's alt text when the source has one,
+else as the address it goes to (so a person who hears the links read knows where it leads, which
+"(picture below)" does not say); a link to a place in the document has no words to give, and the
+mark stands beside it, outside the link. A table cell with words and a picture says
+"(picture below)" as Word's cell does (the table is still a required decision, and the picture
+follows it); a cell with only a picture stays empty.
 
 Color of a Word or LaTeX source follows the PDF path: a passage in a real color is counted,
 and with `FEATURE_COLOUR` off the job gets one `colour_used` notice with the count. The Word
