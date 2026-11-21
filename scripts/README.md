@@ -8,7 +8,7 @@ call no model.
 |---|---|---|
 | `check_shards.py`, `dead_code.py`, `eval_guard.py` | Run by CI: every test ran once across the shards, nothing in `src/` is uncalled, and a change to a model, a prompt or an acceptance rule comes with its evaluation | [docs/development.md](../docs/development.md); [docs/eval.md](../docs/eval.md), "Eval guard" |
 | `dependency_record.py`, `make_glyph_names.py`, `page_dates.py`, `layout_identity.py`, `corpus_refresh.py` | Keep generated files and records in step with the code | [docs/development.md](../docs/development.md) |
-| `brand_icons.py`, `make_social_card.py`, `hero_assets.py`, `design_shots.py` | Draw the site's icons, the link-preview image and the landing page's equation block; take screenshots for design review | [docs/web.md](../docs/web.md) |
+| `brand_icons.py`, `make_social_card.py`, `hero_assets.py`, `hero_screenshot.py`, `design_shots.py` | Draw the site's icons, the link-preview image and the landing page's equation block; take the landing page's product picture; take screenshots for design review | [docs/web.md](../docs/web.md) |
 | `bench_layout.py`, `bench_runtime.py` | Time and memory of layout analysis and of the web app | [docs/development.md](../docs/development.md) |
 | `dev_*.py` | Analyses of runs on the development sets: paired comparisons, where a chatbot is right and the pipeline is not, chemistry classes | [docs/eval.md](../docs/eval.md) |
 | `eq_*.py` | Equation diagnostics on recorded runs, with no model call | [docs/eval-equation-diagnostics.md](../docs/eval-equation-diagnostics.md), [docs/eval-equation-round5.md](../docs/eval-equation-round5.md) |

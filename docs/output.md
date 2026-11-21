@@ -818,9 +818,19 @@ the print build waits for WS21.1):
   equation is wider than the paper. It is complete on the web page." The note is generated
   content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
   The rules of each width step are added to the stylesheet only when an equation has it.
-  Measured (O-094): of the 123 display equations in 73 stored pages, 54 carry the classes and the
-  widest is 1.29 times the sheet's text width on screen, which the 70% floor covers (it reaches
-  1.43 times), so none is cut on paper; the estimate runs wide, and the note shows for 2 that fit.
+  Measured (O-094, O-399): of the 123 display equations in 73 stored pages, 54 carry the classes and the
+  widest is 1.23 times the sheet's text width on screen (1.29 at the first measure), which the 70%
+  floor covers (it reaches 1.43 times), so none is cut on paper. Against Chromium's own widths
+  (the math element's width in em of its font) the estimate of the 54 is 0.79 to 1.22 of the true
+  width (10th to 90th percentile 0.90 to 1.12, median 1.02). The note is checked at five text
+  columns (em of the body text; the column is 37.3 em on Letter and A4 at 100% with Chromium's
+  margins, 33 em with 1 in margins, 29.9, 24.9 and 18.7 em at 125%, 150% and 200% print scale):
+  an equation flagged that fits is 0, 5, 3, 1 and 2 of the 123, and one clipped with no note is 0
+  at every column. So the note shows for a few equations that fit only on a narrower sheet, never
+  the other way; a printed PDF at Letter and at A4 has no note on any of the 73 pages. The
+  estimate was not changed: constants refitted to these widths (and to the 30 public gold
+  equations) trade a flag that was wrong for a clip with no note at the columns people print at,
+  and a clip with no note is the failure the rule exists to prevent.
   A landscape page for an equation beyond the floor (`@page` with a name, `page:` on the
   equation) prints in Chromium for an equation up to about 2.2 times the column, but container
   queries and `cqw` are evaluated against the portrait width there, so the scale and the note are

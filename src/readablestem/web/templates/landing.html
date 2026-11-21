@@ -11,24 +11,34 @@
    /limits (routes/pages.py `_features`), so a server never lists a feature it has off. The
    chart is web/proof_facts.py (the registered report), from `_proof_chart.html` (compact). #}
 <section class="hero" aria-labelledby="hero-title">
-  <h1 id="hero-title">Turn STEM course PDFs into accessible web pages, equations included</h1>
-  {# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
-     should only be added once it is checked against it and the university's own page
-     (UX review BW9). #}
-  <p class="lede">Upload your lecture notes, slides or problem sets. Get a web page whose
-    equations a screen reader can speak, and review what the tool is unsure of.</p>
-  <p class="hero-actions">
-    {% if user %}
-    <a class="button" href="/app">Go to my documents</a>
-    {% else %}
-    <a class="button" href="/login">Sign in and convert a PDF</a>
+  <div class="hero-copy">
+    <h1 id="hero-title">Turn STEM course PDFs into accessible web pages, equations included</h1>
+    {# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
+       should only be added once it is checked against it and the university's own page
+       (UX review BW9). #}
+    <p class="lede">Upload your lecture notes, slides or problem sets. Get a web page whose
+      equations a screen reader can speak, and review what the tool is unsure of.</p>
+    <p class="hero-actions">
+      {% if user %}
+      <a class="button" href="/app">Go to my documents</a>
+      {% else %}
+      <a class="button" href="/login">Sign in and convert a PDF</a>
+      {% endif %}
+      <a class="button-secondary" href="/demo">{{ strings.SEE_DEMO }}</a>
+    </p>
+    {% if not user %}
+    <p class="hint hero-hint">Free during the beta (<a href="/pricing">pricing</a>). <a href="#who">Who can use it</a> and
+      <a href="#documents">what happens to your documents</a>.</p>
     {% endif %}
-    <a class="button-secondary" href="/demo">{{ strings.SEE_DEMO }}</a>
-  </p>
-  {% if not user %}
-  <p class="hint hero-hint">Free during the beta (<a href="/pricing">pricing</a>). <a href="#who">Who can use it</a> and
-    <a href="#documents">what happens to your documents</a>.</p>
-  {% endif %}
+  </div>
+  {# The whole product: the public demo page in a real window, uncropped (scripts/hero_screenshot.py).
+     A click opens the live demo. The picture is the converted page, so it keeps its paper colors
+     in dark mode, in a frame. #}
+  <figure class="hero-shot">
+    <a href="/demo"><img class="hero-shot-img" src="{{ static_url('hero/product.png') }}" width="{{ hero.product_width }}" height="{{ hero.product_height }}"
+      alt="The demo page opened in a browser: a paragraph about the slope of a position versus time graph, equation 2.4 shown as a fraction with its number, and the next heading and paragraph. Opens the demo."></a>
+    <figcaption>The demo: a page converted by ReadableSTEM from OpenStax Physics 2.3 (CC BY 4.0).</figcaption>
+  </figure>
 </section>
 
 {# The real equation 2.4 of the demo (OpenStax Physics 2.3, page 3), built by

@@ -18,7 +18,10 @@ What this module does around pandoc:
   figure. `<main>` is unwrapped: when a page has one, pandoc reads only what is inside it,
   which would leave out the Contents and a draft's banner (the student note "About this
   version" is inside `<main>`, so every output made from the page has it). A WebP picture
-  becomes a PNG (Word cannot show WebP). The language and the title are set explicitly.
+  becomes a PNG (Word cannot show WebP). A picture is given to pandoc as a file in the child's
+  private folder, not as a `data:` address: pandoc holds an address as a list of characters,
+  about 200 times its size, so a scanned 100-page document (a picture a page) ran the child out
+  of its heap. The language and the title are set explicitly.
 - **In pandoc.** One Lua filter (`data/export_docx.lua`, passed with `--lua-filter`) takes out
   the page-break markers (a Word document has its own pages) and the skip link, and writes a
   figure with no picture as paragraphs.
@@ -169,12 +172,17 @@ def _limits() -> None:  # pragma: no cover - runs in the forked child, before ex
         pass
 
 
-def _run_pandoc(html: str, lang: str, pandoc: str, timeout_s: float) -> tuple[bytes, str]:
+def _run_pandoc(
+    html: str, lang: str, pandoc: str, timeout_s: float, pictures: dict[str, bytes]
+) -> tuple[bytes, str]:
     """The Word file pandoc makes, and what the filter said on stderr (`_failed_keys` reads it:
-    pandoc's own warnings quote the document, so nothing else of it is kept)."""
+    pandoc's own warnings quote the document, so nothing else of it is kept). `pictures` are
+    written into the child's private folder under the names the page's `<img>`s carry."""
     work = Path(tempfile.mkdtemp(prefix="readablestem-docx-"))
     try:
         work.chmod(0o700)
+        for name, raw in pictures.items():
+            (work / name).write_bytes(raw)
         out = work / "out.docx"
         command = [
             pandoc,
@@ -242,6 +250,41 @@ def _webp_to_png(root: _Node) -> None:
         except (ValueError, OSError):
             raise DocxExportError("invalid") from None
         img.attrs["src"] = "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
+
+
+_PICTURE_FILES = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/gif": "gif",
+    "image/bmp": "bmp",
+    "image/tiff": "tif",
+}
+
+
+def _pictures_to_files(root: _Node) -> dict[str, bytes]:
+    """The pictures of the page, taken out of their addresses: each `<img>` with a data
+    address of a type pandoc reads from a file is given a file name instead, and the bytes
+    are returned under it. Pandoc holds a data address as a list of characters, about 200 times
+    its size: a scanned 100-page document (one 290 KB picture a page) needed more than the
+    child's 2 GB heap and failed after 48 s, and as files it takes 0.1 GB. Pictures that are the
+    same are one file."""
+    files: dict[str, bytes] = {}
+    names: dict[str, str] = {}
+    for img in (n for n in root.walk() if n.tag == "img"):
+        src = img.attrs.get("src", "")
+        match = _DATA_URI.match(src)
+        extension = _PICTURE_FILES.get(match.group("type").lower()) if match else None
+        if match is None or extension is None:
+            continue
+        if src not in names:
+            try:
+                raw = base64.b64decode(re.sub(r"\s+", "", match.group("data")), validate=True)
+            except ValueError:
+                continue  # left as it is: pandoc says what it makes of it
+            names[src] = f"picture-{len(files) + 1}.{extension}"
+            files[names[src]] = raw
+        img.attrs["src"] = names[src]
+    return files
 
 
 def _replace(node: _Node, replacement: list[_Node | str]) -> None:
@@ -621,6 +664,7 @@ def export_docx(
     _sanitise(root, {s for s in images if _DATA_URI.match(s)})
     _prepare(root)
     _webp_to_png(root)
+    pictures = _pictures_to_files(root)
     token = secrets.token_hex(6)
     equation_ids, unsaid = _mark_equations(body, token)
     _land_links(body)
@@ -631,7 +675,7 @@ def export_docx(
         f"<title>{escape(title, quote=False)}</title></head>"
         f"<body>{''.join(_write(c) for c in body.children)}</body></html>"
     )
-    data, said = _run_pandoc(document, lang, program, timeout_s)
+    data, said = _run_pandoc(document, lang, program, timeout_s, pictures)
     data, (equations, pictures, tables, headers, unlinked) = _rebuild(data, title)
     not_word = sorted(_failed(said, token) & set(range(n_math)))
     if equations + len(not_word) != n_math or unsaid & set(not_word):

@@ -2099,7 +2099,12 @@ the site is built, with the same component and the same script).
   Paragraph, List item; `LISTEN_LABELS`: "Main content", "Navigation", "Side notes", "Footer",
   "Header", "Section", "Collapsed section", "End quote", ...), never the ARIA names ("Main
   landmark", "Content information landmark"). A `<br>` is a pause (a comma in the words), and a
-  `<blockquote>` closes with an "End quote" item.
+  `<blockquote>` closes with an "End quote" item. The contents list (`details.toc-details`
+  inside its `nav`) is navigation, not a section of the document: the landmark says "Navigation,
+  Contents" and the entries follow, with no "Collapsed section" item and no summary (the student
+  page draws that list open wherever the browser can, and a screen reader meets the landmark and
+  its list there too). Other `<details>` (a figure's long description) are still "Collapsed
+  section: ...".
   **Before the lesson (F-120).** The page title, the page language, the skip link (`a.skip-link`,
   kind `skip-link`, said "Skip link: Skip to main content") and a landmark with no name that
   opens the content are marked `Item.before` by `listen._before_the_lesson`, from the items'
@@ -2585,7 +2590,9 @@ From top to bottom:
    16 pages" (while the layout runs, "Reading the layout: 7 of 16 pages" with the step's
    progress bar: the pages whose table search is done, the part of the layout that takes
    most of its time, told by `layout.analyze(on_page=...)` through the same stage events as
-   the other steps), "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
+   the other steps; then again for the pages a scanned document has read from their pictures,
+   each counted when its answer is back or it has none (`image_page.run(on_page=...)`: a page is
+   asked as soon as its picture is drawn, so the count moves while the next is drawn)), "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
    and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
    "Building the HTML file", "Running the structure checks", each "(done)" or "(in
    progress)". Without JavaScript the page shows them as they were when it loaded, with
