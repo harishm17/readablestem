@@ -1237,6 +1237,31 @@ def _cmd_outputs(args: argparse.Namespace) -> int:
     return 0
 
 
+def _cmd_pictures(args: argparse.Namespace) -> int:
+    """`eval pictures`: A18's count over a replay of the corpus (the same replay as `eval
+    outputs`): the pictures not converted by reason, the content pictures with empty alt, the
+    regions called handwriting against the truth list (`eval.pictures`). Spends nothing and
+    gates nothing. Exit code 0: measured; 2: nothing could be counted."""
+    from readablestem.eval import measure, pictures
+
+    path = args.truth or pictures.TRUTH
+    try:
+        truth = pictures.read_truth(path) if path.is_file() else []
+    except (ValueError, KeyError, TypeError) as exc:
+        return _error(f"cannot read {path}: {exc}")
+    measured = _measured(args, runs=1, outputs=True)
+    if isinstance(measured, int):
+        return measured
+    (run,), settings = measured[0][:1], measured[1]
+    metrics = pictures.report(run, truth)
+    record = measure.record(run, settings, metrics)
+    _write_record(args.out, record)
+    print(pictures.render(record))
+    if not metrics["uploads"]["counted"]:
+        return _error("no upload could be counted (a record kept before `eval pictures` has none)")
+    return 0
+
+
 def _cmd_say_once(args: argparse.Namespace) -> int:
     """`eval say-once`: the share of each page's words that no element says, and that are
     said twice, over the corpus, read by layout with no model (`eval.say_once_report`).
@@ -2227,6 +2252,21 @@ def register(
     )
     _add_measure_args(outputs, at_once=4)
     outputs.set_defaults(func=_cmd_outputs)
+
+    pictures = group.add_parser(
+        "pictures",
+        help="A18's count over a replay of the corpus: pictures not converted by reason, "
+        "content pictures with empty alt, regions called handwriting against the truth "
+        "list (spends nothing, gates nothing)",
+    )
+    _add_measure_args(pictures, at_once=4)
+    pictures.add_argument(
+        "--truth",
+        type=Path,
+        help="the list of regions a person saw as pen strokes or not "
+        "(default: data/eval/pen-truth.json)",
+    )
+    pictures.set_defaults(func=_cmd_pictures)
 
     say_once = group.add_parser(
         "say-once",
