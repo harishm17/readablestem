@@ -2036,7 +2036,7 @@ math by the document's evidence; the equation step's own tiers then decide it.
   a sentence and a grid joined the grid's figure, whose crop took the label and the
   sentence (O-388, 2026-11-20). Such a drawing was part of a picture, so it is a figure of
   its own: among the page's leftover drawings it is kept though a block holds its middle (a
-  formula drawn as outlines in a line of a paragraph was dropped there as "maths drawn in a
+  formula drawn as outlines in a line of a paragraph was dropped there as "math drawn in a
   line", and was in no element), and it is not grouped with the leftover drawings near it,
   whose group box would take the sentence in again (`apart_out`, `_leftover_drawings`). A
   figure's box grows with each join, so a join stopped also leaves out the small drawings
