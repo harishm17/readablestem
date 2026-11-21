@@ -3375,7 +3375,7 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-19 at pipeline 0.5.14 by
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-20 at pipeline 0.5.15 by
 `eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 57 decisions,
 0.487 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
@@ -3397,7 +3397,9 @@ sentence") is a list item now. The same 30 uploads are left out, and one of them
 the elements that ask for a decision (`asked`) and the ones a reviewer may look at
 (`optional`), and counts the formulas accepted with nothing to hold them against
 (`not_compared`: 2 of the 52 equations, both for want of usable characters; no decision is
-asked for these). **A paid recording of the
+asked for these). Against the 0.5.14 record the same 43 uploads are measured and each asks the
+same decisions (57 on 117 pages), and the same 30 uploads are left out for the same 1,324
+answers missing: the changes of 0.5.15 moved no decision of an upload the record holds. **A paid recording of the
 answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
 the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.

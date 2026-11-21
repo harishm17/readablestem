@@ -7,7 +7,7 @@
  },
  "profile": {
   "name": "production",
-  "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
+  "sha256": "e48df1a1dc7f72e7f0e18ee34c6bf1b7b44f8c22d528df14337492c42e8f11f2",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,13 +15,13 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.14",
- "commit": "02daf91d85cfd1b1c14e76dbf4eb1a18c9160350",
+ "pipeline_version": "0.5.15",
+ "commit": "dd9f3dc88451ce68d5cfc6fc4f6cc149ac89350f",
  "provenance": {
-  "commit": "02daf91d85cfd1b1c14e76dbf4eb1a18c9160350",
+  "commit": "dd9f3dc88451ce68d5cfc6fc4f6cc149ac89350f",
   "clean": true,
-  "pipeline_version": "0.5.14",
-  "render_version": 10,
+  "pipeline_version": "0.5.15",
+  "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
    "latexml": "latexml (LaTeXML version 0.8.8)",
