@@ -918,7 +918,11 @@ def test_a_lone_capital_far_above_an_entry_of_its_letter_is_not_an_index_heading
     def fill(page):
         page.insert_text((72, 80), "Index", fontsize=18, fontname="hebo")
         y = 120.0
-        for letter, words in [("A", ["acceleration, 4"]), ("B", ["body, 12"]), ("C", ["circuit, 20"])]:
+        for letter, words in [
+            ("A", ["acceleration, 4"]),
+            ("B", ["body, 12"]),
+            ("C", ["circuit, 20"]),
+        ]:
             page.insert_text((72, y), letter, fontsize=BODY, fontname="hebo")
             page.insert_text((72, y + 14), words[0], fontsize=BODY, fontname="helv")
             y += 44
@@ -1450,7 +1454,12 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
     def no_leaders(page):  # "Forces on a Sigma", then its page number at the right margin
         page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
         for k, (title, math, number) in enumerate(
-            [("Motion", "", "3"), ("Forces on a", "S", "9"), ("Energy in", "L", "15"), ("Heat", "", "41")]
+            [
+                ("Motion", "", "3"),
+                ("Forces on a", "S", "9"),
+                ("Energy in", "L", "15"),
+                ("Heat", "", "41"),
+            ]
         ):
             y = 120.0 + 18 * k
             page.insert_text((72, y), title, fontsize=BODY, fontname="helv")
@@ -1479,12 +1488,20 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
 
 
 def test_a_contents_title_that_wraps_is_one_entry():
+    long_title = "2 Proof of the long result on the forces of a falling body through air and water"
+
     def fill(page):
         page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
         y = 120.0
         for lines, number in [
             (["1 Motion"], "3"),
-            (["2 Proof of the long result on the forces of a falling body in a medium of two kinds (Theo-", "rem 1)"], "9"),
+            (
+                [
+                    long_title + " (Theo-",
+                    "rem 1)",
+                ],
+                "9",
+            ),
             (["3 Energy"], "15"),
             (["4 Waves"], "21"),
         ]:
@@ -1500,7 +1517,7 @@ def test_a_contents_title_that_wraps_is_one_entry():
     entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
     assert [e.text for e in entries] == [
         "1 Motion",
-        "2 Proof of the long result on the forces of a falling body in a medium of two kinds (Theorem 1)",
+        long_title + " (Theorem 1)",
         "3 Energy",
         "4 Waves",
     ]
@@ -1508,8 +1525,14 @@ def test_a_contents_title_that_wraps_is_one_entry():
 
 def test_two_lines_of_prose_that_end_in_an_ellipsis_are_not_a_contents_page():
     def fill(page):
-        page.insert_text((72, 100), "The first prompt starts with the words of the task. . . . .", fontsize=BODY)
-        page.insert_text((72, 140), "A second line is cut off the same way after the rules. . . . .", fontsize=BODY)
+        page.insert_text(
+            (72, 100), "The first prompt starts with the words of the task. . . . .", fontsize=BODY
+        )
+        page.insert_text(
+            (72, 140),
+            "A second line is cut off the same way after the rules. . . . .",
+            fontsize=BODY,
+        )
 
     assert not [e for e in analyze(page_of(fill)).elements if "contents entry" in e.reasons]
 

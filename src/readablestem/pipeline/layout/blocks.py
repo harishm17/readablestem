@@ -307,8 +307,9 @@ def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
     """Mark the capital letters that head the sections of an index or a glossary (`_Row.letter`).
 
     One capital letter alone on its line, bold or larger than the body text, with the line
-    right under it (`LETTER_UNDER_REACH`) an entry that starts with that letter, and at least `LETTER_SEQUENCE`
-    different letters set that way in one size and typeface through the document. The test
+    right under it (`LETTER_UNDER_REACH`) an entry that starts with that letter, and at least
+    `LETTER_SEQUENCE` different letters set that way in one size and typeface through the
+    document. The test
     reads the line under the letter, not the order of the page's columns, so the letters of
     an index in three columns are found where they stand. A letter on its own line anywhere
     else is the label of a figure's panel or a variable, and is never marked."""
