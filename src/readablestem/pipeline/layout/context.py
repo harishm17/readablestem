@@ -173,6 +173,10 @@ class Layout:
     # read, tables, rows, figures, equations, order, blocks, elements). The steps of the
     # whole document (margins, list markers, the notices) are in no page's time.
     page_steps: list[PageStageFact] = field(default_factory=list)
+    # Page -> its deck's number (`slides.Deck.numbers`), for every page of a file that holds
+    # several decks or a deck with a title, a page kept whole as its image included: the
+    # headings read from such a page later (`pipeline.image_page`) are put in that deck.
+    deck_pages: dict[int, int] = field(default_factory=dict)
 
 
 def _log_page_failure(number: int, exc: Exception) -> None:

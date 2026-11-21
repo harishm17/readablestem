@@ -97,6 +97,38 @@
   a title that wraps in a list with no leaders, a two-column contents page, titles checked
   against later headings. A new `PIPELINE_VERSION` is owed (a stored result's contents entries
   change); no migration.
+## Unreleased: slide titles (O-032, O-130; O-033 not reproduced)
+
+- A slide's title was taken from a large equation in the top third of the page when the equation
+  was larger than the title: on the html-slides deck 17 of 22 pages had the equation, or a lone
+  "1" from a fraction, as their title.
+  A line that is a formula or a bare number and nothing else is no title now, and no title slide
+  (`slides._is_formula`: no word of three letters besides function names, and a math sign, an
+  italic math letter or no letter). The deck's titles are the real ones, and a title that
+  layout read as a paragraph is no longer dropped as a headline above a "title" that was an
+  equation. The written output of that deck is the same (its titles were headings already).
+- A deck with some scanned slides was not a deck: a page kept whole as its image has no text, so
+  it counted as untitled, and 5 titled pages of 12 were not the 70 % a deck needs. Pages
+  kept whole are left out of the share, so the mixed deck is one deck, with its title at level 1;
+  a file whose pages are all kept whole is still not a deck. The headings the page reader makes
+  on its scanned slides get the deck's reason in `run` (`Layout.deck_pages` says which pages are
+  in which deck), and `heading_levels` puts them under the deck's title: the reader numbers a
+  slide's headings from its own title (1), so each scanned slide's title came out one level
+  below the typed slides' titles (F-254). In the mixed deck the 6 scanned titles are now at the level
+  of the 5 typed ones, and the F-254 mark is off its test.
+- Counted on every landscape file I may open (19 files with landscape pages in the development
+  sets, the repository and the corpus; 4 decks among them with a deck title): the only deck with
+  an equation for a title is html-slides. A fourth level-1 heading that is not a deck title
+  (O-033, file f4) is in none of them, and f4 is not among the files I may open: not built.
+- The corpus replay of all 73 uploads: only the mixed deck changed (its elements, heading
+  fixes and page); the equation, figure, paragraph and table fixes and the recorded requests are
+  the same, so no recording is stale. No stored document changes except the mixed deck's, and
+  only by its heading levels. No `PIPELINE_VERSION` raise is owed for documents that are not
+  decks with scanned slides; a document converted before this change keeps its levels.
+- The layout half of the same comparison (996 results): 3 changed, all html-slides in its three
+  variants; there the deck's headings now say which deck they are in (`slide_deck 1`, and the
+  title `slide_deck_title`), and nothing else about them. No other file changed.
+- No migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
