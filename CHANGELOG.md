@@ -58,6 +58,16 @@
   page that could not be drawn is written "No description. This figure has no text description
   yet." and not "Not converted. This page could not be shown." (a finished document with its
   stored page is served as it was); and its record leaves out the split.
+- Records re-made at 0.5.16 from a clean tree (`5298521e`), $0 and no model call:
+  `data/eval/latest-headings.json` and `latest-tables-local.json` (the same scores as at 0.5.15,
+  and `eval gate --require-current` passes for both); `data/eval/burden-corpus.json` (42 of 43
+  uploads ask the same decisions as at 0.5.15; `s02_syllabus_sidebar` asks none where it asked
+  one: the two-text-columns rule, O-150; 56 decisions on 117 pages); `data/eval/parsing-bench-olmocr.json`
+  (multi_column 69.5 to 70.2, 5 more order checks on two pages of one magazine, and
+  headers_footers 38.6 to 38.4, 1 check fewer on one journal page; table_tests, long_tiny_text and
+  baseline are as before; both movers are the columns under the head of a first page, O-024);
+  `data/eval/order-layout-dev-1.json` (141 of 267 pages right, from 140, and 72 faultless; none
+  made wrong; page 8 of `ax_astrophga_240306369` became right, O-024).
   The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
 
 ## Unreleased: a page that cannot be drawn is that page's problem (O-003)
