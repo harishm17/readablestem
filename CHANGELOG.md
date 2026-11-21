@@ -6,8 +6,13 @@
   both columns and the columns under it was read with no gutter: the head crosses the gap more
   often than a column may, so the page was read top down, line by line across both columns. When
   the page as a whole has no gutter, the columns are now looked for under each run of lines
-  across the page (up to eight, the top first), and the first that gives a gutter is used
-  (`order._find_gutter`). On the 267 gold pages of `layout-dev-1` three pages change, two of one
+  across the page (up to eight, the top first), and the first that gives a gutter with about as
+  many lines on its thinner side as on the other (at least 0.4 of them) is used
+  (`order._find_gutter`, `MIN_HEAD_COLUMN_BALANCE`). The balance keeps a page of one column with
+  a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
+  lines in the right ones, a sentence across the page above) read row by row: the thinner side
+  has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie
+  under a head. On the 267 gold pages of `layout-dev-1` three pages change, two of one
   paper that were wrong and one page of another paper that stays as it was in what the gold
   counts: right 140 to 141 of 267, faultless 72 to 72, blocks broken 106 to 99, joins across
   columns 35 to 27; no page that was right is not right. The search is not limited to first
@@ -15,9 +20,7 @@
   files (every PDF of the corpus, three variants) 9 files change. Five pages in 3 papers are the
   columns found (a join across the columns or alternating single lines gone; one page no longer
   read as code), the numbered lines make 3 more pages in 3 papers, and the notice is the only
-  change in 2 files. Two pages of a textbook (one page in two copies of one file) are mixed: a ruled step table whose
-  table detection is skipped for too many drawn items was read row by row by accident, now it is
-  read column by column, and a 688-character paragraph across both columns is cut in two.
+  change in 2 files. No page of a textbook changes.
 - A numbered line that runs to the right edge no longer takes the next number into its block when
   it is the whole run so far: the affiliations of a paper, numbered 1, 2, 3 to the margin, were
   one paragraph (`figures._starts_block`). Inside a run of numbered lines it still reads as the

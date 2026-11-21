@@ -34,6 +34,11 @@ Gutter = tuple[float, float] | _Ordering | None
 MIN_GUTTER = 8.0  # narrowest white gap between two text columns
 MAX_GUTTER_CROSSINGS = 24  # lines that may cross a gutter (centred titles, captions)
 MAX_HEAD_STOPS = 8  # runs of lines across the page that a page's columns are looked for under
+# Under a head the thinner side of a gutter has at least this share of the lines of the thicker
+# side. Measured on the corpus: the five pages whose columns lie under a head have 0.65 or more;
+# a page of one column with a ruled step table (a few lines in the right cell, the steps' text
+# in the left one) has 0.13 and 0.21, and was read column by column.
+MIN_HEAD_COLUMN_BALANCE = 0.4
 
 
 def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, float] | None:
@@ -57,7 +62,9 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
     # A first page: a title, the authors and their affiliations, an abstract across the page,
     # the columns under it. The centred lines of that head cross the gutter more often than a
     # column's own lines may, so the columns are looked for under the head: under each line
-    # run of lines across the page, the top of the page first.
+    # run of lines across the page, the top of the page first. Two columns hold about as many
+    # lines as each other; a gap between a column of steps and a few lines beside it (a ruled
+    # step table on a page of one column) is no gutter.
     stops: list[float] = []
     across: float | None = None
     for b in sorted(boxes, key=lambda b: b[1]):
@@ -67,9 +74,13 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
             stops.append(across)
             across = None
     for top in stops[:MAX_HEAD_STOPS]:
-        gutter = _gutter_of([b for b in narrow if b[1] >= top - 1.0], left, width, slide)
+        under = [b for b in narrow if b[1] >= top - 1.0]
+        gutter = _gutter_of(under, left, width, slide)
         if gutter is not None:
-            return gutter
+            lefts = sum(b[2] <= gutter[0] + 0.5 for b in under)
+            rights = sum(b[0] >= gutter[1] - 0.5 for b in under)
+            if min(lefts, rights) >= MIN_HEAD_COLUMN_BALANCE * max(lefts, rights):
+                return gutter
     return None
 
 

@@ -83,3 +83,30 @@ def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other
             page.insert_text((x, top + 12 * i), line, fontsize=10, fontname="helv")
     text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
     assert text.rindex("left column line") < text.index("right column line")
+
+
+def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column():
+    # A textbook's worked example: a sentence across the page, then a grid of steps whose left
+    # cells hold most of the lines and whose right cells hold a few (answers, pictures). The gap
+    # between the two is a table's, not a gutter: the steps are read row by row.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 50.0
+    head = ("Solution", "Read the problem", "Name what we look for")
+    for text in (*head, "Let x be a rate", "Solve it", "Check the answer"):
+        width = pymupdf.get_text_length(text, "helv", 11)
+        page.insert_text((306 - width / 2, y), text, fontsize=11, fontname="helv")
+        y += 14
+    sentence = "A sentence across the page that leads into the table. " * 2
+    page.insert_text((54, y + 6), sentence, fontsize=10)
+    top = y + 40
+    for i in range(24):
+        page.insert_text((60, top + 12 * i), f"step {i} " + "word " * 7, fontsize=10)
+    for i in range(4):
+        page.insert_text((317, top + 12 * i), f"answer {i} " + "word " * 7, fontsize=10)
+    page.draw_rect(pymupdf.Rect(54, top - 12, 560, top + 24 * 12))
+    page.draw_line((300, top - 12), (300, top + 24 * 12))
+    text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
+    assert text.index("answer 0") < text.index("step 10")

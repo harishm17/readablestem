@@ -241,8 +241,11 @@ reader, neither to find them nor as a second opinion
    with a head of centered lines (title, authors, affiliations) across both columns has more
    lines across the gap than that, so when the page as a whole has no gutter the columns are
    looked for under the head: the narrow lines below each run of lines across the page (up to
-   eight runs, the top of the page first), the first run that gives a gutter. The lines of the
-   head are then read in the segments the lines across the page make (`order._find_gutter`).
+   eight runs, the top of the page first), the first run that gives a gutter whose thinner
+   side holds at least 0.4 of the lines of the other (`MIN_HEAD_COLUMN_BALANCE`: two columns
+   hold about as many lines; a column of steps beside a few lines is a ruled table on a page
+   of one column, and is read row by row). The lines of the head are then read in the
+   segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
    gutter. Small sub/superscript fragments are folded into their line as one block, after
