@@ -23,7 +23,9 @@
   `REGION_TREE`) change nothing in this release.
   `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
   `data/eval/burden-corpus.json`, `data/eval/parsing-bench-olmocr.json` and
-  `data/eval/order-layout-dev-1.json` are re-made at 0.5.15; the golden pages and the stored demo
+  `data/eval/order-layout-dev-1.json` are re-made at 0.5.15 (all 43 uploads of the burden record
+  ask the same as at 0.5.14; the benchmark's tables category 70.6 from 66.6 and multi_column 69.5
+  from 69.2; reading order 140 of 267 pages right and 72 faultless, from 137 and 71); the golden pages and the stored demo
   page are written again at render 11. Roll back: 0.5.14 opens a 0.5.15 result. Run on
   2026-11-20 against 0.5.14 (`f490ac60`), a Word and a LaTeX result stored by 0.5.15, each with
   a link in a table cell and holding all 56 notice codes the table knows: the job page, the

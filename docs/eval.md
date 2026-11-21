@@ -3102,14 +3102,14 @@ being changed. Its record keeps totals and names no page, `--records`, `--from` 
 `--against` are refused for it, and a failing page is not looked at.
 
 `layout-dev-1` (60 documents, 267 pages;
-`data/eval/order-layout-dev-1.json`, made at 0.5.14), the student page:
+`data/eval/order-layout-dev-1.json`, made at 0.5.15), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 62 | 28 | 36 (37) | 44 (57) | 43 (56) | 0 of 0 | 41 | 17 |
+| paper | 119 | 64 | 29 | 36 (37) | 44 (57) | 44 (57) | 0 of 0 | 38 | 16 |
 | selfmade | 40 | 18 | 9 | 4 (8) | 7 (35) | 14 (31) | 0 of 5 | 18 | 12 |
-| textbook | 108 | 57 | 34 | 17 (17) | 40 (201) | 11 (34) | 0 of 0 | 54 | 7 |
-| all | 267 | 137 | 71 | 57 (62) | 91 (293) | 68 (121) | 0 of 5 | 113 | 36 |
+| textbook | 108 | 58 | 34 | 17 (17) | 41 (204) | 10 (33) | 0 of 0 | 50 | 7 |
+| all | 267 | 140 | 72 | 57 (62) | 92 (296) | 68 (121) | 0 of 5 | 106 | 35 |
 
 The element list reads 138 of 267 of these pages right. The record before this one (0.5.10)
 had 149 pages right and 45 faultless: since then running heads, feet and page numbers are
@@ -3117,7 +3117,14 @@ read on 57 pages and not 145, and 17 pages that were right are not (12 of papers
 textbooks; 5 others became right), with more blocks cut (293, from 207; in textbooks 201,
 from 123) and more broken (113, from 98). The 17 pages were lost between 0.5.10 and 0.5.13
 (0.5.13 reads 137 right and 69 faultless; 0.5.14 changes two pages to faultless and loses
-none); which change lost them has not been traced.
+none); which change lost them has not been traced. From 0.5.14 to 0.5.15 three pages became
+right (140 of 267) and one of them faultless (72), and none was made wrong: pages 3 and 18 of
+`ax_hepth_240306652`, where a figure, a note or a footnote stood under the next page's marker
+(the marker of a page a paragraph goes on over is written before the next element on that
+page), and page 2 of `os_introductory_statistics_2e`, where a figure's crop took a tab and the
+sentence under it (a small drawing does not join a figure across a line of prose). Both are the
+CHANGELOG entry "two faults behind the reading-order fall" (O-388). Page 3 of
+`ax_hepth_240306652` is the faultless one.
 `layout-heldout-1` has not been scored.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
