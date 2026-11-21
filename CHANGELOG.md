@@ -68,6 +68,18 @@
   baseline are as before; both movers are the columns under the head of a first page, O-024);
   `data/eval/order-layout-dev-1.json` (141 of 267 pages right, from 140, and 72 faultless; none
   made wrong; page 8 of `ax_astrophga_240306369` became right, O-024).
+- The corpus hash run against 0.5.15 (`07a10cbc`), with the version strings made equal: of the 73
+  uploads, 63 give the same stored result; 10 differ, each by one entry above. The notice
+  `actualtext_ignored` is added on `d3_arabic_doc`, `r09_handout_14451`, `r14_exam_513`,
+  `w_lecture_5111` and `w_slides_60001_lec1` (O-157); `s02_syllabus_sidebar` (O-150) and
+  `r18_arxiv_opt` (table captions and two text columns, O-061, O-150) change in their elements; `r20_newsletter_drp`
+  and `w_notes_6042_ch2` (contents entries, O-051/O-020) and `w_mixed_slides+image_pages` (slide
+  levels, O-032/O-130) change in their elements or headings. The layout of the other PDFs
+  (996 file and variant runs): 23 files differ, each at one or two entries: columns under a head (O-024)
+  5, the ActualText notice (O-157) 3 (`ax_cscv_240306361` is also in O-024), contents and letters (O-051,
+  O-020) 6, addresses (O-046, O-156, O-021) 3, table captions and two text columns (O-061, O-150) 7,
+  slide titles (O-032, O-130) 1 (`qbionc` is in two of these). No difference is without an entry.
+  The 1,324 answers a recorded replay lacks are the same, upload by upload.
   The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
 
 ## Unreleased: a page that cannot be drawn is that page's problem (O-003)
