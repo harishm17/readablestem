@@ -904,7 +904,11 @@ is still read as an item. The type alone does not make a heading of a lettered o
 that stands in a run of its series either (`_mark_series_items`, `_Row.in_series`): the next
 marker of its column, past its own lines, is the next value ("A.", "B.", "C."; "I." between "H."
 and "J."), or the marker nearest above is the value before with nothing but its own lines
-between. A heading of the same shape has text, or a figure, under it. A bold line that starts
+between. A heading of the same shape has text, or a figure, under it: text of another face is
+no line of the item, and a figure or a table, which is no row of text, shows as the white it
+leaves, where a run ends (more than `SERIES_GAP`, two line heights, between two rows of the
+column: "1. Setup" over a picture and "2. Procedure" under it are two titles). Two titles in
+a row, the first with no text of its own, are read as a list of two. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
 changes nothing).
 
@@ -924,8 +928,12 @@ numbered parent, the x does not tell which level "2)" goes back to, so it goes b
 level of its own series at that x. A numbered series that
 starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
 above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
-goes back to the letters. The same holds right after a cut: "(a)" after "1." and a figure is
-the list of that item, one level down, and not the first level again (`_list_levels`). A marker with two readings ("(i)": the letter after "(h)", or roman
+goes back to the letters. The same holds after a cut: "(a)" after "1." and a figure is
+the list of that item, one level down, and not the first level again (`_list_levels`), on the
+page of that item and with no heading between; lettered items pages after a numbered list, or
+in the next section, are a list of their own. The level is what the result stores and the page
+audit shows: on the student page a list that a figure or a paragraph cut starts a new list
+(`assemble._list_levels` counts from the first item of each run). A marker with two readings ("(i)": the letter after "(h)", or roman
 one) is read against the open level the item stands on, then the innermost one, after the
 levels right of it are closed: the bullets under "(h)" say nothing of the "(i)" that follows
 them (`_numbered`). A list that a paragraph, a figure or a table cut ("(i)", the words of
@@ -2024,7 +2032,14 @@ math by the document's evidence; the equation step's own tiers then decide it.
   overlaps both sideways (`_sentence_between`; a glyph drawn as an outline in a line of
   text has no such line between it and the figure): a dark tab with its label inside ("EXAMPLE 5.2") a few points over
   a sentence and a grid joined the grid's figure, whose crop took the label and the
-  sentence (O-388, 2026-11-20); such a drawing goes to the page's leftover drawings. A
+  sentence (O-388, 2026-11-20). Such a drawing was part of a picture, so it is a figure of
+  its own: among the page's leftover drawings it is kept though a block holds its middle (a
+  formula drawn as outlines in a line of a paragraph was dropped there as "maths drawn in a
+  line", and was in no element), and it is not grouped with the leftover drawings near it,
+  whose group box would take the sentence in again (`apart_out`, `_leftover_drawings`). A
+  figure's box grows with each join, so a join stopped also leaves out the small drawings
+  further on that were in reach only through it: they are read as any small drawing of the
+  page (in a line of a paragraph: held by the paragraph and lost, as the list of what is not read says further down). A
   circuit's parts were not found as labels, see the label rule above.
 - **A drawing made of text fragments** (`_fragment_figures`, WS2.9a): the labels of a drawn
   structure, circuit or diagram whose strokes are too short and plain for a drawing cluster
@@ -2146,7 +2161,12 @@ Wave 2b, from a count of the public papers (131 destinations, 155 notes found, 1
 count is the footnote destinations, the `footnote` notices and the internal links to them).
 In a file that names none, a block is a note only when it opens with a mark printed raised in
 the text above it that is the whole mark ("12" is not the "1" raised above it) and goes on in
-words: a row of axis labels in small type low on a figure (11 "notes" on one page), a lone page
+words. The mark is read from the note's first line as printed (`_lead_token`): raised glyphs
+at its start end the mark where they end ("1" before "2019 was the first year"; at the start
+of a line a glyph a little smaller than the line and lifted off its baseline counts as
+raised, `NOTE_MARK_LIFT`), and a start on the line ends at the first blank ("1 10 mL of
+water"). A raised run in the text holds each of its marks (`_mark_groups`: "1,2" is two
+marks, "1)" is the mark "1"). So: a row of axis labels in small type low on a figure (11 "notes" on one page), a lone page
 number, an integral's lower limit and a running footer ("12 Authors") were notes when one raised
 digit of the same kind stood anywhere above (`_footnote`, `_lead_token`; 14 false notes on 4
 papers, none now; one note of that shape is lost with them, the "Mathematics Subject

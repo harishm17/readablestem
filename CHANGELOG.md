@@ -127,14 +127,21 @@ change. Stored results load unchanged and their pages are made again.
   marker, past its own lines, is the next value of the series, or (set in bold or italics) whose
   nearest marker above is the value before with nothing between but its own lines. Such a row
   is not a heading by "bold body-size line" or "standalone numbered line". A section title with
-  text under it is not touched: "III. Gripper design" in a paper stays a heading.
+  text over it and under it is not touched: "III. Gripper design" in a paper stays a heading.
+  A run ends at the white a picture or a table leaves (more than two line heights,
+  `SERIES_GAP`), so "1. Setup" over a picture and "2. Procedure" under it are two titles
+  (review 12: they were two one-item lists). Two titles in a row, the first with no text of
+  its own, are still read as a list of two.
 - **A lettered title that wraps onto a second row of its face is one heading** ("A. Nonlinear
   System Representation of Boltzmann Soft Q-learning"): the title and its second row are one
   block, at most 12 words, the second row not ending like a sentence.
-- **A series that starts again right after a cut is a level down.** "(a)" after "1." and a
+- **A series that starts again after a cut is a level down.** "(a)" after "1." and a
   figure, "(i)" after "(a)" and a paragraph, "A." after "1." was the first level again; it is
   the list of the item above, as it already was when nothing cut it. A decimal "1." starts a
-  list of its own.
+  list of its own. Only on the page of the item above, and with no heading between (review
+  12: lettered items pages after a numbered list, or in the next section, were level 2).
+  This is the level the result stores and the page audit shows. On the student page a list
+  that a figure or a paragraph cut starts a list of its own, as it did.
 - **A reference list's initials are not a lettered list.** An alphabetical list ("R. Arai, ...",
   "S. Fujiwara, ...") has the next initial in the next entry; a neighbor that opens like an
   author line (an initial, a surname and a comma, "et al", "and" before an initial) no longer
@@ -194,8 +201,8 @@ differs. No migration.
 ## Unreleased: two faults behind the reading-order fall (O-388)
 
 17 pages of `layout-dev-1` were right at 0.5.10 and wrong at 0.5.13 (docs/eval.md). Traced
-page by page, three of them are faults in code, fixed here, each with a case in an existing
-test:
+page by page, three of them come from two faults in code, fixed here, each with a case in an
+existing test:
 
 - A paragraph that goes on over a page break had the markers of the pages it runs into
   written right after it, so a figure, a note or a footnote that follows it on its first page
@@ -204,10 +211,21 @@ test:
 - A small drawing does not join a figure within reach when a line of prose of six words or
   more lies between them (`layout/figures.py`, `_sentence_between`): the figure's crop took a
   tab ("EXAMPLE 5.2") and the sentence under it (`os_introductory_statistics_2e` page 2).
+  A drawing kept out this way is a figure of its own, and is not grouped with the drawings
+  near it. The first form of the rule let it fall where the drawings no figure holds fall:
+  a formula drawn as outlines in a line of a paragraph was then in no element, where before
+  it was at least in the crop (review 12). Counted over the ten OpenStax files of
+  `layout-dev-1`, the drawn paths inside no figure, equation or table: 6,953 on 0.5.14, 7,115
+  with the first form, 7,073 now. Of the 120 more than 0.5.14, 114 are on four pages where
+  the figure had grown with each such join, down over the paragraphs under it, and so held
+  the formulas drawn in their lines; with the first join stopped the others are out of reach,
+  and those formulas are where every formula drawn in a line of text is (held by its
+  paragraph and lost, O-235). 3 are the tab the rule is for, 3 are single dots.
 
 The student page changes for a document with such a paragraph or tab; stored results load
 unchanged and their pages are made again. `PIPELINE_VERSION` and `RENDER_VERSION` are not
 raised here; a raise is owed at the next release.
+
 ## Unreleased: footnotes still missed and algorithm blocks still lost (branch fix/footnotes-algorithms, O-034, O-054, O-394)
 
 A count on the public papers (131 footnote destinations, 155 notes found, 124 linked to their
@@ -220,8 +238,14 @@ mark; 139 found and 135 linked now) and a count of the algorithm shapes on the 2
   smaller type low on the page was a note when it began with a digit that was raised anywhere
   above. A row of axis labels (11 "notes" on one page), a lone page number, an integral's lower
   limit and a running footer ("12 Authors") were notes. A note now opens with the whole mark
-  that is printed raised above, and goes on in words: 14 false notes on 4 papers, 0 now. One
-  note of that shape is lost: the "Mathematics Subject Classification" line of one paper,
+  that is printed raised above, and goes on in words: 14 false notes on 4 papers, 0 now. The
+  mark is read from the note's first line as it is printed: a raised start ends where the
+  raised glyphs end ("1" before "2019 was the first year"), a start on the line ends at the
+  first blank ("1 10 mL of water"), and a raised run in the text holds each of its marks
+  ("1,2" is two marks, "1)" is the mark "1"). The first form of the rule read the mark from
+  the note's glyphs without their blanks and a raised run as one mark, and lost real notes
+  of these four shapes (review 12). One note is lost on the public papers: the "Mathematics
+  Subject Classification" line of one paper,
   which was a note only because a "2" stood raised somewhere above. The corpus hash also
   showed one false note gone on a page of an algebra textbook, and the signs of an author-note
   line (a dagger and a double dagger after an e-mail address, still inside the paragraph
@@ -253,27 +277,6 @@ mark; 139 found and 135 linked now) and a count of the algorithm shapes on the 2
   page each); the 17 notes the earlier count could not find and the false note named for
   2407.04005 are not on the public papers.
 
-## Pipeline 0.5.14, render 10 (2026-11-19)
-
-- `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"
-  entry below down to the 0.5.13 entry. What a PDF's result holds changed (a one-page file's
-  page number, equation numbers, footnotes, lists and lettered titles, a table that goes on
-  from the page before, algorithms, text painted where nobody can see it, the table search's
-  time limit). A Word or LaTeX file's result changed too: bold, italic and code in table cells,
-  struck code, a table with no header marking is a required choice, and color is counted (the
-  LaTeX reader keeps it only with the setting on). The student page changed (a continued table's carried header rows, the year in
-  the finish sentence's date, a sidebar's name, tab stops, nested scripts, very wide equations
-  on paper, the words for a Word file's equations, speech for bars and for raised and lowered
-  text). Six notice codes are new: `table_header_missing`, `table_header_carried`,
-  `struck_not_kept`, `hidden_text_check`, `tables_not_searched`, `word_table_flattened`.
-  Stored results load unchanged and their pages are made again. No migration.
-  `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
-  `data/eval/burden-corpus.json` and `data/eval/parsing-bench-olmocr.json` are re-made at
-  0.5.14, and so is `data/eval/order-layout-dev-1.json` (137 of 267 pages right and 71
-  faultless; the 0.5.10 record had 149 and 45, and docs/eval.md says what moved and that 17
-  pages were lost by 0.5.13); the golden pages and the stored demo page are written again at render 10. Roll back:
-  0.5.13 opens a 0.5.14 result (docs/deploy.md).
-
 ## Unreleased: what the Word and LaTeX readers left out (O-073, O-395)
 
 Six shapes in a Word or LaTeX source lost something or ran two words together; each was
@@ -301,6 +304,27 @@ a paragraph-style strike or a picture in a sentence; the student page of a table
 changes. A `PIPELINE_VERSION` and a `RENDER_VERSION` raise are owed (not made here). No
 migration. Roll back: the models take no extra fields to be an error, so an earlier version opens a
 result with `links` on a cell and ignores them (the cell shows its words, no links).
+
+## Pipeline 0.5.14, render 10 (2026-11-19)
+
+- `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"
+  entry below down to the 0.5.13 entry. What a PDF's result holds changed (a one-page file's
+  page number, equation numbers, footnotes, lists and lettered titles, a table that goes on
+  from the page before, algorithms, text painted where nobody can see it, the table search's
+  time limit). A Word or LaTeX file's result changed too: bold, italic and code in table cells,
+  struck code, a table with no header marking is a required choice, and color is counted (the
+  LaTeX reader keeps it only with the setting on). The student page changed (a continued table's carried header rows, the year in
+  the finish sentence's date, a sidebar's name, tab stops, nested scripts, very wide equations
+  on paper, the words for a Word file's equations, speech for bars and for raised and lowered
+  text). Six notice codes are new: `table_header_missing`, `table_header_carried`,
+  `struck_not_kept`, `hidden_text_check`, `tables_not_searched`, `word_table_flattened`.
+  Stored results load unchanged and their pages are made again. No migration.
+  `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
+  `data/eval/burden-corpus.json` and `data/eval/parsing-bench-olmocr.json` are re-made at
+  0.5.14, and so is `data/eval/order-layout-dev-1.json` (137 of 267 pages right and 71
+  faultless; the 0.5.10 record had 149 and 45, and docs/eval.md says what moved and that 17
+  pages were lost by 0.5.13); the golden pages and the stored demo page are written again at render 10. Roll back:
+  0.5.13 opens a 0.5.14 result (docs/deploy.md).
 
 ## Unreleased: fixes after the fourth and fifth reviews of the algorithm blocks (reviews 10 and 11)
 

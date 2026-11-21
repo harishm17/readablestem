@@ -814,8 +814,8 @@ source origin. The older release then does one of two things with it. It ignores
 has no word for loads as a plain paragraph), or it refuses to load the result, and the job page
 and the review screens of that document answer 500 until traffic goes forward again (the download
 still works). Which of the two a release does is written beside the value where it is
-introduced, in the comments of `pipeline/run.py` that go with `PIPELINE_VERSION`, and under
-the version's heading in `CHANGELOG.md`.
+introduced, in the comments of `pipeline/run.py` that go with `PIPELINE_VERSION`. The
+changelog has each release's changes, not this limit.
 
 So the rule for a rollback is: roll back across a release that adds such a value only before the
 first document has been converted, or converted again, by the newer release. After that, fix
