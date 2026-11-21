@@ -33,6 +33,7 @@ Gutter = tuple[float, float] | _Ordering | None
 
 MIN_GUTTER = 8.0  # narrowest white gap between two text columns
 MAX_GUTTER_CROSSINGS = 24  # lines that may cross a gutter (centred titles, captions)
+MAX_HEAD_STOPS = 8  # runs of lines across the page that a page's columns are looked for under
 
 
 def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, float] | None:
@@ -50,6 +51,33 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
     if width < 150:
         return None
     narrow = [b for b in boxes if b[2] - b[0] <= 0.55 * width]
+    gutter = _gutter_of(narrow, left, width, slide)
+    if gutter is not None or slide:
+        return gutter
+    # A first page: a title, the authors and their affiliations, an abstract across the page,
+    # the columns under it. The centred lines of that head cross the gutter more often than a
+    # column's own lines may, so the columns are looked for under the head: under each line
+    # run of lines across the page, the top of the page first.
+    stops: list[float] = []
+    across: float | None = None
+    for b in sorted(boxes, key=lambda b: b[1]):
+        if b[2] - b[0] > 0.55 * width:
+            across = b[3] if across is None else max(across, b[3])
+        elif across is not None and b[1] >= across - 1.0:
+            stops.append(across)
+            across = None
+    for top in stops[:MAX_HEAD_STOPS]:
+        gutter = _gutter_of([b for b in narrow if b[1] >= top - 1.0], left, width, slide)
+        if gutter is not None:
+            return gutter
+    return None
+
+
+def _gutter_of(
+    narrow: list[BBox], left: float, width: float, slide: bool
+) -> tuple[float, float] | None:
+    """The gutter of these narrow lines: the gap that fewest of them cross, with the columns'
+    lines on both sides (`_gutter_with`)."""
     events = sorted([(b[0], 1) for b in narrow] + [(b[2], -1) for b in narrow])
     # Strictest first: with crossings allowed, the gap would also take in the ragged ends
     # of the longest left-column lines. A gutter crossed by more than MAX_GUTTER_CROSSINGS

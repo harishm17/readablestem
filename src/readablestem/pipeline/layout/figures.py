@@ -1876,7 +1876,9 @@ def _starts_block(
         number is not None
         and before is not None
         and int(number.group(1)) == int(before.group(1)) + 1
-        and prev.x1 < edges.of(prev) - 3 * prev.size
+        # A numbered line that runs to the right edge is still a step or a note when it is the
+        # whole run so far; inside a run of numbered lines it is a margin number's line.
+        and (prev.x1 < edges.of(prev) - 3 * prev.size or len(run.rows) == 1)
         and not _margin_number(prev, row, number)
     )
 
