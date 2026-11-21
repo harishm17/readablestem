@@ -1357,20 +1357,47 @@ def _mark_chars(row: _Row, box: BBox) -> list[int]:
     return [i for i in hits if row.is_script(row.chars[i])] or hits
 
 
+NOTE_MARK_LIFT = 0.2  # a note's own mark stands this share of the line's size above its baseline
+
+
 def _lead_mark(row: _Row, named: bool) -> int:
     """Where the raised mark that starts `row` ends (a char index), or 0 without one. A
     mark is digits and footnote signs (`_FOOTNOTE_MARKS`), any raised glyph in a footnote
-    the file names."""
+    the file names. At the start of a line a glyph a little smaller than the line and lifted
+    off its baseline is raised too (a mark at 7 points in a note at 8: no script by size)."""
     end = 0
     for i, c in enumerate(row.chars):
         if c.blank:
             if end:
                 break
             continue
-        if not row.is_script(c) or not (named or c.c.isdigit() or c.c in _FOOTNOTE_MARKS):
+        raised = row.is_script(c) or (
+            not c.small_cap
+            and c.size < row.size
+            and c.baseline < row.baseline - NOTE_MARK_LIFT * row.size
+        )
+        if not raised or not (named or c.c.isdigit() or c.c in _FOOTNOTE_MARKS):
             break
         end = i + 1
     return end
+
+
+def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
+    """The marks in the run of raised glyphs `row.chars[start:end]`, as char ranges: two marks
+    printed with a comma between them ("1,2") are two, and a closing bracket or a full stop
+    after a mark ("1)") is not part of it."""
+    groups: list[tuple[int, int]] = []
+    at = start
+    for i in range(start, end + 1):
+        if i < end and row.chars[i].c != ",":
+            continue
+        stop = i
+        while stop > at and row.chars[stop - 1].c in ").":
+            stop -= 1
+        if stop > at:
+            groups.append((at, stop))
+        at = i + 1
+    return groups
 
 
 def _place_by_mark(
@@ -1443,12 +1470,12 @@ def _flag_text_marks(row: _Row, marks: set[str]) -> None:
         while j < len(chars) and row.is_script(chars[j]) and chars[j].c.strip():
             j += 1
         before = chars[i - 1] if i else None
-        if (
-            before is not None
-            and "".join(c.c for c in chars[i:j]) in marks
-            and (before.c in ".,;:?!" or (before.c.isalpha() and not before.math))
+        if before is not None and (
+            before.c in ".,;:?!" or (before.c.isalpha() and not before.math)
         ):
-            _flag_marks(row, range(i, j))
+            for a, b in _mark_groups(row, i, j):
+                if "".join(c.c for c in chars[a:b]) in marks:
+                    _flag_marks(row, range(a, b))
         i = j
 
 

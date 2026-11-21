@@ -1053,6 +1053,35 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
     body = layout.elements[0]
     assert body.text.startswith("The boiling point") and body.links[0].kind == "internal"
 
+    # Row 4: the mark is read as it is printed. A note may go on in a number, touching its
+    # raised mark or after a blank; two marks may share a comma in the text; a mark may have
+    # a bracket after it. Each note is a note, with a link from its mark.
+    touching = pymupdf.get_text_length("1", fontname="helv", fontsize=5.5)
+    shapes = [
+        ("1", [("1", 5.5, 0), ("2019 was the first year.", 8, touching)]),
+        ("1", [("1 10 mL of water was used.", 8, 0)]),
+        (
+            "1,2",
+            [("1", 5.5, 0), ("Pressure matters.", 8, 5)],
+            [("2", 5.5, 0), ("Height matters too.", 8, 5)],
+        ),
+        ("1)", [("1 Pressure matters.", 8, 0)]),
+    ]
+    for mark, *lines in shapes:
+
+        def shape(page, mark=mark, lines=lines):
+            body_with_marks(page, mark=mark, after="  at sea level.")
+            for n, parts in enumerate(lines):
+                for text, size, x in parts:
+                    y = 712 + 12 * n - (3 if size < 8 else 0)
+                    page.insert_text((72 + x, y), text, fontsize=size, fontname="helv")
+
+        layout = analyze(page_of(shape))
+        notes = {n.element_id for n in layout.notices if n.code == "footnote"}
+        assert len(notes) == len(lines), mark
+        linked = {link.target_id for e in layout.elements for link in e.links}
+        assert linked == notes, mark
+
     # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
     # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.
     def nearest(page):
