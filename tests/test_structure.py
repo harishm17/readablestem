@@ -1475,16 +1475,23 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
 
     def with_leaders(page):  # "6.1 Gamma = D", leaders, a page number
         page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
-        for k, (label, math, number) in enumerate([("6.1", "G = D", "18"), ("6.2", "G = E", "19")]):
+        rows = [
+            ("6.1 ", "G = D", "", "18"),
+            ("6.2 ", "G = E", "", "19"),
+            ("6.3 Index of ", "W", "", "21"),
+        ]
+        for k, (label, math, _, number) in enumerate(rows):
             y = 120.0 + 18 * k
-            page.insert_text((72, y), label + " ", fontsize=BODY, fontname="helv")
-            page.insert_text((72 + 20, y), math, fontsize=BODY, fontname="symb")
-            page.insert_text((150, y), " ." * 40, fontsize=BODY, fontname="helv")
+            page.insert_text((72, y), label, fontsize=BODY, fontname="helv")
+            x = 72 + pymupdf.get_text_length(label, fontname="helv", fontsize=BODY)
+            page.insert_text((x, y), math, fontsize=BODY, fontname="symb")
+            x += pymupdf.get_text_length(math, fontname="symb", fontsize=BODY)
+            page.insert_text((x + 2, y), " ." * 40, fontsize=BODY, fontname="helv")
             page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
 
     items, equations = entries(with_leaders)
-    assert [e.text.split()[0] for e in items] == ["6.1", "6.2"]  # the section number is text
-    assert all(not e.text.startswith("6.") for e in equations)
+    assert [e.text.split()[0] for e in items] == ["6.1", "6.2", "6.3"]  # the section number is text
+    assert [e.text[0] for e in equations] == ["\u0393", "\u0393", "\u03a9"]  # all still maths
 
 
 def test_a_contents_title_that_wraps_is_one_entry():

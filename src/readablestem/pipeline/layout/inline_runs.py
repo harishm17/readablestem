@@ -569,7 +569,10 @@ def _clear_of_entry_numbers(
             end = tail
             while end > start and chars[end - 1].blank:
                 end -= 1
-        if end > start and (start, end) != (first, head) and (start, end) != (tail, last + 1):
+        number = (label and (start, end) == (first, head)) or (
+            page and (start, end) == (tail, last + 1)
+        )
+        if end > start and not number:
             out.append((start, end, reasons))
     return out
 
