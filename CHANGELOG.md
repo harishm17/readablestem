@@ -191,6 +191,23 @@ channel rule for `e1_mc_columns` page 1 (it fixed that page and made four develo
 wrong). No
 `PIPELINE_VERSION` or `RENDER_VERSION` change is owed: the switch is off, so no stored result
 differs. No migration.
+## Unreleased: two faults behind the reading-order fall (O-388)
+
+17 pages of `layout-dev-1` were right at 0.5.10 and wrong at 0.5.13 (docs/eval.md). Traced
+page by page, three of them are faults in code, fixed here, each with a case in an existing
+test:
+
+- A paragraph that goes on over a page break had the markers of the pages it runs into
+  written right after it, so a figure, a note or a footnote that follows it on its first page
+  stood under the next page's marker (`pipeline/assemble.py`, `owed_marks`; two pages of
+  `ax_hepth_240306652`). They are written before the next element on one of those pages.
+- A small drawing does not join a figure within reach when a line of prose of six words or
+  more lies between them (`layout/figures.py`, `_sentence_between`): the figure's crop took a
+  tab ("EXAMPLE 5.2") and the sentence under it (`os_introductory_statistics_2e` page 2).
+
+The student page changes for a document with such a paragraph or tab; stored results load
+unchanged and their pages are made again. `PIPELINE_VERSION` and `RENDER_VERSION` are not
+raised here; a raise is owed at the next release.
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

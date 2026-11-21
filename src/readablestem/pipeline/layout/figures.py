@@ -60,6 +60,8 @@ FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a fra
 # Leftover drawings this close to each other are one (the marks of a scatter of shapes,
 # the glyphs of one formula drawn as outlines): MIN_DRAWING_PT.
 LEFTOVER_REACH = 24.0
+# A line of prose of this many words between a small drawing and a figure keeps them apart.
+SENTENCE_WORDS = 6
 HAND_MEET = 0.75  # pt
 
 # A row is a label of a figure (`_label_owners`) when it is at most LABEL_SHORT characters
@@ -591,10 +593,14 @@ def _vector_figures(
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
     # a legend's markers a little apart, the force arrows round a free-body diagram's box)
     # are part of it, within LEFTOVER_REACH as `_leftover_drawings` groups them: left out,
-    # its crop missed them.
+    # its crop missed them. Not when a sentence of the page's text lies between the two (a
+    # labelled tab over its sentence, a few points from the grid under it): the union's crop
+    # would take the sentence into the picture.
     for box, members in small:
         for figure in figures:
-            if _within(box, figure.bbox, LEFTOVER_REACH):
+            if _within(box, figure.bbox, LEFTOVER_REACH) and not _sentence_between(
+                rows, box, figure.bbox, document=document
+            ):
                 figure.bbox = figure.drawing = _union([figure.drawing, box])
                 figure.paths += len(members)
                 figure.members += members
@@ -603,6 +609,27 @@ def _vector_figures(
             if small_out is not None:
                 small_out.append((box, members))
     return figures
+
+
+def _sentence_between(
+    rows: Sequence[_Row], box: BBox, figure: BBox, *, document: _Document
+) -> bool:
+    """Is there a line of prose (at least SENTENCE_WORDS words) in the gap between `box` and
+    `figure`, one above the other with the line wholly between them? A label or a tick label
+    is never that long, and a glyph drawn as an outline in a line of text is level with the
+    line's other words, not apart from them."""
+    return any(
+        r.kind == "text"
+        and not r.vertical
+        and (
+            (box[3] <= r.bbox[1] and r.bbox[3] <= figure[1])
+            or (figure[3] <= r.bbox[1] and r.bbox[3] <= box[1])
+        )
+        and max(box[0], figure[0]) < r.bbox[2]
+        and r.bbox[0] < min(box[2], figure[2])
+        and _prose_words(r, _CharInfo.of(r, document=document)) >= SENTENCE_WORDS
+        for r in rows
+    )
 
 
 def _take_border_marks(figures: Sequence[_Figure], border: Sequence[_Path]) -> None:

@@ -378,6 +378,26 @@ def test_a_diagram_of_lines_and_boxes_with_labels_inside_is_a_figure(case):
     assert "It has a direction" in _text_of(out) and "Acceleration is" in _text_of(out)
 
 
+def test_a_labelled_tab_over_a_sentence_is_not_swallowed_by_the_figure_below_it():
+    # A dark tab with its label inside ("EXAMPLE 5.2") is a small drawing a few points from
+    # the grid under the sentence it heads: grouped with the grid (the leftover reach), the
+    # figure's crop took the label and the sentence into the picture.
+    dark, grey = (0.04, 0.24, 0.3), (0.46, 0.45, 0.45)
+    doc = pymupdf.open()
+    page = _page(doc)
+    _rect(page, (72, 373.1, 540, 373.8), colour=None, width=0, fill=dark)
+    _rect(page, (72, 373.8, 137.7, 393.6), colour=None, width=0, fill=dark)
+    page.insert_text((78, 387), "EXAMPLE 5.2", fontsize=8.25, color=(1, 1, 1))
+    _label(page, (72, 409), "The data in Table 5.1 are 55 smiling times, in seconds.", 8.25)
+    for row, col in itertools.product(range(4), range(11)):
+        x, y = 144.3 + 29.4 * col, 416.7 + 24.6 * row
+        _rect(page, (x, y, x + 29.4, y + 24.6), colour=None, width=0, fill=grey)
+        _label(page, (x + 8, y + 16), "10.4", 8.25)
+    out = layout.analyze(doc.tobytes())
+    assert [e.bbox[1] > 410 for e in out.elements if e.kind is Kind.FIGURE] == [True]
+    assert "55 smiling times" in _text_of(out) and "EXAMPLE 5.2" in _text_of(out)
+
+
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():
     # A numbered title a few points over a drawing stays text, a heading of the page, not a
     # label that the figure's picture takes in (a blind student loses the heading). A slide
