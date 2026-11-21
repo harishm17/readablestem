@@ -610,6 +610,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "source_not_compared": "This file was converted from the source itself and was not compared "
     "with its printed pages: read the converted file against your own copy before you post it.",
     "page_turned": "This page was saved sideways in the PDF, so it was turned upright to be read.",
+    "actualtext_ignored": "The PDF holds other words for some of this page than the ones "
+    "printed on it. The printed words were used. Compare the page with the original.",
     # Word and PowerPoint uploads (`web.office_census`); "{count}" is the number counted.
     "office_tracked_changes": "Tracked changes (insertions and deletions) that nobody "
     "accepted or rejected in this Word file: {count}. The PDF this was read from may show "

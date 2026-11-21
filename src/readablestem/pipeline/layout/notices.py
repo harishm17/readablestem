@@ -7,6 +7,8 @@ from __future__ import annotations
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
+import pymupdf
+
 from readablestem.core.page_checks import make
 from readablestem.core.types import Notice
 from readablestem.pipeline import page_type
@@ -78,6 +80,20 @@ def _turned_notices(types: dict[int, page_type.PageTypeResult]) -> list[Notice]:
     """A page saved sideways with no /Rotate was turned to be read (`page_type.turn_page`): what
     the pictures of the page show is the turned page. Information, counted per page."""
     return [make("page_turned", page=number) for number, kind in sorted(types.items()) if kind.turn]
+
+
+def _actualtext_notices(
+    doc: pymupdf.Document, types: dict[int, page_type.PageTypeResult], kept: dict[int, str]
+) -> list[Notice]:
+    """A typed page that carries ActualText and was read without it, because the two readings
+    differ in more than spaces and hyphens and the plain one is not the worse
+    (`page_type.actualtext_flag`): "Worth a look", per page. The words the file says it means
+    are not in the text, and the printed ones are."""
+    return [
+        make("actualtext_ignored", page=number)
+        for number in sorted(types)
+        if number not in kept and page_type.actualtext_flag(doc[number])
+    ]
 
 
 FOOTNOTE_CONTEXT = 10  # characters printed before a footnote's mark that find it again

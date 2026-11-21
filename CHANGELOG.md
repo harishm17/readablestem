@@ -297,6 +297,43 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   from the result with its own rules and drops the cell's link (the cell shows its words); after
   a review change it writes the result back without the links, so going forward again does not
   bring them back. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+## Unreleased: columns under the head of a first page, a numbered line that runs full, a page read without its ActualText (O-024, O-018, O-157)
+
+- A first page with a head of centered lines (a title, the authors, their affiliations) across
+  both columns and the columns under it was read with no gutter: the head crosses the gap more
+  often than a column may, so the page was read top down, line by line across both columns. When
+  the page as a whole has no gutter, the columns are now looked for under each run of lines
+  across the page (up to eight, the top first), and the first that gives a gutter with about as
+  many lines on its thinner side as on the other (at least 0.4 of them) is used
+  (`order._find_gutter`, `MIN_HEAD_COLUMN_BALANCE`). The balance keeps a page of one column with
+  a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
+  lines in the right ones, a sentence across the page above) read row by row: the thinner side
+  has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie
+  under a head. On the 267 gold pages of `layout-dev-1` three pages change, two of one
+  paper that were wrong and one page of another paper that stays as it was in what the gold
+  counts: right 140 to 141 of 267, faultless 72 to 72, blocks broken 106 to 99, joins across
+  columns 35 to 27; no page that was right is not right. The search is not limited to first
+  pages: a page whose columns lie under a row of figures reads the same way. On the 996 analyzed
+  files (every PDF of the corpus, three variants) 7 files change. Five pages in 3 papers are the
+  columns found (a join across the columns or alternating single lines gone; one page no longer
+  read as code), 3 other papers change by the numbered lines below (two of them also by the
+  notice), and the notice is the only change in 1 file. Of the 73 converted uploads 5 change, by
+  the notice alone. No page of a textbook changes: its four copies of a file, which this rule
+  once changed, are as they were.
+- A numbered line that runs to the right edge no longer takes the next number into its block when
+  it is the whole run so far: the affiliations of a paper, numbered 1, 2, 3 to the margin, were
+  one paragraph (`figures._starts_block`). Inside a run of numbered lines it still reads as the
+  line numbers of a passage. Of the 28 arXiv papers of `layout-dev-1`, two first pages had it (3
+  joins); the margin-numbered passages of the generated files are as they were.
+- A page that carries ActualText and is read without it (the two readings differ in more than
+  spaces and hyphens, and the plain reading has no more undecoded characters) has the optional
+  notice `actualtext_ignored`, "Worth a look", one per page. Counted on the corpus (counts only):
+  18 pages in 4 of 28 files are read plain with the readings differing; on the 60 public files of
+  `layout-dev-1` one page of one file keeps ActualText and says so by no notice.
+- No recording or request changes. A stored document is read as before until it is converted
+  again. `PIPELINE_VERSION` is owed (the first page reads, the blocks of numbered lines and the
+  notice change). No `RENDER_VERSION` raise, no migration.
+
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
 - Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The

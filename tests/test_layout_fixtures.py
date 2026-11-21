@@ -323,10 +323,13 @@ def test_labels_a_file_replaces_with_actualtext_are_read_as_printed():
         b"1 0 0 1 72 676 Tm (fitting on the smaller of the two sets.) Tj ET\n"
     )
     doc.update_stream(xref, doc.xref_stream(xref) + soft)
-    text = " ".join(e.text or "" for e in analyze(doc.tobytes()).elements)
+    layout = analyze(doc.tobytes())
+    text = " ".join(e.text or "" for e in layout.elements)
     assert "Switzerland" in text and "Nigeria" in text
     assert "Figure 1" not in text
     assert "overfitting" in text
+    # The page read without its ActualText says so, and the page that kept it does not.
+    assert [n.page for n in layout.notices if n.code == "actualtext_ignored"] == [0]
 
 
 @pytest.mark.parametrize("name", ["d1_scripts", "d4_chinese_doc"])

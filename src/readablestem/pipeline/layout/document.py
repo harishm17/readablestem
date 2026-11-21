@@ -72,6 +72,7 @@ from readablestem.pipeline.layout.joins import (
 )
 from readablestem.pipeline.layout.lists import _list_markers
 from readablestem.pipeline.layout.notices import (
+    _actualtext_notices,
     _FootnoteMark,
     _hidden_text_notices,
     _ink_notices,
@@ -669,6 +670,7 @@ def _analyze_document(
             + _hidden_text_notices(types, kept)
             + _ink_notices(types, kept)
             + _turned_notices(types)
+            + _actualtext_notices(doc, types, kept)
             + _not_searched_notices(not_searched)
         ),
         page_types=types,

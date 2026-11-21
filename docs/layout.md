@@ -172,7 +172,11 @@ reader, neither to find them nor as a second opinion
    (rows, `line_glyphs`, `page_glyphs` for the text pass, the page type, the page labels, the
    tagged headings, the bold letters of equations, the page audit's words, and the review
    probe's region text and glyph marks) adds the page's flag to its own, so no two steps
-   disagree about what the page says. The choice is kept on the open document.
+   disagree about what the page says. The choice is kept on the open document. A typed page
+   that is read without it gets the optional notice `actualtext_ignored` ("Worth a look", one
+   per page): the file says other words for part of the page than the ones printed, and the
+   printed words were used. A page that keeps ActualText gets none, and neither does a page
+   kept as an image.
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
@@ -246,7 +250,15 @@ reader, neither to find them nor as a second opinion
    text width (two table columns are not text columns). Lines for that test are boxes that
    overlap vertically by half the smaller height: TeX splits a line with inline math into
    pieces whose bottom edges differ, and measured piece by piece a full LaTeX column
-   looked like a column of short cells. Margin-band lines are ignored here.
+   looked like a column of short cells. Margin-band lines are ignored here. A first page
+   with a head of centered lines (title, authors, affiliations) across both columns has more
+   lines across the gap than that, so when the page as a whole has no gutter the columns are
+   looked for under the head: the narrow lines below each run of lines across the page (up to
+   eight runs, the top of the page first), the first run that gives a gutter whose thinner
+   side holds at least 0.4 of the lines of the other (`MIN_HEAD_COLUMN_BALANCE`: two columns
+   hold about as many lines; a column of steps beside a few lines is a ruled table on a page
+   of one column, and is read row by row). The lines of the head are then read in the
+   segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
    gutter. Small sub/superscript fragments are folded into their line as one block, after
@@ -314,8 +326,10 @@ so a heading is not, and a line that starts a block is not).
    short of the right edge, the steps of an algorithm or the lines of a listing; the line
    numbers in the margin of a passage do not (a number set apart from its line, in smaller
    type or more than 1.2 em from the text, with a sentence that goes on in lower case across
-   it and no step word such as "end" or "do": `_margin_number`), nor does a number on a line
-   that runs full. Without the page's line
+   it and no step word such as "end" or "do": `_margin_number`). A number after a line that
+   runs full starts one only when that line is the whole run so far (the affiliations of a
+   paper, one line each, numbered 1, 2, 3 to the margin); inside a run of lines a number
+   after a full line is the next line number of a passage. Without the page's line
    ends (`edges`) only the first group and the note and theorem signals are asked. A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
