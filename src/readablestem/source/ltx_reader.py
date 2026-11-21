@@ -807,10 +807,10 @@ class _Reader:
             if _is_picture(item):
                 self.loose.append(item)  # a figure of its own after this block
                 if beside_words:
-                    if not in_link[0]:  # a picture link's words are written after it
-                        emit(
-                            PICTURE_MARK
-                        )  # where it stood, so its absence from the sentence is said
+                    # where it stood, so its absence from the sentence is said (a picture
+                    # link's words are written after it instead)
+                    if not in_link[0]:
+                        emit(PICTURE_MARK)
                 else:
                     gap[0] = bool(parts) and parts[-1][-1:].isalnum()
                 return
@@ -856,9 +856,8 @@ class _Reader:
                         emit(_SPACE.sub(" ", child.tail))
                 if label is not None:
                     in_link[0] = False
-                    if (
-                        label
-                    ):  # the link's words, where the picture is not (see `_picture_link_label`)
+                    # the link's words, where the picture is not (`_picture_link_label`)
+                    if label:
                         if parts and parts[-1][-1:].isalnum():
                             emit(" ")
                         start = length[0]
