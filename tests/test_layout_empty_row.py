@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections import Counter
+from collections import Counter, OrderedDict
 from pathlib import Path
 
 import pymupdf
@@ -23,7 +23,7 @@ from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import layout, page_type
-from readablestem.pipeline.layout import document, elements, furniture, lists
+from readablestem.pipeline.layout import LayoutError, access, document, elements, furniture, lists
 from readablestem.pipeline.layout import page as page_steps
 from readablestem.pipeline.run import convert_pdf
 
@@ -206,3 +206,45 @@ def test_a_slide_whose_pictures_cannot_be_read_is_its_picture_and_the_deck_goes_
     result = layout.analyze(pdf)
     assert result.kept_pages == {1: page_type.PAGE_READ_FAILED}
     assert result.elements and 1 not in {e.page for e in result.elements}
+
+
+# ---- a page the probe's child cannot draw (docs/layout.md "A page that cannot be drawn")
+
+# The probe child dies when page 2 (0-based) is among the pages it was given, as MuPDF does
+# on a damaged page; any other set of pages passes.
+_DIES_ON_PAGE_2 = """
+import os, signal, sys
+if "2" in sys.argv[1].split(","):
+    os.kill(os.getpid(), signal.SIGKILL)
+sys.stdout.write("ok")
+"""
+
+
+@pytest.fixture
+def page_two_cannot_be_drawn(monkeypatch):
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", _DIES_ON_PAGE_2)
+
+
+def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are_read(
+    page_two_cannot_be_drawn, caplog
+):
+    with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.layout"):
+        result = _convert(_document(5))
+    (fix,) = [f for f in result.fixes if f.reason == "page_not_rendered"]
+    assert fix.review == "required"
+    assert [(n.code, n.page) for n in result.notices if n.code == "page_not_rendered"] == [
+        ("page_not_rendered", 2)
+    ]
+    assert "This page could not be shown." in result.html
+    assert "Page 3." not in result.html  # nothing was read from it
+    assert all(f"Page {page}." in result.html for page in (1, 2, 4, 5))
+    assert "page 3" in caplog.text and SENTENCE not in caplog.text
+
+
+def test_a_document_in_which_no_page_can_be_drawn_still_fails(monkeypatch):
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", "import os, signal; os.kill(os.getpid(), 9)")
+    with pytest.raises(LayoutError) as exc:
+        layout.analyze(_document(3))
+    assert exc.value.code == "unreadable"

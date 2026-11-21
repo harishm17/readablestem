@@ -75,6 +75,7 @@ ROWS: tuple[CheckLine, ...] = (
     _page("handwriting_on_page", "required", "ink analysis: handwriting on a typed page"),
     _page("unread_page", "required", "page type: drawings with nothing read from them"),
     _page("page_read_failed", "required", "reading the page raised an error"),
+    _page("page_not_rendered", "required", "the page could not be drawn by the probe"),
     _page(
         "drawings_not_analysed",
         "optional",

@@ -1300,10 +1300,17 @@ def apply_group(
 # so the decision is the same as "Keep as image" (reject) on each of them.
 PAGE_GROUP_PREFIX = "pg-"  # pipeline.run.PAGE_GROUP_PREFIX
 KEPT_IMAGE_REASONS = frozenset(
-    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed", "handwriting_on_page"}
+    {
+        "handwritten_page",
+        "scanned_page",
+        "unread_page",
+        "page_read_failed",
+        "page_not_rendered",
+        "handwriting_on_page",
+    }
 )
 KEPT_PAGE_REASONS = frozenset(
-    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed"}
+    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed", "page_not_rendered"}
 )
 KEPT_IMAGE_ONLY = (
     "This stays an image of the original, marked “Not converted”: there is nothing else "

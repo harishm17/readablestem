@@ -352,6 +352,7 @@ PAGE_REASONS = frozenset(
         page_type.HANDWRITTEN_PAGE,
         page_type.UNREAD_PAGE,
         page_type.PAGE_READ_FAILED,
+        page_type.PAGE_NOT_RENDERED,
     }
 )
 KEPT_REASONS = PAGE_REASONS | {page_type.HANDWRITING_ON_PAGE}
@@ -1011,7 +1012,7 @@ def recrop(
         vector = image_page_vector.analyse(pdf, wanted, kinds)
     try:
         for element in elements:
-            if element.kind not in _MODEL_KINDS:
+            if element.kind not in _MODEL_KINDS or page_type.PAGE_NOT_RENDERED in element.reasons:
                 continue
             try:
                 png = layout.crop(pdf, element)
@@ -1124,6 +1125,7 @@ class _Run:
                 or image_page.wants_crop(e, self.fixes)
             )
             and not image_page.no_crop(e, self.fixes)
+            and page_type.PAGE_NOT_RENDERED not in e.reasons  # no picture of it can be cut
         ]
         with _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)):
             for element in work:
@@ -2089,11 +2091,14 @@ def _convert(
                     key=lambda e: (e.page, e.order),
                 )
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
+            # A page the probe could not draw is never opened in this process again: nothing
+            # reads its tags, links or images (it has only its note).
+            readable = [p for p in page_list if kept.get(p) != page_type.PAGE_NOT_RENDERED]
             elements, scan_fixes = _with_page_images(elements, kept, boxes)
             # Tagged-PDF structure (headings, lists, tables the author marked up) is applied
             # before the steps start: they read the elements it settles. The text pass and
             # the heading decisions run later, beside the steps.
-            elements = tagged.apply(elements, tagged.read(pdf_bytes, page_list))
+            elements = tagged.apply(elements, tagged.read(pdf_bytes, readable))
             read = len(page_list)
             _send(stage_progress, "layout", read, read, _kind_counts(elements))
             fixes = {f.element_id: f for f in scan_fixes}
@@ -2125,7 +2130,7 @@ def _convert(
             made: list[text_pass.TextPassResult] = []
 
             def text_and_headings() -> None:
-                made.append(_text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer))
+                made.append(_text_pass(pdf_bytes, elements, readable, doc.lang, options, tracer))
                 for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 
@@ -2191,7 +2196,7 @@ def _convert(
             measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))
         labels = _page_labels(pdf_bytes, page_list)
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
-        source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
+        source_facts = _source_facts(pdf_bytes, readable, elements, ordered)
         # A PDF repaired when it was opened whose last pages are empty looks cut off: the
         # student note says so, and so does the job page until the owner answers.
         repaired = pdf_facts.repair_notices(pdf_bytes, getattr(doc, "page_types", None) or {})

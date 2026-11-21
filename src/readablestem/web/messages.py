@@ -483,6 +483,8 @@ REASON_MESSAGES: dict[str, str] = {
     "image, marked “Not converted”.",
     "page_read_failed": "This page could not be read, so it is kept as an image, marked "
     "“Not converted”. The rest of the document was read.",
+    "page_not_rendered": "This page could not be shown, so nothing was read from it and the "
+    "file says so, marked “Not converted”. The rest of the document was read.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
     "convert handwriting on typed pages, so it is kept as an image after the typed text.",
 }
@@ -502,6 +504,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "kept as an image, after any text read from it.",
     "page_read_failed": "This page could not be read, so it is kept as an image. The rest of "
     "the document was read.",
+    "page_not_rendered": "This page could not be shown, so nothing was read from it. The rest "
+    "of the document was read: compare the file with the original.",
     "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "

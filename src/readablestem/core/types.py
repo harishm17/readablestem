@@ -957,6 +957,7 @@ NOTICE_CODES = frozenset(
         "handwriting_on_page",  # handwriting on a typed page, kept as an image of it
         "unread_page",  # drawings or images, nothing read from them: page kept as image
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
+        "page_not_rendered",  # the page could not be drawn: not read, no picture, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
         # ... and a paragraph or more of them (`page_type.HIDDEN_BLOCK`): the instructor looks

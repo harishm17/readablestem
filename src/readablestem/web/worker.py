@@ -162,7 +162,14 @@ SCANNED_PAGES = "scanned_pages"  # before page types: some pages were only scann
 PAGES_NOT_CONVERTED = "pages_not_converted"
 # Fix reasons of what the pipeline kept as an image before any model work.
 KEPT_IMAGE_REASONS = frozenset(
-    {"scanned_page", "handwritten_page", "unread_page", "page_read_failed", "handwriting_on_page"}
+    {
+        "scanned_page",
+        "handwritten_page",
+        "unread_page",
+        "page_read_failed",
+        "page_not_rendered",
+        "handwriting_on_page",
+    }
 )
 # Live progress is written to the job row at most this often (seconds), apart from a
 # stage seen for the first time or just finished (`Worker._stage_progress`). The job page

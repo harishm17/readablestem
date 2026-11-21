@@ -33,6 +33,16 @@ PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render th
 # (30 of them 30 s on a fast core), a page of text a few hundredths. Over the limit the
 # error is "too_complex", not "unreadable": the file is fine, it asks for too much.
 PROBE_PER_PAGE_S = 2.0
+
+# When the probe of all the pages fails, the search for the failing pages (`probe_failures`)
+# starts at most this many more probes and runs at most this many seconds, whichever ends
+# first; past either the whole file fails, as it did before the search existed. 40 probes
+# find one bad page of a file of any size up to 1,000,000 pages (2 per halving, so 2 *
+# ceil(log2 n)), two bad pages in 100, and every bad page of a file of up to 20 pages; a
+# page that hangs costs its whole time limit each time it is in a probe, so the clock is
+# the bound that matters there.
+PROBE_SEARCH_MAX = 40
+PROBE_SEARCH_S = 300.0
 PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
 
 # ... but never more than this many pixels on the long side (crop's own cap), so a huge
@@ -410,6 +420,66 @@ def _ensure_probed(pdf_bytes: bytes, key: str, pages: list[int]) -> None:
         _PROBED.move_to_end(key)
     while len(_PROBED) > PROBED_MEMORY:
         _PROBED.popitem(last=False)
+
+
+def probe_failures(pdf_bytes: bytes, key: str, pages: list[int]) -> dict[int, LayoutError]:
+    """Probe the pages of this document that have not passed a probe yet, and find the
+    pages that fail it: page -> the error of its own probe. Hold `_LOCK`.
+
+    All the pages go to one child first. Only when that fails are they probed again in
+    halves, each half that fails split again, until single pages are left: a page that
+    cannot be drawn is that page's problem, and the others are read (docs/layout.md "A page
+    that cannot be drawn"). Both halves are probed, so a failure that comes and goes (a
+    time limit on a busy machine) is not pinned on a page it is not the fault of. Raises the
+    first error, as a probe of the whole document always did, when every page fails, when
+    the halves pass although the whole did not, or when the search used `PROBE_SEARCH_MAX`
+    probes or `PROBE_SEARCH_S` seconds without finishing."""
+    done = _PROBED.get(key, set())
+    todo = [page for page in pages if page not in done]
+    failed: dict[int, LayoutError] = {}
+    if todo:
+        try:
+            _probe_pages(pdf_bytes, todo)
+        except LayoutError as first:
+            failed = _halve(pdf_bytes, todo, first)
+        _PROBED[key] = done | (set(todo) - set(failed))
+    if key in _PROBED:
+        _PROBED.move_to_end(key)
+    while len(_PROBED) > PROBED_MEMORY:
+        _PROBED.popitem(last=False)
+    return failed
+
+
+def _halve(pdf_bytes: bytes, pages: list[int], first: LayoutError) -> dict[int, LayoutError]:
+    """The failing pages of `pages`, which are known to fail together with the error `first`."""
+    failed: dict[int, LayoutError] = {}
+    probes = 0
+    started = time.monotonic()
+
+    def probe(group: list[int]) -> LayoutError | None:
+        nonlocal probes
+        if probes >= PROBE_SEARCH_MAX or time.monotonic() - started > PROBE_SEARCH_S:
+            raise first  # a search that cannot finish is the failure of the whole file
+        probes += 1
+        try:
+            _probe_pages(pdf_bytes, group)
+        except LayoutError as exc:
+            return exc
+        return None
+
+    def split(group: list[int], error: LayoutError) -> None:
+        if len(group) == 1:
+            failed[group[0]] = error
+            return
+        middle = len(group) // 2
+        for half in (group[:middle], group[middle:]):
+            if (found := probe(half)) is not None:
+                split(half, found)
+
+    split(pages, first)
+    if not failed or len(failed) == len(pages):  # nothing found, or nothing to read
+        raise first
+    return failed
 
 
 def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
