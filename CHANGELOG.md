@@ -14,10 +14,13 @@
   new stored field, left out of a result when empty), emphasis and links in a table too large
   for a grid, a single italic letter is no emphasis, a strike set by a paragraph style, and
   "(picture below)" where a picture stood in a sentence. The student page changed (one word for
-  one concept in its own sentences: "items", "Item 3 not converted", "Compare it with the
-  original", "Kept as image"; the marker of a page a paragraph goes on over is written before
-  the next element on that page; a raised digit in a caption; a link in a table cell; the
-  warning on an unconverted equation whose layout boxed a power of ten). No new notice code.
+  one concept in its own sentences: "items", "Item 3 not converted"; the marker of a page a
+  paragraph goes on over is written before the next element on that page; a link in a table
+  cell; the warning on an unconverted equation whose layout boxed a power of ten). A raised
+  digit in a caption is the reader's change (`Element.caption_marked`): a stored result keeps
+  its caption until it is converted again. The review screens' and the record's new words
+  ("Compare it with the original", "Kept as image", "Ready to post") are the web app's, not the
+  student page's. No new notice code.
   Stored results load unchanged and their pages are made again. No migration. The switches that
   stay off (`LAYOUT_INLINE_JOINS`, `LAYOUT_JOIN_PANELS`, `LAYOUT_DISPLAY_GROUPING`,
   `REGION_TREE`) change nothing in this release.
@@ -31,8 +34,9 @@
   a link in a table cell and holding all 56 notice codes the table knows: the job page, the
   review screen and list, the record and its CSV, the student page and its download all answered
   200, with the stored page (render 11) and with the page cleared. 0.5.14 makes the page again
-  from the result with its own rules and drops the cell's link (the cell shows its words); the
-  roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+  from the result with its own rules and drops the cell's link (the cell shows its words); after
+  a review change it writes the result back without the links, so going forward again does not
+  bring them back. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 

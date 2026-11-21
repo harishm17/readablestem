@@ -323,7 +323,9 @@ log = logging.getLogger(__name__)
 # no run, a strike set by a paragraph style, "(picture below)" where a picture stood in a
 # sentence. No new notice code. Results from 0.5.10 to 0.5.14 load unchanged and their page is
 # made again (`assemble.RENDER_VERSION` 11). 0.5.14 opens a 0.5.15 result (it ignores
-# `TableCell.links`: the cell shows its words, no links), so the roll-back limit stays at 0.5.12
+# `TableCell.links`: the cell shows its words, no links; it serves a stored render-11 page as it
+# is, links shown, until a review change makes the page again and writes the result back through
+# its own model, which drops the links for good), so the roll-back limit stays at 0.5.12
 # (docs/deploy.md "Roll back").
 PIPELINE_VERSION = "0.5.15"
 

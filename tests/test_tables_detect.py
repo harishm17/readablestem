@@ -215,15 +215,10 @@ def loose_numbers(caption: bool, rows: int = 7) -> bytes:
     return pdf(fill)
 
 
-@pytest.mark.parametrize(
-    ("caption", "rows", "verdict"),
-    [
-        (True, 7, tables.TABLE),  # a "Table N" line says so, over columns that mostly line up
-    ],
-)
-def test_a_table_line_over_loosely_aligned_columns_makes_it_a_table(caption, rows, verdict):
-    box = (95, 150, 490, 176 + 16 * rows)
-    assert tables.judge(proposal(box), view_of(loose_numbers(caption, rows))).verdict == verdict
+def test_a_table_line_over_loosely_aligned_columns_makes_it_a_table():
+    # A "Table N" line says so, over columns that mostly line up.
+    box = (95, 150, 490, 176 + 16 * 7)
+    assert tables.judge(proposal(box), view_of(loose_numbers(True))).verdict == tables.TABLE
 
 
 def labelled_groups(groups: int, rows: int = 4, paragraph: int = 0, ruled: bool = False) -> bytes:
