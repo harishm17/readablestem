@@ -14,7 +14,13 @@
 - A capital alone on its line heads an index section only when the first entry of its letter
   starts within a line or two under it (`LETTER_UNDER_REACH`); a lone capital at the foot of a
   column was matched with a line of its letter far below it.
-- Measured by layout only: see the numbers in the report of the branch. Not built, not counted:
+- Measured on the 996 layout runs of the development PDFs and the repository's own (332 files, three
+  variants): 6 files change, none a file the fault is not in (4 development papers, a public
+  newsletter, one paper of `data/real-tables`: a section number out of an equation). On the 72
+  corpus files and 73 uploads one file loses three lines that were taken for entries (lines of
+  dots with no page number), one gains merged two-line titles; no upload's calls or recorded
+  requests change (6 and 654 calls, 2 and 644 missed, before and after), so there is no switch.
+  Not built, not counted:
   a title that wraps in a list with no leaders, a two-column contents page, titles checked
   against later headings. A new `PIPELINE_VERSION` is owed (a stored result's contents entries
   change); no migration.
