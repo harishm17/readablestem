@@ -289,7 +289,7 @@ so a heading is not, and a line that starts a block is not).
    line's start at the paragraph's left edge, ending in a period or a colon, after a line that
    does not end in a lead term or run full to the right edge in mid-sentence; `_lead_end`,
    `_starts_entry`); a single capital letter alone on a line, bold or larger than the text, with
-   the line right under it starting with that letter, three or more different letters set that
+   the line right under it (within a line or two) starting with that letter, three or more different letters set that
    way in one size and typeface through the document (`_letter_rows`: a heading one level
    under the section's, `REASON_LETTER`; the test reads the line under the letter and not the
    order of the columns, so it holds on an index of three columns and never takes the panel
@@ -2206,7 +2206,12 @@ an ellipsis counting for three) is a contents page (`_contents_rows`). Each such
 list item of its own with its title only: the leaders go, and so does the page number (at
 the end of the line, or a line of its own at the right edge on the same baseline); a line
 with no leaders whose number stands at that right edge is an entry too (a chapter line in
-bold). Items nest by indent (`list_level`). The page numbers are the printed book's; the
+bold). A line of prose that ends in dots but has no page number (a quotation cut off with
+an ellipsis) is not an entry, so two of them are no contents page. A title that wraps is one
+entry: the line right above an entry, at its size and no further right than it, stopping near
+the page numbers' edge and with no leaders or number of its own, is the first line of its
+title (`_title_head`; the hyphen at its end is repaired as in a paragraph). Items nest by
+indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document
 whose title is the same once section numbers are left out (`_contents_links`); when the
@@ -2220,6 +2225,10 @@ it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section
 lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
 
+A section number that starts an entry ("6.1") and a page number that ends it after math
+("Forces on Σ 9") are the entry's own text, not part of its equation: before, the number next to
+the symbol was read into the formula (`_clear_of_entry_numbers`).
+
 A contents list with no leaders is found by its shape (WS2.7, `_shape_entries`): three or
 more lines one after the other in one column, each ending in a page number (or followed on
 its baseline by a line that is only that number, in a column of its own), the numbers at one
@@ -2232,7 +2241,8 @@ list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`
 reason `contents entry` fires and no second contents list is written. An entry with a number
 links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). A list whose numbers do not stand at one edge is read as numbers that follow their titles only when none of them stands apart in a column of its own: marks ("x", a roman numeral) set in several columns of a table, after the names, are a table's cells and the table is kept. Not read: a
 list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
-it, a title that wraps onto a second line with the number on the second, and a two-column
+it, a title that wraps onto a second line with the number on the second (in a list with leaders it is
+read), and a two-column
 page (the columns are not known when tables are claimed).
 
 ### Kept line ends, the abstract and algorithms (SW53 a and e, WS2.6, F-261)

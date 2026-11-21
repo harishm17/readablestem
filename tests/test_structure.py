@@ -914,6 +914,26 @@ def test_capital_letters_alone_on_their_lines_head_the_sections_of_an_index():
     assert headings == [("Index", 1), ("A", 2), ("B", 2), ("C", 2)]
 
 
+def test_a_lone_capital_far_above_an_entry_of_its_letter_is_not_an_index_heading():
+    def fill(page):
+        page.insert_text((72, 80), "Index", fontsize=18, fontname="hebo")
+        y = 120.0
+        for letter, words in [
+            ("A", ["acceleration, 4"]),
+            ("B", ["body, 12"]),
+            ("C", ["circuit, 20"]),
+        ]:
+            page.insert_text((72, y), letter, fontsize=BODY, fontname="hebo")
+            page.insert_text((72, y + 14), words[0], fontsize=BODY, fontname="helv")
+            y += 44
+        # A capital at the foot of the column, with a line of its letter only far below it.
+        page.insert_text((72, 600), "D", fontsize=BODY, fontname="hebo")
+        page.insert_text((72, 740), "diagram, 31", fontsize=BODY, fontname="helv")
+
+    fixes = heading_fixes(analyze(page_of(fill)).elements)
+    assert [f.heading.text for f in fixes if f.heading] == ["Index", "A", "B", "C"]
+
+
 def test_a_hanging_indent_shared_by_entries_makes_each_entry_one_block():
     filler = ["of", "the", "in", "on", "at", "to", "it", "is", "by"] * 2
 
@@ -1425,6 +1445,106 @@ def test_a_contents_list_with_no_leaders_keeps_its_numbers_and_is_not_a_table():
     assert [e.text for e in entries[:3]] == ["Motion 3", "Forces 9", "Energy 15"]
     # "Motion" under the list is the real section heading; the first entry links to it.
     assert [(k.kind, k.target_id) for k in entries[0].links] == [("internal", elements[9].id)]
+
+
+def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
+    def entries(fill):
+        elements = analyze(page_of(fill)).elements
+        return [e for e in elements if e.kind == Kind.LIST_ITEM], [
+            e for e in elements if e.kind == Kind.EQUATION
+        ]
+
+    def no_leaders(page):  # "Forces on a Sigma", then its page number at the right margin
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        for k, (title, math, number) in enumerate(
+            [
+                ("Motion", "", "3"),
+                ("Forces on a", "S", "9"),
+                ("Energy in", "L", "15"),
+                ("Heat", "", "41"),
+            ]
+        ):
+            y = 120.0 + 18 * k
+            page.insert_text((72, y), title, fontsize=BODY, fontname="helv")
+            if math:
+                x = 72 + pymupdf.get_text_length(title, fontname="helv", fontsize=BODY)
+                page.insert_text((x + 3, y), math, fontsize=BODY, fontname="symb")
+            width = pymupdf.get_text_length(number, fontname="helv", fontsize=BODY)
+            page.insert_text((540 - width, y), number, fontsize=BODY, fontname="helv")
+
+    items, equations = entries(no_leaders)
+    assert [e.text.split()[-1] for e in items] == ["3", "9", "15", "41"]  # the number is text
+    assert [e.text for e in equations] == ["\u03a3", "\u039b"]
+
+    def with_leaders(page):  # "6.1 Gamma = D", leaders, a page number
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        rows = [
+            ("6.1 ", "G = D", "", "18"),
+            ("6.2 ", "G = E", "", "19"),
+            ("6.3 Index of ", "W", "", "21"),
+        ]
+        for k, (label, math, _, number) in enumerate(rows):
+            y = 120.0 + 18 * k
+            page.insert_text((72, y), label, fontsize=BODY, fontname="helv")
+            x = 72 + pymupdf.get_text_length(label, fontname="helv", fontsize=BODY)
+            page.insert_text((x, y), math, fontsize=BODY, fontname="symb")
+            x += pymupdf.get_text_length(math, fontname="symb", fontsize=BODY)
+            page.insert_text((x + 2, y), " ." * 40, fontsize=BODY, fontname="helv")
+            page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
+
+    items, equations = entries(with_leaders)
+    assert [e.text.split()[0] for e in items] == ["6.1", "6.2", "6.3"]  # the section number is text
+    assert [e.text[0] for e in equations] == ["\u0393", "\u0393", "\u03a9"]  # all still maths
+
+
+def test_a_contents_title_that_wraps_is_one_entry():
+    long_title = "2 Proof of the long result on the forces of a falling body through air and water"
+
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        y = 120.0
+        for lines, number in [
+            (["1 Motion"], "3"),
+            (
+                [
+                    long_title + " (Theo-",
+                    "rem 1)",
+                ],
+                "9",
+            ),
+            (["3 Energy"], "15"),
+            (["4 Waves"], "21"),
+        ]:
+            for k, line in enumerate(lines):
+                last = k == len(lines) - 1
+                page.insert_text((72 + (14 if k else 0), y), line, fontsize=BODY, fontname="helv")
+                if last:
+                    page.insert_text((150, y), " ." * 40, fontsize=BODY, fontname="helv")
+                    page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
+                y += 13
+            y += 5
+
+    entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
+    assert [e.text for e in entries] == [
+        "1 Motion",
+        long_title + " (Theorem 1)",
+        "3 Energy",
+        "4 Waves",
+    ]
+
+
+def test_two_lines_of_prose_that_end_in_an_ellipsis_are_not_a_contents_page():
+    def fill(page):
+        page.insert_text(
+            (72, 100), "The first prompt starts with the words of the task. . . . .", fontsize=BODY
+        )
+        page.insert_text(
+            (72, 140),
+            "A second line is cut off the same way after the rules. . . . .",
+            fontsize=BODY,
+        )
+
+    assert not [e for e in analyze(page_of(fill)).elements if "contents entry" in e.reasons]
 
 
 def test_lines_that_end_in_numbers_far_from_the_front_are_not_a_contents_list():
