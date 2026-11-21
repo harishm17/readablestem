@@ -16,10 +16,10 @@
   ]
  },
  "pipeline_version": "0.5.14",
- "commit": "a0a6ed05f160070a6cb0941839622058f3b25f78+changes",
+ "commit": "84736ec4ef6b46d7ac80d8704e8f70bfaec61b52",
  "provenance": {
-  "commit": "a0a6ed05f160070a6cb0941839622058f3b25f78",
-  "clean": false,
+  "commit": "84736ec4ef6b46d7ac80d8704e8f70bfaec61b52",
+  "clean": true,
   "pipeline_version": "0.5.14",
   "render_version": 10,
   "tools": {
@@ -1105,10 +1105,10 @@
   "truth": {
    "pen": 0,
    "not_pen": 10,
-   "unlabelled": 0,
+   "unlabeled": 0,
    "missed": {},
-   "unlabelled_regions": [],
-   "labelled": 10
+   "unlabeled_regions": [],
+   "labeled": 10
   }
  }
 }
