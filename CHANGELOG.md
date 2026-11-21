@@ -28,6 +28,9 @@
   the same, so no recording is stale. No stored document changes except the mixed deck's, and
   only by its heading levels. No `PIPELINE_VERSION` raise is owed for documents that are not
   decks with scanned slides; a document converted before this change keeps its levels.
+- The layout half of the same comparison (996 results): 3 changed, all html-slides in its three
+  variants; there the deck's headings now say which deck they are in (`slide_deck 1`, and the
+  title `slide_deck_title`), and nothing else about them. No other file changed.
 - No migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
