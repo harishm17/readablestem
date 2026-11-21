@@ -1,5 +1,37 @@
 # Changelog
 
+## Pipeline 0.5.15, render 11 (2026-11-20)
+
+- `PIPELINE_VERSION` is 0.5.15 and `RENDER_VERSION` is 11: one raise each for every "Unreleased"
+  entry below down to the 0.5.14 entry. What a PDF's result holds changed (a bold or numbered
+  line in a run of its series is an item and not a heading, a lettered title that wraps is one
+  heading, a series that starts again after a cut is a level down, a reference list's initials
+  are no lettered list, a number or a row of labels is no footnote and a note no link points at
+  is linked by its mark, a small drawing does not join a figure across a line of prose, a raised
+  digit in a figure caption stays raised, an algorithm that holds a bold letter keeps its lines,
+  tables with no ruling lines are found and two unruled columns with no caption are no table).
+  A Word or LaTeX file's result changed too: a link in a table cell (`TableCell.links`, the one
+  new stored field, left out of a result when empty), emphasis and links in a table too large
+  for a grid, a single italic letter is no emphasis, a strike set by a paragraph style, and
+  "(picture below)" where a picture stood in a sentence. The student page changed (one word for
+  one concept in its own sentences: "items", "Item 3 not converted", "Compare it with the
+  original", "Kept as image"; the marker of a page a paragraph goes on over is written before
+  the next element on that page; a raised digit in a caption; a link in a table cell; the
+  warning on an unconverted equation whose layout boxed a power of ten). No new notice code.
+  Stored results load unchanged and their pages are made again. No migration. The switches that
+  stay off (`LAYOUT_INLINE_JOINS`, `LAYOUT_JOIN_PANELS`, `LAYOUT_DISPLAY_GROUPING`,
+  `REGION_TREE`) change nothing in this release.
+  `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
+  `data/eval/burden-corpus.json`, `data/eval/parsing-bench-olmocr.json` and
+  `data/eval/order-layout-dev-1.json` are re-made at 0.5.15; the golden pages and the stored demo
+  page are written again at render 11. Roll back: 0.5.14 opens a 0.5.15 result. Run on
+  2026-11-20 against 0.5.14 (`f490ac60`), a Word and a LaTeX result stored by 0.5.15, each with
+  a link in a table cell and holding all 56 notice codes the table knows: the job page, the
+  review screen and list, the record and its CSV, the student page and its download all answered
+  200, with the stored page (render 11) and with the page cleared. 0.5.14 makes the page again
+  from the result with its own rules and drops the cell's link (the cell shows its words); the
+  roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
 - Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The

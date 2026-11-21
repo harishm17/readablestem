@@ -308,7 +308,24 @@ log = logging.getLogger(__name__)
 # (`assemble.RENDER_VERSION` 10). 0.5.13 opens a 0.5.14 result (it has no words for the new
 # notice lines and drops a cell's runs), so the roll-back limit stays at 0.5.12
 # (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.14"
+# 0.5.15 (2026-11-20): one raise for the wave after 0.5.14 (CHANGELOG.md has each change). What
+# a PDF's result holds moves: a bold or numbered line in a run of its series is an item, not a
+# heading; a lettered title that wraps is one heading; a series that starts again after a cut is
+# a level down (`Element.list_level`); a reference list's initials are no lettered list; a number or
+# a row of labels is no footnote, and a note the file names that no link points at is linked by
+# its mark; a paragraph is no glossary entry with the region tree on (the tree stays off); a
+# small drawing does not join a figure across a line of prose; a raised digit in a figure
+# caption is kept raised (`Element.caption_marked`); an algorithm that holds a bold letter keeps
+# its lines; tables with no ruling lines are found (a box under a "Table N" line, a strip a few
+# lines cross, a table of marks on a first page) and two unruled columns with no caption are no
+# table. A Word or LaTeX file's result: a link in a table cell (`TableCell.links`, new, left out
+# when empty), emphasis and links in a table too large for a grid, a single italic letter makes
+# no run, a strike set by a paragraph style, "(picture below)" where a picture stood in a
+# sentence. No new notice code. Results from 0.5.10 to 0.5.14 load unchanged and their page is
+# made again (`assemble.RENDER_VERSION` 11). 0.5.14 opens a 0.5.15 result (it ignores
+# `TableCell.links`: the cell shows its words, no links), so the roll-back limit stays at 0.5.12
+# (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.15"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

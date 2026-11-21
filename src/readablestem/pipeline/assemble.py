@@ -122,7 +122,14 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # every wide table is a tab stop, a script inside a script keeps a readable size, and a very wide
 # equation is not cut on paper; the words for a Word file's equations; the speech rules for
 # bars and for raised and lowered text.
-RENDER_VERSION = 10
+# 11: one word for one concept in the file's own sentences ("items" where it said "parts",
+# "Item 3 not converted", "Compare it with the original", "Kept as image", "Review it before
+# students use it", "Ready to post"); the marker of a page a paragraph goes on over is written
+# before the next element on that page, not right after the paragraph; a raised digit in a
+# figure caption is a superscript character; a link in a Word or LaTeX table cell is written as
+# a link; an equation shown as an image whose layout boxed a power of ten has the warning that
+# exponents run together in its alt text.
+RENDER_VERSION = 11
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
