@@ -1231,7 +1231,15 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   a portrait document and a landscape table are not decks and are read as before (`_SLIDE_DECK`
   False: no rule below applies). A
   page kept whole as its image (a photographed slide) has no text, is never dropped, never makes
-  the pages beside it a frame, and is untitled.
+  the pages beside it a frame, and is untitled; it does not count against the titled share
+  either (the share is of the pages that have text), so a deck with some scanned slides is
+  still a deck, and a file whose pages are all kept whole is not. The deck number of each page
+  of such a deck, scanned ones included, is on `Layout.deck_pages`; a heading the page reader
+  makes on a scanned slide (`image_page`) is given that deck's reason (`slide_deck N`) in
+  `run`, and `heading_levels` puts its level under the deck's title: the reader numbers the
+  headings of a slide from its own title (1), which is a slide title (level 2) in a deck with a
+  title, as the typed slides' titles are (F-254: the mixed deck's scanned titles came out one
+  level lower).
 - **Several decks in one file** (`slides._decks`). A deck ends where the page size changes, and
   where a title slide comes when the file's first page is one too. A title slide is a page whose
   largest line is at least 1.25 x an ordinary slide's title (the median title size of the file)
@@ -1273,7 +1281,11 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   fixtures: `beamer_overlay` 6 pages to 2 (67 % fewer), `slides_steps` 13 to 6 (54 % fewer).
 - **Frame titles.** A page's title is its largest text in the top third, at least 1.15 x the
   deck's body size (the lines that follow it in the same size, each within half a line of the one
-  before, are part of it). It is always a heading (reason `slide_title`, plus `larger font` so the
+  before, are part of it). A line that is a formula or a bare number and nothing else (no
+  word of three letters besides function names like "sin" and "log", and a math sign, an italic
+  math letter or no letter at all: `slides._is_formula`) is never a title, nor the title of a
+  title slide: a slide with a large equation under its title is titled by the title (on the
+  html-slides deck 16 of 22 slides took their equation). It is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
   title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
   Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a
