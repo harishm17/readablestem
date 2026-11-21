@@ -42,7 +42,8 @@ DESCRIBE = """() => {
     (el.getAttribute('aria-labelledby') || '').split(/\\s+/).map(
       i => (document.getElementById(i) || {}).textContent || '').join(' ') ||
     (el.labels && el.labels.length ? el.labels[0].textContent : '') ||
-    el.textContent || el.value || el.getAttribute('title') || el.getAttribute('alt') || '')
+    el.textContent || Array.from(el.querySelectorAll('img[alt]'), i => i.alt).join(' ') ||
+    el.value || el.getAttribute('title') || el.getAttribute('alt') || '')
     .replace(/\\s+/g, ' ').trim();
   return {
     id: seen.map.get(el), tag: el.tagName.toLowerCase(), domId: el.id || '',

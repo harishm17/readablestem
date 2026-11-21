@@ -250,7 +250,7 @@ def test_finish_notice_opt_in_title_and_announcement(site, browser):
     expect(button).to_be_visible()
     tab_to(page, button)
     page.keyboard.press("Enter")
-    expect(page.locator("#notify-state")).to_contain_text("You will get a notice")
+    expect(page.locator("#notify-state")).to_contain_text("You will get a notification")
     assert page.evaluate("window.__asked") == 1
     assert site.run_worker() == job_id
     finished = page.locator("#job-status[data-finished]")
