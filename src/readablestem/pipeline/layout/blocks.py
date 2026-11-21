@@ -576,6 +576,11 @@ def _next_in_series(first: _Marker, second: _Marker) -> bool:
     )
 
 
+SERIES_GAP = (
+    2.0  # line heights of white between two rows of one run: more, and something stood there
+)
+
+
 def _mark_series_items(rows: list[_Row]) -> None:
     """Set `_Row.in_series` on the rows with an ordered marker that stand in a run of their
     series: the next marker of the row's column, past the item's own lines, is the next value,
@@ -584,7 +589,11 @@ def _mark_series_items(rows: list[_Row]) -> None:
     A heading of the same shape has body text, or a figure, under it, so its neighbors are not
     markers: "B. Newton's second law" in bold among upright options, the bold lines of an agenda
     and "I." between "H." and "J." of an outline are items whatever they are set in. The options
-    of a grid are a list too."""
+    of a grid are a list too. Only text rows are seen here, so a figure or a table shows as the
+    white it leaves (`SERIES_GAP`): a run ends there, and "1. Setup" over a picture with
+    "2. Procedure" under it are two titles.
+
+    Two titles in a row, the first with no text of its own, do read as a list of two."""
     for i, row in enumerate(rows):
         marker = row.marker
         if marker is None or not marker.ordered:
@@ -593,9 +602,14 @@ def _mark_series_items(rows: list[_Row]) -> None:
             row.in_series = True
             continue
         face = _face(row)
+        reach = SERIES_GAP * row.size
+        last = row
         for under in rows[i + 1 :]:
             if under.column != row.column:
                 continue
+            if under.y0 - last.y1 > reach:
+                break
+            last = under
             if under.marker is None and face and _face(under) == face:
                 continue  # more lines of the item itself
             row.in_series = under.marker is not None and _next_in_series(marker, under.marker)
@@ -604,9 +618,13 @@ def _mark_series_items(rows: list[_Row]) -> None:
             continue
         between: set[str] = set()
         lines = 0
+        last = row
         for above in reversed(rows[:i]):
             if above.column != row.column:
                 continue
+            if last.y0 - above.y1 > reach:
+                break
+            last = above
             if above.marker is None:
                 between.add(_face(above))
                 lines += 1

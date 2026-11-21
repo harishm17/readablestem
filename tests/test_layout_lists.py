@@ -502,6 +502,17 @@ def test_a_bold_item_in_a_run_of_its_series_is_an_item_and_a_bold_title_over_tex
     got = analyze(one_page(titles)).elements
     assert [e.text for e in got if e.kind == Kind.HEADING] == ["A. Methods", "B. Results"]
 
+    def picture(page):  # a title with only a picture under it, then the next title
+        y = write(page, 72, 100, ["1. Setup"], fontname="hebo")
+        pix = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 200, 120))
+        pix.set_rect(pix.irect, (90, 120, 200))
+        page.insert_image(pymupdf.Rect(72, y, 272, y + 120), pixmap=pix)
+        y = write(page, 72, y + 136, ["2. Procedure"], fontname="hebo")
+        write(page, 72, y, ["The text of the section runs on for a full line of the page."])
+
+    got = analyze(one_page(picture)).elements
+    assert [e.text for e in got if e.kind == Kind.HEADING] == ["1. Setup", "2. Procedure"]
+
     def topics(page):  # "X and Y" lines are an outline's items, not a list of authors
         y = write(page, 72, 100, ["The outline:"])
         write(page, 90, y, ["B. Predation and herbivory", "C. Mutualism and commensalism"])
