@@ -47,6 +47,7 @@ from __future__ import annotations
 
 import re
 import statistics
+import unicodedata
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
@@ -79,6 +80,12 @@ DECK_REASON = "slide_deck"  # "slide_deck 2": the heading is on a page of the se
 DECK_TITLE_REASON = "slide_deck_title"  # the title of a deck that starts on a title slide
 _BEAMER = re.compile(r"\bbeamer\b", re.IGNORECASE)
 _SLIDE_NUMBER = re.compile(r"^\s*\d{1,3}(?:\s*/\s*\d{1,3})?\s*$")
+# A name of a function in a formula ("sin", "log"): not a word of text.
+_FUNCTION = re.compile(
+    r"(?<![^\W\d_])(?:sin|cos|tan|cot|sec|csc|log|ln|exp|lim|det|max|min|sup|inf|arg|gcd|mod)h?"
+    r"(?![^\W\d_])"
+)
+_WORD = re.compile(r"[^\W\d_]{3,}")
 
 
 @dataclass(frozen=True)
@@ -129,6 +136,9 @@ class PageView:
     rows: Sequence[RowView]
     # every image, and the drawings in the body of the slide (`LazyMarks` reads them late)
     marks: Iterable[Mark] = ()
+    # The page is kept whole as its image (a scanned or photographed slide): it has no rows
+    # here, and `detect` leaves it out of the share of titled pages.
+    kept_whole: bool = False
 
 
 @dataclass(frozen=True)
@@ -264,14 +274,32 @@ def _frames(views: Sequence[PageView], titles: dict[int, Title]) -> list[list[Pa
     return frames
 
 
+def _is_formula(text: str) -> bool:
+    """A line that is a formula or a bare number and nothing else: it has no word of three
+    letters that is not a function name ("sin", "log"), and it has a math sign or an italic
+    math letter ("=", an integral sign, "x"), or no letter at all (the "1" over the bar of a
+    fraction). "Slopes and Rates", "Q & A" and "AI" are text; "x = -b / 2a", "pH = -log10 [H+]"
+    and "1" are not."""
+    plain = "".join(c for c in text if not 0x1D400 <= ord(c) <= 0x1D7FF)
+    if _WORD.search(_FUNCTION.sub(" ", plain)):
+        return False
+    return (
+        len(plain) < len(text)
+        or not any(c.isalpha() for c in text)
+        or any(unicodedata.category(c) == "Sm" for c in text)
+    )
+
+
 def _title(view: PageView, body: float) -> Title | None:
     """The largest text in the top of the page, at least MIN_TITLE_RATIO x the body; the
-    topmost when several are as large."""
+    topmost when several are as large. A line that is a formula only is not a title: a slide
+    with a large formula under its title is titled by the title."""
     top = [
         row
         for row in view.rows
         if not row.vertical
         and row.text.strip()
+        and not _is_formula(row.text)
         and row.bbox[1] <= TITLE_ZONE * view.height
         and row.size >= MIN_TITLE_RATIO * body
     ]
@@ -307,7 +335,7 @@ def _title_slide(view: PageView, ordinary: float, own: Title | None) -> Title | 
     The title may be anywhere on the page: a title slide's is often in the middle. A page with
     a title of its own (`own`, found in the top of the page) that is smaller than its largest
     line is an ordinary slide with a big formula or picture caption, not a title slide."""
-    rows = [r for r in view.rows if not r.vertical and r.text.strip()]
+    rows = [r for r in view.rows if not r.vertical and r.text.strip() and not _is_formula(r.text)]
     if not rows or ordinary <= 0:
         return None
     largest = max(r.size for r in rows)
@@ -365,8 +393,11 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     # some pages and not all (a label tree with a prefix and no numbers labels every page alike).
     labelled = len({v.label for v in views if v.label}) >= 2 and len(frames) >= 2
     by_label = (beamer or (overlaid and labelled)) and sum(slide) >= 0.8 * len(views)
-    titled = sum(v.number in titles or v.number in title_slides for v in views)
-    if not by_label and titled < TITLED_SHARE * len(views):
+    # A page kept whole has no text to be titled by: the pages that have text are judged, so a
+    # deck with some scanned slides is still one (a file of no text pages is not).
+    readable = [v for v in views if not v.kept_whole]
+    titled = sum(v.number in titles or v.number in title_slides for v in readable)
+    if not by_label and (not readable or titled < TITLED_SHARE * len(readable)):
         return None
     # A title slide recurring starts a deck when the file starts with one.
     runs = _decks(views, title_slides if views[0].number in title_slides else ())

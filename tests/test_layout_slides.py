@@ -51,6 +51,19 @@ def title_row(text: str) -> slides.RowView:
     return row(text, y=12.0, size=14.5, x=9.0)
 
 
+def test_scanned_slides_do_not_count_against_the_titles_of_a_deck():
+    """Half the slides are kept whole as images: the typed ones have titles, so it is a deck;
+    a file of kept-whole pages alone is not."""
+    typed = [
+        view(n, [title_row(f"Slide {n}"), row("Some text of the slide that is the body")])
+        for n in (0, 2, 4)
+    ]
+    scanned = [slides.PageView(n, 363.0, 272.0, None, [], kept_whole=True) for n in (1, 3, 5)]
+    pages = sorted([*typed, *scanned], key=lambda v: v.number)
+    assert slides.detect(None, pages) is not None
+    assert slides.detect(None, scanned) is None
+
+
 def test_a_page_with_no_text_is_never_taken_for_an_earlier_step():
     """A page kept whole as its image reaches `detect` with no rows."""
     views = [
@@ -184,6 +197,24 @@ def test_a_formula_larger_than_the_slide_title_does_not_make_a_title_slide():
     levels = heading_levels_of(analyze(deck_pdf(pages)))
     assert levels["First Lecture"] == 1
     assert {levels[t] for t in ("Alpha", "Beta", "Gamma")} == {2}
+
+
+def test_a_formula_in_the_top_of_a_slide_is_not_its_title():
+    """The slide's title is the text above a large formula, not the formula."""
+    pages = [
+        view(
+            n,
+            [
+                row(title, y=20, size=30.0),
+                row("x = -b / 2a", y=60, size=50.0),
+                row("The roots of a quadratic follow from this formula", y=200),
+            ],
+        )
+        for n, title in enumerate(["Alpha", "Beta", "Gamma"])
+    ]
+    deck = slides.detect(None, pages)
+    assert deck is not None
+    assert [t.text for t in deck.titles.values()] == ["Alpha", "Beta", "Gamma"]
 
 
 # ------------------------------------------------------------------ non-slide files

@@ -165,6 +165,10 @@ class Layout:
     # Per page, the table proposals the region tree refused (`REGION_TREE`, WS15.2): the box of
     # each and why (`regions.REFUSED_*`). Codes and boxes only; their text stays in the page.
     table_refusals: dict[int, list[tuple[BBox, str]]] = field(default_factory=dict)
+    # Page -> its deck's number (`slides.Deck.numbers`), for every page of a file that holds
+    # several decks or a deck with a title, a page kept whole as its image included: the
+    # headings read from such a page later (`pipeline.image_page`) are put in that deck.
+    deck_pages: dict[int, int] = field(default_factory=dict)
 
 
 def _log_page_failure(number: int, exc: Exception) -> None:

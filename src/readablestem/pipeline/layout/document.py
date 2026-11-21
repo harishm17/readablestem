@@ -229,9 +229,12 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
     group_of = {e.id: slides.deck_number(e.reasons) for e in headings}
     level_of: dict[tuple[int | None, float], int] = {}
     below: dict[int | None, int] = {}
+    titled_decks: set[int | None] = set()
     for group in set(group_of.values()):
         in_group = [e for e in headings if group_of[e.id] == group]
         titled = any(slides.DECK_TITLE_REASON in e.reasons for e in in_group)
+        if titled:
+            titled_decks.add(group)
         sized = sorted(
             {
                 round(e.font_size or 0.0, 1)
@@ -259,7 +262,16 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             raw = min(2, below[group])  # one level under the title, when there is one
         else:
             raw = below[group] + max(0, (depth[e.id] or shallowest) - shallowest)
-        levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
+        level = tagged_level(e)
+        if (
+            level
+            and group in titled_decks
+            and any(r.startswith(REASON_IMAGE_HEADING) for r in e.reasons)
+        ):
+            # The page reader numbers a slide's headings from its own title (1); under the
+            # deck's title that title is a slide title, as a typed slide's is.
+            level += 1
+        levels[e.id] = max(1, min(6, level or outline.weak_level(e) or raw))
     section = None  # the level of the last heading that is not a letter of an index
     for e in sorted(headings, key=lambda e: e.order):
         if REASON_LETTER not in e.reasons and REASON_LETTERED not in e.reasons:
@@ -600,6 +612,7 @@ def _analyze_document(
         tables_not_searched=not_searched,
         sources=sources,
         table_refusals={n: r for n, r in sorted(refused.items()) if r},
+        deck_pages=dict(deck.numbers) if deck is not None else {},
     )
 
 
@@ -637,6 +650,7 @@ def _read_deck(
                     page_labels.pdf_label(page),
                     rows,
                     slides.LazyMarks(partial(_marks_of, doc, number, paths.get(number, []), guard)),
+                    kept_whole=whole,
                 )
             )
     creator = doc.metadata.get("creator") if doc.metadata else None

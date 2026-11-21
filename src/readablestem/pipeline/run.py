@@ -159,6 +159,7 @@ from readablestem.pipeline import (
     page_witness,
     say_once,
     shadow,
+    slides,
     step_facts,
     table_math,
     table_step,
@@ -902,6 +903,15 @@ def _text_pass(
         )
         _annotate(span, lang_source=text.lang_source, **text.counts())
     return text
+
+
+def _in_deck(element: Element, decks: dict[int, int]) -> Element:
+    """A heading the page reader made on a page of a slide deck says which deck it is in, as
+    a typed slide's heading does (`slides.finish`), so it is levelled with the deck's slides."""
+    if element.kind is Kind.HEADING and (number := decks.get(element.page)) is not None:
+        reasons = [*element.reasons, f"{slides.DECK_REASON} {number}"]
+        return element.model_copy(update={"reasons": reasons})
+    return element
 
 
 def _heading_fixes(elements: list[Element], tracer: Tracer, settings: Settings) -> list[Fix]:
@@ -2062,10 +2072,15 @@ def _convert(
                 # What layout read from a page the pass read (the watermark, header or page
                 # number over a photographed page) is the pass's to read again: the page
                 # would hold that text twice.
+                deck_pages = getattr(doc, "deck_pages", None) or {}
                 elements = sorted(
                     [
                         *(e for e in elements if e.page not in image_built),
-                        *(e for b in image_built.values() for e in b.elements),
+                        *(
+                            _in_deck(e, deck_pages)
+                            for b in image_built.values()
+                            for e in b.elements
+                        ),
                     ],
                     key=lambda e: (e.page, e.order),
                 )

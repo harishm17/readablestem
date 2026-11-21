@@ -75,11 +75,10 @@ def test_a_deck_of_scanned_slides_is_named_by_its_first_slide(
     assert harness.words(name).casefold() == harness.words(top).casefold()
 
 
-@harness.finding("F-254")
 def test_a_scanned_slide_and_a_typed_slide_give_their_titles_one_level(
     site: harness.ReplaySite, mixed: str
 ) -> None:
-    # Every second slide is scanned, and today its title comes out one level lower.
+    # Every second slide is scanned: its title is a slide title like the typed ones.
     assert site.student_file(mixed).xpath("//h3|//h4|//h5|//h6") == []
 
 
