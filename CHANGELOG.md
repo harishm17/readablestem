@@ -17,10 +17,12 @@
   counts: right 140 to 141 of 267, faultless 72 to 72, blocks broken 106 to 99, joins across
   columns 35 to 27; no page that was right is not right. The search is not limited to first
   pages: a page whose columns lie under a row of figures reads the same way. On the 996 analyzed
-  files (every PDF of the corpus, three variants) 9 files change. Five pages in 3 papers are the
+  files (every PDF of the corpus, three variants) 7 files change. Five pages in 3 papers are the
   columns found (a join across the columns or alternating single lines gone; one page no longer
-  read as code), the numbered lines make 3 more pages in 3 papers, and the notice is the only
-  change in 2 files. No page of a textbook changes.
+  read as code), 3 other papers change by the numbered lines below (two of them also by the
+  notice), and the notice is the only change in 1 file. Of the 73 converted uploads 5 change, by
+  the notice alone. No page of a textbook changes: its four copies of a file, which this rule
+  once changed, are as they were.
 - A numbered line that runs to the right edge no longer takes the next number into its block when
   it is the whole run so far: the affiliations of a paper, numbered 1, 2, 3 to the margin, were
   one paragraph (`figures._starts_block`). Inside a run of numbered lines it still reads as the
