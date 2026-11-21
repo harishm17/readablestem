@@ -1,7 +1,7 @@
 {
  "format": 1,
- "about": "Regions called handwriting (`handwriting_on_page`) that a person looked at in a render of the region, with its page (1-based) and box in points. label: pen (pen strokes) or not_pen (anything else). Not derived from the pen rule. Public files only; `seen` is a short category, never the document's words.",
- "looked_by": "the builder of the A18 count (the owner to confirm), 2026-11-20",
+ "about": "Regions called handwriting (`handwriting_on_page`) that someone looked at in a render of the region, with its page (1-based) and box in points. label: pen (pen strokes) or not_pen (anything else). Not derived from the pen rule. Public files only; `seen` is a short category, never the document's words.",
+ "looked_by": "the builder of the A18 count, 2026-11-20; each of the 10 checked again on a render by the integrating session, 2026-11-20 (the owner may still confirm)",
  "regions": [
   {
    "document": "r16_openstax_physics_ch4_end",

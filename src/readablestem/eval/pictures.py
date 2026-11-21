@@ -13,12 +13,12 @@ asks, with no model and no new conversion step. Per document and added up:
 - the regions called handwriting, each with its page and box (numbers, never words), and the
   notices that go with them;
 - against a truth list (`data/eval/pen-truth.json`): of the regions called handwriting, how
-  many a person saw as pen strokes, how many as something else (typeset or vector drawings,
+  many were seen as pen strokes, how many as something else (typeset or vector drawings,
   glyph outlines: the count that must be 0), and how many nobody has looked at yet.
 
-The truth list is written by a person looking at the region, not derived from the rule that
-makes the call: a list built from the pen rule would score the rule against itself. It holds
-one row per region: the document, the 1-based page, the box in points, `pen` or `not_pen`,
+The truth list is written by someone looking at a render of the region, not derived from the
+rule that makes the call: a list built from the pen rule would score the rule against itself.
+It holds one row per region: the document, the 1-based page, the box in points, `pen` or `not_pen`,
 and who looked. A region matches a row on the same page whose box overlaps it by at least
 half (intersection over union), so a change of crop does not lose the label.
 
@@ -127,7 +127,7 @@ def count_document(result: DocumentResult) -> dict[str, Any]:
 
 
 def read_truth(path: Path = TRUTH) -> list[dict[str, Any]]:
-    """The rows of the truth list: each a region a person looked at (document, page, bbox,
+    """The rows of the truth list: each a region someone looked at (document, page, bbox,
     label `pen` or `not_pen`, seen_by)."""
     rows = json.loads(path.read_text(encoding="utf-8"))["regions"]
     for row in rows:

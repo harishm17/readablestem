@@ -3650,7 +3650,7 @@ answer). The counts of those uploads are not what production makes of them, exce
 reasons that come before any model step (`handwriting_on_page`, `scanned_page`, `unread_page`)
 and the regions called handwriting, which layout makes alone.
 
-**The truth list** (`data/eval/pen-truth.json`) holds regions a person looked at in a render of
+**The truth list** (`data/eval/pen-truth.json`) holds regions someone looked at in a render of
 the region: the document, the 1-based page, the box, `pen` or `not_pen`, and a short word for
 what was seen. A region called handwriting matches a row on the same page whose box overlaps
 it by at least half. The report says how many called regions were seen as pen strokes, how
@@ -3984,7 +3984,7 @@ limits is still owed.
 | `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
 | `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
 | `src/readablestem/eval/pictures.py` | `eval pictures`: A18's count (pictures not converted by reason, content pictures with empty alt, regions called handwriting) from the measured replay, and the reading of those regions against the truth list |
-| `data/eval/pictures-corpus.json`, `data/eval/pen-truth.json` | the last pictures record of the corpus, and the regions a person saw as pen strokes or not |
+| `data/eval/pictures-corpus.json`, `data/eval/pen-truth.json` | the last pictures record of the corpus, and the regions seen as pen strokes or not |
 | `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
 | `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
 | `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |

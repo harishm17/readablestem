@@ -5,7 +5,7 @@
 - New `readablestem eval pictures`: from the same replay as `eval outputs`, per upload and added
   up, the pictures not converted by reason, the content pictures with empty alt, the regions
   called handwriting (page and box only) and their notices, and those regions read against a
-  truth list of regions a person looked at (`data/eval/pen-truth.json`). The audit of each
+  truth list of regions someone looked at (`data/eval/pen-truth.json`). The audit of each
   result now also keeps these counts (`eval/pictures.py`, `eval/outputs.py`).
 - First count, on the 39 audit documents (144 images): 0 content pictures with empty alt (12 in
   the audit); 15 pictures kept as images before any model step; 9 regions called handwriting

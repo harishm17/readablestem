@@ -2263,8 +2263,7 @@ def register(
     pictures.add_argument(
         "--truth",
         type=Path,
-        help="the list of regions a person saw as pen strokes or not "
-        "(default: data/eval/pen-truth.json)",
+        help="the list of regions seen as pen strokes or not (default: data/eval/pen-truth.json)",
     )
     pictures.set_defaults(func=_cmd_pictures)
 
