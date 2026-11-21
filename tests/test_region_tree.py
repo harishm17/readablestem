@@ -15,7 +15,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from readablestem.pipeline import layout, tables as table_step
+from readablestem.pipeline import layout
+from readablestem.pipeline import tables as table_step
 from readablestem.pipeline.layout import regions
 from test_tables_detect import grid_table
 
