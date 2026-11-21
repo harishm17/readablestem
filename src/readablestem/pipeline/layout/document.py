@@ -97,6 +97,7 @@ from readablestem.pipeline.layout.rows import (
 )
 from readablestem.pipeline.layout.shared import _Display, _PageBlocks, _Path, _Row
 from readablestem.pipeline.layout.tables import _claim_tables, _table_regions
+from readablestem.pipeline.step_facts import PageTrace
 
 HEADING_LEVEL_TOLERANCE = 0.05  # heading sizes within 5 % of each other share a level
 
@@ -191,6 +192,7 @@ def analyze(
                         region_tree=region_tree,
                         panels=join_panels,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
+                        trace=PageTrace(),
                     ),
                     on_page,
                 )
@@ -353,7 +355,9 @@ def _analyze_document(
     refused: dict[int, list[tuple[BBox, str]]] = {}  # table proposals the region tree refused
     for number in selected:
         with guard(number):
+            lap = document.trace.lap(number)
             rows, drawn, kind = _read_page(doc[number], document, producer)
+            lap("read")
             if _kept_whole(kind):
                 # Nothing but the header and footer bands of its paths is read again (by the
                 # margin filter, before this page is dropped): a page of tens of thousands of
@@ -432,6 +436,7 @@ def _analyze_document(
             # now a picture takes no row the break split.
             unclaimed = frags[number]
             refused_before = document.detector.refused
+            lap = document.trace.lap(number)
             found[number] = (
                 []
                 if number in text_kept
@@ -457,6 +462,7 @@ def _analyze_document(
                     ),
                 )
             )
+            lap("tables")
             if document.detector.refused > refused_before:
                 not_searched.append(number)
             sources[number] = say_once.PageSource()
@@ -477,9 +483,11 @@ def _analyze_document(
             # Axes with tick labels, an axis title or a curve from their corner are a plot's:
             # the rows the header and footer rules dropped count (tick labels in the bands).
             # Rulers with no labels whose ticks are an answer field's cells are not rulers.
+            lap("rows")
             page_rows = [*prepared[number][0], *prepared[number][2]]
             _answer_fields(paths[number], page_rows)
             _mark_plots(paths[number], page_rows)
+            lap("figures")
     forget()
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
@@ -600,6 +608,7 @@ def _analyze_document(
         tables_not_searched=not_searched,
         sources=sources,
         table_refusals={n: r for n, r in sorted(refused.items()) if r},
+        page_steps=document.trace.facts(),
     )
 
 

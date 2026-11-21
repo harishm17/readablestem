@@ -75,3 +75,34 @@ def test_the_bar_judges_nothing_it_cannot_compare(tmp_path, capsys):
     other.write_text(json.dumps(elsewhere))
     assert speed("--from", one, "--against", other) == 2
     assert "another machine class" in capsys.readouterr().out
+
+
+def test_a_conversion_is_timed_page_by_page_and_the_report_names_the_slowest_page(tmp_path, capsys):
+    import pymupdf
+
+    from readablestem.config import Settings
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline import run
+
+    pdf = pymupdf.open()
+    for number in (1, 2):
+        pdf.new_page().insert_text((72, 100), f"Page {number} has a line of ordinary text.")
+    output = run.convert_pdf(
+        pdf.tobytes(),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        client=FakeVisionClient(),
+    )
+    assert output.facts is not None
+    done = Converted(
+        "w_lecture_5111", pages=2, kinds=["typical"] * 2, facts=output.facts, wall_s=1.0, cpu_s=1.0
+    )
+    kept = tmp_path / "speed.json"
+    assert speed("--from", records(tmp_path, "a", [done]), "--out", kept) == 0
+    said = capsys.readouterr().out
+
+    trace = json.loads(kept.read_text())["metrics"]["trace"]
+    assert trace["pages"] == 2
+    assert {row["page"] for row in trace["slowest"]} == {1, 2}
+    assert all(row["step"] in trace["steps"] and row["seconds"] > 0 for row in trace["slowest"])
+    assert trace["s_page"]["max"] >= trace["s_page"]["p50"] > 0
+    assert "slowest pages:" in said

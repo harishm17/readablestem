@@ -125,6 +125,7 @@ from readablestem.core.types import (
     NotFinished,
     Notice,
     PageMathSummary,
+    PageStageFact,
     PageStats,
     PageWitnessSummary,
     ProgressEvent,
@@ -1071,6 +1072,8 @@ class _Run:
     vector: dict[int, image_page_vector.VectorPage] = field(default_factory=dict)
     # The paragraph (or list item, figure) each inline equation sits in, by id.
     parents: dict[str, Element] = field(default_factory=dict)
+    # The time of each page's crops (`PageTrace`).
+    trace: step_facts.PageTrace = field(default_factory=lambda: step_facts.PageTrace(enabled=False))
 
     def start_stages(self, elements: list[Element]) -> None:
         """Each model stage's total, counting what was decided before any model work (a
@@ -1106,7 +1109,10 @@ class _Run:
             )
             and not image_page.no_crop(e, self.fixes)
         ]
-        with _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)):
+        with (
+            _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)),
+            self.trace.step(page, "crops"),
+        ):
             for element in work:
                 self.crop_and_submit(element)
         self.pages.submitted(page)
@@ -1933,6 +1939,10 @@ def _convert(
     # time, and every request to a model with its page.
     watch = step_facts.Stopwatch()
     measured: list[CallFact] = []
+    # Where each page's time went: layout's steps come with its result, the crops are timed
+    # here (`step_facts.PageTrace`).
+    crop_trace = step_facts.PageTrace()
+    page_steps: list[PageStageFact] = []
     # The steps run in shadow (`pipeline.shadow`): a step that is given this runs beside
     # the conversion and can change nothing of it.
     shadowed = shadow.Shadow()
@@ -1980,6 +1990,8 @@ def _convert(
             )
             ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
             tables_late.update(getattr(doc, "tables_not_searched", None) or ())
+            # (the second layout run of the page math pass is not in the trace)
+            page_steps.extend(getattr(doc, "page_steps", None) or [])
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
@@ -2098,6 +2110,7 @@ def _convert(
                 cache=step_cache,
                 observer=call_observer,
                 vector=vector_pages if settings.image_pages_vector_crops else {},
+                trace=crop_trace,
             )
             # The text pass adds links, colour runs and passage languages to the elements
             # without touching their text or anything a step reads, and the heading
@@ -2216,7 +2229,11 @@ def _convert(
             ),
         )
         facts = step_facts.gathered(
-            measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
+            measured,
+            watch,
+            stops + step_facts.capped(ordered),
+            shadowed.facts(),
+            sorted([*page_steps, *crop_trace.facts()], key=lambda fact: fact.page),
         )
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
