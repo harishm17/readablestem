@@ -8,7 +8,8 @@ from __future__ import annotations
 
 import pymupdf
 
-from readablestem.core.types import Kind
+from readablestem.core.types import ConversionOptions, Kind
+from readablestem.pipeline import options as run_options
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.heading_step import heading_fixes
 from readablestem.pipeline.layout import analyze
@@ -363,6 +364,55 @@ def test_an_algorithm_keeps_its_lines_and_three_indent_levels():
         assert any(  # a paragraph still, its two values inline equations
             (e.text or "").startswith("where ") and not e.preformatted for e in elements
         )
+
+    # A bold letter in a step that waits for evidence (notation memory) is put back as a plain
+    # letter: the lines stay as they were, one to a step, and keep their indentation.
+    def bold_letter(page):
+        y = algorithm(page, 100)
+        end = 72 + pymupdf.get_text_length(ALGORITHM[0][1], fontname="helv", fontsize=BODY)
+        page.insert_text((end + 4, 100 + 14), "W", fontsize=BODY, fontname="hebo")
+        return y
+
+    with run_options.using(ConversionOptions(notation_memory=True)):
+        (step,) = [e for e in analyze(page_of(bold_letter)).elements if e.preformatted]
+    assert step.text.split("\n")[3:5] == ["  if w is stressed then", "    count = count + 1"]
+    assert step.text.split("\n")[0] == "input: a line of verse W"
+
+    # The index of a tall expression hangs a little under the end of its step (the text layer
+    # sets it apart): it is part of that step, and the steps after it stay in the block.
+    def hanging(page):
+        page.insert_text((72, 100), "Algorithm 3 Estimate a value", fontsize=BODY, fontname="helv")
+        y = 114.0
+        for text in ("1: Set the start value.", "2: for k = 0 to M do", "3: Set a = b + c."):
+            page.insert_text((72, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        small = "4: y = SGDstep(x, z"  # a step set smaller than the others, an index under its end
+        page.insert_text((72, y - 4), small, fontsize=8, fontname="helv")
+        end = 72 + pymupdf.get_text_length(small, fontname="helv", fontsize=8)
+        page.insert_text((end - 8, y + 3.5), "1:T).", fontsize=8, fontname="symb")
+        for text in ("5: Stop if the criteria are met.", "6: end for"):
+            page.insert_text((72, y + 18), text, fontsize=BODY, fontname="helv")
+            y += 14
+
+    (step,) = [e for e in analyze(page_of(hanging)).elements if e.preformatted]
+    assert [line[:2] for line in step.text.split("\n")] == ["1:", "2:", "3:", "4:", "5:", "6:"]
+
+    # The nearest thing the indent proof must not take: two paragraphs under a caption, each set
+    # in on its first line, with lines that open "For" and "If" (set in, then back out).
+    def paragraphs(page):
+        page.insert_text((72, 100), "Algorithm 2 Overview of the method", fontsize=BODY)
+        text = [
+            (87, "We take every verse of the poem and scan it one word at a time until the"),
+            (72, "end is reached. For every word of the verse we count the stressed syllables"),
+            (72, "and add them to the running total, which is kept for the whole poem."),
+            (87, "If the total is above the threshold then the verse is marked as heavy and"),
+            (72, "we go on to the next one. For each marked verse we write a line in the margin"),
+            (72, "and return to the start of the poem when all verses have been read."),
+        ]
+        for n, (x, line) in enumerate(text):
+            page.insert_text((x, 128 + 13.5 * n), line, fontsize=BODY)
+
+    assert not [e for e in analyze(page_of(paragraphs)).elements if e.preformatted]
 
 
 def test_a_sentence_that_begins_with_algorithm_and_a_number_is_not_one():
@@ -947,6 +997,103 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
     inside = body.model_copy(update={"text": "aim to map ⟦p1-e21⟧ across them", "links": []})
     marks = {note.id: layout_module._FootnoteMark(body.id, "here K > 2", "1")}
     assert layout_module._footnote_links([inside, note], marks)[0].links == []
+
+
+def body_with_marks(page, mark: str = "1", after: str = " at sea level.", font: str = "helv"):
+    """A line of text with a raised mark after "degrees" (and a raised "0", as in "P0"), and the
+    note under it that opens with the mark: the page every row below changes a little."""
+    lead = "Water boils at one hundred degrees"
+    page.insert_text(
+        (72, 100), "The boiling point of water depends on the pressure.", fontsize=BODY
+    )
+    page.insert_text((72, 115), lead, fontsize=BODY, fontname="helv")
+    end = 72 + pymupdf.get_text_length(lead, fontname="helv", fontsize=BODY)
+    page.insert_text((end + 0.5, 110), mark, fontsize=7, fontname="helv")
+    page.insert_text((end + 5, 115), after, fontsize=BODY, fontname=font)
+    page.insert_text((72, 140), "The curve P", fontsize=BODY, fontname="helv")
+    page.insert_text((72 + 52, 143), "0", fontsize=7, fontname="helv")
+    page.draw_line((72, 700), (200, 700))
+
+
+def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
+    # Row 1: a row of axis labels, a page number and a running footer under a real note are
+    # not notes, though a "0" and a "1" are raised above ("P0", the mark itself).
+    def noise(page):
+        body_with_marks(page)
+        page.insert_text((72, 712), "1 Pressure matters.", fontsize=8)
+        page.insert_text((72, 738), "0 . 1   0 . 2   0 . 3", fontsize=8)
+        page.insert_text((72, 754), "12 Water and Boiling", fontsize=8)
+        page.insert_text((300, 770), "1", fontsize=8)
+
+    layout = analyze(page_of(noise))
+    by_id = {e.id: e for e in layout.elements}
+    notes = [by_id[n.element_id].text for n in layout.notices if n.code == "footnote"]
+    assert notes == ["1 Pressure matters."]
+
+    # Row 2: a note that opens "In", "As", "He" ...: the mark and the word are no nuclide.
+    def indium(page):
+        body_with_marks(page)
+        page.insert_text((72, 709), "1", fontsize=5.5, fontname="helv")
+        page.insert_text((77, 712), "In fact the pressure changes with height.", fontsize=8)
+
+    layout = analyze(page_of(indium))
+    note = next(e for e in layout.elements if "In fact" in (e.text or ""))
+    assert not [e for e in layout.elements if e.kind == Kind.EQUATION and "In" in (e.text or "")]
+    assert any(link.target_id == note.id for e in layout.elements for link in e.links)
+
+    # Row 3: its mark in the text, before a math letter, stays text ("system,1 n").
+    def math_letter(page):
+        body_with_marks(page, after="n", font="symb")
+        page.insert_text((72, 709), "1", fontsize=5.5, fontname="helv")
+        page.insert_text((77, 712), "Pressure matters.", fontsize=8)
+
+    layout = analyze(page_of(math_letter))
+    equations = {e.text for e in layout.elements if e.kind == Kind.EQUATION}
+    assert equations == {"\u03bd", "P0"}
+    body = layout.elements[0]
+    assert body.text.startswith("The boiling point") and body.links[0].kind == "internal"
+
+    # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
+    # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.
+    def nearest(page):
+        body_with_marks(page, after=".")
+        page.insert_text((72, 709), "1", fontsize=5.5, fontname="helv")
+        page.insert_text((77, 712), "Pressure matters.", fontsize=8)
+        x = 72 + pymupdf.get_text_length("The mass grows as ", fontname="helv", fontsize=BODY)
+        page.insert_text((72, 200), "The mass grows as ", fontsize=BODY, fontname="helv")
+        page.insert_text((x, 200), "n", fontsize=BODY, fontname="symb")
+        page.insert_text((x + 7, 195), "1", fontsize=7, fontname="helv")
+        at = (
+            x
+            + 20
+            + pymupdf.get_text_length("and the sample holds ", fontname="helv", fontsize=BODY)
+        )
+        page.insert_text((x + 20, 200), "and the sample holds ", fontsize=BODY, fontname="helv")
+        page.insert_text((at, 195), "14", fontsize=7, fontname="helv")
+        page.insert_text((at + 8, 200), "C in it.", fontsize=BODY, fontname="helv")
+
+    layout = analyze(page_of(nearest))
+    equations = {e.text for e in layout.elements if e.kind == Kind.EQUATION}
+    assert {"\u03bd 1", "14C"} <= equations
+
+
+def test_a_note_the_file_names_but_no_link_points_at_is_linked_by_its_mark():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    body_with_marks(page, mark="2", after=". Next we measure it.")
+    page.insert_text((72, 712), "2", fontsize=5.5, fontname="helv")
+    page.insert_text((77, 715), "Pressure is measured in pascals.", fontsize=8)
+    names = doc.get_new_xref()
+    doc.update_object(names, f"<< /Names [(footnote@2) [{page.xref} 0 R /XYZ 72 77 null]] >>")
+    tree = doc.get_new_xref()
+    doc.update_object(tree, f"<< /Dests {names} 0 R >>")
+    doc.xref_set_key(doc.pdf_catalog(), "Names", f"{tree} 0 R")
+    layout = analyze(doc.tobytes())
+    (note,) = [e for e in layout.elements if (e.text or "").startswith("2")]
+    body = layout.elements[0]
+    (link,) = body.links
+    assert (link.kind, link.target_id) == ("internal", note.id)
+    assert (body.text or "")[link.start : link.end] == "2"
 
 
 def named_footnote_pdf() -> bytes:

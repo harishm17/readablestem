@@ -15,7 +15,13 @@ from readablestem.pipeline import chem, equation_images, glyph_math, hyphens, sc
 from readablestem.pipeline.layout.context import _PLAIN, _Document
 from readablestem.pipeline.layout.drawings import BARE_EQUATION_NUMBER, EQUATION_NUMBER
 from readablestem.pipeline.layout.figures import CAPTION, _prose_spans, _prose_words
-from readablestem.pipeline.layout.glyphs import _ACCENTS, _SIGNS, _Char, _font_traits
+from readablestem.pipeline.layout.glyphs import (
+    _ACCENTS,
+    _SIGNS,
+    NOTE_MARK_FLAG,
+    _Char,
+    _font_traits,
+)
 from readablestem.pipeline.layout.rows import _DEGREE_SIGNS, _join_rows, _text_char
 from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
@@ -638,7 +644,8 @@ def _nuclide_runs(row: _Row, kinds: list[ScriptKind | None]) -> list[tuple[int, 
     (`_script_glyphs` gives them a kind: a group of digits and a capital letter at once after
     it). The run is kept only when the group is all digits, starts at the beginning of a word,
     and the letters after it are the symbol of an element (`speech_nuclides.ELEMENTS`) that
-    does not go on into a longer word: "226Ra" is a nuclide, "10 m2S" is not."""
+    does not go on into a longer word: "226Ra" is a nuclide, "10 m2S" is not. A footnote's
+    mark (`NOTE_MARK_FLAG`) is no mass number: "6In fact" is a note, not indium."""
     from readablestem.pipeline.speech_nuclides import ELEMENTS
 
     chars = row.chars
@@ -660,7 +667,7 @@ def _nuclide_runs(row: _Row, kinds: list[ScriptKind | None]) -> list[tuple[int, 
         if (
             not glued
             and group
-            and all(c.c.isdigit() for c in group)
+            and all(c.c.isdigit() and not c.flags & NOTE_MARK_FLAG for c in group)
             and len(group) <= MAX_NUCLIDE_DIGITS
             and k < n
             and chars[k].c.isupper()
