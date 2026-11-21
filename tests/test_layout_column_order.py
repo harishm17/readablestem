@@ -55,3 +55,31 @@ def test_a_short_heading_beside_a_gap_in_the_other_column_still_breaks_the_colum
     boxes = [above_left, above_right, heading, below_left, below_right]
     read = [boxes[i] for i in order(boxes)]
     assert read == [above_left, above_right, heading, below_left, below_right]
+
+
+def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other():
+    # A title, authors and affiliations centered over both columns (more lines across the
+    # gutter than a column may have), an abstract across the page, then two columns.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 60.0
+    for text in ("A Title", "Of Two Lines", "First Author", "Second Author", "Third Author"):
+        width = pymupdf.get_text_length(text, "helv", 12)
+        page.insert_text((306 - width / 2, y), text, fontsize=12, fontname="helv")
+        y += 16
+    for text in ("Institute One", "Institute Two", "Institute Three"):
+        width = pymupdf.get_text_length(text, "helv", 9)
+        page.insert_text((306 - width / 2, y), text, fontsize=9, fontname="helv")
+        y += 12
+    for _ in range(4):
+        page.insert_text((54, y + 8), "abstract " * 11, fontsize=10, fontname="helv")
+        y += 12
+    top = y + 20
+    for x, name in ((54.0, "left"), (317.0, "right")):
+        for i in range(24):
+            line = f"{name} column line {i} " + "word " * 7
+            page.insert_text((x, top + 12 * i), line, fontsize=10, fontname="helv")
+    text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
+    assert text.rindex("left column line") < text.index("right column line")

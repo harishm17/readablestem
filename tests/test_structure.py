@@ -614,6 +614,31 @@ def broken(page, y: float, text: str, x: float = 72.0, hang: float = 0.0) -> flo
     return y + 14
 
 
+def test_a_numbered_line_that_runs_to_the_right_edge_does_not_take_the_next_number():
+    # The affiliations of a paper: raised numbers, small type, each one line that reaches past
+    # the right edge of the body text, one after the other.
+    def fill(page):
+        page.insert_textbox(
+            pymupdf.Rect(44, 100, 440, 250),
+            LONG,
+            fontsize=10,
+            fontname="helv",
+            lineheight=1.3,
+            align=3,
+        )
+        y = 300
+        for n in (1, 2, 3):
+            line = "Department of the study of verse, University of Somewhere in "
+            while pymupdf.get_text_length(line + "Another", "helv", 8) < 440:
+                line += "Another "
+            page.insert_text((44, y - 3), str(n), fontsize=6.2, fontname="helv")
+            page.insert_text((50, y), line.strip(), fontsize=8, fontname="helv")
+            y += 10
+
+    texts = [e.text for e in analyze(page_of(fill)).elements]
+    assert [t[0] for t in texts[1:]] == ["1", "2", "3"]
+
+
 def test_a_step_with_no_number_may_run_over_several_lines_and_text_under_the_last_is_no_step():
     title = "Algorithm 1 Count stressed syllables"
     given = (

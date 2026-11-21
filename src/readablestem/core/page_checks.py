@@ -82,6 +82,12 @@ ROWS: tuple[CheckLine, ...] = (
         not_checked=True,
     ),
     _page("page_turned", "none", "a page saved sideways, turned to read it", "handled"),
+    _page(
+        "actualtext_ignored",
+        "optional",
+        "a page read from its printed characters, where the file says other text for them",
+        not_checked=True,
+    ),
     _page("ocr_text_layer_ignored", "none", "hidden text on a page kept as an image"),
     _page(
         "tables_not_searched",

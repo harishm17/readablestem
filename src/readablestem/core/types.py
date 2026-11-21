@@ -994,6 +994,9 @@ NOTICE_CODES = frozenset(
         "source_not_compared",
         # A page saved sideways (no /Rotate) that was turned to be read (`layout.document`).
         "page_turned",
+        # A typed page that carries ActualText and was read from its printed characters, the
+        # two readings differing in more than spaces and hyphens (`page_type.actualtext_flag`).
+        "actualtext_ignored",
         # LaTeX source: words or pictures no rule of the reader took (`source.report`
         # `SourceReport.unread_words`, `unread_pictures`): `count` of them.
         "source_unread",
