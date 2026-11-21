@@ -23,6 +23,9 @@ Templates read this module as the `strings` global (`{{ strings.KEEP_AS_IMAGE }}
 # it afterwards.
 KEEP_AS_IMAGE = "Keep as image"
 KEPT_AS_IMAGE = "Kept as image (your choice)"
+# A page that could not be drawn has no image to keep: its note is what stays.
+KEEP_AS_NOTE = "Keep the note"
+KEPT_AS_NOTE = "Kept as a note (your choice)"
 KEEP_ORIGINAL = "Keep the original"
 KEPT_ORIGINAL = "Kept the original (your choice)"
 KEEP_WITHOUT_DESCRIPTION = "Keep without a description"

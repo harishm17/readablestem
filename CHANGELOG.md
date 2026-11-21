@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: a page that cannot be drawn is that page's problem (O-003)
+
+- A file with one page that makes MuPDF abort or run past the probe's time failed whole
+  (`unreadable` or `too_complex`) although every other page could be read. When the probe of all
+  the pages fails, layout now probes again in halves (`access.probe_failures`) until the failing
+  pages are single, and reads the others. Each failing page is kept with the new reason
+  `page_not_rendered`: a figure with no picture, a required decision, the notice
+  `page_not_rendered`, and in the student file "Not converted. This page could not be shown."
+  Nothing in the web process opens that page again (no crop, tags, links or images).
+- The search is bounded: after the probe of all the pages, at most 40 probes (2 for each halving:
+  14 find one bad page of 100) and 300 s. A file in which every page fails, in which the halves
+  pass although the whole did not, or in which the search runs out of probes or time, fails with
+  the first probe's error as before. On 100 plain pages with one page whose child dies, 15 probes
+  take 2.7 s (0.7 s for the probe alone); a page that hangs costs its whole time limit each time
+  it is in a probe, so a hang in a file of 100 pages still fails the file (docs/layout.md).
+- Counted first: of 148 files (the 120 tracked public PDFs and the 28 of the private corpus, no
+  held-out or sealed set), one fails the probe, the committed damaged fixture, which has one page
+  and so still fails whole. No corpus file changes.
+- No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` raise is owed, no migration.
+
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
 - Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The

@@ -32,10 +32,10 @@ from readablestem.pipeline.layout.access import (
     _check_content,
     _digest,
     _document_lang,
-    _ensure_probed,
     _open,
     _quiet_mupdf,
     _select_pages,
+    probe_failures,
 )
 from readablestem.pipeline.layout.blocks import (
     MAX_HEADING_CHARS,
@@ -47,7 +47,7 @@ from readablestem.pipeline.layout.blocks import (
     section_number,
 )
 from readablestem.pipeline.layout.bold import _glossary_entries, _lead_entries, _settle_bold_letters
-from readablestem.pipeline.layout.context import Layout, LayoutError, _Document, _PageGuard
+from readablestem.pipeline.layout.context import Layout, LayoutError, _Document, _PageGuard, log
 from readablestem.pipeline.layout.drawings import _page_paths
 from readablestem.pipeline.layout.elements import _contents_links, _footnote_links, _to_elements
 from readablestem.pipeline.layout.figures import (
@@ -180,7 +180,9 @@ def analyze(
                 _check_content(lambda: content_budget.check_objects(doc))  # before the page tree
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _check_content(lambda: content_budget.check(doc, selected))
-                _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
+                unrendered = probe_failures(pdf_bytes, _digest(pdf_bytes), selected)
+                for number, error in unrendered.items():  # the page and the code, no content
+                    log.warning("layout could not draw page %d: %s", number + 1, error.code)
                 return _analyze_document(
                     doc,
                     selected,
@@ -193,6 +195,7 @@ def analyze(
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
                     ),
                     on_page,
+                    unrendered,
                 )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
@@ -325,6 +328,7 @@ def _analyze_document(
     page_math: Any,
     document: _Document,
     on_page: Callable[[int, int], None] | None = None,
+    unrendered: dict[int, LayoutError] | None = None,
 ) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
@@ -333,6 +337,10 @@ def _analyze_document(
     document.tex_made = producer == "tex"
     guard = _PageGuard()
     guard.pages = list(selected)
+    # Pages the probe could not draw (`access.probe_failures`) are failed pages from the start:
+    # no step reads them, and they are kept (`keep_failed`) with a reason of their own.
+    unrendered = unrendered or {}
+    guard.failed.update(unrendered)
 
     def forget() -> None:
         # A page that failed in a step is not in the later ones: whatever the steps before
@@ -345,13 +353,17 @@ def _analyze_document(
     def keep_failed() -> None:
         for number in guard.failed:
             if number in selected:  # a failed reference page of the margin filter is not one
-                kept[number] = page_type.PAGE_READ_FAILED
+                kept[number] = (
+                    page_type.PAGE_NOT_RENDERED
+                    if number in unrendered
+                    else page_type.PAGE_READ_FAILED
+                )
 
     found: dict[int, list[tables.PageTable]] = {}
     prepared: dict[int, tuple[list[_Row], Gutter, list[_Row]]] = {}
     sources: dict[int, say_once.PageSource] = {}
     refused: dict[int, list[tuple[BBox, str]]] = {}  # table proposals the region tree refused
-    for number in selected:
+    for number in guard.live(selected):
         with guard(number):
             rows, drawn, kind = _read_page(doc[number], document, producer)
             if _kept_whole(kind):
@@ -483,7 +495,7 @@ def _analyze_document(
     forget()
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
-    ctx.notes = named_links.read(doc, list(selected)) or None
+    ctx.notes = named_links.read(doc, [n for n in selected if n not in unrendered]) or None
     ctx.region_tree = document.region_tree
     document.compounds, document.whole_words = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows

@@ -308,7 +308,7 @@ def _reject_words(fix: Fix | None, element: Element | None, origin: str) -> str:
     if fix is None:
         return strings.KEPT_ORIGINAL
     if is_kept_image(fix):
-        return strings.KEPT_AS_IMAGE
+        return strings.KEPT_AS_NOTE if fix.reason == "page_not_rendered" else strings.KEPT_AS_IMAGE
     if reject_keeps(origin, fix, element) == "written":
         return strings.LEFT_AS_WRITTEN
     if fix.kind is Kind.HEADING:

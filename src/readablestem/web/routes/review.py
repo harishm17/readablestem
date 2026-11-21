@@ -301,6 +301,14 @@ KEPT_IMAGE_WORDS = RejectWords(
     strings.KEPT_AS_IMAGE,
 )
 
+# A page that could not be drawn (`page_not_rendered`): there is no picture, only a note.
+NOT_RENDERED_WORDS = RejectWords(
+    strings.KEEP_AS_NOTE,
+    "Students see a note that the page could not be shown, marked “Not converted”.",
+    "Kept as a note, marked “Not converted”.",
+    strings.KEPT_AS_NOTE,
+)
+
 
 def reject_words(
     kind: Kind, element: Element | None, fix: Fix | None = None, origin: str = "pdf"
@@ -309,7 +317,7 @@ def reject_words(
     bold in the PDF (as `assemble` writes it); a page kept as an image stays one; a source's
     formula with no picture stays as written."""
     if fix is not None and is_kept_image(fix):
-        return KEPT_IMAGE_WORDS
+        return NOT_RENDERED_WORDS if fix.reason == "page_not_rendered" else KEPT_IMAGE_WORDS
     if fix is not None and reject_keeps(origin, fix, element) == "written":
         return AS_WRITTEN_WORDS
     if kind is Kind.HEADING:
@@ -721,6 +729,18 @@ PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
             "“Not converted”, so a student using a screen reader hears only that for it.",
             "The rest of the document was read. In the HTML each page is an image marked "
             "“Not converted”, so a student using a screen reader hears only that for it.",
+        ),
+    },
+    "page_not_rendered": {
+        "title": ("Page that could not be shown", "Pages that could not be shown"),
+        "lead": ("{pages} could not be shown.", "{pages} could not be shown."),
+        "explain": (
+            "Nothing was read from it and no picture of it could be made. The rest of the "
+            "document was read. In the HTML the page is a note marked “Not converted”, so a "
+            "student using a screen reader hears only that. Compare the file with the original.",
+            "Nothing was read from them and no picture of them could be made. The rest of the "
+            "document was read. In the HTML each page is a note marked “Not converted”, so a "
+            "student using a screen reader hears only that. Compare the file with the original.",
         ),
     },
     "handwriting_on_page": {
