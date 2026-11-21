@@ -3,10 +3,10 @@
   "task": "tables",
   "mode": "local",
   "date": "2026-11-20",
-  "pipeline_version": "0.5.14",
+  "pipeline_version": "0.5.15",
   "profile": {
     "name": "development settings",
-    "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
+    "sha256": "e48df1a1dc7f72e7f0e18ee34c6bf1b7b44f8c22d528df14337492c42e8f11f2",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -77,6 +77,8 @@
     "IMAGE_PAGES_VECTOR_CHECKS": true,
     "IMAGE_PAGES_VECTOR_CROPS": false,
     "LAYOUT_DISPLAY_GROUPING": false,
+    "LAYOUT_INLINE_JOINS": false,
+    "LAYOUT_JOIN_PANELS": false,
     "MATH_READER_CLAUDE_EFFORT": "medium",
     "MATH_READER_CLAUDE_ENABLED": false,
     "MATH_READER_CLAUDE_MODEL": "claude-sonnet-5-5",
@@ -231,10 +233,10 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "c04ee4a307ee44129431a93f660e832b8fbdac5d",
-    "clean": false,
-    "pipeline_version": "0.5.14",
-    "render_version": 10,
+    "commit": "ecb1bee043647dd1e5b15d09b5c02d5441441401",
+    "clean": true,
+    "pipeline_version": "0.5.15",
+    "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",
       "latexml": "latexml (LaTeXML version 0.8.8)",
@@ -478,8 +480,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 5858.0,
-    "p95": 13741.599999999979,
+    "p50": 6824.0,
+    "p95": 16300.999999999976,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }
