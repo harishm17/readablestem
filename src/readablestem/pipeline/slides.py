@@ -38,8 +38,9 @@ back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, 
    replaced by `\\only<2>{B}`) stays, as a step: "step 1 of 2" is added to its heading.
 4. Titles: the frame title is the largest text in the top third of the page (at least 1.15 x
    the body; a line that is only a formula is no title), and always a heading; its lines are
-   one title when they follow each other in one size. What lies above it in the page's headline (section and subsection names, a drawn bar)
-   is furniture and is dropped, and slide numbers alone in the top or bottom band are too. The
+   one title when they follow each other in one size. What lies above it in the page's
+   headline (section and subsection names, a drawn bar) is furniture and is dropped, and slide
+   numbers alone in the top or bottom band are too. The
    headline's text is kept as `Deck.context` for the page, so a reader of the record can still
    see which section a frame was in.
 """
