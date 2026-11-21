@@ -74,6 +74,16 @@ _SCOPING = re.compile(
     r"\\(?:over|atop|choose|above|it|tt|sf|sl|sc|em|boldmath|color|[Ll]arge|Huge|huge|tiny|small"
     r"|footnotesize|normalsize)(?![A-Za-z])"
 )
+# A matrix is its rows between the brackets its name stands for (none for `matrix`), the way
+# `\left(\begin{array}...\end{array}\right)` is.
+_MATRICES = {
+    "matrix": ("", ""),
+    "pmatrix": ("(", ")"),
+    "bmatrix": ("[", "]"),
+    "Bmatrix": ("\\{", "\\}"),
+    "vmatrix": ("|", "|"),
+    "Vmatrix": ("\u2016", "\u2016"),
+}
 _ENVIRONMENTS = "array|aligned|align\\*?|eqnarray\\*?|split|gathered"
 
 
@@ -321,16 +331,33 @@ def _alignment_marks_off(s: str) -> str:
     return re.sub(rf"({_RELATION})\s*&", r"\1", s)
 
 
+_WHOLE_ENVIRONMENT = re.compile(r"\\begin\{aligned\}(.*)\\end\{aligned\}[,.;:]*", re.DOTALL)
+
+
+def _rows_without_environment(s: str) -> str:
+    """`s` without an alignment environment that is the whole formula: rows set in `aligned` print
+    as the same rows with no environment round them. An environment that is only a part (a matrix
+    between brackets, a row beside a second environment) keeps it."""
+    match = _WHOLE_ENVIRONMENT.fullmatch(s)
+    if match is None:
+        return s
+    depth = 0
+    for token in re.finditer(r"\\(begin|end)\{aligned\}", match.group(1)):
+        depth += 1 if token.group(1) == "begin" else -1
+        if depth < 0:  # the first `\begin` is closed before the last `\end`: two environments
+            return s
+    return match.group(1)
+
+
 def canon(latex: str, keep_styles: bool = True) -> str:
     """One spelling for every notation that prints alike. `keep_styles=False` also drops the
     letter-style commands (`\\mathbf`, `\\mathcal`, ...), for the second test of `exact_printed`."""
     s = latex
     # The alignment environments differ in name and column spec, not in print.
     # A matrix is its rows between the brackets the name stands for.
-    s = re.sub(r"\\begin\{bmatrix\}", r"[\\begin{aligned}", s)
-    s = re.sub(r"\\end\{bmatrix\}", r"\\end{aligned}]", s)
-    s = re.sub(r"\\begin\{pmatrix\}", r"(\\begin{aligned}", s)
-    s = re.sub(r"\\end\{pmatrix\}", r"\\end{aligned})", s)
+    for name, (opening, closing) in _MATRICES.items():
+        s = s.replace(f"\\begin{{{name}}}", f"{opening}\\begin{{aligned}}")
+        s = s.replace(f"\\end{{{name}}}", f"\\end{{aligned}}{closing}")
     s = re.sub(rf"\\begin\{{(?:{_ENVIRONMENTS})\}}(\{{[^}}]*\}})?", r"\\begin{aligned}", s)
     s = re.sub(rf"\\end\{{(?:{_ENVIRONMENTS})\}}", r"\\end{aligned}", s)
     # Italic is what a bare letter already is.
@@ -419,6 +446,7 @@ def canon(latex: str, keep_styles: bool = True) -> str:
     group = r"\{(?:[^{}]|\{[^{}]*\})*\}"
     tok = rf"({group}|\([^()]*\)|\\mathrm\{{[^{{}}]*\}}|\\[A-Za-z]+|[^_^{{}}\\])"
     s = re.sub(r"\^" + tok + r"_" + tok, r"_\2^\1", s)
+    s = _rows_without_environment(s)
     # A trailing comma, full stop or line break is punctuation of the sentence, not of the formula.
     return re.sub(rf"[,.;:\\{_BREAK}]+$", "", s)
 
