@@ -197,6 +197,174 @@ def test_an_unruled_aligned_grid_is_kept_on_text_alone():
     assert judgement.reasons == [tables.REASON_TEXT_GRID]
 
 
+def loose_numbers(caption: bool, rows: int = 7) -> bytes:
+    """Rows of short cells whose left edges wander (a share of a column's cells line up), with a
+    "Table 1" line over them or not."""
+    offsets = [0, 0, 6, 12, 6, 0, 12]
+
+    def fill(page):
+        if caption:
+            write(page, 100, 130, "Table 1. Measurements by group")
+        for c, head in enumerate(["Group", "Mass", "Length", "Time"]):
+            write(page, 100 + 90 * c, 160, head)
+        for r, name in enumerate(["Ann", "Bob", "Cy", "Di", "Ed", "Flo", "Gus"][:rows]):
+            for c in range(4):
+                text = name if c == 0 else f"{r + c}.{r * c + 3}"
+                write(page, 100 + 90 * c + (offsets[(r + c) % 7] if c else 0), 176 + 16 * r, text)
+
+    return pdf(fill)
+
+
+@pytest.mark.parametrize(
+    ("caption", "rows", "verdict"),
+    [
+        (True, 7, tables.TABLE),  # a "Table N" line says so, over columns that mostly line up
+        (False, 7, "no_grid"),  # the same cells with nothing to say what they are
+        (True, 3, "no_grid"),  # a caption over a header and three rows is not a grid of lines
+    ],
+)
+def test_a_table_line_over_loosely_aligned_columns_makes_it_a_table(caption, rows, verdict):
+    box = (95, 150, 490, 176 + 16 * rows)
+    assert tables.judge(proposal(box), view_of(loose_numbers(caption, rows))).verdict == verdict
+
+
+def labelled_groups(groups: int, rows: int = 4, paragraph: int = 0) -> bytes:
+    """Course rows under group labels that run across the first columns (nothing is ruled), and
+    the lines of a paragraph under them."""
+
+    def fill(page):
+        for x, head in ((100, "Code"), (190, "Title"), (420, "Kind")):
+            write(page, x, 160, head)
+        y = 176
+        titles = ["Exercise and Health", "Nutrition in the Lifecycle", "Foundations in Nutrition"]
+        for _ in range(groups):
+            write(page, 100, y, "Foundation Courses")
+            y += 16
+            for r in range(rows):
+                write(page, 100, y, f"BIOL {1400 + r * 10}")
+                write(page, 190, y, [*titles, "Sports Psychology"][r])
+                write(page, 420, y, ["Core", "Elective"][r % 2])
+                y += 16
+        for _ in range(paragraph):
+            text = "Every course in these groups counts toward the degree once a student has passed"
+            write(page, 100, y, text)
+            y += 16
+
+    return pdf(fill)
+
+
+def ragged_names() -> bytes:
+    """Two columns whose first has one name longer than the rest: the strip after the shorter
+    names is the end of that column, not a gap between columns."""
+
+    def fill(page):
+        write(page, 100, 160, "Name")
+        write(page, 260, 160, "Affiliation")
+        names = ["Ann Lee", "Bob Ray", "Cy Fox", "Di Wu", "Ed Poe", "Flo Gray", "Gus Hill"]
+        for r, name in enumerate([*names, "Richard Kingsbury-Smythe"]):
+            write(page, 100, 176 + 16 * r, name)
+            write(page, 260, 176 + 16 * r, ["Merton", "Sutton", "Croydon", "Bromley"][r % 4])
+
+    return pdf(fill)
+
+
+@pytest.mark.parametrize(
+    ("maker", "columns"),
+    [
+        (lambda: labelled_groups(3, 4), 3),  # labels cross the first gap; 12 rows are beside it
+        (ragged_names, 2),  # one long name ends in the strip: no column of its own
+    ],
+)
+def test_a_label_across_some_columns_does_not_take_away_the_gap_between_them(maker, columns):
+    judgement = tables.judge(proposal((95, 150, 470, 330)), view_of(maker()))
+    assert judgement.columns == columns
+
+
+def nested_list_with_blanks() -> bytes:
+    """ "b." and, one level in, "i." to "v." (set flush right) before items that end in a blank
+    line to write on; the line over them runs across the strip between the labels and the items."""
+
+    def fill(page):
+        write(page, 92.4, 160, "b.", 8.25)
+        write(page, 107.6, 160, "Identify the following values:", 8.25)
+        items = ["Lowest value for", "Highest value for", "Height of the rectangle:"]
+        items += ["Label for x-axis (words):", "Label for y-axis (words):"]
+        for r, item in enumerate(items):
+            y = 172 + 12 * r
+            label = ["i.", "ii.", "iii.", "iv.", "v."][r]
+            write(page, 117.6 - pymupdf.get_text_length(label, fontsize=8.25), y, label, 8.25)
+            write(page, 125.6, y, f"{item} _______", 8.25)
+
+    return pdf(fill)
+
+
+def algorithm_with_comments(caption_below: bool) -> bytes:
+    """A frame of numbered steps with a comment column at the right edge, one long step running
+    across the strip before it, and the "Table" line of the next table under the frame."""
+
+    def fill(page):
+        write(page, 49, 262, "Algorithm 5 Establish the base.", 10)
+        page.draw_line((49, 268), (563, 268), width=0.6)
+        long_step = "z = Score(d, k); with the scores kept per group and reset after each pass"
+        steps = [(0, "Input: Xs[..], Ys[..]", "available inputs")]
+        steps += [(0, "Output: Z[..]", "the result")]
+        steps += [(0, "function Make(data)", None), (1, "for each d in data do", None)]
+        steps += [(2, "for each k in keys do", "see Table X"), (3, long_step, None)]
+        steps += [(3, "u = Merge(z, u)", "merged"), (2, "end for", None), (1, "end for", None)]
+        steps += [(1, "return z", "done")]
+        for i, (level, step, comment) in enumerate(steps):
+            y = 282 + 13 * i
+            write(page, 54.7 if i < 9 else 50.7, y, f"{i + 1}:", 10)
+            write(page, 66 + 15 * level, y, step, 10)
+            if comment:
+                write(page, 420, y, f"▷ {comment}", 10)
+        end = 282 + 13 * len(steps)
+        page.draw_line((49, end), (563, end), width=0.6)
+        if caption_below:
+            write(page, 230, end + 26, "TABLE IX. Results by group", 10)
+
+    return pdf(fill)
+
+
+@pytest.mark.parametrize(
+    ("data", "box", "verdict"),
+    [
+        pytest.param(nested_list_with_blanks(), (90, 150, 250, 232), "numbered", id="nested-list"),
+        pytest.param(  # the "Table" line under it is the next table's
+            algorithm_with_comments(True), (45, 250, 565, 420), "no_grid", id="algorithm"
+        ),
+        pytest.param(  # the paragraph under a table is not rows of it
+            labelled_groups(3, 4, paragraph=3), (95, 150, 500, 470), "page_text", id="paragraph"
+        ),
+        pytest.param(labelled_groups(3, 4), (95, 150, 500, 420), tables.TABLE, id="table-alone"),
+    ],
+)
+def test_a_strip_a_few_lines_cross_does_not_make_a_list_or_an_algorithm_a_table(data, box, verdict):
+    assert tables.judge(proposal(box), view_of(data)).verdict == verdict
+
+
+def test_a_table_of_marks_after_names_is_not_a_contents_list():
+    # "x" is a roman numeral: marks set in several columns after names, on the first page of a
+    # file, looked like page numbers that follow their titles and the table was dropped.
+    def fill(page):
+        write(page, 72, 100, "Table 3. Continued.")
+        write(page, 72, 130, "Species")
+        for x, head in ((250, "North"), (310, "South"), (370, "East"), (430, "West")):
+            write(page, x, 130, head)
+        page.draw_line((72, 118), (480, 118), width=0.6)
+        page.draw_line((72, 138), (480, 138), width=0.6)
+        for r, name in enumerate(
+            ["Alpha bee", "Beta fly", "Gamma ant", "Delta moth", "Epsilon wasp", "Zeta gnat", "Eta"]
+        ):
+            write(page, 72, 156 + 12 * r, name)
+            write(page, [250, 310, 370, 430][(r * 3) % 4] + 3, 156 + 12 * r, "x")
+        page.draw_line((72, 156 + 12 * 7), (480, 156 + 12 * 7), width=0.6)
+
+    found = analyze(pdf(fill)).elements
+    assert Kind.TABLE in [e.kind for e in found]
+    assert not [e for e in found if "contents entry" in e.reasons]
+
+
 def test_a_table_of_contents_with_dot_leaders_is_dropped():
     def fill(page):
         for i, title in enumerate(["Motion", "Forces", "Energy", "Momentum", "Waves"]):

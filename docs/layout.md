@@ -2215,7 +2215,7 @@ apart; a line with no number ends the list, so the section heading right after i
 taken in. It is tried before a grid is taken for a table: a table whose lines are mostly the
 list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`), so the
 reason `contents entry` fires and no second contents list is written. An entry with a number
-links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). Not read: a
+links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). A list whose numbers do not stand at one edge is read as numbers that follow their titles only when none of them stands apart in a column of its own: marks ("x", a roman numeral) set in several columns of a table, after the names, are a table's cells and the table is kept. Not read: a
 list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
 it, a title that wraps onto a second line with the number on the second, and a two-column
 page (the columns are not known when tables are claimed).

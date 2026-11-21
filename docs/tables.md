@@ -173,6 +173,27 @@ rules above.
    or each begins with a header row; each part must be kept by `judge` on its own, else the
    box stays as it was. A table and a plot in one box, and two ruled tables in one box, are
    not split.
+   Two rules keep an unruled table whose cells do not line up as one column each (O-114). A
+   white strip that a few lines cross is still a gap between columns when at least five other
+   lines have cells on both sides of it, four for each line that crosses it, and every line
+   over the strip runs past it on both sides (`_gap_in_spite_of_labels`: a group's name or a
+   "Total" set across some columns; the ragged end of a column, where only its longest entry
+   reaches into the strip, is not a gap). Such a strip only rescues a box whose plain grid is
+   not a table already (what the plain reading judged, a numbered system of equations among
+   them, stays as it was), and a box it rescued that is no table by rules, caption or a
+   stack of rules is asked the page-text, numbered-line and word tests of the boxes made here
+   (`_text_block_dropped`). Two things differ for a box read this way, because the strip is
+   weaker evidence than a gap no cell crosses. A "Table N" line only names it when it stands
+   over the box (a line under a box may be the next table's: an algorithm's frame with the
+   caption of the table that follows it is not a table). And the label of a numbered item is
+   the cell that opens its line, not only the first column: a strip that a few cells cross
+   is often an indent, so the "i." to "v." of a nested list, with blanks to write on after the
+   items, are list lines (`_numbered`). And a box it made that holds two lines of running
+   text across its columns (`_running_text`) is a table with the paragraph under it taken in,
+   not a table. A second rule: a box under a "Table N" line with no rules, of
+   three columns or more, six grid lines and alignment 0.5 (not 0.75) is a table: the caption
+   is the reason, as it is for a layout grid (`CAPTION_COLUMNS`, `CAPTION_GRID_LINES`,
+   `CAPTION_ALIGNMENT`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,

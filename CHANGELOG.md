@@ -304,6 +304,38 @@ a paragraph-style strike or a picture in a sentence; the student page of a table
 changes. A `PIPELINE_VERSION` and a `RENDER_VERSION` raise are owed (not made here). No
 migration. Roll back: the models take no extra fields to be an error, so an earlier version opens a
 result with `links` on a cell and ignores them (the cell shows its words, no links).
+## Unreleased: tables with no ruling lines (O-114, O-131, O-393)
+
+- Three causes of an unruled table that was not built, found by tracing the olmOCR-Bench table
+  pages: a box under a "Table N" line whose columns line up only loosely was refused (it is now
+  a table at three columns, six grid lines and alignment 0.5); a few lines set across some
+  columns (a group's name, a total) took away the gap between the columns for the whole box (a
+  strip that a few lines cross is a gap when at least five other lines have cells on both
+  sides of it); and a table of marks ("x") set after names, on the first pages of a file, was
+  taken for a contents list and dropped (numbers that stand apart in a column of their own are
+  not page numbers that follow titles). A box found by the second rule is asked more than a box
+  with a plain gap: a "Table N" line only names it when it stands over it (the line under a box
+  may be the next table's), the label of a numbered item may be the cell that opens its line (a
+  nested list's "i." to "v." at an indent, as well as the first column's), and two lines of
+  running text across its columns mean a paragraph was taken in with the table, so it is page
+  text. These refuse the two false tables the rule first made (a list of blanks and an
+  algorithm's frame) and a table that took in the paragraph under it. The benchmark's tables
+  category passes 70.6 percent of its checks, from 66.6 (605 of 857 from 571: 34 checks gained
+  on 8 pages, none lost); the other four categories are unchanged. Its 188 table pages ask for
+  364 table requests, from 354. On the development PDFs and the repository's own PDFs (996
+  runs of 332 files) 15 files differ: 14 only in a reason ("aligned text grid") on tables that
+  were found before, 1 in a new table (an R print-out of a data frame, a real table); none
+  loses a table and none gains a false one. No upload of the corpus gains a table request (one
+  of 73 differs, in the reasons of its elements only), so there is no switch. `eval order` on
+  layout-dev-1 reads 137 of 267 pages right and 71 faultless, as before, and the public table
+  sets (`eval pipeline --task tables --mode local`, 45 documents) give the stored report's
+  numbers to the digit (recall 0.970, precision 0.974, TEDS 0.915, 5 false tables). Written
+  under docs/tables.md and docs/layout.md.
+- O-393 measured, nothing built: of 97 pairs of tables on consecutive pages in the development
+  PDFs 20 are joined, 1 is kept apart by text under the first part, and the detector found no
+  one-row last part that the table before could not claim; the "continued" notices are one for
+  each part. A new `PIPELINE_VERSION` is owed (a stored result's tables and contents lists
+  change); no migration.
 
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 

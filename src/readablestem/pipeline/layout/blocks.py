@@ -784,7 +784,9 @@ def _is_contents_list(
     middle = statistics.median(edges)
     size = statistics.median([row.size for row, _, _ in block])
     aligned = all(abs(e - middle) <= CONTENTS_REACH * size for e in edges)
-    if not aligned and len(block) < CONTENTS_RAGGED_LINES:
+    # A number that stands apart is a column of its own, at one right edge: marks ("x") set in
+    # several columns of a table, after names, are not page numbers that follow their titles.
+    if not aligned and (len(block) < CONTENTS_RAGGED_LINES or any(twin for _, twin, _ in block)):
         return False
     orders = [_page_order(word) for _, _, word in block]
     if any(a > b for a, b in pairwise(orders)):
