@@ -128,10 +128,13 @@ change. Stored results load unchanged and their pages are made again.
   nearest marker above is the value before with nothing between but its own lines. Such a row
   is not a heading by "bold body-size line" or "standalone numbered line". A section title with
   text over it and under it is not touched: "III. Gripper design" in a paper stays a heading.
-  A run ends at the white a picture or a table leaves (more than two line heights,
-  `SERIES_GAP`), so "1. Setup" over a picture and "2. Procedure" under it are two titles
-  (review 12: they were two one-item lists). Two titles in a row, the first with no text of
-  its own, are still read as a list of two.
+  A run ends where more than twice the type size of white stands between two rows of the
+  column (`SERIES_GAP`), as it does where a picture or a table stands, so "1. Setup" over a
+  picture and "2. Procedure" under it are two titles (review 12: they were two one-item lists).
+  The white alone ends it, whatever stands there: numbered items set that far apart (a
+  worksheet's questions with room to answer) end their runs too, and set in bold they are
+  headings, as on 0.5.14 (O-401). Two titles in a row, the first with no text of its own, are
+  still read as a list of two.
 - **A lettered title that wraps onto a second row of its face is one heading** ("A. Nonlinear
   System Representation of Boltzmann Soft Q-learning"): the title and its second row are one
   block, at most 12 words, the second row not ending like a sentence.
@@ -310,8 +313,8 @@ result with `links` on a cell and ignores them (the cell shows its words, no lin
   pages: a box under a "Table N" line whose columns line up only loosely was refused (it is now
   a table at three columns, six grid lines and alignment 0.5); a few lines set across some
   columns (a group's name, a total) took away the gap between the columns for the whole box (a
-  strip that a few lines cross is a gap when at least five other lines have cells on both
-  sides of it); and a table of marks ("x") set after names, on the first pages of a file, was
+  strip that at most three lines cross is a gap when at least five other lines, and four for
+  each line that crosses it, have cells on both sides of it); and a table of marks ("x") set after names, on the first pages of a file, was
   taken for a contents list and dropped (numbers that stand apart in a column of their own are
   not page numbers that follow titles). A box found by the second rule is asked more than a box
   with a plain gap: a "Table N" line only names it when it stands over it (the line under a box
@@ -319,7 +322,12 @@ result with `links` on a cell and ignores them (the cell shows its words, no lin
   nested list's "i." to "v." at an indent, as well as the first column's), and two lines of
   running text across its columns mean a paragraph was taken in with the table, so it is page
   text. These refuse the two false tables the rule first made (a list of blanks and an
-  algorithm's frame) and a table that took in the paragraph under it. The benchmark's tables
+  algorithm's frame) and a table that took in the paragraph under it. Two columns found this
+  way with no rule and no "Table N" line are no table (labelled questions with a "Part B" line
+  among them, terms and their meanings under short headings, a dialogue: review 13). Such a
+  strip only adds tables: a box it does not make a table is judged as if the strip were not a
+  gap, so a ruled table under its caption with long panel titles across it stays one table
+  (review 13). The benchmark's tables
   category passes 70.6 percent of its checks, from 66.6 (605 of 857 from 571: 34 checks gained
   on 8 pages, none lost); the other four categories are unchanged. Its 188 table pages ask for
   364 table requests, from 354. On the development PDFs and the repository's own PDFs (996

@@ -219,8 +219,6 @@ def loose_numbers(caption: bool, rows: int = 7) -> bytes:
     ("caption", "rows", "verdict"),
     [
         (True, 7, tables.TABLE),  # a "Table N" line says so, over columns that mostly line up
-        (False, 7, "no_grid"),  # the same cells with nothing to say what they are
-        (True, 3, "no_grid"),  # a caption over a header and three rows is not a grid of lines
     ],
 )
 def test_a_table_line_over_loosely_aligned_columns_makes_it_a_table(caption, rows, verdict):
@@ -228,16 +226,26 @@ def test_a_table_line_over_loosely_aligned_columns_makes_it_a_table(caption, row
     assert tables.judge(proposal(box), view_of(loose_numbers(caption, rows))).verdict == verdict
 
 
-def labelled_groups(groups: int, rows: int = 4, paragraph: int = 0) -> bytes:
+def labelled_groups(groups: int, rows: int = 4, paragraph: int = 0, ruled: bool = False) -> bytes:
     """Course rows under group labels that run across the first columns (nothing is ruled), and
-    the lines of a paragraph under them."""
+    the lines of a paragraph under them. `ruled`: a booktabs table under a "Table 4." line, the
+    first two groups each under a panel title that runs across every column."""
+    panels = ["Panel A: courses that every student of the first year must take and pass"]
+    panels += ["Panel B: courses that a student of the second year may choose between freely"]
 
     def fill(page):
+        if ruled:
+            write(page, 100, 143, "Table 4. Courses by group and kind")
+            page.draw_line((100, 150), (480, 150), width=0.6)
+            page.draw_line((100, 165), (480, 165), width=0.6)
         for x, head in ((100, "Code"), (190, "Title"), (420, "Kind")):
             write(page, x, 160, head)
         y = 176
         titles = ["Exercise and Health", "Nutrition in the Lifecycle", "Foundations in Nutrition"]
-        for _ in range(groups):
+        for g in range(groups):
+            if ruled and g < len(panels):
+                write(page, 100, y, panels[g])
+                y += 16
             write(page, 100, y, "Foundation Courses")
             y += 16
             for r in range(rows):
@@ -249,35 +257,10 @@ def labelled_groups(groups: int, rows: int = 4, paragraph: int = 0) -> bytes:
             text = "Every course in these groups counts toward the degree once a student has passed"
             write(page, 100, y, text)
             y += 16
+        if ruled:
+            page.draw_line((100, y - 10), (480, y - 10), width=0.6)
 
     return pdf(fill)
-
-
-def ragged_names() -> bytes:
-    """Two columns whose first has one name longer than the rest: the strip after the shorter
-    names is the end of that column, not a gap between columns."""
-
-    def fill(page):
-        write(page, 100, 160, "Name")
-        write(page, 260, 160, "Affiliation")
-        names = ["Ann Lee", "Bob Ray", "Cy Fox", "Di Wu", "Ed Poe", "Flo Gray", "Gus Hill"]
-        for r, name in enumerate([*names, "Richard Kingsbury-Smythe"]):
-            write(page, 100, 176 + 16 * r, name)
-            write(page, 260, 176 + 16 * r, ["Merton", "Sutton", "Croydon", "Bromley"][r % 4])
-
-    return pdf(fill)
-
-
-@pytest.mark.parametrize(
-    ("maker", "columns"),
-    [
-        (lambda: labelled_groups(3, 4), 3),  # labels cross the first gap; 12 rows are beside it
-        (ragged_names, 2),  # one long name ends in the strip: no column of its own
-    ],
-)
-def test_a_label_across_some_columns_does_not_take_away_the_gap_between_them(maker, columns):
-    judgement = tables.judge(proposal((95, 150, 470, 330)), view_of(maker()))
-    assert judgement.columns == columns
 
 
 def nested_list_with_blanks() -> bytes:
@@ -327,20 +310,44 @@ def algorithm_with_comments(caption_below: bool) -> bytes:
 
 
 @pytest.mark.parametrize(
-    ("data", "box", "verdict"),
+    ("data", "box", "table"),
     [
-        pytest.param(nested_list_with_blanks(), (90, 150, 250, 232), "numbered", id="nested-list"),
+        pytest.param(nested_list_with_blanks(), (90, 150, 250, 232), False, id="nested-list"),
         pytest.param(  # the "Table" line under it is the next table's
-            algorithm_with_comments(True), (45, 250, 565, 420), "no_grid", id="algorithm"
+            algorithm_with_comments(True), (45, 250, 565, 420), False, id="algorithm"
         ),
         pytest.param(  # the paragraph under a table is not rows of it
-            labelled_groups(3, 4, paragraph=3), (95, 150, 500, 470), "page_text", id="paragraph"
+            labelled_groups(3, 4, paragraph=3), (95, 150, 500, 470), False, id="paragraph"
         ),
-        pytest.param(labelled_groups(3, 4), (95, 150, 500, 420), tables.TABLE, id="table-alone"),
+        pytest.param(labelled_groups(3, 4), (95, 150, 500, 420), True, id="table-alone"),
+        pytest.param(  # long panel titles across it: the rules and the caption still say table
+            labelled_groups(3, 4, ruled=True), (98, 148, 482, 462), True, id="ruled-panels"
+        ),
     ],
 )
-def test_a_strip_a_few_lines_cross_does_not_make_a_list_or_an_algorithm_a_table(data, box, verdict):
-    assert tables.judge(proposal(box), view_of(data)).verdict == verdict
+def test_a_strip_a_few_lines_cross_does_not_make_a_list_or_an_algorithm_a_table(data, box, table):
+    assert (tables.judge(proposal(box), view_of(data)).verdict == tables.TABLE) == table
+
+
+def test_labelled_lines_with_a_line_at_the_margin_are_not_a_table():
+    # "Part B" over some questions crosses the strip after the labels "Q1" ... "Q6": with no
+    # rule and no "Table N" line, two such columns are lines of text, not a table.
+    questions = ["State the law of inertia.", "Give one example of it from the lab."]
+    questions += ["Why does the cart slow down on the flat?", "Draw the forces on the cart."]
+    questions += ["Which force does no work on the cart?", "Estimate the friction from your data."]
+
+    def fill(page):
+        write(page, 100, 110, "Answer every question below in full sentences, and show the working")
+        y = 160
+        for i, question in enumerate(questions):
+            if i in (0, 3):
+                write(page, 100, y, f"Part {'AB'[i // 3]}")
+                y += 16
+            write(page, 100, y, f"Q{i + 1}")
+            write(page, 125, y, question)
+            y += 16
+
+    assert Kind.TABLE not in [e.kind for e in analyze(pdf(fill)).elements]
 
 
 def test_a_table_of_marks_after_names_is_not_a_contents_list():

@@ -178,12 +178,16 @@ rules above.
    lines have cells on both sides of it, four for each line that crosses it, and every line
    over the strip runs past it on both sides (`_gap_in_spite_of_labels`: a group's name or a
    "Total" set across some columns; the ragged end of a column, where only its longest entry
-   reaches into the strip, is not a gap). Such a strip only rescues a box whose plain grid is
-   not a table already (what the plain reading judged, a numbered system of equations among
-   them, stays as it was), and a box it rescued that is no table by rules, caption or a
-   stack of rules is asked the page-text, numbered-line and word tests of the boxes made here
-   (`_text_block_dropped`). Two things differ for a box read this way, because the strip is
-   weaker evidence than a gap no cell crosses. A "Table N" line only names it when it stands
+   reaches into the strip, is not a gap). Such a strip only adds tables: a box whose plain
+   grid is strong is read on the plain grid, and a box the strip does not make a table is
+   judged again as if the strip were not a gap (`judge`'s `tolerant` off), so what the plain
+   reading judged, a numbered system of equations and a ruled table under its caption with
+   long panel titles across it among them, stays as it was. A box it rescued that is no table
+   by rules, caption or a stack of rules is asked the page-text, numbered-line and word tests
+   of the boxes made here (`_text_block_dropped`), and two columns with no rule and no
+   "Table N" line are no table (labelled questions with a "Part B" line among them). Two
+   things differ for a box read this way, because the strip is weaker evidence than a gap no
+   cell crosses. A "Table N" line only names it when it stands
    over the box (a line under a box may be the next table's: an algorithm's frame with the
    caption of the table that follows it is not a table). And the label of a numbered item is
    the cell that opens its line, not only the first column: a strip that a few cells cross

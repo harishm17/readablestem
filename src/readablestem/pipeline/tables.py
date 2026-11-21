@@ -1469,10 +1469,13 @@ def _sparse_stack(grid: _Grid, row_rules: Sequence[float], page_width: float) ->
     return True
 
 
-def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judgement:
+def judge(
+    proposal: Proposal, view: _PageView, *, joined: bool = False, tolerant: bool = True
+) -> Judgement:
     """Keep a proposed box as a data table, or say why not (`DROPPED` codes). `joined`: the box
     is a stack of rule spans that a table of the detector's lies in (`_joined_frames`), so
-    paragraphs between its rules are its cells.
+    paragraphs between its rules are its cells. `tolerant` off: no white strip that a few
+    cells cross is a column gap (`_gutters`).
 
     The box first grows to the drawn table around it (`_snap`, `_extend`): the detector
     often stops at the text, or at the header row of a blank table. Rules are evidence
@@ -1487,7 +1490,7 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
     # Grown by a row or a column, not just to a border a few points away.
     extended = any(abs(a - b) > size for a, b in zip(box, snapped, strict=True))
     row_rules, column_rules = _rules(view, box, size)
-    grid = _text_grid(view, box, column_rules)
+    grid = _text_grid(view, box, column_rules, tolerant=tolerant)
     verdict = Judgement(
         "no_grid",
         box,
@@ -1608,8 +1611,23 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
             # Lines of a paragraph across the columns: a table with the text under it in the
             # box, which a strip a few cells cross made one box of.
             verdict.verdict = "page_text"
-        if verdict.verdict != TABLE:
-            verdict.reasons.clear()
+        if (
+            verdict.verdict == TABLE
+            and grid.tolerated
+            and grid.columns == 2
+            and not ruled
+            and not caption
+        ):
+            # Two columns, one of them made by a strip that a few lines cross, with no rule and
+            # no "Table N" line: labelled lines with a heading or a note at the margin among
+            # them (questions and their parts, terms and their meanings, a dialogue).
+            verdict.verdict = "no_grid"
+    if verdict.verdict != TABLE:
+        verdict.reasons.clear()
+        if grid.tolerated:
+            # Such a strip only adds tables: a box it does not make one is judged as if the
+            # strip were not a gap, so a box that was a table on the plain reading stays one.
+            return judge(proposal, view, joined=joined, tolerant=False)
     return verdict
 
 

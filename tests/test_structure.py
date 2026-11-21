@@ -1055,10 +1055,13 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
 
     # Row 4: the mark is read as it is printed. A note may go on in a number, touching its
     # raised mark or after a blank; two marks may share a comma in the text; a mark may have
-    # a bracket after it. Each note is a note, with a link from its mark.
+    # a bracket after it; a mark may be only a little smaller than its note (7 points in a
+    # note of 8: raised by its place, not its size). Each note is a note, with a link from
+    # its mark.
     touching = pymupdf.get_text_length("1", fontname="helv", fontsize=5.5)
     shapes = [
         ("1", [("1", 5.5, 0), ("2019 was the first year.", 8, touching)]),
+        ("1", [("1", 7, 0), ("2019 was the first year.", 8, 5)]),
         ("1", [("1 10 mL of water was used.", 8, 0)]),
         (
             "1,2",
