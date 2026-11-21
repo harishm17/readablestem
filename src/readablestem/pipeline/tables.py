@@ -75,6 +75,7 @@ from readablestem.core.types import (
     grid_problems,
 )
 from readablestem.pipeline import hyphens, script_marks, table_model
+from readablestem.pipeline.output_chars import BRACKET_PIECES
 
 if TYPE_CHECKING:
     import numpy as np
@@ -1982,11 +1983,7 @@ def _conditions(grid: _Grid) -> bool:
     # A brace, bracket or parenthesis built from pieces (`cases`, a matrix) is maths: the
     # pieces are glyphs of their own, in the Unicode block of bracket pieces or the private
     # use range that Symbol-style fonts put them in.
-    if any(
-        0x239B <= ord(ch) <= 0x23B3 or 0xF8EB <= ord(ch) <= 0xF8FE
-        for seg in grid.segs
-        for ch in seg.text
-    ):
+    if any(ch in BRACKET_PIECES for seg in grid.segs for ch in seg.text):
         return False
     # The cell that opens the last column on each line (a value after it is the next cell).
     last_column = max((seg.columns[0] for seg in grid.segs if seg.columns), default=0)

@@ -190,6 +190,30 @@
   caption would need re-recording. Documents already stored keep their old captions until converted
   again. A `PIPELINE_VERSION` raise is owed when the wave is released (the reader's output
   changes: captions and one table). No migration.
+## Unreleased: equation leftovers (O-042, O-048, O-134, O-129)
+
+- The printed-equation score (`eval/equations_printed.py`) calls an answer right when its rows are
+  the whole formula and the key sets the same rows in `aligned` (or the other way round), and
+  reads `matrix`, `vmatrix`, `Vmatrix` and `Bmatrix` as the rows between the brackets their name
+  stands for, as `pmatrix` and `bmatrix` already were. On the recorded development runs (8,003
+  pairs, $0): right 7,237 before, 7,242 after; 5 pairs newly right, none newly wrong. The matrix
+  names move no pair. A row of `tests/test_equations_printed.py` for each.
+- The pieces of built-up brackets are one table (`output_chars.BRACKET_PIECES`, with
+  `ADOBE_PIECES` for the private-use form) read by the table check that takes a brace or matrix
+  for maths (`tables.py`) and by the sign check (`signs.py`), where each had its own code-point
+  test. Same characters, no change to any output. Measured on the 28 corpus files: of 427
+  private-use pieces (U+F8E5 to U+F8FF) 73 are read by glyph name before any reader sees the
+  text and 354 are U+F8FF in MathTime fonts (the font tables read those), so a reader never meets
+  the private-use form of a bracket piece in this set.
+- Labeled parts inside one display equation ("(a)" and "(b)" in one display) are not split. Counted
+  by the text of the layout's display equations: 7 of 65,817 (1 of 49,314 on 72 of the real-world
+  development papers, 6 of 16,429 on the 28 corpus files, 0 of 74 on the repository's PDFs).
+  Splitting a display changes its crop and so its recorded request, for under 0.02% of displays.
+- Overlines over a letter stay out of the accent comparison. The glyph facts of an equation
+  (`GlyphContext`) hold characters and their letter styles, not drawn rules, and layout's rules
+  reach an element only as the reasons "fraction bar" and "radical sign".
+- No recording or request changes. No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed, no
+  migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 

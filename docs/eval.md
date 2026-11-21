@@ -232,6 +232,16 @@ letter against a plain one. Where the two sources set the same letters in the sa
 spell the style two ways, that is one style, and it scores right. An answer with no LaTeX, or a
 gold with none, scores wrong.
 
+A matrix environment is its rows between the brackets its name stands for (`pmatrix` round brackets,
+`bmatrix` square, `Bmatrix` braces, `vmatrix` bars, `Vmatrix` double bars, `matrix` none), so it
+scores right against `array` or `aligned` rows set between the same `\left` and `\right`. Rows that
+are the whole formula score the same with or without the `aligned` round them; an environment that
+is only a part of the formula (a matrix between brackets, a row beside another formula) is kept.
+Measured at $0 on the recorded development runs (8,003 pairs with a gold reading and an answer's
+LaTeX: dev, dev2, fresh, fresh2 and fresh3, one run each): right 7,237 before, 7,242 after; 5 pairs
+newly right (each the same rows with and without the environment), none newly wrong. The matrix
+names move no pair: no pair of the five parts is wrong only for a matrix name.
+
 A *pairing miss* is a pair that `exact_printed` calls wrong where the answer's letters and digits
 equal those of the file's own text for that region and the gold's do not. The gold was matched to
 another region, so the pair says nothing about the reading. It is counted in its own number
