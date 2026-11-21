@@ -14,9 +14,10 @@ from typing import Literal
 
 from readablestem.config import ConfigError
 from readablestem.core.budget import BudgetExceeded
-from readablestem.core.types import BBox, Element, Notice
+from readablestem.core.types import BBox, Element, Notice, PageStageFact
 from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import page_type, say_once, tables
+from readablestem.pipeline.step_facts import PageTrace
 
 log = logging.getLogger("readablestem.pipeline.layout")
 
@@ -46,6 +47,7 @@ class _Document:
     (`regions.py`) in place of one gutter.
     `panels`: `analyze(join_panels=...)`: the panels of one captioned figure are one figure
     (`figures._join_panels`).
+    `trace`: the page trace (`step_facts.PageTrace`): the time of each step on each page.
     `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector
     (`tables.DetectorBudget`) may still spend on this document. Only `_read_page` and
     `_claim_tables` use them, and they take the document of the call: `_PLAIN` is for the
@@ -59,6 +61,8 @@ class _Document:
     inline_joins: bool = False
     region_tree: bool = False
     panels: bool = False
+    # Where each page's time goes. `analyze` makes one that times; the default times nothing.
+    trace: PageTrace = field(default_factory=lambda: PageTrace(enabled=False))
     ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)
     detector: tables.DetectorBudget = field(default_factory=tables.DetectorBudget)
 
@@ -165,6 +169,10 @@ class Layout:
     # Per page, the table proposals the region tree refused (`REGION_TREE`, WS15.2): the box of
     # each and why (`regions.REFUSED_*`). Codes and boxes only; their text stays in the page.
     table_refusals: dict[int, list[tuple[BBox, str]]] = field(default_factory=dict)
+    # The page trace: the seconds of each layout step on each page, in `PageStageFact`s (steps:
+    # read, tables, rows, figures, equations, order, blocks, elements). The steps of the
+    # whole document (margins, list markers, the notices) are in no page's time.
+    page_steps: list[PageStageFact] = field(default_factory=list)
 
 
 def _log_page_failure(number: int, exc: Exception) -> None:

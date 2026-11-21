@@ -3238,9 +3238,19 @@ What the first run shows:
 
 A replay waits on no model, so its seconds are the local work. The report prints:
 
-- seconds a page by page kind, at the median and the 95th percentile. The conversion does
-  not time each page yet, so a page is given its document's seconds divided by its pages:
-  exact for a document of one kind, blurred for a mixed one;
+- seconds a page by page kind, at the median and the 95th percentile. A page is given its
+  document's seconds divided by its pages: exact for a document of one kind, blurred for a
+  mixed one (the page trace, next, is not blurred);
+- seconds of one page, from the page trace: the conversion times each layout step on each
+  page (`read`, `tables`, `rows`, `figures`, `equations`, `order`, `blocks`, `elements`) and
+  the page's `crops` (`pipeline/step_facts.PageTrace`, docs/layout.md "The page trace"). The
+  report gives the median, the 95th percentile and the slowest of the pages, each step's
+  median, 95th percentile and share of the traced time, and the five slowest pages with the
+  step that took most of each. Steps over the whole document (the margin filter, list
+  markers, the notices) and the models belong to no page, so the traced layout steps are
+  less than the layout stage: the report prints the share (84% on the corpus). A record made
+  before the trace says "no page trace". The trace is in the run record (`--records`) and the
+  report's `metrics.trace`; a job in the web app does not store it;
 - seconds a page by stage (`layout`, `image_pages`, `steps`, `assemble`, `checks`), over the
   documents that have the stage, with the stage's mean over every page and its share;
 - start-up apart, as seconds of a job: starting the conversion process and loading its code
@@ -3292,6 +3302,42 @@ assembly 7% and the checks 1%. The models are not waited for in a replay; when t
 were recorded a request took 1.4 s at the median for an equation, 2.6 s for a figure, 3.2 s
 for a table and 8.9 s for a page read as a picture. The conversion process held at most
 515 MB and the process that called it 424 MB.
+
+**Seconds of one page, from the trace** (2026-11-20, pipeline 0.5.14, the machine above, with a
+load average of 18 to 24 on its 16 cores while other work ran: read every figure as an upper
+bound).
+
+On the corpus replay (73 uploads, 338 pages, one run of each): a page took 0.42 s at the
+median, 2.38 s at p95 and 7.05 s at most, from layout steps and crops. The table search was
+56% of the traced time (0.25 s a page at the median, 1.17 at p95), the crops 26% (0.03 s at
+the median, 0.77 at p95), reading the text and drawings 12%, and rows, blocks and figures 2%
+or 1% each; equations, reading order and the conversion to elements are 0% at the median. Of
+the five slowest pages the table search took the most time on two, the crops on two and reading
+a handwritten page on one.
+
+On the layout development set (`layout-dev-1`'s 60 documents, 954 pages, layout alone with no
+model and the table search unlimited, as a replay runs it): 0.69 s a page at the median,
+2.12 s at p95 and 8.35 s for the slowest page (6.9 s of it the table search). The table search
+was 69% of the traced time, reading 17%, rows 5%, blocks 4%, figures 3%, and elements,
+equations and order 0.1% each. The traced steps are 90% of layout's wall time on these
+documents (the rest is the probe process, the margin filter, list markers and the notices).
+The slowest document, 59 pages, took 68 s.
+
+The time of a page is the table search's first and the crops' second. Nothing here is a bar:
+it is where to look.
+
+**What the trace costs.** A page has 11 timed steps in layout and one for its crops. The
+layout ones cost 26 microseconds a page, timed in a loop on this machine under load, against a
+page's median of 0.4 to 0.7 s: 0.005%, far under the 2% the work item allowed, and not to be
+told from the noise of a run. It is always on and has no switch.
+
+**`_Char.blank`** was a property that called `str.isspace` on each read. On the slowest
+document of the development set (59 pages, 146,000 characters) it was read 11.6 million times,
+79 reads for each character made. It is now worked out once when the character is made (a
+field set in `__post_init__`): a read costs 15 ns where it cost 79, and making a character
+costs a little more, so the saving is about 0.75 s of the 78 s of CPU layout took on that file
+(about 1%). Three runs before measured 78.6 to 78.9 s and three after 71.3 to 79.1 s, on a
+machine with a load of 20, so the runs show only that nothing got slower.
 
 ### `eval burden`
 
@@ -3611,8 +3657,6 @@ What none of the reports has yet:
 
 - A replay of held-out whole documents (the recording is not made), and so a bar or a
   public figure.
-- Seconds of one page. They come with the per-page trace of the conversion; until then a
-  kind's seconds are those of the documents its pages are in.
 - A long document. The longest corpus file has 39 pages; the 100-page math-heavy document
   the audit timed is not in the corpus.
 - A LaTeX source, a Word or a PowerPoint file: the corpus has none whose answers are

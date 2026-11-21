@@ -55,6 +55,22 @@
 - Counted first: of 148 files (the 120 tracked public PDFs and the 28 of the private corpus, no
   held-out or sealed set), one fails the probe, the committed damaged fixture, which has one page
   and so still fails whole. No corpus file changes.
+## Unreleased: a per-page trace of the conversion, and seconds of one page in `eval speed` (O-010)
+
+- The conversion times each layout step on each page (`read`, `tables`, `rows`, `figures`,
+  `equations`, `order`, `blocks`, `elements`) and the page's crops, and returns the seconds on
+  `StepFacts.page_steps` (`step_facts.PageTrace`; `Layout.page_steps` for layout's part). The web
+  worker does not store it (it keeps the calls, the stages and the unfinished steps), and it
+  decides nothing: a page's reading is the same with it. It costs 26 microseconds a page against a
+  median page of 0.4 to 0.7 s.
+- `eval speed` reports seconds of one page from the trace: the median, the 95th percentile and the
+  slowest of the pages, each step's share, and the five slowest pages with their longest step. On
+  the corpus replay a page took 0.42 s at the median and 2.38 s at p95, and the table search was
+  56% of the traced time and the crops 26%. On `layout-dev-1` (954 pages, layout alone) it was
+  0.69 s and 2.12 s, and the table search was 69%. The numbers are in docs/eval.md, with the
+  caveat that the machine was loaded. "No page trace" is gone from docs/layout.md.
+- `_Char.blank` is worked out once when a character is made: it was read 11.6 million times for
+  146,000 characters on the slowest development file, about 0.75 s of 78 s of CPU.
 - No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
   `RENDER_VERSION` raise is owed, no migration.
 

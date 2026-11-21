@@ -56,6 +56,7 @@ CLOCKS = {
     ("pipeline/run.py", "_run_step"): TIMING,
     ("pipeline/run.py", "_convert"): TIMING,
     ("pipeline/step_facts.py", "Stopwatch"): TIMING,
+    ("pipeline/step_facts.py", "PageTrace"): TIMING,
     ("pipeline/layout/access.py", "_DocumentCache"): CACHE,
     ("pipeline/figure_images.py", "student_image"): CACHE,
     ("pipeline/image_page_reconcile.py", "reconcile"): SAYS_SO,

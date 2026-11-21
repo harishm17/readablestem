@@ -1466,6 +1466,17 @@ class StageFact(BaseModel):
     seconds: float
 
 
+class PageStageFact(BaseModel):
+    """The wall time of one step of the conversion on one page (`pipeline.step_facts.PageTrace`):
+    a layout step ("read", "tables", "rows", "figures", "equations", "order", "blocks",
+    "elements") or a later one that works page by page ("crops"). A step that runs more than
+    once on a page is one fact with both times."""
+
+    page: int = Field(ge=0)  # 0-based
+    step: str
+    seconds: float
+
+
 # Why a step stopped before it had done all of its work (`NotFinished.reason`):
 # - "work_budget": it had done the count of work it is allowed (the same on every machine);
 # - "time_limit": a clock stopped it, so another machine may have got further;
@@ -1510,6 +1521,9 @@ class StepFacts(BaseModel):
     stages: list[StageFact] = Field(default_factory=list)
     not_finished: list[NotFinished] = Field(default_factory=list)
     shadow: list[ShadowFact] = Field(default_factory=list)
+    # The page trace: where each page's time went. Kept in the run record of a measurement
+    # (`eval speed`) only: the web worker stores `calls`, `stages` and `not_finished`.
+    page_steps: list[PageStageFact] = Field(default_factory=list)
 
 
 class ConversionOutput(BaseModel):
