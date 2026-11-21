@@ -7,6 +7,15 @@ from collections import Counter
 import pytest
 
 from readablestem.cli.main import main
+from readablestem.core.types import (
+    DocumentResult,
+    DocumentStats,
+    Element,
+    FigureFix,
+    Fix,
+    Kind,
+    Status,
+)
 from readablestem.eval import outputs
 from readablestem.eval.measure import Converted
 from readablestem.pipeline import export_docx, output_audit
@@ -200,3 +209,81 @@ def test_the_report_adds_up_the_places_and_keeps_a_short_recording_apart(tmp_pat
     assert whole["documents"]["out_notice_missing"] == 1
     assert whole["by_upload"] == [{"upload": "w_lecture_5111", "places": len(wrong["places"])}]
     assert "1 uploads whose recording lacks answers" in capsys.readouterr().out
+
+
+def _figure(n: int, box, fix: Fix | None) -> tuple[Element, Fix | None]:
+    element = Element(id=f"p1-e{n}", kind=Kind.FIGURE, page=0, bbox=box, order=n)
+    return element, fix
+
+
+def test_the_pictures_report_counts_what_was_not_converted_and_reads_the_truth_list(
+    tmp_path, capsys
+):
+    # One page, four figures: one described, one region called handwriting, one a model
+    # refused, one called handwriting that a person saw as printed. Its page has a content
+    # picture with empty alt.
+    described = Fix(
+        element_id="p1-e0",
+        kind=Kind.FIGURE,
+        status=Status.ACCEPTED,
+        figure=FigureFix(figure_type="photo", alt="A cart."),
+    )
+    kept = lambda n, reason: Fix(  # noqa: E731
+        element_id=f"p1-e{n}", kind=Kind.FIGURE, status=Status.FAILED, reason=reason
+    )
+    pen, printed = (10, 10, 60, 40), (100, 100, 160, 140)
+    parts = [
+        _figure(0, (0, 200, 50, 250), described),
+        _figure(1, pen, kept(1, "handwriting_on_page")),
+        _figure(2, (0, 300, 50, 350), kept(2, "model_refused")),
+        _figure(3, printed, kept(3, "handwriting_on_page")),
+    ]
+    result = DocumentResult(
+        pipeline_version="test",
+        elements=[element for element, _ in parts],
+        fixes=[fix for _, fix in parts if fix is not None],
+        stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
+        html=_changed(PAGE, ('alt="the red button"', 'alt=""')),
+    )
+    run = [
+        Converted("r01_syllabus_16851", pages=1, outputs=outputs.audit_document(result)),
+        Converted("w_pset_801", pages=4),  # a record kept before the pictures were counted
+    ]
+    truth = tmp_path / "truth.json"
+    truth.write_text(
+        json.dumps(
+            {
+                "regions": [
+                    {
+                        "document": "r01_syllabus_16851",
+                        "page": 1,
+                        "bbox": [12, 9, 58, 41],
+                        "label": "pen",
+                    },
+                    {
+                        "document": "r01_syllabus_16851",
+                        "page": 1,
+                        "bbox": printed,
+                        "label": "not_pen",
+                    },
+                ]
+            }
+        )
+    )
+    records, out = tmp_path / "records.json", tmp_path / "pictures.json"
+    records.write_text(json.dumps({"runs": [[done.as_dict() for done in run]]}))
+
+    code = main(
+        ["eval", "pictures", "--from", str(records), "--truth", str(truth), "--out", str(out)]
+    )
+
+    assert code == 0
+    metrics = json.loads(out.read_text())["metrics"]
+    audit = metrics["sets"]["audit"]["whole"]
+    assert (audit["documents"], audit["images"], audit["empty_alt"]) == (1, 4, 1)
+    assert audit["not_converted"] == {"handwriting_on_page": 2, "model_refused": 1}
+    assert audit["handwriting_regions"] == 2
+    assert metrics["uploads"]["not_counted"] == ["w_pset_801"]
+    truth_counts = metrics["truth"]
+    assert (truth_counts["pen"], truth_counts["not_pen"], truth_counts["unlabelled"]) == (1, 1, 0)
+    assert "as something else 1" in capsys.readouterr().out

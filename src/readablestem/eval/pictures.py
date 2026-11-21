@@ -102,6 +102,10 @@ def count_document(result: DocumentResult) -> dict[str, Any]:
         for element, fix in figures
         if fix is not None and fix.reason == HANDWRITING_ON_PAGE
     ]
+    notices: Counter[str] = Counter()
+    for notice in result.notices:
+        if notice.code in NOTICES:
+            notices[notice.code] += notice.count
     page = output_audit.read_html(result.html)
     return {
         "images": summary.figures,
@@ -115,16 +119,7 @@ def count_document(result: DocumentResult) -> dict[str, Any]:
         "handwritten_pages": sum(
             1 for _, fix in figures if fix is not None and fix.reason == HANDWRITTEN_PAGE
         ),
-        "notices": dict(
-            sorted(
-                Counter(
-                    {
-                        code: sum(n.count for n in result.notices if n.code == code)
-                        for code in NOTICES
-                    }
-                ).items()
-            )
-        ),
+        "notices": dict(sorted(notices.items())),
     }
 
 
