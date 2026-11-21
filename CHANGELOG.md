@@ -249,6 +249,20 @@
   needs new recordings (docs/eval.md, "eval pictures").
 - No pipeline change: no recording or request changes, no stored document changes. No
   `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed, no migration.
+## Unreleased: link-only blocks and the "For students" settings are framed (O-105, F-198)
+
+- On a finished document's page, the blocks that held only a heading and a link now look like the
+  rest of the app: "Share with a colleague" and "If you change the PDF" are two cards in a row
+  under "Settings and sharing" (one column on a phone), each with its link as a button at the
+  foot. "Record for your accessibility office" is a group with the same rule above it as the
+  others, and its two links are buttons. In "For students", the language and the title and
+  contact line are cards; the two fields sit side by side where there is room, and "Change" under
+  the language is a button instead of bare bold text far from its sentence. No route, wording of
+  a setting or stored value changes (`web/templates/_job_*.html`, `web/static/app.css`).
+- Not done: one form with one Save for the title and the contact line (D-025). They are two
+  routes (`/title`, `/contact`) and merging them changes what a request does.
+- No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` bump.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 

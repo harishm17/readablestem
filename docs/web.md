@@ -2625,6 +2625,10 @@ From top to bottom:
    students hear and the contact line, as sub-headings), Settings and sharing (sharing with
    a colleague, which says it is not how students get the file; and "If you change the PDF"),
    Record, and Delete (the one place retention is explained, with the real deletion date).
+   A setting or a link-only block is a framed card under its group's heading, with its
+   heading, one line and the link as a button: the language, the title and contact line (two
+   fields side by side where there is room, each with its own Save), and the cards of Settings
+   and sharing (`.link-cards`); Record is a group of its own with its two links as buttons.
    Someone a document is shared with sees only the groups that are theirs. The results
    are one line ("Found 19 equations, 7 figures and 36 headings on 13 pages.") with "Counts in
    detail" for the rest (list items, pages kept as images, decisions to make and made).

@@ -1,11 +1,11 @@
 {# Audiences: owner #}
 {# A link to the review record (T3-6, routes/record.py): a page to print and a CSV for the
-   person's accessibility office. #}
-<section aria-labelledby="record-link-heading">
+   person's accessibility office. A group of its own, like the others on the page. #}
+<section aria-labelledby="record-link-heading" class="job-group">
   <h2 id="record-link-heading">Record for your accessibility office</h2>
   <p>What the tool did and what was decided. A record, not a verdict; deleted with the document.</p>
   <ul class="actions">
-    <li><a href="/jobs/{{ job.id }}/record">Open the review record</a></li>
-    <li><a href="/jobs/{{ job.id }}/record.csv">Download it as a CSV file</a></li>
+    <li><a class="button-secondary" href="/jobs/{{ job.id }}/record">Open the review record</a></li>
+    <li><a class="button-secondary" href="/jobs/{{ job.id }}/record.csv">Download it as a CSV file</a></li>
   </ul>
 </section>
