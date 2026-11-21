@@ -228,6 +228,32 @@ def test_a_paragraph_left_out_is_left_out_again_on_the_unchanged_paragraph_only(
     assert done.items == [] and done.dropped == 1 and not changed.left_out_blocks
 
 
+def test_a_paragraph_split_into_parts_is_split_again_at_the_same_lines_on_the_same_words():
+    cut = "Discuss vectors\nand scalars with the class."
+    old, old_crops = fresh()
+    made = page_edits.split_block(old, PLAIN, cut)
+    new, new_crops = fresh()
+    done, _, _ = carry_all(old, old_crops, new, new_crops, rows_of(made))
+    assert done.items == [(carry_edits.BLOCK_SPLIT, PLAIN)] and done.dropped == 0
+    texts = [e.text for e in sorted(new.elements, key=lambda e: e.order) if e.page == 0]
+    assert "Discuss vectors" in texts and "and scalars with the class." in texts
+    assert done.changes[(carry_edits.BLOCK_SPLIT, PLAIN)].action == "split_block"
+    # Undone, there is nothing to carry; on words that changed it is listed, not made.
+    undone, undone_crops = fresh()
+    undo = page_edits.undo(old, PLAIN, made.before["structure"])
+    done, _, _ = carry_all(old, old_crops, undone, undone_crops, rows_of(made, undo))
+    assert done.items == [] and done.dropped == 0
+    old, old_crops = fresh()
+    made = page_edits.split_block(old, PLAIN, cut)
+    changed, changed_crops = fresh()
+    changed.elements = [
+        e.model_copy(update={"text": "Another sentence entirely."}) if e.id == PLAIN else e
+        for e in changed.elements
+    ]
+    done, _, _ = carry_all(old, old_crops, changed, changed_crops, rows_of(made))
+    assert done.items == [] and done.dropped == 1
+
+
 # --------------------------------------------------------------------------- headings
 
 

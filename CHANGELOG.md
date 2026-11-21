@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: a page tool that splits a block into separate parts (O-030, O-035)
+
+- Options or list items that run together in one paragraph or list item (layout's `option_labels`)
+  could only be changed word by word. The page tools have "Split it": a box with the block's words
+  and a line break before each later label found, which the reviewer moves, and each line becomes
+  its own paragraph or list item. One page operation with Undo (`page_edits.split_block`, the
+  `edit/{element}` route with `action=split`, `templates/_page_tools.html`), recorded as "Split a
+  paragraph or list item into separate parts" with the words the block had, and carried onto a
+  document converted again where exactly one block says the same words
+  (`carry_edits._carry_split`). Only line breaks can change; a block with an inline equation,
+  right-to-left text, program code, a footnote or a link to it is refused with a sentence.
+- Counted at $0 before building: 9 blocks flagged `option_labels` in 5 of 360 PDFs (public sets
+  5 blocks in 3 of 332 files, none in the real-world sets; private corpus 4 blocks in 2 of 28
+  files). Of the 5 public blocks 3 are two-column options whose lines interleave, which a cut at the
+  labels cannot put right: the reviewer puts the words in order first (docs/web.md says so).
+- The two notice sentences for run-together options now name the tool.
+- Not built: text decisions on any other kind of text (no producer, nothing measured needs one),
+  and the reorder of right-to-left text (held).
+- No recording or request changes. A document stored before is unchanged. No `PIPELINE_VERSION`
+  or `RENDER_VERSION` raise is owed, no migration.
+
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
 - Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The

@@ -112,6 +112,21 @@
       {% elif ed.leave_out_why_not %}
       <p class="hint">{{ ed.leave_out_why_not }}</p>
       {% endif %}
+      {% if ed.can_split %}
+      {% call form("review.edit_element", "/jobs/" ~ job.id ~ "/edit/" ~ eid, {"class": "decide-form"}) %}
+        {{ tool_fields() }}<input type="hidden" name="action" value="split">
+        <div class="{{ field_classes(ed.errors.get("split")) }}">
+          <label for="split-{{ eid }}">Split this {{ ed.label|lower }} into separate parts</label>
+          <p class="hint" id="split-hint-{{ eid }}">For answer options or list items that run together in one block. Each line becomes its own {{ ed.label|lower }}, in this order.{% if ed.lines and "\n" in ed.lines %} The breaks are where the tool found the next label (B, C and so on): move them if it is wrong.{% else %} Put a line break where each part starts.{% endif %} Check that every line reads as one item. Only line breaks can change here; to change a word, use “Save the words”.</p>
+          {{ field_error("split-error-" ~ eid, ed.errors.get("split")) }}
+          <textarea id="split-{{ eid }}" name="lines" rows="{{ [ed.lines.split("\n")|length + 1, 4]|max }}" maxlength="12000" class="prose-input" data-edit-field
+                    {{ field_aria("split-error-" ~ eid, ed.errors.get("split"), "split-hint-" ~ eid) }}>{{ ed.lines }}</textarea>
+        </div>
+        <button type="submit" class="button-secondary" data-role="split-block">Split it<span class="visually-hidden">: {{ ed.label|lower }}</span></button>
+      {% endcall %}
+      {% elif ed.split_why_not %}
+      <p class="hint">{{ ed.split_why_not }}</p>
+      {% endif %}
     </div>
     {% endif %}
   </section>

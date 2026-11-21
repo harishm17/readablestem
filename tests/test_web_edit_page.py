@@ -29,6 +29,7 @@ from readablestem.core.types import (
 )
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import equation_step
+from readablestem.pipeline import notices as notice_rules
 from readablestem.web import page_edits, reread
 from readablestem.web.database import utc_today
 from readablestem.web.db import Blob, Job, session_scope
@@ -40,6 +41,7 @@ CODE = "p1-e8"
 ENTRY = "p1-e9"
 NEXT = "p1-e10"  # a plain paragraph, then another: the two sit side by side
 AFTER = "p1-e11"
+OPTIONS = "p1-e12"  # "(A) 3 m (B) 5 m (C) 7 m", layout flagged it: a decision waits
 
 EQUATION_ANSWER = {"is_equation": True, "latex": "x^2 + 1", "confidence": 0.99}
 
@@ -61,6 +63,12 @@ def edit_output() -> ConversionOutput:
             Element(id=eid, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, top, 540.0, top + 15.0),
                     order=52 + number, text=f"A paragraph beside it, number {number + 1}.")
         )  # fmt: skip
+    options = Element(
+        id=OPTIONS, kind=Kind.PARAGRAPH, page=0, bbox=(72.0, 720.0, 540.0, 735.0), order=54,
+        text="(A) 3 m (B) 5 m (C) 7 m", reasons=["option_labels"],
+    )  # fmt: skip
+    result.elements.append(options)
+    result.fixes.extend(notice_rules.text_decisions([options], {}))
     return output
 
 
@@ -452,6 +460,46 @@ def test_only_a_paragraph_or_list_item_nothing_points_at_is_left_out(edits):
     page_edits.omit_page(result, 0, pages=page_edits.page_count(result))
     with pytest.raises(page_edits.ReviewInvalid):
         page_edits.put_back_block(result, PLAIN)
+
+
+def test_options_run_together_are_split_at_the_breaks_the_reviewer_confirms(edits):
+    page = f"/jobs/{edits.job_id}/review?page=1&tools=1&change={OPTIONS}"
+    assert "(A) 3 m\n(B) 5 m\n(C) 7 m" in unescape(edits.browser.get(page).text)  # proposed
+    # A changed word is not a split, one line is not either, and nothing changes.
+    for lines in ("(A) 3 m\n(B) 6 m\n(C) 7 m", "(A) 3 m (B) 5 m (C) 7 m"):
+        assert edit_post(edits, OPTIONS, action="split", lines=lines).status_code == 422
+    options = [e.text for e in stored(edits).elements if e.id == OPTIONS]
+    assert options == ["(A) 3 m (B) 5 m (C) 7 m"]
+    # The reviewer moves the last break: two parts, the decision is theirs now.
+    done = edit_post(edits, OPTIONS, action="split", lines="(A) 3 m\n(B) 5 m (C) 7 m")
+    assert done.status_code == 303
+    result = stored(edits)
+    parts = sorted(
+        (e for e in result.elements if (e.text or "").startswith(("(A) ", "(B) "))),
+        key=lambda e: e.order,
+    )
+    assert [e.text for e in parts] == ["(A) 3 m", "(B) 5 m (C) 7 m"]
+    assert parts[0].id == OPTIONS and "option_labels" not in parts[0].reasons + parts[1].reasons
+    assert len({e.order for e in result.elements}) == len(result.elements)
+    fix = next(f for f in result.fixes if f.element_id == OPTIONS)
+    assert fix.status is Status.EDITED and fix.reviewed
+    html = with_file(edits).html or ""
+    assert "<p" in html and ">(A) 3 m</p>" in html and ">(B) 5 m (C) 7 m</p>" in html
+    record = text_of(edits.browser.get(f"/jobs/{edits.job_id}/record").text)
+    assert "Split a paragraph or list item into separate parts" in record
+    assert "(A) 3 m (B) 5 m (C) 7 m" in record  # the words it had
+    # Undo gives back the one block and the open decision.
+    path = f"/jobs/{edits.job_id}/review"
+    undone = edits.browser.post(
+        f"/jobs/{edits.job_id}/undo",
+        data={"csrf_token": token(edits.browser, path), "version": version(edits)},
+    )
+    assert undone.status_code == 303
+    result = stored(edits)
+    assert element(edits, OPTIONS).text == "(A) 3 m (B) 5 m (C) 7 m"
+    assert not [e for e in result.elements if e.text == "(B) 5 m (C) 7 m"]
+    assert next(f for f in result.fixes if f.element_id == OPTIONS).status is Status.NEEDS_REVIEW
+    assert "option_labels" in element(edits, OPTIONS).reasons
 
 
 # --------------------------------------------------------------------------- pictures

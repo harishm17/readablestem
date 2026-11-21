@@ -1636,7 +1636,9 @@ required notice. The notice (`option_labels`, `rtl_text`, listed under "Not hand
 file") is derived from the pending decision (`notices.from_fixes`) and goes when it is made.
 A result stored before this has only the reason; `notices.from_reasons` still lists the
 notice, and `web.states` still holds that job at "Ready" (there is nothing to decide).
-Not built: the page record, the document card, and the per-source switch.
+Not built: the page record, the document card, and the per-source switch. The reviewer's tool
+for a block that is still whole is "Split it" in the page tools (docs/web.md, "The page
+tools"); the notice's words say so.
 
 - **Option labels** (`option_labels`, `_later_labels`, `_split_options`): a block that
   starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
