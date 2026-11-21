@@ -1,5 +1,65 @@
 # Changelog
 
+## Pipeline 0.5.16, render 11 (2026-11-21)
+
+- `PIPELINE_VERSION` is 0.5.16 and `RENDER_VERSION` stays 11: one raise of the pipeline for every
+  "Unreleased" entry below down to the 0.5.15 entry. What changes for a reader, one line for each:
+  - A page that cannot be drawn (O-003): the other pages are read; that page is a note, "Not
+    converted. This page could not be shown.", a required decision and a notice. Such a file
+    failed whole before.
+  - The per-page trace (O-010): nothing for a reader; `eval speed` reports seconds of one page.
+  - Contents lists and letter headings (O-051, O-020): a section or page number beside math stays
+    the entry's text, a title that wraps is one entry, two lines of prose ending in an ellipsis
+    are no contents page, a lone capital heads an index section only when its entries are near.
+  - Slide titles (O-032, O-130): a line that is a formula or a bare number is no slide title; a
+    deck with some scanned slides is one deck and its headings are levelled with the typed ones.
+  - A web address printed on two lines (O-046, O-156, O-021): one address, with no space where
+    the file's link annotations run across the break.
+  - Table captions and two text columns (O-061, O-150): a caption under a table keeps its first
+    eight lines; a body column beside a sidebar is two columns of text, not a table.
+  - Equation leftovers (O-042, O-048, O-134, O-129): nothing for a reader (the printed-equation
+    score and one shared table of bracket pieces).
+  - The page tool "Split it" (O-030, O-035): a paragraph or list item whose options run together
+    can be cut into separate parts in the page tools (web; a reviewer's change, with Undo).
+  - The A18 count (O-172): nothing for a reader (`eval pictures`).
+  - Link-only blocks and the "For students" settings (O-105, F-198): framed cards on the job page
+    (web).
+  - Pictures in LaTeX headings, links and cells; the scanned-page counter: a heading holds its
+    words only, a link of only a picture reads as its alt text or its address, a picture in a
+    cell leaves "(picture below)"; the job page's bar for scanned pages no longer steps back.
+  - Columns under the head of a first page, a numbered line that runs full, a page read without
+    its ActualText (O-024, O-018, O-157): a first page with a centered head over two columns is
+    read in columns, an affiliation list numbered to the margin is not one block, and a page
+    whose ActualText was left out says so in a notice.
+- New notice codes: `page_not_rendered` (required; also the reason of the figure that stands for
+  the page) and `actualtext_ignored` (optional, "Worth a look"). Every code has its message
+  (`tests/test_web_review_messages.py`). No new field in a stored result. The page trace
+  (`StepFacts.page_steps`) stays in a measurement's run record and is not stored by the web
+  worker; "pages" is a new key in a running job's progress; a split paragraph is a new review
+  edit, `split_block`, whose parts are ordinary elements. No migration.
+- No render raise is owed. The one new word on the student page, "Not converted. This page could
+  not be shown.", is written only for a figure with the reason `page_not_rendered`, which only a
+  new conversion makes (a stored result cannot hold it). Every other change is the reader's, the
+  web app's or a measurement's. The golden pages and the stored demo page are the same at render
+  11 (the golden test passed before the raise); the two golden files that name the pipeline in
+  their generator line say 0.5.16 now, and nothing else in them changed. Stored results from 0.5.10 to 0.5.15 load unchanged and their
+  pages are not made again; a document converted before keeps its old contents entries, slide
+  levels, captions and addresses until it is converted again. The switches that stay off
+  (`LAYOUT_INLINE_JOINS`, `LAYOUT_JOIN_PANELS`, `LAYOUT_DISPLAY_GROUPING`, `REGION_TREE`) change
+  nothing in this release.
+- Roll back: run on 2026-11-21 against 0.5.15 (`07a10cbc`), a PDF result stored by 0.5.16 with a
+  page that could not be drawn, all 58 notice codes the table knows and a paragraph split in the
+  page tools, with decisions pending and with all of them made, with the stored page and with it
+  cleared: the job page, the review screen and list (also page 3), the page tools, the record and
+  its CSV, the student page and its download all answered 200, and 0.5.15 undid the split. A
+  review change written by 0.5.15 kept every key of the result (no field is dropped), so going
+  forward again loses nothing. What 0.5.15 gets wrong: it has no words for the new reason, so
+  once it makes the page again (after a review change, as a draft, or with the page cleared) the
+  page that could not be drawn is written "No description. This figure has no text description
+  yet." and not "Not converted. This page could not be shown." (a finished document with its
+  stored page is served as it was); and its record leaves out the split.
+  The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+
 ## Unreleased: a page that cannot be drawn is that page's problem (O-003)
 
 - A file with one page that makes MuPDF abort or run past the probe's time failed whole

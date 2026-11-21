@@ -330,7 +330,35 @@ log = logging.getLogger(__name__)
 # is, links shown, until a review change makes the page again and writes the result back through
 # its own model, which drops the links for good), so the roll-back limit stays at 0.5.12
 # (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.15"
+# 0.5.16 (2026-11-21): one raise for the wave after 0.5.15 (CHANGELOG.md has each change). What
+# a PDF's result holds moves: a file with a page the probe cannot draw is read page by page and
+# that page is a figure with no picture, reason `page_not_rendered` (a required decision) and
+# the notice of that name, where it failed whole; a section number or a page number beside math
+# in a contents entry stays text, a contents title that wraps is one entry, two lines of prose
+# ending in an ellipsis are no contents page, and a capital alone on its line heads an index
+# section only when its first entry is near; a line that is a formula or a bare number is no
+# slide title, a deck with scanned slides is one deck and its headings are levelled with it; a
+# web address printed on two lines is joined with no space where the file's link annotations run
+# across the break; a table caption may run to eight lines and two text columns with prose are
+# no table; the columns under the head of a first page are found and a numbered line that runs
+# to the right edge keeps its block; a page read without its ActualText has the notice
+# `actualtext_ignored`. A LaTeX file's result: a heading holds its words only (a picture in it
+# is a figure of its own), a link of only a picture reads as the picture's alt text or its
+# address, a picture in a table cell leaves "(picture below)". New notice codes:
+# `page_not_rendered` (required) and `actualtext_ignored` (optional); the new figure reason is
+# `page_not_rendered`. No new field in a stored result. The page trace (`StepFacts.page_steps`,
+# `PageStageFact`) is kept in a measurement's run record only; the stage "pages" is a key of a
+# running job's progress row; a split paragraph is a new `ReviewEdit.action` ("split_block")
+# whose parts are ordinary elements. Results from 0.5.10 to 0.5.15 load unchanged and their
+# page is not made again (`assemble.RENDER_VERSION` stays 11: no stored result can hold
+# `page_not_rendered`, the one new word on the student page, "Not converted. This page could not
+# be shown."). 0.5.15 opens a 0.5.16 result (run on 2026-11-21: it loads all 58 notice codes and
+# the split parts, drops no stored key when a review change writes the result back, and undoes a
+# split), but it has no words for the new reason: a page that could not be drawn is written
+# "No description. This figure has no text description yet." (as a draft, "Needs a description.")
+# as soon as it makes the page again (a review change, a draft, a cleared page), and its record
+# leaves the split change out. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.16"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
