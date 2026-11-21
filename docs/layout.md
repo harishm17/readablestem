@@ -1285,7 +1285,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   word of three letters besides function names like "sin" and "log", and a math sign, an italic
   math letter or no letter at all: `slides._is_formula`) is never a title, nor the title of a
   title slide: a slide with a large equation under its title is titled by the title (on the
-  html-slides deck 16 of 22 slides took their equation). It is always a heading (reason `slide_title`, plus `larger font` so the
+  html-slides deck 17 of 22 slides took their equation or a lone "1"). It is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
   title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
   Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a
