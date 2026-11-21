@@ -121,6 +121,19 @@ middle of the other, through the page-math hook) cannot change each other. `_PLA
 document with none of these set, is what a caller outside a read gets by default. `_LOCK`
 guards PyMuPDF, its warning store and the caches, nothing else.
 
+**The page trace.** `analyze` times each step on each page (`step_facts.PageTrace`, on
+`_Document.trace`) and returns the seconds as `Layout.page_steps`: `read` (text, drawings and
+page type), `tables` (the table search), `rows` (rows, labels and the rows' classes),
+`figures` (figures, fragment figures, pictures of equations, drawings left over, plots),
+`equations` (grouping the rows of a display), `order` (reading order and column
+continuations), `blocks` (rows to blocks, captions, lists) and `elements` (blocks to
+`Element`s). The conversion adds `crops` (cutting the page's pictures for the model steps)
+and carries the list on `StepFacts.page_steps`; `eval speed` reports it. Steps that are done
+over the whole document (the margin filter, list markers, label keys, the notices) belong to
+no page and are in none of the seconds. The trace is not stored with a job (the web worker
+keeps the calls, the stages and the unfinished steps) and decides nothing: it reads
+the clock and adds up. The second layout run of the page math pass is not in it.
+
 ## How a page is read
 
 The order and the regions of a page are found by rules, with no model and no learned layout
@@ -551,8 +564,8 @@ table is an item yet) and `regions.table_refusal` judges each proposal against i
   by the tree like any other line. The tree that reads the page is built after the judging,
   from the accepted tables only, so the tree a proposal was judged against is not the tree that
   reads the page: it differs by the room the accepted tables take. Verdicts are not made again.
-- The refusals are on `Layout.table_refusals` (page, box and reason code; no text). No page trace
-  exists yet (WS14.8), so this is where they are kept.
+- The refusals are on `Layout.table_refusals` (page, box and reason code; no text). The page
+  trace holds seconds only, so this is where they are kept.
 - The next page's continued-table check (`find_continued`) is given only the accepted tables.
 - `_text_block_dropped` and the "box extended along rules" growth (`REASON_EXTENDED`) are not
   changed: they run on the raw page and take no region argument; that belongs to the second
