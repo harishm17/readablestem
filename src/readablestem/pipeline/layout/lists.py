@@ -442,8 +442,9 @@ def _capital_letter(candidate: _MarkerCandidate) -> int:
     return ord(text[0]) - 64
 
 
-def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
-    """Nesting level (1 = top) per list-item block id, from the indent of the item text.
+def _list_levels(pages: Iterable[Sequence[_Block]], tolerance: float) -> dict[int, int]:
+    """Nesting level (1 = top) per list-item block id, from the indent of the item text, for
+    the blocks of each page in reading order.
 
     Consecutive items in reading order form one list (display equations inside an item
     do not end it; anything else does). A deeper indent opens a level, a shallower one
@@ -456,13 +457,18 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     even where the texts start at one indent (the answer lines of an exam). A list that a
     paragraph, a figure or a table cut ("(i)" ... "negative" ... "(ii)") goes on where the
     next item takes up the numbering of an open level: its levels are kept for that item.
+    A series that starts at its first value after such a cut is under the item above only on
+    that item's page and with no heading between: "(a)" pages after "3.", or in the next
+    section, is a list of its own.
     """
     levels: dict[int, int] = {}
     stack: list[_Level] = []  # the open levels: the x of the text, the marker series
     cut: list[_Level] = []  # the levels a block that is not an item closed, to be taken up
     options: float | None = None  # the x the options of the grid being read are placed at
     before: tuple[str, float] | None = None  # (series, x of the marker) of the item before
-    for block in blocks:
+    apart = False  # a page break or a heading stands between the item before and this block
+    for block, first in ((b, i == 0) for blocks in pages for i, b in enumerate(blocks)):
+        apart = apart or first
         if block.joined:  # the rest of the item before it, on the next page: no element of its own
             continue
         if block.marker is None:
@@ -470,6 +476,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
                 cut = stack or cut
                 stack = []
                 before = None
+                apart = apart or block.kind == Kind.HEADING
             continue
         x = block.marker.x - block.origin
         series, own = _series(block.marker), _marker_x(block)
@@ -480,6 +487,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             last = cut[-1].number
             if (
                 taken is None
+                and not apart
                 and number.value == 1
                 and last is not None
                 and last.key != number.key
@@ -487,6 +495,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             ):
                 stack = list(cut)  # "(a)" after "1." and a figure: the list of that item (`starts`)
         cut = []
+        apart = False
         # The marker of another series set right of the one above opens a level even where the
         # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.
         nested = (

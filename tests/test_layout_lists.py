@@ -537,3 +537,15 @@ def test_a_series_that_starts_again_after_a_figure_or_a_paragraph_is_under_the_i
 
     got = [(m, lvl) for m, _, lvl, _ in items(analyze(one_page(fill)).elements)]
     assert got == [("1.", 1), ("(a)", 2), ("(b)", 2), ("2.", 1)]
+
+    def next_section(page):  # the letters of the next section are a list of their own
+        y = write(page, 72, 100, ["1. Solve linear equations", "2. Draw the graph of a line"])
+        y = write(page, 72, y + 20, ["Grading"], fontname="hebo", fontsize=16)
+        y = write(page, 72, y, ["The final mark is made of two parts, weighted as follows."])
+        for marker, text in (("(a)", "Homework is worth a third"), ("(b)", "The examination")):
+            page.insert_text((74, y + 20), marker, fontsize=BODY)
+            page.insert_text((94, y + 20), text, fontsize=BODY)
+            y += 25
+
+    got = [(m, lvl) for m, _, lvl, _ in items(analyze(one_page(next_section)).elements)]
+    assert got == [("1.", 1), ("2.", 1), ("(a)", 1), ("(b)", 1)]
