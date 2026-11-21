@@ -9,7 +9,7 @@
  "client": "none",
  "profile": {
   "name": "production",
-  "sha256": "90c66bc8ef67f72c418626f66ecc2fd7bb7a9badb3a733b187618b422886e8a2",
+  "sha256": "e48df1a1dc7f72e7f0e18ee34c6bf1b7b44f8c22d528df14337492c42e8f11f2",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -17,13 +17,13 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.14",
- "commit": "709a023fe83bf6f53d386f4060a589fa8b977154",
+ "pipeline_version": "0.5.15",
+ "commit": "3efefeab9859564e8d47e192a12c83f5085fc7cb",
  "provenance": {
-  "commit": "709a023fe83bf6f53d386f4060a589fa8b977154",
+  "commit": "3efefeab9859564e8d47e192a12c83f5085fc7cb",
   "clean": true,
-  "pipeline_version": "0.5.14",
-  "render_version": 10,
+  "pipeline_version": "0.5.15",
+  "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
    "latexml": "latexml (LaTeXML version 0.8.8)",
@@ -59,35 +59,35 @@
   },
   "kinds": {
    "scan": 158,
-   "table": 176,
-   "figure": 179,
-   "typical": 181,
+   "table": 185,
+   "figure": 176,
+   "typical": 175,
    "dense_math": 49,
    "slide": 4
   },
-  "pages_that_asked_a_model": 599,
+  "pages_that_asked_a_model": 603,
   "requests_refused_by_step": {
-   "equation": 2854,
-   "figure": 1174,
+   "equation": 2844,
+   "figure": 1170,
    "image_page": 264,
-   "table": 530
+   "table": 550
   },
   "stopped_early": 0,
-  "seconds_median": 3.75
+  "seconds_median": 3.55
  },
  "metrics": {
   "multi_column": {
    "checks": 884,
    "run": 708,
-   "passed": 490,
-   "score": 69.2,
-   "score_if_dropped_failed": 55.4,
+   "passed": 492,
+   "score": 69.5,
+   "score_if_dropped_failed": 55.7,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 133,
     "scan with no text layer": 43
    },
-   "run_no_request": 216,
-   "score_no_request": 77.3,
+   "run_no_request": 213,
+   "score_no_request": 77.0,
    "pdfs": 231,
    "pdfs_run": 186,
    "column": "MultCol"
@@ -103,7 +103,7 @@
     "scan with no text layer": 35
    },
    "run_no_request": 218,
-   "score_no_request": 31.2,
+   "score_no_request": 30.7,
    "pdfs": 266,
    "pdfs_run": 227,
    "column": "Hdr/Ftr"
@@ -127,14 +127,14 @@
   "table_tests": {
    "checks": 1020,
    "run": 857,
-   "passed": 571,
-   "score": 66.6,
-   "score_if_dropped_failed": 56.0,
+   "passed": 605,
+   "score": 70.6,
+   "score_if_dropped_failed": 59.3,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 89,
     "scan with no text layer": 74
    },
-   "run_no_request": 38,
+   "run_no_request": 19,
    "score_no_request": 0.0,
    "pdfs": 188,
    "pdfs_run": 160,
@@ -150,7 +150,7 @@
     "scan read from its picture (an OCR layer, if any, is not used)": 101,
     "scan with no text layer": 60
    },
-   "run_no_request": 147,
+   "run_no_request": 143,
    "score_no_request": 100.0,
    "pdfs": 747,
    "pdfs_run": 586,
