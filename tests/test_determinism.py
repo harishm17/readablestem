@@ -58,6 +58,7 @@ CLOCKS = {
     ("pipeline/step_facts.py", "Stopwatch"): TIMING,
     ("pipeline/step_facts.py", "PageTrace"): TIMING,
     ("pipeline/layout/access.py", "_DocumentCache"): CACHE,
+    ("pipeline/layout/access.py", "_halve"): ENDS_JOB,
     ("pipeline/figure_images.py", "student_image"): CACHE,
     ("pipeline/image_page_reconcile.py", "reconcile"): SAYS_SO,
     ("pipeline/layout/figures.py", "_image_infos"): ENDS_JOB,
