@@ -3610,6 +3610,90 @@ What none of the reports has yet:
   recorded, so the `source` kind has no row.
 - How long a background (batch) check takes to come back: no batch answer is recorded.
 
+### `eval pictures`
+
+A18's count: how many pictures a student gets that were not converted, how many content
+pictures have no alt text, and which regions the tool calls handwriting. It is made from the
+same measured replay as `eval outputs` (the audit of each result is kept beside it: a record
+made with `eval outputs --records` before this existed has no counts and is reported as "not
+counted"), so it spends nothing and gates nothing, and it reads what the conversion wrote and
+nothing else.
+
+```bash
+uv run readablestem eval pictures --out data/eval/pictures-corpus.json
+uv run readablestem eval pictures --from kept.json        # report on a kept replay
+uv run readablestem eval pictures --truth my-truth.json   # read the regions against another list
+```
+
+What it counts, per upload and added up:
+
+- **Images not converted, by reason.** A figure the page shows as the picture of the original,
+  with the fix's own reason: `handwriting_on_page`, `scanned_page`, `unread_page` (kept as
+  images before any model step), a refused or failed answer, `no_proposal`, `no_description`,
+  or `unproven_decoration` (the model said decoration and the page does not take it).
+  Equations, tables and paragraphs shown as pictures are counted apart as "other parts".
+- **Content pictures with empty alt.** A picture on the page that is not marked as decoration
+  and has no alt text or an empty one (the output audit's `out_alt_missing`, which is also
+  counted in `eval outputs`). Pictures with empty alt that are decoration are counted apart.
+- **Regions called handwriting**, each with its page and box in points (numbers, never words),
+  handwritten pages, and the notices that go with them.
+
+**The 39 audit documents** (AQ4, plan WS6.10 and A18) are the corpus's `r` and `s` files as the
+corpus held them when the audit was made: `r01` to `r21` and `s01` to `s18` with `s12a` and
+`s12b`, not `s05_form_acroform` (added later). The set is a rule in `eval/pictures.py`
+(`audit_set`). The report names them "audit" and the other uploads "rest".
+
+**Uploads whose recording lacks answers are kept apart**, as in `eval outputs`: a figure the
+replay has no recorded answer for is kept as a picture, and shows `model_refused` (the
+replay's stand-in for an answer it does not hold; it never appears in an upload with every
+answer). The counts of those uploads are not what production makes of them, except the
+reasons that come before any model step (`handwriting_on_page`, `scanned_page`, `unread_page`)
+and the regions called handwriting, which layout makes alone.
+
+**The truth list** (`data/eval/pen-truth.json`) holds regions a person looked at in a render of
+the region: the document, the 1-based page, the box, `pen` or `not_pen`, and a short word for
+what was seen. A region called handwriting matches a row on the same page whose box overlaps
+it by at least half. The report says how many called regions were seen as pen strokes, how
+many as something else (typeset or vector drawings, glyph outlines: this count must be 0) and
+how many nobody has looked at, and which labeled pen regions no call matched. The list is
+filled by looking, never from the pen rule itself, which would score the rule against itself.
+
+Baseline (2026-11-20, pipeline 0.5.14, production profile, 73 uploads of the 72 documents,
+`data/eval/pictures-corpus.json`):
+
+| Set | Uploads | Images | Not converted | Empty alt | Regions called handwriting |
+|---|---|---|---|---|---|
+| 39 audit documents, every answer recorded | 26 | 15 | 2 | 0 | 0 |
+| 39 audit documents, answers missing | 13 | 129 | 84 | 0 | 9 |
+| rest, every answer recorded | 17 | 8 | 4 | 0 | 0 |
+| rest, answers missing | 17 | 92 | 61 | 0 | 1 |
+
+- **Empty alt: 0 on every upload** (12 on the 39 documents in the audit). The goal bar of 0 is
+  met on the development set.
+- **Kept as images before any model step, on the 39 documents: 15 of 144 images**: 9 regions
+  called handwriting, 1 scanned page and 5 `unread_page`. The audit measured 31 of 169 not
+  converted on older code; the two counts are not set side by side, since 13 of these
+  documents lack answers (below).
+- **The 9 regions called handwriting on the 39 documents are all printed**: 8 on `r16` (a
+  number, unit or symbol of the text drawn as a filled outline: the formula part WS4.1 owns) and
+  1 on `r17` (the journal's printed header with its emblem). A tenth, outside the 39, is two
+  typeset arrows on `w_slides_60001_lec10`. All 10 were seen by rendering the region (public,
+  CC BY or CC BY-NC-SA files); 0 were pen strokes, so the goal bar of 0 typeset or vector
+  drawings called handwriting is not met: 10 regions, 10 of them wrong. The labels are one
+  builder's reading of the renders and want the owner's look.
+- **13 of the 39 audit documents have no recorded answers for part of their requests** (and 17
+  more documents outside them): the crops, and so the requests, changed after the recordings were
+  made. Their `model_refused` count (68 images on the 39) is a recording gap, not a refusal. The
+  count of pictures not converted by the answers the model gives on those 13 documents needs
+  new recordings, which cost money and are not made.
+- The truth list so far holds only these 10 regions, none of them pen strokes. It cannot say
+  whether a real pen stroke is missed: that needs labeled pen regions on public files, and
+  none is called in the corpus. No private region is waiting for the owner: every region called
+  is in a public file.
+
+The bar is judged on a held-out set of public course files with at least 100 images, split by
+WS0.6; none is made. Until then these are development figures.
+
 ### `eval say-once`
 
 The words of each page said by no element, and said twice (`pipeline/say_once.py`,
@@ -3899,6 +3983,8 @@ limits is still owed.
 | `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
 | `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
 | `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
+| `src/readablestem/eval/pictures.py` | `eval pictures`: A18's count (pictures not converted by reason, content pictures with empty alt, regions called handwriting) from the measured replay, and the reading of those regions against the truth list |
+| `data/eval/pictures-corpus.json`, `data/eval/pen-truth.json` | the last pictures record of the corpus, and the regions a person saw as pen strokes or not |
 | `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
 | `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
 | `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |

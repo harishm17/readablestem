@@ -42,7 +42,7 @@ from readablestem.pipeline.notices import HANDWRITING_ON_PAGE, HANDWRITTEN_PAGE,
 
 TRUTH = Path(__file__).resolve().parents[3] / "data" / "eval" / "pen-truth.json"
 PEN, NOT_PEN = "pen", "not_pen"
-# A box is the same region when it overlaps the labelled one by at least this much.
+# A box is the same region when it overlaps the labeled one by at least this much.
 MATCH = 0.5
 # The reason of a part that is a figure shown as its picture and has none of its own: the
 # fix said nothing (`no_answer`), proposed nothing (`no_proposal`), or proposed no alt text
@@ -153,11 +153,11 @@ def against_truth(
     """The regions called handwriting (`called`: by upload, each with page and bbox) against
     the truth list. `pen`: called and seen as pen strokes. `not_pen`: called and seen as
     something else (a typeset or vector drawing, a glyph outline): the count that must be 0.
-    `unlabelled`: called and not looked at yet, listed by upload, page and box for whoever
+    `unlabeled`: called and not looked at yet, listed by upload, page and box for whoever
     labels them. `missed`: seen as pen strokes and not called, by upload."""
     rows = list(truth)
     verdict: Counter[str] = Counter()
-    unlabelled: list[dict[str, Any]] = []
+    unlabeled: list[dict[str, Any]] = []
     used: set[int] = set()
     for upload, regions in called.items():
         for region in regions:
@@ -169,8 +169,8 @@ def against_truth(
                 if score >= best:
                     best, found = score, index
             if found is None:
-                verdict["unlabelled"] += 1
-                unlabelled.append({"upload": upload, **region})
+                verdict["unlabeled"] += 1
+                unlabeled.append({"upload": upload, **region})
             else:
                 used.add(found)
                 verdict[rows[found]["label"]] += 1
@@ -182,10 +182,10 @@ def against_truth(
     return {
         PEN: verdict[PEN],
         NOT_PEN: verdict[NOT_PEN],
-        "unlabelled": verdict["unlabelled"],
+        "unlabeled": verdict["unlabeled"],
         "missed": dict(sorted(missed.items())),
-        "unlabelled_regions": unlabelled,
-        "labelled": len(rows),
+        "unlabeled_regions": unlabeled,
+        "labeled": len(rows),
     }
 
 
@@ -220,7 +220,7 @@ def report(
     (those lacking answers, as in `eval outputs`: an unanswered picture is kept as a picture
     with a flag, so their "not converted" counts are not production's). The regions called
     handwriting are made by layout before any model step: the truth list is read against
-    every audit document, answered or not."""
+    every document, answered or not."""
     counted: dict[str, dict[str, Any]] = {}
     answers_missing: dict[str, int] = {}
     not_counted: list[str] = []
@@ -252,11 +252,7 @@ def report(
         "sets": sets,
         "by_upload": {name: found for name, found in sorted(counted.items())},
         "truth": against_truth(
-            {
-                name: found["handwriting_regions"]
-                for name, found in counted.items()
-                if audit_set(name)
-            },
+            {name: found["handwriting_regions"] for name, found in counted.items()},
             truth,
         ),
     }
@@ -293,7 +289,10 @@ def render(record: dict[str, Any], worst: int = 15) -> str:
         for kind in ("whole", "apart")
     ]
     lines += measure.table(("set", "documents", *heads), rows)
-    lines.append("(apart: the recording lacks answers; those pictures are kept with a flag)")
+    lines.append(
+        "(apart: the recording lacks answers; a picture asked about is kept with a flag, and "
+        "model_refused there is the replay's stand-in for an answer it does not hold)"
+    )
     for name in ("audit", "rest"):
         for kind in ("whole", "apart"):
             held = sets[name][kind]
@@ -312,13 +311,13 @@ def render(record: dict[str, Any], worst: int = 15) -> str:
                 )
     lines += [
         "",
-        "regions called handwriting on the audit documents: "
+        "regions called handwriting in the corpus: "
         f"seen as pen strokes {truth[PEN]}, as something else {truth[NOT_PEN]} (must be 0), "
-        f"not looked at yet {truth['unlabelled']} ({truth['labelled']} rows in the truth list)",
+        f"not looked at yet {truth['unlabeled']} ({truth['labeled']} rows in the truth list)",
     ]
     if truth["missed"]:
         lines.append(
-            "labelled pen, not called: "
+            "labeled pen, not called: "
             + ", ".join(f"{name} {n}" for name, n in truth["missed"].items())
         )
     named = sorted(

@@ -285,5 +285,5 @@ def test_the_pictures_report_counts_what_was_not_converted_and_reads_the_truth_l
     assert audit["handwriting_regions"] == 2
     assert metrics["uploads"]["not_counted"] == ["w_pset_801"]
     truth_counts = metrics["truth"]
-    assert (truth_counts["pen"], truth_counts["not_pen"], truth_counts["unlabelled"]) == (1, 1, 0)
+    assert (truth_counts["pen"], truth_counts["not_pen"], truth_counts["unlabeled"]) == (1, 1, 0)
     assert "as something else 1" in capsys.readouterr().out
