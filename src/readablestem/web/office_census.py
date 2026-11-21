@@ -5,8 +5,8 @@ stored on the job as `Job.office_json`). Here the counts become two things:
 
 - notices (`core.types.Notice`, whole document), added to the result when it is stored: open
   tracked changes in a Word file are *required* (listed under "Not handled in this file", and
-  the job is "Ready", not "Ready to share"); speaker notes, hidden slides and comments are
-  *optional* ("Worth checking"). Each says how many; none quotes the file.
+  the job is "Ready", not "Ready to post"); speaker notes, hidden slides and comments are
+  *optional* ("Worth a look"). Each says how many; none quotes the file.
 - `read_lines`: the sentences of the job page's "How this file was read" section.
 
 Counts the census holds but nothing here reads (`units`, `units_exact`) are for a later charge
@@ -87,6 +87,6 @@ def read_lines(census: Census | None) -> list[str]:
         lines.append(
             f"{many} equation{'s' if many != 1 else ''} typed in the equation editor "
             f"{'was' if many == 1 else 'were'} read as {'a picture' if many == 1 else 'pictures'} "
-            "of the page, like any equation in a PDF, so check them against the original."
+            "of the page, like any equation in a PDF, so compare them with the original."
         )
     return lines

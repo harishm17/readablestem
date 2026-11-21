@@ -358,17 +358,17 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     page.get_by_role("button", name=re.compile("^Keep as headings at level 2")).click()
     page.wait_for_url(url)
     # Every part converted: the job page's finish line, word for word.
-    assert page.locator("#decision-title").inner_text() == "Ready to share"
+    assert page.locator("#decision-title").inner_text() == "Ready to post"
     assert page.get_by_role("link", name="Download the HTML file").is_visible()
     assert page.locator(".page-scroll .box-required").count() == 0
     review_page = page.url
     page.goto(f"{site.base}/jobs/{job}")
-    assert page.locator("#job-status .status-badge").inner_text() == "Ready to share"
+    assert page.locator("#job-status .status-badge").inner_text() == "Ready to post"
     page.goto(review_page)
     # The optional checks still open without scripts.
     page.locator("#optional-summary").click()
     page.get_by_role("link", name="Equation 2, page 1").click()
-    assert page.locator("#decision-title").inner_text().startswith("Optional check")
+    assert page.locator("#decision-title").inner_text().startswith("Optional item")
     context.close()
 
 
@@ -564,7 +564,7 @@ def abstained_job(site, browser) -> str:
 def test_an_equation_with_no_proposal_can_be_decided_by_keyboard(
     site, browser, abstained_job, axe_source
 ):
-    """Read again, then Not an equation, by keyboard: the result is announced, focus goes
+    """A new model reading, then Not an equation, by keyboard: the result is announced, focus goes
     to the decision's heading, Save waits for something typed, and axe finds nothing."""
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{abstained_job}/review?item=p1-e5"
@@ -580,7 +580,7 @@ def test_an_equation_with_no_proposal_can_be_decided_by_keyboard(
     assert save.is_disabled()
     assert strict_axe(page, axe_source) == []
 
-    again = page.get_by_role("button", name="Read again")
+    again = page.get_by_role("button", name="Ask the model to read it again")
     again.focus()
     with page.expect_navigation():
         page.keyboard.press("Enter")

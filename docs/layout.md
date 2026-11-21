@@ -411,7 +411,14 @@ column last. A `grid` is a set of labeled cells read in label order. The items c
 unmerged line fragments, the page's raster pictures (they occupy space), the rectangles drawn
 round text, and the tables found on the page (`_claim_tables` takes their cells and captions out
 of the fragments before the rows are made, so a table is one item with the box of its cells and
-its caption, like a picture). A vector figure is not an item: its drawings are read later.
+its caption, like a picture). A vector figure is not an item: its drawings are read later. It was
+tried as one (the reader's `_vector_figures` boxes, cut like a picture) and measured on the 267
+development pages and the 91 corpus gold pages: no page's reading order changed, and one page
+(`ax_qbionc_240307089` page 8) was faultless again, because two lines were no longer merged
+across the figure. On generated pages with a drawing between two columns of short lines it read
+worse (the rows of the two columns alternated, as they do with the tree on for a narrow raster
+picture there), so the code was not kept. A figure between narrow columns has to be cut like a
+column first.
 
 **The cuts.**
 
@@ -450,13 +457,18 @@ its caption, like a picture). A vector figure is not an item: its drawings are r
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
 10. Entry lists: a line at the first line's edge starts a new paragraph when the run hangs (a
-    glossary), or when both open with a section number or a bold term.
+    glossary: the line before it ends short of the right edge by a size and a half, because a
+    line that runs to the edge is a paragraph going on, under a heading or the last page's
+    tail, with its first line indented), or when both open with a section number or a bold
+    term.
 12. Numbered runs, the reordering only: where a run of six or more numbered labels is out of
     sequence, the column-by-column reading is used if it makes the run consecutive.
 
 Rules 4 (a foot heading), 7 (the question rule) and 11 (labels given back to the text) were
 built, measured and taken out: leaving each out changed no page of the development sets, or
-adding it changed none. Rule 13 was not ported, and rule 12's page check was not built.
+adding it changed none. Rule 13 was not ported, and rule 12's page check was not built: of the pages still wrong with the
+tree on (1 of the corpus gold pages made wrong, below, and none of the development pages), none
+asks for them.
 
 **How it is wired.** `RegionTree` stands where the gutter stood: `order._Ordering` is a protocol,
 `Gutter` is `tuple | _Ordering | None`, and `order._reading_order` hands the boxes to
@@ -470,13 +482,31 @@ gutter as with the tree off, so a rule that heads one column is never the blank 
 other; the tables found on the page (`_claim_tables`) are handed to the tree as boxes.
 
 **Measured** (`eval order --set layout-dev-1` and the corpus gold pages, no model, scored on
-the elements): 267 development pages, 141 right off, 163 on (22 made right, none made wrong; 154
-on, 9 made wrong, before the five fixes below); 91 corpus gold pages, 70 right off, 82 on (12
-made right, none made wrong). Added alone on top
-of rules 1 to 8: rule 9 made 1 page right, rule 10 made 8, rule 12 made 1, none made one wrong.
-Leaving one of rules 1 to 8 out (pages that stop being right / pages that become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4 and 7 0/0. Speed: 0.575
-(off) and 0.578 s per page (on) on a quiet box; in the runs after the five fixes, with the box
-busy, on took 0.90 of off's time (0.91 before them).
+the elements; 2026-11-20, 0.5.14): 267 development pages, 137 right off, 156 on (19 made right,
+none made wrong), 71 faultless off and 79 on (9 gained one, 1 lost: `ax_qbionc_240307089` page 8
+has two lines merged across a gutter, a fault the page did not have off); 91 corpus gold pages,
+71 right off, 83 on (13 made right, 1 made wrong), 37 faultless off and 42 on. The page made
+wrong is `e1_mc_columns` page 1: the last line of a block of choices in two columns has a mark at
+the right edge, and its text reaches the gutter, so the band shares only the 9 pt that are left of
+the gutter's 30 and the line joins the choices' columns. Keeping an overlap only when half of the
+narrower channel is left fixed it and made four development pages wrong (a 10 to 18 pt channel
+cut from 21 to 65 pt is a gutter on those pages), so it was not built. Rule 10's hanging test
+(the line before the first ends a size and a half short of the edge) mended no page's status:
+it took 10 splits and 18 cuts out of the development pages (a paragraph whose first line is
+indented, under a heading or the last page's tail, was read as a glossary), and it costs one
+glossary entry whose last line runs to the edge (`sm_glossary_a` page 1: 157 pages right before
+it and 156 after; the page is wrong off as well). The earlier measurement (0.5.13 pages, 141 right
+off, 163 on) is not comparable: the record was made again at 0.5.14. Added alone on top
+of rules 1 to 8 (that measurement): rule 9 made 1 page right, rule 10 made 8, rule 12 made 1,
+none made one wrong. Leaving one of rules 1 to 8 out (pages that stop being right / pages that
+become right): rule 1 1/0, rule 2 2/0, rule 3 7/2, rule 5 2/1, rule 6 1/1, rule 8 1/0; rules 4
+and 7 0/0. Speed: 0.575 (off) and 0.578 s per page (on) on a quiet box; in the runs after the
+five fixes, with the box busy, on took 0.90 of off's time (0.91 before them).
+
+The order numbers alone do not say whether to turn it on. With the tree on, the replayed result
+of 24 of the 73 corpus uploads changes (`hashrun.py full`, 2026-11-20), and a changed box changes
+a crop, so the recorded answers of the pages it moves stop matching: turning it on comes with a
+re-recording and a version bump.
 
 **The nine pages the first measurement made wrong** (154 right on, 9 right off and wrong on) are
 right again (163 right on, 22 made right, none made wrong; the corpus gold pages are unchanged at
@@ -541,7 +571,10 @@ bump and a recorded re-measurement first.
   (`"larger font"`).
 - A **bold body-size** run of at most 2 rows and 120 characters that starts a block (after a
   gap, an indent or a sentence end) and reads like a title (no lowercase start, no trailing
-  comma) is a heading with weak evidence (`"bold body-size line"`).
+  comma) is a heading with weak evidence (`"bold body-size line"`). A row that is the item of a
+  run of its series (`_Row.in_series`, below) is not one: the bold "B. Newton's second law"
+  among upright options of an answer key, the bold lettered lines of an agenda and "I. Outline
+  topic" between "H." and "J." are items, and a standalone numbered line is held to the same.
 - A **standalone numbered line** at body size ("2.3 Units of Speed", one row, a gap above
   and below, no full stop) is a heading (`"standalone numbered line"`), but only with a
   real section shape (`section_heading_number`): a dotted number
@@ -850,7 +883,9 @@ paragraphs. A capital letter and a full stop whose text opens like a list of aut
 or a surname and a comma, "and" or "et al": "A. Smith, B. Jones", "D. S. Turaga, ...") is the
 marker of a list only beside its neighbor: the item just before or just after it in reading
 order (a page's left column, then its right), or the one just above or below it at the same x,
-is the next or the previous letter (`_names`, `_list_markers`). Some line of a long document
+is the next or the previous letter (`_names`, `_list_markers`), unless that neighbor opens
+like an author line itself (an initial, a surname and a comma or "et al", "and" before an initial;
+an alphabetical reference list has the next initial in its next entry). Some line of a long document
 has the next letter, and a reference list or a byline had its lines read as lettered items.
 Any other capital letter keeps the sibling test above. Headings are decided first:
 "1. Introduction" in a large font is a heading; so is a line of 2 to 12 words that starts with
@@ -862,8 +897,20 @@ of it (`_mark_lettered_titles`): the next row of its column is not text in the t
 face, and has no marker unless it opens a numbering ("A. Datasets", then "1) CIFAR-10: ...");
 and the nearest marker above it in its column is not the letter before with only that item's
 own lines between them, which is the next item of a list. An option of a grid is never one.
-The title is a block of its own, apart from the text under it. Known and left: a title that
-wraps onto a second row in the same face stays the list item it was. A bold line that starts
+The title is a block of its own, apart from the text under it. A title that wraps onto a second
+row of its face (no marker, less than half a row height under it, at most 12 words in all, the
+second row not ending like a sentence) is one title of two rows; a title that ends in a full stop
+is still read as an item. The type alone does not make a heading of a lettered or numbered line
+that stands in a run of its series either (`_mark_series_items`, `_Row.in_series`): the next
+marker of its column, past its own lines, is the next value ("A.", "B.", "C."; "I." between "H."
+and "J."), or the marker nearest above is the value before with nothing but its own lines
+between. A heading of the same shape has text, or a figure, under it: text of another face is
+no line of the item, and a figure or a table, which is no row of text, shows as the white it
+leaves, where a run ends (more than `SERIES_GAP` times the type size between two rows of the
+column: "1. Setup" over a picture and "2. Procedure" under it are two titles). The white alone
+ends a run, whatever stands in it: numbered items set that far apart, with room to answer
+between them, end their runs too, and set in bold they are headings (O-401). Two titles in
+a row, the first with no text of its own, are read as a list of two. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
 changes nothing).
 
@@ -883,7 +930,12 @@ numbered parent, the x does not tell which level "2)" goes back to, so it goes b
 level of its own series at that x. A numbered series that
 starts again at its first value ("(a)" after "1.", "(i)" after "(a)") is a list under the item
 above, even where the item texts start at one indent (the answer lines of an exam); "(b)" then
-goes back to the letters. A marker with two readings ("(i)": the letter after "(h)", or roman
+goes back to the letters. The same holds after a cut: "(a)" after "1." and a figure is
+the list of that item, one level down, and not the first level again (`_list_levels`), on the
+page of that item and with no heading between; lettered items pages after a numbered list, or
+in the next section, are a list of their own. The level is what the result stores and the page
+audit shows: on the student page a list that a figure or a paragraph cut starts a new list
+(`assemble._list_levels` counts from the first item of each run). A marker with two readings ("(i)": the letter after "(h)", or roman
 one) is read against the open level the item stands on, then the innermost one, after the
 levels right of it are closed: the bullets under "(h)" say nothing of the "(i)" that follows
 them (`_numbered`). A list that a paragraph, a figure or a table cut ("(i)", the words of
@@ -1000,7 +1052,7 @@ math font, stay math.
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Three patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Six patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behavior.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
@@ -1028,12 +1080,56 @@ math font, stay math.
      "0 > s_1 > s_2 > ..." out of the inline formula as a full stop; three dots after a comma
      or a relation or operator (`_trailing_ellipsis`) stay in it. Four dots are an ellipsis
      and the sentence's full stop, and the full stop still goes.
+  4. *A line set off like a display, with a word in it.* A line with a prose word is read as
+     text, so its formula was cut around the word ("Diam(C) <= ... for all i" came out as two
+     inline formulas and a paragraph). `_promote_set_off_lines` makes such a line a display
+     when it is mostly math (`NUMBERED_SHARE`) with at most `SET_OFF_WORDS` words, has some
+     math row or a line score at the equation threshold, and stands in `SET_OFF_INDENT` font
+     sizes from both edges of the text of its column (the left edge is that of the lines within
+     `NEAR_LINES` sizes of it, so the last line of an indented paragraph is not a display), and
+     does not sit within `SET_OFF_GAP` of the bottom of a line of text above it (a paragraph's
+     last line). The rows of the line become math rows; nothing is joined.
+  5. *A piece inside a display.* The top of a tall bracket set in pieces, the double bars of a
+     norm: a line of its own to the stacking, inside the box of the formula it belongs to.
+     `_absorb_contained_regions` joins a region with at least `CONTAINED_SHARE` (0.9) of its
+     area inside a larger one; two numbered displays are never joined.
+  6. *Limits at the size of the row.* `_joins_line` takes limits by their size (a script size
+     under a big operator); a paper that sets them at the size of the row ("k=1" at 7 pt under
+     a sum at 7 pt) gave it nothing to go by. `_limits_of` joins a line that hangs right under
+     (or sits right over) a big operator (sum, product, integral, union, intersection),
+     centered on it and no wider than twice its sign.
+
+  Measured on the 21 development papers (a development box score kept outside the repository; 11,258 formulas, display
+  class 1,004): whole 80.0% with the switch off, 83.9% with rules 1 to 3, and with 4, 5 and 6
+  added one after the other 88.4% (rule 4: 46 formulas made whole, 1 broken: an inline formula
+  that a display's box now reaches), 89.8% (rule 5: 14, none broken) and 89.9% (rule 6: 1,
+  none broken). No paper got worse. The one display that was whole in the first round of the
+  grouping and is not any more (2412.12319, equation 82) is not in the box score: the gold
+  writes its aligned rows one by one and the layout reads them as one array that holds every
+  row, the form kept below.
+
+  Loose equation numbers (O-037, O-391), counted on the same papers with the switch on: 6
+  numbers left at the end of an equation's text with no label (2103.06872, 2305.10416 twice,
+  2308.10321, 2411.03309, 2412.18448), and 6 numbers that are a paragraph of their own: 2 at
+  the left margin of a display ("(3)" in 2309.01468), 1 right of a display, and 3 with no
+  equation level with them (2411.03309: "(10)" beside a line of digits, "11 00 ,", that is
+  read as text). They are no cluster, none was built, and the rules above leave them as they
+  were.
 
   Not done, and why: aligned rows that the gold writes one by one stay one element with rows
   (that is the form a screen reader reads best, and `scripts/rw_spoken.py` scores it per
   row); a display set with function names in a text font (`PMI`, `Unif` in Times) is still
   cut at the word, and an equation number set above the first row of a tall display is still
   an element of its own.
+- **Inline formulas kept whole (`LAYOUT_INLINE_JOINS`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Four rules for the places where an inline run ended inside one printed formula, all behind `analyze(inline_joins=True)`; with the switch off the output is byte for byte what it was (the layout of 996 files, hashed before and after). Measured on the position truth of 21 development papers (a development box score kept outside the repository; 11,258 formulas, 8,990 whole before), each rule alone, and none made a paper worse:
+  1. *Operator names* (`_MORE_MATH_WORDS` in `shared.py`): `erfi`, `erfc`, `supp`, `diam`, `codim`, `coker` and `arccot` count as math words, like `sin` or `max`. +2 whole, none lost.
+  2. *A colon or semicolon inside a bracket* (`_separator_in_bracket`): "I(A : B)", "W(P; G)". A TeX-made page's separator inside a bracket the run opened, with math in between and the bracket closing on the same row, does not end the run. +76 whole, none lost.
+  3. *A math word between formulas* (`_math_word_joins`): "a = b mod n". A word space next to a math word, with math on the other side, does not end the run: the spaces around `\bmod` and `\pmod` are the author's. The run before it must be math on its own evidence. +3 whole, none lost.
+  4. *A label joins the run after it* (`_joined_labels`): "H0:" and "f :=". A short label (four glyphs or fewer, letters and digits only) that ends in a colon right before a run, and carries an index or a ":=", is the left side of that formula and joins it. A bare letter before a colon ("A:") is as often a list heading and stays out. +6 whole, none lost.
+  All four together: 9,077 whole (+87), none lost; with `LAYOUT_DISPLAY_GROUPING` also on, 9,118 (+128), none lost.
+
+  Not built: a part label "(a)", "(b)", "(iii)" that splits a run and stays text. A TeX word-space rule already splits "(a) x = 1" on TeX pages; on the other pages the narrowed rule changed no box on the development papers (a first version lost 29 whole boxes by taking a raised "(j)" and "V(f)" for labels), so it is not in the code.
+
 - **Inline math split or merged (T2-6).** A middle dot `·` or `∙` in the text font (Chromium
   prints a product so) is an operator, so a run goes on through it. A blank in a text font
   between math-font glyphs ends the run (`_between_formulas`): Chromium puts the spaces
@@ -1482,10 +1578,20 @@ this section describes.
   that are not a script of upright text (the 2 of `(a + b)2` after a line break, the `cell`
   of `E°cell`) are still given a kind when something stands before them: written raised they
   read better than flat.
-- **Flagged when flat** (`scripts_flattened`, optional "Worth checking"): raised or lowered
-  glyphs left with no base, those in a figure caption, and lowered glyphs in a table (a
-  table cell keeps raised marks as superscript characters, `tables._marked`, and not lowered
-  ones).
+- **Flagged when flat** (`scripts_flattened`, optional "Worth a look"): raised or lowered
+  glyphs left with no base, lowered glyphs in a figure caption, and lowered glyphs in a table
+  (a table cell keeps raised marks as superscript characters, `tables._marked`, and not
+  lowered ones).
+- **Raised digits in a caption**: a caption is a plain string with nowhere to hold a script
+  run, so a raised run in it is written in superscript characters, as a table cell's and a
+  table caption's are (`script_marks.raised_characters`: "10⁸", "CP³"; a run with a character
+  that has no superscript form is written "^(...)"). A figure caption was written "108" and
+  "CP3" and only flagged; the page now has the raised form in `Element.caption_marked`, and
+  `Element.caption` stays the flat text the figure step is sent, so no recorded request stops
+  matching. Listen says superscript characters as a `<sup>` is said ("10
+  superscript 8"). A power of ten in a TeX paper is part of an inline equation (`power of
+  ten`); if that equation is not converted, its alt text begins with the warning that
+  exponents run together in the characters, as it does for any equation with a raised part.
 
 Not done: lowered text in table cells (the cell text stays flat, the notice says so);
 a script that is part of a word the text layer splits across rows.
@@ -1892,6 +1998,29 @@ math by the document's evidence; the equation step's own tiers then decide it.
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).
+- **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code and in
+  production; bump `PIPELINE_VERSION` when it is turned on). A figure printed as panels
+  (a), (b), (c) under one caption was found as one figure for each panel, and only the one
+  nearest the caption took the caption (`_attach_captions`), so the others were figures
+  with a picture and no words: a reader got one description for each panel and the caption
+  on one of them. With the switch on, a figure that holds a caption takes the captionless
+  figures that stand in a row or a column with it (gap at most `PANEL_GAP` = 3.5 body
+  sizes from the panels it holds, not at a corner), under the caption's width and on the
+  caption's side of it, until none does; a line of text among the panels ends the join,
+  and the short label rows among them (panel letters, axis words) do not. The rows among
+  the panels are claimed as labels again, and a row of one or two characters ("A", "b",
+  "3", "n") within `PANEL_MARK_REACH` = 2.5 body sizes of any figure's box is a label of
+  it (panel letters and the names of a drawing's parts stand at a corner, beyond the one
+  reach of `_label_owners`), unless it is a word ("to", "of") or the start of a list item.
+  Measured (2026-11-20, the 277 readable public files: the repository's, the layout gold
+  and the real-world dev and fresh sets; and the 28-file corpus): captionless figures
+  standing beside a captioned one, 285 in 59 files public and 30 in 3 files corpus; with
+  the switch on the figures go from 1,611 to 1,320 public and from 456 to 405 corpus, and
+  the captioned figures stay 517 and 145. Not joined, by the same rules: 83 candidates in
+  24 public files and 3 in 2 corpus files (a paragraph between, another caption's figure,
+  a gap wider than the reach). The other half of the fault, an axis label or a part mark
+  found as a figure of its own (`drawing_fragments`), is on no file of either set (0
+  figures), so nothing was built for it. Off, the output is byte-identical to before.
 - **Shapes that vanished** (WS6.15, 2026-11-18). A timeline's ruler (a long thin line
   with ticks, 5 pt tall) fell under the 24 pt a figure needs on both sides, so it was a
   small drawing; no label was held for it and the paragraph's block took its labels, so
@@ -1900,8 +2029,20 @@ math by the document's evidence; the equation step's own tiers then decide it.
   (`thin_ruler`, `_vector_figures`; a table's header rule alone stays a rule). A free-body diagram's
   force arrows, each thin and 20 pt off its box, were separate small drawings that
   joined the box only within 12 pt: a small drawing joins a figure within
-  `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves. A circuit's
-  parts were not found as labels, see the label rule above.
+  `LEFTOVER_REACH` (24 pt), as the leftover drawings do among themselves, unless a line of
+  prose (`SENTENCE_WORDS`, 6 words or more) lies wholly in the gap between the two and
+  overlaps both sideways (`_sentence_between`; a glyph drawn as an outline in a line of
+  text has no such line between it and the figure): a dark tab with its label inside ("EXAMPLE 5.2") a few points over
+  a sentence and a grid joined the grid's figure, whose crop took the label and the
+  sentence (O-388, 2026-11-20). Such a drawing was part of a picture, so it is a figure of
+  its own: among the page's leftover drawings it is kept though a block holds its middle (a
+  formula drawn as outlines in a line of a paragraph was dropped there as "math drawn in a
+  line", and was in no element), and it is not grouped with the leftover drawings near it,
+  whose group box would take the sentence in again (`apart_out`, `_leftover_drawings`). A
+  figure's box grows with each join, so a join stopped also leaves out the small drawings
+  further on that were in reach only through it: they are read as any small drawing of the
+  page (in a line of a paragraph: held by the paragraph and lost, as the list of what is not read says further down). A
+  circuit's parts were not found as labels, see the label rule above.
 - **A drawing made of text fragments** (`_fragment_figures`, WS2.9a): the labels of a drawn
   structure, circuit or diagram whose strokes are too short and plain for a drawing cluster
   were written as dozens of loose paragraphs and one-symbol equations, each its own
@@ -2018,6 +2159,35 @@ marks, and in a file that names none only a raised digit or sign that opens a li
 type low on the page, or a raised run at the end of a heading that is the same as the opening
 of such a line on the page.
 
+Wave 2b, from a count of the public papers (131 destinations, 155 notes found, 124 linked; now 139 found, 135 linked; the
+count is the footnote destinations, the `footnote` notices and the internal links to them).
+In a file that names none, a block is a note only when it opens with a mark printed raised in
+the text above it that is the whole mark ("12" is not the "1" raised above it) and goes on in
+words. The mark is read from the note's first line as printed (`_lead_token`): raised glyphs
+at its start end the mark where they end ("1" before "2019 was the first year"; at the start
+of a line a glyph a little smaller than the line and lifted off its baseline counts as
+raised, `NOTE_MARK_LIFT`), and a start on the line ends at the first blank ("1 10 mL of
+water"). A raised run in the text holds each of its marks (`_mark_groups`: "1,2" is two
+marks, "1)" is the mark "1"). So: a row of axis labels in small type low on a figure (11 "notes" on one page), a lone page
+number, an integral's lower limit and a running footer ("12 Authors") were notes when one raised
+digit of the same kind stood anywhere above (`_footnote`, `_lead_token`; 14 false notes on 4
+papers, none now; one note of that shape is lost with them, the "Mathematics Subject
+Classification" line of ax_mathap_240306449, a note only because a "2" was raised somewhere above,
+as the same line of ax_mathco_240306468, which was never one). The nuclide rule leaves a mark alone (`_nuclide_runs` reads no glyph with
+`NOTE_MARK_FLAG`), so a note that opens "In fact" or "As" is not indium or arsenic with the mark
+for its mass number (2 notes, 2 papers). In a file that names none, the raised mark in the text
+before a math letter, right after a word of text type or a comma, stop or colon, is flagged the
+same way as a named one and is no part of the equation with the letter (`_flag_text_marks`: an
+exponent, after a math letter or a bracket, is not touched). And a note the file names but no link
+points at (a class that writes the destinations and no link rectangles: 6 notes on 2 papers) is
+linked by its mark, the raised one in the text above on the same page that the note opens with
+(`_layout_notices`); it still has to be found once. Not changed, and why: the 2 author notes of
+ax_astrophga_240306369 and the note of a table (`a`) have no mark printed in the text, nothing to
+link; `[1]` of 2503.22999 is a bibliography item the file names `footnote`. The false footnote on
+2407.04005 p10 (p10-e50), "a mark inside a heading" and the 17 not found could not be measured
+on the public papers: none of them has a false note, a heading mark that is not linked, or a
+named note not found (131 destinations, 131 found).
+
 **Contents pages.** A page with at least two lines that end in dot leaders (five dots, or
 an ellipsis counting for three) is a contents page (`_contents_rows`). Each such line is a
 list item of its own with its title only: the leaders go, and so does the page number (at
@@ -2047,7 +2217,7 @@ apart; a line with no number ends the list, so the section heading right after i
 taken in. It is tried before a grid is taken for a table: a table whose lines are mostly the
 list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`), so the
 reason `contents entry` fires and no second contents list is written. An entry with a number
-links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). Not read: a
+links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). A list whose numbers do not stand at one edge is read as numbers that follow their titles only when none of them stands apart in a column of its own: marks ("x", a roman numeral) set in several columns of a table, after the names, are a table's cells and the table is kept. Not read: a
 list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
 it, a title that wraps onto a second line with the number on the second, and a two-column
 page (the columns are not known when tables are claimed).
@@ -2107,15 +2277,18 @@ the long line, "repeat"; the line of a paragraph goes on to a "for ..." that run
 margin). Any other (a long first line, a long line that wraps into a second one, a long line
 over a loop line that reaches the margin) may be a long step ("Initialize the table of
 counts ..." set out to the margin) or the running text under a float's caption, so the lines
-must then show more: one step set further right under a line that opens a block and ends as
-one does ("do", "then", a colon: `_nested` with `said`), or a closing line set back to the left.
-A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
+must then show more: one step set further right than the line above it and a later one set back
+to the left of the line above it (`_nested`, from the indent alone: it reads no word, so a block
+that opens with no "do", "then" or colon shows itself, and a sentence that begins "For" is no
+proof by its first word; it was a proof of opening and closing words before wave 2b, and it is
+the same on all 22 public pages with an "Algorithm" or "Procedure" line, which is the set it was
+tried on). A formula on a line of its own counts as a step here (a loop whose body is "b <- A b"). Two
 lines that start more than `ALGORITHM_SET_IN` (6) em apart prove nothing: a line that far right
 is a display equation of the text, centered in the column ("... as follows:" over "v = d / t"),
 and a closing line that far left of it is the sentence going on ("until the last word is read").
 With no caption line (one under a rule, a box or nothing) it takes more proof:
 `ALGORITHM_BARE_ROWS` (4) lines, `ALGORITHM_BARE_WORDS` (3) with a step word, a step that closes
-a block, and either consecutive line numbers ("3:") with one step set inside another (`_nested`;
+a block, and either consecutive line numbers ("3:") with one step set in and a later one set back (`_nested`;
 the numbered lines of a manuscript and the questions of an exam all start at one place), or no
 numbers, an indent ladder of three left edges and something only code holds (a formula, an
 assignment, an "end", a block word on a line that ends in "do", "then" or a colon). A bullet is
@@ -2158,8 +2331,11 @@ the column's right edge, and the new line has no number, does not start with a c
 word) is joined to its step; a word broken by a hyphen across the wrap is mended. A line with no
 number right of the numbers (a step that broke early, a comment on a line of its own) is joined
 too when the next number is within `ALGORITHM_BETWEEN` (2) rows below it. A bit of math or
-small print the text layer cut off a line (`ALGORITHM_SAME_LINE`) is a piece of that line, and rows
-the page lists out of order are put back in the order of their lines.
+small print the text layer cut off a line (`ALGORITHM_SAME_LINE`) is a piece of that line, and so
+is one that hangs under the line's end, up to `ALGORITHM_HANG` (0.7) em lower and starting no
+more than `ALGORITHM_HANG_AT` (1.5) em left of where the line ends (the subscripts of a tall
+expression: the steps after it stayed outside the block, Algorithm 3 of ax_statme_240307124);
+rows the page lists out of order are put back in the order of their lines.
 
 A display equation between two steps ends the rows there; the algorithm goes on at the next step
 within `ALGORITHM_REACH` (16) lines (`_after_equation`) as a second block: the step with the next
@@ -2184,8 +2360,9 @@ the caption ends within `ALGORITHM_WRAPPED` (3) em of the column's right edge (a
 only an algorithm, a narrow column), a first step with no step word is read as the second line
 of the caption. Algorithms still lost (independent reviews 9, finding 1, and 10, findings 2
 to 5): under a long first line in plain words, steps that show no nesting in the way asked
-above, which are a flat algorithm (no line set further right), one whose loop lines end in no
-"do", "then" or colon unless a short "return x" or an "end" is set back to the left, a loop
+above, which are a flat algorithm (no line set further right), one whose last line is still inside
+its loop (nothing is set back to the left after the line that goes in; the words "do", "then"
+and a colon are no longer asked), a loop
 that holds two formula lines or more (a display equation of several lines is not a step) and
 a loop whose only line is a formula set more than 6 em to the right. The same pages with a
 short first line are read as algorithms, and so are those with the long line second when it
@@ -2195,7 +2372,12 @@ one after the other, a long step over "count = 0" or over a loop line that reach
 margin; with flat steps under them these are paragraphs. Pseudo-code numbered "1." under a
 caption whose only nesting is between lines 9 and 10 is a list. An "=" step that is the first
 of its block after an equation is not picked up when the line that opens the block wraps
-into a second line that starts where it does.
+into a second line that starts where it does. Counted on the public pages (wave 2b: the 22 pages
+of `layout-dev-1`, the arXiv gold and the repository's own with an "Algorithm" or "Procedure" line)
+and not built, each on one page: a step after a monospaced comment row (2405.15050 p4), an
+Input list of two-row math regions that stops after the first line and leaves the steps from
+the seventh on as paragraphs (2504.06207 p4), and a step whose second line is a paragraph of its
+own between the steps (Algorithm 1 of ax_statme_240307124, p12).
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a
@@ -2504,7 +2686,7 @@ The decisions in the rules, with the measured values next to each threshold in t
   a hang: 60 s a page (`INK_GUARD_S`), about 40 times the slowest corpus page. Such a page says
   `ink_not_analysed`, and its stored page type says why (`ink_cause`: `work` or `time`); the
   conversion writes a "not finished" fact for it (`page_type`, `work_budget` or `time_limit`),
-  and a page read for its text gets the notice `drawings_not_analysed` ("Worth checking"), so
+  and a page read for its text gets the notice `drawings_not_analysed` ("Worth a look"), so
   the job page does not say "Everything was converted". A page not analyzed with less than a
   line of typed text is kept as its image beside that text; with a line or more it is read as
   before (its drawings are figures for the figure model), unless a drawing fills the page,
@@ -3090,7 +3272,7 @@ The document's language (`DocumentResult.lang`, `lang_source`):
 4. else "en": source "default" and the notice `lang_assumed`.
 
 No language holding 60 % of the letters adds `lang_mixed`. `lang_assumed` and
-`lang_mixed` are required checks (`web.states`): the job is not "Ready to share" until the
+`lang_mixed` are required checks (`web.states`): the job is not "Ready to post" until the
 owner confirms or changes the language on the job page
 (`text_pass.set_document_language`, source "user"). `lang_detected` stays optional.
 

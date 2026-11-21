@@ -1,7 +1,7 @@
 """The second automated check's note on the review screen and the job page (server-rendered).
 
 The note ("a possible mismatch between the alt text and the image") is listed under
-"Optional checks" by policy (ADR 0005), but it is not something small: a wrong alt text
+"Optional items" by policy (ADR 0005), but it is not something small: a wrong alt text
 changes what a screen reader user hears. So wherever the page describes the optional
 checks, it says this one is worth a look instead of calling it small or "nothing to do".
 The browser test (test_web_second_check_browser.py) covers axe and reflow.

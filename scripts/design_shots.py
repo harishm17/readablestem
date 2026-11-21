@@ -79,7 +79,13 @@ SIGNED_IN = {
     "listen": "/jobs/{job}/listen",
     "bulk-figures": "/jobs/{job}/accept/figures",
 }
-VIEWS = {"1440": {"width": 1440, "height": 900}, "390": {"width": 390, "height": 844}}
+VIEWS = {
+    "1440": {"width": 1440, "height": 900},
+    "1280": {"width": 1280, "height": 800},
+    "768": {"width": 768, "height": 1024},
+    "390": {"width": 390, "height": 844},
+    "320": {"width": 320, "height": 640},
+}
 
 # --check: what a screenshot cannot show. Interactive things under 24px (inline links in running
 # text are exempt), text under 7:1 against its real background, text under 14px, and sideways

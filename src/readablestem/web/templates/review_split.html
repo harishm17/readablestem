@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "components/forms.html" import form with context %}
 {# The review screen (routes/split.py): one decision at a time beside the page it is on.
-   DOM order is decision, optional checks, page: on a phone that is the reading order,
+   DOM order is decision, optional items, page: on a phone that is the reading order,
    and on a wide screen CSS grid puts the page on the left. Every mark on the page is a
    link to its item, every decision a form: it all works without JavaScript. #}
 {% block title %}{% if errors %}Error: {% endif %}{% if panel.mode == "decision" %}{{ panel.title }}: {% endif %}Review {{ job.filename }}{% endblock %}
@@ -176,7 +176,7 @@
     {# Scrolls sideways when wide: a named tab stop, so it can be scrolled from the keyboard. #}
     <div class="cmp-row" tabindex="0" role="group" aria-label="Proposed {{ item.label|lower }}"><div class="cmp-math">{{ item.mathml }}</div></div>
     {% else %}
-    <p class="cmp-none">No proposal yet.{% if item.can_read_again %} Read it again, type the LaTeX, keep it as a picture with your description{% if item.can_not_equation %}, or say it is not an equation{% endif %}.{% else %} Type the LaTeX below, or keep it as an image.{% endif %}</p>
+    <p class="cmp-none">No proposal yet.{% if item.can_read_again %} {{ strings.READ_AGAIN }}, type the LaTeX, keep it as an image with your description{% if item.can_not_equation %}, or say it is not an equation{% endif %}.{% else %} Type the LaTeX below, or keep it as an image.{% endif %}</p>
     {% endif %}
   </div>
   {{ speech_lines(item, p.spoken) }}
@@ -218,7 +218,7 @@
 </div>
 {% endif %}
 {% if p.compare and p.compare.same %}<p class="same-line">Same in both: {{ p.compare.same|join(", ") }}.</p>{% endif %}
-{% if p.compare and p.compare.unseen and p.compare.rows %}<p class="unseen-line">The PDF's text cannot show the style of: {{ p.compare.unseen|join(", ") }} (in the proposal). Check {{ "it" if p.compare.unseen|length == 1 else "them" }} in the image.</p>{% endif %}
+{% if p.compare and p.compare.unseen and p.compare.rows %}<p class="unseen-line">The PDF's text cannot show the style of: {{ p.compare.unseen|join(", ") }} (in the proposal). Look at {{ "it" if p.compare.unseen|length == 1 else "them" }} in the image.</p>{% endif %}
 {# Notation memory: the job's course notation about this equation. #}
 {% include "_course_notation_card.html" %}
 {% if p.chips %}
@@ -318,7 +318,7 @@
 {% if item.data_table and item.data_table_offered %}
 <div class="data-offer">
   <p class="part-label">Optional: a data table for this chart</p>
-  <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
+  <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you look at them.</p>
   <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
   {% call form("review.decide", "/jobs/" ~ job.id ~ "/review/" ~ eid, {"class": "inline-form"}) %}
     {{ hidden_fields() }}
@@ -540,7 +540,7 @@
   <blockquote><p>{{ n.excerpt }}</p></blockquote>
 </figure>
 {% endif %}
-{% if n.others %}<p class="hint">{{ n.others }} more {{ "note is" if n.others == 1 else "notes are" }} about this paragraph; {{ "it is" if n.others == 1 else "they are" }} in the optional checks below.</p>{% endif %}
+{% if n.others %}<p class="hint">{{ n.others }} more {{ "note is" if n.others == 1 else "notes are" }} about this paragraph; {{ "it is" if n.others == 1 else "they are" }} in the optional items below.</p>{% endif %}
 <p class="notice-actions">
   {% if n.change_href %}<a class="button-secondary" href="{{ n.change_href }}" data-role="change-words">Change the words</a>{% endif %}
 </p>
@@ -632,7 +632,7 @@
     <p class="done-actions"><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a>
       <a href="/jobs/{{ job.id }}/view" data-ph-event="result_opened">Preview the student version</a>
       <a href="/jobs/{{ job.id }}/listen">{{ "Listen as a student" if job.is_owner else "Listen to it" }}</a></p>
-    <p>Before you share, read the student version through once, and listen to it: {{ ready.checks_scope }}{% if ready.notes %} {{ ready.notes }}.{% endif %}</p>
+    <p>Before you post, read the student version through once, and listen to it: {{ ready.checks_scope }}{% if ready.notes %} {{ ready.notes }}.{% endif %}</p>
     <p><a href="/help/posting">How to post it in your course</a> · <a href="/jobs/{{ job.id }}#ready">Back to the results</a></p>
     {% else %}
     <p><a href="/jobs/{{ job.id }}">Back to the results</a></p>
@@ -662,10 +662,10 @@
       <div class="tech">
         <p class="part-label">Details for this item</p>
         <p>Confidence: {{ panel.confidence }}</p>
-        {% if panel.item.reason %}<p>{{ panel.item.reason.text }} <span class="code-line">Code: <code>{{ panel.item.reason.code }}</code></span></p>{% endif %}
+        {% if panel.item.reason %}<p>{{ panel.item.reason.text }}</p>{% endif %}
         {% if panel.checks %}
         <ul class="check-list">
-          {% for check in panel.checks %}<li><strong>{{ check.severity }}:</strong> {{ check.text }} <span class="code-line">Code: <code>{{ check.code }}</code></span></li>{% endfor %}
+          {% for check in panel.checks %}<li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>{% endfor %}
         </ul>
         {% endif %}
       </div>
@@ -704,14 +704,14 @@
   <section class="optional-area" aria-labelledby="optional-summary{% if decided_lines %} decided-summary{% endif %}">
     {% if optional %}
     <details class="optional-box"{% if optional_open %} open{% endif %}>
-      <summary id="optional-summary">Optional checks ({{ optional|length }})</summary>
+      <summary id="optional-summary">{{ strings.OPTIONAL_ITEMS }} ({{ optional|length }})</summary>
       <p class="hint">Accepted automatically with a small note. Nothing to do unless you disagree.</p>
       <ul class="optional-list">
         {% for line in optional %}{{ item_line(line) }}{% endfor %}
       </ul>
     </details>
     {% else %}
-    <p class="optional-none" id="optional-summary">No optional checks.</p>
+    <p class="optional-none" id="optional-summary">No optional items.</p>
     {% endif %}
     {% if decided_lines %}
     {# What the reviewer decided, kept apart from what was accepted automatically. #}
@@ -752,7 +752,7 @@
       <ul class="legend" aria-label="What the marks mean">
         {% if "required" in tiers %}<li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>{% endif %}
         {% if "repeat" in tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Same decision, other page</li>{% endif %}
-        {% if "optional" in tiers %}<li><span class="key key-optional" aria-hidden="true"></span> Optional check</li>{% endif %}
+        {% if "optional" in tiers %}<li><span class="key key-optional" aria-hidden="true"></span> {{ strings.OPTIONAL_ITEM }}</li>{% endif %}
         {% if "accepted" in tiers %}<li><span class="key key-accepted" aria-hidden="true"></span> Accepted</li>{% endif %}
       </ul>
       {% endif %}

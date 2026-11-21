@@ -51,7 +51,7 @@ keep, and adds to the elements without changing their text or anything a model s
   fill in: neither crosses a glyph's middle, so neither is struck text. The words stay in
   the text; the run only marks them (`pipeline.inline_text` writes `<del>`).
 
-Every notice is optional ("Worth checking"); nothing here adds a decision.
+Every notice is optional ("Worth a look"); nothing here adds a decision.
 
 How a rectangle on the page becomes offsets into `Element.text`: layout does not keep
 where each character of an element's text was printed (the text is cleaned, joined

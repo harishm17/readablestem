@@ -19,7 +19,8 @@ dev-v2/check-*`) and `proof/` are never read. `--extra DIR` adds the PDFs under 
 (each is written under a name made from its path).
 
 `LAYOUT_DISPLAY_GROUPING=true` in the environment runs the snapshot with the display-grouping
-rules on (off by default, as in production).
+rules on, and `LAYOUT_INLINE_JOINS=true` with the inline-join rules on (both off by default, as in
+production).
 
 The ink analysis is bounded per page by counts of work (`page_type.InkBudget`), the same on
 any machine; its clock is only a guard against a hang. The table search still has a time
@@ -77,6 +78,8 @@ def describe(path: str) -> dict[str, Any]:
         result = layout.analyze(
             Path(path).read_bytes(),
             display_grouping=os.environ.get("LAYOUT_DISPLAY_GROUPING", "").lower() == "true",
+            inline_joins=os.environ.get("LAYOUT_INLINE_JOINS", "").lower() == "true",
+            join_panels=os.environ.get("LAYOUT_JOIN_PANELS", "").lower() == "true",
         )
     except layout.LayoutError as exc:
         return {"error": exc.code, "seconds": round(time.perf_counter() - started, 2)}

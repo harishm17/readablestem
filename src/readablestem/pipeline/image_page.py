@@ -63,7 +63,7 @@ import re
 import unicodedata
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from typing import Literal
 
@@ -282,23 +282,17 @@ def run(
     pages: Mapping[int, Callable[[], bytes | None]],
     *,
     concurrency: int = DEFAULT_CONCURRENCY,
+    on_page: Callable[[int, int], None] | None = None,
 ) -> PassResult:
     """Read the pages given (`{page: render}`, `render()` makes the page's PNG; called on this
     thread, since PyMuPDF is not thread-safe). A page whose picture cannot be made is a read
     with outcome "no_image". A budget refusal stops the pass: the pages answered before it
-    stay, the others are not read."""
+    stay, the others are not read. A page is asked as soon as its picture is made, while the
+    next is drawn. `on_page(done, total)` is told, on this thread, each time pages are
+    finished (answered or without a picture); it may raise to stop the pass."""
     result = PassResult()
     work: dict[int, bytes] = {}
-    for number, render in sorted(pages.items()):
-        try:
-            png = render()
-        except Exception as exc:  # a page picture is never worth failing the conversion for
-            log.warning("image page picture failed: %s", type(exc).__name__)
-            png = None
-        if png:
-            work[number] = png
-        else:
-            result.reads[number] = PageRead(number, None, [], "no_image")
+    total = len(pages)
 
     def one(number: int) -> tuple[int, PageRead | None, Exception | None]:
         try:
@@ -309,11 +303,38 @@ def run(
             log.warning("image page failed: %s", type(exc).__name__)
             return number, PageRead(number, None, [], "error", work[number]), None
 
-    with ThreadPoolExecutor(
-        max_workers=max(1, concurrency), thread_name_prefix="imagepage"
-    ) as pool:
-        outcomes = list(pool.map(one, sorted(work)))
-    for number, read, error in outcomes:
+    told = 0
+    futures: dict[int, Future[tuple[int, PageRead | None, Exception | None]]] = {}
+
+    def tell() -> None:
+        nonlocal told
+        done = len(result.reads) + sum(1 for f in futures.values() if f.done())
+        if on_page is not None and done > told:
+            told = done
+            on_page(done, total)
+
+    pool = ThreadPoolExecutor(max_workers=max(1, concurrency), thread_name_prefix="imagepage")
+    try:
+        for number, render in sorted(pages.items()):
+            try:
+                png = render()
+            except Exception as exc:  # a page picture is never worth failing the conversion for
+                log.warning("image page picture failed: %s", type(exc).__name__)
+                png = None
+            if png:
+                work[number] = png
+                futures[number] = pool.submit(one, number)
+            else:
+                result.reads[number] = PageRead(number, None, [], "no_image")
+            tell()
+        for _ in as_completed(list(futures.values())):
+            tell()
+    except BaseException:
+        pool.shutdown(wait=True, cancel_futures=True)  # no page is asked once the pass stops
+        raise
+    pool.shutdown()
+    for number in sorted(futures):
+        _, read, error = futures[number].result()
         if isinstance(error, (ConfigError, UnknownModelError)):
             raise error
         if isinstance(error, BudgetExceeded):

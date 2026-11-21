@@ -67,7 +67,7 @@
 {% macro own_choices(item, form_id="") %}
 {% set eid = item.element_id %}
 {% if item.can_read_again %}
-{{ submit_button("Read again", "reading", "action", "reread", "button-secondary", {"form": form_id or none, "data-role": "reread", "aria-describedby": "reread-note-" ~ eid}) }}
+{{ submit_button(strings.READ_AGAIN, "reading", "action", "reread", "button-secondary", {"form": form_id or none, "data-role": "reread", "aria-describedby": "reread-note-" ~ eid}) }}
 {% endif %}
 {% if item.can_not_equation %}
 {{ submit_button("Not an equation", "saving", "action", "not_equation", "button-secondary", {"form": form_id or none, "data-role": "not-equation", "data-tone": "quiet", "aria-describedby": "not-equation-note-" ~ eid}) }}
@@ -76,7 +76,7 @@
 
 {% macro own_notes(item) %}
 {% set eid = item.element_id %}
-{% if item.can_read_again %}<p class="hint decide-note" id="reread-note-{{ eid }}">Read again reads the picture once more and replaces the proposal.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>{% endif %}
+{% if item.can_read_again %}<p class="hint decide-note" id="reread-note-{{ eid }}">This asks the model to read the picture once more and replaces the proposal.{% if not job.is_owner %} {{ REREAD_SHARED_NOTE }}{% endif %}</p>{% endif %}
 {% if item.can_not_equation %}<p class="hint decide-note" id="not-equation-note-{{ eid }}">Not an equation gives it back to the page as text, as the {{ source|default("PDF") }} has it.</p>{% endif %}
 {% endmacro %}
 

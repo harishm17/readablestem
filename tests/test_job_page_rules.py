@@ -213,9 +213,9 @@ def test_the_card_rows_say_what_is_lost_specifically_and_never_score():
     # One equation is a picture, so only the converted parts have the structure (SW7).
     assert (
         rows["jump from section to section"].html
-        == "In the converted parts: 1 heading in one outline."
+        == "In the converted items: 1 heading in one outline."
     )
-    assert rows["hear lists as lists"].html == "In the converted parts: 1 list with 2 items."
+    assert rows["hear lists as lists"].html == "In the converted items: 1 list with 2 items."
     # T1-15: the count says how many were kept, not "Yes" or "Not yet".
     assert rows["follow the links"].html == "0 of 2 links kept."
     for row in card.rows:

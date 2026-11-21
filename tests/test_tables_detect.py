@@ -197,6 +197,176 @@ def test_an_unruled_aligned_grid_is_kept_on_text_alone():
     assert judgement.reasons == [tables.REASON_TEXT_GRID]
 
 
+def loose_numbers(caption: bool, rows: int = 7) -> bytes:
+    """Rows of short cells whose left edges wander (a share of a column's cells line up), with a
+    "Table 1" line over them or not."""
+    offsets = [0, 0, 6, 12, 6, 0, 12]
+
+    def fill(page):
+        if caption:
+            write(page, 100, 130, "Table 1. Measurements by group")
+        for c, head in enumerate(["Group", "Mass", "Length", "Time"]):
+            write(page, 100 + 90 * c, 160, head)
+        for r, name in enumerate(["Ann", "Bob", "Cy", "Di", "Ed", "Flo", "Gus"][:rows]):
+            for c in range(4):
+                text = name if c == 0 else f"{r + c}.{r * c + 3}"
+                write(page, 100 + 90 * c + (offsets[(r + c) % 7] if c else 0), 176 + 16 * r, text)
+
+    return pdf(fill)
+
+
+def test_a_table_line_over_loosely_aligned_columns_makes_it_a_table():
+    # A "Table N" line says so, over columns that mostly line up.
+    box = (95, 150, 490, 176 + 16 * 7)
+    assert tables.judge(proposal(box), view_of(loose_numbers(True))).verdict == tables.TABLE
+
+
+def labelled_groups(groups: int, rows: int = 4, paragraph: int = 0, ruled: bool = False) -> bytes:
+    """Course rows under group labels that run across the first columns (nothing is ruled), and
+    the lines of a paragraph under them. `ruled`: a booktabs table under a "Table 4." line, the
+    first two groups each under a panel title that runs across every column."""
+    panels = ["Panel A: courses that every student of the first year must take and pass"]
+    panels += ["Panel B: courses that a student of the second year may choose between freely"]
+
+    def fill(page):
+        if ruled:
+            write(page, 100, 143, "Table 4. Courses by group and kind")
+            page.draw_line((100, 150), (480, 150), width=0.6)
+            page.draw_line((100, 165), (480, 165), width=0.6)
+        for x, head in ((100, "Code"), (190, "Title"), (420, "Kind")):
+            write(page, x, 160, head)
+        y = 176
+        titles = ["Exercise and Health", "Nutrition in the Lifecycle", "Foundations in Nutrition"]
+        for g in range(groups):
+            if ruled and g < len(panels):
+                write(page, 100, y, panels[g])
+                y += 16
+            write(page, 100, y, "Foundation Courses")
+            y += 16
+            for r in range(rows):
+                write(page, 100, y, f"BIOL {1400 + r * 10}")
+                write(page, 190, y, [*titles, "Sports Psychology"][r])
+                write(page, 420, y, ["Core", "Elective"][r % 2])
+                y += 16
+        for _ in range(paragraph):
+            text = "Every course in these groups counts toward the degree once a student has passed"
+            write(page, 100, y, text)
+            y += 16
+        if ruled:
+            page.draw_line((100, y - 10), (480, y - 10), width=0.6)
+
+    return pdf(fill)
+
+
+def nested_list_with_blanks() -> bytes:
+    """ "b." and, one level in, "i." to "v." (set flush right) before items that end in a blank
+    line to write on; the line over them runs across the strip between the labels and the items."""
+
+    def fill(page):
+        write(page, 92.4, 160, "b.", 8.25)
+        write(page, 107.6, 160, "Identify the following values:", 8.25)
+        items = ["Lowest value for", "Highest value for", "Height of the rectangle:"]
+        items += ["Label for x-axis (words):", "Label for y-axis (words):"]
+        for r, item in enumerate(items):
+            y = 172 + 12 * r
+            label = ["i.", "ii.", "iii.", "iv.", "v."][r]
+            write(page, 117.6 - pymupdf.get_text_length(label, fontsize=8.25), y, label, 8.25)
+            write(page, 125.6, y, f"{item} _______", 8.25)
+
+    return pdf(fill)
+
+
+def algorithm_with_comments(caption_below: bool) -> bytes:
+    """A frame of numbered steps with a comment column at the right edge, one long step running
+    across the strip before it, and the "Table" line of the next table under the frame."""
+
+    def fill(page):
+        write(page, 49, 262, "Algorithm 5 Establish the base.", 10)
+        page.draw_line((49, 268), (563, 268), width=0.6)
+        long_step = "z = Score(d, k); with the scores kept per group and reset after each pass"
+        steps = [(0, "Input: Xs[..], Ys[..]", "available inputs")]
+        steps += [(0, "Output: Z[..]", "the result")]
+        steps += [(0, "function Make(data)", None), (1, "for each d in data do", None)]
+        steps += [(2, "for each k in keys do", "see Table X"), (3, long_step, None)]
+        steps += [(3, "u = Merge(z, u)", "merged"), (2, "end for", None), (1, "end for", None)]
+        steps += [(1, "return z", "done")]
+        for i, (level, step, comment) in enumerate(steps):
+            y = 282 + 13 * i
+            write(page, 54.7 if i < 9 else 50.7, y, f"{i + 1}:", 10)
+            write(page, 66 + 15 * level, y, step, 10)
+            if comment:
+                write(page, 420, y, f"▷ {comment}", 10)
+        end = 282 + 13 * len(steps)
+        page.draw_line((49, end), (563, end), width=0.6)
+        if caption_below:
+            write(page, 230, end + 26, "TABLE IX. Results by group", 10)
+
+    return pdf(fill)
+
+
+@pytest.mark.parametrize(
+    ("data", "box", "table"),
+    [
+        pytest.param(nested_list_with_blanks(), (90, 150, 250, 232), False, id="nested-list"),
+        pytest.param(  # the "Table" line under it is the next table's
+            algorithm_with_comments(True), (45, 250, 565, 420), False, id="algorithm"
+        ),
+        pytest.param(  # the paragraph under a table is not rows of it
+            labelled_groups(3, 4, paragraph=3), (95, 150, 500, 470), False, id="paragraph"
+        ),
+        pytest.param(labelled_groups(3, 4), (95, 150, 500, 420), True, id="table-alone"),
+        pytest.param(  # long panel titles across it: the rules and the caption still say table
+            labelled_groups(3, 4, ruled=True), (98, 148, 482, 462), True, id="ruled-panels"
+        ),
+    ],
+)
+def test_a_strip_a_few_lines_cross_does_not_make_a_list_or_an_algorithm_a_table(data, box, table):
+    assert (tables.judge(proposal(box), view_of(data)).verdict == tables.TABLE) == table
+
+
+def test_labelled_lines_with_a_line_at_the_margin_are_not_a_table():
+    # "Part B" over some questions crosses the strip after the labels "Q1" ... "Q6": with no
+    # rule and no "Table N" line, two such columns are lines of text, not a table.
+    questions = ["State the law of inertia.", "Give one example of it from the lab."]
+    questions += ["Why does the cart slow down on the flat?", "Draw the forces on the cart."]
+    questions += ["Which force does no work on the cart?", "Estimate the friction from your data."]
+
+    def fill(page):
+        write(page, 100, 110, "Answer every question below in full sentences, and show the working")
+        y = 160
+        for i, question in enumerate(questions):
+            if i in (0, 3):
+                write(page, 100, y, f"Part {'AB'[i // 3]}")
+                y += 16
+            write(page, 100, y, f"Q{i + 1}")
+            write(page, 125, y, question)
+            y += 16
+
+    assert Kind.TABLE not in [e.kind for e in analyze(pdf(fill)).elements]
+
+
+def test_a_table_of_marks_after_names_is_not_a_contents_list():
+    # "x" is a roman numeral: marks set in several columns after names, on the first page of a
+    # file, looked like page numbers that follow their titles and the table was dropped.
+    def fill(page):
+        write(page, 72, 100, "Table 3. Continued.")
+        write(page, 72, 130, "Species")
+        for x, head in ((250, "North"), (310, "South"), (370, "East"), (430, "West")):
+            write(page, x, 130, head)
+        page.draw_line((72, 118), (480, 118), width=0.6)
+        page.draw_line((72, 138), (480, 138), width=0.6)
+        for r, name in enumerate(
+            ["Alpha bee", "Beta fly", "Gamma ant", "Delta moth", "Epsilon wasp", "Zeta gnat", "Eta"]
+        ):
+            write(page, 72, 156 + 12 * r, name)
+            write(page, [250, 310, 370, 430][(r * 3) % 4] + 3, 156 + 12 * r, "x")
+        page.draw_line((72, 156 + 12 * 7), (480, 156 + 12 * 7), width=0.6)
+
+    found = analyze(pdf(fill)).elements
+    assert Kind.TABLE in [e.kind for e in found]
+    assert not [e for e in found if "contents entry" in e.reasons]
+
+
 def test_a_table_of_contents_with_dot_leaders_is_dropped():
     def fill(page):
         for i, title in enumerate(["Motion", "Forces", "Energy", "Momentum", "Waves"]):

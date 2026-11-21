@@ -309,11 +309,14 @@ def test_a_paragraph_over_two_pages_does_not_swallow_the_marker_of_its_last_page
         [
             block(0, Kind.PARAGRAPH, "Before it."),
             block(1, Kind.PARAGRAPH, "Runs over the break and ends.", last_page=1),
+            block(2, Kind.PARAGRAPH, "Still on the first page."),
             block(0, Kind.PARAGRAPH, "Third page.", page=2),
         ]
     )
     html = render(pairs)
     assert re.findall(r'aria-label="(Page \d+)"', html) == ["Page 1", "Page 2", "Page 3"]
+    # what follows it on the page it starts stays under that page's marker
+    assert html.index("Still on the first page.") < html.index("pagebreak-2")
     # the marker comes after the joined paragraph, never inside it
     assert html.index("Runs over the break and ends.") < html.index("pagebreak-2")
     assert html.index("pagebreak-2") < html.index("Third page.")

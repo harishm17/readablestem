@@ -185,7 +185,7 @@
 
   <h3 id="block-heading">Block by email</h3>
   <p>Stops any account, whether or not it is in the list above: it is signed out everywhere,
-    its queued and running jobs are stopped, and its sign-ins are refused.</p>
+    its queued and running documents are stopped, and its sign-ins are refused.</p>
   {# Opens the question (routes/admin.py): nothing is blocked until the next page's button. #}
   {% call form("admin.block", "/admin/users/block", {"novalidate": true, "class": "stack-form", "aria-labelledby": "block-heading"}) %}
     <div class="field">
@@ -197,7 +197,7 @@
 
   <h3 id="blocked-heading">Blocked accounts</h3>
   <p>Accounts that cannot sign in: people you removed or blocked. Their documents are deleted
-    on schedule and their jobs were stopped. Unblocking lets them sign in again with the
+    on schedule and their conversions were stopped. Unblocking lets them sign in again with the
     access they had.</p>
   {% if blocked %}
   <div class="table-scroll" tabindex="0" role="region" aria-labelledby="blocked-caption">

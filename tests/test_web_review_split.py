@@ -116,7 +116,7 @@ def test_a_style_the_pdf_text_cannot_show_is_not_called_a_difference(tmp_path):
         body = panel(screen(env, "?item=p1-e5"))
         assert (
             "The proposal has a double-struck \u211d. The PDF's text cannot show that style, so "
-            "check it in the image." in text_of(body)
+            "look at it in the image." in text_of(body)
         )
         assert "What differs" not in body and "plain" not in text_of(body)
 
@@ -166,7 +166,7 @@ def test_fix_something_on_a_page_opens_that_pages_tools_first_with_no_decision(s
     assert heading and heading.group(1) == "Page 2"
     assert "Decision" not in text_of(before_tools)  # nothing of a decision above the tools
     assert "Decision 1 of" not in text_of(html) and 'class="steps"' not in html
-    assert "No optional checks." in html  # the one note is on page 1
+    assert "No optional items." in html  # the one note is on page 1
     assert "?page=1&amp;mode=page#decision-title" in html  # the page chips keep the mode
     # An address that names an item is the ordinary screen.
     assert "Decision 1 of" in text_of(screen(split, "?mode=page&page=2&item=p1-e2"))
@@ -444,7 +444,7 @@ def evidence_env(tmp_path, *, scanned: bool):
 def test_a_card_states_its_evidence_in_words(tmp_path, scanned):
     """WS19.7: an equation card gives the sentence around it with the proposal read aloud
     in its place; where the page has no text layer, or a figure has no caption and no
-    sentence that refers to it, the card says it can only be checked against the page image."""
+    sentence that refers to it, the card says it can only be compared with the page image."""
     env = evidence_env(tmp_path, scanned=scanned)
     with env.running() as client:
         env.allow(ALICE)
@@ -454,7 +454,7 @@ def test_a_card_states_its_evidence_in_words(tmp_path, scanned):
         env.run_worker()
         equation = text_of(panel(screen(env, "?item=p1-e2")))
         figure = text_of(panel(screen(env, "?item=p1-e6")))
-    only = "This can only be checked against the page image."
+    only = "This can only be compared with the page image."
     if scanned:
         assert only in equation and only in figure
         assert "angular velocity omega" not in equation

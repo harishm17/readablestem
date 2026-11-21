@@ -20,8 +20,8 @@ What each part becomes:
   equation, a theorem's paragraph, a figure, a table, a bibliography or list item, or the
   paragraph that holds the id. The words stay as they are; an id that became no element
   (`Reading` made nothing there), a link inside the element it names and one in a place that
-  holds no links (a table cell, a caption: `TableCell` and `caption` are plain text) make no
-  link. A link in a heading or in a footnote (written after its sentence) is kept;
+  holds no links (a caption: `caption` is plain text) make no link. A link in a heading, in a
+  footnote (written after its sentence) or in a table cell (`TableCell.links`) is kept;
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
   no usable picture the figure is a required decision (`source_figure_missing`). A picture
@@ -50,6 +50,7 @@ Nothing here runs TeX or opens a file outside the project folder.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Literal
@@ -101,6 +102,9 @@ SOURCE_READ_CHECK = "source.read"
 FORMULA_UNREAD = "source_formula_unread"
 TABLE_PICTURE = "source_table_picture"
 UNREAD_START_WORDS = 12
+# Written in a sentence where a picture stood: the picture is a figure of its own straight after
+# the block (`_Reader.loose`).
+PICTURE_MARK = " (picture below) "
 _SPACE = re.compile("[ \\t\\r\\n\\u00a0]+")
 _LEVEL = re.compile(r"^h([1-6])$")
 # What a step of a frame does not show (`\\pause`, `\\only`, `\\visible`).
@@ -187,7 +191,7 @@ def style_runs(text: str, spans: list[tuple[str, int, int, object]]) -> list[Run
     letters and digits or more is the block's own (a theorem set in italic, a bold line) and
     makes no run, except a highlight and an `\\emph` that stands upright in italic text; a run
     never holds an inline-equation marker; a piece is kept only when it has a letter or a
-    digit."""
+    digit, and one italic letter is no run (the PDF path's rule: a variable typed in the text)."""
     from readablestem.core.types import INLINE_MARKER_RE
     from readablestem.pipeline.text_pass import STYLE_SHARE
 
@@ -223,8 +227,11 @@ def style_runs(text: str, spans: list[tuple[str, int, int, object]]) -> list[Run
                     start += 1
                 while end > start and text[end - 1].isspace():
                     end -= 1
-                if any(c.isalnum() for c in text[start:end]):
-                    found.append(Run(start=start, end=end, kind=kind))
+                if not any(c.isalnum() for c in text[start:end]):
+                    continue
+                if kind == "emphasis" and end - start == 1:
+                    continue  # one italic letter is a variable typed in the text, not emphasis
+                found.append(Run(start=start, end=end, kind=kind))
     return sorted(found, key=lambda r: (r.start, r.end))
 
 
@@ -264,6 +271,21 @@ def _is_picture(node: Node) -> bool:
 
 def _itertext(node: Node) -> str:
     return "".join(node.itertext())
+
+
+def _has_words(node: Node) -> bool:
+    """Whether `node` holds text outside its pictures."""
+    stack = [node]
+    while stack:
+        item = stack.pop()
+        if (item.text or "").strip():
+            return True
+        for child in _children(item):
+            if (child.tail or "").strip():
+                return True
+            if not _is_picture(child):
+                stack.append(child)
+    return False
 
 
 def needs_decision(fix: Fix, code: str) -> Fix:
@@ -357,6 +379,8 @@ class _Reader:
         # element, start, end, the id. They become links once every element exists (`link_refs`).
         self.ids: dict[str, str] = {}
         self.refs: list[tuple[Element, int, int, str]] = []
+        # the same for words in a table's cells: table element id, row, col, start, end, id
+        self.cell_refs: list[tuple[str, int, int, int, int, str]] = []
 
     def _take(self, node: Node) -> str:
         """The text of `node` and all below it, now read."""
@@ -701,6 +725,7 @@ class _Reader:
         length = [0]
         self.read.add(id(node))
 
+        beside_words = _has_words(node)  # a picture here stood in a sentence, not on its own
         after_break = [False]  # a kept line end was just written: no space follows it
         gap = [False]  # a picture stood between two letters: the words it cut are two words
 
@@ -755,7 +780,10 @@ class _Reader:
                 return
             if _is_picture(item):
                 self.loose.append(item)  # a figure of its own after this block
-                gap[0] = bool(parts) and parts[-1][-1:].isalnum()
+                if beside_words:
+                    emit(PICTURE_MARK)  # where it stood, so its absence from the sentence is said
+                else:
+                    gap[0] = bool(parts) and parts[-1][-1:].isalnum()
                 return
             self.read.add(id(item))
             if tag == "math":
@@ -1061,7 +1089,8 @@ class _Reader:
     def _table(self, node: Node, caption: str | None) -> Element | None:
         """A grid (one table element), or one list item per row when it is too large; the
         pictures in its cells follow it as figures (`self.loose`). The table element."""
-        grid = _grid(node, caption)
+        cell_refs: list[tuple[int, int, int, int, str]] = []
+        grid = _grid(node, caption, cell_refs)
         pictures = self._pictures_in(node)
         self.loose.extend(pictures)
         element = self._new(Kind.TABLE, text=None)
@@ -1073,6 +1102,7 @@ class _Reader:
             if "ltx_ERROR" in _classes(inner):
                 self._mark(inner, element)
         element.table = grid
+        self.cell_refs += [(element.id, *ref) for ref in cell_refs]
         fix = Fix(
             element_id=element.id,
             kind=Kind.TABLE,
@@ -1088,18 +1118,36 @@ class _Reader:
         return element
 
     def _flatten_table(self, node: Node, element: Element) -> None:
-        """A table too large for a grid: one list item per row."""
+        """A table too large for a grid: one list item per row, its cells joined by " | ", each
+        read as running text (a formula is an equation of the item; links and bold, italic and
+        code runs are kept)."""
         self.out.elements.remove(element)
         self.counter -= 1
         for row in (r for r in node.iter() if _local(r.tag) == "tr"):
-            cells = [_squash(self._plain(c)) for c in _children(row)]
-            text = " | ".join(c for c in cells if c)
-            if text:
-                item = self._new(Kind.LIST_ITEM, text=text, list_ordered=False, list_level=1)
-                self.chars += len(text)
-                for inner in row.iter():
-                    if "ltx_ERROR" in _classes(inner):
-                        self._mark(inner, item)
+            cells = [c for c in _children(row) if _squash(self._plain(c))]
+            if not cells:
+                continue
+            item = self._new(Kind.LIST_ITEM, text="", list_ordered=False, list_level=1)
+            pieces: list[str] = []
+            spans: list[tuple[str, int, int, object]] = []
+            shown = 0
+            for cell in cells:
+                # the pictures of the table follow it already (`_table`): not again here
+                loose, errors = list(self.loose), self.errors
+                text, found = self._inline_text(cell, owner=item)
+                self.loose, self.errors = loose, errors
+                if not text:
+                    continue
+                shift = shown + 3 if pieces else 0
+                spans += [(kind, a + shift, b + shift, extra) for kind, a, b, extra in found]
+                pieces.append(text)
+                shown = shift + len(text)
+            item.text = " | ".join(pieces)
+            self._apply_spans(item, spans)
+            self.chars += len(item.text)
+            for inner in row.iter():
+                if "ltx_ERROR" in _classes(inner):
+                    self._mark(inner, item)
 
     # ------------------------------------------------------------------ figures
 
@@ -1611,7 +1659,11 @@ def _own_conversion(latex: str, display: Display) -> EquationFix | None:
 # ---------------------------------------------------------------------------- tables
 
 
-def _grid(table: Node, caption: str | None) -> TableGrid | None:
+def _grid(
+    table: Node, caption: str | None, refs: list[tuple[int, int, int, int, str]] | None = None
+) -> TableGrid | None:
+    """The grid of `table`. `refs` takes the links of its cells to a place in the document as
+    (row, col, start, end, id): they are made once every element exists (`link_internal`)."""
     rows: list[tuple[Node, str]] = []  # (tr, section)
     for section in table:
         tag = _local(section.tag)
@@ -1641,6 +1693,15 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
             except ValueError:
                 row_span = col_span = 1
             text, styled = squashed(*_cell_text(cell))
+            links: list[Link] = []
+            for kind, a, b, extra in styled:
+                if kind == "ref" and refs is not None:
+                    refs.append((r, col, a, b, str(extra)))
+                elif kind == "uri" and not any(k.start < b and a < k.end for k in links):
+                    try:
+                        links.append(Link(kind="uri", start=a, end=b, href=str(extra)))
+                    except ValueError:
+                        continue
             latex = mathml = None
             maths = [m for m in cell.iter() if _local(m.tag) == "math"]
             if len(maths) == 1 and not _squash(_text_without_math(cell)):
@@ -1656,6 +1717,7 @@ def _grid(table: Node, caption: str | None) -> TableGrid | None:
                     row=r, col=col, row_span=row_span, col_span=col_span, text=text,
                     latex=latex, mathml=mathml, header=header,
                     runs=[] if latex else style_runs(text, styled),
+                    links=[] if latex else links,
                 )
             )  # fmt: skip
             for dr in range(row_span):
@@ -1718,7 +1780,8 @@ def _lenient(grid: TableGrid) -> TableGrid | None:
 
 
 def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
-    """The text of a cell as written and the spans of its styled words (offsets into it)."""
+    """The text of a cell as written and the spans of its styled words and links (offsets into
+    it)."""
     parts: list[str] = []
     spans: list[tuple[str, int, int, object]] = []
     length = 0
@@ -1736,6 +1799,12 @@ def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
                 length += len(shown)
             else:
                 visit(child)
+                if _local(child.tag) == "a" and length > start:
+                    href = child.get("href") or ""
+                    if href.startswith(("http://", "https://", "mailto:")):
+                        spans.append(("uri", start, length, href))
+                    elif len(href) > 1 and href.startswith("#"):
+                        spans.append(("ref", start, length, href[1:]))
                 if (look := _style_of(child)) and length > start:
                     spans.append((look, start, length, _upright(child)))
             if child.tail:
@@ -1879,12 +1948,16 @@ def link_internal(
     elements: list[Element],
     ids: dict[str, str],
     refs: list[tuple[Element, int, int, str]],
+    cell_refs: Sequence[tuple[str, int, int, int, int, str]] = (),
+    fixes: dict[str, Fix] | None = None,
 ) -> None:
     """The links a source file makes to a place in itself (`\\ref`, `\\eqref`, `\\cite`,
     `\\autoref`, a contents entry; a Word link to a bookmark) as internal links. `refs`: where
     each one is (element, start, end) and the id it names, which `ids` maps to the element
-    that place became. An id that became no element, a link inside the element it points to
-    and one that overlaps another link make none: the words stay as text."""
+    that place became; `cell_refs`: the same for the words of a table's cell (the table's
+    element id, the cell's row and column, start, end, the id). An id that became no element,
+    a link inside the element it points to and one that overlaps another link make none: the
+    words stay as text."""
     made = {e.id for e in elements}
     for element, start, end, name in refs:
         target = ids.get(name)
@@ -1893,6 +1966,20 @@ def link_internal(
         if any(k.start < end and start < k.end for k in element.links):
             continue
         inline.add(element, Link(kind="internal", start=start, end=end, target_id=target))
+    by_id = {e.id: e for e in elements}
+    for table_id, row, col, start, end, name in cell_refs:
+        target = ids.get(name)
+        table = by_id.get(table_id)
+        if target is None or target not in made or target == table_id or table is None:
+            continue
+        # the grid is in the element and in its fix: the same cells, or copies of them
+        fix = (fixes or {}).get(table_id)
+        grids = [g for g in (table.table, fix.table.grid if fix and fix.table else None) if g]
+        for grid in {id(g): g for g in grids}.values():
+            cell = next((c for c in grid.cells if (c.row, c.col) == (row, col)), None)
+            if cell is None or any(k.start < end and start < k.end for k in cell.links):
+                continue
+            cell.links.append(Link(kind="internal", start=start, end=end, target_id=target))
 
 
 def read(
@@ -1916,7 +2003,7 @@ def read(
     in_formula = {id(n) for m in body.iter() if _local(m.tag) == "math" for n in m.iter()}
     error_nodes = [n for n in body.iter() if "ltx_ERROR" in _classes(n)]
     reader.walk(body)
-    link_internal(reader.out.elements, reader.ids, reader.refs)
+    link_internal(reader.out.elements, reader.ids, reader.refs, reader.cell_refs, reader.out.fixes)
     out = reader.out
     out.errors = reader.errors
     out.error_nodes = len(error_nodes)

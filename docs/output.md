@@ -454,8 +454,11 @@ document in another language marks it `lang="en"`).
   page. The id is by the page's position in the PDF (`pagebreak-N`, N from 1), so it never
   repeats. A marker is written before the first block of each page that has any, never
   inside a block of text: a paragraph that runs over a page boundary is one element and
-  stays whole (layout joins it), a list that runs over one keeps one `<ul>` and the marker
-  stands at the start of the item that begins the page, and the same for a glossary entry. A
+  stays whole (layout joins it) and the markers of the pages it runs into are written before
+  the next element that is on one of them (not right after it: a figure or note that follows
+  it on its first page stays under that page's marker), a list that runs over one keeps one
+  `<ul>` and the marker stands at the start of the item that begins the page, and the same
+  for a glossary entry. A
   document with blocks on one page only has none. The words of a marker are one of:
   "Page 12" for a printed label; "PDF page 5" for a page without one, when any page of the
   document has one (so two different pages never both read "Page 5"); "Page 5" (the position
@@ -818,9 +821,19 @@ the print build waits for WS21.1):
   equation is wider than the paper. It is complete on the web page." The note is generated
   content on the equation's box, so it is not in the text of the page, Word, EPUB or Canvas.
   The rules of each width step are added to the stylesheet only when an equation has it.
-  Measured (O-094): of the 123 display equations in 73 stored pages, 54 carry the classes and the
-  widest is 1.29 times the sheet's text width on screen, which the 70% floor covers (it reaches
-  1.43 times), so none is cut on paper; the estimate runs wide, and the note shows for 2 that fit.
+  Measured (O-094, O-399): of the 123 display equations in 73 stored pages, 54 carry the classes and the
+  widest is 1.23 times the sheet's text width on screen (1.29 at the first measure), which the 70%
+  floor covers (it reaches 1.43 times), so none is cut on paper. Against Chromium's own widths
+  (the math element's width in em of its font) the estimate of the 54 is 0.79 to 1.22 of the true
+  width (10th to 90th percentile 0.90 to 1.12, median 1.02). The note is checked at five text
+  columns (em of the body text; the column is 37.3 em on Letter and A4 at 100% with Chromium's
+  margins, 33 em with 1 in margins, 29.9, 24.9 and 18.7 em at 125%, 150% and 200% print scale):
+  an equation flagged that fits is 0, 5, 3, 1 and 2 of the 123, and one clipped with no note is 0
+  at every column. So the note shows for a few equations that fit only on a narrower sheet, never
+  the other way; a printed PDF at Letter and at A4 has no note on any of the 73 pages. The
+  estimate was not changed: constants refitted to these widths (and to the 30 public gold
+  equations) trade a flag that was wrong for a clip with no note at the columns people print at,
+  and a clip with no note is the failure the rule exists to prevent.
   A landscape page for an equation beyond the floor (`@page` with a name, `page:` on the
   equation) prints in Chromium for an equation up to about 2.2 times the column, but container
   queries and `cqw` are evaluated against the portrait width there, so the scale and the note are
@@ -1120,7 +1133,7 @@ accessibility summary, the Canvas README, the record) says they are not in the f
 `file_repaired` (optional) is the line for a repaired file with content on every page.
 
 `lang_assumed` and `lang_mixed` are required checks: until the owner confirms the language
-or changes it, the job is not "Ready to share" (the state "Converted: confirm the
+or changes it, the job is not "Ready to post" (the state "Converted: confirm the
 language", `web.states`) and the open item is counted. Where the document language
 came from is `DocumentResult.lang_source`. The job page shows the language and lets the
 instructor change it: the route calls `text_pass.set_document_language(result, tag)` (a
@@ -1156,8 +1169,9 @@ SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></s
 
 The text itself is unchanged (`H2O`), so search and copy read as before. A run is skipped
 when it would start inside an inline equation's marker or overlap another. What cannot be
-carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
-written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+carried (a lowered run in a figure caption or a table cell, a script with nothing before it) is
+written flat, and the notice `scripts_flattened` ("Worth a look") says where. A raised run in
+a caption is written in superscript characters ("10⁸"), as a table cell's is.
 
 The page, Word and the EPUB keep the raised or lowered run as `<sup>`, `<sub>` or Word's own
 superscript and subscript, which a screen reader reads as plain characters ("g/cm3"). Listen
@@ -1295,7 +1309,7 @@ What each output holds for the struck date above:
 
 Where runs come from: the text pass marks struck PDF text (docs/layout.md "Struck text"),
 and the LaTeX reader turns `\sout` and `\xout` (ulem) into deleted runs. Each element with
-struck text gets the optional notice `struck_text` ("Worth checking", with its page; it adds
+struck text gets the optional notice `struck_text` ("Worth a look", with its page; it adds
 no required decision): the instructor may want to take out words students no longer need.
 A text edit that changes struck words takes the run off, and the edit's message counts it
 ("1 struck-text mark was taken off because its words changed"); the notice goes with the
@@ -1344,12 +1358,12 @@ and `w:i`, or a style that sets them), the highlight a Word run carries as `high
 pandoc drops a direct font; a run struck through is left as it is, and loses a code style it
 has, since code carries no strike and the words would read as live). Pandoc reads a strike only
 as `w:strike` on the run, so the package step writes a double strike (`w:dstrike`) and a strike
-that a character style sets that way too (`_keep_strikes`); a strike set by a paragraph style is
-not read. The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
+that a character style or a paragraph style sets that way too (`_keep_strikes`). The LaTeX reader takes them from LaTeXML's classes (`\textbf`,
 `\emph`, `\textit`, `\texttt`, `\verb`). Both use the PDF path's rules: a style on 70% or more
 of a block's characters is the block's own and makes no run (a bold heading, a whole italic
 theorem body, a header cell set in bold), a run never holds an inline equation or a blank
-edge, and it needs a letter or a digit. An `\emph` inside a theorem's italic body is a run
+edge, and it needs a letter or a digit (and, as on the PDF path, a single italic letter is a
+variable, not an emphasis, so it makes no run). An `\emph` inside a theorem's italic body is a run
 (the words stand out against the italic). Headings, program code and glossary entries get
 none. Nothing is guessed from looks: a heading style is not bold text. A table cell of a Word
 or LaTeX table that holds no math keeps its runs (`TableCell.runs`, offsets into the cell's
@@ -1357,12 +1371,20 @@ text) and the table is written with the same tags: `<td><strong>closed</strong> 
 cell edit in the review screen drops them, like a text edit that changes words.
 
 Links of a Word or LaTeX source (a web or mail address, `\\ref`, `\\cite`, a Word bookmark on
-a heading) are kept in a paragraph, a list item, a heading and a footnote, which is written
-after its sentence as "(note: ...)". They are not kept in a table cell or a caption: a cell
-(`TableCell`) and a caption (`Element.caption`) hold plain text, so a link there is its words.
+a heading) are kept in a paragraph, a list item, a heading, a table cell and a footnote, which
+is written after its sentence as "(note: ...)". A table cell holds its links as `TableCell.links`
+(offsets into the cell's text, like its runs): a web address is a link, and a reference to a
+heading, equation, theorem, figure or table of the document is an internal link, as in a
+paragraph (a cell's link to its own table makes none). The table's page writes them as
+`<a>` inside the cell, and a cell edit in the review screen drops them with the runs. A table
+too large for a grid is a list, one item a row: its rows keep their runs and links, and a
+formula in a row is an equation of its own item. A caption (`Element.caption`) holds plain
+text, so a link there is its words; none of the public development LaTeX sources has a web
+address in a caption.
 A picture in the middle of a sentence is a figure straight after the block that holds it (the
-output has no place for a picture inside a sentence); the words it stood between stay two
-words.
+output has no place for a picture inside a sentence), and the sentence reads "(picture below)"
+where it stood, so the words do not run together (a picture on its own line leaves nothing). A
+Word source, which is off in production, does the same.
 
 Color of a Word or LaTeX source follows the PDF path: a passage in a real color is counted,
 and with `FEATURE_COLOUR` off the job gets one `colour_used` notice with the count. The Word
@@ -1942,7 +1964,7 @@ Keep the two in step when a limit changes.
   in a figure's caption. A link whose rectangle covers only part of a word links that
   part.
 - Link text is kept as printed, also when it says nothing on its own ("click here"):
-  only the instructor can reword it (the job page lists it as worth checking).
+  only the instructor can reword it (the job page lists it as “Worth a look”).
 - Language detection needs about 100 letters of prose; a short handout of mostly math is
   assumed to be English unless the PDF says otherwise, and the job then waits for you to
   confirm the language. You can also choose the language when you upload. A passage is

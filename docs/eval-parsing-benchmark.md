@@ -24,36 +24,41 @@ page text, no file from the benchmark, no home path).
   spelled out, invisible characters removed, the ellipsis and `''` as the benchmark writes them.
 - Run 2 and run 3 converted all 747 pages from scratch; see "Repeat" below.
 
-## Scores (pipeline 0.5.14, 747 pages, 3,846 checks listed, $0)
+## Scores (pipeline 0.5.15, 747 pages, 3,846 checks listed, $0)
 
-Measured on 2026-11-19 at commit `709a023f`. The interval is the 95 % Wilson interval of the
-checks run. The two columns after it are the records before this one (pipeline 0.5.13 at
-`3b177567`, 2026-11-19, and the first record, pipeline 0.5.11, 2026-11-18).
+Measured on 2026-11-20 at commit `3efefeab`. The interval is the 95 % Wilson interval of the
+checks run. The two columns after it are the records before this one (pipeline 0.5.14 at
+`709a023f`, 2026-11-19, and the first record, pipeline 0.5.11, 2026-11-18).
 
-| Category | Ours (checks run) | 95 % interval | At 0.5.13 | At 0.5.11 | Run of listed | Dropped |
+| Category | Ours (checks run) | 95 % interval | At 0.5.14 | At 0.5.11 | Run of listed | Dropped |
 |---|---|---|---|---|---|---|
-| multi_column (order) | 69.2 (490 of 708) | 65.7 to 72.5 | 69.2 (708) | 68.8 (705) | 884 | 176 scans |
-| headers_footers (absent) | 38.6 (244 of 632) | 34.9 to 42.5 | 34.5 (632) | 32.5 (636) | 753 | 121 scans |
+| multi_column (order) | 69.5 (492 of 708) | 66.0 to 72.8 | 69.2 (708) | 68.8 (705) | 884 | 176 scans |
+| headers_footers (absent) | 38.6 (244 of 632) | 34.9 to 42.5 | 38.6 (632) | 32.5 (636) | 753 | 121 scans |
 | long_tiny_text (present) | 37.3 (31 of 83) | 27.7 to 48.1 | 37.3 (83) | 37.3 (83) | 442 | 359 scans |
-| table_tests (table) | 66.6 (571 of 857) | 63.4 to 69.7 | 66.6 (857) | 51.8 (857) | 1,020 | 163 scans |
+| table_tests (table) | 70.6 (605 of 857) | 67.5 to 73.5 | 66.6 (857) | 51.8 (857) | 1,020 | 163 scans |
 | baseline (not blank, no repeats) | 100.0 (586 of 586) | 99.3 to 100.0 | 100.0 (586) | 99.0 (586) | 747 | 161 scans |
 | arxiv_math, old_scans_math | not run at $0 | | not run | not run | 2,927 and 458 | equations are read by a model |
 | old_scans | not run | | not run | not run | 526 | scans: a model reads the picture |
 
-From 0.5.13 to 0.5.14 only headers_footers moved (26 more checks pass: the head and foot of a
-one-page file found by their shape, as narrowed after review; see "A head and foot found by
-their shape" below). The other four categories pass and fail the same number of checks. The
+From 0.5.14 to 0.5.15 two categories moved and none fell. table_tests passes 34 more checks, on
+8 pages (571 to 605 of 857): the tables with no ruling lines that the wave's table search now
+finds (a box under a "Table N" line, a strip a few lines cross, a table of marks on a first page;
+CHANGELOG "tables with no ruling lines"). multi_column passes 2 more order checks, both on one
+page of a journal article: the reference list's initials ("K. Pister") were read as a lettered
+list and cut an entry in two; they are no list now (CHANGELOG "A reference list's initials are
+not a lettered list"). headers_footers, long_tiny_text and baseline pass and fail the same
+checks. From 0.5.13 to 0.5.14 only headers_footers had moved. The
 table score rose from 0.5.11 to 0.5.13 as the corner-square fix below measured on the two
-halves (571 checks pass, 444 before); no category fell. The sections under "Failures by
+halves (571 checks pass, 444 before). The sections under "Failures by
 cause" were read on the 0.5.11 run, and the counts in their headings are that run's.
 
 Dropped checks are in the score of no category; the record also holds each score with the
-dropped checks counted as failed (55.4, 32.4, 7.0, 56.0, 78.4). Of the 161 dropped pages, 60 are
+dropped checks counted as failed (55.7, 32.4, 7.0, 59.3, 78.4). Of the 161 dropped pages, 60 are
 scans with no text layer, 72 are scans with an OCR layer (the product reads such a page from its
 picture and does not use the layer, so at $0 there is no output), 3 are drawings with no text and
 26 are typed otherwise but hold only pictures (image-only pages). long_tiny_text keeps 83 of 442
-checks (13 of 62 pages), so its score is a thin sample. 599 of the 747 pages asked a model for
-something (equations 2,854, figures 1,174, tables 530, image pages 264); at $0 those parts are
+checks (13 of 62 pages), so its score is a thin sample. 603 of the 747 pages asked a model for
+something (equations 2,844, figures 1,170, tables 550, image pages 264); at $0 those parts are
 left as the text path makes them.
 
 Published scores of other tools (README; their full runs, all categories): olmOCR 79.4 / 93.4 /
@@ -142,8 +147,23 @@ a page's ("Page 3", "Page 3 of 9", "3 of 9"); a page number alone on its line go
 38.6 (244 of 632, 95 % interval 34.9 to 42.5), between the 34.5 of 0.5.13 (218) and the 51.4
 of the rule as first built (325). The 81 checks given back are journal heads with a bare page
 number beside the name, which this rule cannot tell from a quiz's own lines. multi_column
-(490 of 708), table_tests, long_tiny_text and baseline are as at 0.5.13. Not built, to be
-measured: taking such lines when they are set smaller than the body text.
+(490 of 708), table_tests, long_tiny_text and baseline are as at 0.5.13.
+
+**Small-type heads and feet, measured and not built (2026-11-20).** The line left open above,
+taking a stack of one-page files that is set at least 0.5 pt under the body size, clear of the
+text block, with no page number needed, was run over the same 747 pages ($0, patched in a
+process, not shipped). 213 pages took lines (447 lines). Read: most are furniture (DOIs, journal
+and volume lines, "Downloaded from", copyright and license lines, "by guest on"), and 173 pages
+have a headers_footers absent check that names a line taken. But 89 of the 447 lines, on 65
+pages, read as content: footnotes (three numbered notes of a Spanish report), figure captions
+("Fig. 3. (a, b) TEM images ..."), a table's note ("Stdev. = Standard deviation, CV% = ..."),
+a flyer's fine print, a bullet of a program ("Three panels will be running simultaneously."),
+and lines that a table or order check names (13 on table pages, 4 on multi_column). The same
+shape that finds "jb.asm.org" finds a footnote, so no narrower form of it is built here. On the
+one-page files of the repository's other material the rule took 9 lines on 9 of 56 files, and
+on the private corpus 2 lines on 2 of 3. Candidate (ii), no removal and a notice that lists the
+furniture with a put-back, is not measured: it needs a notice and a way back in the student page,
+which this layout change does not touch.
 
 ### long_tiny_text: 52 failed of 83
 

@@ -33,6 +33,7 @@ from readablestem.web import (
     office_census,
     output,
     states,
+    strings,
 )
 from readablestem.web.database import as_utc
 from readablestem.web.db import Blob, Job, JobStatus, ReviewEdit, User, utcnow
@@ -45,7 +46,7 @@ FIX_STATUS_LABELS = {
     Status.ABSTAINED: "Not converted (no confident proposal)",
     Status.FAILED: "Not converted (error)",
     Status.EDITED: "Edited by you",
-    Status.REJECTED: "Rejected: original kept",
+    Status.REJECTED: strings.KEPT_ORIGINAL,
 }
 # A reviewer's Accept shares Status.ACCEPTED with the pipeline's (Fix.reviewed differs).
 REVIEWER_ACCEPTED_LABEL = "Accepted by you"
@@ -302,7 +303,7 @@ class CheckLine:
 
     text: str  # what it means (web.messages)
     code: str  # "name: code"
-    severity: str  # "Must be fixed" or "Worth checking"
+    severity: str  # "Must be fixed" or "Worth a look"
 
 
 @dataclass

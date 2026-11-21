@@ -3,7 +3,7 @@
 A heading made bold text is rejected as a heading (`Status.REJECTED`), and `REJECTED` is the
 status of an equation or figure kept as the original image. The job page used to count the
 three bold headings as "shown as an image", so a job whose decisions were all made never
-said "Ready to share", and the counts disagreed between the job page, the review screen and
+said "Ready to post", and the counts disagreed between the job page, the review screen and
 the documents list. One decision unit everywhere: a group of headings is one decision, and
 a heading is never an image.
 
@@ -76,8 +76,8 @@ def test_a_heading_group_made_bold_leaves_the_job_ready_when_the_rest_is_decided
 
     page = ux.browser.get(f"/jobs/{ux.job_id}").text
     text = text_of(page)
-    assert "<title>Ready to share: Vectors" in page
+    assert "<title>Ready to post: Vectors" in page
     assert 'id="ready"' in page
     assert "shown as an image" not in text
     assert "shown as images" not in text
-    assert "3 headings" not in text.split("Ready to share", 1)[1].split("Results", 1)[0]
+    assert "3 headings" not in text.split("Ready to post", 1)[1].split("Results", 1)[0]

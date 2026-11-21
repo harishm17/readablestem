@@ -43,6 +43,7 @@ from readablestem.pipeline.layout.display import (
     _equation_regions,
     _mark_case_rows,
     _promote_numbered_lines,
+    _promote_set_off_lines,
     _split_braced_systems,
     _split_exercise_numbers,
     _split_labels,
@@ -62,6 +63,7 @@ from readablestem.pipeline.layout.figures import (
     _cluster,
     _connected,
     _fragment_figures,
+    _join_panels,
     _label_owners,
     _line_chain,
     _merge_figures,
@@ -436,10 +438,13 @@ def _page_blocks(
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
     _promote_numbered_lines(rows)
+    if document.grouping:
+        _promote_set_off_lines(rows)
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []
     small: list[tuple[BBox, list[_Path]]] = []
+    apart: set[int] = set()  # paths of small drawings kept out of the figure beside them
     vector = _vector_figures(
         loose,
         rows,
@@ -448,6 +453,7 @@ def _page_blocks(
         page_sized=page_sized,
         left_out=left_out,
         small_out=small,
+        apart_out=apart,
         ink=ink_sources,
         hand=ink,
         document=document,
@@ -498,6 +504,10 @@ def _page_blocks(
         if block.kind == Kind.EQUATION and region is not None:
             _add_rules(block, region.rules)
     _attach_captions(blocks, figures, document=document)
+    if document.panels:
+        taken = {b.text: b.bbox for b in blocks if b.kind == "attached" and b.text is not None}
+        figures = _join_panels(figures, taken, rows, ctx, document=document)
+        blocks = [b for b in blocks if not (b.rows and all(r.absorbed for r in b.rows))]
     captions = [b.bbox for b in blocks if b.kind == "attached"]
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:
@@ -536,7 +546,7 @@ def _page_blocks(
         index = _RowIndex([r for r in rows if not r.vertical])
         frames = [q.bbox for q in paths if q.frame and _page_furniture(q, page_rect)]
         found, marks = _leftover_drawings(
-            small, blocks, index, page_rect, margins, ink_sources, frames, covers
+            small, blocks, index, page_rect, margins, ink_sources, frames, covers, apart
         )
         if page_sized:
             blocks.extend(found)
@@ -790,6 +800,7 @@ def _leftover_drawings(
     ink_sources: Collection[int],
     frames: Sequence[BBox] = (),
     covers: Sequence[tuple[float, float]] = (),
+    apart: Collection[int] = frozenset(),
 ) -> tuple[list[_Block], list[BBox]]:
     """A typed page's drawings too small to be figures (`_vector_figures`' `small_out`)
     that no block holds: before, dropped with nothing to say so (the silent-loss sweep,
@@ -797,8 +808,9 @@ def _leftover_drawings(
     ticks). Not counted: drawn list bullets, a repeated mark in the header or footer band,
     horizontal and vertical lines and boxes alone (an empty answer box, a black box over a
     line) unless they are a ruler (a timeline: `_mark_axes`), anything whose middle lies
-    in a block (an underline, a box round a word), and
-    the ornaments of a page frame: marks at the edges of a frame round the page
+    in a block (an underline, a box round a word; not a drawing that stood beside a figure and
+    was kept out of it for the sentence between them, `apart`: it was in a picture, and is
+    one), and the ornaments of a page frame: marks at the edges of a frame round the page
     (`frames`, corner curls), or a group that runs round the page itself (a frame of
     separate dots), dots alone (DOT_PT), and a shape painted over hidden text (`covers`,
     the covered characters' origins: a box or a black highlight hiding a line). The rest
@@ -839,6 +851,7 @@ def _leftover_drawings(
             holders
             and not _dots(members)  # decided once grouped (`_dots_out_of_line`)
             and not _bonds(members, index)
+            and not any(id(p) in apart for p in members)
         ):
             continue  # an underline, a box round a word, maths drawn in a line
         if any(_at_edge(box, frame, FIGURE_PART_REACH) for frame in frames):
@@ -846,7 +859,12 @@ def _leftover_drawings(
         keep.append((box, members))
     figures: list[_Block] = []
     marks: list[BBox] = []
-    for group in _cluster([b for b, _ in keep], LEFTOVER_REACH):
+    # A drawing kept out of a figure for the sentence between them is not grouped with the
+    # drawings near it either: the group's box would take that sentence in again.
+    lone = [i for i, (_, cluster) in enumerate(keep) if any(id(p) in apart for p in cluster)]
+    rest = [i for i in range(len(keep)) if i not in lone]
+    grouped = [[rest[j] for j in g] for g in _cluster([keep[i][0] for i in rest], LEFTOVER_REACH)]
+    for group in [*grouped, *([i] for i in lone)]:
         members = [p for i in group for p in keep[i][1]]
         box = _union(keep[i][0] for i in group)
         places = len({_box_key(p.bbox) for p in members})  # a path drawn again is one mark
@@ -1349,20 +1367,47 @@ def _mark_chars(row: _Row, box: BBox) -> list[int]:
     return [i for i in hits if row.is_script(row.chars[i])] or hits
 
 
+NOTE_MARK_LIFT = 0.2  # a note's own mark stands this share of the line's size above its baseline
+
+
 def _lead_mark(row: _Row, named: bool) -> int:
     """Where the raised mark that starts `row` ends (a char index), or 0 without one. A
     mark is digits and footnote signs (`_FOOTNOTE_MARKS`), any raised glyph in a footnote
-    the file names."""
+    the file names. At the start of a line a glyph a little smaller than the line and lifted
+    off its baseline is raised too (a mark at 7 points in a note at 8: no script by size)."""
     end = 0
     for i, c in enumerate(row.chars):
         if c.blank:
             if end:
                 break
             continue
-        if not row.is_script(c) or not (named or c.c.isdigit() or c.c in _FOOTNOTE_MARKS):
+        raised = row.is_script(c) or (
+            not c.small_cap
+            and c.size < row.size
+            and c.baseline < row.baseline - NOTE_MARK_LIFT * row.size
+        )
+        if not raised or not (named or c.c.isdigit() or c.c in _FOOTNOTE_MARKS):
             break
         end = i + 1
     return end
+
+
+def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
+    """The marks in the run of raised glyphs `row.chars[start:end]`, as char ranges: two marks
+    printed with a comma between them ("1,2") are two, and a closing bracket or a full stop
+    after a mark ("1)") is not part of it."""
+    groups: list[tuple[int, int]] = []
+    at = start
+    for i in range(start, end + 1):
+        if i < end and row.chars[i].c != ",":
+            continue
+        stop = i
+        while stop > at and row.chars[stop - 1].c in ").":
+            stop -= 1
+        if stop > at:
+            groups.append((at, stop))
+        at = i + 1
+    return groups
 
 
 def _place_by_mark(
@@ -1420,6 +1465,35 @@ def _set_off(row: _Row, at: int) -> None:
         row.__dict__.pop(cached, None)
 
 
+def _flag_text_marks(row: _Row, marks: set[str]) -> None:
+    """The raised glyphs of `row` that are a mark of a note below (`marks`), with no destination
+    to say so: one right after a word of text type or a clause's end ("system,1 n" read the
+    mark and the math letter after it as one equation). A raised digit after a math letter or
+    a bracket is an exponent and stays what it was."""
+    chars = row.chars
+    i = 0
+    while i < len(chars):
+        if not (row.is_script(chars[i]) and chars[i].c.strip()):
+            i += 1
+            continue
+        j = i
+        while j < len(chars) and row.is_script(chars[j]) and chars[j].c.strip():
+            j += 1
+        before = chars[i - 1] if i else None
+        if before is not None and (
+            before.c in ".,;:?!" or (before.c.isalpha() and not before.math)
+        ):
+            for a, b in _mark_groups(row, i, j):
+                if "".join(c.c for c in chars[a:b]) in marks:
+                    _flag_marks(row, range(a, b))
+        i = j
+
+
+def _in_notes(row: _Row, height: float, ctx: _Context) -> bool:
+    """`row` is low on the page, in smaller type than the body: where a footnote stands."""
+    return row.y0 >= FOOTNOTE_ZONE * height and row.size < FOOTNOTE_SIZE * ctx.body
+
+
 def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> None:
     """Where a footnote starts on this page, and each note mark set off from the word it
     touches (a raised "2" kept as a character of "Feehly" read "2Feehly").
@@ -1443,15 +1517,31 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
                 unplaced.append(dest.name)
         _place_by_mark(rows, notes.references.get(number, ()), unplaced, height, ctx)
     marks: set[str] = set()
+    unlinked: set[str] = set()  # marks of notes no link of the file points at
+    linked = (
+        {r.name for refs in notes.references.values() for r in refs} if notes is not None else set()
+    )
+    # what is printed raised above the notes: the mark of an unnamed note is one of these
+    raised = {
+        c.c
+        for r in rows
+        if not r.vertical and not _in_notes(r, height, ctx)
+        for c in r.chars
+        if c.c.strip() and r.is_script(c)
+    }
     for row in rows:
         if row.vertical:
             continue
-        low = row.y0 >= FOOTNOTE_ZONE * height and row.size < FOOTNOTE_SIZE * ctx.body
+        low = _in_notes(row, height, ctx)
         end = _lead_mark(row, named=bool(row.note)) if row.note or (not named and low) else 0
         if end:
-            marks.add("".join(c.c for c in row.chars[:end] if not c.blank))
-            if row.note:
-                _flag_marks(row, [i for i in range(end) if not row.chars[i].blank])
+            token = "".join(c.c for c in row.chars[:end] if not c.blank)
+            marks.add(token)
+            if not any(name in linked for name in row.note):
+                unlinked.add(token)  # nothing in the file says where its mark stands
+            lead = [i for i in range(end) if not row.chars[i].blank]
+            if row.note or row.chars[lead[0]].c in raised:
+                _flag_marks(row, lead)
             _set_off(row, end)
     heading_rows = [r for r in rows if not r.note and not r.vertical and _heading_sized(r, ctx)]
     for ref in notes.references.get(number, ()) if notes is not None else ():
@@ -1469,6 +1559,9 @@ def _mark_notes(rows: list[_Row], number: int, height: float, ctx: _Context) -> 
             elif (after := hits[-1] + 1) < len(row.chars) and row.chars[after].c.isalnum():
                 _set_off(row, after)
             break
+    for row in rows if unlinked else ():
+        if not row.vertical and not _in_notes(row, height, ctx):
+            _flag_text_marks(row, unlinked)
     if named or not marks:
         return
     for row in heading_rows:

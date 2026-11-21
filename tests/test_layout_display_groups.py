@@ -23,9 +23,13 @@ import pytest
 
 from readablestem.core.types import Element, Kind
 from readablestem.pipeline import layout
-from readablestem.pipeline.layout import analyze
+from readablestem.pipeline.layout import analyze, display
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "latex" / "display_groups.pdf"
+DEJAVU = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+needs_dejavu = pytest.mark.skipif(
+    not DEJAVU.exists(), reason="needs DejaVu Sans for the maths signs"
+)
 
 
 def nospace(text: str | None) -> str:
@@ -147,6 +151,68 @@ def test_an_equation_number_is_not_a_column_of_the_display_beside_it():
     column = layout._Line([one_row("xyz", 330, 451)], [])
     assert not layout._beside_row([row], [number], 11.0)
     assert layout._beside_row([row], [column], 11.0)  # the same place, a column of the display
+
+
+# ------------------------------------------------------------ a line set off like a display
+
+PROSE = (
+    "Because the tree is a fair-split tree, we can bound the diameter of every cell in the",
+    "partition and then sum the bounds over the cells that the query point can reach, which",
+    "gives the estimate that we use in the rest of this note. We write the bound out below",
+    "and then state what it implies for the error of the estimator.",
+)
+
+
+def prose(page, top: float) -> None:
+    for i, line in enumerate(PROSE):
+        page.insert_text((72, top + 14 * i), line, fontsize=11)
+
+
+@needs_dejavu
+def test_a_line_of_maths_with_a_word_in_it_set_off_from_its_text_is_a_display():
+    """ "Diam(C) <= ... for all i" has a prose word, so it was read as a line of text and cut
+    around the word; set in from both edges of the column between paragraphs it is a display."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_font(fontname="dv", fontfile=str(DEJAVU))
+    prose(page, 100)
+    page.insert_text(
+        (190, 190),
+        "Diam(C) \u2264 x\u00b2 + y\u00b2 \u2212 2xy for all i",
+        fontsize=11,
+        fontname="dv",
+    )
+    prose(page, 220)
+    shown = blocks(analyze(doc.tobytes(), display_grouping=True).elements)
+    assert len(shown) == 1 and "forall" in nospace(shown[0].text)
+    assert not blocks(analyze(doc.tobytes()).elements)
+
+
+# ------------------------------------------------------------ a piece inside a display
+
+
+def test_a_piece_that_lies_inside_the_box_of_a_display_is_a_part_of_it():
+    """The top of a tall bracket, a line of its own inside the box of the two rows of the
+    formula it belongs to; a numbered display beside it stays apart."""
+    rows = layout._Line([one_row("Y=F(ab+c)d", 125, 420), one_row("xyz", 140, 438)], [])
+    top = layout._Line([one_row("\u239b", 164, 424)], [])
+    beside = layout._Line([one_row("abc", 300, 420)], [])
+    formula, piece, other = region_of(rows), region_of(top), region_of(beside)
+    kept = display._absorb_contained_regions([formula, piece, other])
+    assert kept == [formula, other]
+    assert len(formula.rows) == 3
+
+
+# ------------------------------------------------------------ limits at the size of the row
+
+
+def test_the_limits_of_a_sum_set_at_the_size_of_its_row_are_a_part_of_the_display():
+    main = layout._Line([one_row("K=\u2211CF=1", 150, 200)], [])
+    limits = layout._Line([one_row("k=1", 154, 212)], [])
+    assert not display._joins_line(main, main.box, limits)
+    assert display._joins_line(main, main.box, limits, grouping=True)
+    far = layout._Line([one_row("k=1", 300, 212)], [])  # not under the sign: another display
+    assert not display._joins_line(main, main.box, far, grouping=True)
 
 
 # ------------------------------------------------------------ the setting (off by default)

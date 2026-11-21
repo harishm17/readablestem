@@ -74,7 +74,7 @@ from readablestem.core.types import (
     TableGrid,
     grid_problems,
 )
-from readablestem.pipeline import hyphens, table_model
+from readablestem.pipeline import hyphens, script_marks, table_model
 
 if TYPE_CHECKING:
     import numpy as np
@@ -94,6 +94,12 @@ ROW_RULE_SPAN = 0.5  # a horizontal rule covers at least this share of the box w
 COLUMN_RULE_SPAN = 0.35  # a vertical rule covers at least this share of the box height
 MIN_GRID_LINES = 3  # lines with text in two or more columns for a table without rules
 MIN_ALIGNMENT = 0.75  # share of a column's cells that line up (left, right or centre)
+CROSSED_MIN_LINES = 5  # lines with cells on both sides of a gap that a few lines' cells cross
+CROSSED_MAX = 3  # most cells that may cross it ...
+CROSSED_SHARE = 4  # ... and for each of them this many lines with cells on both sides
+CAPTION_COLUMNS = 3  # a box under a "Table N" line with no rules needs this many columns ...
+CAPTION_GRID_LINES = 6  # ... this many lines with cells in two of them ...
+CAPTION_ALIGNMENT = 0.5  # ... and this share of its cells lined up
 ALIGN_TOL = 2.0  # cells line up when their edges (or centres) are this close
 CURVE_SHARE = 0.05  # one curve covering this share of the box makes it a drawing
 IMAGE_SHARE = 0.2  # raster images covering this share of the box make it a picture
@@ -768,27 +774,6 @@ class _Word:
         self.marked = self.marked or self.text
 
 
-# Superscript forms; a raised run with a character not here is written "^(...)".
-_SUPERSCRIPTS = {
-    **dict(
-        zip(
-            "0123456789",
-            "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079",
-            strict=True,
-        )
-    ),
-    "+": "\u207a",
-    "-": "\u207b",
-    "\u2212": "\u207b",  # minus sign
-    "\u2013": "\u207b",  # en dash: some fonts print a raised minus as one
-    "=": "\u207c",
-    "(": "\u207d",
-    ")": "\u207e",
-    "n": "\u207f",
-    "i": "\u2071",
-}
-
-
 def _raised(chars: Sequence[GlyphLike]) -> set[int]:
     """Indexes (into `chars`, one visual line, left to right) of the superscript glyphs:
     smaller than the full-size glyph before them (after them at the start of the line)
@@ -834,10 +819,7 @@ def _marked(chars: Sequence[GlyphLike], raised: Sequence[bool]) -> str:
         while j < len(chars) and raised[j]:
             j += 1
         run = "".join(c.c for c in chars[i:j])
-        if all(ch in _SUPERSCRIPTS for ch in run):
-            out.append("".join(_SUPERSCRIPTS[ch] for ch in run))
-        else:
-            out.append(f"^({run})" if len(run) > 1 else f"^{run}")
+        out.append(script_marks.raised_characters(run))
         i = j
     return "".join(out)
 
@@ -1170,11 +1152,15 @@ def _rules(view: _PageView, box: BBox, size: float) -> tuple[list[float], list[f
     return rows, [x for i, x in enumerate(cols) if i == 0 or x - cols[i - 1] > RULE_JOIN]
 
 
-def _gutters(segs: list[_Seg], extent: float) -> list[tuple[float, float]]:
-    """x-intervals no cell crosses: column gaps. A line holding one cell that spans most
-    of the text (a title row, a note) is left out; it does not cut the columns."""
+def _gutters(
+    segs: list[_Seg], extent: float, *, tolerant: bool = True
+) -> tuple[list[tuple[float, float]], bool]:
+    """x-intervals no cell crosses: column gaps, and whether one of them is a strip that a few
+    cells cross (`_gap_in_spite_of_labels`; `tolerant` off: none is). A line holding one cell
+    that spans most of the text (a title row, a note) is left out; it does not cut the columns."""
     if not segs:
-        return []
+        return [], False
+    tolerated = False
     per_line: dict[int, list[_Seg]] = {}
     for seg in segs:
         per_line.setdefault(seg.line, []).append(seg)
@@ -1189,9 +1175,33 @@ def _gutters(segs: list[_Seg], extent: float) -> list[tuple[float, float]]:
     depth = 0
     for (x, step), (following, _) in pairwise(events):
         depth += step
-        if depth == 0 and following - x >= GUTTER_PT:
+        if following - x < GUTTER_PT:
+            continue
+        if depth == 0:
             gaps.append((x, following))
-    return gaps
+        elif tolerant and 1 <= depth <= CROSSED_MAX and _gap_in_spite_of_labels(used, x, following):
+            # The strips a label's end splits one gap into are one gap.
+            if gaps and gaps[-1][1] == x:
+                x = gaps.pop()[0]
+            gaps.append((x, following))
+            tolerated = True
+    return gaps, tolerated
+
+
+def _gap_in_spite_of_labels(used: Sequence[_Seg], x: float, following: float) -> bool:
+    """Is the white strip from `x` to `following`, which a few cells cross, a column gap all the
+    same? Labels set across the columns of some rows (a group's name, a note, "Total") would
+    otherwise take away a gap that at least `CROSSED_MIN_LINES` other lines, `CROSSED_SHARE`
+    for each of these rows, have cells on both sides of. A cell that only ends in the strip (the
+    longest entry of a column) is the ragged edge of that column, not a label across a gap."""
+    crossing = [s for s in used if s.x0 < x - 0.5 and s.x1 > following + 0.5]
+    covering = [s for s in used if s.x0 < following - 0.5 and s.x1 > x + 0.5]
+    if not crossing or len(crossing) != len(covering):
+        return False
+    before = {s.line for s in used if s.x1 <= x + 0.5}
+    after = {s.line for s in used if s.x0 >= following - 0.5}
+    beside = len((before & after) - {s.line for s in crossing})
+    return beside >= CROSSED_MIN_LINES and CROSSED_SHARE * len(crossing) <= beside
 
 
 def _word_gutters(words: Sequence[_Word], lines: int, x0: float, x1: float) -> list[float]:
@@ -1271,6 +1281,7 @@ class _Grid:
     crossings: int  # words a vertical rule runs through
     texts: list[str]  # each visual line's text (for leaders), never logged
     cuts: list[float] = field(default_factory=list)  # x positions between the columns
+    tolerated: bool = False  # a cut is a strip that a few cells cross (`_gutters`)
 
     @property
     def strong(self) -> bool:
@@ -1296,13 +1307,15 @@ class _Grid:
         return self.crossings >= max(2, 0.1 * len(self.words))
 
 
-def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
+def _text_grid(
+    view: _PageView, box: BBox, column_rules: list[float], *, tolerant: bool = True
+) -> _Grid:
     lines = _visual_lines(view.glyphs_in(box))
     segs, words, crossings = _segments(lines, column_rules)
     size = statistics.median([s.size for s in segs]) if segs else 10.0
     text_x0 = min((s.x0 for s in segs), default=box[0])
     text_x1 = max((s.x1 for s in segs), default=box[2])
-    gaps = _gutters(segs, text_x1 - text_x0)
+    gaps, tolerated = _gutters(segs, text_x1 - text_x0, tolerant=tolerant)
     # Drawn column rules cut wherever they are inside the box, text or not (a blank form);
     # a white gap cuts where no rule runs through it.
     drawn = [x for x in column_rules if box[0] + 2 < x < box[2] - 2]
@@ -1331,7 +1344,7 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
             by_line.setdefault(seg.line, set()).add(seg.columns[0])
     grid_lines = sum(1 for cols in by_line.values() if len(cols) >= 2)
     texts = [" ".join(s.text for s in segs if s.line == i) for i in range(len(lines))]
-    return _Grid(
+    grid = _Grid(
         segs,
         words,
         len(lines),
@@ -1342,7 +1355,16 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
         crossings,
         texts,
         cuts,
+        tolerated,
     )
+    if tolerated:
+        # A strip that a few cells cross only rescues a box whose grid is not one already: what
+        # the plain reading made of it (and the tests that follow, a numbered system of
+        # equations among them) stays as it was.
+        plain = _text_grid(view, box, column_rules, tolerant=False)
+        if plain.strong:
+            return plain
+    return grid
 
 
 def _toc(grid: _Grid, min_lines: int = 4) -> bool:
@@ -1447,10 +1469,13 @@ def _sparse_stack(grid: _Grid, row_rules: Sequence[float], page_width: float) ->
     return True
 
 
-def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judgement:
+def judge(
+    proposal: Proposal, view: _PageView, *, joined: bool = False, tolerant: bool = True
+) -> Judgement:
     """Keep a proposed box as a data table, or say why not (`DROPPED` codes). `joined`: the box
     is a stack of rule spans that a table of the detector's lies in (`_joined_frames`), so
-    paragraphs between its rules are its cells.
+    paragraphs between its rules are its cells. `tolerant` off: no white strip that a few
+    cells cross is a column gap (`_gutters`).
 
     The box first grows to the drawn table around it (`_snap`, `_extend`): the detector
     often stops at the text, or at the header row of a blank table. Rules are evidence
@@ -1465,7 +1490,7 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
     # Grown by a row or a column, not just to a border a few points away.
     extended = any(abs(a - b) > size for a, b in zip(box, snapped, strict=True))
     row_rules, column_rules = _rules(view, box, size)
-    grid = _text_grid(view, box, column_rules)
+    grid = _text_grid(view, box, column_rules, tolerant=tolerant)
     verdict = Judgement(
         "no_grid",
         box,
@@ -1477,6 +1502,9 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
     )
     if not grid.segs:
         return verdict
+    # A "Table N" line under a box may be the next table's: it names a box whose columns a
+    # strip that a few cells cross made only when it stands over it.
+    caption = _has_caption(view, box, above=grid.tolerated)
     ruled = not grid.background_rules and (
         len(row_rules) >= 3
         or len(column_rules) >= 3
@@ -1500,7 +1528,7 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
     # Rules round the box and a "Table N" line just above or below it: the document calls it
     # a table, whatever the glyphs say about its columns (wrapped text, bullets in cells). A
     # box made here from rules alone (the span between two callouts) needs columns too.
-    captioned = ruled and (not own or grid.weak) and _has_caption(view, box)
+    captioned = ruled and (not own or grid.weak) and caption
     # A top and a bottom rule (a booktabs table with no rule between its rows is not "ruled"
     # above) round two columns of text under a "Table N" line is the same evidence, for the
     # detector's box (the span between two rules of a table is no box of its own).
@@ -1510,7 +1538,18 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
         and not grid.background_rules
         and grid.columns >= 2
         and grid.grid_lines >= MIN_GRID_LINES  # more than a header row of a table cut short
-        and _has_caption(view, box)
+        and caption
+    )
+    # A "Table N" line over a box the detector proposed, of three columns or more whose rows
+    # mostly line up, is the document calling it a table when no rule is drawn between its rows
+    # (a journal's table set with white space and a shaded header only).
+    captioned = captioned or (
+        not own
+        and not grid.background_rules
+        and grid.columns >= CAPTION_COLUMNS
+        and grid.grid_lines >= CAPTION_GRID_LINES
+        and grid.alignment >= CAPTION_ALIGNMENT
+        and _has_caption(view, box, above=True)
     )
     # A chart is a chart whoever proposed it: bars, scatter dots and a plot's lines in the
     # box (the detector's layout model also takes a bar chart's axes for a ruled grid).
@@ -1538,9 +1577,7 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
         if extended:
             verdict.reasons.append(REASON_EXTENDED)
         if proposal.source == SOURCE_TEXT:
-            verdict.verdict = (
-                _text_block_dropped(grid, view.width, _has_caption(view, box)) or TABLE
-            )
+            verdict.verdict = _text_block_dropped(grid, view.width, caption) or TABLE
         elif proposal.source == SOURCE_FRAME:
             # Read without the drawn column rules, which a grid of cells in the box would
             # otherwise carry through its paragraphs, cutting their lines into cells.
@@ -1554,13 +1591,43 @@ def judge(proposal: Proposal, view: _PageView, *, joined: bool = False) -> Judge
                 verdict.verdict = "no_grid"  # rules around paragraphs, or around one line
             else:
                 # Not the page-column test: a table of paragraphs has columns of prose.
-                dropped = _text_block_dropped(
-                    grid, view.width, _has_caption(view, box), columns_of_prose=True
-                )
+                dropped = _text_block_dropped(grid, view.width, caption, columns_of_prose=True)
                 if dropped:
                     verdict.verdict = dropped
-        if verdict.verdict != TABLE:
-            verdict.reasons.clear()
+        elif grid.tolerated:
+            # Columns that a strip crossed by a few cells made (`_gutters`) are asked what the
+            # boxes made here are asked: the line numbers of an algorithm, a list of blanks.
+            plain = _text_grid(view, box, column_rules, tolerant=False)
+            if not ((ruled and plain.weak and not own) or ruled_cells or captioned or sparse):
+                dropped = _text_block_dropped(grid, view.width, caption)
+                if dropped:
+                    verdict.verdict = dropped
+        if (
+            verdict.verdict == TABLE
+            and grid.tolerated
+            and not (ruled_cells or sparse)
+            and _running_text(grid, box)
+        ):
+            # Lines of a paragraph across the columns: a table with the text under it in the
+            # box, which a strip a few cells cross made one box of.
+            verdict.verdict = "page_text"
+        if (
+            verdict.verdict == TABLE
+            and grid.tolerated
+            and grid.columns == 2
+            and not ruled
+            and not caption
+        ):
+            # Two columns, one of them made by a strip that a few lines cross, with no rule and
+            # no "Table N" line: labelled lines with a heading or a note at the margin among
+            # them (questions and their parts, terms and their meanings, a dialogue).
+            verdict.verdict = "no_grid"
+    if verdict.verdict != TABLE:
+        verdict.reasons.clear()
+        if grid.tolerated:
+            # Such a strip only adds tables: a box it does not make one is judged as if the
+            # strip were not a gap, so a box that was a table on the plain reading stays one.
+            return judge(proposal, view, joined=joined, tolerant=False)
     return verdict
 
 
@@ -1868,13 +1935,33 @@ def _numbered(grid: _Grid) -> bool:
     first = min((m.line for m in grid.segs), default=0)
     if any(re.match(r"^(?:Algorithm|Listing)\s+\d", m.text) for m in grid.segs if m.line == first):
         return True
-    labels = [m.text for m in grid.segs if m.columns == (0,)]
-    others = [m for m in grid.segs if m.columns and m.columns[0] != 0]
-    return (
+    readings = [
+        (
+            [m.text for m in grid.segs if m.columns == (0,)],
+            [m for m in grid.segs if m.columns and m.columns[0] != 0],
+        )
+    ]
+    if grid.tolerated:
+        # A strip that a few cells cross is often an indent (the levels of a nested list: "b.",
+        # then "i.", "ii." one level in): the label of an item is also the cell that opens a line
+        # with another cell after it.
+        count = Counter(m.line for m in grid.segs)
+        opening: dict[int, _Seg] = {}
+        for m in grid.segs:
+            if count[m.line] >= 2 and (m.line not in opening or m.x0 < opening[m.line].x0):
+                opening[m.line] = m
+        readings.append(
+            (
+                [m.text for m in opening.values()],
+                [m for m in grid.segs if m.line in opening and opening[m.line] is not m],
+            )
+        )
+    return any(
         len(labels) >= 2
         and sum(bool(_ENUMERATION.match(t)) for t in labels) >= 0.7 * len(labels)
         and bool(others)
         and sum(_wordy(m.text) for m in others) >= 0.5 * len(others)
+        for labels, others in readings
     ) or (
         len([m for m in grid.segs if m.line == first and re.match(r"^\([a-z]\)", m.text)]) >= 2
     )  # (a) ... (b) ... side by side: subfigure captions

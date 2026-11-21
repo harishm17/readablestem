@@ -49,6 +49,9 @@ _MATH_WORDS = frozenset(
     )
 )
 
+# More operator names, taken as maths words only when `analyze(inline_joins=True)`.
+_MORE_MATH_WORDS = frozenset(("erfi", "erfc", "supp", "diam", "codim", "coker", "arccot"))
+
 
 _SUPERSCRIPT_FLAG = 1
 
@@ -84,6 +87,9 @@ class _Row:
     # "A. Problem Descriptions" in bold or italics over text in another face: a heading, not
     # the item of a list (`blocks._mark_lettered_titles`).
     lettered_title: bool = False
+    # The item of a run of one series ("B." set in bold between "A." and "C."; the lines of an
+    # agenda), whatever it is set in: never a heading by its type (`blocks._mark_series_items`).
+    in_series: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
@@ -443,7 +449,9 @@ def _word_lengths(
         )
         for k in members:
             lengths[k] = 1 if italic_variables else len(members)
-            maths_word[k] = named or word in _MATH_WORDS
+            maths_word[k] = (
+                named or word in _MATH_WORDS or (document.inline_joins and word in _MORE_MATH_WORDS)
+            )
         i = j
     return lengths, maths_word
 
@@ -689,7 +697,8 @@ class _Figure:
     paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
-    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths.
+    # The caption cut into text and inline maths (`_paragraph_pieces`), when it has any maths
+    # or a raised run.
     caption_pieces: list[str | _Inline] | None = None
     caption_size: float | None = None
     xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)

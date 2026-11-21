@@ -14,6 +14,7 @@ from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token
 from readablestem.core.types import Notice
 from readablestem.web import record as rec
+from readablestem.web import strings
 
 
 @pytest.fixture
@@ -73,9 +74,12 @@ def test_the_page_says_what_it_is_and_is_not_a_certification(web):
 def test_a_decision_is_listed_with_who_when_and_what_the_tool_had(web):
     decide(web, "p1-e2", action="accept")
     decide(web, "p2-e2", action="reject")
+    decide(web, "p1-e3", action="reject")  # a bold line the tool read as a heading
     words = text_of(web.browser.get(f"/jobs/{web.job_id}/record").text)
     assert "Decisions and changes made by a person" in words
-    assert "Accepted" in words and "Rejected, original kept" in words
+    assert "Accepted" in words and "Kept as image" in words and "Rejected" not in words
+    review = text_of(web.browser.get(f"/jobs/{web.job_id}/review").text)
+    assert strings.MADE_BOLD_TEXT in words and strings.MADE_BOLD_TEXT in review  # one wording
     assert "Asked for a decision" in words  # what the tool had for the first
     assert ALICE in words  # by whom
     assert re.search(r"\w+ \d{1,2}, 20\d\d, \d\d:\d\d UTC", words)  # when

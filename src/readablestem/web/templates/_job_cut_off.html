@@ -1,7 +1,7 @@
 {# Audiences: owner #}
 {% from "components/forms.html" import form with context %}
 {# A PDF that looks cut off (`file_cut_off`, pipeline/source_facts.py): its last pages are empty.
-   Until the owner answers, the document is not "Ready to share" (web/states.py). Two ways on:
+   Until the owner answers, the document is not "Ready to post" (web/states.py). Two ways on:
    a fresh copy of the file, or "continue" (POST /jobs/{id}/cut-off), which keeps the notice and
    the statement that those pages are not in the file. #}
 {% if job.is_owner and pg.cut_off_open %}

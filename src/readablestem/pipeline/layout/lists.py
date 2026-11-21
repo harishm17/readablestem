@@ -388,6 +388,7 @@ def _list_markers(
         return any(
             other is not None
             and _capital_letter(other) == value + step
+            and not _names(other, sure=True)  # a reference list has the next initial too
             and (
                 page_of[id(other)] != page_of[id(candidate)]  # a list goes on over a page break
                 or (other.row.column != candidate.row.column and _face(candidate.row) != "")
@@ -420,13 +421,16 @@ def _list_markers(
 
 
 _NAMES = re.compile(r"[A-Z]\.|[A-Z][\w'\u2019-]+(?:,| and\b| et al\b)")
+# What cannot confirm a neighbor: "and" counts only before an initial ("Lampe and M. Riedmiller"),
+# not before a word ("Predation and herbivory" is an outline's item).
+_SURE_NAMES = re.compile(r"[A-Z]\.|[A-Z][\w'\u2019-]+(?:,| et al\b| and [A-Z]\.)")
 
 
-def _names(candidate: _MarkerCandidate) -> bool:
+def _names(candidate: _MarkerCandidate, *, sure: bool = False) -> bool:
     """Does the text after the marker open like a list of authors: another initial ("S. Choi"), or
-    a surname and a comma, "and" or "et al"?"""
+    a surname and a comma, "and" or "et al"? With `sure`, "and" counts only before an initial."""
     parts = candidate.row.clean.split(maxsplit=1)
-    return len(parts) == 2 and _NAMES.match(parts[1]) is not None
+    return len(parts) == 2 and (_SURE_NAMES if sure else _NAMES).match(parts[1]) is not None
 
 
 def _capital_letter(candidate: _MarkerCandidate) -> int:
@@ -438,8 +442,9 @@ def _capital_letter(candidate: _MarkerCandidate) -> int:
     return ord(text[0]) - 64
 
 
-def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
-    """Nesting level (1 = top) per list-item block id, from the indent of the item text.
+def _list_levels(pages: Iterable[Sequence[_Block]], tolerance: float) -> dict[int, int]:
+    """Nesting level (1 = top) per list-item block id, from the indent of the item text, for
+    the blocks of each page in reading order.
 
     Consecutive items in reading order form one list (display equations inside an item
     do not end it; anything else does). A deeper indent opens a level, a shallower one
@@ -452,13 +457,18 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
     even where the texts start at one indent (the answer lines of an exam). A list that a
     paragraph, a figure or a table cut ("(i)" ... "negative" ... "(ii)") goes on where the
     next item takes up the numbering of an open level: its levels are kept for that item.
+    A series that starts at its first value after such a cut is under the item above only on
+    that item's page and with no heading between: "(a)" pages after "3.", or in the next
+    section, is a list of its own.
     """
     levels: dict[int, int] = {}
     stack: list[_Level] = []  # the open levels: the x of the text, the marker series
     cut: list[_Level] = []  # the levels a block that is not an item closed, to be taken up
     options: float | None = None  # the x the options of the grid being read are placed at
     before: tuple[str, float] | None = None  # (series, x of the marker) of the item before
-    for block in blocks:
+    apart = False  # a page break or a heading stands between the item before and this block
+    for block, first in ((b, i == 0) for blocks in pages for i, b in enumerate(blocks)):
+        apart = apart or first
         if block.joined:  # the rest of the item before it, on the next page: no element of its own
             continue
         if block.marker is None:
@@ -466,6 +476,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
                 cut = stack or cut
                 stack = []
                 before = None
+                apart = apart or block.kind == Kind.HEADING
             continue
         x = block.marker.x - block.origin
         series, own = _series(block.marker), _marker_x(block)
@@ -473,7 +484,18 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
         if not stack and cut and number is not None and block.marker.option is None:
             taken = _taken_up(cut, number, x, tolerance)
             stack = cut[: taken + 1] if taken is not None else []
+            last = cut[-1].number
+            if (
+                taken is None
+                and not apart
+                and number.value == 1
+                and last is not None
+                and last.key != number.key
+                and not number.key.endswith("|decimal")  # "1." starts a list of its own
+            ):
+                stack = list(cut)  # "(a)" after "1." and a figure: the list of that item (`starts`)
         cut = []
+        apart = False
         # The marker of another series set right of the one above opens a level even where the
         # item texts agree: sub-bullets under "1)" in slides set larger than the text indent.
         nested = (

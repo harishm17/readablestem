@@ -322,12 +322,12 @@ class _Writer:
             mathml = self.math(cell.mathml)
             if mathml is not None:
                 return mathml
-        if cell.runs:  # a Word or LaTeX cell's bold, italic and code, written as the text's are
+        if cell.runs or cell.links:  # a Word or LaTeX cell's bold, italic, code and links
             from readablestem.pipeline.inline_text import render_inline_text  # it imports us
 
             holder = Element(
                 id="cell", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 0, 0), order=0,
-                text=cell.text, runs=cell.runs,
+                text=cell.text, runs=cell.runs, links=cell.links,
             )  # fmt: skip
             return render_inline_text(cell.text, element=holder, equation=lambda _id: None)
         return escape_text(cell.text)

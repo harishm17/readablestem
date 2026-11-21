@@ -35,10 +35,10 @@
     {# ux-lane-b: for someone who has documents, the sample is a compact link here. #}
     {% if own_documents|default(false) and sample_available|default(false) %}
     {% if sample_job %}
-    <a class="sample-link" href="/jobs/{{ sample_job }}">Practice on the sample</a>
+    <a class="sample-link" href="/jobs/{{ sample_job }}">{{ strings.OPEN_SAMPLE }}</a>
     {% else %}
     {% call form("upload.sample", "/sample", {"class": "inline-form sample-link"}) %}
-      <button type="submit" class="link-button">Practice on the sample</button>
+      <button type="submit" class="link-button">{{ strings.OPEN_SAMPLE }}</button>
     {% endcall %}
     {% endif %}
     {% endif %}
@@ -220,7 +220,7 @@
           </div>
           <div class="field checkbox-field">
             <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint"{% if share_on %} checked{% endif %}>
-            <label for="share">Also let us look at the results ({{ opt_in_days }} days)</label>
+            <label for="share">{{ strings.OPT_IN_LABEL }} ({{ opt_in_days }} days)</label>
             <p class="hint" id="share-hint">To find and fix mistakes in the tool.</p>
           </div>
         </div>

@@ -204,7 +204,7 @@ def _to_elements(
     is taken back, and the later part of a paragraph it was to carry over from the next page
     is written there instead (`_join_page_splits`)."""
     elements: list[Element] = []
-    levels = _list_levels((b for page in pages for b in page.blocks), 0.6 * ctx.body)
+    levels = _list_levels((page.blocks for page in pages), 0.6 * ctx.body)
     for page in pages:
         first = len(elements)
         with guard(page.number):
@@ -309,7 +309,7 @@ def _page_elements(
                     parts.append(inline_marker(child_id))
                 else:
                     parts.append(piece)
-            caption_marked = " ".join(script_marks.strip_marks("".join(parts)).split())
+            caption_marked = " ".join(script_marks.as_characters("".join(parts)).split())
         table = block.table if kind is Kind.TABLE else None
         if table is not None and block.cell_inlines:
             # A cell that is one formula is an inline equation of the table: its id goes

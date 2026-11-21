@@ -489,6 +489,7 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
 
 
 MAX_LETTERED_TITLE_WORDS = 12
+WRAPPED_TITLE_GAP = 0.5  # x row height: how far under a title its second row stands
 
 
 def _capital(row: _Row) -> int:
@@ -517,7 +518,19 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
             continue
         if row.clean[-1:] in ".,;:":
             continue
-        under = next((r for r in rows[i + 1 :] if r.column == row.column), None)
+        ahead = [r for r in rows[i + 1 :] if r.column == row.column]
+        if (  # a title that goes on in a second row of its face, one line down
+            ahead
+            and ahead[0].kind == "text"
+            and ahead[0].marker is None
+            and _face(ahead[0]) == face
+            and ahead[0].y0 - row.y1 <= WRAPPED_TITLE_GAP * row.height
+        ):
+            more = ahead[0].clean.split()
+            if len(words) + len(more) > MAX_LETTERED_TITLE_WORDS or ahead[0].clean[-1:] in ".,;:":
+                continue
+            ahead = ahead[1:]
+        under = ahead[0] if ahead else None
         if under is None or (under.kind == "text" and _face(under) == face):
             continue
         if under.marker is not None and not _opens_numbering(under.marker):
@@ -547,6 +560,82 @@ def _lettered_title(row: _Row) -> bool:
     """Is the row a title that starts with a capital letter and a full stop, set in bold or in
     italics (`_mark_lettered_titles`)?"""
     return row.lettered_title
+
+
+def _next_in_series(first: _Marker, second: _Marker) -> bool:
+    """Is `second` the marker right after `first` in one series ("B." after "A.", "2)" after
+    "1)", "II." after "I.")?"""
+    one = _ordered_marker(first.text) if first.ordered else None
+    two = _ordered_marker(second.text) if second.ordered else None
+    if one is None or two is None or one[0] != two[0]:
+        return False
+    return any(
+        style == after and value + 1 == next_value
+        for style, value in marker_readings(one[1])
+        for after, next_value in marker_readings(two[1])
+    )
+
+
+SERIES_GAP = (
+    2.0  # line heights of white between two rows of one run: more, and something stood there
+)
+
+
+def _mark_series_items(rows: list[_Row]) -> None:
+    """Set `_Row.in_series` on the rows with an ordered marker that stand in a run of their
+    series: the next marker of the row's column, past the item's own lines, is the next value,
+    or the nearest one above is the value before with nothing between but its own lines.
+
+    A heading of the same shape has body text, or a figure, under it, so its neighbors are not
+    markers: "B. Newton's second law" in bold among upright options, the bold lines of an agenda
+    and "I." between "H." and "J." of an outline are items whatever they are set in. The options
+    of a grid are a list too. Only text rows are seen here, so a figure or a table shows as the
+    white it leaves (`SERIES_GAP`): a run ends there, and "1. Setup" over a picture with
+    "2. Procedure" under it are two titles.
+
+    Two titles in a row, the first with no text of its own, do read as a list of two."""
+    for i, row in enumerate(rows):
+        marker = row.marker
+        if marker is None or not marker.ordered:
+            continue
+        if marker.option is not None:
+            row.in_series = True
+            continue
+        face = _face(row)
+        reach = SERIES_GAP * row.size
+        last = row
+        for under in rows[i + 1 :]:
+            if under.column != row.column:
+                continue
+            if under.y0 - last.y1 > reach:
+                break
+            last = under
+            if under.marker is None and face and _face(under) == face:
+                continue  # more lines of the item itself
+            row.in_series = under.marker is not None and _next_in_series(marker, under.marker)
+            break
+        if row.in_series:
+            continue
+        between: set[str] = set()
+        lines = 0
+        last = row
+        for above in reversed(rows[:i]):
+            if above.column != row.column:
+                continue
+            if last.y0 - above.y1 > reach:
+                break
+            last = above
+            if above.marker is None:
+                between.add(_face(above))
+                lines += 1
+                continue
+            row.in_series = (
+                above.marker.ordered
+                and _next_in_series(above.marker, marker)
+                and between <= {_face(above)}
+                and (face != "" or lines == 0)  # lines in the text's face may be a section's
+            )
+            break
 
 
 def _opens_with_bullet(row: _Row) -> bool:
@@ -695,7 +784,9 @@ def _is_contents_list(
     middle = statistics.median(edges)
     size = statistics.median([row.size for row, _, _ in block])
     aligned = all(abs(e - middle) <= CONTENTS_REACH * size for e in edges)
-    if not aligned and len(block) < CONTENTS_RAGGED_LINES:
+    # A number that stands apart is a column of its own, at one right edge: marks ("x") set in
+    # several columns of a table, after names, are not page numbers that follow their titles.
+    if not aligned and (len(block) < CONTENTS_RAGGED_LINES or any(twin for _, twin, _ in block)):
         return False
     orders = [_page_order(word) for _, _, word in block]
     if any(a > b for a, b in pairwise(orders)):
@@ -982,6 +1073,8 @@ ALGORITHM_PREAMBLE = 4  # lines (Input, Output ...) that may come before the fir
 ALGORITHM_REACH = 16  # lines: how far a display equation may push the next step down the page
 ALGORITHM_NUMBER_GAP = 0.25  # em: the gap that sets a line number apart from a step with no blank
 ALGORITHM_SAME_LINE = 0.6  # x font size: rows this close in baseline are on one line
+ALGORITHM_HANG = 0.7  # x font size: how far under a line's end a bit of math (a subscript) hangs
+ALGORITHM_HANG_AT = 1.5  # em: ... and how far left of the line's end it may start
 ALGORITHM_WRAPPED = 3  # em: a line that ends this close to the right edge goes on in the next
 ALGORITHM_SMALL = 0.6  # x the size of the steps: the smallest a step ("Output: ...") may be set
 ALGORITHM_MAX_DEPTH = 12
@@ -1086,10 +1179,19 @@ class _Steps:
         )
 
     def on_line(self, row: _Row) -> bool:
-        """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?"""
+        """Is `row` on the line of one of the last steps (a piece of it the text layer cut off)?
+        Rows on one baseline are; so is one that hangs under the end of the line, a little lower
+        than the line (the subscripts of a tall expression are set apart in the text layer)."""
+        size = self.anchor.size
         return any(
-            abs(row.baseline - g.baseline) <= ALGORITHM_SAME_LINE * self.anchor.size
-            and row.x0 > g.x0
+            row.x0 > g.x0
+            and (
+                abs(row.baseline - g.baseline) <= ALGORITHM_SAME_LINE * size
+                or (
+                    0 < row.baseline - g.baseline <= ALGORITHM_HANG * size
+                    and row.x0 >= g.x1 - ALGORITHM_HANG_AT * size
+                )
+            )
             for g in self.rows[-4:]
         )
 
@@ -1324,32 +1426,31 @@ def _open_blocks(steps: _Steps) -> int:
     return count
 
 
-def _nested(
-    steps: _Steps, texts: Sequence[tuple[_Row, tuple[int, str, int] | None]], said: bool = False
-) -> bool:
-    """Does one step stand inside another: right of the line just above it, which opens a
-    block, or, closing one, left of the line just above it? (The numbered lines of a
-    manuscript and the questions of an exam start at one place, but for the first line of a
-    paragraph.) With `said`, the line that opens the block must say so where it ends ("do",
-    "then", a colon): a sentence that begins "For" does not. Two numbered lines whose numbers
-    differ in length ("9." and "10.") prove nothing, nor do two lines that start more than
-    `ALGORITHM_SET_IN` em apart (a display equation of the text, centered in the column, and
-    the sentence going on under it)."""
+def _nested(steps: _Steps, texts: Sequence[tuple[_Row, tuple[int, str, int] | None]]) -> bool:
+    """Does one step stand inside another? From the indent alone: some line is set right of the
+    line just above it, and a later line is set back left of the line just above it. The
+    numbered lines of a manuscript and the questions of an exam start at one place; the first
+    line of a paragraph is set in and the next goes back out, so a text of two paragraphs shows
+    this too, and the callers ask for more with it (a caption, step words, a block word). No
+    word of the lines is read: a sentence that begins "For" and a block that opens with no "do"
+    or "then" are told apart by the indent. Two numbered lines whose numbers differ in length
+    ("9." and "10.") prove nothing, nor do two lines that start more than `ALGORITHM_SET_IN` em
+    apart (a display equation of the text, centered in the column, and the sentence going on
+    under it)."""
     half = 0.5 * steps.anchor.size
+    far = ALGORITHM_SET_IN * steps.anchor.size
 
     def at(row: _Row, number: tuple[int, str, int] | None) -> float:
         return row.chars[number[2]].x0 if number is not None else row.x0
 
+    went_in = False
     for (above, n_above), (row, n_row) in pairwise(texts):
         if n_above is not None and n_row is not None and len(n_above[1]) != len(n_row[1]):
             continue  # "9." to "10.": with no tab stop the longer number moves its words right
-        upper, lower = _step_text(above, n_above), _step_text(row, n_row)
-        opens = _opens_block(upper) and not (said and _OPENS.fullmatch(upper.rstrip()) is None)
         set_in = at(row, n_row) - at(above, n_above)
-        far = ALGORITHM_SET_IN * steps.anchor.size
-        if opens and half < set_in <= far:
-            return True
-        if _CLOSER.fullmatch(lower) and -far <= set_in < -half:
+        if half < set_in <= far:
+            went_in = True
+        elif went_in and -far <= set_in < -half:
             return True
     return False
 
@@ -1390,7 +1491,7 @@ def _is_algorithm(steps: _Steps, edges: _RightEdges) -> bool:
             and (blocks >= 1 or numbered)
             and (numbered or not _reads_on(steps, edges))
             and (not any(_listed(n) for n in marks) or _nested(steps, texts))
-            and (numbered or not steps.ran_on or _nested(steps, lines, said=True))
+            and (numbered or not steps.ran_on or _nested(steps, lines))
         )
     closing = any(_CLOSER.fullmatch(_step_text(r, n)) for r, n in texts)
     ladder = len({round(r.x0 / (0.5 * r.size)) for r in rows}) >= 3
@@ -2157,6 +2258,7 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
     code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
     rows = _option_grids(rows, ctx, code, document=document)
     _mark_lettered_titles(rows)
+    _mark_series_items(rows)
     scored: dict[int, list[_Row]] = {}  # a points label, by the run of the line it scores
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
@@ -2223,8 +2325,8 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx, edges)
             if (
                 geometric
-                and len(run.rows) == 1
-                and _lettered_title(prev)
+                and len(run.rows) <= MAX_BOLD_HEADING_ROWS
+                and _lettered_title(run.rows[0])
                 and _face(row) != _face(prev)
             ):  # the title and the text under it are two blocks, not one list item
                 run.block_end = True
@@ -2453,6 +2555,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and letters >= 2
         and _title_like(text)
         and not _opens_with_bullet(rows[0])
+        and not rows[0].in_series
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif (
@@ -2464,9 +2567,10 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
         and len(text) <= 80
         and len(text.split()) <= 12
         and text[-1:] != "."
+        and not rows[0].in_series
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
-    elif upright and len(rows) == 1 and _lettered_title(rows[0]):
+    elif upright and len(rows) <= MAX_BOLD_HEADING_ROWS and _lettered_title(rows[0]):
         heading = [REASON_LETTERED]
     if heading is not None and _mostly_maths(rows, document=document):
         # A formula set large or bold on a slide is not a title: it goes to the equation
@@ -3077,11 +3181,18 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure], *, document: 
         if c_index in used_captions or figures[f_index].caption is not None:
             continue
         figures[f_index].caption = blocks[c_index].text
+        # A raised run is written in superscript characters (`Element.caption_marked`, as a
+        # table caption's is); `caption` stays the flat text the figure step is sent. A lowered
+        # run has no such form: it stays flat, and the notice says so.
         figures[f_index].flat_scripts = any(
-            kind for row in blocks[c_index].rows for kind in _script_kinds(row, document=document)
+            kind == "sub"
+            for row in blocks[c_index].rows
+            for kind in _script_kinds(row, document=document)
         )
         pieces = _paragraph_pieces(blocks[c_index], document=document)
-        if any(isinstance(piece, _Inline) for piece in pieces):
+        if any(isinstance(piece, _Inline) for piece in pieces) or any(
+            isinstance(piece, str) and script_marks.SUP_OPEN in piece for piece in pieces
+        ):
             figures[f_index].caption_pieces = pieces
             figures[f_index].caption_size = blocks[c_index].font_size
         used_captions.add(c_index)

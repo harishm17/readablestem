@@ -981,7 +981,7 @@ def add_equation(
         action="add_equation",
         before={STRUCTURE_KEY: before},
         after={STRUCTURE_KEY: capture(result, elements=[element_id], fixes=[element_id])},
-        message="The equation was added. Check what the tool read from it.",
+        message="The equation was added. Look at what the tool read from it.",
         crops={element_id: png},
         shows=element_id,
     )
@@ -1000,7 +1000,7 @@ NOT_AN_EQUATION_IN_TABLE = (
 NOT_AN_EQUATION_WHERE = "The text this belongs to is not there any more."
 
 
-READ_AGAIN = "The tool read it again. Check what it read."
+READ_AGAIN = "The tool read it again. Look at what it read."
 # The same picture, the same question: the record answered and the model was not asked.
 READ_BEFORE = (
     "The tool has already read this picture a second time, and this is the reading it gave. "

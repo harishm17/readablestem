@@ -308,7 +308,26 @@ log = logging.getLogger(__name__)
 # (`assemble.RENDER_VERSION` 10). 0.5.13 opens a 0.5.14 result (it has no words for the new
 # notice lines and drops a cell's runs), so the roll-back limit stays at 0.5.12
 # (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.14"
+# 0.5.15 (2026-11-20): one raise for the wave after 0.5.14 (CHANGELOG.md has each change). What
+# a PDF's result holds moves: a bold or numbered line in a run of its series is an item, not a
+# heading; a lettered title that wraps is one heading; a series that starts again after a cut is
+# a level down (`Element.list_level`); a reference list's initials are no lettered list; a number or
+# a row of labels is no footnote, and a note the file names that no link points at is linked by
+# its mark; a paragraph is no glossary entry with the region tree on (the tree stays off); a
+# small drawing does not join a figure across a line of prose; a raised digit in a figure
+# caption is kept raised (`Element.caption_marked`); an algorithm that holds a bold letter keeps
+# its lines; tables with no ruling lines are found (a box under a "Table N" line, a strip a few
+# lines cross, a table of marks on a first page) and two unruled columns with no caption are no
+# table. A Word or LaTeX file's result: a link in a table cell (`TableCell.links`, new, left out
+# when empty), emphasis and links in a table too large for a grid, a single italic letter makes
+# no run, a strike set by a paragraph style, "(picture below)" where a picture stood in a
+# sentence. No new notice code. Results from 0.5.10 to 0.5.14 load unchanged and their page is
+# made again (`assemble.RENDER_VERSION` 11). 0.5.14 opens a 0.5.15 result (it ignores
+# `TableCell.links`: the cell shows its words, no links; it serves a stored render-11 page as it
+# is, links shown, until a review change makes the page again and writes the result back through
+# its own model, which drops the links for good), so the roll-back limit stays at 0.5.12
+# (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.15"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -1680,8 +1699,12 @@ def _page_math_pass(
             grouping: dict[str, Any] = (
                 {"display_grouping": True} if settings.layout_display_grouping else {}
             )
+            if settings.layout_inline_joins:
+                grouping["inline_joins"] = True
             if settings.region_tree == "on":
                 grouping["region_tree"] = True
+            if settings.layout_join_panels:
+                grouping["join_panels"] = True
             if settings.table_search_unlimited:
                 grouping["table_search_limited"] = False
             try:
@@ -1820,6 +1843,7 @@ def _image_pages_pass(
     observer: Callable[[ModelCall], None] | None,
     measured: list[CallFact],
     step_cache: StepCache | None = None,
+    stage_progress: StageProgressFn | None = None,
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept pages `pages` (`image_page.kept_reads`) from a picture of each (ADR 0007).
 
@@ -1845,7 +1869,18 @@ def _image_pages_pass(
         for number in pages
     }
     with _span(tracer, "image_pages", pages=len(pages)) as span:
-        result = image_page.run(recording, settings, renders, concurrency=concurrency)
+        result = image_page.run(
+            recording,
+            settings,
+            renders,
+            concurrency=concurrency,
+            # the pages read are the layout's pages on the job page, as the table search's are
+            on_page=(
+                None
+                if stage_progress is None
+                else lambda done, total: _send(stage_progress, "layout", done, total)
+            ),
+        )
         for number, read in result.reads.items():
             read.vector = vector.get(number)  # (empty when both vector settings are off)
         if (
@@ -1945,8 +1980,12 @@ def _convert(
             extra: dict[str, Any] = {} if collector is None else {"page_math": collector}
             if settings.layout_display_grouping:
                 extra["display_grouping"] = True
+            if settings.layout_inline_joins:
+                extra["inline_joins"] = True
             if settings.region_tree == "on":
                 extra["region_tree"] = True
+            if settings.layout_join_panels:
+                extra["join_panels"] = True
             if settings.table_search_unlimited:
                 extra["table_search_limited"] = False
             if stage_progress is not None:
@@ -2034,6 +2073,7 @@ def _convert(
                     observer=call_observer,
                     step_cache=step_cache,
                     measured=measured,
+                    stage_progress=stage_progress,
                 )
                 watch.stage("layout")
                 for number in image_built:

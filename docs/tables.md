@@ -80,7 +80,7 @@ the largest that got through the detector at all):
 
   A stop is said, not silent: the conversion writes the "not finished" fact `table_search`
   with reason `time_limit` for each page cut short (`job_not_finished`, operations.md), each
-  such page carries the notice `tables_not_searched` ("Worth checking"), and the job is
+  such page carries the notice `tables_not_searched` ("Worth a look"), and the job is
   not "Ready" with nothing to add until the owner has seen it. A document within the budget
   reads exactly as it would without one. Evals and replays run without it
   (`TABLE_SEARCH_UNLIMITED`, eval.md "The same file gives the same document"), so no score
@@ -173,6 +173,31 @@ rules above.
    or each begins with a header row; each part must be kept by `judge` on its own, else the
    box stays as it was. A table and a plot in one box, and two ruled tables in one box, are
    not split.
+   Two rules keep an unruled table whose cells do not line up as one column each (O-114). A
+   white strip that a few lines cross is still a gap between columns when at least five other
+   lines have cells on both sides of it, four for each line that crosses it, and every line
+   over the strip runs past it on both sides (`_gap_in_spite_of_labels`: a group's name or a
+   "Total" set across some columns; the ragged end of a column, where only its longest entry
+   reaches into the strip, is not a gap). Such a strip only adds tables: a box whose plain
+   grid is strong is read on the plain grid, and a box the strip does not make a table is
+   judged again as if the strip were not a gap (`judge`'s `tolerant` off), so what the plain
+   reading judged, a numbered system of equations and a ruled table under its caption with
+   long panel titles across it among them, stays as it was. A box it rescued that is no table
+   by rules, caption or a stack of rules is asked the page-text, numbered-line and word tests
+   of the boxes made here (`_text_block_dropped`), and two columns with no rule and no
+   "Table N" line are no table (labeled questions with a "Part B" line among them). Two
+   things differ for a box read this way, because the strip is weaker evidence than a gap no
+   cell crosses. A "Table N" line only names it when it stands
+   over the box (a line under a box may be the next table's: an algorithm's frame with the
+   caption of the table that follows it is not a table). And the label of a numbered item is
+   the cell that opens its line, not only the first column: a strip that a few cells cross
+   is often an indent, so the "i." to "v." of a nested list, with blanks to write on after the
+   items, are list lines (`_numbered`). And a box it made that holds two lines of running
+   text across its columns (`_running_text`) is a table with the paragraph under it taken in,
+   not a table. A second rule: a box under a "Table N" line with no rules, of
+   three columns or more, six grid lines and alignment 0.5 (not 0.75) is a table: the caption
+   is the reason, as it is for a layout grid (`CAPTION_COLUMNS`, `CAPTION_GRID_LINES`,
+   `CAPTION_ALIGNMENT`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,
@@ -270,9 +295,9 @@ rules above.
    its header to the third from the second. A part that printed its header again keeps it and
    gets no second one. Where the columns do not agree, or the part's first rows repeat the
    header without being marked as one, nothing is carried and the notice
-   `table_header_missing` ("Worth checking") says the part has no header row. A table whose
+   `table_header_missing` ("Worth a look") says the part has no header row. A table whose
    first part has no header row gets neither. A part that is given the header gets the notice
-   `table_header_carried` ("Worth checking"): the review card shows the grid stored for the
+   `table_header_carried` ("Worth a look"): the review card shows the grid stored for the
    part, which has no header row, so the notice is where a reviewer learns what students get
    and can check that the two parts are one table.
 

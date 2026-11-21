@@ -122,7 +122,12 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 # every wide table is a tab stop, a script inside a script keeps a readable size, and a very wide
 # equation is not cut on paper; the words for a Word file's equations; the speech rules for
 # bars and for raised and lowered text.
-RENDER_VERSION = 10
+# 11: one word for one concept in the file's own sentences ("items" where it said "parts",
+# "Item 3 not converted"); the marker of a page a paragraph goes on over is written before the
+# next element on that page, not right after the paragraph; a link in a Word or LaTeX table cell
+# is written as a link; an equation shown as an image whose layout boxed a power of ten has the
+# warning that exponents run together in its alt text.
+RENDER_VERSION = 11
 RENDER_META = "readablestem-render"
 _RENDER_LINE = re.compile(
     r'<meta name="' + re.escape(RENDER_META) + r'" content="(\d{1,9})">', re.ASCII
@@ -250,7 +255,7 @@ def equation_alt_text(alt: str) -> str:
 
 
 # Layout's reasons that say the text layer of an equation is not in reading order.
-_FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
+_FLATTENED_REASONS = ("superscript", "power of ten", "fraction bar", "radical sign", "lines merged")
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
 # A figure with no description, never empty alt text: only decoration with evidence has that
 # (`pipeline.decoration`, WS6.4).
@@ -326,12 +331,12 @@ FIGURE_NOTE = "This figure has no text description yet."
 # each box used to repeat. What to do ("ask your instructor for a version you can read") is
 # in the statement of the same notice.
 NOT_CONVERTED_WHY = Words(
-    "A screen reader cannot read what a picture shows, so it says only that each of these "
-    "parts is there; for an equation it also reads the characters the PDF holds, and says "
+    "A screen reader cannot read what a picture shows, so it says only that each of these items "
+    "is there; for an equation it also reads the characters the PDF holds, and says "
     "where they are from. Each one is marked where it stands, with what it is."
 )
 NOT_CONVERTED_WHY_WRITTEN = Words(
-    "A screen reader may not read these parts well. Each one is marked where it stands, with "
+    "A screen reader may not read these items well. Each one is marked where it stands, with "
     "what it is."
 )
 # Pages and pictures kept as images (pipeline.page_type: there is no handwriting or scan
@@ -395,12 +400,13 @@ OMITTED_NOTE = "Writing on the page that is not in the text."
 # checker is told to check it, with the label that goes with it.
 IMAGE_PAGE_NOTE = Words(
     "This page was read from a picture of the original, so small errors are possible.",
-    "Check it against the original.",
+    "Compare it with the original.",
 )
 IMAGE_PAGE_LABEL = Words("Note:", "Converted from an image of the page.")
 IMAGE_PAGE_SHOW = Words("Show the original page {page}")
 IMAGE_PAGE_ORIGINAL_ALT = Words(
-    "Original of page {page}.", "Original of page {page}, shown for checking the converted text."
+    "Original of page {page}.",
+    "Original of page {page}, shown for comparing with the converted text.",
 )
 # The label of a figure's note: to the student what is missing, to the checker what to do.
 FIGURE_LABEL = Words("No description.", "Needs a description.")
@@ -1131,6 +1137,7 @@ class _Renderer:
     pdf_pages: Mapping[int, int] = field(default_factory=dict)
     mark_pages: bool = False
     last_page: int | None = None
+    owed_to: int | None = None  # the last page of a paragraph that goes on over page breaks
     footnote_ids: Collection[str] = ()
     noterefs: dict[str, str] = field(default_factory=dict)
     # "pdf", or "latex" / "beamer" for a source (`DocumentResult.origin`): a source's
@@ -1177,9 +1184,12 @@ class _Renderer:
         """The page marker to write before `element` when it is on a page after the last one
         written; "" otherwise (and always in a one-page document). Never inside a block of
         text: callers ask only between blocks, or at the start of a list item."""
-        if not self.mark_pages or element.page == self.last_page:
+        if not self.mark_pages:
             return ""
-        return self.mark_for(element.page)
+        owed = self.owed_marks(element.page)
+        if element.page == self.last_page:
+            return owed
+        return owed + self.mark_for(element.page)
 
     def lead(self, element: Element) -> str:
         """What goes before a block that starts `element`: its page marker, and the note
@@ -1200,20 +1210,31 @@ class _Renderer:
             f"{UNREAD_PARTS_NOTE}{link}</p>"
         )
 
-    def marks_after(self, element: Element) -> str:
-        """The markers of the pages a paragraph goes on over (`Element.last_page`), to write
-        right after it: it is one element on the page it starts, so the pages it runs into
-        have no element of their own to carry their marker, and a marker inside the text
-        would cut it. Written in page order, so the markers stay continuous (Page 1, Page 2,
-        Page 3) and the next element on the last of those pages gets none."""
-        if not self.mark_pages or element.last_page is None:
+    def marks_after(self, element: Element) -> None:
+        """Owe the markers of the pages a paragraph goes on over (`Element.last_page`): it is
+        one element on the page it starts, so the pages it runs into have no element of
+        their own to carry their marker, and a marker inside the text would cut it. They are
+        written (`owed_marks`) before the next element that is on one of those pages, in
+        page order, so the markers stay continuous (Page 1, Page 2, Page 3) and the next
+        element on the last of those pages gets none. What follows the paragraph on the page
+        it starts (a figure, a note, a footnote) stays under that page's marker."""
+        if self.mark_pages and element.last_page is not None:
+            self.owed_to = max(element.last_page, self.owed_to or 0)
+
+    def owed_marks(self, page: int | None = None) -> str:
+        """The owed markers (`marks_after`) of the pages up to `page` (all when None)."""
+        if self.owed_to is None:
             return ""
-        start = (element.page if self.last_page is None else self.last_page) + 1
-        return "".join(
-            self.mark_for(page)
-            for page in range(start, element.last_page + 1)
-            if not self.pdf_pages or page in self.pdf_pages  # a page that is not in the file
+        last = self.owed_to if page is None else min(self.owed_to, page)
+        start = self.last_page + 1 if self.last_page is not None else last
+        marks = "".join(
+            self.mark_for(number)
+            for number in range(start, last + 1)
+            if not self.pdf_pages or number in self.pdf_pages  # a page that is not in the file
         )
+        if page is None or page >= self.owed_to:
+            self.owed_to = None
+        return marks
 
     def page_words(self, page: int) -> tuple[str, int]:
         """What the student's page marker says for `page` ("Page 5", "PDF page 5"), and its
@@ -1343,9 +1364,10 @@ class _Renderer:
                 if mark := self.lead(ordered[i]):
                     chunks.append(mark)
                 chunks.append(chunk)
-                if after := self.marks_after(ordered[i]):
-                    chunks.append(after)
+                self.marks_after(ordered[i])
             i += 1
+        if rest := self.owed_marks():
+            chunks.append(rest)
         return _one_wrapper_each(chunks)
 
     def list_goes_on(self, ordered: list[Element], start: int) -> bool:
@@ -1847,13 +1869,13 @@ def image_pages_note(pages: list[int]) -> str:
     numbers = [str(p + 1) for p in sorted(set(pages))]
     if not numbers:
         return ""
-    tail = "it starts with a note and the original page to check it against."
+    tail = "it starts with a note and the original page to compare it with."
     if len(numbers) == 1:
         return f"Page {numbers[0]} was converted from an image of the page: {tail}"
     listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
     return (
         f"Pages {listed} were converted from images of the pages: each starts with a note "
-        "and the original page to check it against."
+        "and the original page to compare it with."
     )
 
 

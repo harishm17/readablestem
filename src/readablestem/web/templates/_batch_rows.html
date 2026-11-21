@@ -58,7 +58,7 @@
     <p><a class="button" id="batch-download" href="/app/batch/{{ result_id }}/download">Download {{ ready }} ready {{ "document" if ready == 1 else "documents" }} as one zip</a></p>
     {% if held_back %}<p id="batch-download-note">{{ held_back }} left out: decisions still to make.</p>{% endif %}
     {% else %}
-    <p id="batch-download-note">No document in this batch is ready to share yet{% if held_back %}: {{ held_back }} still {{ "needs" if held_back == 1 else "need" }} decisions{% endif %}.</p>
+    <p id="batch-download-note">No document in this batch is ready to post yet{% if held_back %}: {{ held_back }} still {{ "needs" if held_back == 1 else "need" }} decisions{% endif %}.</p>
     {% endif %}
   </section>
   {% endif %}

@@ -347,4 +347,6 @@ def _settle_bold_letters(pages: list[_PageBlocks]) -> None:
                     pieces.append(letter)
                     continue
             pieces.append(piece)
-        block.pieces = _tidy(pieces)
+        # An algorithm's lines are written with "\n" and their indent as leading spaces: tidying
+        # would run them into one line.
+        block.pieces = pieces if block.algo else _tidy(pieces)

@@ -33,7 +33,7 @@ SNIPPET_CHARS = 70
 NAME_CHARS = 60
 MAX_NAMES = 5
 # Notices that are a decision of their own (the table or page kept as an image is a fix the
-# reviewer decides): they are in the queue, not in the optional checks.
+# reviewer decides): they are in the queue, not in the optional items.
 DECISION_CODES = (
     frozenset({"table_not_rebuilt", *notice_rules.TEXT_CODES}) | notice_rules.KEPT_IMAGE_CODES
 )
@@ -158,7 +158,7 @@ def places(result: DocumentResult, labels: dict[str, str]) -> list[Place]:
 
 
 def shown_in_review(place: Place, fixes: dict[str, Fix]) -> bool:
-    """Listed with the review screen's optional checks: everything but the notices that are
+    """Listed with the review screen's optional items: everything but the notices that are
     a decision of their own (a table or page kept as an image) and the whole-document ones
     that are about the file's language (the job page has the control)."""
     notice = place.notice
@@ -170,7 +170,7 @@ def shown_in_review(place: Place, fixes: dict[str, Fix]) -> bool:
 
 @dataclass(frozen=True)
 class Row:
-    """One notice as a line of the review screens' optional checks."""
+    """One notice as a line of the review screens' optional items."""
 
     label: str  # "Page 3"
     sentence: str

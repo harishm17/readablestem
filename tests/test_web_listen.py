@@ -28,7 +28,8 @@ def test_page_title_landmarks_headings_paragraphs_and_lists():
     items = listen.build_transcript(
         doc(
             '<a class="skip-link" href="#main">Skip to main content</a>'
-            '<nav aria-label="Contents"><ul><li><a href="#a">Intro</a></li></ul></nav>'
+            '<nav aria-label="Contents"><details class="toc-details"><summary>Contents</summary>'
+            '<ul><li><a href="#a">Intro</a></li></ul></details></nav>'
             "<main><h1>Motion</h1><h2>Kinematics</h2><p>Speed is <em>distance</em> over time.</p>"
             "<ul><li>one</li><li>two<ul><li>inner</li></ul></li><li>three</li></ul></main>"
             '<footer aria-label="About this version"><p>Tell your instructor.</p></footer>'
@@ -38,7 +39,13 @@ def test_page_title_landmarks_headings_paragraphs_and_lists():
     assert spoken[:2] == ["Page title: Kinematics", "Page language: English"]
     # F-120: the skip link and the bare landmark are said before the lesson, chosen by kind;
     # Play starts at the navigation, the first item with content. F-122: plain role words.
-    assert spoken[2:4] == ["Skip link: Skip to main content", "Navigation, Contents"]
+    # O-177: the contents list is navigation, read as its entries, not as a collapsed section.
+    assert spoken[2:6] == [
+        "Skip link: Skip to main content",
+        "Navigation, Contents",
+        "List, 1 item",
+        "link Intro",
+    ]
     assert [i.before for i in items[:5]] == [True, True, True, False, False]
     assert "Main content" in spoken
     assert items[2].kind == "skip-link"
@@ -303,3 +310,14 @@ def test_raised_and_lowered_text_says_which_it_is_except_an_ordinal():
         "On the 10th it was 19.3 g/cm superscript 3 and SO subscript 4 superscript 2-; "
         "read x subscript 1 end subscript y link 1." in said(items)
     )
+
+
+def test_superscript_characters_are_said_as_a_raised_run_is():
+    """A table cell or a caption has "10⁸" as characters, not a <sup>: it says the same words."""
+    items = listen.build_transcript(
+        doc(
+            '<main><figure><img alt="Counts" src="a.png">'
+            "<figcaption>Figure 4: About 10⁸ cells of CP³.</figcaption></figure></main>"
+        )
+    )
+    assert "Figure 4: About 10 superscript 8 cells of CP superscript 3." in said(items)

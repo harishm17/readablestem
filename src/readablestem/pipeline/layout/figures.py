@@ -60,6 +60,8 @@ FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a fra
 # Leftover drawings this close to each other are one (the marks of a scatter of shapes,
 # the glyphs of one formula drawn as outlines): MIN_DRAWING_PT.
 LEFTOVER_REACH = 24.0
+# A line of prose of this many words between a small drawing and a figure keeps them apart.
+SENTENCE_WORDS = 6
 HAND_MEET = 0.75  # pt
 
 # A row is a label of a figure (`_label_owners`) when it is at most LABEL_SHORT characters
@@ -446,6 +448,7 @@ def _vector_figures(
     left_out: list[BBox] | None = None,
     depth: int = 0,
     small_out: list[tuple[BBox, list[_Path]]] | None = None,
+    apart_out: set[int] | None = None,
     ink: Collection[int] = frozenset(),
     hand: Sequence[BBox] = (),
     document: _Document,
@@ -477,7 +480,9 @@ def _vector_figures(
     there that is no box round text. Pen strokes (`ink`) and what lies in the page's
     handwriting regions (`hand`) are no signs. Clusters too small to be figures that are
     no part of one go to `small_out`: the page decides what they are once its text is
-    read (`_leftover_drawings`)."""
+    read (`_leftover_drawings`). `apart_out` gets the ids of the paths of those that lie
+    beside a figure and were kept out of it for the sentence between the two
+    (`_sentence_between`): each is a drawing of its own, not lost with the join."""
     figures = []
     small: list[tuple[BBox, list[_Path]]] = []  # drawings too small to be figures on their own
     index = _RowIndex([r for r in rows if not r.vertical])
@@ -553,6 +558,7 @@ def _vector_figures(
                     left_out=left_out,
                     depth=depth + 1,
                     small_out=small_out,
+                    apart_out=apart_out,
                     ink=ink,
                     hand=hand,
                     document=document,
@@ -591,18 +597,49 @@ def _vector_figures(
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
     # a legend's markers a little apart, the force arrows round a free-body diagram's box)
     # are part of it, within LEFTOVER_REACH as `_leftover_drawings` groups them: left out,
-    # its crop missed them.
+    # its crop missed them. Not when a sentence of the page's text lies between the two (a
+    # labelled tab over its sentence, a few points from the grid under it): the union's crop
+    # would take the sentence into the picture. Such a drawing was part of a picture and is
+    # one of its own now (`apart_out`): a formula drawn as outlines must not go with the join.
     for box, members in small:
+        apart = False
         for figure in figures:
-            if _within(box, figure.bbox, LEFTOVER_REACH):
-                figure.bbox = figure.drawing = _union([figure.drawing, box])
-                figure.paths += len(members)
-                figure.members += members
-                break
+            if not _within(box, figure.bbox, LEFTOVER_REACH):
+                continue
+            if _sentence_between(rows, box, figure.bbox, document=document):
+                apart = True
+                continue
+            figure.bbox = figure.drawing = _union([figure.drawing, box])
+            figure.paths += len(members)
+            figure.members += members
+            break
         else:
             if small_out is not None:
                 small_out.append((box, members))
+            if apart and apart_out is not None:
+                apart_out.update(id(p) for p in members)
     return figures
+
+
+def _sentence_between(
+    rows: Sequence[_Row], box: BBox, figure: BBox, *, document: _Document
+) -> bool:
+    """Is there a line of prose (at least SENTENCE_WORDS words) in the gap between `box` and
+    `figure`, one above the other with the line wholly between them? A label or a tick label
+    is never that long, and a glyph drawn as an outline in a line of text is level with the
+    line's other words, not apart from them."""
+    return any(
+        r.kind == "text"
+        and not r.vertical
+        and (
+            (box[3] <= r.bbox[1] and r.bbox[3] <= figure[1])
+            or (figure[3] <= r.bbox[1] and r.bbox[3] <= box[1])
+        )
+        and max(box[0], figure[0]) < r.bbox[2]
+        and r.bbox[0] < min(box[2], figure[2])
+        and _prose_words(r, _CharInfo.of(r, document=document)) >= SENTENCE_WORDS
+        for r in rows
+    )
 
 
 def _take_border_marks(figures: Sequence[_Figure], border: Sequence[_Path]) -> None:
@@ -1453,6 +1490,105 @@ def _claim_labels(
     for figure in figures:
         if figure.labels:
             figure.bbox = _union([figure.drawing, *(r.bbox for r in figure.labels)])
+
+
+PANEL_GAP = 3.5  # body sizes: furthest apart two panels of one figure stand
+PANEL_MARK_REACH = 2.5  # body sizes: furthest from a figure's box a one- or two-letter mark may be
+PANEL_MARK_CHARS = 2  # a panel mark ("A", "b", "3") is this many characters or fewer
+
+
+def _join_panels(
+    figures: list[_Figure],
+    captions: dict[str, BBox],
+    rows: Sequence[_Row],
+    ctx: _Context,
+    *,
+    document: _Document,
+) -> list[_Figure]:
+    """The panels of one figure are one figure ("Panels of one figure" in docs/layout.md).
+
+    A figure that holds a caption (`captions`: the box of each caption text a figure took)
+    takes the figures without one that stand beside it, above it or below it, within PANEL_GAP
+    body sizes of the panels it holds already, on its caption's side of the caption and under
+    its width, until none does. Only the caption's nearest figure had it, so the other panels
+    were figures with a picture and no words: a reader got one description for each of them
+    and the caption on one. A line of text among the panels (a paragraph that runs between two
+    pictures) ends the join. The rows among the panels are then claimed as labels
+    (`_claim_labels`), and a row of one or two characters within PANEL_MARK_REACH body sizes
+    of any figure's box ("A", "b", "3", "n") is a label of it too (panel letters and the names
+    of a drawing's parts stand at a corner, beyond the reach of `_label_owners`), unless it is
+    a word ("to", "of") or the start of a list item."""
+    joined: set[int] = set()
+    reach = PANEL_GAP * ctx.body
+    for host in figures:
+        box = captions.get(host.caption) if host.caption is not None else None
+        if box is None or host.equation or id(host) in joined:
+            continue
+        below = box[1] >= host.bbox[3] - 2.0  # the caption stands under the figure
+        group = [host]
+        union = host.bbox
+        grew = True
+        while grew:
+            grew = False
+            for other in figures:
+                if other is host or other in group or other.caption is not None or other.equation:
+                    continue
+                if id(other) in joined:
+                    continue
+                dx = max(0.0, other.bbox[0] - union[2], union[0] - other.bbox[2])
+                dy = max(0.0, other.bbox[1] - union[3], union[1] - other.bbox[3])
+                if dx > reach or dy > reach or (dx > 0 and dy > 0):
+                    continue  # too far, or only at a corner: not a row or a column of panels
+                middle = (other.bbox[0] + other.bbox[2]) / 2
+                if not box[0] - reach <= middle <= box[2] + reach:
+                    continue  # beside the caption's column, not under it
+                if (other.bbox[3] > box[1] + 2.0) if below else (other.bbox[1] < box[3] - 2.0):
+                    continue  # on the other side of the caption
+                grown = _union([union, other.bbox])
+                if any(
+                    not r.absorbed
+                    and not CAPTION.match(r.clean)
+                    and not _short_label(r)
+                    and _mostly_in(r.bbox, grown)
+                    and not _mostly_in(r.bbox, union)
+                    and not _mostly_in(r.bbox, other.bbox)
+                    for r in rows
+                ):
+                    continue  # text between the panels
+                group.append(other)
+                union = grown
+                grew = True
+        for other in group[1:]:
+            joined.add(id(other))
+            host.images += other.images
+            host.paths += other.paths
+            host.members.extend(other.members)
+            host.labels.extend(other.labels)
+        if len(group) > 1:
+            host.xref = 0
+            host.drawing = _union([f.drawing for f in group])
+            host.bbox = _union([f.bbox for f in group])
+    kept = [f for f in figures if id(f) not in joined]
+    if joined:
+        _claim_labels(kept, rows, ctx, document=document)  # the rows among the panels
+    for figure in kept:
+        if figure.equation:
+            continue
+        near = _pad(figure.bbox, PANEL_MARK_REACH * ctx.body)
+        for row in rows:
+            if (
+                not row.absorbed
+                and not row.vertical
+                and len(row.clean) <= PANEL_MARK_CHARS
+                and row.clean.lower() not in _PROSE_TWO_LETTER
+                and not _starts_like_item(row)
+                and _inside(row.bbox, near)
+            ):
+                row.absorbed = True
+                figure.labels.append(row)
+        if figure.labels:
+            figure.bbox = _union([figure.bbox, *(r.bbox for r in figure.labels)])
+    return kept
 
 
 FRAGMENT_CHARS = 3  # a text row of this many characters or fewer is a fragment

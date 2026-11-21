@@ -49,7 +49,14 @@ def starts_entry(prev: _Row, row: _Row, run: _Run) -> bool:
     first = run.rows[0]
     if row.x0 > first.x0 + 0.3 * size:
         return False  # not at the entry edge
-    hanging = len(run.rows) >= 2 and run.margin - first.x0 >= 0.8 * size
+    # an entry ends short of the right edge; a line that runs to it is a paragraph going on (a
+    # heading, or the tail of the last page's paragraph, over a paragraph whose first line is
+    # indented, is no entry with a hanging indent)
+    hanging = (
+        len(run.rows) >= 2
+        and run.margin - first.x0 >= 0.8 * size
+        and prev.x1 < run.box[2] - 1.5 * size
+    )
     if hanging:  # a glossary: a line back at the entry edge is the next entry
         return True
     if _SECTION_NUMBER.match(row.clean) and _SECTION_NUMBER.match(first.clean):

@@ -244,7 +244,7 @@ def _fix_table(output: ConversionOutput) -> list[str]:
 
 
 def _review_summary(fixes: list[Fix]) -> str:
-    """'3 decisions needed (1 equation, 2 headings), 18 optional checks': what the
+    """'3 decisions needed (1 equation, 2 headings), 18 optional items': what the
     review screen will ask for (a group of repeated headings is one decision)."""
     load = triage.review_load(fixes)
     kinds = ", ".join(

@@ -73,7 +73,15 @@ def test_equation_alt(text, label, alt):
 
 
 @pytest.mark.parametrize(
-    "reason", ["superscript", "fraction bar", "radical sign", "2 lines merged", "7 lines merged"]
+    "reason",
+    [
+        "superscript",
+        "power of ten",
+        "fraction bar",
+        "radical sign",
+        "2 lines merged",
+        "7 lines merged",
+    ],
 )
 def test_text_that_may_have_lost_its_fractions_and_exponents_says_so(reason):
     flat = equation("v2 = v20 + 2ad", reasons=["relation symbol", reason])

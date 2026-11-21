@@ -14,6 +14,7 @@ they are not control characters; a PDF that really holds one is read with it dro
 
 from __future__ import annotations
 
+import re
 from typing import Literal
 
 from readablestem.core.types import ScriptRun
@@ -49,6 +50,62 @@ def wrap(chars: list[str], kinds: list[Kind | None]) -> str:
     if current is not None:
         out.append(_CLOSE[current])
     return "".join(out)
+
+
+# Superscript forms; a raised run with a character not here is written "^(...)".
+_SUPERSCRIPTS = {
+    **dict(
+        zip(
+            "0123456789",
+            "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079",
+            strict=True,
+        )
+    ),
+    "+": "\u207a",
+    "-": "\u207b",
+    "\u2212": "\u207b",  # minus sign
+    "\u2013": "\u207b",  # en dash: some fonts print a raised minus as one
+    "=": "\u207c",
+    "(": "\u207d",
+    ")": "\u207e",
+    "n": "\u207f",
+    "i": "\u2071",
+}
+
+
+# A run of superscript characters: what a table cell or a caption has for a raised run.
+RAISED_RUN = re.compile("[" + "".join(sorted(set(_SUPERSCRIPTS.values()))) + "]+")
+
+
+def raised_characters(run: str) -> str:
+    """A raised run as text that has no place for a script (a table cell, a caption): in
+    superscript characters (10 and the raised 8), or "^(...)" when one has no superscript
+    form."""
+    if all(ch in _SUPERSCRIPTS for ch in run):
+        return "".join(_SUPERSCRIPTS[ch] for ch in run)
+    return f"^({run})" if len(run) > 1 else f"^{run}"
+
+
+def as_characters(text: str) -> str:
+    """`text` with its marks gone and each raised run written by `raised_characters`; a
+    lowered run stays flat (a plain string has no subscript the reader can say)."""
+    out: list[str] = []
+    run: list[str] = []
+    raised = False
+    for char in text:
+        if char == SUP_OPEN:
+            raised = True
+        elif char == SUP_CLOSE:
+            if run:
+                out.append(raised_characters("".join(run)))
+            run, raised = [], False
+        elif char in MARKS:
+            continue
+        elif raised:
+            run.append(char)
+        else:
+            out.append(char)
+    return "".join(out + run)
 
 
 def has_marks(text: str) -> bool:

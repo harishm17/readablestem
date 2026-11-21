@@ -42,7 +42,7 @@ from readablestem.core.types import DocumentResult, Notice
 from readablestem.pipeline import checked, checked_words
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.checked import CheckedSummary
-from readablestem.web import job_page
+from readablestem.web import job_page, strings
 from readablestem.web import outcome as words
 from readablestem.web.database import as_utc
 from readablestem.web.dates import format_day, format_time
@@ -109,7 +109,7 @@ TABLE: dict[str, Row] = {
     # What a reader sees of "needs_decisions": the decisions are the owner's (`views.audience_of`).
     "being_checked": Row("Being checked", NEEDS_YOU, True),
     "partly_converted": Row("Partly converted", GAPS, True),
-    "ready": Row("Ready to share", DONE, True),
+    "ready": Row("Ready to post", DONE, True),
     # Finished with no decision open, but the language is a guess (SW20a): the owner confirms or
     # changes it first, with the control on the job page. Said to the owner only; a document
     # already shared stays shared.
@@ -366,7 +366,7 @@ class Context:
 class Counts:
     """The open required decisions of a finished job (a group of repeated headings counted
     once), and what the statement of what was converted, checked and reviewed
-    (`pipeline.checked.CheckedSummary`) says of it: `whole`, whether it is ready to share, and
+    (`pipeline.checked.CheckedSummary`) says of it: `whole`, whether it is ready to post, and
     `remains`, what stands between it and that. `open` is the summary's own count when there
     is one; the documents list passes the stored `jobs.open_decisions` alone for a job with
     decisions open, made by the same function (`core.triage.review_load`). `whole` None: not
@@ -606,10 +606,10 @@ def gaps_of(job: Facts, left: int, viewer: str = "owner", ctx: Context | None = 
     missing = (
         Step(
             "missing",
-            "Convert the missing parts",
+            strings.CONVERT_MISSING_ITEMS,
             f"/jobs/{job.id}/retry",
             form=True,
-            explain="Only the parts that were not converted are sent again. Nothing is counted "
+            explain="Only the items that were not converted are sent again. Nothing is counted "
             "against your daily pages, and your decisions are kept.",
         )
         if left and owner
@@ -666,56 +666,56 @@ def _unanalysed_pages(result: Mapping[str, Any] | None) -> int:
 _HOLDS = {
     # `web.office_census`: the PDF may show deleted words, so it is not known to be the final text
     "office_tracked_changes": (
-        "The Word file still has tracked changes, so check the notices before you share it."
+        "The Word file still has tracked changes, so look at the notes before you post it."
     ),
     # `source.docx_reader`: the file has the text as if every change were accepted
     "word_tracked_changes": (
-        "The Word file still has tracked changes, so check the notices before you share it."
+        "The Word file still has tracked changes, so look at the notes before you post it."
     ),
     "word_table_flattened": (
-        "A table of the Word file is written as a list, so check the notices before you share it."
+        "A table of the Word file is written as a list, so look at the notes before you post it."
     ),
     "word_objects": (
-        "Diagrams or charts in the Word file are not in this file, so check the notices "
-        "before you share it."
+        "Diagrams or charts in the Word file are not in this file, so look at the notes "
+        "before you post it."
     ),
     # `source.convert._source_lines`: LaTeX errors with no place in the result, so no decision
     # can stand behind them
     "source_unplaced": (
         "LaTeX reported problems that could not be matched to a place in the converted file, so "
-        "check the notices before you share it."
+        "look at the notes before you post it."
     ),
     # `source.convert._source_lines`: nothing compiled or printed the source, so the text was not
     # compared with its pages; "every part the tool found was converted" would read as if it had
     "source_not_compared": (
         "This file was converted from the source itself and was not compared with its printed "
-        "pages: read the converted file against your own copy before you share it."
+        "pages: read the converted file against your own copy before you post it."
     ),
     # `pipeline.notices.TEXT_CODES`: a result stored before the text decision existed has the
     # notice and no decision behind it. A result with the decision is counted by the summary.
     "rtl_text": (
-        "The words of right-to-left text may be out of order, so check the notices before you "
-        "share it."
+        "The words of right-to-left text may be out of order, so look at the notes before you "
+        "post it."
     ),
     "option_labels": (
-        "Answer options may be run together, so check the notices before you share it."
+        "Answer options may be run together, so look at the notes before you post it."
     ),
     # `layout._not_searched_notices`: the table search ran out of time before this page, so a
     # table there may be plain text
     "tables_not_searched": (
         "The search for tables was cut short on some pages, so a table there may be read as "
-        "plain text: check the notices before you share it."
+        "plain text: look at the notes before you post it."
     ),
     # `layout.notices._hidden_text_notices`: a paragraph or more of words nobody sees on a typed
     # page is left out, and may be what the page says
     "hidden_text_check": (
         "A page has a lot of hidden text that was left out, so compare it with the original "
-        "before you share it."
+        "before you post it."
     ),
     # `text_pass.comment_notes`: a comment may have been written for the instructor alone (an
     # answer, a co-author's remark), and every one is a paragraph of the student file
     "annotations_read": (
-        "Comments in the PDF are in this file as paragraphs, so read them before you share it."
+        "Comments in the PDF are in this file as paragraphs, so read them before you post it."
     ),
 }
 
@@ -727,11 +727,11 @@ _HOLDS = {
 _LANGUAGE_CHECKS = {
     "lang_assumed": (
         "The language of this document is assumed to be English, so confirm it before you "
-        "share it: a screen reader reads the whole file in that language's voice."
+        "post it: a screen reader reads the whole file in that language's voice."
     ),
     "lang_mixed": (
         "No one language makes up most of this document, so confirm which it is before you "
-        "share it: a screen reader reads the whole file in that language's voice."
+        "post it: a screen reader reads the whole file in that language's voice."
     ),
 }
 
@@ -772,8 +772,8 @@ def _held_by_notice(result: Mapping[str, Any] | None) -> str:
 
 def _unanalysed_message(pages: int) -> str:
     return (
-        f"The drawings on {checked_words.plural(pages, 'page')} were not analyzed, so check the "
-        "notices before you share it."
+        f"The drawings on {checked_words.plural(pages, 'page')} were not analyzed, so look at the "
+        "notes before you post it."
     )
 
 
@@ -800,7 +800,7 @@ def finished_facts(result: object) -> dict[str, Any] | None:
     word to add (`gaps_of`, `_unanalysed_pages`, `_held_by_notice`). A plain result is read by
     `load` from these alone; any other has its result read. `by` names the code that made
     them (`_facts_stamp`): facts made by other code are made again on first sight, so a list
-    never shows a sentence or a "Ready to share" that this code would not say. None for a
+    never shows a sentence or a "Ready to post" that this code would not say. None for a
     result this version cannot read."""
     if not isinstance(result, dict):
         return None
@@ -859,7 +859,7 @@ def _done(job: Facts, counts: Counts, left: int, viewer: str, ctx: Context | Non
             return _make("ready_remains", held, steps)
         return _make("ready", checked_words.READY_ALL, steps)
     # Not known to be whole (no summary), or a part is a picture, a page is left out or a
-    # structure check failed: "Ready", and what remains, never "Ready to share".
+    # structure check failed: "Ready", and what remains, never "Ready to post".
     return _make("ready_remains", counts.remains, steps)
 
 

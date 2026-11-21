@@ -138,6 +138,19 @@ class Settings(BaseSettings):
     # requests on TeX papers with such displays, so PIPELINE_VERSION must be bumped in the
     # change that enables it.
     layout_display_grouping: bool = False
+    # Inline formulas kept whole (`layout.analyze(inline_joins=True)`, docs/layout.md "Inline
+    # formulas kept whole"): a maths word and its operand ("a mod n"), a label before a formula
+    # ("H0:") and a colon inside a bracket no longer end an inline formula. Off: output is
+    # byte-identical to before. Production's value is in the profile. Turning it on moves
+    # equation boxes, so the recorded answers of the pages it moves stop matching, and
+    # PIPELINE_VERSION must be bumped in the change that enables it.
+    layout_inline_joins: bool = False
+    # The panels of one captioned figure are one figure, and the panel marks beside it are its
+    # labels (`layout.analyze(join_panels=True)`, docs/layout.md "Panels of one figure"). Off:
+    # output is byte-identical to before. Turning it on moves figure crops, so the recorded
+    # figure answers of the pages it moves stop matching and `PIPELINE_VERSION` must be bumped
+    # in the change that enables it.
+    layout_join_panels: bool = False
     # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
     # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
     # tree of regions from the unmerged line fragments first and orders the pages by it. Off:

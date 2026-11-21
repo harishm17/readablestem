@@ -1,5 +1,389 @@
 # Changelog
 
+## Pipeline 0.5.15, render 11 (2026-11-20)
+
+- `PIPELINE_VERSION` is 0.5.15 and `RENDER_VERSION` is 11: one raise each for every "Unreleased"
+  entry below down to the 0.5.14 entry. What a PDF's result holds changed (a bold or numbered
+  line in a run of its series is an item and not a heading, a lettered title that wraps is one
+  heading, a series that starts again after a cut is a level down, a reference list's initials
+  are no lettered list, a number or a row of labels is no footnote and a note no link points at
+  is linked by its mark, a small drawing does not join a figure across a line of prose, a raised
+  digit in a figure caption stays raised, an algorithm that holds a bold letter keeps its lines,
+  tables with no ruling lines are found and two unruled columns with no caption are no table).
+  A Word or LaTeX file's result changed too: a link in a table cell (`TableCell.links`, the one
+  new stored field, left out of a result when empty), emphasis and links in a table too large
+  for a grid, a single italic letter is no emphasis, a strike set by a paragraph style, and
+  "(picture below)" where a picture stood in a sentence. The student page changed (one word for
+  one concept in its own sentences: "items", "Item 3 not converted"; the marker of a page a
+  paragraph goes on over is written before the next element on that page; a link in a table
+  cell; the warning on an unconverted equation whose layout boxed a power of ten). A raised
+  digit in a caption is the reader's change (`Element.caption_marked`): a stored result keeps
+  its caption until it is converted again. The review screens' and the record's new words
+  ("Compare it with the original", "Kept as image", "Ready to post") are the web app's, not the
+  student page's. No new notice code.
+  Stored results load unchanged and their pages are made again. No migration. The switches that
+  stay off (`LAYOUT_INLINE_JOINS`, `LAYOUT_JOIN_PANELS`, `LAYOUT_DISPLAY_GROUPING`,
+  `REGION_TREE`) change nothing in this release.
+  `data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`,
+  `data/eval/burden-corpus.json`, `data/eval/parsing-bench-olmocr.json` and
+  `data/eval/order-layout-dev-1.json` are re-made at 0.5.15 (all 43 uploads of the burden record
+  ask the same as at 0.5.14; the benchmark's tables category 70.6 from 66.6 and multi_column 69.5
+  from 69.2; reading order 140 of 267 pages right and 72 faultless, from 137 and 71); the golden pages and the stored demo
+  page are written again at render 11. Roll back: 0.5.14 opens a 0.5.15 result. Run on
+  2026-11-20 against 0.5.14 (`f490ac60`), a Word and a LaTeX result stored by 0.5.15, each with
+  a link in a table cell and holding all 56 notice codes the table knows: the job page, the
+  review screen and list, the record and its CSV, the student page and its download all answered
+  200, with the stored page (render 11) and with the page cleared. 0.5.14 makes the page again
+  from the result with its own rules and drops the cell's link (the cell shows its words); after
+  a review change it writes the result back without the links, so going forward again does not
+  bring them back. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+
+## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
+
+- Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The
+  list is navigation: Listen says "Navigation, Contents" and reads the entries, as a screen reader
+  does on the student page. A figure's long description is still a collapsed section
+  (`web/listen.py`).
+- The Word export of a scanned 100-page document made no file (a plain page, 409, after 48 s):
+  pandoc holds a picture's `data:` address as a list of characters and the child ran out of its
+  2 GB heap. Pictures are now given to it as files in its private folder
+  (`export_docx._pictures_to_files`); 100 scanned pages (41 MB of page) make a Word file in 18 s
+  with a child that peaks at 0.25 GB, where 40 pages already used 2.2 GB.
+- A scanned document's page-reading pass told the job page nothing for 39 s of 100 pages: each page
+  picture was drawn one after another before any was asked. A page is now asked as soon as its
+  picture is drawn, and the job page counts the pages as they finish ("Reading the layout: 7 of 100
+  pages"); the longest silent stretch in the pass is 15 s (building the pages from the answers).
+- The "wider than the paper" note: measured at five print columns on the 54 equations that carry
+  the print classes (123 equations in all): none is clipped without a note at any, and 0 to 5 are
+  flagged that fit, only on a narrower sheet; at Letter and A4 with Chromium's margins none is
+  flagged. The estimate is not changed (docs/output.md has the table).
+- The landing page's hero has a second column: a real picture of the public demo page, shown
+  whole in a frame, and a click opens the demo. It drops under the text below 60rem
+  (`scripts/hero_screenshot.py`).
+- No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` raise is owed, no migration.
+
+## Unreleased: a raised digit in a figure caption stays raised
+
+- A figure caption was written from a plain string, so "10⁸" came out "108" and "CP³" came out
+  "CP3" with only a notice that some script was flat. A raised run in a caption is now written in
+  superscript characters, as a table cell's and a table caption's are
+  (`script_marks.raised_characters`, used by `layout/blocks.py` and `tables._marked`): the page
+  has them in `Element.caption_marked`, and `Element.caption` keeps the flat text the figure
+  step is sent. Only a lowered run in a caption is still written flat and flagged
+  (`scripts_flattened`).
+- Listen says superscript characters as it says a raised run: "10 superscript 8".
+- An equation shown as an image because it was not converted has the warning that exponents run
+  together in its alt text when layout boxed a power of ten ("108" was given as the equation).
+- No recording or request changes (the figure and equation steps are sent what they were). A
+  stored result loads unchanged and keeps its old caption until the file is converted again.
+  The pages a layout change like this one reaches need a `PIPELINE_VERSION` raise when the wave
+  is released. No migration.
+## Unreleased: inline formulas kept whole (WS4.8, off)
+
+- New switch `LAYOUT_INLINE_JOINS` / `layout.analyze(inline_joins=True)`, off in code and in
+  production, wired like `LAYOUT_DISPLAY_GROUPING`. Four rules behind it (`layout/inline_runs.py`,
+  `layout/shared.py`): more operator names are math words; a colon or semicolon inside a bracket
+  that closes on the row does not end a run; a word space next to a math word ("a = b mod n")
+  does not end a run; a label with an index or ":=" ("H0:", "f :=") joins the run after it.
+  On the development papers' position truth the four give 87 more whole formulas and lose none
+  (8,990 to 9,077 of 11,258); with `LAYOUT_DISPLAY_GROUPING` also on, 9,118. A fifth rule, part
+  labels "(a)" split off as text, was measured and not built: it changed no box once narrowed.
+  With the switch off nothing changes; no version bump, nothing to migrate.
+- Gold: a macro argument that starts with a letter, put after a control word in the body
+  (`\lVert#1` with `A`), keeps a space between them (`gold/arxiv_tex.py`).
+## Unreleased: one word for each concept (SW22)
+
+- Every screen, message, record, export and email now uses one word for one concept, and the
+  labels more than one place says are read from the new `web/strings.py` (the Jinja global
+  `strings`). **Check** names only an automatic check the tool ran; what a person may look
+  at is an **item** ("Optional items", "Worth a look", and the verb is "look at" or
+  "compare"). **Item** is one thing the tool handled; **part** is only a page range of an
+  upload, so the button is "Convert the missing items". **Post** is putting the finished file
+  where students get it ("Ready to post", "before you post it"); **share** is giving named
+  people access. **Document**, never "job", on the pages, in the routes' own messages and in
+  the help pages. **Keep as image** is the one label (the page groups, the describe box, the
+  review card), and the record and the status say "Kept as image (your choice)". "Ask the
+  model to read it again" and "Model reads today: N of M" name the model read. The sample
+  document has one label ("Open the sample document") and the public page is "the demo".
+  The browser's own are "notifications". The consent box reads "Also let ReadableSTEM look
+  at the results" (30 days; nothing about the choice changed). The AI service is "the model"
+  except on the status page's provider line. The review details no longer print the raw
+  reason and check codes.
+- The student file's own words changed in the same pass (the "not converted" line, the
+  legend, the note on a table or equation kept as an image, the record's headings), so a
+  document made before this change keeps the old words until it is made again.
+  `RENDER_VERSION` is owed a raise (not made here). No model request changed, no migration,
+  no stored result or hash changed, and no new model read or cost.
+## Unreleased: the eval gate guards the last nine constants, and smaller follow-ups
+
+- **The eval gate guards nine more constants** (`eval/gate.py`): `table_step.NUMERIC_SHARE`,
+  `page_math.MIN_PAGE_CHARS`, `page_math_reconcile.RULE_MARGIN` and `ATTACHED_LETTERS`,
+  `page_witness.SPLIT_MIN_ROWS`, `witness_reconcile.MIN_GLYPH`, `image_page.RECOVERY_MARGIN`,
+  `image_page_check.CROP_MARGIN_PX` and `MIN_CROP_HEIGHT_PX` had waited, marked "NOT YET
+  GUARDED", for the two no-model reports to be made again. They are made again here
+  (`data/eval/latest-headings.json`, `data/eval/latest-tables-local.json`: same scores, now
+  holding the nine flags), so no constant that decides a request or a bar is left unguarded.
+- **`eval burden` ends with its verdict.** The reasons and the note that the band check was not
+  made come first; the last line printed is "The bar is met", "The bar is NOT met." or "The bar
+  was not judged", so a long line above it cannot hide it.
+- **Docs say what is true on main without naming a release.** `docs/deploy.md` "Roll back" and
+  `docs/deploy-railway.md` give the rule for stored results (roll back across a release that
+  adds a value the older code refuses only before the first document is converted by the newer
+  one) and point to the changelog for which release does what; `docs/operations.md` says there
+  is no per-job storage cap and why, in place of "not built".
+- Tests: `tests/test_layout_lists.py`, `tests/test_region_tree.py`, `tests/test_structure.py`
+  and `tests/test_web_edit_page.py` lose a dash permutation, a test of a setting's default, a
+  markup pin and a dead assertion, and fold tests that set up the same page into one.
+## Unreleased: three more rules for one printed display, one element (branch feat/display-box-rules)
+
+- Behind `LAYOUT_DISPLAY_GROUPING` (`layout.analyze(display_grouping=True)`), still off in
+  `config.py` and in `production.profile.toml`: with it off nothing changes. Turning it on moves
+  boxes, so it needs a `PIPELINE_VERSION` raise and new recorded equation requests. On the 21
+  development papers the display formulas the box score finds whole go from 803 of 1,004 with
+  the switch off, and 842 with the first three grouping rules, to 903 (89.9%):
+  - A line of mostly maths with at most four words, set in from both edges of its column's text
+    and not under a line of text, is a display (`display._promote_set_off_lines`): 46 made
+    whole, 1 broken.
+  - A region inside the box of a larger one is a part of it
+    (`display._absorb_contained_regions`): the tall brackets and norm bars that were elements
+    of their own (14 made whole, none broken).
+  - The limits of a sum, product or integral set at the size of its row join it
+    (`display._limits_of`): 1, none broken.
+- Not changed: the equation numbers that are still loose (O-037, O-391); docs/layout.md says
+  what was counted.
+## Unreleased: headings and lists of an answer key, an agenda, an outline and a reference list
+
+`layout/blocks.py`, `layout/lists.py`, `layout/shared.py`. What a PDF's result holds changes,
+so a raise of `PIPELINE_VERSION` is owed; it is not made here. No migration, no prompt or model
+change. Stored results load unchanged and their pages are made again.
+
+- **A bold or numbered line in a run of its series is an item, not a heading.** The bold option
+  of an answer key ("B. Newton's second law" among upright options), the bold lettered lines of
+  an agenda, and "I." between "H." and "J." of an outline, or "I." and "II." of a question's
+  statements, were headings. `_mark_series_items` sets `_Row.in_series` on a row whose next
+  marker, past its own lines, is the next value of the series, or (set in bold or italics) whose
+  nearest marker above is the value before with nothing between but its own lines. Such a row
+  is not a heading by "bold body-size line" or "standalone numbered line". A section title with
+  text over it and under it is not touched: "III. Gripper design" in a paper stays a heading.
+  A run ends where more than twice the type size of white stands between two rows of the
+  column (`SERIES_GAP`), as it does where a picture or a table stands, so "1. Setup" over a
+  picture and "2. Procedure" under it are two titles (review 12: they were two one-item lists).
+  The white alone ends it, whatever stands there: numbered items set that far apart (a
+  worksheet's questions with room to answer) end their runs too, and set in bold they are
+  headings, as on 0.5.14 (O-401). Two titles in a row, the first with no text of its own, are
+  still read as a list of two.
+- **A lettered title that wraps onto a second row of its face is one heading** ("A. Nonlinear
+  System Representation of Boltzmann Soft Q-learning"): the title and its second row are one
+  block, at most 12 words, the second row not ending like a sentence.
+- **A series that starts again after a cut is a level down.** "(a)" after "1." and a
+  figure, "(i)" after "(a)" and a paragraph, "A." after "1." was the first level again; it is
+  the list of the item above, as it already was when nothing cut it. A decimal "1." starts a
+  list of its own. Only on the page of the item above, and with no heading between (review
+  12: lettered items pages after a numbered list, or in the next section, were level 2).
+  This is the level the result stores and the page audit shows. On the student page a list
+  that a figure or a paragraph cut starts a list of its own, as it did.
+- **A reference list's initials are not a lettered list.** An alphabetical list ("R. Arai, ...",
+  "S. Fujiwara, ...") has the next initial in the next entry; a neighbor that opens like an
+  author line (an initial, a surname and a comma, "et al", "and" before an initial) no longer
+  confirms a marker. "Predation and herbivory", "Mutualism and commensalism" still confirm one
+  another.
+- Not changed: a lettered title ending in a full stop stays an item; a title set in part of
+  its face (1 row, 1 private file) stays an item; a numbered bold question with text under it is
+  a heading as before. `damaged_render_abort.pdf` is a refusal ("unreadable") on main; a test
+  row already holds it.
+- **One-page running heads and feet: measured, nothing built.** Taking stacks that are smaller
+  than the body text at the margin of a one-page file took lines of 213 of the 747
+  benchmark pages; 89 of the 447 lines on 65 pages are content (footnotes, figure captions,
+  table notes, fine print), so the rule is not built (docs/eval-parsing-benchmark.md). The
+  furniture functions are not touched; `headers_footers` stays 38.6 (244 of 632).
+
+Measured at this commit, $0: headings eval (`eval pipeline --task headings --fake`) 121 gold,
+105 predicted, precision 0.914 and recall 0.793, as before; `eval order --set layout-dev-1` 137
+of 267 pages right, as before. The corpus hash against `f490ac60` differs in 20 public files
+(11 of layout-dev-1, 3 realworld, 6 repository files, counted by what `hashrun analyze` lists)
+and 7 of 73 uploads, all in list levels, markers and the headings named above.
+## Unreleased: the panels of one figure (off)
+
+- New setting `LAYOUT_JOIN_PANELS` (off in code, in `.env.example` and in the production
+  profile; the output is byte-identical to before when it is off, so no `PIPELINE_VERSION`
+  bump until it is turned on). On, the panels printed under one caption are one figure
+  (`layout/figures.py`, `_join_panels`: docs/layout.md "Panels of one figure") and a panel
+  letter or part mark of one or two characters near a figure is its label. The figures of the
+  277 readable public files go from 1,611 to 1,320 and the 28 corpus files' from 456 to 405,
+  with every caption kept (517 and 145). Turning it on moves figure crops, so it needs a
+  `PIPELINE_VERSION` bump and the recorded figure answers of the pages it moves made again.
+## Unreleased: reading order with the region tree on (O-012, O-013, O-014)
+
+Measured with the tree on and no model, on `layout-dev-1` and the 91 corpus gold pages, with
+the one fix below: 156 of 267 development pages right (137 off) and 79 faultless (71 off), none
+made wrong; 83 of 91 corpus pages right (71 off) and 42 faultless (37 off), one made wrong
+(`e1_mc_columns` page 1: a line with a mark at the right edge joins the columns of the choices
+above it, a cause named, not built). The
+`REGION_TREE` setting stays off in the code and in the production profile, so every result the
+pipeline makes is unchanged (corpus hash runs, `analyze` and `full`: 0 differences). Built
+(`layout/entries.py`, one case in `tests/test_region_tree.py`):
+
+- **A paragraph is no glossary entry.** Rule 10 read a run as hanging when its first line stood
+  right of the rest, so a paragraph whose first line is indented, under a heading or the last
+  page's tail that runs to the edge, had its lines split off as entries. A line before the first
+  that runs to the right edge (within a size and a half) is a paragraph going on, so the run no
+  longer hangs. It took 10 splits and 18 cuts out of the development pages; it costs one glossary
+  entry whose last line runs to the edge (`sm_glossary_a` page 1, wrong with the tree off as well).
+  With the tree on only.
+
+Not built, with the count: vector figures as items (O-013, O-014: measured as items, one page
+faultless again and no reading order changed, but generated pages with a drawing between two
+columns read worse), rule 13 and rule 12's page check (no counted page asks), and a narrower
+channel rule for `e1_mc_columns` page 1 (it fixed that page and made four development pages
+wrong). No
+`PIPELINE_VERSION` or `RENDER_VERSION` change is owed: the switch is off, so no stored result
+differs. No migration.
+## Unreleased: two faults behind the reading-order fall (O-388)
+
+17 pages of `layout-dev-1` were right at 0.5.10 and wrong at 0.5.13 (docs/eval.md). Traced
+page by page, three of them come from two faults in code, fixed here, each with a case in an
+existing test:
+
+- A paragraph that goes on over a page break had the markers of the pages it runs into
+  written right after it, so a figure, a note or a footnote that follows it on its first page
+  stood under the next page's marker (`pipeline/assemble.py`, `owed_marks`; two pages of
+  `ax_hepth_240306652`). They are written before the next element on one of those pages.
+- A small drawing does not join a figure within reach when a line of prose of six words or
+  more lies between them (`layout/figures.py`, `_sentence_between`): the figure's crop took a
+  tab ("EXAMPLE 5.2") and the sentence under it (`os_introductory_statistics_2e` page 2).
+  A drawing kept out this way is a figure of its own, and is not grouped with the drawings
+  near it. The first form of the rule let it fall where the drawings no figure holds fall:
+  a formula drawn as outlines in a line of a paragraph was then in no element, where before
+  it was at least in the crop (review 12). Counted over the ten OpenStax files of
+  `layout-dev-1`, the drawn paths inside no figure, equation or table: 6,953 on 0.5.14, 7,115
+  with the first form, 7,073 now. Of the 120 more than 0.5.14, 114 are on four pages where
+  the figure had grown with each such join, down over the paragraphs under it, and so held
+  the formulas drawn in their lines; with the first join stopped the others are out of reach,
+  and those formulas are where every formula drawn in a line of text is (held by its
+  paragraph and lost, O-235). 3 are the tab the rule is for, 3 are single dots.
+
+The student page changes for a document with such a paragraph or tab; stored results load
+unchanged and their pages are made again. `PIPELINE_VERSION` and `RENDER_VERSION` are not
+raised here; a raise is owed at the next release.
+
+## Unreleased: footnotes still missed and algorithm blocks still lost (branch fix/footnotes-algorithms, O-034, O-054, O-394)
+
+A count on the public papers (131 footnote destinations, 155 notes found, 124 linked to their
+mark; 139 found and 135 linked now) and a count of the algorithm shapes on the 22 public pages with an "Algorithm" or
+"Procedure" line, each fix with a case in `tests/test_structure.py` that fails without it
+(`layout/page.py`, `layout/notices.py`, `layout/inline_runs.py`, `layout/blocks.py`,
+`layout/bold.py`):
+
+- **A number or a row of labels is no footnote.** In a file that names no footnotes, a block of
+  smaller type low on the page was a note when it began with a digit that was raised anywhere
+  above. A row of axis labels (11 "notes" on one page), a lone page number, an integral's lower
+  limit and a running footer ("12 Authors") were notes. A note now opens with the whole mark
+  that is printed raised above, and goes on in words: 14 false notes on 4 papers, 0 now. The
+  mark is read from the note's first line as it is printed: a raised start ends where the
+  raised glyphs end ("1" before "2019 was the first year"), a start on the line ends at the
+  first blank ("1 10 mL of water"), and a raised run in the text holds each of its marks
+  ("1,2" is two marks, "1)" is the mark "1"). The first form of the rule read the mark from
+  the note's glyphs without their blanks and a raised run as one mark, and lost real notes
+  of these four shapes (review 12). One note is lost on the public papers: the "Mathematics
+  Subject Classification" line of one paper,
+  which was a note only because a "2" stood raised somewhere above. The corpus hash also
+  showed one false note gone on a page of an algebra textbook, and the signs of an author-note
+  line (a dagger and a double dagger after an e-mail address, still inside the paragraph
+  under them) are now flat text with an optional `scripts_flattened` notice instead of two
+  one-sign equations.
+- **A note that opens "In fact" is not indium.** The mark and the word after it were read as a
+  nuclide (`6 In`) and became an equation inside the note: 2 papers of the set it was built on,
+  8 files (7 papers) in the release's corpus hash. A footnote's mark is no
+  mass number. In a file that names no footnotes, the mark in the text before a math letter
+  ("system,1 n") is also kept out of the equation.
+- **A note the file names and no link points at is linked by its mark.** Some classes write
+  the destinations with no link rectangles, so no mark was found: 6 notes on 2 papers are
+  linked now (the raised mark above, on the same page, that the note opens with, found once).
+  Linked 124 to 135 of the 139 notes found (the dev and dev2 sets hold some of the same papers, counted twice); the 4 left are 2 author notes with no mark in the
+  text, one table note and one bibliography item the file names `footnote`.
+- **An algorithm that holds a bold letter waiting for evidence keeps its lines.** The pass
+  that puts a bold letter back as plain text tidied the block's lines into one: 4 blocks on 4
+  pages of one paper (`layout/bold.py`).
+- **Nesting is proved from the indent alone.** `_nested` asked a line that opens a block to
+  begin with a step word and end in "do", "then" or a colon (review 11, finding 1b); it now
+  asks that one line is set right of the line above it and a later one back to the left of
+  the line above it. The same on all 22 public pages and on the generated prose that is
+  nearest to an algorithm (a paragraph under a caption, two paragraphs, a manuscript page, a
+  numbered list with a sub-list, an outline).
+- **A bit of math under a step's end is the step's.** The subscripts of a tall expression
+  hang a little lower than the line; the row was the end of the block, and the steps after it
+  were paragraphs (Algorithm 3 of one paper, 3 steps).
+- Left, and written in docs/layout.md: a step after a monospaced comment row, an Input list
+  on two-row math regions, a step whose second line is a paragraph of its own between steps (one
+  page each); the 17 notes the earlier count could not find and the false note named for
+  2407.04005 are not on the public papers.
+
+## Unreleased: what the Word and LaTeX readers left out (O-073, O-395)
+
+Six shapes in a Word or LaTeX source lost something or ran two words together; each was
+reproduced on the smallest source first. Fixed in `source/ltx_reader.py`, `source/docx_reader.py`
+and `source/docx_package.py`, each with a row in `tests/test_source_reader.py`:
+
+- A link in a table cell (a web address or a `\ref` to a heading, equation, theorem, figure
+  or table) is kept: `TableCell.links` is new (offsets into the cell's text, left out of a
+  stored result when empty), the table's page writes it as `<a>` in the cell, and a cell edit in
+  the review screen drops it with the runs. A Word cell keeps its links too. A link in a caption
+  is still its words (a caption is a plain string with no place for spans); no public
+  development source has a web address in one.
+- A table too large for a grid (read as a list, one item a row) keeps its bold, italic, code
+  and links per row; a formula in a row is now an equation of its own item.
+- A single italic letter is a variable, not an emphasis: it makes no run, as on the PDF path.
+- A strike set by a Word paragraph style is read (it was lost without a word).
+- A picture in a sentence leaves "(picture below)" where it stood, so the words around it no
+  longer run together (LaTeX and Word).
+- Not built: a source that runs out of memory (a macro that calls itself) still gets the
+  general "could not be read" sentence; nothing tells it from a very large source.
+
+Stored results load unchanged. A Word or LaTeX source made again gives different documents
+where it has a link in a table cell, a flattened table with emphasis, a single italic letter,
+a paragraph-style strike or a picture in a sentence; the student page of a table with a link
+changes. A `PIPELINE_VERSION` and a `RENDER_VERSION` raise are owed (not made here). No
+migration. Roll back: the models take no extra fields to be an error, so an earlier version opens a
+result with `links` on a cell and ignores them (the cell shows its words, no links).
+## Unreleased: tables with no ruling lines (O-114, O-131, O-393)
+
+- Three causes of an unruled table that was not built, found by tracing the olmOCR-Bench table
+  pages: a box under a "Table N" line whose columns line up only loosely was refused (it is now
+  a table at three columns, six grid lines and alignment 0.5); a few lines set across some
+  columns (a group's name, a total) took away the gap between the columns for the whole box (a
+  strip that at most three lines cross is a gap when at least five other lines, and four for
+  each line that crosses it, have cells on both sides of it); and a table of marks ("x") set after names, on the first pages of a file, was
+  taken for a contents list and dropped (numbers that stand apart in a column of their own are
+  not page numbers that follow titles). A box found by the second rule is asked more than a box
+  with a plain gap: a "Table N" line only names it when it stands over it (the line under a box
+  may be the next table's), the label of a numbered item may be the cell that opens its line (a
+  nested list's "i." to "v." at an indent, as well as the first column's), and two lines of
+  running text across its columns mean a paragraph was taken in with the table, so it is page
+  text. These refuse the two false tables the rule first made (a list of blanks and an
+  algorithm's frame) and a table that took in the paragraph under it. Two columns found this
+  way with no rule and no "Table N" line are no table (labeled questions with a "Part B" line
+  among them, terms and their meanings under short headings, a dialogue: review 13). Such a
+  strip only adds tables: a box it does not make a table is judged as if the strip were not a
+  gap, so a ruled table under its caption with long panel titles across it stays one table
+  (review 13). The benchmark's tables
+  category passes 70.6 percent of its checks, from 66.6 (605 of 857 from 571: 34 checks gained
+  on 8 pages, none lost); the other four categories are unchanged. Its 188 table pages ask for
+  364 table requests, from 354. On the development PDFs and the repository's own PDFs (996
+  runs of 332 files) 15 files differ: 14 only in a reason ("aligned text grid") on tables that
+  were found before, 1 in a new table (an R print-out of a data frame, a real table); none
+  loses a table and none gains a false one. No upload of the corpus gains a table request (one
+  of 73 differs, in the reasons of its elements only), so there is no switch. `eval order` on
+  layout-dev-1 reads 137 of 267 pages right and 71 faultless, as before, and the public table
+  sets (`eval pipeline --task tables --mode local`, 45 documents) give the stored report's
+  numbers to the digit (recall 0.970, precision 0.974, TEDS 0.915, 5 false tables). Written
+  under docs/tables.md and docs/layout.md.
+- O-393 measured, nothing built: of 97 pairs of tables on consecutive pages in the development
+  PDFs 20 are joined, 1 is kept apart by text under the first part, and the detector found no
+  one-row last part that the table before could not claim; the "continued" notices are one for
+  each part. A new `PIPELINE_VERSION` is owed (a stored result's tables and contents lists
+  change); no migration.
+
 ## Pipeline 0.5.14, render 10 (2026-11-19)
 
 - `PIPELINE_VERSION` is 0.5.14 and `RENDER_VERSION` is 10: one raise each for every "Unreleased"
