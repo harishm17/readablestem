@@ -234,6 +234,21 @@
   and the reorder of right-to-left text (held).
 - No recording or request changes. A document stored before is unchanged. No `PIPELINE_VERSION`
   or `RENDER_VERSION` raise is owed, no migration.
+## Unreleased: the A18 count (O-172)
+
+- New `readablestem eval pictures`: from the same replay as `eval outputs`, per upload and added
+  up, the pictures not converted by reason, the content pictures with empty alt, the regions
+  called handwriting (page and box only) and their notices, and those regions read against a
+  truth list of regions someone looked at (`data/eval/pen-truth.json`). The audit of each
+  result now also keeps these counts (`eval/pictures.py`, `eval/outputs.py`).
+- First count, on the 39 audit documents (144 images): 0 content pictures with empty alt (12 in
+  the audit); 15 pictures kept as images before any model step; 9 regions called handwriting
+  (8 on one textbook chapter, 1 on a journal header), and all 9 are printed, as is a tenth on a
+  slide file. The bar of 0 is not met. 13 of the 39 lack recorded answers for part of their
+  requests (the crops changed after the recordings), so their count by the model's answers
+  needs new recordings (docs/eval.md, "eval pictures").
+- No pipeline change: no recording or request changes, no stored document changes. No
+  `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed, no migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 

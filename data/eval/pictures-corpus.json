@@ -1,0 +1,1114 @@
+{
+ "split": {
+  "name": "development",
+  "seed": "corpus",
+  "set_sha256": "84a76a99c535293f452328bd3c7d17745a8be1859e24005be724f23157141bc0",
+  "documents": 72
+ },
+ "profile": {
+  "name": "production",
+  "sha256": "e48df1a1dc7f72e7f0e18ee34c6bf1b7b44f8c22d528df14337492c42e8f11f2",
+  "confirmed": false,
+  "differs": [],
+  "counted_off": [
+   "FEATURE_LATEX_SOURCE",
+   "OFFICE_INPUT_ENABLED"
+  ]
+ },
+ "pipeline_version": "0.5.14",
+ "commit": "84736ec4ef6b46d7ac80d8704e8f70bfaec61b52",
+ "provenance": {
+  "commit": "84736ec4ef6b46d7ac80d8704e8f70bfaec61b52",
+  "clean": true,
+  "pipeline_version": "0.5.14",
+  "render_version": 10,
+  "tools": {
+   "pandoc": "pandoc 3.7.0.2",
+   "latexml": "latexml (LaTeXML version 0.8.8)",
+   "pymupdf": "1.28.2",
+   "fonts": "fonts-liberation=1:2.1.5-3build1 fonts-noto-core=20201225-2build1"
+  }
+ },
+ "machine": {
+  "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
+  "cores": 16
+ },
+ "not_finished": [],
+ "metrics": {
+  "uploads": {
+   "counted": 73,
+   "answers_missing": {
+    "ar3_sideways90": 2,
+    "ar4_sideways270": 2,
+    "d1_scripts": 8,
+    "e1_mc_columns": 6,
+    "e2_solutions_rubric": 6,
+    "e3_calendar": 2,
+    "f1_notation": 46,
+    "f2_figures": 14,
+    "f4_matrices": 12,
+    "r01_syllabus_16851": 6,
+    "r05_labmanual_5310_lab1": 24,
+    "r07_labnotebook_5310": 8,
+    "r09_handout_14451": 18,
+    "r14_exam_513": 44,
+    "r15_openstax_chem_ch3": 2,
+    "r16_openstax_physics_ch4_end": 20,
+    "r17_arxiv_ligo": 76,
+    "r18_arxiv_opt": 38,
+    "r19_poster_codesign": 4,
+    "r20_newsletter_drp": 2,
+    "r21_infographic_orcid": 8,
+    "s15_charts_figures": 4,
+    "w_exam_5111": 40,
+    "w_exam_5111+exam": 40,
+    "w_lecture_5111": 30,
+    "w_notes_6042_ch2": 644,
+    "w_pset_801": 6,
+    "w_slides_60001_lec1": 50,
+    "w_slides_60001_lec10": 98,
+    "w_solutions_1802": 64
+   },
+   "not_counted": []
+  },
+  "sets": {
+   "audit": {
+    "whole": {
+     "documents": 26,
+     "images": 15,
+     "empty_alt": 0,
+     "decorative": 0,
+     "handwritten_pages": 0,
+     "handwriting_regions": 0,
+     "not_converted": {
+      "unread_page": 2
+     },
+     "other_pictures": {
+      "equation": 2
+     },
+     "notices": {
+      "unread_page": 2
+     },
+     "not_converted_all": 2
+    },
+    "apart": {
+     "documents": 13,
+     "images": 129,
+     "empty_alt": 0,
+     "decorative": 0,
+     "handwritten_pages": 0,
+     "handwriting_regions": 9,
+     "not_converted": {
+      "handwriting_on_page": 9,
+      "model_refused": 68,
+      "scanned_page": 1,
+      "unproven_decoration": 3,
+      "unread_page": 3
+     },
+     "other_pictures": {
+      "equation": 52,
+      "table": 1
+     },
+     "notices": {
+      "handwriting_on_page": 9,
+      "scanned_page": 1,
+      "unread_page": 3
+     },
+     "not_converted_all": 84
+    }
+   },
+   "rest": {
+    "whole": {
+     "documents": 17,
+     "images": 8,
+     "empty_alt": 0,
+     "decorative": 0,
+     "handwritten_pages": 0,
+     "handwriting_regions": 0,
+     "not_converted": {
+      "unread_page": 4
+     },
+     "other_pictures": {
+      "paragraph": 1
+     },
+     "notices": {
+      "unread_page": 4
+     },
+     "not_converted_all": 4
+    },
+    "apart": {
+     "documents": 17,
+     "images": 92,
+     "empty_alt": 0,
+     "decorative": 3,
+     "handwritten_pages": 0,
+     "handwriting_regions": 1,
+     "not_converted": {
+      "handwriting_on_page": 1,
+      "model_refused": 59,
+      "unread_page": 1
+     },
+     "other_pictures": {
+      "equation": 511
+     },
+     "notices": {
+      "handwriting_on_page": 1,
+      "unread_page": 1
+     },
+     "not_converted_all": 61
+    }
+   }
+  },
+  "by_upload": {
+   "a3_sideways_norotate": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "a3b_sideways_270": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "a6_two_up": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "a8_handout_3up": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "a9_handout_6up": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "ar3_sideways90": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "ar4_sideways270": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "b3_stamp": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "b4_line_numbers": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "b6_margin_identifier": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "d1_scripts": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {
+     "equation": 4
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "d2_language_passages": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "d3_arabic_doc": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "d4_chinese_doc": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "e1_mc_columns": {
+    "images": 1,
+    "not_converted": {
+     "model_refused": 1
+    },
+    "other_pictures": {
+     "equation": 1
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "e2_solutions_rubric": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {
+     "equation": 2
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "e3_calendar": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "f1_notation": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {
+     "equation": 22
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "f2_figures": {
+    "images": 3,
+    "not_converted": {
+     "model_refused": 3
+    },
+    "other_pictures": {
+     "equation": 4
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "f3_music": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "f4_matrices": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {
+     "equation": 6
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r01_syllabus_16851": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r02_syllabus_21l704": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r03_syllabus_21l708": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r04_grading_5310": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r05_labmanual_5310_lab1": {
+    "images": 11,
+    "not_converted": {
+     "model_refused": 10
+    },
+    "other_pictures": {
+     "equation": 5
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r06_labsafety_5310": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r07_labnotebook_5310": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r08_labhandout_2996": {
+    "images": 1,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r09_handout_14451": {
+    "images": 9,
+    "not_converted": {
+     "model_refused": 9
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r10_handout_4241": {
+    "images": 2,
+    "not_converted": {
+     "unread_page": 2
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "unread_page": 2
+    }
+   },
+   "r11_recitation_2003sc": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r12_exam_900sc": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r13_exam_3044": {
+    "images": 7,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r14_exam_513": {
+    "images": 22,
+    "not_converted": {
+     "model_refused": 21,
+     "scanned_page": 1
+    },
+    "other_pictures": {
+     "equation": 1
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "scanned_page": 1
+    }
+   },
+   "r15_openstax_chem_ch3": {
+    "images": 17,
+    "not_converted": {
+     "model_refused": 1,
+     "unproven_decoration": 1,
+     "unread_page": 1
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "unread_page": 1
+    }
+   },
+   "r16_openstax_physics_ch4_end": {
+    "images": 40,
+    "not_converted": {
+     "handwriting_on_page": 8,
+     "model_refused": 10,
+     "unread_page": 1
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [
+     {
+      "page": 4,
+      "bbox": [
+       446.0,
+       557.8,
+       468.4,
+       573.1
+      ]
+     },
+     {
+      "page": 5,
+      "bbox": [
+       132.2,
+       68.8,
+       144.8,
+       84.1
+      ]
+     },
+     {
+      "page": 6,
+      "bbox": [
+       223.7,
+       441.7,
+       248.7,
+       463.4
+      ]
+     },
+     {
+      "page": 6,
+      "bbox": [
+       279.4,
+       488.3,
+       289.5,
+       501.3
+      ]
+     },
+     {
+      "page": 8,
+      "bbox": [
+       446.6,
+       369.2,
+       473.1,
+       386.5
+      ]
+     },
+     {
+      "page": 8,
+      "bbox": [
+       500.4,
+       561.2,
+       511.4,
+       574.4
+      ]
+     },
+     {
+      "page": 9,
+      "bbox": [
+       142.9,
+       571.5,
+       159.4,
+       586.7
+      ]
+     },
+     {
+      "page": 9,
+      "bbox": [
+       363.7,
+       117.1,
+       426.2,
+       147.6
+      ]
+     }
+    ],
+    "handwritten_pages": 0,
+    "notices": {
+     "handwriting_on_page": 8,
+     "unread_page": 1
+    }
+   },
+   "r17_arxiv_ligo": {
+    "images": 5,
+    "not_converted": {
+     "handwriting_on_page": 1,
+     "model_refused": 4
+    },
+    "other_pictures": {
+     "equation": 33,
+     "table": 1
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [
+     {
+      "page": 1,
+      "bbox": [
+       48.0,
+       37.8,
+       564.0,
+       62.8
+      ]
+     }
+    ],
+    "handwritten_pages": 0,
+    "notices": {
+     "handwriting_on_page": 1
+    }
+   },
+   "r18_arxiv_opt": {
+    "images": 4,
+    "not_converted": {
+     "model_refused": 4
+    },
+    "other_pictures": {
+     "equation": 13
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r19_poster_codesign": {
+    "images": 4,
+    "not_converted": {
+     "model_refused": 2
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r20_newsletter_drp": {
+    "images": 5,
+    "not_converted": {
+     "model_refused": 1
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "r21_infographic_orcid": {
+    "images": 10,
+    "not_converted": {
+     "model_refused": 4,
+     "unproven_decoration": 2,
+     "unread_page": 1
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "unread_page": 1
+    }
+   },
+   "s01_newsletter_3col": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s02_syllabus_sidebar": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s03_lab_callouts": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s04_worksheet": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s05_form_acroform": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s06_landscape_table": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s07_glossary": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s08_bibliography": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s09_index": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s10_slides_boxes": {
+    "images": 4,
+    "not_converted": {},
+    "other_pictures": {
+     "equation": 2
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s11_layout_change": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s12a_handout_tagged": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s12b_handout_untagged": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s13_textbook_margin": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s14_toc_outline": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s15_charts_figures": {
+    "images": 2,
+    "not_converted": {
+     "model_refused": 2
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s16_calendar_grid": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s17_word_syllabus": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "s18_exam_twocol": {
+    "images": 1,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_exam_5111": {
+    "images": 6,
+    "not_converted": {
+     "model_refused": 1
+    },
+    "other_pictures": {
+     "equation": 23
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_exam_5111+exam": {
+    "images": 6,
+    "not_converted": {
+     "model_refused": 1
+    },
+    "other_pictures": {
+     "equation": 23
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_handwritten_6006+image_pages": {
+    "images": 4,
+    "not_converted": {
+     "unread_page": 3
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "unread_page": 3
+    }
+   },
+   "w_lecture_5111": {
+    "images": 12,
+    "not_converted": {
+     "model_refused": 5
+    },
+    "other_pictures": {
+     "equation": 10
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_lecture_560": {
+    "images": 2,
+    "not_converted": {},
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_mixed_slides+image_pages": {
+    "images": 1,
+    "not_converted": {
+     "unread_page": 1
+    },
+    "other_pictures": {},
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "unread_page": 1
+    }
+   },
+   "w_notes_6042_ch2": {
+    "images": 0,
+    "not_converted": {},
+    "other_pictures": {
+     "equation": 322
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_pset_801": {
+    "images": 9,
+    "not_converted": {
+     "model_refused": 3
+    },
+    "other_pictures": {
+     "equation": 2
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_scan_slides+image_pages": {
+    "images": 1,
+    "not_converted": {},
+    "other_pictures": {
+     "paragraph": 1
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   },
+   "w_slides_60001_lec1": {
+    "images": 13,
+    "not_converted": {
+     "model_refused": 11,
+     "unread_page": 1
+    },
+    "other_pictures": {
+     "equation": 13
+    },
+    "empty_alt": 0,
+    "decorative": 1,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {
+     "unread_page": 1
+    }
+   },
+   "w_slides_60001_lec10": {
+    "images": 36,
+    "not_converted": {
+     "handwriting_on_page": 1,
+     "model_refused": 32
+    },
+    "other_pictures": {
+     "equation": 19
+    },
+    "empty_alt": 0,
+    "decorative": 2,
+    "handwriting_regions": [
+     {
+      "page": 6,
+      "bbox": [
+       203.1,
+       433.3,
+       310.1,
+       457.0
+      ]
+     }
+    ],
+    "handwritten_pages": 0,
+    "notices": {
+     "handwriting_on_page": 1
+    }
+   },
+   "w_solutions_1802": {
+    "images": 6,
+    "not_converted": {
+     "model_refused": 2
+    },
+    "other_pictures": {
+     "equation": 60
+    },
+    "empty_alt": 0,
+    "decorative": 0,
+    "handwriting_regions": [],
+    "handwritten_pages": 0,
+    "notices": {}
+   }
+  },
+  "truth": {
+   "pen": 0,
+   "not_pen": 10,
+   "unlabeled": 0,
+   "missed": {},
+   "unlabeled_regions": [],
+   "labeled": 10
+  }
+ }
+}
