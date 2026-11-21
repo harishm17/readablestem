@@ -911,7 +911,7 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         else:
             continue
         if head := _title_head(row, heads, right):
-            new.contents_wrap = True
+            new.contents_wrap = head
             heads.pop(id(head))
             entries.append((head, head))
         entries.append((row, new))
@@ -972,7 +972,7 @@ def _leveled(rows: list[_Row], entries: list[tuple[_Row, _Row]], dropped: set[in
     if not entries:
         return rows
     steps: list[float] = []  # the distinct indents, outermost first
-    for x in sorted(new.x0 for _, new in entries if not new.contents_wrap):
+    for x in sorted(new.x0 for _, new in entries if new.contents_wrap is None):
         if not steps or x > steps[-1] + 0.6 * entries[0][1].size:
             steps.append(x)
     for old, new in entries:
@@ -2325,6 +2325,11 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
     for row in rows:
+        if row.contents_wrap is not None and (
+            first := next((r for r in reversed(runs) if r.rows[-1] is row.contents_wrap), None)
+        ):
+            first.add(row)  # the rest of a title that wraps, whatever lies between its lines
+            continue
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
@@ -2343,9 +2348,6 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 and _continues(prev, row, run, ctx)
             ):
                 run.add(row)
-                continue
-            if row.contents_wrap and run.contents:
-                run.add(row)  # the rest of a title that wraps
                 continue
             if row.contents_level or run.contents:
                 run.block_end = True
