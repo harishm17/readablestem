@@ -300,13 +300,14 @@ HANGING_ENTRIES = 3  # entries in a row that make a hanging indent a list of ent
 HANGING_REACH = (1.0, 4.0)  # em: how far right of an entry's first line its other lines start
 LEAD_ENTRIES = 3  # paragraphs in a row that start with a lead term, to make a list of entries
 LETTER_SEQUENCE = 3  # letters in a row that make capitals alone on a line the sections of an index
+LETTER_UNDER_REACH = 2.5  # x size: how far under a letter its first entry starts (a line or two)
 
 
 def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
     """Mark the capital letters that head the sections of an index or a glossary (`_Row.letter`).
 
     One capital letter alone on its line, bold or larger than the body text, with the line
-    right under it an entry that starts with that letter, and at least `LETTER_SEQUENCE`
+    right under it (`LETTER_UNDER_REACH`) an entry that starts with that letter, and at least `LETTER_SEQUENCE`
     different letters set that way in one size and typeface through the document. The test
     reads the line under the letter, not the order of the page's columns, so the letters of
     an index in three columns are found where they stand. A letter on its own line anywhere
@@ -328,7 +329,11 @@ def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
                 key=lambda r: r.y0,
                 default=None,
             )
-            if under is not None and _first_letter(under.clean) == row.ink[0].c:
+            if (
+                under is not None
+                and under.y0 - row.y1 <= LETTER_UNDER_REACH * row.size
+                and _first_letter(under.clean) == row.ink[0].c
+            ):
                 found.setdefault((round(row.size * 2), row.family), []).append(row)
     for members in found.values():
         if len({row.ink[0].c for row in members}) >= LETTER_SEQUENCE:
@@ -683,6 +688,9 @@ CONTENTS_START_PAGES = 3  # without a "Contents" heading over it, a list counts 
 CONTENTS_REACH = 1.5  # x size: how far the right edges of a list's page numbers differ
 CONTENTS_RAGGED_LINES = 6  # lines of a list whose numbers follow their titles, at no one edge
 MIN_TITLE_LETTERS = 3  # letters in the title of a contents entry that has no leaders
+WRAPPED_TITLE_PITCH = 1.6  # x size: the most a wrapped title's lines stand apart
+WRAPPED_TITLE_INDENT = 5.0  # x size: the most its last line is set in from its first
+WRAPPED_TITLE_REACH = 6.0  # x size: how far from the page numbers' edge its first line stops
 _CONTENTS_HEADING = re.compile(r"(table of )?contents( \(continued\))?", re.IGNORECASE)
 _SHAPE_NUMBER = re.compile(r"\d{1,4}|[ivx]{1,6}")
 
@@ -875,21 +883,74 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         if twin is not None:
             taken.add(id(twin))
         pairs.append((row, twin))
+    # A line of prose that ends in an ellipsis has leaders but no page number: not an entry.
+    split = {
+        id(row): split[id(row)]
+        for row, twin in pairs
+        if id(row) in split and (twin is not None or _ends_in_number(row))
+    }
+    if len(split) < MIN_CONTENTS_LEADER_ROWS:
+        return _shaped_rows(rows, number)
     # The numbers of a contents page stand at one right edge.
     edge = statistics.median([t.x1 for _, t in pairs if t is not None] or [0.0])
     entries: list[tuple[_Row, _Row]] = []  # (the line, the line it becomes)
     dropped: set[int] = set()
+    heads = {
+        id(row): row
+        for row, twin in pairs
+        if id(row) not in split and twin is None and _numbered_line(row) is None
+    }
+    right = statistics.median([(twin or row).x1 for row, twin in pairs if id(row) in split])
     for row, twin in pairs:
         aligned = twin is not None and abs(twin.x1 - edge) <= 1.5 * row.size
         if id(row) in split:
-            entries.append((row, _Row(split[id(row)], column=row.column)))
+            new = _Row(split[id(row)], column=row.column)
         elif aligned and row.kind == "text" and len(split) >= 1:
-            entries.append((row, row))
+            new = row
         else:
             continue
+        if head := _title_head(row, heads, right):
+            new.contents_wrap = True
+            heads.pop(id(head))
+            entries.append((head, head))
+        entries.append((row, new))
         if aligned and twin is not None:
             dropped.add(id(twin))
     return _leveled(rows, entries, dropped)
+
+
+def _ends_in_number(row: _Row) -> bool:
+    """Does the line end in a page number, after a blank or a leader dot?"""
+    chars = [c for c in row.chars if not c.blank]
+    start = len(chars)
+    while start and chars[start - 1].c.isalnum():
+        start -= 1
+    return (
+        0 < start < len(chars)
+        and bool(_PAGE_NUMBER.fullmatch("".join(c.c for c in chars[start:])))
+        and chars[start - 1].c in LEADER_DOTS
+    )
+
+
+def _title_head(row: _Row, heads: dict[int, _Row], right: float) -> _Row | None:
+    """The line right above an entry's line when the title wraps ("E.5 Proof of ... (Lemma" over
+    "D.6) . . . 39"): in the same column, at the entry's size and no further right than it, and
+    reaching the right edge of the entries (`right`: the page numbers' column). A title
+    that wraps has no leaders or number on its first line, so it was no entry."""
+    return next(
+        (
+            h
+            for h in heads.values()
+            if h.kind == "text"
+            and h.column == row.column
+            and 0 < row.baseline - h.baseline <= WRAPPED_TITLE_PITCH * row.size
+            and abs(h.size - row.size) <= 0.5
+            and h.x0 <= row.x0 + 0.6 * row.size
+            and row.x0 - h.x0 <= WRAPPED_TITLE_INDENT * row.size
+            and h.x1 >= right - WRAPPED_TITLE_REACH * row.size
+        ),
+        None,
+    )
 
 
 def _shaped_rows(rows: list[_Row], number: int) -> list[_Row]:
@@ -910,7 +971,7 @@ def _leveled(rows: list[_Row], entries: list[tuple[_Row, _Row]], dropped: set[in
     if not entries:
         return rows
     steps: list[float] = []  # the distinct indents, outermost first
-    for x in sorted(new.x0 for _, new in entries):
+    for x in sorted(new.x0 for _, new in entries if not new.contents_wrap):
         if not steps or x > steps[-1] + 0.6 * entries[0][1].size:
             steps.append(x)
     for old, new in entries:
@@ -2281,6 +2342,9 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
                 and _continues(prev, row, run, ctx)
             ):
                 run.add(row)
+                continue
+            if row.contents_wrap and run.contents:
+                run.add(row)  # the rest of a title that wraps
                 continue
             if row.contents_level or run.contents:
                 run.block_end = True

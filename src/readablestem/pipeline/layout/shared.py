@@ -81,6 +81,9 @@ class _Row:
     # A line of a table of contents with its leaders and page number cut off
     # (`_contents_rows`): an entry of its own, at this nesting level (1 = outermost).
     contents_level: int = 0
+    # The last line of an entry of a table of contents whose title wraps: it goes on the line
+    # above, which is the first line of the same entry (`_contents_rows`).
+    contents_wrap: bool = False
     # A capital letter alone on its line, in a sequence of such lines (A, B, C ... of a
     # glossary or an index): a heading of its own (`_letter_rows`).
     letter: bool = False
