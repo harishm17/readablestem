@@ -95,7 +95,7 @@ from readablestem.core.types import (
     Run,
     is_safe_href,
 )
-from readablestem.pipeline import contrast, language, layout, page_type
+from readablestem.pipeline import contrast, hyphens, language, layout, page_type
 from readablestem.pipeline import notices as notice_rules
 from readablestem.pipeline.baseline_rules import STRIKE_X_SLACK, Ink, classify
 from readablestem.pipeline.layout import FormField, Glyph, Highlight, Strike
@@ -735,6 +735,25 @@ def _address_end(text: str, start: int, end: int) -> int:
     return end
 
 
+def _ends_whole(text: str, end: int, at: int) -> bool:
+    """Does the address that stops at `end` (the matched text goes to `at`) end the line
+    whole, the sentence going on below? A break inside an address comes after a sign ("/",
+    ".", "-", "_", "=", "?", "&", "#"), so an address that stops on a letter or a digit,
+    or on the stop or comma of the sentence, and goes on in the next line with a plain word of
+    the language ("today", "Next"), is whole. The next word after a full stop that starts with
+    a capital is a new sentence; after any other ending it is a word the list knows."""
+    stop = text[end:at]
+    if not text[end - 1 : end].isalnum() or stop.strip(",;:!)]}'\"\u2019\u201d\u00bb\u2026>."):
+        return False
+    after = text[at:].split(None, 1)
+    word = after[0].strip(",;:!?.()[]'\"\u2019\u201d") if after else ""
+    if not word.isalpha():
+        return False
+    if stop.endswith("."):
+        return word[0].isupper()
+    return word.lower() in hyphens.words()
+
+
 def typed_addresses(
     text: str, taken: Sequence[Link] = (), wraps: Callable[[int], bool] | None = None
 ) -> list[Link]:
@@ -750,9 +769,9 @@ def typed_addresses(
         start = match.start()
         if start and text[start - 1].isalnum():
             continue  # the end of a longer word, not an address
-        if wraps is not None and wraps(match.end()):
-            continue  # cut by the line: a link to the first part would go somewhere else
         end = _address_end(text, start, match.end())
+        if wraps is not None and wraps(match.end()) and not _ends_whole(text, end, match.end()):
+            continue  # cut by the line: a link to the first part would go somewhere else
         shown = text[start:end]
         href = shown if shown.lower().startswith("http") else f"https://{shown}"
         if is_safe_href(href) and _HOST_NAME.fullmatch(urlsplit(href).hostname or ""):

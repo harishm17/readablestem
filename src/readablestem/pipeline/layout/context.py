@@ -39,6 +39,8 @@ class _Document:
     `compounds`, `whole_words`: how the document spells its own compounds
     (`hyphens.document_spellings`), for the hyphen at the end of a line: pairs it hyphenates
     inside a line, words it writes whole.
+    `link_cuts`: where the file's own link annotations run across a line break inside a printed
+    address (`hyphens.link_cut`), for the join of that break (`hyphens.joins_inside_token`).
     `grouping`: `analyze(display_grouping=...)`.
     `inline_joins`: `analyze(inline_joins=...)`: the rules that keep the whole inline formula in one
     run (docs/layout.md "Inline formulas kept whole").
@@ -55,6 +57,7 @@ class _Document:
     slide_deck: bool = False
     compounds: frozenset[str] = frozenset()
     whole_words: frozenset[str] = frozenset()
+    link_cuts: frozenset[tuple[str, str]] = frozenset()
     grouping: bool = False
     inline_joins: bool = False
     region_tree: bool = False
