@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: contents lists and letter headings (O-051, O-020)
+
+- A section number or a page number next to math in a contents entry stays the entry's own text.
+  The symbol before a page number ("Forces on Σ 9") took the number into its equation, and an
+  entry that starts with a section number and goes on in symbols ("6.1 Γ = D4") was one whole
+  equation; the number is now text and the equation is the formula (`inline_runs._clear_of_entry_numbers`).
+- A title that wraps in a contents list with leaders is one entry: the first line has no leaders
+  and no number, so it was a paragraph or a heading and the second line an entry of its own
+  ("tion", "orem 1)"). It is joined to the line under it (`blocks._title_head`, hyphen repaired).
+- Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
+  page number, its own or a line of its own beside it (`blocks._ends_in_number`).
+- A capital alone on its line heads an index section only when the first entry of its letter
+  starts within a line or two under it (`LETTER_UNDER_REACH`); a lone capital at the foot of a
+  column was matched with a line of its letter far below it.
+- Measured by layout only: see the numbers in the report of the branch. Not built, not counted:
+  a title that wraps in a list with no leaders, a two-column contents page, titles checked
+  against later headings. A new `PIPELINE_VERSION` is owed (a stored result's contents entries
+  change); no migration.
+
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
 - Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The
