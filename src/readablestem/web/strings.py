@@ -29,6 +29,10 @@ KEEP_WITHOUT_DESCRIPTION = "Keep without a description"
 KEPT_WITHOUT_DESCRIPTION = "Kept without a description (your choice)"
 LEAVE_AS_WRITTEN = "Leave as written"
 LEFT_AS_WRITTEN = "Left as written (your choice)"
+# A heading a person rejected is text again, bold where its line is bold: the item's state and
+# the record say it in the same words.
+MADE_BOLD_TEXT = "Made bold text by you"
+MADE_PLAIN_TEXT = "Made plain text by you"
 
 # What a person may look at, and the tool's own word for the lowest severity.
 ITEM = "item"

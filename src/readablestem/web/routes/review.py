@@ -267,13 +267,13 @@ BOLD_TEXT_WORDS = RejectWords(
     "Make bold text",
     "It stays in bold but leaves the outline.",
     "Made bold text, not a heading.",
-    "Made bold text by you",
+    strings.MADE_BOLD_TEXT,
 )
 PLAIN_TEXT_WORDS = RejectWords(
     "Make plain text",
     "It stays as text but leaves the outline.",
     "Made plain text, not a heading.",
-    "Made plain text by you",
+    strings.MADE_PLAIN_TEXT,
 )
 OTHER_WORDS = RejectWords(
     strings.KEEP_ORIGINAL,

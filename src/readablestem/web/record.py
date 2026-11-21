@@ -303,13 +303,17 @@ REJECT_WORDS = {
 def _reject_words(fix: Fix | None, element: Element | None, origin: str) -> str:
     """What a reviewer's "reject" kept for this item, in the words the review screen gives its
     state (`routes.review.reject_words`): a page kept as an image is an image whatever its
-    kind, and a formula of a source with no picture is left as written."""
+    kind, a formula of a source with no picture is left as written, and a heading is text
+    again, bold where its line is."""
     if fix is None:
         return strings.KEPT_ORIGINAL
     if is_kept_image(fix):
         return strings.KEPT_AS_IMAGE
     if reject_keeps(origin, fix, element) == "written":
         return strings.LEFT_AS_WRITTEN
+    if fix.kind is Kind.HEADING:
+        bold = element is not None and element.bold
+        return strings.MADE_BOLD_TEXT if bold else strings.MADE_PLAIN_TEXT
     return REJECT_WORDS.get(fix.kind.value, strings.KEPT_ORIGINAL)
 
 
