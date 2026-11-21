@@ -204,14 +204,16 @@
 {% if owns %}
 <div class="job-group" id="settings">
   <h2 id="settings-heading">Settings and sharing</h2>
-  {% with hl = 3 %}{% include "_job_sharing.html" %}{% endwith %}
-  {% if not job.summary or job.summary.checked.origin == "pdf" %}{# a source file has no revised version yet (WS18.8) #}
-  <section aria-labelledby="revise-heading">
-    <h3 id="revise-heading">If you change the PDF</h3>
-    <p><a href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a>
-      (your decisions carry over)</p>
-  </section>
-  {% endif %}
+  <ul class="link-cards">
+    {% with hl = 3 %}{% include "_job_sharing.html" %}{% endwith %}
+    {% if not job.summary or job.summary.checked.origin == "pdf" %}{# a source file has no revised version yet (WS18.8) #}
+    <li class="card">
+      <h3 id="revise-heading">If you change the PDF</h3>
+      <p>Your decisions carry over to the new version.</p>
+      <p class="link-card-action"><a class="button-secondary" href="/app?revises={{ job.id }}#upload-heading" data-role="revise">Upload a revised version</a></p>
+    </li>
+    {% endif %}
+  </ul>
 </div>
 {% endif %}
 {% if job.is_owner %}{% include "_job_record.html" %}{% endif %}
