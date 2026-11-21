@@ -197,7 +197,10 @@ rules above.
    not a table. A second rule: a box under a "Table N" line with no rules, of
    three columns or more, six grid lines and alignment 0.5 (not 0.75) is a table: the caption
    is the reason, as it is for a layout grid (`CAPTION_COLUMNS`, `CAPTION_GRID_LINES`,
-   `CAPTION_ALIGNMENT`).
+   `CAPTION_ALIGNMENT`). And two text columns (a body and its sidebar, paired at their
+   sentence ends) are not a table: two columns, prose in one of them, and fewer than half the
+   lines with a cell in each (`TEXT_COLUMN_SHARE`; a line or two that stand level are no rows).
+   A "Table N" line under it still makes it one (`_text_block_dropped`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,
@@ -252,7 +255,9 @@ rules above.
    lines become `Element.caption` and `TableGrid.caption`. N is Arabic or Roman ("Table IV");
    "Table 2 shows that ..." is not a caption. The gap, 36 pt (the reach of figure captions), is
    measured from the caption block's nearest edge: over the table, from the block's last line
-   (a caption of up to eight lines), not from its first; under it, from its first line. Where
+   (a caption of up to eight lines), not from its first; under it, from its first line (a caption
+   of up to eight lines there too: it was cut at four, so a long caption lost its last lines to the
+   text under the table, `CAPTION_LINES_BELOW`). Where
    two tables are stacked, a caption goes to the nearer table. The pattern is
    `core/captions.py`, shared with the HTML check below and with figure captions. A caption is
    never invented.
@@ -774,6 +779,13 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 - An em dash for "no value" folds into the dash that is not compared: an answer that
   leaves that cell empty passes.
 - No speech text for math cells (the review screen reads the MathML).
+- A table whose borders are drawn as filled boxes thicker than 1.6 pt (`THIN_IMAGE`, and
+  `RULE_THICKNESS` in `layout/drawings.py`) is found, and its borders are also a figure (a
+  generated 4 by 3 table with borders of 2, 3 and 4 pt: one table, one figure). The cap is not
+  raised: on 519 public PDFs a cap of 3 pt gives no table that was missed and makes a plot whose
+  axes are drawn 2 to 3 pt thick (`ax_astrophga`, page 8) a table with seven headings, and a cap
+  of 2 pt turns the section rules of a minutes form into a second table. Thick rules are rules of
+  a table only together with a grid; no set has such a table to measure a rule on.
 
 ### Tests
 

@@ -16,6 +16,7 @@ import pymupdf
 import pytest
 
 from readablestem.pipeline import layout
+from readablestem.pipeline import tables as table_step
 from readablestem.pipeline.layout import regions
 from test_tables_detect import grid_table
 
@@ -131,15 +132,24 @@ def _tables(name: str, page: int, *, on: bool = True) -> tuple[list, layout.Layo
     return [e for e in result.elements if e.page == page and e.kind.value == "table"], result
 
 
-def test_a_table_proposal_across_a_gutter_with_prose_on_both_sides_is_refused():
-    # The detector boxes lines of the body and of the sidebar of a syllabus together and takes
-    # their sentence ends for cells; with the tree on they stay in their columns and the
-    # reason is recorded. The grading table, in one column, is kept.
+def test_two_text_columns_are_no_table_with_the_tree_on_or_off():
+    # The text boxes of a syllabus's body and of its sidebar paired at their sentence ends are
+    # read as a grid: most of its lines hold one cell, so it is two columns of text
+    # (`tables._text_block_dropped`), tree on or off. The grading table, in one column, is kept.
+    for on in (True, False):
+        tables, result = _tables("s02_syllabus_sidebar", 0, on=on)
+        assert [t.bbox[2] < 400 for t in tables] == [True]
+        texts = {e.text for e in result.elements if e.page == 0 and e.kind.value == "heading"}
+        assert {"Learning Outcomes", "Key Dates"} <= texts
+
+
+def test_a_table_proposal_across_a_gutter_with_prose_on_both_sides_is_refused(monkeypatch):
+    # The same page with the rule above off: the detector's box takes the sentence ends for
+    # cells; with the tree on the lines stay in their columns and the reason is recorded.
+    monkeypatch.setattr(table_step, "TEXT_COLUMN_SHARE", 0.0)
     tables, result = _tables("s02_syllabus_sidebar", 0)
     assert [t.bbox[2] < 400 for t in tables] == [True]
     assert [why for _, why in result.table_refusals[0]] == [regions.REFUSED_PROSE]
-    texts = {e.text for e in result.elements if e.page == 0 and e.kind.value == "heading"}
-    assert {"Learning Outcomes", "Key Dates"} <= texts
     assert len(_tables("s02_syllabus_sidebar", 0, on=False)[0]) == 2  # off: the old reading
 
 

@@ -276,3 +276,17 @@ def test_a_long_caption_is_measured_from_its_nearest_line_and_stays_with_its_tab
     first, other = data_tables(pdf(fill))
     assert first.caption == " ".join(long)
     assert other.caption == " ".join(second)
+
+
+def test_a_caption_of_six_lines_under_its_table_is_whole():
+    lines = ["Table 1. Measured periods of the pendulum,"] + [
+        f"and the part {i} of a caption that runs on" for i in range(1, 6)
+    ]
+
+    def fill(page):
+        grid_table(page, PENDULUM, y0=150)
+        for i, line in enumerate(lines):
+            write(page, 100, 250 + 12 * i, line, 10)
+
+    (found,) = data_tables(pdf(fill))
+    assert found.caption == " ".join(lines)

@@ -154,6 +154,42 @@
   one annotation drawn over two lines (not one per line) is not read.
 - No recording or request changes. `PIPELINE_VERSION` needs the bump of the wave (the text of a
   PDF with such an address changes); no `RENDER_VERSION` raise, no migration.
+## Unreleased: table captions and two text columns (O-061, O-150; O-056 measured, not built)
+
+- A caption under a table was cut at its fourth line (`CAPTION_LINES_BELOW` 3, so the first line
+  and three more): a longer one lost its last lines, which then stood as a paragraph under the
+  table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
+  may now run to eight lines, as it may over the table (`tables._caption_lines`). On the 519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole now;
+  of 123 captions under a table, 46 have more than one line and none of them was a one-line caption
+  with a paragraph taken in. The corpus replay (73 uploads): two differ, `r18_arxiv_opt`, whose
+  Table 1 caption is whole and whose dangling paragraph is gone (105 elements, now 103), and `s02_syllabus_sidebar` (below); the
+  requests it cannot replay are 38 of 52 before and after, so no recorded answer stops matching
+  because of this. Corpus layout (996 results): 23 differ, all in the 7 PDFs this change reaches.
+- Two text columns read as a grid: `s02_syllabus_sidebar` page 1 (a body column beside a
+  sidebar) gave a false two-column table, the sidebar's lines paired with body lines. A box found from text with two columns, prose in
+  one and fewer than half its lines with a cell in each column is now two columns of text
+  (`tables._text_block_dropped`, `TEXT_COLUMN_SHARE`), unless a "Table N" line says it is a
+  table. Of 827 boxes of this kind that were kept on the public sets, 2 are two columns with prose
+  and fewer than half their lines paired: this page and one page of an OpenStax book that was not
+  a table in the end either. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,
+  with the new rule off (`tests/test_region_tree.py`).
+- Benchmark `table_tests`: 70.6 before and after (857 checks); baseline 100.0. The public table
+  evaluation (`eval pipeline --task tables --mode local`, 5 real documents with 25 tables, 200
+  tables of the dev documents): every score the same.
+- Not built. Borders thicker than 1.6 pt (O-056): a cap of 3 pt makes a plot whose axes are 2 to 3
+  pt thick (`ax_astrophga`, page 8) a table with seven headings and no set holds a table whose
+  borders are thick, so it would be a rule measured only on generated tables
+  (docs/tables.md, "Known limits"). A one-line caption that takes the same-size paragraph under it
+  and inline math in a table caption (O-061): no case of the first on the sets; the second would
+  make each formula in a caption a new equation request (a table's caption is written by layout
+  from its lines before any block is made of them) and the plain text is what a table's
+  `<caption>` shows; the caption tag of a tagged file is not touched.
+- No recorded request stops matching (calls 52 and missed 38 on `r18_arxiv_opt` before and after;
+  `s02_syllabus_sidebar` missed 0, calls 3), so no off switch is needed. A table whose caption was
+  cut now sends its whole caption to the table model, so a recording made for it with the cut
+  caption would need re-recording. Documents already stored keep their old captions until converted
+  again. A `PIPELINE_VERSION` raise is owed when the wave is released (the reader's output
+  changes: captions and one table). No migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
