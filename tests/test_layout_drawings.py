@@ -397,6 +397,25 @@ def test_a_labelled_tab_over_a_sentence_is_not_swallowed_by_the_figure_below_it(
     assert [e.bbox[1] > 410 for e in out.elements if e.kind is Kind.FIGURE] == [True]
     assert "55 smiling times" in _text_of(out) and "EXAMPLE 5.2" in _text_of(out)
 
+    # What is kept out of the picture is still a drawing: a formula drawn as outlines in a
+    # line of the paragraph under a plot went into the plot's crop with the sentence over
+    # it. Out of the crop, it is a figure of its own, not a drawing in no element.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _scatter(page, 100)
+    _label(page, (72, 312), "The cosecant function is the reciprocal of the sine function, so", 11)
+    _label(page, (72, 328), "we have", 11)
+    for i in range(6):
+        shape = page.new_shape()
+        shape.draw_oval(pymupdf.Rect(128 + 11 * i, 319, 135 + 11 * i, 329))
+        shape.finish(color=BLACK, width=0.8)
+        shape.commit()
+    _label(page, (204, 328), "and the function is therefore odd.", 11)
+    out = layout.analyze(doc.tobytes())
+    plot, formula = sorted(_figures(out), key=lambda e: e.bbox[1])
+    assert plot.bbox[3] < 304 < 318 < formula.bbox[1]
+    assert "reciprocal of the sine function" in _text_of(out)
+
 
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():
     # A numbered title a few points over a drawing stays text, a heading of the page, not a

@@ -444,6 +444,7 @@ def _page_blocks(
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []
     small: list[tuple[BBox, list[_Path]]] = []
+    apart: set[int] = set()  # paths of small drawings kept out of the figure beside them
     vector = _vector_figures(
         loose,
         rows,
@@ -452,6 +453,7 @@ def _page_blocks(
         page_sized=page_sized,
         left_out=left_out,
         small_out=small,
+        apart_out=apart,
         ink=ink_sources,
         hand=ink,
         document=document,
@@ -544,7 +546,7 @@ def _page_blocks(
         index = _RowIndex([r for r in rows if not r.vertical])
         frames = [q.bbox for q in paths if q.frame and _page_furniture(q, page_rect)]
         found, marks = _leftover_drawings(
-            small, blocks, index, page_rect, margins, ink_sources, frames, covers
+            small, blocks, index, page_rect, margins, ink_sources, frames, covers, apart
         )
         if page_sized:
             blocks.extend(found)
@@ -798,6 +800,7 @@ def _leftover_drawings(
     ink_sources: Collection[int],
     frames: Sequence[BBox] = (),
     covers: Sequence[tuple[float, float]] = (),
+    apart: Collection[int] = frozenset(),
 ) -> tuple[list[_Block], list[BBox]]:
     """A typed page's drawings too small to be figures (`_vector_figures`' `small_out`)
     that no block holds: before, dropped with nothing to say so (the silent-loss sweep,
@@ -805,8 +808,9 @@ def _leftover_drawings(
     ticks). Not counted: drawn list bullets, a repeated mark in the header or footer band,
     horizontal and vertical lines and boxes alone (an empty answer box, a black box over a
     line) unless they are a ruler (a timeline: `_mark_axes`), anything whose middle lies
-    in a block (an underline, a box round a word), and
-    the ornaments of a page frame: marks at the edges of a frame round the page
+    in a block (an underline, a box round a word; not a drawing that stood beside a figure and
+    was kept out of it for the sentence between them, `apart`: it was in a picture, and is
+    one), and the ornaments of a page frame: marks at the edges of a frame round the page
     (`frames`, corner curls), or a group that runs round the page itself (a frame of
     separate dots), dots alone (DOT_PT), and a shape painted over hidden text (`covers`,
     the covered characters' origins: a box or a black highlight hiding a line). The rest
@@ -847,6 +851,7 @@ def _leftover_drawings(
             holders
             and not _dots(members)  # decided once grouped (`_dots_out_of_line`)
             and not _bonds(members, index)
+            and not any(id(p) in apart for p in members)
         ):
             continue  # an underline, a box round a word, maths drawn in a line
         if any(_at_edge(box, frame, FIGURE_PART_REACH) for frame in frames):
@@ -854,7 +859,12 @@ def _leftover_drawings(
         keep.append((box, members))
     figures: list[_Block] = []
     marks: list[BBox] = []
-    for group in _cluster([b for b, _ in keep], LEFTOVER_REACH):
+    # A drawing kept out of a figure for the sentence between them is not grouped with the
+    # drawings near it either: the group's box would take that sentence in again.
+    lone = [i for i, (_, cluster) in enumerate(keep) if any(id(p) in apart for p in cluster)]
+    rest = [i for i in range(len(keep)) if i not in lone]
+    grouped = [[rest[j] for j in g] for g in _cluster([keep[i][0] for i in rest], LEFTOVER_REACH)]
+    for group in [*grouped, *([i] for i in lone)]:
         members = [p for i in group for p in keep[i][1]]
         box = _union(keep[i][0] for i in group)
         places = len({_box_key(p.bbox) for p in members})  # a path drawn again is one mark

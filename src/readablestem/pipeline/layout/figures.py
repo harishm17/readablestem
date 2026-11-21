@@ -448,6 +448,7 @@ def _vector_figures(
     left_out: list[BBox] | None = None,
     depth: int = 0,
     small_out: list[tuple[BBox, list[_Path]]] | None = None,
+    apart_out: set[int] | None = None,
     ink: Collection[int] = frozenset(),
     hand: Sequence[BBox] = (),
     document: _Document,
@@ -479,7 +480,9 @@ def _vector_figures(
     there that is no box round text. Pen strokes (`ink`) and what lies in the page's
     handwriting regions (`hand`) are no signs. Clusters too small to be figures that are
     no part of one go to `small_out`: the page decides what they are once its text is
-    read (`_leftover_drawings`)."""
+    read (`_leftover_drawings`). `apart_out` gets the ids of the paths of those that lie
+    beside a figure and were kept out of it for the sentence between the two
+    (`_sentence_between`): each is a drawing of its own, not lost with the join."""
     figures = []
     small: list[tuple[BBox, list[_Path]]] = []  # drawings too small to be figures on their own
     index = _RowIndex([r for r in rows if not r.vertical])
@@ -555,6 +558,7 @@ def _vector_figures(
                     left_out=left_out,
                     depth=depth + 1,
                     small_out=small_out,
+                    apart_out=apart_out,
                     ink=ink,
                     hand=hand,
                     document=document,
@@ -595,19 +599,25 @@ def _vector_figures(
     # are part of it, within LEFTOVER_REACH as `_leftover_drawings` groups them: left out,
     # its crop missed them. Not when a sentence of the page's text lies between the two (a
     # labelled tab over its sentence, a few points from the grid under it): the union's crop
-    # would take the sentence into the picture.
+    # would take the sentence into the picture. Such a drawing was part of a picture and is
+    # one of its own now (`apart_out`): a formula drawn as outlines must not go with the join.
     for box, members in small:
+        apart = False
         for figure in figures:
-            if _within(box, figure.bbox, LEFTOVER_REACH) and not _sentence_between(
-                rows, box, figure.bbox, document=document
-            ):
-                figure.bbox = figure.drawing = _union([figure.drawing, box])
-                figure.paths += len(members)
-                figure.members += members
-                break
+            if not _within(box, figure.bbox, LEFTOVER_REACH):
+                continue
+            if _sentence_between(rows, box, figure.bbox, document=document):
+                apart = True
+                continue
+            figure.bbox = figure.drawing = _union([figure.drawing, box])
+            figure.paths += len(members)
+            figure.members += members
+            break
         else:
             if small_out is not None:
                 small_out.append((box, members))
+            if apart and apart_out is not None:
+                apart_out.update(id(p) for p in members)
     return figures
 
 
