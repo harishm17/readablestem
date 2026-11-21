@@ -129,6 +129,31 @@
   variants; there the deck's headings now say which deck they are in (`slide_deck 1`, and the
   title `slide_deck_title`), and nothing else about them. No other file changed.
 - No migration.
+## Unreleased: a web address the file links on two lines is one address (O-046, O-156, O-021)
+
+- A line break inside a printed web address was joined with a space unless the line ended on a
+  sign ("/", "-", "=" and the like): "doi.org/10.1016/j." / "tics.2022.11.009" came out with a
+  space, and so did "https:" / "//doi.org/...". The file's own link annotations now settle it:
+  where two annotations of one address (one per line, as hyperref writes them) run across the
+  break, and the words under them, with their spaces taken out, are the address, the break joins
+  with no space (`hyphens.link_cut`, read per document by `layout.document._link_cuts` into
+  `_Document.link_cuts`, used by `blocks._line_break`). A named link over two lines ("Smith" /
+  "Jones") is not an address and keeps its space; an address not under a link is decided as it was.
+  On the 126 public papers and corpus files, 3 public files change (18 breaks, each a space
+  removed inside an address, nothing else); no `full` replay of the 73 corpus documents changes,
+  so no recorded request or answer stops matching.
+- O-156 (an address that ends a line whole, the sentence going on below, gets no link): not built.
+  Counted on the 98 public papers and 28 corpus files: no typed address is lost to the line-end
+  rule (`text_pass._wraps`), so there is nothing to measure a rule against.
+- O-021 (blanks): not built. An equation is written from its LaTeX, never from its text, so a
+  blank run on the text of an equation line would not be written or said; marking those four
+  underscores needs the equation's own writing (or its request) to change. A row of three labels
+  over three rules is not found on the 28 corpus files: of 18 rows of two or more rules at one
+  height none holds a blank beside an underline or a plain rule.
+- Not done: the cells of a table (`tables._cell_text`, `_joined_text`) read no link annotation, and
+  one annotation drawn over two lines (not one per line) is not read.
+- No recording or request changes. `PIPELINE_VERSION` needs the bump of the wave (the text of a
+  PDF with such an address changes); no `RENDER_VERSION` raise, no migration.
 
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 

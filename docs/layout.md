@@ -351,9 +351,14 @@ so a heading is not, and a line that starts a block is not).
    `org`, with a lowercase start), so a sentence that ends with an address keeps its space
    and so does an address with a path that ends in a full stop; a non-breaking hyphen
    (U+2011, also U+FE63 and U+FF0D) after a letter or digit is a compound that must not
-   break (`easy-` / `to-use`), kept as written. The address test reads the word before the
-   break; the page's link annotations, which would settle the ambiguous cases, are not read
-   yet.
+   break (`easy-` / `to-use`), kept as written. Otherwise the address test reads the word before the
+   break. The file's own links settle the rest: where two link annotations of one address
+   (one per line, as hyperref writes them) run across the break, the words under them are
+   the address, and the break joins with no space whatever its last character is
+   (`hyphens.link_cut`, read per document by `document._link_cuts` into `_Document.link_cuts`,
+   and so used only by the paragraph joins: not yet by the cells of a table, and not for one
+   annotation drawn over two lines). A named link over two lines ("Smith" / "Jones") is not an
+   address, and its break keeps its space.
    Inline math that wraps from one line to the next is one equation (`_wrapped_inline`): a
    relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
    minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),

@@ -2738,7 +2738,7 @@ def _line_break(before: str, after: str, *, document: _Document = _PLAIN) -> tup
     """
     if before.endswith("\u00ad"):
         return before[:-1], ""
-    if hyphens.joins_inside_token(before, after):
+    if hyphens.joins_inside_token(before, after, document.link_cuts):
         return before, ""
     if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
         if after[:1].islower() and not hyphens.keeps_hyphen(
