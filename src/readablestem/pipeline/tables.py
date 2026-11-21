@@ -108,7 +108,7 @@ EDGE_SIZE_TOLERANCE = 0.6  # pt: the line's glyphs are the table's size, within 
 EDGE_COLUMN_TOLERANCE = 3.0  # pt: it starts where a column of the grid starts, within this
 CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (as figures)
 CAPTION_LINES_ABOVE = 7  # lines that may follow a caption's first line, over its table
-CAPTION_LINES_BELOW = 3  # ... under its table (the lines under it may be the text that follows)
+CAPTION_LINES_BELOW = 7  # ... under its table (as over it: a long caption is cut at its fourth line)
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
 WORD_GRID_ROWS = 6  # ... no more rows than this, no digit, and no "Table N" caption
@@ -145,6 +145,7 @@ CONDITION_LINES = 3  # lines ending in "if ..." that make a list of definitions 
 TEXT_TABLE_LINES = 4  # lines a box found from text alone needs, without a "Table N" caption
 BLOCK_MIN_LINES = 3  # lines with text in two or more cells that make a block of text columns
 PROSE_WORDS = 6  # a cell of this many words is a line of running text, not a label or a term
+TEXT_COLUMN_SHARE = 0.5  # fewer lines than this share with cells in both of two columns: text
 FRAME_MIN_WIDTH = 100.0  # pt: a rule shorter than this does not frame a table
 FRAME_MAX_RULES = 12  # rules of one extent on a page that are looked at together
 FRAME_GRID_SHARE = 0.3  # share of a framed box's lines with text in two columns (callouts have few)
@@ -2023,6 +2024,15 @@ def _text_block_dropped(
             return "page_text"
     if captioned:
         return None  # "Table 3: ..." under it: the document says it is one
+    if (
+        grid.columns == 2
+        and not columns_of_prose
+        and grid.grid_lines < TEXT_COLUMN_SHARE * grid.lines
+        and len(prose) >= 1
+    ):
+        # Two columns of text beside each other (a body and its sidebar): most of the lines
+        # hold one cell, and the lines that hold two are not rows, only lines that stand level.
+        return "page_text"
     conditional = _conditions(grid)
     if grid.lines < TEXT_TABLE_LINES and not conditional:
         return "no_grid"  # three lines of cells are as likely a fraction, a limit, a formula
