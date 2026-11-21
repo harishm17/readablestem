@@ -289,7 +289,8 @@ mark; 139 found and 135 linked now) and a count of the algorithm shapes on the 2
   under them) are now flat text with an optional `scripts_flattened` notice instead of two
   one-sign equations.
 - **A note that opens "In fact" is not indium.** The mark and the word after it were read as a
-  nuclide (`6 In`) and became an equation inside the note: 2 papers. A footnote's mark is no
+  nuclide (`6 In`) and became an equation inside the note: 2 papers of the set it was built on,
+  8 files (7 papers) in the release's corpus hash. A footnote's mark is no
   mass number. In a file that names no footnotes, the mark in the text before a math letter
   ("system,1 n") is also kept out of the equation.
 - **A note the file names and no link points at is linked by its mark.** Some classes write
