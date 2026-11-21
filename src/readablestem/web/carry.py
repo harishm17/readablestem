@@ -70,6 +70,7 @@ NOT_REAPPLIED_WORDS = {
     "heading": "paragraph you made a heading",
     "role": "paragraph you made a sidebar or a quotation",
     "block_left_out": "paragraph you left out",
+    "block_split": "paragraph you split into parts",
     "picture": "picture you added",
     "equation": "equation you marked",
     "page_left_out": "page you left out",

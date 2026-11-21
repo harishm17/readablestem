@@ -21,9 +21,10 @@ import math
 import re
 import unicodedata
 from collections import Counter
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from itertools import count, pairwise
 from typing import Any
 
 from readablestem.core import inline, triage
@@ -44,6 +45,8 @@ from readablestem.core.types import (
     Status,
     inline_marker,
 )
+from readablestem.pipeline.layout.lists import marker_readings
+from readablestem.pipeline.notices import OPTION_LABELS, RTL_TEXT, TEXT_NOTICE_OF
 from readablestem.web.review import (
     STRUCTURE_KEY,
     FieldError,
@@ -743,6 +746,212 @@ def put_back_block(result: DocumentResult, element_id: str) -> StructureChange:
         after={STRUCTURE_KEY: capture(result, elements=[element_id], blocks=True)},
         message="That text is back in the student file.",
         page=held.element.page,
+    )
+
+
+# --------------------------------------------------------------------------- one block split
+
+MAX_PIECES = 20
+SPLIT_NOT_TEXT = "Only a paragraph or a list item can be split into several."
+SPLIT_CODE = "Program code and glossary entries stay whole."
+SPLIT_EQUATION = "It holds an equation, which has its own decision. Leave it whole."
+SPLIT_RTL = "Right-to-left text stays whole: the PDF may not give its words in reading order."
+SPLIT_FOOTNOTE = "A mark in the text above links to this footnote, so it stays whole."
+SPLIT_LINKED = "Another part of the page links to this text, so it stays whole."
+SPLIT_DECISION = "A decision is still waiting on this text. Decide it first."
+SPLIT_WORDS = (
+    "Only break the text into lines here, and keep every word. To change a word, use "
+    "“Save the words” first."
+)
+SPLIT_ONE = "Put each item on its own line: break the text where it should be cut."
+SPLIT_MANY = f"Split it into at most {MAX_PIECES} parts."
+_WORD = re.compile(r"\S+")
+_LABEL = re.compile(
+    r"^(?:\((?P<inner>[A-Za-z0-9]{1,4})\)|(?P<plain>[A-Za-z0-9]{1,4})(?P<sep>[.)]))$"
+)
+
+
+def _label(token: str) -> tuple[str, str] | None:
+    """(form, body) of an ordered label word: "(b)" -> ("({})", "b"), "2." -> ("{}.", "2")."""
+    match = _LABEL.match(token)
+    if match is None:
+        return None
+    if match["inner"] is not None:
+        return "({})", match["inner"]
+    return "{}" + match["sep"], match["plain"]
+
+
+def split_blocked(result: DocumentResult, element: Element) -> str:
+    """Why a paragraph or list item cannot be split, or "" when it can. What something else
+    points at by id (a footnote its mark links to, a link to the block, an inline equation in
+    it) or what needs another decision first stays whole, as for leaving a block out."""
+    if element.kind not in (Kind.PARAGRAPH, Kind.LIST_ITEM):
+        return SPLIT_NOT_TEXT
+    if element.preformatted or element.term_end is not None:
+        return SPLIT_CODE
+    if RTL_TEXT in element.reasons:
+        return SPLIT_RTL
+    if any(e.parent_id == element.id for e in result.elements) or INLINE_MARKER_RE.search(
+        element.text or ""
+    ):
+        return SPLIT_EQUATION
+    if any(n.code == "footnote" and n.element_id == element.id for n in result.notices):
+        return SPLIT_FOOTNOTE
+    if any(
+        link.target_id == element.id
+        for e in result.elements
+        if e.id != element.id
+        for link in e.links
+    ):
+        return SPLIT_LINKED
+    if any(
+        f.element_id == element.id and f.pending and f.reason not in TEXT_NOTICE_OF
+        for f in result.fixes
+    ):
+        return SPLIT_DECISION
+    return ""
+
+
+def proposed_lines(element: Element) -> str:
+    """The block's words with a line break before each later option label: the label that
+    follows the first one in order, in the same form ("(A) ... (B) ...", "a. ... b. ...").
+    The reviewer confirms or moves the breaks (`split_block`); with no label found the words
+    are one line."""
+    spans = list(_WORD.finditer(element.text or ""))
+    words = [m.group(0) for m in spans]
+    first = element.list_marker or (words[0] if words else "")
+    parsed = _label(first)
+    cuts: list[int] = []
+    if parsed is not None:
+        form, body = parsed
+        wanted = {(style, value + 1) for style, value in marker_readings(body)}
+        for k, word in enumerate(words):
+            token = _label(word)
+            if (k == 0 and not element.list_marker) or k == len(words) - 1 or token is None:
+                continue
+            readings = set(marker_readings(token[1])) & wanted
+            if token[0] == form and readings:
+                cuts.append(k)
+                wanted = {(style, value + 1) for style, value in readings}
+    bounds = [0, *cuts, len(words)]
+    return "\n".join(" ".join(words[a:b]) for a, b in pairwise(bounds))
+
+
+def _next_element_id(result: DocumentResult, page: int) -> Callable[[], str]:
+    """A source of free "p{page+1}-e{index}" ids on this page, one past the highest index used
+    by an element, a left-out paragraph or a page left out."""
+    prefix = f"p{page + 1}-e"
+    held = [
+        *result.elements,
+        *(b.element for b in result.left_out_blocks),
+        *(e for o in result.omitted for e in o.elements),
+    ]
+    used = [
+        int(e.id.removeprefix(prefix))
+        for e in held
+        if e.id.startswith(prefix) and e.id.removeprefix(prefix).isdecimal()
+    ]
+    counter = count(max(used) + 1 if used else 0)
+    return lambda: f"{prefix}{next(counter)}"
+
+
+def split_block(result: DocumentResult, element_id: str, typed: str) -> StructureChange:
+    """Split a paragraph or list item into several, at the line breaks in `typed` (its words
+    with a break where each part starts: `proposed_lines` offers the breaks). Only breaks may
+    change: every word stays, in its order. The first part keeps the element's id, fix and
+    notices; the others are elements of the same kind right after it, with the same box,
+    size, language and role, and ids of their own. A list item's later parts take their
+    leading label as their marker ("(b)"), else the item's own marker. Links, colors and raised
+    runs stay on their words (one across a break is dropped, and the notice says how many
+    links). Layout's doubt about the options run together is answered: the text decision on
+    the block, if any, is the reviewer's own now. Raises ReviewInvalid and LookupError;
+    nothing is changed then."""
+    element = text_element(result, element_id)
+    fid = _fid("split", element_id)
+    values = {"lines": typed}
+    if blocked := split_blocked(result, element):
+        raise ReviewInvalid([FieldError(fid, blocked)], values)
+    if len(typed) > MAX_TEXT_CHARS * 2:
+        raise ReviewInvalid([FieldError(fid, f"Keep the text under {MAX_TEXT_CHARS} characters.")])
+    cleaned = _CONTROL.sub("", typed.replace("\r\n", "\n").replace("\r", "\n"))
+    lines = [line.split() for line in cleaned.split("\n") if line.strip()]
+    text = element.text or ""
+    spans = list(_WORD.finditer(text))
+    if [w for line in lines for w in line] != [m.group(0) for m in spans]:
+        raise ReviewInvalid([FieldError(fid, SPLIT_WORDS)], values)
+    if len(lines) < 2:
+        raise ReviewInvalid([FieldError(fid, SPLIT_ONE)], values)
+    if len(lines) > MAX_PIECES:
+        raise ReviewInvalid([FieldError(fid, SPLIT_MANY)], values)
+    # Each part: (first word, one past the last word), and for a list item's later parts the
+    # label that starts it, which becomes the marker.
+    parts: list[tuple[int, int, str | None]] = []
+    at = 0
+    for number, line in enumerate(lines):
+        label: str | None = None
+        first = at
+        if element.kind is Kind.LIST_ITEM and number and len(line) > 1 and _label(line[0]):
+            label, first = line[0], at + 1
+        parts.append((first, at + len(line), label))
+        at += len(line)
+    new_id = _next_element_id(result, element.page)
+    pieces: list[Element] = []
+    taken: Counter[str] = Counter()
+    for number, (first, end, label) in enumerate(parts):
+        start, stop = spans[first].start(), spans[end - 1].end()
+        update, dropped = inline.moved(
+            element,
+            lambda a, b, start=start, stop=stop: (
+                (a - start, b - start) if start <= a and b <= stop else None
+            ),
+        )
+        taken += Counter({k: n for k, n in dropped.items() if n})
+        change: dict[str, Any] = {
+            "text": text[start:stop],
+            "reasons": [r for r in element.reasons if r != OPTION_LABELS],
+            **update,
+        }
+        if number:
+            change |= {"id": new_id(), "order": element.order + number}
+            if label is not None:
+                change["list_marker"] = label
+        pieces.append(element.model_copy(update=change))
+    extra = len(pieces) - 1
+    # The ids of the new parts are saved as "not there", so Undo takes them out again.
+    before = capture(
+        result,
+        elements=[p.id for p in pieces],
+        fixes=[element_id],
+        orders=True,
+        page=element.page,
+    )
+    for other in result.elements:
+        if other.order > element.order:
+            other.order += extra
+    index = next(n for n, e in enumerate(result.elements) if e.id == element_id)
+    result.elements[index] = pieces[0]
+    result.elements.extend(pieces[1:])
+    fix = next((f for f in result.fixes if f.element_id == element_id), None)
+    if fix is not None and fix.pending and fix.reason in TEXT_NOTICE_OF:
+        fix.status, fix.reviewed = Status.EDITED, True
+    _recount(result)
+    # Spans that held links across a break are named; colors and raised runs are not.
+    note = _taken_off(Counter({"link": taken["link"], "deleted": taken["deleted"]}))
+    return StructureChange(
+        element_id=element_id,
+        action="split_block",
+        before={STRUCTURE_KEY: before},
+        after={
+            STRUCTURE_KEY: capture(
+                result,
+                elements=[p.id for p in pieces],
+                orders=True,
+                page=element.page,
+            ),
+            "lines": [" ".join(line) for line in lines],
+        },
+        message=f"The text is now {len(pieces)} separate parts.{note}",
+        page=element.page,
     )
 
 

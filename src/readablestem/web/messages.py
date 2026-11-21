@@ -442,7 +442,8 @@ REASON_MESSAGES: dict[str, str] = {
     "original: if they read right, choose Looks right; if not, change the words.",
     "text.option_labels": "Answer options (A, B, C and so on) run together in one paragraph or "
     "list item, so a screen reader reads them as one block. If each option can still be told "
-    "from the next, choose Looks right; if not, change the words so that each one is set apart.",
+    "from the next, choose Looks right; if not, split it into one part for each option with "
+    "“Split this paragraph into separate parts” in the page tools, or change the words.",
     # Table step (pipeline.table_step)
     "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
     "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
@@ -563,7 +564,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "need them.",
     "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
     "item, so a screen reader reads them as one block: look at whether each option can be told "
-    "from the next, and change the words if not.",
+    "from the next, and split it into parts with the page tools, or change the words, if not.",
     "rtl_text": "This text is written right to left (Arabic or Hebrew). The PDF may store its "
     "words in a different order from the one they are read in, so the words may be out of "
     "order: compare it with the original.",

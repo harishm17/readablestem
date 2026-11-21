@@ -55,6 +55,7 @@ TEXT = "text"
 HEADING = "heading"
 ROLE = "role"
 BLOCK_LEFT_OUT = "block_left_out"
+BLOCK_SPLIT = "block_split"
 PICTURE = "picture"
 EQUATION = "equation"
 PAGE_LEFT_OUT = "page_left_out"
@@ -62,7 +63,17 @@ NOT_EQUATION = "not_equation"
 # A page operation that is never made again (a try-again or a revision starts from the
 # pipeline's reading): an equation read again. It is listed, by name and page, as not re-applied.
 READ_AGAIN = "read_again"
-KINDS = (TEXT, HEADING, ROLE, BLOCK_LEFT_OUT, PICTURE, EQUATION, PAGE_LEFT_OUT, NOT_EQUATION)
+KINDS = (
+    TEXT,
+    HEADING,
+    ROLE,
+    BLOCK_LEFT_OUT,
+    BLOCK_SPLIT,
+    PICTURE,
+    EQUATION,
+    PAGE_LEFT_OUT,
+    NOT_EQUATION,
+)
 CARRIED_KEY = "carried_edit"
 
 # `ReviewEdit.action` values of the edits that change the text or the kind of an element.
@@ -123,6 +134,7 @@ ROW_ACTIONS = {
     HEADING: "make_heading",
     ROLE: "set_role",
     NOT_EQUATION: "not_equation",
+    BLOCK_SPLIT: "split_block",
 }
 
 
@@ -452,6 +464,71 @@ def _apply_words(
     return kinds, changes
 
 
+# --------------------------------------------------------------------------- a block split
+
+
+def _split_rows(rows: list[EditRow]) -> list[EditRow]:
+    """The latest `split_block` row of each block, in the order they were made (a block split,
+    undone and split again has two rows; the later one is what the file says)."""
+    latest: dict[str, EditRow] = {}
+    for row in rows:
+        if row.action == "split_block":
+            latest.pop(row.element_id, None)
+            latest[row.element_id] = row
+    return list(latest.values())
+
+
+def _held(row: EditRow, side: str, element_id: str) -> dict[str, Any] | None:
+    held = ((getattr(row, side) or {}).get(STRUCTURE_KEY) or {}).get("elements") or {}
+    return held.get(element_id) if isinstance(held.get(element_id), dict) else None
+
+
+def _carry_split(old: DocumentResult, new: DocumentResult, rows: list[EditRow]) -> EditsCarried:
+    """A paragraph or list item split into parts (`page_edits.split_block`) is split again at
+    the same lines in the paragraph of the new file that says what it said before the split
+    (kind, words, size and weight), when exactly one does. A split that was undone left no
+    parts and is not carried; one whose parts were changed since is listed as not made again,
+    as is one with no paragraph to match."""
+    out = EditsCarried()
+    by_id = {e.id: e for e in old.elements}
+    for row in _split_rows(rows):
+        after = (row.after or {}).get(STRUCTURE_KEY) or {}
+        parts = [i for i, d in (after.get("elements") or {}).items() if isinstance(d, dict)]
+        held = _held(row, "before", row.element_id)
+        lines = (row.after or {}).get("lines")
+        if not parts or any(i not in by_id for i in parts):
+            continue  # undone: nothing was left of it
+        page = by_id[row.element_id].page if row.element_id in by_id else None
+        if held is None or not isinstance(lines, list):
+            out.drop(BLOCK_SPLIT, page)
+            continue
+        if any(by_id[i].text != after["elements"][i].get("text") for i in parts):
+            out.drop(BLOCK_SPLIT, page)  # a part was changed since: not what was split
+            continue
+        try:
+            before = Element.model_validate(held)
+        except ValueError:
+            out.drop(BLOCK_SPLIT, page)
+            continue
+        key = uid.fingerprint(before)
+        found = [
+            e
+            for e in new.elements
+            if e.kind is before.kind and uid.fingerprint(e) == key and _same_look(before, e)
+        ]
+        if len(found) != 1:
+            out.drop(BLOCK_SPLIT, page)
+            continue
+        try:
+            change = page_edits.split_block(new, found[0].id, "\n".join(map(str, lines)))
+        except (ReviewInvalid, LookupError):
+            out.drop(BLOCK_SPLIT, page)
+            continue
+        out.items.append((BLOCK_SPLIT, found[0].id))
+        out.changes[(BLOCK_SPLIT, found[0].id)] = change
+    return out
+
+
 # --------------------------------------------------------------------------- added items
 
 
@@ -648,6 +725,7 @@ def carry_structure(
     (`with_omitted_back`); `rows` are the earlier version's structural `ReviewEdit`s in the
     order they were made."""
     out = _carry_words(old, old_crops, new, new_crops, rows)
+    out.extend(_carry_split(old, new, rows))
     added = _carry_added(old, old_crops, new, unchanged, job_pages)
     out.extend(added)
     out.extend(_carry_not_equation(old_crops, new, new_crops, rows))

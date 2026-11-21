@@ -3612,6 +3612,36 @@ an edit or an error, and when `tools=1`) with, in this order:
   again, only where the new file would allow it (an open decision, a link or an equation there
   refuses it); a paragraph put back is not carried, and one not made again is listed as
   "paragraph you left out". No keyboard shortcut.
+  *Split it into separate parts* (`action=split`, `page_edits.split_block`; the same route, a
+  labeled box `lines`, button "Split it"; O-030, O-035). For options or list items that run
+  together in one paragraph or list item. The box holds the block's words with a line break
+  before each later label found (`page_edits.proposed_lines`: the next label of the first one's
+  form in order, "(A) ... (B) ...", "a. ... b. ..."), or as one line when none is found; the
+  reviewer moves, adds or takes out breaks. Only breaks can change: every word stays in its
+  order, or the route refuses it and says to use "Save the words" first. Each line becomes an
+  element of the same kind, in order right after the first: the first part keeps the element's
+  id, fix and notices, the others take the next free `p{page}-e{n}` of the page and the same box,
+  size, language and role (the page's marks for them overlap), and a list item's later parts take
+  their leading label as their marker, else the item's own. A link, color or raised run stays on
+  its words; one across a break is dropped and the notice names how many links. Layout's reason
+  `option_labels` is taken off every part, and the text decision it raised on the block, if still
+  open, is the reviewer's own now (status "edited", `reviewed`), since they cut the text where it
+  needed cutting. Refused (`page_edits.split_blocked`, each with a sentence): anything but a
+  paragraph or list item, program code, a glossary entry, right-to-left text, a block that holds an
+  inline equation, a footnote, a block another element links to, and a block a decision of
+  another kind waits on. It moves the reading order of what follows, so it is written like the
+  page operations that do (one `ReviewEdit` `split_block` with an Undo snapshot of the block and
+  the order, counted among the changes to pages; stale after any write since the page was drawn).
+  The record names it by the words the block had. A document converted again carries it over
+  (`carry_edits._carry_split`, kind `block_split`): the block that says the same words before the
+  split, when exactly one does, is split at the same lines; an undone split is not carried, and one
+  whose parts were changed since, or with no single matching block, is listed as "paragraph you
+  split into parts". No keyboard shortcut. Not built: text decisions on any other kind of text
+  than right-to-left order and options run together (no other kind has a producer, and nothing
+  measured needs one); the reorder of right-to-left text (held, SW54b); and a cut that reorders
+  words. Options set in two columns whose lines interleave ("(a) one two (b) three four five six"
+  with "five six" the end of the first) are cut at the labels, which gives the wrong words, so the
+  reviewer puts the words in order with "Save the words" and then splits.
 - *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
   the proposal read aloud in its place (the sentence before and after for one on its own line),
   and both readings, as speech and as LaTeX, where the page witness read it differently; a
