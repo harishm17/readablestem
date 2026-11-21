@@ -39,14 +39,17 @@ def test_page_title_landmarks_headings_paragraphs_and_lists():
     assert spoken[:2] == ["Page title: Kinematics", "Page language: English"]
     # F-120: the skip link and the bare landmark are said before the lesson, chosen by kind;
     # Play starts at the navigation, the first item with content. F-122: plain role words.
-    assert spoken[2:4] == ["Skip link: Skip to main content", "Navigation, Contents"]
+    # O-177: the contents list is navigation, read as its entries, not as a collapsed section.
+    assert spoken[2:6] == [
+        "Skip link: Skip to main content",
+        "Navigation, Contents",
+        "List, 1 item",
+        "link Intro",
+    ]
     assert [i.before for i in items[:5]] == [True, True, True, False, False]
     assert "Main content" in spoken
     assert items[2].kind == "skip-link"
     assert "Navigation, Contents" in spoken
-    # O-177: the contents list is navigation, read as its entries, not a collapsed section
-    assert not any("ollapsed" in s or "xpandable" in s for s in spoken[:8])
-    assert "Link: Intro" in spoken or any("Intro" in s for s in spoken[:8])
     assert "Heading level 1: Motion" in spoken
     assert "Heading level 2: Kinematics" in spoken
     assert "Speed is distance over time." in spoken
