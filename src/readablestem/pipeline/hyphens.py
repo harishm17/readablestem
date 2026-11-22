@@ -136,6 +136,7 @@ _SCHEME = re.compile(r"[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
 _ADDRESS_END = "/._-="
 _CUT_CHARS = 24  # how much of each side of a linked break is kept to know it again
 _OPENERS = "([{<\"'\u201c\u2018"
+_SENTENCE_END = ".,;:!?)]}\"'\u201d\u2019"  # what may follow an address inside its annotation
 
 
 def _address(token: str) -> bool:
@@ -178,11 +179,16 @@ def link_cut(uri: str, first: str, second: str) -> tuple[str, str] | None:
     start of `second`), or None. `first` and `second` are the texts under two link
     annotations of the same `uri` on neighbouring lines. They are the address itself when
     the two, with their spaces taken out, run on one after the other in the `uri` and what
-    they print is an address (it holds ".", "/", "@" or ":"). A named link ("Smith" over two
-    lines, or "Khan" / "Academy" under khanacademy.org, whose words run together are in the
-    `uri` too) is not, and its break keeps its space."""
-    a, b = "".join(first.split()), "".join(second.split())
+    they print is an address (it holds ".", "/", "@" or ":"). The sentence sign that an
+    annotation may cover after the address ("Academy." or "tics.2022.11.009)") is not part of
+    it, and neither is a full stop followed by a capital ("Dr." / "Smith" under
+    example.org/dr.smith). A named link ("Smith" over two lines, or "Khan" / "Academy" under
+    khanacademy.org, whose words run together are in the `uri` too) is not an address, and
+    its break keeps its space."""
+    a, b = "".join(first.split()), "".join(second.split()).rstrip(_SENTENCE_END)
     if not a or not b or not any(c in a + b for c in "./@:"):
+        return None
+    if a.endswith(".") and b[0].isupper():
         return None
     shown = _SCHEME.sub("", a + b, count=1).removeprefix("mailto:").lower()
     if shown not in _SCHEME.sub("", uri, count=1).removeprefix("mailto:").lower():

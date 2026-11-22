@@ -28,7 +28,8 @@ def test_a_missing_word_list_joins_as_it_always_did(monkeypatch):
 def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_space():
     """Nothing in "...PhysRevLett.1" / "23.4567" says the address goes on, so it was joined
     with a space; the link annotations the file has over both lines (one per line, as hyperref
-    writes them) say it. A named link over two lines ("Smith" / "Jones") keeps its space."""
+    writes them) say it, also where an annotation covers the sentence's full stop. A named link over
+    two lines ("Smith" / "Jones", "Khan" / "Academy.", "Dr." / "Smith") keeps its space."""
     import pymupdf
 
     from readablestem.pipeline import layout
@@ -42,13 +43,24 @@ def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_
         "Jones and the rest of the group, who also recommend the unit on Khan",
         "Academy and then the videos that were recorded for the Khan",
         "Academy course, which follow the same order as our lectures in the class.",
+        "The notes are kept at https://example.org/people/notes/chap",
+        "ter1.html. The first unit on Khan",
+        "Academy. Then ask Dr.",
+        "Smith about the rest of it, which is all that the course page has to say.",
     ]
+    notes = "https://example.org/people/notes/chapter1.html"
     links = [(1, lines[1], address), (2, lines[2].split()[0], address)]
     links += [
         (3, "Smith", "https://example.org/people/x"),
         (4, "Jones", "https://example.org/people/x"),
         (5, "Khan", "https://www.khanacademy.org/math"),
         (6, "Academy", "https://www.khanacademy.org/math"),
+        (7, "https://example.org/people/notes/chap", notes),
+        (8, "ter1.html.", notes),  # the annotation covers the sentence's full stop
+        (8, "Khan", "https://www.khanacademy.org/math"),
+        (9, "Academy.", "https://www.khanacademy.org/math"),
+        (9, "Dr.", "https://example.org/dr.smith"),
+        (10, "Smith", "https://example.org/dr.smith"),
     ]
 
     def converted(linked: bool) -> str:
@@ -71,4 +83,6 @@ def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_
     text = converted(linked=True)
     assert "PhysRevLett.123.4567 for anyone" in text
     assert "Smith Jones" in text
-    assert text.count("Khan Academy") == 2
+    assert text.count("Khan Academy") == 3  # also where the link covers the full stop
+    assert "chapter1.html. The first" in text
+    assert "Dr. Smith about" in text
