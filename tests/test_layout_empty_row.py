@@ -227,9 +227,27 @@ def page_two_cannot_be_drawn(monkeypatch):
     monkeypatch.setattr(access, "_PROBE_SCRIPT", _DIES_ON_PAGE_2)
 
 
+# What page 3's page tree says about its size: (keys on the page, keys on the Pages node above it).
+_PAGE_TREES = {
+    "plain": ({}, {}),
+    "user unit 2": ({"UserUnit": "2"}, {}),
+    "crop larger than the media box": ({"CropBox": "[-100 -100 750 950]"}, {}),
+    "no media box, a crop": ({"MediaBox": "null", "CropBox": "[0 0 300 300]"}, {}),
+}
+
+
+@pytest.mark.parametrize("tree", _PAGE_TREES)
 def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are_read(
-    page_two_cannot_be_drawn, caplog, monkeypatch
+    tree, page_two_cannot_be_drawn, caplog, monkeypatch
 ):
+    doc = pymupdf.open("pdf", _document(5))
+    page_keys, node_keys = _PAGE_TREES[tree]
+    node = int(doc.xref_get_key(doc[2].xref, "Parent")[1].split()[0])
+    for xref, keys in ((doc[2].xref, page_keys), (node, node_keys)):
+        for key, value in keys.items():
+            doc.xref_set_key(xref, key, value)
+    pdf = doc.tobytes()
+    doc.close()
     loaded: list[int] = []
     real_load = pymupdf.Document.load_page
 
@@ -239,9 +257,12 @@ def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are
 
     monkeypatch.setattr(pymupdf.Document, "load_page", load_page)
     with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.layout"):
-        result = _convert(_document(5))
+        result = _convert(pdf)
     assert 2 not in loaded and {0, 1, 3, 4} <= set(loaded)  # page 3 is never built
-    assert result.page_sizes[2] == (595.0, 842.0)
+    with pymupdf.open("pdf", pdf) as again:  # built here, apart from the conversion
+        rect = again[2].rect
+    assert result.page_sizes[2] == (round(rect.width, 2), round(rect.height, 2))
+    assert tree != "plain" or result.page_sizes[2] == (595.0, 842.0)
     (fix,) = [f for f in result.fixes if f.reason == "page_not_rendered"]
     assert fix.review == "required"
     assert [(n.code, n.page) for n in result.notices if n.code == "page_not_rendered"] == [

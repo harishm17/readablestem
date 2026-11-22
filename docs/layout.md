@@ -3691,9 +3691,12 @@ did not, the file fails as it did. Such a page is not read at all (the probe cov
 read as well as the drawing, so nothing of the page is trusted) and the conversion does not
 build it again: no step, crop, tag, link or image reads it, the page-number pass skips it (its
 number is the one its neighbors' printed numbers give it, if they bracket it; the PDF's own
-label for it is not read), and its size for the page list comes from the page tree (its CropBox
-inside the MediaBox and its inherited Rotate, `document._unloaded_size`; US Letter if the tree
-cannot be read; a page saved sideways that layout would turn upright is not turned). The web
+label for it is not read), and its size for the page list comes from the page tree, the size
+`Page.rect` gives (`document._unloaded_size`): the MediaBox cut to the CropBox where they overlap
+(both and Rotate inherited from the Pages nodes above), times the page's own UserUnit, turned by
+Rotate; US Letter where the MediaBox is missing or empty, where the CropBox leaves nothing of it,
+or if the tree cannot be read; a page saved sideways that layout would turn upright is not
+turned). The web
 process has no PyMuPDF call of its own: the upload check and the review screen's page pictures
 run in child processes (`web/pdf_probe.py`), which is where a page that kills MuPDF may be
 opened. It is kept with the reason
