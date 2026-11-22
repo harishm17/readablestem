@@ -7,7 +7,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections.abc import Iterable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 
 from readablestem.core.mathchars import base_char, char_variant, styled_char
@@ -200,10 +200,12 @@ class _Char:
     # (`mark_small_capitals`). Text, not a script; a lower-case letter of the source when a
     # full-size capital leads the word.
     small_cap: bool = False
+    # Whitespace. Read about 80 times for each char made (11.6 million reads for 146,000
+    # chars on the slowest development file), so it is worked out once, here.
+    blank: bool = field(init=False, repr=False, compare=False)
 
-    @property
-    def blank(self) -> bool:
-        return self.c.isspace()
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "blank", self.c.isspace())
 
     @property
     def bold(self) -> bool:

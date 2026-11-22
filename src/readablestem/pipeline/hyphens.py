@@ -134,7 +134,9 @@ def keeps_hyphen(
 
 _SCHEME = re.compile(r"[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
 _ADDRESS_END = "/._-="
+_CUT_CHARS = 24  # how much of each side of a linked break is kept to know it again
 _OPENERS = "([{<\"'\u201c\u2018"
+_SENTENCE_END = ".,;:!?)]}\"'\u201d\u2019"  # what may follow an address inside its annotation
 
 
 def _address(token: str) -> bool:
@@ -169,16 +171,44 @@ def _host_unfinished(token: str) -> bool:
     return len([label for label in labels if label]) <= 1
 
 
-def joins_inside_token(before: str, after: str) -> bool:
+LinkCuts = frozenset[tuple[str, str]]
+
+
+def link_cut(uri: str, first: str, second: str) -> tuple[str, str] | None:
+    """What a printed address, linked on two lines, says about its break: (end of `first`,
+    start of `second`), or None. `first` and `second` are the texts under two link
+    annotations of the same `uri` on neighbouring lines. They are the address itself when
+    the two, with their spaces taken out, run on one after the other in the `uri` and what
+    they print is an address (it holds ".", "/", "@" or ":"). The sentence sign that an
+    annotation may cover after the address ("Academy." or "tics.2022.11.009)") is not part of
+    it, and neither is a full stop followed by a capital ("Dr." / "Smith" under
+    example.org/dr.smith). A named link ("Smith" over two lines, or "Khan" / "Academy" under
+    khanacademy.org, whose words run together are in the `uri` too) is not an address, and
+    its break keeps its space."""
+    a, b = "".join(first.split()), "".join(second.split()).rstrip(_SENTENCE_END)
+    if not a or not b or not any(c in a + b for c in "./@:"):
+        return None
+    if a.endswith(".") and b[0].isupper():
+        return None
+    shown = _SCHEME.sub("", a + b, count=1).removeprefix("mailto:").lower()
+    if shown not in _SCHEME.sub("", uri, count=1).removeprefix("mailto:").lower():
+        return None
+    return a[-_CUT_CHARS:], b[:_CUT_CHARS]
+
+
+def joins_inside_token(before: str, after: str, cuts: LinkCuts = frozenset()) -> bool:
     """Did the line break fall inside one token, so that `after` goes on from `before`
     with no space and the hyphen, if there is one, stays (module docstring)?
 
     `before` ends the earlier line and `after` starts the next, neither with spaces at the
-    break. The caller has handled a soft hyphen. Whether the break fell inside an address is
-    read from the last word of `before` alone: the link annotations of the page, which would
-    settle the ambiguous cases, are not available to this function yet."""
+    break. The caller has handled a soft hyphen. `cuts` are the breaks of the document's
+    linked addresses (`link_cut`): a break the file's own link runs across is inside the
+    address, whatever its last character is. Any other break inside an address is read from
+    the last word of `before` alone."""
     if len(before) < 2 or not after or before[-1].isspace() or after[0].isspace():
         return False
+    if any(before.endswith(end) and after.startswith(start) for end, start in cuts):
+        return True
     last, previous = before[-1], before[-2]
     if last in HYPHENS + FIXED_HYPHENS and previous.isdecimal() and after[0].isdecimal():
         return True

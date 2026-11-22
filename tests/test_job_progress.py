@@ -104,6 +104,28 @@ def test_the_layout_counts_its_pages_until_it_is_done(fake_steps):
     assert (line.state, line.done, line.total) == ("now", 1, 2)  # the page's progress bar
 
 
+def test_the_scanned_pages_have_a_counter_of_their_own_and_no_bar_steps_back():
+    from image_page_support import block, scan_pdf, text
+
+    page = {"blocks": [block("paragraph", runs=[text("Speed.")], y0=100, y1=160)]}
+    fake = FakeVisionClient(responders={"image_page": lambda r: page})
+    events: list[ProgressEvent] = []
+    run.convert_pdf(
+        scan_pdf(3),
+        settings=settings(feature_image_pages=True),
+        client=fake,
+        stage_progress=events.append,
+    )
+    for stage in ("layout", "pages"):
+        done = [e.done for e in events if e.stage == stage and e.total]
+        assert done == sorted(done), stage  # the layout's count is done before the pages start
+    assert [(e.done, e.total) for e in events if e.stage == "pages"][-1] == (3, 3)
+    mid = {"stages": {"pages": {"stage": "pages", "done": 1, "total": 3}}}
+    (line,) = job_page.stage_lines(mid)
+    assert (line.state, line.done, line.total) == ("now", 1, 3)
+    assert job_page.stage_sentence(mid) == "Reading the scanned pages."
+
+
 # --------------------------------------------------------------------------- the worker
 
 

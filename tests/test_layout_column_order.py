@@ -14,6 +14,8 @@ the left column, and a line as wide as its column counted as a heading.
 
 from __future__ import annotations
 
+import pytest
+
 from readablestem.pipeline import layout
 
 GUTTER = (299.0, 317.0)
@@ -55,3 +57,136 @@ def test_a_short_heading_beside_a_gap_in_the_other_column_still_breaks_the_colum
     boxes = [above_left, above_right, heading, below_left, below_right]
     read = [boxes[i] for i in order(boxes)]
     assert read == [above_left, above_right, heading, below_left, below_right]
+
+
+@pytest.mark.parametrize(
+    ("note", "paragraphs"),
+    [(False, None), (True, None), (False, (5, 4))],
+)
+def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other(note, paragraphs):
+    # A title, authors and affiliations centered over both columns (more lines across the
+    # gutter than a column may have), an abstract across the page, then two columns; with a
+    # note across the page under them whose last line is short and sits at the left; or with
+    # paragraphs set a line apart, of five lines on the left and four on the right, so each
+    # column has holes of its own at its own places.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 60.0
+    for text in ("A Title", "Of Two Lines", "First Author", "Second Author", "Third Author"):
+        width = pymupdf.get_text_length(text, "helv", 12)
+        page.insert_text((306 - width / 2, y), text, fontsize=12, fontname="helv")
+        y += 16
+    for text in ("Institute One", "Institute Two", "Institute Three"):
+        width = pymupdf.get_text_length(text, "helv", 9)
+        page.insert_text((306 - width / 2, y), text, fontsize=9, fontname="helv")
+        y += 12
+    for _ in range(4):
+        page.insert_text((54, y + 8), "abstract " * 11, fontsize=10, fontname="helv")
+        y += 12
+    top = y + 20
+    for side, (x, name) in enumerate(((54.0, "left"), (317.0, "right"))):
+        for i in range(24):
+            line = f"{name} column line {i} " + "word " * 7
+            gaps = i // paragraphs[side] if paragraphs else 0
+            page.insert_text((x, top + 12 * (i + gaps)), line, fontsize=10, fontname="helv")
+    if note:
+        page.insert_text((54, top + 12 * 25), "A note across the page. " * 9, fontsize=8)
+        page.insert_text((54, top + 12 * 25 + 10), "The last line.", fontsize=8)
+    text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
+    assert text.rindex("left column line") < text.index("right column line")
+
+
+def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column():
+    # A textbook's worked example: a sentence across the page, then a grid of steps whose left
+    # cells hold most of the lines and whose right cells hold a few (answers, pictures). The gap
+    # between the two is a table's, not a gutter: the steps are read row by row.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 50.0
+    head = ("Solution", "Read the problem", "Name what we look for")
+    for text in (*head, "Let x be a rate", "Solve it", "Check the answer"):
+        width = pymupdf.get_text_length(text, "helv", 11)
+        page.insert_text((306 - width / 2, y), text, fontsize=11, fontname="helv")
+        y += 14
+    sentence = "A sentence across the page that leads into the table. " * 2
+    page.insert_text((54, y + 6), sentence, fontsize=10)
+    top = y + 40
+    for i in range(24):
+        page.insert_text((60, top + 12 * i), f"step {i} " + "word " * 7, fontsize=10)
+    for i in range(4):
+        page.insert_text((317, top + 12 * i), f"answer {i} " + "word " * 7, fontsize=10)
+    page.draw_rect(pymupdf.Rect(54, top - 12, 560, top + 24 * 12))
+    page.draw_line((300, top - 12), (300, top + 24 * 12))
+    text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
+    assert text.index("answer 0") < text.index("step 10")
+
+
+@pytest.mark.parametrize(
+    ("question", "options", "questions", "space", "pitch", "section", "wrap"),
+    [
+        # a question that runs the whole width of the page; one that stops short of the gutter,
+        # set at the pitch of its options (single spacing) with no space between the questions
+        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16, 0, None),
+        ("Which statement about the forces is correct?", 4, 4, 0, 13.2, 0, None),
+        # two short questions only: the gutter runs through them
+        ("Which statement about the forces is correct?", 4, 2, 12, 16, 0, None),
+        # one question, six options: three lines a side under it
+        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, 0, None),
+        # a section line set a line apart above the first question
+        ("Which statement about the forces is correct?", 4, 3, 12, 16, 1, None),
+        # an option runs on to a second line, single spacing: b of the first of three questions
+        # (right), a of the second of four (left)
+        ("Which statement about the forces is correct?", 4, 3, 0, 14, 0, (0, 334)),
+        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, (1, 98)),
+    ],
+)
+def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
+    question, options, questions, space, pitch, section, wrap
+):
+    # An exam page of one column: centered head lines, an instruction across the page, then
+    # questions with their options two by two under each. The option pairs look like two columns
+    # under the head, but the questions between them cut them up: the options of a question are
+    # read one after the other (a, b, c, d), not all of the left ones first (a, c, b, d).
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 90.0
+    for text in (
+        "Physics Midterm Examination",
+        "Department of Physics",
+        "Fall Semester",
+        "Ninety minutes",
+    ):
+        width = pymupdf.get_text_length(text, "helv", 11)
+        page.insert_text((306 - width / 2, y), text, fontsize=11, fontname="helv")
+        y += 16
+    y += 12
+    page.insert_text(
+        (72, y), "Answer every question and mark the single best option on the sheet.", fontsize=11
+    )
+    y += 28
+    if section:
+        page.insert_text((72, y), "Section A: Multiple choice", fontsize=11)
+        y += 36
+    for q in range(questions):
+        page.insert_text((72, y), f"{q + 1}. " + question.format(q=q), fontsize=11)
+        y += 18 if space else pitch
+        for row in range(options // 2):
+            for x, k in ((84, 2 * row), (320, 2 * row + 1)):
+                page.insert_text(
+                    (x, y),
+                    f"option {'abcdef'[k]}{q} the net force on the block is zero",
+                    fontsize=11,
+                )
+            if wrap and wrap[0] == q and row == 0:
+                y += pitch
+                page.insert_text((wrap[1], y), "and the block moves at a steady speed", fontsize=11)
+            y += pitch
+        y += space
+    text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
+    assert text.index("option b0") < text.index("option c0")

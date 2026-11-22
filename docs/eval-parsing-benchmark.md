@@ -24,21 +24,47 @@ page text, no file from the benchmark, no home path).
   spelled out, invisible characters removed, the ellipsis and `''` as the benchmark writes them.
 - Run 2 and run 3 converted all 747 pages from scratch; see "Repeat" below.
 
-## Scores (pipeline 0.5.15, 747 pages, 3,846 checks listed, $0)
+## Scores (pipeline 0.5.16, 747 pages, 3,846 checks listed, $0)
 
-Measured on 2026-11-20 at commit `3efefeab`. The interval is the 95 % Wilson interval of the
-checks run. The two columns after it are the records before this one (pipeline 0.5.14 at
-`709a023f`, 2026-11-19, and the first record, pipeline 0.5.11, 2026-11-18).
+Measured on 2026-11-21 at commit `5298521e`. The interval is the 95 % Wilson interval of the
+checks run. The two columns after it are the records before this one (pipeline 0.5.15 at
+`3efefeab`, 2026-11-20, and the first record, pipeline 0.5.11, 2026-11-18).
 
-| Category | Ours (checks run) | 95 % interval | At 0.5.14 | At 0.5.11 | Run of listed | Dropped |
+| Category | Ours (checks run) | 95 % interval | At 0.5.15 | At 0.5.11 | Run of listed | Dropped |
 |---|---|---|---|---|---|---|
-| multi_column (order) | 69.5 (492 of 708) | 66.0 to 72.8 | 69.2 (708) | 68.8 (705) | 884 | 176 scans |
-| headers_footers (absent) | 38.6 (244 of 632) | 34.9 to 42.5 | 38.6 (632) | 32.5 (636) | 753 | 121 scans |
+| multi_column (order) | 70.2 (497 of 708) | 66.7 to 73.5 | 69.5 (708) | 68.8 (705) | 884 | 176 scans |
+| headers_footers (absent) | 38.4 (243 of 632) | 34.7 to 42.3 | 38.6 (632) | 32.5 (636) | 753 | 121 scans |
 | long_tiny_text (present) | 37.3 (31 of 83) | 27.7 to 48.1 | 37.3 (83) | 37.3 (83) | 442 | 359 scans |
-| table_tests (table) | 70.6 (605 of 857) | 67.5 to 73.5 | 66.6 (857) | 51.8 (857) | 1,020 | 163 scans |
+| table_tests (table) | 70.6 (605 of 857) | 67.5 to 73.5 | 70.6 (857) | 51.8 (857) | 1,020 | 163 scans |
 | baseline (not blank, no repeats) | 100.0 (586 of 586) | 99.3 to 100.0 | 100.0 (586) | 99.0 (586) | 747 | 161 scans |
 | arxiv_math, old_scans_math | not run at $0 | | not run | not run | 2,927 and 458 | equations are read by a model |
 | old_scans | not run | | not run | not run | 526 | scans: a model reads the picture |
+
+From 0.5.15 to 0.5.16 two categories moved by a few checks, one up and one down; the other three
+pass and fail the same checks. multi_column passes 5 more order checks (492 to 497 of 708): all
+five are on two pages of one French magazine (`09f801e3…` pages 18 and 24), a page of two
+columns under a head band, which was read across the gutter line by line and is read column by
+column now. The checks of two other multi_column pages fail as before, with other text (page 16
+of `081875a1…`, where the columns are read apart now but its two order checks still fail; page
+18 of `0514f667…`, where a printed web address is cut one character later). headers_footers
+passes 1 check fewer (244 to 243 of 632): the absent check of the page number "391" on page 1
+of a journal article (`9009e616…`) passed and fails now. That page's output changed in one
+place: the line "ISSN: 1790-5117", which stood apart, is part of a paragraph now, because the
+page is read in two columns under its head; why the number's check flips with it has not been
+traced (the number is a line of its own in both outputs). Six other headers_footers pages and
+three table_tests pages have other text and the same checks passing and failing. The cause is
+the CHANGELOG entry "columns under the head of a first page" (O-024). Measured by running the
+layout of the four pages above and of the three table pages on the commit before that change
+and on it: every one changes there and on no other commit of the release, except page 18 of
+`0514f667…`, which changes at the commit for a printed address that the file links on both
+lines (O-046, O-156). table_tests keeps its 605 of 857. 603 pages asked a model for something
+at $0, as at 0.5.15. The record was made again on 2026-11-22 at `d0cc3e04` (the review fixes
+after the release), with the same scores: the first run at 0.5.16 (`5298521e`) read one
+headers_footers page (`a85bbe20…`, page 11, a list of references by year) with no table, so
+602 pages asked and two checks of the run without a model passed that fail now; the same
+commit reads the page's two tables today, three times out of three, as does `d0cc3e04`. The
+cause in that run was not traced; the code did not change it. The median page took 2.39 s
+(3.55 at 0.5.15): a different load on the machine, not a measured change of the code.
 
 From 0.5.14 to 0.5.15 two categories moved and none fell. table_tests passes 34 more checks, on
 8 pages (571 to 605 of 857): the tables with no ruling lines that the wave's table search now

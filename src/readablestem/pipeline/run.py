@@ -66,7 +66,8 @@ Design notes:
   after layout, before any step; it sets `lang`, `lang_source` and its own notices, and
   never fails the conversion.
 - Live progress (`stage_progress`, for the job page): "layout" when analysis starts and
-  again with the pages and the elements found per kind; "equations", "figures" and
+  again with the pages and the elements found per kind; "pages" with the scanned pages read
+  from their pictures (`image_page.run`), on a counter of its own; "equations", "figures" and
   "tables" with how many of each are done, first with their totals and then after every
   element (the receiver decides how often to store them); "assemble" and "checks" as the
   HTML is written and checked. All on the calling thread, content-free.
@@ -125,6 +126,7 @@ from readablestem.core.types import (
     NotFinished,
     Notice,
     PageMathSummary,
+    PageStageFact,
     PageStats,
     PageWitnessSummary,
     ProgressEvent,
@@ -159,6 +161,7 @@ from readablestem.pipeline import (
     page_witness,
     say_once,
     shadow,
+    slides,
     step_facts,
     table_math,
     table_step,
@@ -327,7 +330,35 @@ log = logging.getLogger(__name__)
 # is, links shown, until a review change makes the page again and writes the result back through
 # its own model, which drops the links for good), so the roll-back limit stays at 0.5.12
 # (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.15"
+# 0.5.16 (2026-11-21): one raise for the wave after 0.5.15 (CHANGELOG.md has each change). What
+# a PDF's result holds moves: a file with a page the probe cannot draw is read page by page and
+# that page is a figure with no picture, reason `page_not_rendered` (a required decision) and
+# the notice of that name, where it failed whole; a section number or a page number beside math
+# in a contents entry stays text, a contents title that wraps is one entry, two lines of prose
+# ending in an ellipsis are no contents page, and a capital alone on its line heads an index
+# section only when its first entry is near; a line that is a formula or a bare number is no
+# slide title, a deck with scanned slides is one deck and its headings are levelled with it; a
+# web address printed on two lines is joined with no space where the file's link annotations run
+# across the break; a table caption may run to eight lines and two text columns with prose are
+# no table; the columns under the head of a first page are found and a numbered line that runs
+# to the right edge keeps its block; a page read without its ActualText has the notice
+# `actualtext_ignored`. A LaTeX file's result: a heading holds its words only (a picture in it
+# is a figure of its own), a link of only a picture reads as the picture's alt text or its
+# address, a picture in a table cell leaves "(picture below)". New notice codes:
+# `page_not_rendered` (required) and `actualtext_ignored` (optional); the new figure reason is
+# `page_not_rendered`. No new field in a stored result. The page trace (`StepFacts.page_steps`,
+# `PageStageFact`) is kept in a measurement's run record only; the stage "pages" is a key of a
+# running job's progress row; a split paragraph is a new `ReviewEdit.action` ("split_block")
+# whose parts are ordinary elements. Results from 0.5.10 to 0.5.15 load unchanged and their
+# page is not made again (`assemble.RENDER_VERSION` stays 11: no stored result can hold
+# `page_not_rendered`, the one new word on the student page, "Not converted. This page could not
+# be shown."). 0.5.15 opens a 0.5.16 result (run on 2026-11-21: it loads all 58 notice codes and
+# the split parts, drops no stored key when a review change writes the result back, and undoes a
+# split), but it has no words for the new reason: a page that could not be drawn is written
+# "No description. This figure has no text description yet." (as a draft, "Needs a description.")
+# as soon as it makes the page again (a review change, a draft, a cleared page), and its record
+# leaves the split change out. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.16"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -352,6 +383,7 @@ PAGE_REASONS = frozenset(
         page_type.HANDWRITTEN_PAGE,
         page_type.UNREAD_PAGE,
         page_type.PAGE_READ_FAILED,
+        page_type.PAGE_NOT_RENDERED,
     }
 )
 KEPT_REASONS = PAGE_REASONS | {page_type.HANDWRITING_ON_PAGE}
@@ -923,6 +955,15 @@ def _text_pass(
     return text
 
 
+def _in_deck(element: Element, decks: dict[int, int]) -> Element:
+    """A heading the page reader made on a page of a slide deck says which deck it is in, as
+    a typed slide's heading does (`slides.finish`), so it is levelled with the deck's slides."""
+    if element.kind is Kind.HEADING and (number := decks.get(element.page)) is not None:
+        reasons = [*element.reasons, f"{slides.DECK_REASON} {number}"]
+        return element.model_copy(update={"reasons": reasons})
+    return element
+
+
 def _heading_fixes(elements: list[Element], tracer: Tracer, settings: Settings) -> list[Fix]:
     headings = [e for e in elements if e.kind is Kind.HEADING]
     with _span(tracer, "headings", count=len(headings)) as span:
@@ -1011,7 +1052,7 @@ def recrop(
         vector = image_page_vector.analyse(pdf, wanted, kinds)
     try:
         for element in elements:
-            if element.kind not in _MODEL_KINDS:
+            if element.kind not in _MODEL_KINDS or page_type.PAGE_NOT_RENDERED in element.reasons:
                 continue
             try:
                 png = layout.crop(pdf, element)
@@ -1090,6 +1131,8 @@ class _Run:
     vector: dict[int, image_page_vector.VectorPage] = field(default_factory=dict)
     # The paragraph (or list item, figure) each inline equation sits in, by id.
     parents: dict[str, Element] = field(default_factory=dict)
+    # The time of each page's crops (`PageTrace`).
+    trace: step_facts.PageTrace = field(default_factory=lambda: step_facts.PageTrace(enabled=False))
 
     def start_stages(self, elements: list[Element]) -> None:
         """Each model stage's total, counting what was decided before any model work (a
@@ -1124,8 +1167,12 @@ class _Run:
                 or image_page.wants_crop(e, self.fixes)
             )
             and not image_page.no_crop(e, self.fixes)
+            and page_type.PAGE_NOT_RENDERED not in e.reasons  # no picture of it can be cut
         ]
-        with _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)):
+        with (
+            _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)),
+            self.trace.step(page, "crops"),
+        ):
             for element in work:
                 self.crop_and_submit(element)
         self.pages.submitted(page)
@@ -1484,13 +1531,13 @@ def _source_facts(
         return None
 
 
-def _page_labels(pdf_bytes: bytes, pages: list[int]) -> dict[int, str]:
+def _page_labels(pdf_bytes: bytes, pages: list[int], unloaded: list[int]) -> dict[int, str]:
     """`page_labels.read`, which never raises; none if it did anyway (page markers are a
     convenience: a bug there must not cost the user a finished conversion)."""
     lock = getattr(layout, "_LOCK", None)
     try:
         with lock if lock is not None else contextlib.nullcontext():
-            return page_labels.read(pdf_bytes, pages)
+            return page_labels.read(pdf_bytes, pages, unloaded)
     except Exception as exc:
         log.warning("page labels failed: %s", type(exc).__name__)
         return {}
@@ -1874,11 +1921,12 @@ def _image_pages_pass(
             settings,
             renders,
             concurrency=concurrency,
-            # the pages read are the layout's pages on the job page, as the table search's are
+            # a counter of its own: the layout's count (the table search's pages) is done by
+            # now, and the bar must not step back to this pass's first page
             on_page=(
                 None
                 if stage_progress is None
-                else lambda done, total: _send(stage_progress, "layout", done, total)
+                else lambda done, total: _send(stage_progress, "pages", done, total)
             ),
         )
         for number, read in result.reads.items():
@@ -1952,6 +2000,10 @@ def _convert(
     # time, and every request to a model with its page.
     watch = step_facts.Stopwatch()
     measured: list[CallFact] = []
+    # Where each page's time went: layout's steps come with its result, the crops are timed
+    # here (`step_facts.PageTrace`).
+    crop_trace = step_facts.PageTrace()
+    page_steps: list[PageStageFact] = []
     # The steps run in shadow (`pipeline.shadow`): a step that is given this runs beside
     # the conversion and can change nothing of it.
     shadowed = shadow.Shadow()
@@ -1999,6 +2051,8 @@ def _convert(
             )
             ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
             tables_late.update(getattr(doc, "tables_not_searched", None) or ())
+            # (the second layout run of the page math pass is not in the trace)
+            page_steps.extend(getattr(doc, "page_steps", None) or [])
             page_math_summary: PageMathSummary | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
@@ -2081,19 +2135,27 @@ def _convert(
                 # What layout read from a page the pass read (the watermark, header or page
                 # number over a photographed page) is the pass's to read again: the page
                 # would hold that text twice.
+                deck_pages = getattr(doc, "deck_pages", None) or {}
                 elements = sorted(
                     [
                         *(e for e in elements if e.page not in image_built),
-                        *(e for b in image_built.values() for e in b.elements),
+                        *(
+                            _in_deck(e, deck_pages)
+                            for b in image_built.values()
+                            for e in b.elements
+                        ),
                     ],
                     key=lambda e: (e.page, e.order),
                 )
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
+            # A page the probe could not draw is never opened in this process again: nothing
+            # reads its tags, links or images (it has only its note).
+            readable = [p for p in page_list if kept.get(p) != page_type.PAGE_NOT_RENDERED]
             elements, scan_fixes = _with_page_images(elements, kept, boxes)
             # Tagged-PDF structure (headings, lists, tables the author marked up) is applied
             # before the steps start: they read the elements it settles. The text pass and
             # the heading decisions run later, beside the steps.
-            elements = tagged.apply(elements, tagged.read(pdf_bytes, page_list))
+            elements = tagged.apply(elements, tagged.read(pdf_bytes, readable))
             read = len(page_list)
             _send(stage_progress, "layout", read, read, _kind_counts(elements))
             fixes = {f.element_id: f for f in scan_fixes}
@@ -2117,6 +2179,7 @@ def _convert(
                 cache=step_cache,
                 observer=call_observer,
                 vector=vector_pages if settings.image_pages_vector_crops else {},
+                trace=crop_trace,
             )
             # The text pass adds links, colour runs and passage languages to the elements
             # without touching their text or anything a step reads, and the heading
@@ -2125,7 +2188,7 @@ def _convert(
             made: list[text_pass.TextPassResult] = []
 
             def text_and_headings() -> None:
-                made.append(_text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer))
+                made.append(_text_pass(pdf_bytes, elements, readable, doc.lang, options, tracer))
                 for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 
@@ -2189,9 +2252,9 @@ def _convert(
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
             measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))
-        labels = _page_labels(pdf_bytes, page_list)
+        labels = _page_labels(pdf_bytes, page_list, [p for p in page_list if p not in readable])
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
-        source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
+        source_facts = _source_facts(pdf_bytes, readable, elements, ordered)
         # A PDF repaired when it was opened whose last pages are empty looks cut off: the
         # student note says so, and so does the job page until the owner answers.
         repaired = pdf_facts.repair_notices(pdf_bytes, getattr(doc, "page_types", None) or {})
@@ -2235,7 +2298,11 @@ def _convert(
             ),
         )
         facts = step_facts.gathered(
-            measured, watch, stops + step_facts.capped(ordered), shadowed.facts()
+            measured,
+            watch,
+            stops + step_facts.capped(ordered),
+            shadowed.facts(),
+            sorted([*page_steps, *crop_trace.facts()], key=lambda fact: fact.page),
         )
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)

@@ -10,10 +10,15 @@ What the figures are:
 
 - **Seconds a page, by stage.** A stage's seconds of a document (`pipeline.step_facts`)
   divided by its pages, at the median and the 95th percentile over documents.
-- **Seconds a page, by page kind.** The conversion does not yet time each page (the page
-  trace is a later work item), so a page is given its document's local seconds divided by
+- **Seconds a page, by page kind.** A page is given its document's local seconds divided by
   its pages. A kind's figure is therefore the speed of the documents its pages are in. It is
   exact for a document of one kind and blurred for a mixed one, and the report says so.
+- **Seconds of one page, from the page trace** (`pipeline.step_facts.PageTrace`): the
+  conversion times each layout step on each page (read, tables, rows, figures, equations,
+  order, blocks, elements) and the page's crops. The report gives the median, 95th
+  percentile and slowest pages, with the step that took the time, and each step's share. It
+  leaves out what no page owns (the steps over the whole document, the models), so the
+  traced seconds are less than the layout stage's, and the report prints the share.
 - **Start-up** is a stage of a job and not of a page: starting the conversion process and
   loading its code takes the same time for 1 page and for 40, so it is printed per job and
   kept out of the seconds a page.
@@ -85,6 +90,58 @@ def _kinds(measured: Sequence[Converted]) -> dict[str, dict[str, Any]]:
         }
         for kind in measure.KINDS
         if seconds[kind]
+    }
+
+
+SLOWEST = 5  # pages named in the report
+
+
+def _trace(measured: Sequence[Converted]) -> dict[str, Any] | None:
+    """Seconds of one page from the page trace, or None for a record made before it."""
+    pages: dict[tuple[str, int], dict[str, float]] = defaultdict(dict)
+    for done in measured:
+        for fact in done.facts.page_steps:
+            steps = pages[(done.upload, fact.page + 1)]
+            steps[fact.step] = steps.get(fact.step, 0.0) + fact.seconds
+    if not pages:
+        return None
+    totals = {page: sum(steps.values()) for page, steps in pages.items()}
+    by_step: dict[str, list[float]] = defaultdict(list)
+    for steps in pages.values():
+        for step, seconds in steps.items():
+            by_step[step].append(seconds)
+    traced = sum(totals.values())
+    layout = sum(
+        fact.seconds for done in measured for fact in done.facts.stages if fact.stage == "layout"
+    )
+    slowest = sorted(totals, key=lambda page: (-totals[page], page))[:SLOWEST]
+    return {
+        "pages": len(pages),
+        "s_page": {**_spread(list(totals.values())), "max": round(max(totals.values()), 4)},
+        "steps": {
+            step: {
+                "pages": len(values),
+                "s_page": _spread(values),
+                "share": round(sum(values) / traced, 4),
+            }
+            for step, values in sorted(by_step.items(), key=lambda item: -sum(item[1]))
+        },
+        "slowest": [
+            {
+                "upload": upload,
+                "page": number,
+                "seconds": round(totals[(upload, number)], 4),
+                "step": (top := max(pages[(upload, number)].items(), key=lambda kv: kv[1]))[0],
+                "step_seconds": round(top[1], 4),
+            }
+            for upload, number in slowest
+        ],
+        # Layout steps of one page over the layout stage of the run: what the trace sees.
+        "layout_traced_share": round(
+            sum(v for steps in pages.values() for k, v in steps.items() if k != "crops") / layout, 4
+        )
+        if layout
+        else None,
     }
 
 
@@ -161,6 +218,7 @@ def report(runs: Sequence[Sequence[Converted]], *, allowance: float = ALLOWANCE)
             "cpu": _spread([done.cpu_s / done.pages for done in measured]),
         },
         "kinds": _kinds(measured),
+        "trace": _trace(measured),
         "stages": {
             stage: {
                 "documents": len(stage_s[stage]),
@@ -291,6 +349,49 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
             for kind, row in made["kinds"].items()
         ],
     )
+    trace = made.get("trace")
+    if trace:
+        lines += [
+            "",
+            f"seconds of one page, from the page trace ({trace['pages']} pages): "
+            f"median {_s(trace['s_page']['p50'])}, p95 {_s(trace['s_page']['p95'])}, "
+            f"slowest {_s(trace['s_page']['max'])}"
+            + (
+                f"; the traced layout steps are {trace['layout_traced_share']:.0%} of the "
+                "layout stage"
+                if trace["layout_traced_share"] is not None
+                else ""
+            ),
+        ]
+        lines += measure.table(
+            ("step", "pages", "median", "p95", "share of traced time"),
+            [
+                (
+                    step,
+                    row["pages"],
+                    _s(row["s_page"]["p50"]),
+                    _s(row["s_page"]["p95"]),
+                    f"{row['share']:.0%}",
+                )
+                for step, row in trace["steps"].items()
+            ],
+        )
+        lines += ["slowest pages:"]
+        lines += measure.table(
+            ("upload", "page", "seconds", "longest step", "its seconds"),
+            [
+                (
+                    row["upload"],
+                    row["page"],
+                    _s(row["seconds"]),
+                    row["step"],
+                    _s(row["step_seconds"]),
+                )
+                for row in trace["slowest"]
+            ],
+        )
+    else:
+        lines += ["", "seconds of one page: this record has no page trace"]
     lines += ["", "by stage (seconds a page of a document that has the stage):"]
     lines += measure.table(
         ("stage", "documents", "median", "p95", "mean over every page", "share of local time"),

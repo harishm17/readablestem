@@ -156,6 +156,7 @@ def audit_files(html: str, facts: Facts, speeches: Mapping[str, str] | None) -> 
 def audit_document(result: DocumentResult) -> dict[str, Any]:
     """`audit_files` of a converted document: its page, and the readings it stores (the ones
     the page, Listen and the files show, so a reading older rules wrote is made again)."""
+    from readablestem.eval import pictures
     from readablestem.pipeline.speech import refresh_readings
 
     refresh_readings(result)
@@ -164,7 +165,9 @@ def audit_document(result: DocumentResult) -> dict[str, Any]:
         for fix in result.fixes
         if fix.equation is not None and fix.equation.speech
     }
-    return audit_files(result.html, output_audit.facts_of(result), speeches)
+    audit = audit_files(result.html, output_audit.facts_of(result), speeches)
+    # A18's counts of the same result (`eval pictures`), kept beside the audit.
+    return audit | {"pictures": pictures.count_document(result)}
 
 
 def _table(measured: Iterable[Converted]) -> dict[str, Any]:

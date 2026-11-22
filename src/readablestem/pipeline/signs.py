@@ -93,7 +93,7 @@ from typing import Any
 import defusedxml.ElementTree as DET
 
 from readablestem.core.mathchars import STYLE_GROUPS, char_variant
-from readablestem.pipeline.output_chars import GAP
+from readablestem.pipeline.output_chars import ADOBE_PIECES, GAP
 
 MINUS = "minus"
 PLUS = "plus"
@@ -258,7 +258,7 @@ def _unknown_arrow(ch: str) -> bool:
 # a sign. U+F8E6 and U+F8E7 (arrowvertex, arrowhorizex) are arrow extenders: part of an
 # arrow, so they widen the arrow classes only.
 _ARROW_EXTENDERS = frozenset("\uf8e6\uf8e7")
-_NO_SIGN = (frozenset(map(chr, range(0xF8E5, 0xF8FF))) - _ARROW_EXTENDERS) | {"\uf6be"}
+_NO_SIGN = (ADOBE_PIECES - _ARROW_EXTENDERS) | {"\uf6be"}
 
 
 def _unnamed(ch: str) -> bool:

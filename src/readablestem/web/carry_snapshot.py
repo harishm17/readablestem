@@ -55,6 +55,7 @@ STRUCTURE_ACTIONS = frozenset(
         "set_role",
         "leave_out_block",
         "restore_block",
+        "split_block",
         "add_figure",
         "add_equation",
         "omit_page",

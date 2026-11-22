@@ -75,6 +75,7 @@ ROWS: tuple[CheckLine, ...] = (
     _page("handwriting_on_page", "required", "ink analysis: handwriting on a typed page"),
     _page("unread_page", "required", "page type: drawings with nothing read from them"),
     _page("page_read_failed", "required", "reading the page raised an error"),
+    _page("page_not_rendered", "required", "the page could not be drawn by the probe"),
     _page(
         "drawings_not_analysed",
         "optional",
@@ -82,6 +83,12 @@ ROWS: tuple[CheckLine, ...] = (
         not_checked=True,
     ),
     _page("page_turned", "none", "a page saved sideways, turned to read it", "handled"),
+    _page(
+        "actualtext_ignored",
+        "optional",
+        "a page read from its printed characters, where the file says other text for them",
+        not_checked=True,
+    ),
     _page("ocr_text_layer_ignored", "none", "hidden text on a page kept as an image"),
     _page(
         "tables_not_searched",

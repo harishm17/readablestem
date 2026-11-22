@@ -12,6 +12,7 @@ it; the tests that need it skip without it.
 from __future__ import annotations
 
 import logging
+import textwrap
 from pathlib import Path
 
 import pymupdf
@@ -509,6 +510,83 @@ def test_a_two_column_grid_of_prose_is_a_layout_grid():
     assert not tables.is_layout_grid(grid([["Mass", "2 kg"], ["Speed", "3 m/s"]]))
     assert not tables.is_layout_grid(grid([["1", PROSE[0]], ["2", PROSE[1]]]))
     assert not tables.is_layout_grid(grid([[*r, "9.8"] for r in terms]))
+
+
+def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_sidebar_is_not():
+    # "Week 1" ... "Week 5" with a description of three lines each, no rules, no caption: every
+    # label stands level with a line of its description, and no label stands on the line next to
+    # another. A body beside a sidebar has lines of its own in both columns that stand level
+    # with nothing (`tables._labels_open_runs`).
+    description = [
+        "Kinematics in one dimension, unit {week}: position, velocity and",
+        "acceleration; graphs of motion and how to read them in {week};",
+        "free fall near the surface of the Earth, case {week}",
+    ]
+
+    def schedule(label, level, period, skip, lines=(3, 3, 3, 3, 3)):
+        def fill(page):
+            write(page, 72, 90, "Course schedule", 15)
+            write(
+                page,
+                72,
+                116,
+                "The term has five units. Each unit ends with a short quiz in its last class.",
+            )
+            y = 142.0
+            for week, n in enumerate(lines, 1):
+                for i, text in enumerate(description[:n]):
+                    if i == level:
+                        write(page, 72, y, label(week))
+                    end = "." if period and i == n - 1 else ""
+                    write(page, 170, y, text.format(week=week) + end)
+                    y += 14
+                y += skip
+            write(
+                page,
+                72,
+                y + 12,
+                "Bring a calculator to every quiz. Formula sheets come with the paper.",
+            )
+
+        return fill
+
+    def sidebar(page):  # a margin column of two blocks, each level with lines of the body
+        write(page, 72, 90, "Course schedule", 15)
+        body = (
+            "a cart rolls down the ramp and its speed grows with every metre it travels, while"
+            " the force of gravity along the slope stays the same from the top of the ramp to"
+            " its foot, so the work done on it grows in step with the distance it covers on the"
+            " way down; friction takes a little of that work and turns it to heat in the wheels"
+            " and the track, and what is left shows up as the kinetic energy of the cart when it"
+            " reaches the bottom of the ramp, where a spring stops it and stores that energy for a"
+            " moment before it pushes the cart back up the slope again with a little less speed"
+            " than it had, since the friction took some of the energy on each trip, until at last"
+            " the cart comes to rest at the foot of the ramp with all its energy spent as heat"
+        )
+        for i, line in enumerate(textwrap.wrap(body, 62)):
+            write(page, 170, 120 + 14 * i, line)
+        labels = ("Key idea", "momentum is", "Remember", "units agree")
+        for i, text in zip((1, 2, 9, 10), labels, strict=True):
+            write(page, 72, 120 + 14 * i, text)
+
+    def week(n):
+        return f"Week {n}"
+
+    def date(n):
+        return f"Sep {7 * n - 5}"
+
+    for fill in (
+        schedule(week, 0, True, 8),  # the label level with the first line, a sentence end between
+        schedule(date, 0, False, 0),  # dates, no full stop and no extra space between rows
+        schedule(week, 1, True, 8),  # the label level with the middle line
+        schedule(date, 1, False, 0),
+        # a week of one line ("Week 2  Midterm") between weeks of three, no full stops
+        schedule(week, 0, False, 0, (3, 1, 3, 3, 3)),
+        # ... where that week's label is in lower case ("fall break")
+        schedule(lambda n: "fall break" if n == 2 else week(n), 0, False, 0, (3, 1, 3, 3, 3)),
+    ):
+        assert [e.kind for e in analyze(pdf(fill)).elements].count(Kind.TABLE) == 1
+    assert Kind.TABLE not in [e.kind for e in analyze(pdf(sidebar)).elements]
 
 
 KEY_TERMS = [

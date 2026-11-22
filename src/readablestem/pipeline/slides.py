@@ -18,7 +18,8 @@ back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, 
    title (`_title_slide`), on at least `TITLED_SHARE` of the pages. (c) needs neither Beamer
    nor labels: a PowerPoint or Keynote deck exported as PDF has neither. For (c) a letter or
    A4 sheet on its side counts as well: a deck printed to PDF is on one, and its titles say
-   it is a deck. A file that is none of these is not a deck and is read as before.
+   it is a deck. Pages kept whole as images (`PageView.kept_whole`: scanned slides) have no text
+   and are left out of the share. A file that is none of these is not a deck and is read as before.
 2. Decks: a file may hold several. A deck ends where the page size changes, and where a title
    slide comes (a page with a title-sized line, at least `TITLE_SLIDE_RATIO` x an ordinary
    slide title, and at most `MAX_SUBTITLE_ROWS` other lines in its body) when the file's first
@@ -36,9 +37,10 @@ back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, 
    the last page has it all. A page with something the last page does not have (`\\only<1>{A}`
    replaced by `\\only<2>{B}`) stays, as a step: "step 1 of 2" is added to its heading.
 4. Titles: the frame title is the largest text in the top third of the page (at least 1.15 x
-   the body), and always a heading; its lines are one title when they follow each other in one
-   size. What lies above it in the page's headline (section and subsection names, a drawn bar)
-   is furniture and is dropped, and slide numbers alone in the top or bottom band are too. The
+   the body; a line that is only a formula is no title), and always a heading; its lines are
+   one title when they follow each other in one size. What lies above it in the page's
+   headline (section and subsection names, a drawn bar) is furniture and is dropped, and slide
+   numbers alone in the top or bottom band are too. The
    headline's text is kept as `Deck.context` for the page, so a reader of the record can still
    see which section a frame was in.
 """
@@ -47,6 +49,7 @@ from __future__ import annotations
 
 import re
 import statistics
+import unicodedata
 from collections.abc import Callable, Iterable, Iterator, Sequence
 from dataclasses import dataclass, field
 
@@ -79,6 +82,17 @@ DECK_REASON = "slide_deck"  # "slide_deck 2": the heading is on a page of the se
 DECK_TITLE_REASON = "slide_deck_title"  # the title of a deck that starts on a title slide
 _BEAMER = re.compile(r"\bbeamer\b", re.IGNORECASE)
 _SLIDE_NUMBER = re.compile(r"^\s*\d{1,3}(?:\s*/\s*\d{1,3})?\s*$")
+# A name of a function in a formula ("sin", "log"): not a word of text.
+_FUNCTION = re.compile(
+    r"(?<![^\W\d_])(?:sin|cos|tan|cot|sec|csc|log|ln|exp|lim|det|max|min|sup|inf|arg|gcd|mod)h?"
+    r"(?![^\W\d_])"
+)
+_WORD = re.compile(r"[^\W\d_]{3,}")
+# A name that ends in a plus or two ("C++", "g++", "A+", "Notepad++"), and "Q+A": text, not a
+# sum. A plus between two letters or a letter and a digit ("A+B", "N+1") is a sum.
+_NAME_WITH_PLUS = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Za-z][A-Za-z0-9]*(?:\+\+|\+(?![A-Za-z0-9]))|Q\+A(?![A-Za-z0-9]))"
+)
 
 
 @dataclass(frozen=True)
@@ -129,6 +143,9 @@ class PageView:
     rows: Sequence[RowView]
     # every image, and the drawings in the body of the slide (`LazyMarks` reads them late)
     marks: Iterable[Mark] = ()
+    # The page is kept whole as its image (a scanned or photographed slide): it has no rows
+    # here, and `detect` leaves it out of the share of titled pages.
+    kept_whole: bool = False
 
 
 @dataclass(frozen=True)
@@ -264,14 +281,34 @@ def _frames(views: Sequence[PageView], titles: dict[int, Title]) -> list[list[Pa
     return frames
 
 
-def _title(view: PageView, body: float) -> Title | None:
+def _is_formula(text: str) -> bool:
+    """A line that is a formula or a bare number and nothing else: it has no word of three
+    letters that is not a function name ("sin", "log"), and it has a math sign or an italic
+    math letter ("=", an integral sign, "x"), or no letter at all (the "1" over the bar of a
+    fraction). A name with a plus in it ("C++", "g++", "A+", "Q+A") is not a math sign, in
+    any line. "Slopes and Rates", "Q & A", "AI", "C++ 17", "C/C++" and "Q+A" are text;
+    "x = -b / 2a", "A+B", "N+1", "pH = -log10 [H+]" and "1" are not."""
+    plain = "".join(c for c in text if not 0x1D400 <= ord(c) <= 0x1D7FF)
+    if _WORD.search(_FUNCTION.sub(" ", plain)):
+        return False
+    return (
+        len(plain) < len(text)
+        or not any(c.isalpha() for c in text)
+        or any(unicodedata.category(c) == "Sm" for c in _NAME_WITH_PLUS.sub(" ", text))
+    )
+
+
+def _title(view: PageView, body: float, *, formulas: bool = False) -> Title | None:
     """The largest text in the top of the page, at least MIN_TITLE_RATIO x the body; the
-    topmost when several are as large."""
+    topmost when several are as large. A line that is a formula only is not a title: a slide
+    with a large formula under its title is titled by the title. With `formulas`, it may be
+    (the line at a title's place and size, which says the page is titled like a slide)."""
     top = [
         row
         for row in view.rows
         if not row.vertical
         and row.text.strip()
+        and (formulas or not _is_formula(row.text))
         and row.bbox[1] <= TITLE_ZONE * view.height
         and row.size >= MIN_TITLE_RATIO * body
     ]
@@ -307,7 +344,7 @@ def _title_slide(view: PageView, ordinary: float, own: Title | None) -> Title | 
     The title may be anywhere on the page: a title slide's is often in the middle. A page with
     a title of its own (`own`, found in the top of the page) that is smaller than its largest
     line is an ordinary slide with a big formula or picture caption, not a title slide."""
-    rows = [r for r in view.rows if not r.vertical and r.text.strip()]
+    rows = [r for r in view.rows if not r.vertical and r.text.strip() and not _is_formula(r.text)]
     if not rows or ordinary <= 0:
         return None
     largest = max(r.size for r in rows)
@@ -365,8 +402,16 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     # some pages and not all (a label tree with a prefix and no numbers labels every page alike).
     labelled = len({v.label for v in views if v.label}) >= 2 and len(frames) >= 2
     by_label = (beamer or (overlaid and labelled)) and sum(slide) >= 0.8 * len(views)
-    titled = sum(v.number in titles or v.number in title_slides for v in views)
-    if not by_label and titled < TITLED_SHARE * len(views):
+    # A page kept whole has no text to be titled by: the pages that have text are judged, so a
+    # deck with some scanned slides is still one (a file of no text pages is not).
+    readable = [v for v in views if not v.kept_whole]
+    # A page whose title is a formula ("A+B") is titled like a slide all the same: the formula
+    # rule says which line titles a slide, not whether the file is a deck.
+    titled = sum(
+        v.number in titles or v.number in title_slides or _title(v, body, formulas=True) is not None
+        for v in readable
+    )
+    if not by_label and (not readable or titled < TITLED_SHARE * len(readable)):
         return None
     # A title slide recurring starts a deck when the file starts with one.
     runs = _decks(views, title_slides if views[0].number in title_slides else ())

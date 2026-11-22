@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.15",
- "commit": "dd9f3dc88451ce68d5cfc6fc4f6cc149ac89350f",
+ "pipeline_version": "0.5.16",
+ "commit": "5298521e872f641884e1e3e09bb4ec4ae0e68e67",
  "provenance": {
-  "commit": "dd9f3dc88451ce68d5cfc6fc4f6cc149ac89350f",
+  "commit": "5298521e872f641884e1e3e09bb4ec4ae0e68e67",
   "clean": true,
-  "pipeline_version": "0.5.15",
+  "pipeline_version": "0.5.16",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -72,20 +72,20 @@
    "not_measured": []
   },
   "pages": 117,
-  "decisions": 57,
-  "per_page": 0.4872,
+  "decisions": 56,
+  "per_page": 0.4786,
   "document": {
    "p50": 0.0,
    "p95": 2.2,
-   "mean": 0.3496,
+   "mean": 0.338,
    "max": 3.0
   },
   "page": {
    "p50": 0,
    "p95": 3,
-   "mean": 0.4872,
+   "mean": 0.4786,
    "max": 8,
-   "none": 0.7778
+   "none": 0.7863
   },
   "kinds": {
    "dense_math": {
@@ -139,12 +139,12 @@
    "table": {
     "pages": 13,
     "documents": 9,
-    "decisions": 3,
-    "per_page": 0.2308,
+    "decisions": 2,
+    "per_page": 0.1538,
     "page": {
      "p50": 0,
      "p95": 1,
-     "mean": 0.2308,
+     "mean": 0.1538,
      "max": 1
     }
    },
@@ -166,7 +166,7 @@
    "equation": 15,
    "figure": 10,
    "paragraph": 9,
-   "table": 3
+   "table": 2
   },
   "reasons": {
    "heading.weak_evidence": {
@@ -193,10 +193,6 @@
     "decisions": 3,
     "per_100_pages": 2.56
    },
-   "numbers_not_a_table": {
-    "decisions": 3,
-    "per_100_pages": 2.56
-   },
    "text.rtl_order": {
     "decisions": 3,
     "per_100_pages": 2.56
@@ -210,6 +206,10 @@
     "per_100_pages": 1.71
    },
    "not_equation": {
+    "decisions": 2,
+    "per_100_pages": 1.71
+   },
+   "numbers_not_a_table": {
     "decisions": 2,
     "per_100_pages": 1.71
    },
@@ -575,21 +575,6 @@
     ]
    },
    {
-    "upload": "s02_syllabus_sidebar",
-    "pages": 2,
-    "decisions": 1,
-    "per_page": 0.5,
-    "asked": [
-     [
-      "p1-e13",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e2"
-    ]
-   },
-   {
     "upload": "s04_worksheet",
     "pages": 2,
     "decisions": 1,
@@ -930,6 +915,16 @@
     "per_page": 0.0,
     "asked": [],
     "optional": []
+   },
+   {
+    "upload": "s02_syllabus_sidebar",
+    "pages": 2,
+    "decisions": 0,
+    "per_page": 0.0,
+    "asked": [],
+    "optional": [
+     "p1-e2"
+    ]
    },
    {
     "upload": "s03_lab_callouts",

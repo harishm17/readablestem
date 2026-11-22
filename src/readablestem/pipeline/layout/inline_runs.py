@@ -531,7 +531,50 @@ def _inline_runs(
     if document.inline_joins:
         runs = _joined_labels(chars, info, runs)
     joined = _with_simple_maths(row, info, _join_signatures(chars, runs), document=document)
-    return _with_chemistry(row, kinds, _with_nuclides(row, kinds, joined))
+    found = _with_chemistry(row, kinds, _with_nuclides(row, kinds, joined))
+    return _clear_of_entry_numbers(row, found) if row.contents_level else found
+
+
+_ENTRY_PAGE = re.compile(r"\d{1,4}|[ivx]{1,6}", re.IGNORECASE)
+_ENTRY_LABEL = re.compile(r"(\d+|[A-Z])(\.\d+)*\.?")
+
+
+def _clear_of_entry_numbers(
+    row: _Row, runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` of a line of a table of contents without the numbers that are not maths: the
+    section number it starts with ("6.1 \u0393 = D4") and the page number it ends in ("Forces on
+    \u03a3 9", a number set after the title). Digits next to a symbol read as part of the
+    formula; here they are the entry's own."""
+    chars = row.chars
+    ink = [i for i, c in enumerate(chars) if not c.blank]
+    if not ink:
+        return runs
+    first, last = ink[0], ink[-1]
+    head = first
+    while head <= last and not chars[head].blank:
+        head += 1
+    tail = last
+    while tail > first and not chars[tail - 1].blank:
+        tail -= 1
+    label = _ENTRY_LABEL.fullmatch("".join(c.c for c in chars[first:head]))
+    page = _ENTRY_PAGE.fullmatch("".join(c.c for c in chars[tail : last + 1]))
+    out = []
+    for start, end, reasons in runs:
+        if label and head <= last and start == first and end > head:
+            start = head
+            while start < end and chars[start].blank:
+                start += 1
+        if page and tail > first and end == last + 1 and start < tail:
+            end = tail
+            while end > start and chars[end - 1].blank:
+                end -= 1
+        number = (label and (start, end) == (first, head)) or (
+            page and (start, end) == (tail, last + 1)
+        )
+        if end > start and not number:
+            out.append((start, end, reasons))
+    return out
 
 
 LABEL_MAX_GLYPHS = 4  # the longest label that joins a formula: "H0", "P(A)", "f_n"

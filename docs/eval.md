@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.15 as of 2026-11-20; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.16 as of 2026-11-21; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,14 +43,14 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-20 | 0.5.15 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-21 | 0.5.16 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
 **What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
 report is held to its baseline only when this pipeline version made it (`eval gate
 --require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
-so CI's `eval-gate` job gates those two, re-made at 0.5.15. Equations, figures and document
+so CI's `eval-gate` job gates those two, re-made at 0.5.16. Equations, figures and document
 need a paid run: their latest and baseline reports are historical records of the 0.5.0
 system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
 the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
@@ -231,6 +231,16 @@ a slash, a grouping that changes what is under a script), and a bold, script or 
 letter against a plain one. Where the two sources set the same letters in the same styles but
 spell the style two ways, that is one style, and it scores right. An answer with no LaTeX, or a
 gold with none, scores wrong.
+
+A matrix environment is its rows between the brackets its name stands for (`pmatrix` round brackets,
+`bmatrix` square, `Bmatrix` braces, `vmatrix` bars, `Vmatrix` double bars, `matrix` none), so it
+scores right against `array` or `aligned` rows set between the same `\left` and `\right`. Rows that
+are the whole formula score the same with or without the `aligned` round them; an environment that
+is only a part of the formula (a matrix between brackets, a row beside another formula) is kept.
+Measured at $0 on the recorded development runs (8,003 pairs with a gold reading and an answer's
+LaTeX: dev, dev2, fresh, fresh2 and fresh3, one run each): right 7,237 before, 7,242 after; 5 pairs
+newly right (each the same rows with and without the environment), none newly wrong. The matrix
+names move no pair: no pair of the five parts is wrong only for a matrix name.
 
 A *pairing miss* is a pair that `exact_printed` calls wrong where the answer's letters and digits
 equal those of the file's own text for that region and the gold's do not. The gold was matched to
@@ -3102,16 +3112,16 @@ being changed. Its record keeps totals and names no page, `--records`, `--from` 
 `--against` are refused for it, and a failing page is not looked at.
 
 `layout-dev-1` (60 documents, 267 pages;
-`data/eval/order-layout-dev-1.json`, made at 0.5.15), the student page:
+`data/eval/order-layout-dev-1.json`, made at 0.5.16), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 64 | 29 | 36 (37) | 44 (57) | 44 (57) | 0 of 0 | 38 | 16 |
+| paper | 119 | 65 | 29 | 36 (37) | 44 (57) | 44 (57) | 0 of 0 | 31 | 8 |
 | selfmade | 40 | 18 | 9 | 4 (8) | 7 (35) | 14 (31) | 0 of 5 | 18 | 12 |
 | textbook | 108 | 58 | 34 | 17 (17) | 41 (204) | 10 (33) | 0 of 0 | 50 | 7 |
-| all | 267 | 140 | 72 | 57 (62) | 92 (296) | 68 (121) | 0 of 5 | 106 | 35 |
+| all | 267 | 141 | 72 | 57 (62) | 92 (296) | 68 (121) | 0 of 5 | 99 | 27 |
 
-The element list reads 138 of 267 of these pages right. The record before this one (0.5.10)
+The element list reads 139 of 267 of these pages right. The record before this one (0.5.10)
 had 149 pages right and 45 faultless: since then running heads, feet and page numbers are
 read on 57 pages and not 145, and 17 pages that were right are not (12 of papers, 5 of
 textbooks; 5 others became right), with more blocks cut (293, from 207; in textbooks 201,
@@ -3125,6 +3135,15 @@ page), and page 2 of `os_introductory_statistics_2e`, where a figure's crop took
 sentence under it (a small drawing does not join a figure across a line of prose). Both are the
 CHANGELOG entry "two faults behind the reading-order fall" (O-388). Page 3 of
 `ax_hepth_240306652` is the faultless one.
+From 0.5.15 to 0.5.16 one page became right (141 of 267; faultless stays 72) and none was made
+wrong: page 8 of `ax_astrophga_240306369` (its 4 broken blocks and 3 cross-joins are gone).
+Two pages changed in their fault counts only: page 1 of the same paper (strays 11 to 9; 3
+broken blocks and 5 cross-joins gone) and page 1 of `ax_cscv_240306361` (strays 7 to 9). The
+cause is the CHANGELOG entry "columns under the head of a first page" (O-024): the layout of
+each of the two documents, run on the commit before it and on it, changes there. Broken blocks
+fall from 106 to 99 and cross-joins from 35 to 27, all of them in the papers (38 to 31 and 16
+to 8). Builder 11 measured 141 of 267 and 72 faultless for this change; the record gives the
+same.
 `layout-heldout-1` has not been scored.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
@@ -3238,9 +3257,19 @@ What the first run shows:
 
 A replay waits on no model, so its seconds are the local work. The report prints:
 
-- seconds a page by page kind, at the median and the 95th percentile. The conversion does
-  not time each page yet, so a page is given its document's seconds divided by its pages:
-  exact for a document of one kind, blurred for a mixed one;
+- seconds a page by page kind, at the median and the 95th percentile. A page is given its
+  document's seconds divided by its pages: exact for a document of one kind, blurred for a
+  mixed one (the page trace, next, is not blurred);
+- seconds of one page, from the page trace: the conversion times each layout step on each
+  page (`read`, `tables`, `rows`, `figures`, `equations`, `order`, `blocks`, `elements`) and
+  the page's `crops` (`pipeline/step_facts.PageTrace`, docs/layout.md "The page trace"). The
+  report gives the median, the 95th percentile and the slowest of the pages, each step's
+  median, 95th percentile and share of the traced time, and the five slowest pages with the
+  step that took most of each. Steps over the whole document (the margin filter, list
+  markers, the notices) and the models belong to no page, so the traced layout steps are
+  less than the layout stage: the report prints the share (84% on the corpus). A record made
+  before the trace says "no page trace". The trace is in the run record (`--records`) and the
+  report's `metrics.trace`; a job in the web app does not store it;
 - seconds a page by stage (`layout`, `image_pages`, `steps`, `assemble`, `checks`), over the
   documents that have the stage, with the stage's mean over every page and its share;
 - start-up apart, as seconds of a job: starting the conversion process and loading its code
@@ -3292,6 +3321,42 @@ assembly 7% and the checks 1%. The models are not waited for in a replay; when t
 were recorded a request took 1.4 s at the median for an equation, 2.6 s for a figure, 3.2 s
 for a table and 8.9 s for a page read as a picture. The conversion process held at most
 515 MB and the process that called it 424 MB.
+
+**Seconds of one page, from the trace** (2026-11-20, pipeline 0.5.14, the machine above, with a
+load average of 18 to 24 on its 16 cores while other work ran: read every figure as an upper
+bound).
+
+On the corpus replay (73 uploads, 338 pages, one run of each): a page took 0.42 s at the
+median, 2.38 s at p95 and 7.05 s at most, from layout steps and crops. The table search was
+56% of the traced time (0.25 s a page at the median, 1.17 at p95), the crops 26% (0.03 s at
+the median, 0.77 at p95), reading the text and drawings 12%, and rows, blocks and figures 2%
+or 1% each; equations, reading order and the conversion to elements are 0% at the median. Of
+the five slowest pages the table search took the most time on two, the crops on two and reading
+a handwritten page on one.
+
+On the layout development set (`layout-dev-1`'s 60 documents, 954 pages, layout alone with no
+model and the table search unlimited, as a replay runs it): 0.69 s a page at the median,
+2.12 s at p95 and 8.35 s for the slowest page (6.9 s of it the table search). The table search
+was 69% of the traced time, reading 17%, rows 5%, blocks 4%, figures 3%, and elements,
+equations and order 0.1% each. The traced steps are 90% of layout's wall time on these
+documents (the rest is the probe process, the margin filter, list markers and the notices).
+The slowest document, 59 pages, took 68 s.
+
+The time of a page is the table search's first and the crops' second. Nothing here is a bar:
+it is where to look.
+
+**What the trace costs.** A page has 11 timed steps in layout and one for its crops. The
+layout ones cost 26 microseconds a page, timed in a loop on this machine under load, against a
+page's median of 0.4 to 0.7 s: 0.005%, far under the 2% the work item allowed, and not to be
+told from the noise of a run. It is always on and has no switch.
+
+**`_Char.blank`** was a property that called `str.isspace` on each read. On the slowest
+document of the development set (59 pages, 146,000 characters) it was read 11.6 million times,
+79 reads for each character made. It is now worked out once when the character is made (a
+field set in `__post_init__`): a read costs 15 ns where it cost 79, and making a character
+costs a little more, so the saving is about 0.75 s of the 78 s of CPU layout took on that file
+(about 1%). Three runs before measured 78.6 to 78.9 s and three after 71.3 to 79.1 s, on a
+machine with a load of 20, so the runs show only that nothing got slower.
 
 ### `eval burden`
 
@@ -3382,9 +3447,9 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-20 at pipeline 0.5.15 by
-`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 57 decisions,
-0.487 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-21 at pipeline 0.5.16 by
+`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 56 decisions,
+0.479 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
 capitals, equation numbers and kept line ends) make the pipeline ask questions the
 recording does not hold, so 30 uploads are left out for 1,324 answers missing, among them the
@@ -3406,7 +3471,14 @@ the elements that ask for a decision (`asked`) and the ones a reviewer may look 
 (`not_compared`: 2 of the 52 equations, both for want of usable characters; no decision is
 asked for these). Against the 0.5.14 record the same 43 uploads are measured and each asks the
 same decisions (57 on 117 pages), and the same 30 uploads are left out for the same 1,324
-answers missing: the changes of 0.5.15 moved no decision of an upload the record holds. **A paid recording of the
+answers missing: the changes of 0.5.15 moved no decision of an upload the record holds. Against the
+0.5.15 record (made 2026-11-20, 57 decisions) the same 43 uploads are measured and 42 ask the same
+decisions: `s02_syllabus_sidebar` asks none where it asked one (a table on its first page, the
+record's 3 tables are 2 and its 57 decisions 56): the body column beside a sidebar was read as a
+table and sent for a decision, and is two columns of text now
+(CHANGELOG "two text columns whose lines mostly hold one cell are not a table", O-150). The same 30
+uploads are left out, for the same 1,324 answers missing, upload by upload: no recorded request
+stops matching. **A paid recording of the
 answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
 the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.
@@ -3611,13 +3683,95 @@ What none of the reports has yet:
 
 - A replay of held-out whole documents (the recording is not made), and so a bar or a
   public figure.
-- Seconds of one page. They come with the per-page trace of the conversion; until then a
-  kind's seconds are those of the documents its pages are in.
 - A long document. The longest corpus file has 39 pages; the 100-page math-heavy document
   the audit timed is not in the corpus.
 - A LaTeX source, a Word or a PowerPoint file: the corpus has none whose answers are
   recorded, so the `source` kind has no row.
 - How long a background (batch) check takes to come back: no batch answer is recorded.
+
+### `eval pictures`
+
+A18's count: how many pictures a student gets that were not converted, how many content
+pictures have no alt text, and which regions the tool calls handwriting. It is made from the
+same measured replay as `eval outputs` (the audit of each result is kept beside it: a record
+made with `eval outputs --records` before this existed has no counts and is reported as "not
+counted"), so it spends nothing and gates nothing, and it reads what the conversion wrote and
+nothing else.
+
+```bash
+uv run readablestem eval pictures --out data/eval/pictures-corpus.json
+uv run readablestem eval pictures --from kept.json        # report on a kept replay
+uv run readablestem eval pictures --truth my-truth.json   # read the regions against another list
+```
+
+What it counts, per upload and added up:
+
+- **Images not converted, by reason.** A figure the page shows as the picture of the original,
+  with the fix's own reason: `handwriting_on_page`, `scanned_page`, `unread_page` (kept as
+  images before any model step), a refused or failed answer, `no_proposal`, `no_description`,
+  or `unproven_decoration` (the model said decoration and the page does not take it).
+  Equations, tables and paragraphs shown as pictures are counted apart as "other parts".
+- **Content pictures with empty alt.** A picture on the page that is not marked as decoration
+  and has no alt text or an empty one (the output audit's `out_alt_missing`, which is also
+  counted in `eval outputs`). Pictures with empty alt that are decoration are counted apart.
+- **Regions called handwriting**, each with its page and box in points (numbers, never words),
+  handwritten pages, and the notices that go with them.
+
+**The 39 audit documents** (AQ4, plan WS6.10 and A18) are the corpus's `r` and `s` files as the
+corpus held them when the audit was made: `r01` to `r21` and `s01` to `s18` with `s12a` and
+`s12b`, not `s05_form_acroform` (added later). The set is a rule in `eval/pictures.py`
+(`audit_set`). The report names them "audit" and the other uploads "rest".
+
+**Uploads whose recording lacks answers are kept apart**, as in `eval outputs`: a figure the
+replay has no recorded answer for is kept as a picture, and shows `model_refused` (the
+replay's stand-in for an answer it does not hold; it never appears in an upload with every
+answer). The counts of those uploads are not what production makes of them, except the
+reasons that come before any model step (`handwriting_on_page`, `scanned_page`, `unread_page`)
+and the regions called handwriting, which layout makes alone.
+
+**The truth list** (`data/eval/pen-truth.json`) holds regions someone looked at in a render of
+the region: the document, the 1-based page, the box, `pen` or `not_pen`, and a short word for
+what was seen. A region called handwriting matches a row on the same page whose box overlaps
+it by at least half. The report says how many called regions were seen as pen strokes, how
+many as something else (typeset or vector drawings, glyph outlines: this count must be 0) and
+how many nobody has looked at, and which labeled pen regions no call matched. The list is
+filled by looking, never from the pen rule itself, which would score the rule against itself.
+
+Baseline (2026-11-20, pipeline 0.5.14, production profile, 73 uploads of the 72 documents,
+`data/eval/pictures-corpus.json`):
+
+| Set | Uploads | Images | Not converted | Empty alt | Regions called handwriting |
+|---|---|---|---|---|---|
+| 39 audit documents, every answer recorded | 26 | 15 | 2 | 0 | 0 |
+| 39 audit documents, answers missing | 13 | 129 | 84 | 0 | 9 |
+| rest, every answer recorded | 17 | 8 | 4 | 0 | 0 |
+| rest, answers missing | 17 | 92 | 61 | 0 | 1 |
+
+- **Empty alt: 0 on every upload** (12 on the 39 documents in the audit). The goal bar of 0 is
+  met on the development set.
+- **Kept as images before any model step, on the 39 documents: 15 of 144 images**: 9 regions
+  called handwriting, 1 scanned page and 5 `unread_page`. The audit measured 31 of 169 not
+  converted on older code; the two counts are not set side by side, since 13 of these
+  documents lack answers (below).
+- **The 9 regions called handwriting on the 39 documents are all printed**: 8 on `r16` (a
+  number, unit or symbol of the text drawn as a filled outline: the formula part WS4.1 owns) and
+  1 on `r17` (the journal's printed header with its emblem). A tenth, outside the 39, is two
+  typeset arrows on `w_slides_60001_lec10`. All 10 were seen by rendering the region (public,
+  CC BY or CC BY-NC-SA files); 0 were pen strokes, so the goal bar of 0 typeset or vector
+  drawings called handwriting is not met: 10 regions, 10 of them wrong. The labels are one
+  builder's reading of the renders and want the owner's look.
+- **13 of the 39 audit documents have no recorded answers for part of their requests** (and 17
+  more documents outside them): the crops, and so the requests, changed after the recordings were
+  made. Their `model_refused` count (68 images on the 39) is a recording gap, not a refusal. The
+  count of pictures not converted by the answers the model gives on those 13 documents needs
+  new recordings, which cost money and are not made.
+- The truth list so far holds only these 10 regions, none of them pen strokes. It cannot say
+  whether a real pen stroke is missed: that needs labeled pen regions on public files, and
+  none is called in the corpus. No private region is waiting for the owner: every region called
+  is in a public file.
+
+The bar is judged on a held-out set of public course files with at least 100 images, split by
+WS0.6; none is made. Until then these are development figures.
 
 ### `eval say-once`
 
@@ -3908,6 +4062,8 @@ limits is still owed.
 | `src/readablestem/eval/cost.py`, `eval/speed.py`, `eval/burden.py` | `eval cost`, `eval speed` and `eval burden`: the reports made from a measured replay, and the speed and review-load bars |
 | `src/readablestem/pipeline/output_audit.py`, `eval/outputs.py` | the output audit (a reader for each file a student is given, and the counts) and `eval outputs`, which builds the files from a measured replay and reports the counts |
 | `data/eval/outputs-corpus.json` | the last output-audit record of the corpus (development set) |
+| `src/readablestem/eval/pictures.py` | `eval pictures`: A18's count (pictures not converted by reason, content pictures with empty alt, regions called handwriting) from the measured replay, and the reading of those regions against the truth list |
+| `data/eval/pictures-corpus.json`, `data/eval/pen-truth.json` | the last pictures record of the corpus, and the regions seen as pen strokes or not |
 | `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
 | `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
 | `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |

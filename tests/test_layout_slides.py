@@ -15,6 +15,7 @@ from functools import cache
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from readablestem.core.types import Element, Kind
 from readablestem.pipeline import layout, slides
@@ -49,6 +50,19 @@ def view(
 
 def title_row(text: str) -> slides.RowView:
     return row(text, y=12.0, size=14.5, x=9.0)
+
+
+def test_scanned_slides_do_not_count_against_the_titles_of_a_deck():
+    """Half the slides are kept whole as images: the typed ones have titles, so it is a deck;
+    a file of kept-whole pages alone is not."""
+    typed = [
+        view(n, [title_row(f"Slide {n}"), row("Some text of the slide that is the body")])
+        for n in (0, 2, 4)
+    ]
+    scanned = [slides.PageView(n, 363.0, 272.0, None, [], kept_whole=True) for n in (1, 3, 5)]
+    pages = sorted([*typed, *scanned], key=lambda v: v.number)
+    assert slides.detect(None, pages) is not None
+    assert slides.detect(None, scanned) is None
 
 
 def test_a_page_with_no_text_is_never_taken_for_an_earlier_step():
@@ -184,6 +198,56 @@ def test_a_formula_larger_than_the_slide_title_does_not_make_a_title_slide():
     levels = heading_levels_of(analyze(deck_pdf(pages)))
     assert levels["First Lecture"] == 1
     assert {levels[t] for t in ("Alpha", "Beta", "Gamma")} == {2}
+
+
+def test_a_formula_in_the_top_of_a_slide_is_not_its_title():
+    """The slide's title is the text above a large formula, not the formula."""
+    pages = [
+        view(
+            n,
+            [
+                row(title, y=20, size=30.0),
+                row("x = -b / 2a", y=60, size=50.0),
+                row("The roots of a quadratic follow from this formula", y=200),
+            ],
+        )
+        for n, title in enumerate(["Alpha", "Beta", "Gamma"])
+    ]
+    deck = slides.detect(None, pages)
+    assert deck is not None
+    assert [t.text for t in deck.titles.values()] == ["Alpha", "Beta", "Gamma"]
+
+
+@pytest.mark.parametrize(
+    "titles",
+    [
+        ["C++", "Q+A", "Alpha"],
+        ["C++", "C++ 17", "C++ II", "C/C++", "g++", "Q+A:", "C++ vs. C#", "C#", "A+ grade"],
+    ],
+)
+def test_a_slide_titled_with_a_name_that_has_a_plus_in_it_keeps_its_title(titles):
+    pages = [
+        view(
+            n, [row(title, y=20, size=30.0), row("Body text of the slide goes in this line", y=200)]
+        )
+        for n, title in enumerate(titles)
+    ]
+    deck = slides.detect(None, pages)
+    assert deck is not None
+    assert [t.text for t in deck.titles.values()] == titles
+
+
+def test_slides_titled_with_sums_are_a_deck_whose_sums_are_not_titles():
+    titles = ["C++", "A+B", "C++ 17", "N+1", "C/C++", "X+Y", "Q+A", "Alpha"]
+    pages = [
+        view(
+            n, [row(title, y=20, size=30.0), row("Body text of the slide goes in this line", y=200)]
+        )
+        for n, title in enumerate(titles)
+    ]
+    deck = slides.detect(None, pages)
+    assert deck is not None
+    assert [t.text for t in deck.titles.values()] == ["C++", "C++ 17", "C/C++", "Q+A", "Alpha"]
 
 
 # ------------------------------------------------------------------ non-slide files

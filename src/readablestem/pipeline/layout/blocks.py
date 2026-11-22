@@ -11,7 +11,7 @@ import re
 import statistics
 import unicodedata
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Sequence, Set
 from dataclasses import dataclass
 from itertools import pairwise
 
@@ -300,14 +300,16 @@ HANGING_ENTRIES = 3  # entries in a row that make a hanging indent a list of ent
 HANGING_REACH = (1.0, 4.0)  # em: how far right of an entry's first line its other lines start
 LEAD_ENTRIES = 3  # paragraphs in a row that start with a lead term, to make a list of entries
 LETTER_SEQUENCE = 3  # letters in a row that make capitals alone on a line the sections of an index
+LETTER_UNDER_REACH = 2.5  # x size: how far under a letter its first entry starts (a line or two)
 
 
 def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
     """Mark the capital letters that head the sections of an index or a glossary (`_Row.letter`).
 
     One capital letter alone on its line, bold or larger than the body text, with the line
-    right under it an entry that starts with that letter, and at least `LETTER_SEQUENCE`
-    different letters set that way in one size and typeface through the document. The test
+    right under it (`LETTER_UNDER_REACH`) an entry that starts with that letter, and at least
+    `LETTER_SEQUENCE` different letters set that way in one size and typeface through the
+    document. The test
     reads the line under the letter, not the order of the page's columns, so the letters of
     an index in three columns are found where they stand. A letter on its own line anywhere
     else is the label of a figure's panel or a variable, and is never marked."""
@@ -328,7 +330,11 @@ def _letter_rows(pages: dict[int, list[_Row]], ctx: _Context) -> None:
                 key=lambda r: r.y0,
                 default=None,
             )
-            if under is not None and _first_letter(under.clean) == row.ink[0].c:
+            if (
+                under is not None
+                and under.y0 - row.y1 <= LETTER_UNDER_REACH * row.size
+                and _first_letter(under.clean) == row.ink[0].c
+            ):
                 found.setdefault((round(row.size * 2), row.family), []).append(row)
     for members in found.values():
         if len({row.ink[0].c for row in members}) >= LETTER_SEQUENCE:
@@ -683,8 +689,14 @@ CONTENTS_START_PAGES = 3  # without a "Contents" heading over it, a list counts 
 CONTENTS_REACH = 1.5  # x size: how far the right edges of a list's page numbers differ
 CONTENTS_RAGGED_LINES = 6  # lines of a list whose numbers follow their titles, at no one edge
 MIN_TITLE_LETTERS = 3  # letters in the title of a contents entry that has no leaders
+WRAPPED_TITLE_PITCH = 1.6  # x size: the most a wrapped title's lines stand apart
+WRAPPED_TITLE_INDENT = 5.0  # x size: the most its last line is set in from its first
+WRAPPED_TITLE_REACH = 6.0  # x size: how far from the page numbers' edge its first line stops
 _CONTENTS_HEADING = re.compile(r"(table of )?contents( \(continued\))?", re.IGNORECASE)
 _SHAPE_NUMBER = re.compile(r"\d{1,4}|[ivx]{1,6}")
+# A section label: a number ("2", "2.3", "A.4", "II"), after a word if any ("Chapter 5",
+# "Part II", "Week 3:", "Module 4").
+_SECTION_LABEL = re.compile(r"(?:[A-Z][a-z]+\s+)?(?:\d+(?:\.\d+)*|[A-Z](?:\.\d+)+|[IVX]+)[.:]?\s")
 
 
 def _page_order(word: str) -> tuple[int, int]:
@@ -875,21 +887,148 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         if twin is not None:
             taken.add(id(twin))
         pairs.append((row, twin))
+    # A line of prose that ends in an ellipsis has leaders but no page number: not an entry.
+    split = {
+        id(row): split[id(row)]
+        for row, twin in pairs
+        if id(row) in split and (twin is not None or _ends_in_number(row))
+    }
+    if len(split) < MIN_CONTENTS_LEADER_ROWS:
+        return _shaped_rows(rows, number)
     # The numbers of a contents page stand at one right edge.
     edge = statistics.median([t.x1 for _, t in pairs if t is not None] or [0.0])
     entries: list[tuple[_Row, _Row]] = []  # (the line, the line it becomes)
     dropped: set[int] = set()
+    heads = {
+        id(row): row
+        for row, twin in pairs
+        if id(row) not in split and twin is None and _numbered_line(row) is None
+    }
+    right = statistics.median([(twin or row).x1 for row, twin in pairs if id(row) in split])
+    labelled = 2 * sum(_starts_with_label(r) for r in rows if id(r) in split) > len(split)
+    listed = {
+        id(row)
+        for row, twin in pairs
+        if id(row) in split
+        or (
+            twin is not None
+            and abs(twin.x1 - edge) <= 1.5 * row.size
+            and row.kind == "text"
+            and len(split) >= 1
+        )
+    }
+    # the forms of the entries' labels, with leaders or with a page number at the margin
+    shapes = {_label_shape(r) for r in rows if id(r) in listed} - {None}
     for row, twin in pairs:
         aligned = twin is not None and abs(twin.x1 - edge) <= 1.5 * row.size
         if id(row) in split:
-            entries.append((row, _Row(split[id(row)], column=row.column)))
+            new = _Row(split[id(row)], column=row.column)
         elif aligned and row.kind == "text" and len(split) >= 1:
-            entries.append((row, row))
+            new = row
         else:
             continue
+        head = _title_head(row, heads, right, rows, listed)
+        if head and _wraps(head, row, labelled=labelled, shapes=shapes):
+            new.contents_wrap = head
+            heads.pop(id(head))
+            entries.append((head, head))
+        entries.append((row, new))
         if aligned and twin is not None:
             dropped.add(id(twin))
     return _leveled(rows, entries, dropped)
+
+
+def _ends_in_number(row: _Row) -> bool:
+    """Does the line end in a page number, after a blank or a leader dot?"""
+    chars = [c for c in row.chars if not c.blank]
+    start = len(chars)
+    while start and chars[start - 1].c.isalnum():
+        start -= 1
+    return (
+        0 < start < len(chars)
+        and bool(_PAGE_NUMBER.fullmatch("".join(c.c for c in chars[start:])))
+        and chars[start - 1].c in LEADER_DOTS
+    )
+
+
+def _title_head(
+    row: _Row, heads: dict[int, _Row], right: float, rows: Sequence[_Row], listed: set[int]
+) -> _Row | None:
+    """The line right above an entry's line when the title wraps ("E.5 Proof of ... (Lemma" over
+    "D.6) . . . 39"): in the same column, at the entry's size and no further right than it, and
+    reaching the right edge of the entries (`right`: the page numbers' column). A title
+    that wraps has no leaders or number on its first line, so it was no entry. Only in the
+    middle of a list: when what stands right above the line is no entry (`listed`), it is the
+    last line of a paragraph, a heading or a part line, or the first line of the first entry
+    ("Week 1: ..." or "Temperature ..." under a paragraph that runs to the right edge look the
+    same as a title that wraps), and the line stays as it was."""
+    return next(
+        (
+            h
+            for h in heads.values()
+            if h.kind == "text"
+            and _entry_above(h, rows, listed)
+            and h.column == row.column
+            and 0 < row.baseline - h.baseline <= WRAPPED_TITLE_PITCH * row.size
+            and abs(h.size - row.size) <= 0.5
+            and h.x0 <= row.x0 + 0.6 * row.size
+            and row.x0 - h.x0 <= WRAPPED_TITLE_INDENT * row.size
+            and h.x1 >= right - WRAPPED_TITLE_REACH * row.size
+        ),
+        None,
+    )
+
+
+def _wraps(head: _Row, row: _Row, *, labelled: bool, shapes: Set[str | None]) -> bool:
+    """Is `row` the second line of the title `head` starts, not an entry under a chapter line?
+
+    In a list whose entries start with a section label, a title's second line has none: an
+    entry that has one is no title's second line, whatever stands above it (a part line, or a
+    chapter line with no page number of its own, which starts with a label too). In any list,
+    under a line with a label a line without one goes on from it when it is in lower case,
+    after a hyphen ("2.1 Work and heat in closed" / "systems"), or when the label has the form
+    of the labels of the entries with leaders or a page number at the margin (`shapes`: "E.5
+    Proof of ... (Lemma" / "D.6)" among "E.4" and "E.6"); otherwise the line with the label is
+    a chapter line over an entry of its own ("Chapter 2 ..." / "Introduction" among "1.1" and
+    "2.1")."""
+    if labelled and _starts_with_label(row):
+        return False
+    if not _starts_with_label(head) or _starts_with_label(row):
+        return True
+    return row.clean[:1].islower() or head.clean.endswith("-") or _label_shape(head) in shapes
+
+
+def _label_shape(row: _Row) -> str | None:
+    """The form of the section label a line starts with, or None: "2.3" and "4.1" are "9.9",
+    "Chapter 5" is "Chapter 9", "B.2" is "A.9", "IV" is "I" (a part line over "1", "2")."""
+    found = _SECTION_LABEL.match(row.clean)
+    if not found:
+        return None
+    label = found.group().strip().rstrip(".:")
+    return re.sub(r"^[A-Z](?=\.)", "A", re.sub(r"\b[IVX]+$", "I", re.sub(r"\d+", "9", label)))
+
+
+def _starts_with_label(row: _Row) -> bool:
+    """Does the line start with a section label ("1", "2.3", "A.4", "Chapter 5", "Part II",
+    "Week 3:") and then a space?"""
+    return bool(_SECTION_LABEL.match(row.clean))
+
+
+def _entry_above(row: _Row, rows: Sequence[_Row], listed: set[int]) -> bool:
+    """Is the nearest line right above `row` (over some of its width, so the text of another
+    column beside a list is no neighbor) an entry of the list (`listed`)?"""
+    above = [
+        r
+        for r in rows
+        if not r.vertical
+        and r.x0 < row.x1
+        and r.x1 > row.x0
+        and r.baseline < row.baseline - 0.35 * row.size
+    ]
+    if not above:
+        return False
+    near = max(r.baseline for r in above)
+    return any(id(r) in listed for r in above if near - r.baseline <= 0.35 * row.size)
 
 
 def _shaped_rows(rows: list[_Row], number: int) -> list[_Row]:
@@ -910,7 +1049,7 @@ def _leveled(rows: list[_Row], entries: list[tuple[_Row, _Row]], dropped: set[in
     if not entries:
         return rows
     steps: list[float] = []  # the distinct indents, outermost first
-    for x in sorted(new.x0 for _, new in entries):
+    for x in sorted(new.x0 for _, new in entries if new.contents_wrap is None):
         if not steps or x > steps[-1] + 0.6 * entries[0][1].size:
             steps.append(x)
     for old, new in entries:
@@ -2263,6 +2402,11 @@ def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
     for row in rows:
+        if row.contents_wrap is not None and (
+            first := next((r for r in reversed(runs) if r.rows[-1] is row.contents_wrap), None)
+        ):
+            first.add(row)  # the rest of a title that wraps, whatever lies between its lines
+            continue
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
@@ -2671,7 +2815,7 @@ def _line_break(before: str, after: str, *, document: _Document = _PLAIN) -> tup
     """
     if before.endswith("\u00ad"):
         return before[:-1], ""
-    if hyphens.joins_inside_token(before, after):
+    if hyphens.joins_inside_token(before, after, document.link_cuts):
         return before, ""
     if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
         if after[:1].islower() and not hyphens.keeps_hyphen(

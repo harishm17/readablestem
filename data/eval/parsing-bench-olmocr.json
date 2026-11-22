@@ -17,12 +17,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.15",
- "commit": "3efefeab9859564e8d47e192a12c83f5085fc7cb",
+ "pipeline_version": "0.5.16",
+ "commit": "d0cc3e04ded9d8e48021d02d8877f1368a97a6c1",
  "provenance": {
-  "commit": "3efefeab9859564e8d47e192a12c83f5085fc7cb",
+  "commit": "d0cc3e04ded9d8e48021d02d8877f1368a97a6c1",
   "clean": true,
-  "pipeline_version": "0.5.15",
+  "pipeline_version": "0.5.16",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -67,21 +67,21 @@
   },
   "pages_that_asked_a_model": 603,
   "requests_refused_by_step": {
-   "equation": 2844,
+   "equation": 2846,
    "figure": 1170,
    "image_page": 264,
    "table": 550
   },
   "stopped_early": 0,
-  "seconds_median": 3.55
+  "seconds_median": 2.39
  },
  "metrics": {
   "multi_column": {
    "checks": 884,
    "run": 708,
-   "passed": 492,
-   "score": 69.5,
-   "score_if_dropped_failed": 55.7,
+   "passed": 497,
+   "score": 70.2,
+   "score_if_dropped_failed": 56.2,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 133,
     "scan with no text layer": 43
@@ -95,15 +95,15 @@
   "headers_footers": {
    "checks": 753,
    "run": 632,
-   "passed": 244,
-   "score": 38.6,
-   "score_if_dropped_failed": 32.4,
+   "passed": 243,
+   "score": 38.4,
+   "score_if_dropped_failed": 32.3,
    "dropped": {
     "scan read from its picture (an OCR layer, if any, is not used)": 86,
     "scan with no text layer": 35
    },
    "run_no_request": 218,
-   "score_no_request": 30.7,
+   "score_no_request": 30.3,
    "pdfs": 266,
    "pdfs_run": 227,
    "column": "Hdr/Ftr"

@@ -5,11 +5,13 @@ the page picture a failed page is kept as, and the heading levels read from the 
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import math
 import re
 from collections.abc import Callable, Sequence
 from functools import partial
+from itertools import pairwise
 from typing import Any
 
 import pymupdf
@@ -32,10 +34,10 @@ from readablestem.pipeline.layout.access import (
     _check_content,
     _digest,
     _document_lang,
-    _ensure_probed,
     _open,
     _quiet_mupdf,
     _select_pages,
+    probe_failures,
 )
 from readablestem.pipeline.layout.blocks import (
     MAX_HEADING_CHARS,
@@ -47,7 +49,7 @@ from readablestem.pipeline.layout.blocks import (
     section_number,
 )
 from readablestem.pipeline.layout.bold import _glossary_entries, _lead_entries, _settle_bold_letters
-from readablestem.pipeline.layout.context import Layout, LayoutError, _Document, _PageGuard
+from readablestem.pipeline.layout.context import Layout, LayoutError, _Document, _PageGuard, log
 from readablestem.pipeline.layout.drawings import _page_paths
 from readablestem.pipeline.layout.elements import _contents_links, _footnote_links, _to_elements
 from readablestem.pipeline.layout.figures import (
@@ -71,6 +73,7 @@ from readablestem.pipeline.layout.joins import (
 )
 from readablestem.pipeline.layout.lists import _list_markers
 from readablestem.pipeline.layout.notices import (
+    _actualtext_notices,
     _FootnoteMark,
     _hidden_text_notices,
     _ink_notices,
@@ -97,6 +100,7 @@ from readablestem.pipeline.layout.rows import (
 )
 from readablestem.pipeline.layout.shared import _Display, _PageBlocks, _Path, _Row
 from readablestem.pipeline.layout.tables import _claim_tables, _table_regions
+from readablestem.pipeline.step_facts import PageTrace
 
 HEADING_LEVEL_TOLERANCE = 0.05  # heading sizes within 5 % of each other share a level
 
@@ -180,7 +184,9 @@ def analyze(
                 _check_content(lambda: content_budget.check_objects(doc))  # before the page tree
                 selected = _select_pages(doc.page_count, pages, max_pages)
                 _check_content(lambda: content_budget.check(doc, selected))
-                _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
+                unrendered = probe_failures(pdf_bytes, _digest(pdf_bytes), selected)
+                for number, error in unrendered.items():  # the page and the code, no content
+                    log.warning("layout could not draw page %d: %s", number + 1, error.code)
                 return _analyze_document(
                     doc,
                     selected,
@@ -191,8 +197,10 @@ def analyze(
                         region_tree=region_tree,
                         panels=join_panels,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
+                        trace=PageTrace(),
                     ),
                     on_page,
+                    unrendered,
                 )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
@@ -229,9 +237,12 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
     group_of = {e.id: slides.deck_number(e.reasons) for e in headings}
     level_of: dict[tuple[int | None, float], int] = {}
     below: dict[int | None, int] = {}
+    titled_decks: set[int | None] = set()
     for group in set(group_of.values()):
         in_group = [e for e in headings if group_of[e.id] == group]
         titled = any(slides.DECK_TITLE_REASON in e.reasons for e in in_group)
+        if titled:
+            titled_decks.add(group)
         sized = sorted(
             {
                 round(e.font_size or 0.0, 1)
@@ -259,7 +270,16 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             raw = min(2, below[group])  # one level under the title, when there is one
         else:
             raw = below[group] + max(0, (depth[e.id] or shallowest) - shallowest)
-        levels[e.id] = max(1, min(6, tagged_level(e) or outline.weak_level(e) or raw))
+        level = tagged_level(e)
+        if (
+            level
+            and group in titled_decks
+            and any(r.startswith(REASON_IMAGE_HEADING) for r in e.reasons)
+        ):
+            # The page reader numbers a slide's headings from its own title (1); under the
+            # deck's title that title is a slide title, as a typed slide's is.
+            level += 1
+        levels[e.id] = max(1, min(6, level or outline.weak_level(e) or raw))
     section = None  # the level of the last heading that is not a letter of an index
     for e in sorted(headings, key=lambda e: e.order):
         if REASON_LETTER not in e.reasons and REASON_LETTERED not in e.reasons:
@@ -281,6 +301,46 @@ def _meaningful_title(raw: str | None) -> str | None:
     if sum(c.isalpha() for c in title) < 3 or _JUNK_TITLE.search(title):
         return None
     return title[:MAX_HEADING_CHARS]
+
+
+def _link_cuts(doc: pymupdf.Document, rows: dict[int, list[_Row]]) -> hyphens.LinkCuts:
+    """The line breaks inside a printed address that the file's own links run across: two
+    link annotations of one address on neighbouring lines of a page (hyperref writes one
+    per line), as `hyphens.link_cut` reads them from the words under each. Link rectangles
+    are read the way the text pass reads them (`text_pass._pdf_links`)."""
+    cuts: set[tuple[str, str]] = set()
+    for number, page_rows in rows.items():
+        try:
+            links = [
+                link for link in doc[number].get_links() if link.get("kind") == pymupdf.LINK_URI
+            ]
+        except (RuntimeError, pymupdf.mupdf.FzErrorBase):
+            continue
+        by_uri: dict[str, list[pymupdf.Rect]] = {}
+        for link in links:
+            if link.get("from") is not None and link.get("uri"):
+                by_uri.setdefault(link["uri"], []).append(link["from"])
+        for uri, rects in by_uri.items():
+            rects.sort(key=lambda r: (r.y0, r.x0))
+            for above, below in pairwise(rects):
+                if 0.5 * above.height < below.y0 - above.y0 < 2.5 * above.height:
+                    first, second = (_text_in(page_rows, r) for r in (above, below))
+                    if cut := hyphens.link_cut(uri, first, second):
+                        cuts.add(cut)
+    return frozenset(cuts)
+
+
+def _text_in(rows: list[_Row], rect: pymupdf.Rect) -> str:
+    """The characters of `rows` whose centres are in `rect`, in reading order."""
+    found = [
+        c
+        for row in rows
+        for c in row.chars
+        if not c.blank
+        and rect.x0 <= (c.x0 + c.x1) / 2 <= rect.x1
+        and rect.y0 <= (c.y0 + c.y1) / 2 <= rect.y1
+    ]
+    return "".join(c.c for c in sorted(found, key=lambda c: (round(c.baseline), c.x0)))
 
 
 def _read_page(
@@ -325,6 +385,7 @@ def _analyze_document(
     page_math: Any,
     document: _Document,
     on_page: Callable[[int, int], None] | None = None,
+    unrendered: dict[int, LayoutError] | None = None,
 ) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
@@ -333,6 +394,10 @@ def _analyze_document(
     document.tex_made = producer == "tex"
     guard = _PageGuard()
     guard.pages = list(selected)
+    # Pages the probe could not draw (`access.probe_failures`) are failed pages from the start:
+    # no step reads them, and they are kept (`keep_failed`) with a reason of their own.
+    unrendered = unrendered or {}
+    guard.failed.update(unrendered)
 
     def forget() -> None:
         # A page that failed in a step is not in the later ones: whatever the steps before
@@ -345,15 +410,21 @@ def _analyze_document(
     def keep_failed() -> None:
         for number in guard.failed:
             if number in selected:  # a failed reference page of the margin filter is not one
-                kept[number] = page_type.PAGE_READ_FAILED
+                kept[number] = (
+                    page_type.PAGE_NOT_RENDERED
+                    if number in unrendered
+                    else page_type.PAGE_READ_FAILED
+                )
 
     found: dict[int, list[tables.PageTable]] = {}
     prepared: dict[int, tuple[list[_Row], Gutter, list[_Row]]] = {}
     sources: dict[int, say_once.PageSource] = {}
     refused: dict[int, list[tuple[BBox, str]]] = {}  # table proposals the region tree refused
-    for number in selected:
+    for number in guard.live(selected):
         with guard(number):
+            lap = document.trace.lap(number)
             rows, drawn, kind = _read_page(doc[number], document, producer)
+            lap("read")
             if _kept_whole(kind):
                 # Nothing but the header and footer bands of its paths is read again (by the
                 # margin filter, before this page is dropped): a page of tens of thousands of
@@ -432,6 +503,7 @@ def _analyze_document(
             # now a picture takes no row the break split.
             unclaimed = frags[number]
             refused_before = document.detector.refused
+            lap = document.trace.lap(number)
             found[number] = (
                 []
                 if number in text_kept
@@ -457,6 +529,7 @@ def _analyze_document(
                     ),
                 )
             )
+            lap("tables")
             if document.detector.refused > refused_before:
                 not_searched.append(number)
             sources[number] = say_once.PageSource()
@@ -477,16 +550,21 @@ def _analyze_document(
             # Axes with tick labels, an axis title or a curve from their corner are a plot's:
             # the rows the header and footer rules dropped count (tick labels in the bands).
             # Rulers with no labels whose ticks are an answer field's cells are not rulers.
+            lap("rows")
             page_rows = [*prepared[number][0], *prepared[number][2]]
             _answer_fields(paths[number], page_rows)
             _mark_plots(paths[number], page_rows)
+            lap("figures")
     forget()
     guard.settle()
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
-    ctx.notes = named_links.read(doc, list(selected)) or None
+    ctx.notes = named_links.read(doc, [n for n in selected if n not in unrendered]) or None
     ctx.region_tree = document.region_tree
     document.compounds, document.whole_words = hyphens.document_spellings(
         row.text for rows, _, _ in prepared.values() for row in rows
+    )
+    document.link_cuts = _link_cuts(
+        doc, {n: [*rows, *dropped] for n, (rows, _, dropped) in prepared.items()}
     )
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx, guard)
     _letter_rows({n: rows for n, (rows, _, _) in prepared.items()}, ctx)
@@ -524,7 +602,7 @@ def _analyze_document(
                     source=sources.get(n),
                     document=document,
                 )
-        pages.append(read if read is not None else _kept_page(doc[n], n))
+        pages.append(read if read is not None else _kept_page(doc, n, unrendered))
     forget()
     keep_failed()
     guard.settle()
@@ -542,7 +620,7 @@ def _analyze_document(
     guard.settle()
     # A page whose blocks could not be written as elements is its picture, as the others
     # that failed (the notices below read only the pages that stay).
-    pages = [p if guard.ok(p.number) else _kept_page(doc[p.number], p.number) for p in pages]
+    pages = [p if guard.ok(p.number) else _kept_page(doc, p.number, unrendered) for p in pages]
     footnote_marks: dict[str, _FootnoteMark] = {}
     notices = _layout_notices(pages, ctx, block_ids, footnote_marks)
     elements = _contents_links(_footnote_links(elements, footnote_marks))
@@ -593,6 +671,7 @@ def _analyze_document(
             + _hidden_text_notices(types, kept)
             + _ink_notices(types, kept)
             + _turned_notices(types)
+            + _actualtext_notices(doc, types, kept)
             + _not_searched_notices(not_searched)
         ),
         page_types=types,
@@ -600,6 +679,8 @@ def _analyze_document(
         tables_not_searched=not_searched,
         sources=sources,
         table_refusals={n: r for n, r in sorted(refused.items()) if r},
+        page_steps=document.trace.facts(),
+        deck_pages=dict(deck.numbers) if deck is not None else {},
     )
 
 
@@ -637,6 +718,7 @@ def _read_deck(
                     page_labels.pdf_label(page),
                     rows,
                     slides.LazyMarks(partial(_marks_of, doc, number, paths.get(number, []), guard)),
+                    kept_whole=whole,
                 )
             )
     creator = doc.metadata.get("creator") if doc.metadata else None
@@ -732,9 +814,88 @@ def _kept_whole(kind: page_type.PageTypeResult) -> bool:
     return page_type.kept_reason(kind) is not None and not page_type.keeps_text(kind)
 
 
-def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:
-    """A page kept as its page image: no blocks."""
+def _kept_page(
+    doc: pymupdf.Document, number: int, unrendered: dict[int, LayoutError]
+) -> _PageBlocks:
+    """A page kept as its page image: no blocks. A page the probe could not draw is not
+    loaded: its size comes from the page tree (`_unloaded_size`)."""
+    if number in unrendered:
+        return _PageBlocks(number, _unloaded_size(doc, number), [])
+    page = doc[number]
     return _PageBlocks(number, (round(page.rect.width, 2), round(page.rect.height, 2)), [])
+
+
+def _unloaded_size(doc: pymupdf.Document, number: int) -> tuple[float, float]:
+    """(width, height) in points of a page, as `Page.rect` gives it, read from the page
+    tree the way MuPDF reads it: the MediaBox cut to the CropBox, both and Rotate inherited
+    from the pages above the page, scaled by the page's own UserUnit (not inherited; 0 or
+    less is read as 1, where MuPDF makes the page empty) and turned by Rotate to the nearest
+    quarter turn. US Letter where the MediaBox is missing
+    (the CropBox is then not read) or empty, and where the cut leaves nothing. MuPDF does not
+    build the page for this, so a page that kills or hangs it when it is built is not built.
+    A page turned upright when read (`page_type.turn_page`) is not turned here. US Letter if
+    the tree cannot be read."""
+    with contextlib.suppress(Exception):  # a page tree MuPDF cannot read: not worth failing for
+        xref = doc.page_xref(number)
+        box = _tree_box(doc, xref, "MediaBox")
+        crop = _tree_box(doc, xref, "CropBox")
+        if box and crop:
+            box = (
+                max(box[0], crop[0]),
+                max(box[1], crop[1]),
+                min(box[2], crop[2]),
+                min(box[3], crop[3]),
+            )
+        if not box or box[0] >= box[2] or box[1] >= box[3]:
+            box = (0.0, 0.0, 612.0, 792.0)
+        kind, unit = doc.xref_get_key(xref, "UserUnit")
+        if kind == "xref":
+            unit = doc.xref_object(int(unit.split()[0])).strip()
+        scale = float(unit) if unit not in ("null", "") and float(unit) > 0 else 1.0
+        width, height = (box[2] - box[0]) * scale, (box[3] - box[1]) * scale
+        kind, turn = _tree_value(doc, xref, "Rotate")
+        if kind == "int" and (int(turn) + 45) // 90 % 2:
+            width, height = height, width
+        if width > 0 and height > 0:
+            return round(width, 2), round(height, 2)
+    return 612.0, 792.0
+
+
+def _tree_value(doc: pymupdf.Document, xref: int, key: str) -> tuple[str, str]:
+    """A page's value for `key`, or the nearest one on the Pages nodes above it (the depth
+    of any real page tree; a cycle stops there). An indirect value is read through."""
+    for _ in range(32):
+        kind, value = doc.xref_get_key(xref, key)
+        if kind == "xref":
+            value = " ".join(doc.xref_object(int(value.split()[0])).split())
+            kind = "array" if value.startswith("[") else "int"
+        if kind != "null":
+            return kind, value
+        kind, value = doc.xref_get_key(xref, "Parent")
+        if kind != "xref":
+            break
+        xref = int(value.split()[0])
+    return "null", ""
+
+
+_INDIRECT = re.compile(r"(\d+) \d+ R")
+
+
+def _tree_box(
+    doc: pymupdf.Document, xref: int, key: str
+) -> tuple[float, float, float, float] | None:
+    """A box of the page tree as (x0, y0, x1, y1) with its corners in order (it may be
+    empty); None if it is missing. An array that is not four numbers is an empty box; a number
+    given as an object of its own ("12 0 R") is read through."""
+    kind, value = _tree_value(doc, xref, key)
+    if kind != "array":
+        return None
+    value = _INDIRECT.sub(lambda m: doc.xref_object(int(m[1])).strip(), value)
+    try:
+        x0, y0, x1, y1 = (float(n) for n in value.strip("[]").split())
+    except ValueError:
+        return 0.0, 0.0, 0.0, 0.0
+    return min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)
 
 
 def _unread_ink(

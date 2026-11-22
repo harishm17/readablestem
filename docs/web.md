@@ -2383,8 +2383,9 @@ document.
   | `internal_error` | Anything else |
 
 - **Live progress.** The converter's `ProgressEvent`s (`convert_pdf(stage_progress=)`:
-  "layout", then "equations", "figures", "tables" with done and total, then "assemble"
-  and "checks"; content-free) are kept per stage and written to `jobs.progress_json` as
+  "layout", "pages" (a scan's pages read from their pictures), then "equations",
+  "figures", "tables" with done and total, then "assemble" and "checks"; content-free) are
+  kept per stage and written to `jobs.progress_json` as
   `{"stages": {stage: event}}`: a stage seen for the first time or just finished at
   once, other updates at most every 2 s (`worker.PROGRESS_WRITE_S`), and only while
   this attempt owns the job (otherwise the next event raises `JobCancelled`). A failed
@@ -2590,9 +2591,12 @@ From top to bottom:
    16 pages" (while the layout runs, "Reading the layout: 7 of 16 pages" with the step's
    progress bar: the pages whose table search is done, the part of the layout that takes
    most of its time, told by `layout.analyze(on_page=...)` through the same stage events as
-   the other steps; then again for the pages a scanned document has read from their pictures,
-   each counted when its answer is back or it has none (`image_page.run(on_page=...)`: a page is
-   asked as soon as its picture is drawn, so the count moves while the next is drawn)), "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
+   the other steps), "Found 21 equations, 7 figures and 52 headings", then, for a scanned
+   document, "Reading the scanned pages: 7 of 20 pages" on a counter of its own (the pages read from
+   their pictures, each counted when its answer is back or it has none
+   (`image_page.run(on_page=...)`: a page is asked as soon as its picture is drawn, so the count
+   moves while the next is drawn); the layout's count is done by then and never steps back),
+   "Equations: 14 of 21 read
    and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
    "Building the HTML file", "Running the structure checks", each "(done)" or "(in
    progress)". Without JavaScript the page shows them as they were when it loaded, with
@@ -2625,6 +2629,10 @@ From top to bottom:
    students hear and the contact line, as sub-headings), Settings and sharing (sharing with
    a colleague, which says it is not how students get the file; and "If you change the PDF"),
    Record, and Delete (the one place retention is explained, with the real deletion date).
+   A setting or a link-only block is a framed card under its group's heading, with its
+   heading, one line and the link as a button: the language, the title and contact line (two
+   fields side by side where there is room, each with its own Save), and the cards of Settings
+   and sharing (`.link-cards`); Record is a group of its own with its two links as buttons.
    Someone a document is shared with sees only the groups that are theirs. The results
    are one line ("Found 19 equations, 7 figures and 36 headings on 13 pages.") with "Counts in
    detail" for the rest (list items, pages kept as images, decisions to make and made).
@@ -3612,6 +3620,36 @@ an edit or an error, and when `tools=1`) with, in this order:
   again, only where the new file would allow it (an open decision, a link or an equation there
   refuses it); a paragraph put back is not carried, and one not made again is listed as
   "paragraph you left out". No keyboard shortcut.
+  *Split it into separate parts* (`action=split`, `page_edits.split_block`; the same route, a
+  labeled box `lines`, button "Split it"; O-030, O-035). For options or list items that run
+  together in one paragraph or list item. The box holds the block's words with a line break
+  before each later label found (`page_edits.proposed_lines`: the next label of the first one's
+  form in order, "(A) ... (B) ...", "a. ... b. ..."), or as one line when none is found; the
+  reviewer moves, adds or takes out breaks. Only breaks can change: every word stays in its
+  order, or the route refuses it and says to use "Save the words" first. Each line becomes an
+  element of the same kind, in order right after the first: the first part keeps the element's
+  id, fix and notices, the others take the next free `p{page}-e{n}` of the page and the same box,
+  size, language and role (the page's marks for them overlap), and a list item's later parts take
+  their leading label as their marker, else the item's own. A link, color or raised run stays on
+  its words; one across a break is dropped and the notice names how many links. Layout's reason
+  `option_labels` is taken off every part, and the text decision it raised on the block, if still
+  open, is the reviewer's own now (status "edited", `reviewed`), since they cut the text where it
+  needed cutting. Refused (`page_edits.split_blocked`, each with a sentence): anything but a
+  paragraph or list item, program code, a glossary entry, right-to-left text, a block that holds an
+  inline equation, a footnote, a block another element links to, and a block a decision of
+  another kind waits on. It moves the reading order of what follows, so it is written like the
+  page operations that do (one `ReviewEdit` `split_block` with an Undo snapshot of the block and
+  the order, counted among the changes to pages; stale after any write since the page was drawn).
+  The record names it by the words the block had. A document converted again carries it over
+  (`carry_edits._carry_split`, kind `block_split`): the block that says the same words before the
+  split, when exactly one does, is split at the same lines; an undone split is not carried, and one
+  whose parts were changed since, or with no single matching block, is listed as "paragraph you
+  split into parts". No keyboard shortcut. Not built: text decisions on any other kind of text
+  than right-to-left order and options run together (no other kind has a producer, and nothing
+  measured needs one); the reorder of right-to-left text (held, SW54b); and a cut that reorders
+  words. Options set in two columns whose lines interleave ("(a) one two (b) three four five six"
+  with "five six" the end of the first) are cut at the labels, which gives the wrong words, so the
+  reviewer puts the words in order with "Save the words" and then splits.
 - *In words* (WS19.7). An equation's card gives the sentence around it from the PDF's text with
   the proposal read aloud in its place (the sentence before and after for one on its own line),
   and both readings, as speech and as LaTeX, where the page witness read it differently; a

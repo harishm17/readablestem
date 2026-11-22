@@ -442,7 +442,8 @@ REASON_MESSAGES: dict[str, str] = {
     "original: if they read right, choose Looks right; if not, change the words.",
     "text.option_labels": "Answer options (A, B, C and so on) run together in one paragraph or "
     "list item, so a screen reader reads them as one block. If each option can still be told "
-    "from the next, choose Looks right; if not, change the words so that each one is set apart.",
+    "from the next, choose Looks right; if not, split it into one part for each option with "
+    "“Split this paragraph into separate parts” in the page tools, or change the words.",
     # Table step (pipeline.table_step)
     "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
     "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
@@ -483,6 +484,8 @@ REASON_MESSAGES: dict[str, str] = {
     "image, marked “Not converted”.",
     "page_read_failed": "This page could not be read, so it is kept as an image, marked "
     "“Not converted”. The rest of the document was read.",
+    "page_not_rendered": "This page could not be shown, so nothing was read from it and the "
+    "file says so, marked “Not converted”. The rest of the document was read.",
     "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
     "convert handwriting on typed pages, so it is kept as an image after the typed text.",
 }
@@ -502,6 +505,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "kept as an image, after any text read from it.",
     "page_read_failed": "This page could not be read, so it is kept as an image. The rest of "
     "the document was read.",
+    "page_not_rendered": "This page could not be shown, so nothing was read from it. The rest "
+    "of the document was read: compare the file with the original.",
     "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "
@@ -559,7 +564,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "need them.",
     "option_labels": "Answer options (A, B, C and so on) run together in one paragraph or list "
     "item, so a screen reader reads them as one block: look at whether each option can be told "
-    "from the next, and change the words if not.",
+    "from the next, and split it into parts with the page tools, or change the words, if not.",
     "rtl_text": "This text is written right to left (Arabic or Hebrew). The PDF may store its "
     "words in a different order from the one they are read in, so the words may be out of "
     "order: compare it with the original.",
@@ -605,6 +610,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "source_not_compared": "This file was converted from the source itself and was not compared "
     "with its printed pages: read the converted file against your own copy before you post it.",
     "page_turned": "This page was saved sideways in the PDF, so it was turned upright to be read.",
+    "actualtext_ignored": "The PDF holds other words for some of this page than the ones "
+    "printed on it. The printed words were used. Compare the page with the original.",
     # Word and PowerPoint uploads (`web.office_census`); "{count}" is the number counted.
     "office_tracked_changes": "Tracked changes (insertions and deletions) that nobody "
     "accepted or rejected in this Word file: {count}. The PDF this was read from may show "

@@ -197,7 +197,25 @@ rules above.
    not a table. A second rule: a box under a "Table N" line with no rules, of
    three columns or more, six grid lines and alignment 0.5 (not 0.75) is a table: the caption
    is the reason, as it is for a layout grid (`CAPTION_COLUMNS`, `CAPTION_GRID_LINES`,
-   `CAPTION_ALIGNMENT`).
+   `CAPTION_ALIGNMENT`). And two text columns (a body and its sidebar, paired at their
+   sentence ends) are not a table: two columns, prose in one of them, and fewer than half the
+   lines with a cell in each (`TEXT_COLUMN_SHARE`; a line or two that stand level are no rows).
+   A "Table N" line under it still makes it one, and so do short labels that each stand level
+   with a line of the other column and open a run (a schedule: "Week 1" and its description
+   over three lines: the line above the label ends a sentence or is a paragraph's space
+   away, or no other label stands on the line before or after it, since a schedule's labels
+   stand a description apart; or a label does stand on the line before or after it, a week of
+   one line such as "Week 6 Midterm", two or more labels head a description of several
+   lines and all labels but one in five start with a capital or hold a digit): a body beside a
+   sidebar has lines of its own in both columns that stand level with nothing, and a sidebar's
+   lines follow one another in blocks and run on in lower case, so that more than one label in
+   five has neither a capital at its start nor a digit
+   (`_text_block_dropped`, `_labels_open_runs`). A sidebar whose labels all but one in five
+   start with a capital or hold a digit ("see fig. 3") is still made a table, and a schedule
+   with two lower-case labels in seven ("fall break", "exam week") is not one (its order is
+   kept). A sidebar of two or more blocks whose lines
+   start with capitals (a margin list of key terms) is still taken for a schedule and made a
+   table, as before.
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,
@@ -252,7 +270,20 @@ rules above.
    lines become `Element.caption` and `TableGrid.caption`. N is Arabic or Roman ("Table IV");
    "Table 2 shows that ..." is not a caption. The gap, 36 pt (the reach of figure captions), is
    measured from the caption block's nearest edge: over the table, from the block's last line
-   (a caption of up to eight lines), not from its first; under it, from its first line. Where
+   (a caption of up to eight lines), not from its first; under it, from its first line (a caption
+   of up to eight lines there too: it was cut at four, so a long caption lost its last lines to the
+   text under the table, `CAPTION_LINES_BELOW`), but a next line that starts with a capital after a
+   step more than 1 pt wider than the caption's own line step (or, for a caption of one line, the
+   next line's own) ends it: the paragraph under the table. Within the first four lines (where
+   the caption used to be cut, `CAPTION_LINES_CUT`) the caption's line must also end a sentence
+   or end three font sizes or more short of the next line's right edge (a caption's short last
+   line over a paragraph that runs full, `CAPTION_LAST_LINE_SHORT`), so a full line pushed down
+   by a tall formula does not cut a caption mid-sentence (a ragged caption's short line over
+   such a line does, and so does a short title line set more than 1 pt apart from its
+   description; the rest follows as a paragraph); past them any
+   line may end it. Steps
+   are measured baseline to baseline (`_baseline`), so a subscript or a raised mark on a line does
+   not change them. Where
    two tables are stacked, a caption goes to the nearer table. The pattern is
    `core/captions.py`, shared with the HTML check below and with figure captions. A caption is
    never invented.
@@ -774,6 +805,13 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 - An em dash for "no value" folds into the dash that is not compared: an answer that
   leaves that cell empty passes.
 - No speech text for math cells (the review screen reads the MathML).
+- A table whose borders are drawn as filled boxes thicker than 1.6 pt (`THIN_IMAGE`, and
+  `RULE_THICKNESS` in `layout/drawings.py`) is found, and its borders are also a figure (a
+  generated 4 by 3 table with borders of 2, 3 and 4 pt: one table, one figure). The cap is not
+  raised: on 519 public PDFs a cap of 3 pt gives no table that was missed and makes a plot whose
+  axes are drawn 2 to 3 pt thick (`ax_astrophga`, page 8) a table with seven headings, and a cap
+  of 2 pt turns the section rules of a minutes form into a second table. Thick rules are rules of
+  a table only together with a grid; no set has such a table to measure a rule on.
 
 ### Tests
 

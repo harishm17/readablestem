@@ -4,12 +4,12 @@
    (POST /jobs/{id}/language: CSRF-checked, owner only; the HTML file is made again with
    the new language). Screen readers choose their voice from it. T1-11: one line, the
    control folded behind "Change" (a details element, so it works without JavaScript). #}
-<section aria-labelledby="language-heading">
+<section aria-labelledby="language-heading" class="card">
   <h{{ hl|default(2) }} id="language-heading">Language</h{{ hl|default(2) }}>
   <div class="setting-line">
     <p>Language: {{ pg.language }}.{% if pg.language_check %} Screen readers use it to choose a voice, so look at whether it is right.{% endif %}</p>
     <details class="inline-details"{% if pg.language_check %} id="change-language"{% endif %}>
-      <summary>Change<span class="visually-hidden"> the language</span></summary>
+      <summary class="button-secondary">Change<span class="visually-hidden"> the language</span></summary>
       {% call form("job.language", "/jobs/" ~ job.id ~ "/language") %}
         <div class="field">
           <label for="document-language">Language of this document</label>

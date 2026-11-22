@@ -6,8 +6,9 @@
    are CSRF-checked, owner only, and make the HTML file again. #}
 {% set title_error = field_errors.get("title") %}
 {% set contact_error = field_errors.get("contact") %}
-<section aria-labelledby="student-file-heading">
+<section aria-labelledby="student-file-heading" class="card">
   <h{{ hl|default(2) }} id="student-file-heading">{{ "Title and contact line" if hl|default(2) > 2 else "For students" }}</h{{ hl|default(2) }}>
+  <div class="student-fields">
   {% call form("job.title", "/jobs/" ~ job.id ~ "/title", {"class": "student-setting"}) %}
     {% set title_hint %}Read out when the file opens; names the download.
         {% if job.title_override %}Clear the box to use the title the file has without yours: “{{ pg.title_suggested }}”. {{ pg.title_source }}{% else %}{{ pg.title_source }} Type your own to replace it; a blank box keeps this one.{% endif %}{% endset %}
@@ -24,4 +25,5 @@
     {% endcall %}
     <button type="submit" class="button-secondary">Save the contact line</button>
   {% endcall %}
+  </div>
 </section>

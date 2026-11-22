@@ -1,0 +1,127 @@
+{
+ "format": 1,
+ "about": "Regions called handwriting (`handwriting_on_page`) that someone looked at in a render of the region, with its page (1-based) and box in points. label: pen (pen strokes) or not_pen (anything else). Not derived from the pen rule. Public files only; `seen` is a short category, never the document's words.",
+ "looked_by": "the builder of the A18 count, 2026-11-20; each of the 10 checked again on a render by the integrating session, 2026-11-20 (the owner may still confirm)",
+ "regions": [
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 4,
+   "bbox": [
+    446.0,
+    557.8,
+    468.4,
+    573.1
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 5,
+   "bbox": [
+    132.2,
+    68.8,
+    144.8,
+    84.1
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 6,
+   "bbox": [
+    223.7,
+    441.7,
+    248.7,
+    463.4
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 6,
+   "bbox": [
+    279.4,
+    488.3,
+    289.5,
+    501.3
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 8,
+   "bbox": [
+    446.6,
+    369.2,
+    473.1,
+    386.5
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 8,
+   "bbox": [
+    500.4,
+    561.2,
+    511.4,
+    574.4
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 9,
+   "bbox": [
+    142.9,
+    571.5,
+    159.4,
+    586.7
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r16_openstax_physics_ch4_end",
+   "page": 9,
+   "bbox": [
+    363.7,
+    117.1,
+    426.2,
+    147.6
+   ],
+   "label": "not_pen",
+   "seen": "a number, unit or symbol of the typeset text, drawn as a filled outline in its line"
+  },
+  {
+   "document": "r17_arxiv_ligo",
+   "page": 1,
+   "bbox": [
+    48.0,
+    37.8,
+    564.0,
+    62.8
+   ],
+   "label": "not_pen",
+   "seen": "the printed journal header: typeset words, a rule and the journal's emblem"
+  },
+  {
+   "document": "w_slides_60001_lec10",
+   "page": 6,
+   "bbox": [
+    203.1,
+    433.3,
+    310.1,
+    457.0
+   ],
+   "label": "not_pen",
+   "seen": "two typeset arrows of the slide, ruled and even"
+  }
+ ]
+}

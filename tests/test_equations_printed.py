@@ -25,6 +25,9 @@ PRINTS_ALIKE = [
     (r"\begin{array}{rcl}a&=&b\\c&=&d\end{array}", r"\begin{aligned}a&=b\\c&=d\end{aligned}"),
     (r"\begin{pmatrix}a&b\\c&d\end{pmatrix}", r"\left(\begin{array}{cc}a&b\\c&d\end{array}\right)"),
     (r"\begin{array}{rcl}a&&\\&\rightarrow&b\end{array}", r"\begin{aligned}a\\ \to b\end{aligned}"),
+    (r"\begin{vmatrix}a&b\\c&d\end{vmatrix}", r"\left|\begin{array}{cc}a&b\\c&d\end{array}\right|"),
+    (r"\begin{matrix}a&b\end{matrix}", r"\begin{array}{cc}a&b\end{array}"),
+    (r"\begin{aligned}a&=b\\c&=d\end{aligned}.", r"a&=b\\c&=d"),  # rows with no environment
 ]
 
 PRINTS_DIFFERENTLY = [
@@ -44,6 +47,9 @@ PRINTS_DIFFERENTLY = [
     (r"\begin{cases}x&y>0\end{cases}", r"\begin{cases}xy>0\end{cases}"),
     (r"{a \over b}c", r"{a \over bc}"),  # where an infix fraction ends
     (r"a\\b", r"a;b"),  # a line break against a semicolon
+    (r"\begin{vmatrix}a&b\end{vmatrix}", r"\begin{pmatrix}a&b\end{pmatrix}"),  # other brackets
+    (r"\begin{pmatrix}a&b\end{pmatrix}", r"a&b"),  # brackets that are not an environment
+    (r"\begin{aligned}a&=b\end{aligned}c", r"a&=bc"),  # an environment that is only a part
 ]
 
 

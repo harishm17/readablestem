@@ -327,19 +327,22 @@ def edit_element(
     text: Annotated[str, Form()] = "",
     level: Annotated[str, Form()] = "",
     role: Annotated[str, Form()] = "",
+    lines: Annotated[str, Form()] = "",
     version: Annotated[str, Form()] = "",
 ) -> Response:
     """Change what the tool did not propose: the words of a paragraph, list item or heading
     (`action=text`), make a paragraph a heading (`action=heading`, with its `level`), or make it
     a sidebar or a quotation, or neither (`action=role`, with `role` `aside`, `quote` or empty),
     or leave a paragraph or list item out of the student file (`action=leave_out`) and put it
-    back (`action=put_back`)."""
+    back (`action=put_back`), or split a paragraph or list item into several at the line breaks
+    of `lines` (`action=split`)."""
     if not ELEMENT_ID.match(element_id) or action not in {
         "text",
         "heading",
         "role",
         "leave_out",
         "put_back",
+        "split",
     }:
         raise PageError(404, *NOT_FOUND)
     page, element_id = _page_of(request, job_id, user, element_id)
@@ -353,11 +356,20 @@ def edit_element(
             return page_edits.leave_out_block(result, element_id)
         if action == "put_back":
             return page_edits.put_back_block(result, element_id)
+        if action == "split":
+            return page_edits.split_block(result, element_id, lines)
         return page_edits.make_heading(result, element_id, level)
 
     try:
+        # A split moves the reading order of everything after it, so any write since the page
+        # was drawn refuses it (no `acts_on`).
         change, _, owned_id = write_structure(
-            request, job_id, user, version, make, acts_on=lambda _: [element_id]
+            request,
+            job_id,
+            user,
+            version,
+            make,
+            acts_on=None if action == "split" else lambda _: [element_id],
         )
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None

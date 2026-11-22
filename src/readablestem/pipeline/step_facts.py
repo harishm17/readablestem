@@ -30,7 +30,8 @@ Two kinds of time:
 from __future__ import annotations
 
 import time
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable
+from contextlib import contextmanager
 from typing import Any
 
 from readablestem.core.types import (
@@ -39,6 +40,7 @@ from readablestem.core.types import (
     ModelCall,
     NotFinished,
     NotFinishedReason,
+    PageStageFact,
     ShadowFact,
     StageFact,
     Status,
@@ -85,6 +87,51 @@ class Stopwatch:
         self._close()
         self._name = None
         return [StageFact(stage=name, seconds=round(s, 4)) for name, s in self._seconds.items()]
+
+
+class PageTrace:
+    """How long each step took on each page. A step is named when it ends: `lap(page)` gives
+    a function that, called with a name, adds the time since the last call (or since `lap`)
+    to that step of that page, and `step(page, name)` times a block. Two timings of one step
+    of one page are one total. A trace made `enabled=False` times nothing.
+
+    It reads a clock and decides nothing: the output of a conversion is the same with it."""
+
+    def __init__(
+        self, *, enabled: bool = True, clock: Callable[[], float] = time.perf_counter
+    ) -> None:
+        self.enabled = enabled
+        self._clock = clock
+        self._seconds: dict[tuple[int, str], float] = {}
+
+    def lap(self, page: int) -> Callable[[str], None]:
+        if not self.enabled:
+            return lambda name: None
+        since = self._clock()
+
+        def mark(name: str) -> None:
+            nonlocal since
+            now = self._clock()
+            key = (page, name)
+            self._seconds[key] = self._seconds.get(key, 0.0) + now - since
+            since = now
+
+        return mark
+
+    @contextmanager
+    def step(self, page: int, name: str) -> Generator[None]:
+        mark = self.lap(page)
+        try:
+            yield
+        finally:
+            mark(name)
+
+    def facts(self) -> list[PageStageFact]:
+        """The page steps so far, by page and in the order each step first ran on it."""
+        return [
+            PageStageFact(page=page, step=name, seconds=round(seconds, 5))
+            for (page, name), seconds in sorted(self._seconds.items(), key=lambda kv: kv[0][0])
+        ]
 
 
 def start_up(facts: StepFacts, call_seconds: float) -> StageFact:
@@ -212,10 +259,18 @@ def gathered(
     watch: Stopwatch,
     not_finished: Iterable[NotFinished] = (),
     shadow: Iterable[ShadowFact] = (),
+    page_steps: Iterable[PageStageFact] = (),
 ) -> StepFacts:
     """The facts of one conversion, its calls ordered by page and step so that two runs of
     one document give the same list whatever order their threads finished in. `shadow` is
-    what the steps run in shadow said (`pipeline.shadow.Shadow.facts`, already in order)."""
+    what the steps run in shadow said (`pipeline.shadow.Shadow.facts`, already in order).
+    `page_steps` is the page trace, already in order."""
     ordered = sorted(calls, key=lambda c: (c.page is None, c.page or 0, c.step, c.attempt))
     stops = sorted(not_finished, key=lambda n: (n.step, n.page is None, n.page or 0, n.reason))
-    return StepFacts(calls=ordered, stages=watch.stop(), not_finished=stops, shadow=list(shadow))
+    return StepFacts(
+        calls=ordered,
+        stages=watch.stop(),
+        not_finished=stops,
+        shadow=list(shadow),
+        page_steps=list(page_steps),
+    )

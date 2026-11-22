@@ -207,7 +207,7 @@ def _to_elements(
     levels = _list_levels((page.blocks for page in pages), 0.6 * ctx.body)
     for page in pages:
         first = len(elements)
-        with guard(page.number):
+        with guard(page.number), document.trace.step(page.number, "elements"):
             _page_elements(page, ctx, levels, block_ids, elements, document=document)
         if not guard.ok(page.number):
             del elements[first:]

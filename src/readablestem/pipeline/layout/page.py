@@ -423,6 +423,7 @@ def _page_blocks(
     document: _Document,
 ) -> _PageBlocks:
     page_rect = page.rect
+    lap = document.trace.lap(number)
     rows = _split_exercise_numbers(
         _split_braced_systems(_split_labels(rows, document=document), document=document),
         document=document,
@@ -440,6 +441,7 @@ def _page_blocks(
     _promote_numbered_lines(rows)
     if document.grouping:
         _promote_set_off_lines(rows)
+    lap("rows")
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []
@@ -480,6 +482,7 @@ def _page_blocks(
         ctx,
         document=document,
     )
+    lap("figures")
     text_rows = [r for r in rows if not r.absorbed]
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
     if page_math is not None:
@@ -493,8 +496,10 @@ def _page_blocks(
     _equation_regions(text_rows, used_rules, document=document)
     if page_math is not None:
         page_math.after_regions(number, text_rows)
+    lap("equations")
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
+    lap("order")
     runs = _split_options(_runs(ordered, ctx, document=document), document=document)
     blocks = [_classify_run(run, ctx, document=document) for run in runs]
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
@@ -536,6 +541,7 @@ def _page_blocks(
             )
         )
     blocks.extend(_table_blocks(page_tables))
+    lap("blocks")
     # A typed page's drawings too small to be figures that no element holds (an icon, a
     # benzene ring, maths drawn as outlines, a tick): a figure of their own, or
     # handwriting when they are pen marks. A page with less than a line of text keeps
@@ -574,9 +580,11 @@ def _page_blocks(
     if len(loose) >= LOOSE_INK_STROKES or marks:
         ink = [*ink, *page_type.stroke_regions([*loose, *marks])]
     blocks.extend(_ink_blocks(ink, page_rect))
+    lap("figures")
     # A caption held by its figure still fills its column: without it the column looks empty
     # beside the next line of the other column, which then reads as a heading across both.
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions, blocks=True)
+    lap("order")
     final = _option_order(_merge_column_continuations([blocks[i] for i in order]))
     edges = _RightEdges(text_rows)
     _label_abstracts(final, text_rows, edges)
@@ -608,6 +616,7 @@ def _page_blocks(
             margins,
         )
     )
+    lap("blocks")
     return _PageBlocks(number, size, final, left_out, unread)
 
 

@@ -311,6 +311,9 @@ UNREAD_PAGE = "unread_page"  # painted, but nothing could be read from it
 # Layout raised while reading the page (a bug, not a property of the page): kept as its image,
 # the other pages are read. Set by `layout._analyze_document`, never by `kept_reason`.
 PAGE_READ_FAILED = "page_read_failed"
+# The page could not be drawn in the probe's child process (it crashed or ran out of time or
+# memory there): not read at all, no picture of it either. Set by `layout.analyze`.
+PAGE_NOT_RENDERED = "page_not_rendered"
 # Element reason of a handwriting region layout cuts out of a typed page.
 HANDWRITING_REGION = "handwriting"
 

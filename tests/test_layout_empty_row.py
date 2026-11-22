@@ -11,7 +11,9 @@ from __future__ import annotations
 
 import copy
 import logging
-from collections import Counter
+import re
+import time
+from collections import Counter, OrderedDict
 from pathlib import Path
 
 import pymupdf
@@ -23,7 +25,7 @@ from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.models.pricing import UnknownModelError
 from readablestem.pipeline import layout, page_type
-from readablestem.pipeline.layout import document, elements, furniture, lists
+from readablestem.pipeline.layout import LayoutError, access, document, elements, furniture, lists
 from readablestem.pipeline.layout import page as page_steps
 from readablestem.pipeline.run import convert_pdf
 
@@ -206,3 +208,101 @@ def test_a_slide_whose_pictures_cannot_be_read_is_its_picture_and_the_deck_goes_
     result = layout.analyze(pdf)
     assert result.kept_pages == {1: page_type.PAGE_READ_FAILED}
     assert result.elements and 1 not in {e.page for e in result.elements}
+
+
+# ---- a page the probe's child cannot draw (docs/layout.md "A page that cannot be drawn")
+
+# The probe child dies when page 2 (0-based) is among the pages it was given, as MuPDF does
+# on a damaged page; any other set of pages passes.
+_DIES_ON_PAGE_2 = """
+import os, signal, sys
+if "2" in sys.argv[1].split(","):
+    os.kill(os.getpid(), signal.SIGKILL)
+sys.stdout.write("ok")
+"""
+
+
+@pytest.fixture
+def page_two_cannot_be_drawn(monkeypatch):
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", _DIES_ON_PAGE_2)
+
+
+# What page 3's page tree says about its size: (keys on the page, keys on the Pages node above it).
+# A value in braces is an object of its own that the key refers to ("12 0 R").
+_PAGE_TREES = {
+    "plain": ({}, {}),
+    "user unit 2, it and a number of the media box objects of their own": (
+        {"UserUnit": "{2}", "MediaBox": "[0 0 {500} 700]"},
+        {},
+    ),
+    "crop larger than the media box": ({"CropBox": "[-100 -100 750 950]"}, {}),
+    "no media box, a crop": ({"MediaBox": "null", "CropBox": "[0 0 300 300]"}, {}),
+}
+
+
+def _object(doc, value):
+    xref = doc.get_new_xref()
+    doc.update_object(xref, value)
+    return f"{xref} 0 R"
+
+
+@pytest.mark.parametrize("tree", _PAGE_TREES)
+def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are_read(
+    tree, page_two_cannot_be_drawn, caplog, monkeypatch
+):
+    doc = pymupdf.open("pdf", _document(5))
+    page_keys, node_keys = _PAGE_TREES[tree]
+    node = int(doc.xref_get_key(doc[2].xref, "Parent")[1].split()[0])
+    for xref, keys in ((doc[2].xref, page_keys), (node, node_keys)):
+        for key, value in keys.items():
+            doc.xref_set_key(xref, key, re.sub(r"\{(.*?)\}", lambda m: _object(doc, m[1]), value))
+    pdf = doc.tobytes()
+    doc.close()
+    loaded: list[int] = []
+    real_load = pymupdf.Document.load_page
+
+    def load_page(self, page_id=0):
+        loaded.append(page_id)
+        return real_load(self, page_id)
+
+    monkeypatch.setattr(pymupdf.Document, "load_page", load_page)
+    with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.layout"):
+        result = _convert(pdf)
+    assert 2 not in loaded and {0, 1, 3, 4} <= set(loaded)  # page 3 is never built
+    with pymupdf.open("pdf", pdf) as again:  # built here, apart from the conversion
+        rect = again[2].rect
+    assert result.page_sizes[2] == (round(rect.width, 2), round(rect.height, 2))
+    assert tree != "plain" or result.page_sizes[2] == (595.0, 842.0)
+    (fix,) = [f for f in result.fixes if f.reason == "page_not_rendered"]
+    assert fix.review == "required"
+    assert [(n.code, n.page) for n in result.notices if n.code == "page_not_rendered"] == [
+        ("page_not_rendered", 2)
+    ]
+    assert "This page could not be shown." in result.html
+    assert "Page 3." not in result.html  # nothing was read from it
+    assert all(f"Page {page}." in result.html for page in (1, 2, 4, 5))
+    assert "page 3" in caplog.text and SENTENCE not in caplog.text
+
+
+def test_a_search_for_the_page_that_cannot_be_drawn_never_runs_past_its_seconds(monkeypatch):
+    """Every probe hangs: the file fails after the probe of all the pages and at most the
+    search's seconds, not after a whole time limit more."""
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", "import time; time.sleep(60)")
+    monkeypatch.setattr(access, "PROBE_TIMEOUT_S", 3.0)
+    monkeypatch.setattr(access, "PROBE_PER_PAGE_S", 0.0)
+    monkeypatch.setattr(access, "PROBE_SEARCH_S", 0.5)
+    started = time.monotonic()
+    with pytest.raises(LayoutError) as exc:
+        layout.analyze(_document(4))
+    assert exc.value.code == "too_complex"
+    assert time.monotonic() - started < 3.0 + 0.5 + 1.5  # the first probe, the search, slack
+
+
+def test_a_document_in_which_no_page_can_be_drawn_still_fails(monkeypatch):
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", "import os, signal; os.kill(os.getpid(), 9)")
+    with pytest.raises(LayoutError) as exc:
+        layout.analyze(_document(3))
+    assert exc.value.code == "unreadable"

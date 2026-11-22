@@ -121,6 +121,19 @@ middle of the other, through the page-math hook) cannot change each other. `_PLA
 document with none of these set, is what a caller outside a read gets by default. `_LOCK`
 guards PyMuPDF, its warning store and the caches, nothing else.
 
+**The page trace.** `analyze` times each step on each page (`step_facts.PageTrace`, on
+`_Document.trace`) and returns the seconds as `Layout.page_steps`: `read` (text, drawings and
+page type), `tables` (the table search), `rows` (rows, labels and the rows' classes),
+`figures` (figures, fragment figures, pictures of equations, drawings left over, plots),
+`equations` (grouping the rows of a display), `order` (reading order and column
+continuations), `blocks` (rows to blocks, captions, lists) and `elements` (blocks to
+`Element`s). The conversion adds `crops` (cutting the page's pictures for the model steps)
+and carries the list on `StepFacts.page_steps`; `eval speed` reports it. Steps that are done
+over the whole document (the margin filter, list markers, label keys, the notices) belong to
+no page and are in none of the seconds. The trace is not stored with a job (the web worker
+keeps the calls, the stages and the unfinished steps) and decides nothing: it reads
+the clock and adds up. The second layout run of the page math pass is not in it.
+
 ## How a page is read
 
 The order and the regions of a page are found by rules, with no model and no learned layout
@@ -159,7 +172,11 @@ reader, neither to find them nor as a second opinion
    (rows, `line_glyphs`, `page_glyphs` for the text pass, the page type, the page labels, the
    tagged headings, the bold letters of equations, the page audit's words, and the review
    probe's region text and glyph marks) adds the page's flag to its own, so no two steps
-   disagree about what the page says. The choice is kept on the open document.
+   disagree about what the page says. The choice is kept on the open document. A typed page
+   that is read without it gets the optional notice `actualtext_ignored` ("Worth a look", one
+   per page): the file says other words for part of the page than the ones printed, and the
+   printed words were used. A page that keeps ActualText gets none, and neither does a page
+   kept as an image.
 2. **Running headers, footers and other decoration.** A line whose center is in the top or
    bottom 7 % of the page is dropped when its text, lower-cased with digits replaced by
    `#`, appears in the same band on at least half of the reference pages (and at least
@@ -233,7 +250,50 @@ reader, neither to find them nor as a second opinion
    text width (two table columns are not text columns). Lines for that test are boxes that
    overlap vertically by half the smaller height: TeX splits a line with inline math into
    pieces whose bottom edges differ, and measured piece by piece a full LaTeX column
-   looked like a column of short cells. Margin-band lines are ignored here.
+   looked like a column of short cells. Margin-band lines are ignored here. A first page
+   with a head of centered lines (title, authors, affiliations) across both columns has more
+   lines across the gap than that, so when the page as a whole has no gutter the columns are
+   looked for under the head: the narrow lines below each run of lines across the page (up to
+   eight runs, the top of the page first), the first run that gives a gutter whose thinner
+   side holds at least 0.4 of the lines of the other (`MIN_HEAD_COLUMN_BALANCE`: two columns
+   hold about as many lines; a column of steps beside a few lines is a ruled table on a page
+   of one column, and is read row by row; and at least four lines), and the two columns run
+   unbroken (`order._columns_run`). An exam's questions, each a line across the page or a
+   short line at the left with its options two by two under it, are no columns: a line across
+   the page that has lines of both sides above and below it breaks them (a note across the
+   page under the columns, whose last line is short and sits at the left, has lines of one
+   side below it, and does not), and so do breaks in the thinner side (a step from a line's
+   top to the next one's over 1.9 line pitches, `MIN_BREAK_PITCHES`, with one to three lines
+   of the other side or across the gap beside it: a short question that the gap runs through
+   stands in the break too) that cut it into runs of fewer than five lines on average. Measured
+   top to top, a question set at the pitch of its options with no space between questions
+   skips one line, 2 pitches, at any leading. A column page of the development set has one
+   such break in 10 lines on its thinner side, just enough to keep its columns, and a step of
+   1.78 pitches where a heading's space stands beside one line, which is no break; one with
+   three breaks in 28 lines keeps its columns too (`ax_astrophga_240306409`, its tenth page,
+   index 9). A step in the other side's own lines over 1.9 of their line steps, with lines of
+   the thinner side beside it but none of its breaks within a line of it (a figure or a
+   heading's space in one column only), keeps the columns when there are two or more such
+   steps and at least half as many as breaks: an exam's questions cut both sides at once, a
+   section line set apart above the first question or under the last has no line of the
+   thinner side beside its space, and one option that runs on to a second line makes the other
+   side skip a line once. The pitch is the median step of
+   both sides' lines, each side measured on its own: an exam's thinner side skips a question's
+   line at every other step, so its own median lies between one pitch and two. A hole under the thinner column's end, one within
+   a line of a break of the thinner side, a hole only in the thinner column, fewer holes than
+   that beside the breaks, and a heading's space under 1.9 steps leave the page to the breaks
+   (read across, as before), and so do columns whose thinner side is set at about twice the
+   other's pitch (a spaced list beside running text: the pooled pitch finds a break at every
+   line).
+   Left as it is: a longer exam (six questions; five with options that run on to a second
+   line; four with three rows of options) is taken by the gutter of the page as a whole,
+   before the runs are asked about, since a few lines across it are allowed for every ten
+   lines; an exam of four questions with two options that run on makes two holes beside three
+   breaks and keeps the columns; an exam with one row
+   of two options under each question has no break in its option columns, and one with ten
+   options under one or two questions too few; all of these are read as columns (left options
+   first). The lines of the head are
+   then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
    gutter. Small sub/superscript fragments are folded into their line as one block, after
@@ -276,7 +336,7 @@ so a heading is not, and a line that starts a block is not).
    line's start at the paragraph's left edge, ending in a period or a colon, after a line that
    does not end in a lead term or run full to the right edge in mid-sentence; `_lead_end`,
    `_starts_entry`); a single capital letter alone on a line, bold or larger than the text, with
-   the line right under it starting with that letter, three or more different letters set that
+   the line right under it (within a line or two) starting with that letter, three or more different letters set that
    way in one size and typeface through the document (`_letter_rows`: a heading one level
    under the section's, `REASON_LETTER`; the test reads the line under the letter and not the
    order of the columns, so it holds on an index of three columns and never takes the panel
@@ -301,8 +361,10 @@ so a heading is not, and a line that starts a block is not).
    short of the right edge, the steps of an algorithm or the lines of a listing; the line
    numbers in the margin of a passage do not (a number set apart from its line, in smaller
    type or more than 1.2 em from the text, with a sentence that goes on in lower case across
-   it and no step word such as "end" or "do": `_margin_number`), nor does a number on a line
-   that runs full. Without the page's line
+   it and no step word such as "end" or "do": `_margin_number`). A number after a line that
+   runs full starts one only when that line is the whole run so far (the affiliations of a
+   paper, one line each, numbered 1, 2, 3 to the margin); inside a run of lines a number
+   after a full line is the next line number of a passage. Without the page's line
    ends (`edges`) only the first group and the note and theorem signals are asked. A change
    between bold and regular, or into or out of heading size, ends a run. A single
    display-equation row that starts at the paragraph's left margin at the usual line
@@ -338,9 +400,19 @@ so a heading is not, and a line that starts a block is not).
    `org`, with a lowercase start), so a sentence that ends with an address keeps its space
    and so does an address with a path that ends in a full stop; a non-breaking hyphen
    (U+2011, also U+FE63 and U+FF0D) after a letter or digit is a compound that must not
-   break (`easy-` / `to-use`), kept as written. The address test reads the word before the
-   break; the page's link annotations, which would settle the ambiguous cases, are not read
-   yet.
+   break (`easy-` / `to-use`), kept as written. Otherwise the address test reads the word before the
+   break. The file's own links settle the rest: where two link annotations of one address
+   (one per line, as hyperref writes them) run across the break, the words under them are
+   the address, and the break joins with no space whatever its last character is
+   (`hyphens.link_cut`, read per document by `document._link_cuts` into `_Document.link_cuts`,
+   and so used only by the paragraph joins: not yet by the cells of a table, and not for one
+   annotation drawn over two lines). Only printed text that is an address counts (it holds
+   `.`, `/`, `@` or `:`; a sentence sign the second annotation covers after the address, as in
+   "Academy." or "tics.2022.11.009)", is left out, and so is a full stop before a capital,
+   "Dr." / "Smith"): a named link over two lines ("Smith" / "Jones", or "Khan" / "Academy"
+   under khanacademy.org, with or without a full stop under the link) is not, and its break
+   keeps its space, here and wherever else those words break. A middle line of a three-line
+   address that prints none of those signs keeps its space.
    Inline math that wraps from one line to the next is one equation (`_wrapped_inline`): a
    relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
    minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),
@@ -551,8 +623,8 @@ table is an item yet) and `regions.table_refusal` judges each proposal against i
   by the tree like any other line. The tree that reads the page is built after the judging,
   from the accepted tables only, so the tree a proposal was judged against is not the tree that
   reads the page: it differs by the room the accepted tables take. Verdicts are not made again.
-- The refusals are on `Layout.table_refusals` (page, box and reason code; no text). No page trace
-  exists yet (WS14.8), so this is where they are kept.
+- The refusals are on `Layout.table_refusals` (page, box and reason code; no text). The page
+  trace holds seconds only, so this is where they are kept.
 - The next page's continued-table check (`find_continued`) is given only the accepted tables.
 - `_text_block_dropped` and the "box extended along rules" growth (`REASON_EXTENDED`) are not
   changed: they run on the raw page and take no region argument; that belongs to the second
@@ -1233,7 +1305,15 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   a portrait document and a landscape table are not decks and are read as before (`_SLIDE_DECK`
   False: no rule below applies). A
   page kept whole as its image (a photographed slide) has no text, is never dropped, never makes
-  the pages beside it a frame, and is untitled.
+  the pages beside it a frame, and is untitled; it does not count against the titled share
+  either (the share is of the pages that have text), so a deck with some scanned slides is
+  still a deck, and a file whose pages are all kept whole is not. The deck number of each page
+  of such a deck, scanned ones included, is on `Layout.deck_pages`; a heading the page reader
+  makes on a scanned slide (`image_page`) is given that deck's reason (`slide_deck N`) in
+  `run`, and `heading_levels` puts its level under the deck's title: the reader numbers the
+  headings of a slide from its own title (1), which is a slide title (level 2) in a deck with a
+  title, as the typed slides' titles are (F-254: the mixed deck's scanned titles came out one
+  level lower).
 - **Several decks in one file** (`slides._decks`). A deck ends where the page size changes, and
   where a title slide comes when the file's first page is one too. A title slide is a page whose
   largest line is at least 1.25 x an ordinary slide's title (the median title size of the file)
@@ -1275,7 +1355,13 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   fixtures: `beamer_overlay` 6 pages to 2 (67 % fewer), `slides_steps` 13 to 6 (54 % fewer).
 - **Frame titles.** A page's title is its largest text in the top third, at least 1.15 x the
   deck's body size (the lines that follow it in the same size, each within half a line of the one
-  before, are part of it). It is always a heading (reason `slide_title`, plus `larger font` so the
+  before, are part of it). A line that is a formula or a bare number and nothing else (no
+  word of three letters besides function names like "sin" and "log", and a math sign, an italic
+  math letter or no letter at all; a name that ends in a plus or two ("C++", "g++", "A+") and
+  "Q+A" are not math signs, in any line, so "C++ 17" and "C/C++" are text, while "A+B", "N+1"
+  and "x + y = 2" are formulas: `slides._is_formula`) is never a title, nor the title of a
+  title slide: a slide with a large equation under its title is titled by the title (on the
+  html-slides deck 17 of 22 slides took their equation or a lone "1"). Whether a file is a deck is counted as before: a page whose largest top line is a formula is titled like a slide all the same (`detect`, `_title(formulas=True)`). A slide's title is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
   title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
   Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a
@@ -1638,7 +1724,9 @@ required notice. The notice (`option_labels`, `rtl_text`, listed under "Not hand
 file") is derived from the pending decision (`notices.from_fixes`) and goes when it is made.
 A result stored before this has only the reason; `notices.from_reasons` still lists the
 notice, and `web.states` still holds that job at "Ready" (there is nothing to decide).
-Not built: the page record, the document card, and the per-source switch.
+Not built: the page record, the document card, and the per-source switch. The reviewer's tool
+for a block that is still whole is "Split it" in the page tools (docs/web.md, "The page
+tools"); the notice's words say so.
 
 - **Option labels** (`option_labels`, `_later_labels`, `_split_options`): a block that
   starts with a label ("(A)", "a.", "1)") and holds the next one of the same form later in
@@ -2193,7 +2281,35 @@ an ellipsis counting for three) is a contents page (`_contents_rows`). Each such
 list item of its own with its title only: the leaders go, and so does the page number (at
 the end of the line, or a line of its own at the right edge on the same baseline); a line
 with no leaders whose number stands at that right edge is an entry too (a chapter line in
-bold). Items nest by indent (`list_level`). The page numbers are the printed book's; the
+bold). A line of prose that ends in dots but has no page number (a quotation cut off with
+an ellipsis) is not an entry, so two of them are no contents page. A title that wraps is one
+entry: the line right above an entry, at its size and no further right than it, stopping near
+the page numbers' edge and with no leaders or number of its own, is the first line of its
+title (`_title_head`; the hyphen at its end is repaired as in a paragraph). It is so only in
+the middle of a list, when the nearest line above it is an entry (`_entry_above`): above the
+first entry it may be the last line of a paragraph, a heading or a part line, which look the
+same, so it stays a line of its own. In a list whose entries start with a label ("1
+Temperature", "A.4", "Part II", "Week 3:", "Module 4": a number, a letter and a number, a
+Roman numeral of I, V and X, alone or after a capitalised word, then a space; so a lone "I"
+counts, and so does any capitalised word before a number), an entry that starts with one is never
+a title's second line: the line above it is a part, chapter or unit line with no page number
+of its own (`_starts_with_label`), and a title whose second line starts with a number is two
+lines. In any list, a line without a label under a line with one goes on from it in lower
+case, after a hyphen ("2.1 Work and heat in closed" / "systems"), or under a label of the form
+of the entries' own (`_label_shape`: "2" among "1" and "3"; "E.5 Proof of ... (Lemma" / "D.6)"
+among "E.4" and "E.6"; the entries are those with leaders or a page number at the margin, so a
+LaTeX article's section lines count; a Roman numeral has a form of its own); otherwise the
+line with the label is a chapter line over an entry of its own ("Chapter 2 ..." /
+"Introduction", "2 ..." over it among "2.1" and "2.2", "IV ..." over it among "1" and "2",
+`_wraps`). Left as it is: a chapter line whose label is a word ("Chapter Two", "Part Two:"),
+in capitals ("CHAPTER 2") or that has none is still joined to the entry under it, and so is
+one over an entry that starts in lower case or with a year, and one with the entries' own
+form of label over an entry with none ("2 ..." over "Introduction" among "1", "2", "3", with
+or without leaders), which looks like a title of entry 2 that wraps. A wrapped title whose
+Roman label is the only Roman one among Arabic entries, or that starts with the word "I", is
+two lines (`_label_shape` gives the Roman numeral a form of its own).
+Items nest by
+indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document
 whose title is the same once section numbers are left out (`_contents_links`); when the
@@ -2207,6 +2323,10 @@ it goes, the text pass keeps those. Before, the
 chapter lines became headings with their numbers as stray paragraphs, and the section
 lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
 
+A section number that starts an entry ("6.1") and a page number that ends it after math
+("Forces on Σ 9") are the entry's own text, not part of its equation: before, the number next to
+the symbol was read into the formula (`_clear_of_entry_numbers`).
+
 A contents list with no leaders is found by its shape (WS2.7, `_shape_entries`): three or
 more lines one after the other in one column, each ending in a page number (or followed on
 its baseline by a line that is only that number, in a column of its own), the numbers at one
@@ -2219,7 +2339,8 @@ list's is dropped and its lines stay text (`_contents_lines`, in `_claim_tables`
 reason `contents entry` fires and no second contents list is written. An entry with a number
 links to its heading by its title with the number left out, and by the number when both print one (`_contents_links`). A list whose numbers do not stand at one edge is read as numbers that follow their titles only when none of them stands apart in a column of its own: marks ("x", a roman numeral) set in several columns of a table, after the names, are a table's cells and the table is kept. Not read: a
 list of fewer than six lines whose numbers do not stand at one edge, a list on a later page with no heading over
-it, a title that wraps onto a second line with the number on the second, and a two-column
+it, a title that wraps onto a second line with the number on the second (in a list with leaders it is
+read), and a two-column
 page (the columns are not known when tables are claimed).
 
 ### Kept line ends, the abstract and algorithms (SW53 a and e, WS2.6, F-261)
@@ -3599,7 +3720,8 @@ MuPDF accepts page boxes far past the PDF maximum, and an 18000 pt page at 72 dp
 1 GB pixmap. The display list, where the crash is, is built whatever the zoom; a render
 that runs out of memory under the cap is a Python error there and ignored like the
 others. A child that dies (any non-zero exit) or runs longer than
-`PROBE_TIMEOUT_S` (60 s) makes the file `LayoutError("unreadable")`; Python exceptions in
+`PROBE_TIMEOUT_S` (60 s) fails that probe: `LayoutError("unreadable")` or `("too_complex")`, which
+fails the file only when no page can be drawn (next paragraph); Python exceptions in
 the child are ignored, because only crashes and hangs matter there. `analyze` probes the
 selected pages; `crop` probes a page `analyze` did not cover. Which pages passed is kept
 by document hash (hashes only, 64 documents), so repeated calls do not probe again. The
@@ -3611,6 +3733,47 @@ resource names (`unknown keyword: 'JaneDoe...'`), and stdout goes to the service
 Layout switches both off (`TOOLS.mupdf_display_errors(False)`, `..._warnings(False)`) on
 every call, because the switch is process-wide and other code could turn it back on, and
 empties MuPDF's in-memory warning store after every `analyze` and `crop`.
+
+**A page that cannot be drawn** is that page's problem, not the document's
+(`access.probe_failures`). `analyze` first probes all the selected pages in one child, as
+before. If that fails, the pages are probed again in halves, and each half that fails in
+halves again, down to single pages; a page whose own probe fails is a page that cannot be
+drawn. Both halves are always probed, so a failure that comes and goes (a time limit on a busy
+machine) is not pinned on a page that is not at fault: if the halves pass although the whole
+did not, the file fails as it did. Such a page is not read at all (the probe covers the text
+read as well as the drawing, so nothing of the page is trusted) and the conversion does not
+build it again: no step, crop, tag, link or image reads it, the page-number pass skips it (its
+number is the one its neighbors' printed numbers give it, if they bracket it; the PDF's own
+label for it is not read), and its size for the page list comes from the page tree, the size
+`Page.rect` gives (`document._unloaded_size`): the MediaBox cut to the CropBox where they overlap
+(both and Rotate inherited from the Pages nodes above), times the page's own UserUnit, turned by
+Rotate, each read through an object of its own where the tree refers to one ("12 0 R", for a
+whole box or one of its numbers); US Letter where the MediaBox is missing or empty, where the
+CropBox leaves nothing of it, or if the tree cannot be read; a UserUnit of 0 or less is read as
+1, where MuPDF makes the page empty; a page saved sideways that layout would turn upright is not
+turned). The web
+process has no PyMuPDF call of its own: the upload check and the review screen's page pictures
+run in child processes (`web/pdf_probe.py`), which is where a page that kills MuPDF may be
+opened. It is kept with the reason
+`page_not_rendered`: a figure for the page with no picture, a required decision (one decision for
+all such pages, like the other kept pages), the notice `page_not_rendered`, and in the student file
+the page break, the label "Not converted." and "This page could not be shown." The log names the
+page and the probe's error code, never anything of the page. The other pages are read as
+if the file had no such page. The search is bounded: after the probe of all the pages it starts at
+most `PROBE_SEARCH_MAX` (40) probes and runs at most `PROBE_SEARCH_S` (300 s), each probe's
+own time limit cut to what is left of them (a probe the clock ends is not taken for a failing
+page); past either, and when every page fails or the halves find nothing, the file fails with the first probe's error, as
+before. Two probes for each halving, so 2 * ceil(log2 n) find one bad page of n (14 for 100
+pages), 40 find two bad pages in 100 and every bad page of a file of up to 20 pages. A
+file of 100 pages with every page bad costs 41 child processes, not 199, and then fails. Cost on
+100 plain pages with one page whose child dies: 15 probes in 2.7 s (the probe of all of them
+alone is 0.7 s); with three such pages, 33 probes in 5 s. A page that hangs costs its whole time limit (60 s plus 2 s for each page after the first in
+the probe) each time it is in a probe that is run, which is why the search has a clock of its
+own: in a file of 5 pages, one such page is found in about four timeouts of 60 s or less; in a
+file of 100 pages the first timeout is 258 s and the halves (158, 108, 84 s ...) do not fit in
+the clock, so the file fails with the first probe's error after the search has used its 300 s
+(258 s for the first probe and 300 s for the search: 558 s at most; a probe that could start at
+299 s used to run its 158 s on top, 716 s). A page that makes MuPDF abort is quick: the child dies at once.
 
 The probe also guards table detection: `find_tables` renders the page for its layout
 model, where the known MuPDF aborts are, and it only ever runs on pages the probe passed.

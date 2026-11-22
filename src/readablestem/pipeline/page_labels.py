@@ -135,10 +135,13 @@ def _detected(numbers: dict[int, tuple[str, int]]) -> dict[int, str]:
     return labels
 
 
-def read(pdf_bytes: bytes, pages: Iterable[int]) -> dict[int, str]:
+def read(pdf_bytes: bytes, pages: Iterable[int], unloaded: Iterable[int] = ()) -> dict[int, str]:
     """Label of each of the 0-based `pages` that has one (PDF label, else printed number).
-    Never raises: an unreadable PDF or page has no label."""
+    Never raises: an unreadable PDF or page has no label. A page in `unloaded` (one the
+    probe could not draw) is never opened: it has no label of its own, and it has the
+    number its neighbours' numbers give it when it lies between pages that print one."""
     wanted = sorted(set(pages))
+    skipped = set(unloaded)
     try:
         doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
     except Exception:
@@ -147,7 +150,7 @@ def read(pdf_bytes: bytes, pages: Iterable[int]) -> dict[int, str]:
     try:
         numbers: dict[int, tuple[str, int]] = {}
         for index in wanted:
-            if not 0 <= index < doc.page_count:
+            if not 0 <= index < doc.page_count or index in skipped:
                 continue
             with contextlib.suppress(Exception):
                 page = doc[index]

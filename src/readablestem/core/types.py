@@ -957,6 +957,7 @@ NOTICE_CODES = frozenset(
         "handwriting_on_page",  # handwriting on a typed page, kept as an image of it
         "unread_page",  # drawings or images, nothing read from them: page kept as image
         "page_read_failed",  # reading the page raised: kept as an image, the rest is read
+        "page_not_rendered",  # the page could not be drawn: not read, no picture, the rest is read
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
         # ... and a paragraph or more of them (`page_type.HIDDEN_BLOCK`): the instructor looks
@@ -994,6 +995,9 @@ NOTICE_CODES = frozenset(
         "source_not_compared",
         # A page saved sideways (no /Rotate) that was turned to be read (`layout.document`).
         "page_turned",
+        # A typed page that carries ActualText and was read from its printed characters, the
+        # two readings differing in more than spaces and hyphens (`page_type.actualtext_flag`).
+        "actualtext_ignored",
         # LaTeX source: words or pictures no rule of the reader took (`source.report`
         # `SourceReport.unread_words`, `unread_pictures`): `count` of them.
         "source_unread",
@@ -1465,6 +1469,17 @@ class StageFact(BaseModel):
     seconds: float
 
 
+class PageStageFact(BaseModel):
+    """The wall time of one step of the conversion on one page (`pipeline.step_facts.PageTrace`):
+    a layout step ("read", "tables", "rows", "figures", "equations", "order", "blocks",
+    "elements") or a later one that works page by page ("crops"). A step that runs more than
+    once on a page is one fact with both times."""
+
+    page: int = Field(ge=0)  # 0-based
+    step: str
+    seconds: float
+
+
 # Why a step stopped before it had done all of its work (`NotFinished.reason`):
 # - "work_budget": it had done the count of work it is allowed (the same on every machine);
 # - "time_limit": a clock stopped it, so another machine may have got further;
@@ -1509,6 +1524,9 @@ class StepFacts(BaseModel):
     stages: list[StageFact] = Field(default_factory=list)
     not_finished: list[NotFinished] = Field(default_factory=list)
     shadow: list[ShadowFact] = Field(default_factory=list)
+    # The page trace: where each page's time went. Kept in the run record of a measurement
+    # (`eval speed`) only: the web worker stores `calls`, `stages` and `not_finished`.
+    page_steps: list[PageStageFact] = Field(default_factory=list)
 
 
 class ConversionOutput(BaseModel):
@@ -1609,7 +1627,7 @@ class ConversionOptions(BaseModel):
 
 
 # Stages of a conversion as the job page shows them, in order.
-Stage = Literal["queued", "layout", "equations", "figures", "tables", "assemble", "checks"]
+Stage = Literal["queued", "layout", "pages", "equations", "figures", "tables", "assemble", "checks"]
 
 
 class ProgressEvent(BaseModel):

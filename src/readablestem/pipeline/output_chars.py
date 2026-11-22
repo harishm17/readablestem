@@ -43,6 +43,17 @@ UNREADABLE = "[unreadable character]"
 # U+FFFD it never reaches an output: `NOT_TEXT` has it, so the page writes `UNREADABLE`.
 GAP = "⯑"
 
+# The pieces of built-up brackets, braces, parentheses, integrals and radicals, in the two forms
+# a text layer holds them: Adobe's private-use code points (glyph list names radicalex to
+# bracerightbt, U+F8E5-U+F8FE) that Symbol-style fonts and pdfTeX write them at, and the Unicode
+# piece characters (U+239B-U+23B3) that `glyph_names` reads from the font. Layout reads the
+# glyph's name first (`glyph_names.recover`), so the private-use form reaches a reader only
+# when the name is missing; every reader that asks "is this a piece" asks here.
+ADOBE_PIECES = frozenset(map(chr, range(0xF8E5, 0xF8FF)))
+BRACKET_PIECES = frozenset(map(chr, range(0x239B, 0x23B4))) | {
+    char for char in ADOBE_PIECES if char >= "\uf8eb"
+}
+
 _RANGES = [
     "\x00-\x08",  # C0 controls (tab, line feed and carriage return are text)
     "\x0b\x0c",

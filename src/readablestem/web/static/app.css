@@ -1085,13 +1085,20 @@ input[type="number"].input-short { width: 6rem; }
 /* The job page: its one-line settings and the student-file fields, links to its groups, then
    each group under one heading with a rule above; where to post it; and how long a document has
    been waiting. */
-.setting-line { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); align-items: baseline; }
+.setting-line { display: flex; flex-direction: column; align-items: flex-start; gap: var(--space-2); }
 .setting-line p { margin: 0; }
-.setting-line details[open] { flex-basis: 100%; }
 .inline-details > summary { display: inline-block; }
 .inline-details > form { margin-top: var(--space-3); }
-.student-setting { margin: 0 0 var(--space-4); max-width: 40rem; }
+/* The job page's settings and link-only blocks are framed cards under their group's heading:
+   the student file's fields side by side where there is room, and the cards of "Settings and
+   sharing" in a row with the link (a button) at the foot of each. */
+.job-group > .card { margin-top: var(--space-4); }
+.student-fields { display: grid; gap: var(--space-5); grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); margin-top: var(--space-3); }
+.student-setting { margin: 0; max-width: 40rem; }
 .student-setting input[type="text"] { width: 100%; max-width: 40rem; }
+.link-cards { list-style: none; margin: var(--space-4) 0 0; padding: 0; display: grid; gap: var(--space-4); grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr)); }
+.link-cards > .card { display: flex; flex-direction: column; margin: 0; }
+.link-card-action { margin-top: auto; padding-top: var(--space-2); }
 .group-fact { margin: var(--space-2) 0; }
 .group-crops { list-style: none; padding: 0; margin: var(--space-3) 0; display: grid; gap: var(--space-3);
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }

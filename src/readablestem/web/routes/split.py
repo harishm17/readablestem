@@ -273,7 +273,10 @@ class TextEditor:
     can_set_role: bool = False  # a plain paragraph: it can be a sidebar or a quotation
     can_leave_out: bool = False  # a paragraph or list item nothing else points at
     leave_out_why_not: str = ""  # why a paragraph or list item cannot be left out
-    # "text", "level", "role", "leave_out" -> message
+    can_split: bool = False  # a paragraph or list item that can be cut into several
+    split_why_not: str = ""  # why it cannot
+    lines: str = ""  # its words with a break before each later option label found, or as typed
+    # "text", "level", "role", "leave_out", "split" -> message
     errors: dict[str, str] = field(default_factory=dict)
 
 
@@ -1345,6 +1348,9 @@ class SplitBuilder:
         if element.kind is not Kind.HEADING:
             editor.leave_out_why_not = page_edits.left_out_blocked(self.result, element)
             editor.can_leave_out = not editor.leave_out_why_not
+            editor.split_why_not = page_edits.split_blocked(self.result, element)
+            editor.can_split = not editor.split_why_not
+            editor.lines = page_edits.proposed_lines(element) if editor.can_split else ""
         if element.kind is Kind.HEADING:
             if fix is not None and fix.heading is not None:
                 editor.heading_level = fix.heading.level
@@ -1371,6 +1377,7 @@ class SplitBuilder:
     def _editor_error(self, editor: TextEditor, exc: ReviewInvalid) -> None:
         editor.text = exc.values.get("text", editor.text)
         editor.level = exc.values.get("level", editor.level)
+        editor.lines = exc.values.get("lines", editor.lines)
         for error in exc.errors:
             editor.errors[error.field_id.split("-", 1)[0]] = error.message
 

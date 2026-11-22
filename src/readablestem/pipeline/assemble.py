@@ -371,6 +371,13 @@ KEPT_IMAGE_WORDS = {
         KEPT_IMAGE_LABEL,
         "This page could not be read.",
     ),
+    # Not drawn at all: nothing was read from the page and no picture of it could be made,
+    # so the file says that and nothing more (the figure has no picture, `original`).
+    "page_not_rendered": (
+        "Page {page}: this page could not be shown.",
+        KEPT_IMAGE_LABEL,
+        "This page could not be shown.",
+    ),
     "handwriting_on_page": (
         "Part of page {page}, shown as a picture, not converted to text.",
         KEPT_PICTURE_LABEL,
@@ -412,7 +419,7 @@ IMAGE_PAGE_ORIGINAL_ALT = Words(
 FIGURE_LABEL = Words("No description.", "Needs a description.")
 # The about section names the pages kept whole as images.
 KEPT_PAGE_REASONS = frozenset(
-    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed"}
+    {"handwritten_page", "scanned_page", "unread_page", "page_read_failed", "page_not_rendered"}
 )
 
 # Fix statuses whose proposal is not used: the original stays, flagged.

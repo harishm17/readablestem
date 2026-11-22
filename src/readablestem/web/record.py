@@ -90,6 +90,7 @@ ACTION_WORDS = {
     "make_heading": "Made a heading of a paragraph",
     "set_role": "Made a paragraph a sidebar or a quotation, or took that off",
     "leave_out_block": "Left a paragraph out of the student file",
+    "split_block": "Split a paragraph or list item into separate parts",
     "restore_block": "Put a paragraph left out back into the student file",
     "add_figure": "Added a picture the tool missed, with the person's own alt text",
     "add_equation": "Marked an equation the tool missed; the tool read it and a person looked at "
@@ -124,6 +125,7 @@ CARRIED_EDIT_WORDS = {
     "heading": "paragraph made a heading",
     "role": "paragraph made a sidebar or a quotation, or given back as neither",
     "block_left_out": "paragraph left out of the student file",
+    "block_split": "paragraph or list item split into separate parts",
     "picture": "picture added by hand",
     "equation": "equation marked by hand",
     "page_left_out": "page left out",
@@ -137,6 +139,7 @@ PAGE_CHANGES = frozenset(
         "set_role",
         "leave_out_block",
         "restore_block",
+        "split_block",
         "add_figure",
         "add_equation",
         "omit_page",
@@ -151,6 +154,7 @@ STRUCTURE_TOOL_HAD = {
     "make_heading": "A paragraph",
     "set_role": "A paragraph",
     "leave_out_block": "A paragraph in the file",
+    "split_block": "One paragraph or list item",
     "restore_block": "A paragraph left out",
     "add_figure": "Not found by the tool",
     "add_equation": "Not found by the tool",
@@ -308,7 +312,7 @@ def _reject_words(fix: Fix | None, element: Element | None, origin: str) -> str:
     if fix is None:
         return strings.KEPT_ORIGINAL
     if is_kept_image(fix):
-        return strings.KEPT_AS_IMAGE
+        return strings.KEPT_AS_NOTE if fix.reason == "page_not_rendered" else strings.KEPT_AS_IMAGE
     if reject_keeps(origin, fix, element) == "written":
         return strings.LEFT_AS_WRITTEN
     if fix.kind is Kind.HEADING:
@@ -342,8 +346,9 @@ def _decision_words(edit: Any, rejected: str = "") -> str:
 
 
 # The record says which words were taken out of the student file, so a left-out paragraph never
-# disappears without a trace; this much of them (the stored words are whole).
-LEFT_OUT_ACTIONS = frozenset({"leave_out_block", "restore_block"})
+# disappears without a trace; this much of them (the stored words are whole). A block split into
+# parts is named by the words it had before, the same way.
+LEFT_OUT_ACTIONS = frozenset({"leave_out_block", "restore_block", "split_block"})
 MAX_LEFT_OUT_CHARS = 400
 
 

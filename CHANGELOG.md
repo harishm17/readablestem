@@ -1,5 +1,508 @@
 # Changelog
 
+## Pipeline 0.5.16, render 11 (2026-11-21)
+
+- `PIPELINE_VERSION` is 0.5.16 and `RENDER_VERSION` stays 11: one raise of the pipeline for every
+  "Unreleased" entry below down to the 0.5.15 entry. What changes for a reader, one line for each:
+  - A page that cannot be drawn (O-003): the other pages are read; that page is a note, "Not
+    converted. This page could not be shown.", a required decision and a notice. Such a file
+    failed whole before.
+  - The per-page trace (O-010): nothing for a reader; `eval speed` reports seconds of one page.
+  - Contents lists and letter headings (O-051, O-020): a section or page number beside math stays
+    the entry's text, a title that wraps is one entry, two lines of prose ending in an ellipsis
+    are no contents page, a lone capital heads an index section only when its entries are near.
+  - Slide titles (O-032, O-130): a line that is a formula or a bare number is no slide title; a
+    deck with some scanned slides is one deck and its headings are levelled with the typed ones.
+  - A web address printed on two lines (O-046, O-156, O-021): one address, with no space where
+    the file's link annotations run across the break.
+  - Table captions and two text columns (O-061, O-150): a caption under a table keeps its first
+    eight lines, up to the paragraph that follows it; a body column beside a sidebar is two columns
+    of text, not a table, but a schedule of labels and descriptions stays one.
+  - Equation leftovers (O-042, O-048, O-134, O-129): nothing for a reader (the printed-equation
+    score and one shared table of bracket pieces).
+  - The page tool "Split it" (O-030, O-035): a paragraph or list item whose options run together
+    can be cut into separate parts in the page tools (web; a reviewer's change, with Undo).
+  - The A18 count (O-172): nothing for a reader (`eval pictures`).
+  - Link-only blocks and the "For students" settings (O-105, F-198): framed cards on the job page
+    (web).
+  - Pictures in LaTeX headings, links and cells; the scanned-page counter: a heading holds its
+    words only, a link of only a picture reads as its alt text or its address, a picture in a
+    cell leaves "(picture below)"; the job page's bar for scanned pages no longer steps back.
+  - Columns under the head of a first page, a numbered line that runs full, a page read without
+    its ActualText (O-024, O-018, O-157): a first page with a centered head over two columns is
+    read in columns, an affiliation list numbered to the margin is not one block, and a page
+    whose ActualText was left out says so in a notice.
+- New notice codes: `page_not_rendered` (required; also the reason of the figure that stands for
+  the page) and `actualtext_ignored` (optional, "Worth a look"). Every code has its message
+  (`tests/test_web_review_messages.py`). No new field in a stored result. The page trace
+  (`StepFacts.page_steps`) stays in a measurement's run record and is not stored by the web
+  worker; "pages" is a new key in a running job's progress; a split paragraph is a new review
+  edit, `split_block`, whose parts are ordinary elements. No migration.
+- No render raise is owed. The one new word on the student page, "Not converted. This page could
+  not be shown.", is written only for a figure with the reason `page_not_rendered`, which only a
+  new conversion makes (a stored result cannot hold it). Every other change is the reader's, the
+  web app's or a measurement's. The golden pages and the stored demo page are the same at render
+  11 (the golden test passed before the raise); the two golden files that name the pipeline in
+  their generator line say 0.5.16 now, and nothing else in them changed. Stored results from 0.5.10 to 0.5.15 load unchanged and their
+  pages are not made again; a document converted before keeps its old contents entries, slide
+  levels, captions and addresses until it is converted again. The switches that stay off
+  (`LAYOUT_INLINE_JOINS`, `LAYOUT_JOIN_PANELS`, `LAYOUT_DISPLAY_GROUPING`, `REGION_TREE`) change
+  nothing in this release.
+- Roll back: run on 2026-11-21 against 0.5.15 (`07a10cbc`), a PDF result stored by 0.5.16 with a
+  page that could not be drawn, all 58 notice codes the table knows and a paragraph split in the
+  page tools, with decisions pending and with all of them made, with the stored page and with it
+  cleared: the job page, the review screen and list (also page 3), the page tools, the record and
+  its CSV, the student page and its download all answered 200, and 0.5.15 undid the split. A
+  review change written by 0.5.15 kept every key of the result (no field is dropped), so going
+  forward again loses nothing. What 0.5.15 gets wrong: it has no words for the new reason, so
+  once it makes the page again (after a review change, as a draft, or with the page cleared) the
+  page that could not be drawn is written "No description. This figure has no text description
+  yet." and not "Not converted. This page could not be shown." (a finished document with its
+  stored page is served as it was); and its record leaves out the split.
+- Records re-made at 0.5.16 from a clean tree (`5298521e`), $0 and no model call:
+  `data/eval/latest-headings.json` and `latest-tables-local.json` (the same scores as at 0.5.15,
+  and `eval gate --require-current` passes for both); `data/eval/burden-corpus.json` (42 of 43
+  uploads ask the same decisions as at 0.5.15; `s02_syllabus_sidebar` asks none where it asked
+  one: the two-text-columns rule, O-150; 56 decisions on 117 pages); `data/eval/parsing-bench-olmocr.json`
+  (multi_column 69.5 to 70.2, 5 more order checks on two pages of one magazine, and
+  headers_footers 38.6 to 38.4, 1 check fewer on one journal page; table_tests, long_tiny_text and
+  baseline are as before; both movers are the columns under the head of a first page, O-024);
+  `data/eval/order-layout-dev-1.json` (141 of 267 pages right, from 140, and 72 faultless; none
+  made wrong; page 8 of `ax_astrophga_240306369` became right, O-024).
+  The parsing-benchmark record was made again at `d0cc3e04`, after the review fixes, with the
+  same scores; 603 pages asked a model, not 602 (one page's tables, read in this run and not
+  in the first; docs/eval-parsing-benchmark.md).
+- The corpus hash run against 0.5.15 (`07a10cbc`), with the version strings made equal: of the 73
+  uploads, 63 give the same stored result; 10 differ, each by one entry above. The notice
+  `actualtext_ignored` is added on `d3_arabic_doc`, `r09_handout_14451`, `r14_exam_513`,
+  `w_lecture_5111` and `w_slides_60001_lec1` (O-157); `s02_syllabus_sidebar` (O-150) and
+  `r18_arxiv_opt` (table captions and two text columns, O-061, O-150) change in their elements; `r20_newsletter_drp`
+  and `w_notes_6042_ch2` (contents entries, O-051/O-020) and `w_mixed_slides+image_pages` (slide
+  levels, O-032/O-130) change in their elements or headings. The layout of the other PDFs
+  (996 file and variant runs): 23 files differ, each at one or two entries: columns under a head (O-024)
+  5, the ActualText notice (O-157) 3 (`ax_cscv_240306361` is also in O-024), contents and letters (O-051,
+  O-020) 6, addresses (O-046, O-156, O-021) 3, table captions and two text columns (O-061, O-150) 7,
+  slide titles (O-032, O-130) 1 (`qbionc` is in two of these). No difference is without an entry.
+  The 1,324 answers a recorded replay lacks are the same, upload by upload.
+  The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+
+## Unreleased: a page that cannot be drawn is that page's problem (O-003)
+
+- A file with one page that makes MuPDF abort or run past the probe's time failed whole
+  (`unreadable` or `too_complex`) although every other page could be read. When the probe of all
+  the pages fails, layout now probes again in halves (`access.probe_failures`) until the failing
+  pages are single, and reads the others. Each failing page is kept with the new reason
+  `page_not_rendered`: a figure with no picture, a required decision, the notice
+  `page_not_rendered`, and in the student file "Not converted. This page could not be shown."
+  The conversion does not build that page again: no step, crop, tag, link or image reads it, the
+  page-number pass skips it, and its size comes from the page tree, not from the page (the
+  MediaBox cut to the CropBox, times the page's UserUnit, turned by Rotate, each read through an
+  object of its own where the tree refers to one: the size the page gives when it is built,
+  except that a UserUnit of 0, which MuPDF makes an empty page, is read as 1). Its own
+  PDF page label is not read (it has the number its neighbors give it, or none).
+- The search is bounded: after the probe of all the pages, at most 40 probes (2 for each halving:
+  14 find one bad page of 100) and 300 s, each probe's own time limit cut to what is left of the
+  300 s (a file in which every probe hangs now fails 300 s after its first probe at the latest,
+  not up to a whole probe later). A file in which every page fails, in which the halves
+  pass although the whole did not, or in which the search runs out of probes or time, fails with
+  the first probe's error as before. On 100 plain pages with one page whose child dies, 15 probes
+  take 2.7 s (0.7 s for the probe alone); a page that hangs costs its whole time limit each time
+  it is in a probe, so a hang in a file of 100 pages still fails the file (docs/layout.md).
+- Counted first: of 148 files (the 120 tracked public PDFs and the 28 of the private corpus, no
+  held-out or sealed set), one fails the probe, the committed damaged fixture, which has one page
+  and so still fails whole. No corpus file changes.
+## Unreleased: a per-page trace of the conversion, and seconds of one page in `eval speed` (O-010)
+
+- The conversion times each layout step on each page (`read`, `tables`, `rows`, `figures`,
+  `equations`, `order`, `blocks`, `elements`) and the page's crops, and returns the seconds on
+  `StepFacts.page_steps` (`step_facts.PageTrace`; `Layout.page_steps` for layout's part). The web
+  worker does not store it (it keeps the calls, the stages and the unfinished steps), and it
+  decides nothing: a page's reading is the same with it. It costs 26 microseconds a page against a
+  median page of 0.4 to 0.7 s.
+- `eval speed` reports seconds of one page from the trace: the median, the 95th percentile and the
+  slowest of the pages, each step's share, and the five slowest pages with their longest step. On
+  the corpus replay a page took 0.42 s at the median and 2.38 s at p95, and the table search was
+  56% of the traced time and the crops 26%. On `layout-dev-1` (954 pages, layout alone) it was
+  0.69 s and 2.12 s, and the table search was 69%. The numbers are in docs/eval.md, with the
+  caveat that the machine was loaded. "No page trace" is gone from docs/layout.md.
+- `_Char.blank` is worked out once when a character is made: it was read 11.6 million times for
+  146,000 characters on the slowest development file, about 0.75 s of 78 s of CPU.
+- No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` raise is owed, no migration.
+## Unreleased: contents lists and letter headings (O-051, O-020)
+
+- A section number or a page number next to math in a contents entry stays the entry's own text.
+  The symbol before a page number ("Forces on Σ 9") took the number into its equation, and an
+  entry that starts with a section number and goes on in symbols ("6.1 Γ = D4") was one whole
+  equation; the number is now text and the equation is the formula (`inline_runs._clear_of_entry_numbers`).
+- A title that wraps in a contents list with leaders is one entry: the first line has no leaders
+  and no number, so it was a paragraph or a heading and the second line an entry of its own
+  ("tion", "orem 1)"). It is joined to the line under it (`blocks._title_head`, hyphen repaired).
+- A title that wraps is joined only in the middle of a list: when the line right above the
+  wrapped line is an entry of the list (`blocks._title_head`, `_entry_above`). Above the first
+  entry that line is a paragraph's last line, a heading or a "Part One, ..." line, and nothing in
+  its shape tells it from the first line of a title, so it stays as it was: a paragraph that runs
+  to the right edge was fused into the first entry ("Week 1: ...", "Module 1 ...", "Temperature
+  and heat", "1 Temperature and heat"). The first entry of a list whose first title wraps is
+  therefore not joined (as in 0.5.15). In a list whose entries start with a label (a section
+  number, "Chapter 5", "Week 3:", "Module 4"; also "A.4", and a Roman numeral of I, V and X,
+  so a lone "I" counts, and so does any capitalised word before a number or numeral), an entry
+  that starts with one is never a title's
+  second line: the line above it is a part, chapter or unit line with no page number of its own
+  ("Chapter 2 ...", "2 ...", "Part II ...", "Unit 2 ..." over "Week 4: ..."), not a title's first
+  line (`blocks._starts_with_label`). A title whose second line starts with a number ("... of
+  Chapters" over "1 and 2 done again") is therefore two lines, as in 0.5.15. In any list, a line
+  without a label under a line with one goes on from it when it starts in lower case, when the
+  line above ends in a hyphen ("2.1 Work and heat in closed" / "systems"), or when the line
+  above starts with a label of the form of the entries' own ("2" among "1" and "3", "E.5" among
+  "E.4" and "E.6": "E.5 Proof of ... (Lemma" / "D.6)"; the entries are those with leaders or a
+  page number at the margin, so a LaTeX article's section lines, which have no leaders, count,
+  and a Roman numeral has a form of its own, so "IV" is not "1"); otherwise the line with the
+  label is a chapter line over an entry of its own ("Chapter 2 ..." over "Introduction", or "2
+  ..." over it among entries "2.1", "2.2", or "IV ..." over it among "1", "2"), and stays apart
+  (`blocks._wraps`, `_label_shape`).
+  Left as it is: in a list of unnumbered entries, a "Part Two, ..." line between two entries
+  that runs as far right as the entries' page numbers is still joined to the entry under it
+  (0.5.15 kept it apart); a shorter part line is not, since a title wraps only on a full line.
+  A chapter line whose label is a word ("Chapter Two ...", "Part Two: ...") or that has none,
+  and one over an entry that starts in lower case or with a year, are still joined to the entry
+  under them (0.5.15 kept them apart), and so are a chapter line in capitals ("CHAPTER 2 ...")
+  and one whose label has the entries' own form over an entry with no label ("2 ..." over
+  "Introduction" among entries "1", "2", "3", with or without leaders), which cannot be told
+  from a title of entry 2 that wraps. A wrapped title whose Roman label is the only Roman one
+  among Arabic entries ("II Proof of ... (after" / "Newton)" among "1" to "5"), or that starts
+  with the word "I", is two lines, as in 0.5.15.
+- Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
+  page number, its own or a line of its own beside it (`blocks._ends_in_number`).
+- A capital alone on its line heads an index section only when the first entry of its letter
+  starts within a line or two under it (`LETTER_UNDER_REACH`); a lone capital at the foot of a
+  column was matched with a line of its letter far below it.
+- Measured on the 996 layout runs of the development PDFs and the repository's own (332 files, three
+  variants): 6 files change, none a file the fault is not in (4 development papers, a public
+  newsletter, one paper of `data/real-tables`: a section number out of an equation). On the 72
+  corpus files and 73 uploads one file loses three lines that were taken for entries (lines of
+  dots with no page number), one gains merged two-line titles; no upload's calls or recorded
+  requests change (6 and 654 calls, 2 and 644 missed, before and after), so there is no switch.
+  Not built, not counted:
+  a title that wraps in a list with no leaders, a two-column contents page, titles checked
+  against later headings. A new `PIPELINE_VERSION` is owed (a stored result's contents entries
+  change); no migration.
+## Unreleased: slide titles (O-032, O-130; O-033 not reproduced)
+
+- A slide's title was taken from a large equation in the top third of the page when the equation
+  was larger than the title: on the html-slides deck 17 of 22 pages had the equation, or a lone
+  "1" from a fraction, as their title.
+  A line that is a formula or a bare number and nothing else is no title now, and no title slide
+  (`slides._is_formula`: no word of three letters besides function names, and a math sign, an
+  italic math letter or no letter; a name that ends in a plus or two, "C++", "g++" or "A+", and
+  "Q+A", are not math signs, in a line of any other words too: "C++ 17", "C/C++" and "C++ vs. C#"
+  stay titles, and "A+B", "N+1" and "x + y = 2" are still formulas). The deck's titles are the real ones, and a title that
+  layout read as a paragraph is no longer dropped as a headline above a "title" that was an
+  equation. The written output of that deck is the same (its titles were headings already). Whether a file is a deck is counted as before: a page whose title is a formula is titled like a slide all the same (a deck of eight slides, three titled "A+B", "N+1" and "X+Y", is a deck; of those three only "N+1" loses its title and is a paragraph, while "A+B" and "X+Y" stay headings by their font).
+- A deck with some scanned slides was not a deck: a page kept whole as its image has no text, so
+  it counted as untitled, and 5 titled pages of 12 were not the 70 % a deck needs. Pages
+  kept whole are left out of the share, so the mixed deck is one deck, with its title at level 1;
+  a file whose pages are all kept whole is still not a deck. The headings the page reader makes
+  on its scanned slides get the deck's reason in `run` (`Layout.deck_pages` says which pages are
+  in which deck), and `heading_levels` puts them under the deck's title: the reader numbers a
+  slide's headings from its own title (1), so each scanned slide's title came out one level
+  below the typed slides' titles (F-254). In the mixed deck the 6 scanned titles are now at the level
+  of the 5 typed ones, and the F-254 mark is off its test.
+- Counted on every landscape file I may open (19 files with landscape pages in the development
+  sets, the repository and the corpus; 4 decks among them with a deck title): the only deck with
+  an equation for a title is html-slides. A fourth level-1 heading that is not a deck title
+  (O-033, file f4) is in none of them, and f4 is not among the files I may open: not built.
+- The corpus replay of all 73 uploads: only the mixed deck changed (its elements, heading
+  fixes and page); the equation, figure, paragraph and table fixes and the recorded requests are
+  the same, so no recording is stale. No stored document changes except the mixed deck's, and
+  only by its heading levels. No `PIPELINE_VERSION` raise is owed for documents that are not
+  decks with scanned slides; a document converted before this change keeps its levels.
+- The layout half of the same comparison (996 results): 3 changed, all html-slides in its three
+  variants; there the deck's headings now say which deck they are in (`slide_deck 1`, and the
+  title `slide_deck_title`), and nothing else about them. No other file changed.
+- No migration.
+## Unreleased: a web address the file links on two lines is one address (O-046, O-156, O-021)
+
+- A line break inside a printed web address was joined with a space unless the line ended on a
+  sign ("/", "-", "=" and the like): "doi.org/10.1016/j." / "tics.2022.11.009" came out with a
+  space, and so did "https:" / "//doi.org/...". The file's own link annotations now settle it:
+  where two annotations of one address (one per line, as hyperref writes them) run across the
+  break, and the words under them, with their spaces taken out, are the address, the break joins
+  with no space (`hyphens.link_cut`, read per document by `layout.document._link_cuts` into
+  `_Document.link_cuts`, used by `blocks._line_break`). Only printed text that is an address
+  counts (it holds ".", "/", "@" or ":"): a named link over two lines ("Smith" / "Jones", or
+  "Khan" / "Academy" under khanacademy.org, whose words run together are in the address) is not
+  one and keeps its space, there and wherever else those words break; an address not under a link
+  is decided as it was. A sentence sign the second annotation covers after the address
+  ("Academy." or "tics.2022.11.009.", also "," ";" ")") is left out before both tests, so a named
+  link that ends a sentence keeps its space and an address followed by a full stop still joins;
+  a break after a full stop before a capital ("Dr." / "Smith" under example.org/dr.smith) is not
+  an address either. A three-line address whose middle pair prints none of ". / @ :" joins at
+  its other break only; the middle break keeps its space, as in 0.5.15.
+  On the 126 public papers and corpus files, 3 public files change (18 breaks, each a space
+  removed inside an address, nothing else); no `full` replay of the 73 corpus documents changes,
+  so no recorded request or answer stops matching.
+- O-156 (an address that ends a line whole, the sentence going on below, gets no link): not built.
+  Counted on the 98 public papers and 28 corpus files: no typed address is lost to the line-end
+  rule (`text_pass._wraps`), so there is nothing to measure a rule against.
+- O-021 (blanks): not built. An equation is written from its LaTeX, never from its text, so a
+  blank run on the text of an equation line would not be written or said; marking those four
+  underscores needs the equation's own writing (or its request) to change. A row of three labels
+  over three rules is not found on the 28 corpus files: of 18 rows of two or more rules at one
+  height none holds a blank beside an underline or a plain rule.
+- Not done: the cells of a table (`tables._cell_text`, `_joined_text`) read no link annotation, and
+  one annotation drawn over two lines (not one per line) is not read.
+- No recording or request changes. `PIPELINE_VERSION` needs the bump of the wave (the text of a
+  PDF with such an address changes); no `RENDER_VERSION` raise, no migration.
+## Unreleased: table captions and two text columns (O-061, O-150; O-056 measured, not built)
+
+- A caption under a table was cut at its fourth line (`CAPTION_LINES_BELOW` 3, so the first line
+  and three more): a longer one lost its last lines, which then stood as a paragraph under the
+  table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
+  may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
+  where the next line starts with a capital after a step wider than the caption's own line step by
+  more than 1 pt (for a caption of one line, the next line's own); within its first four lines
+  the caption's line must also end a sentence or end three font sizes or more short of the next
+  line's right edge (a caption's short last line over a paragraph that runs full,
+  `CAPTION_LAST_LINE_SHORT`), so a line of a caption set full width and pushed down by a tall
+  formula does not cut it mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`),
+  steps measured from baseline to baseline so that a subscript or a
+  raised mark on a line does not make a step look small or wide: a "Table 1: ..." caption over a
+  paragraph set more than 1 pt looser than its lines does not take the paragraph in, unless the
+  caption's last line runs to within three font sizes of the paragraph's first line's right edge
+  with no sentence end (the paragraph's first line is short, the paragraph is narrower than
+  the caption, or the caption's last line nearly full). Left as it is: a ragged caption whose
+  short line stands over a line pushed down by a formula, and a short title line set more than
+  1 pt apart from its description, end there (0.5.15 kept them whole); the rest follows as a
+  paragraph, in order. A
+  paragraph set at the caption's own line pitch cannot be told from the caption's next line and
+  is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
+  519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole
+  now; of 123 captions under a table, 46 have more than one line, and the stop changes none of the
+  996 layout results or 73 replayed uploads. The corpus replay (73 uploads): two differ, `r18_arxiv_opt`, whose
+  Table 1 caption is whole and whose dangling paragraph is gone (105 elements, now 103), and `s02_syllabus_sidebar` (below); the
+  requests it cannot replay are 38 of 52 before and after, so no recorded answer stops matching
+  because of this. Corpus layout (996 results): 23 differ, all in the 7 PDFs this change reaches.
+- Two text columns read as a grid: `s02_syllabus_sidebar` page 1 (a body column beside a
+  sidebar) gave a false two-column table, the sidebar's lines paired with body lines. A box found from text with two columns, prose in
+  one and fewer than half its lines with a cell in each column is now two columns of text
+  (`tables._text_block_dropped`, `TEXT_COLUMN_SHARE`), unless a "Table N" line says it is a
+  table, or short labels that each stand level with a line of the other column and open a run
+  (a schedule: "Week 1" with its description over three lines; the line above the label ends a
+  sentence or is a paragraph's space away, or no other label stands on the line before or after
+  it, as the labels of a schedule stand a description apart and a sidebar's lines follow one
+  another; or, where two or more labels head a description of several lines, a label stands on
+  the line before or after it, a week of one line such as "Week 6 Midterm", and all labels but
+  one in five start with a capital or hold a digit ("fall break" among dates), as a sidebar's
+  running lines need not (a sidebar whose labels all but one in five start with a capital or
+  hold a digit, "see fig. 3", is still a table, and a schedule with two lower-case labels in
+  seven, "fall break" and "exam week", is no table, its order kept); `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
+  built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to five lines a
+  description and weeks of one line among weeks of three or five, with or without full stops and space between rows, the label level with the first
+  or the middle line; a borderless schedule with no caption had become ten paragraphs). Of 827
+  boxes of this kind that were kept on the public sets, 2 are two columns with prose and fewer
+  than half their lines paired: this page and one page of an OpenStax book that was not a table in
+  the end either; neither has labels that open runs, and the rule keeps the same two out. On the
+  520 PDFs of the public sets 14 boxes reach the labels rule: it keeps 9 (8 before its second
+  condition), the ninth a brace of cases in one arXiv paper that later rules still drop, so no
+  result changes. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,
+  with the new rule off (`tests/test_region_tree.py`).
+- Benchmark `table_tests`: 70.6 before and after (857 checks); baseline 100.0. The public table
+  evaluation (`eval pipeline --task tables --mode local`, 5 real documents with 25 tables, 200
+  tables of the dev documents): every score the same.
+- Not built. Borders thicker than 1.6 pt (O-056): a cap of 3 pt makes a plot whose axes are 2 to 3
+  pt thick (`ax_astrophga`, page 8) a table with seven headings and no set holds a table whose
+  borders are thick, so it would be a rule measured only on generated tables
+  (docs/tables.md, "Known limits"). A one-line caption that takes the same-size paragraph under it
+  and inline math in a table caption (O-061): no case of the first on the sets; the second would
+  make each formula in a caption a new equation request (a table's caption is written by layout
+  from its lines before any block is made of them) and the plain text is what a table's
+  `<caption>` shows; the caption tag of a tagged file is not touched.
+- No recorded request stops matching (calls 52 and missed 38 on `r18_arxiv_opt` before and after;
+  `s02_syllabus_sidebar` missed 0, calls 3), so no off switch is needed. A table whose caption was
+  cut now sends its whole caption to the table model, so a recording made for it with the cut
+  caption would need re-recording. Documents already stored keep their old captions until converted
+  again. A `PIPELINE_VERSION` raise is owed when the wave is released (the reader's output
+  changes: captions and one table). No migration.
+## Unreleased: equation leftovers (O-042, O-048, O-134, O-129)
+
+- The printed-equation score (`eval/equations_printed.py`) calls an answer right when its rows are
+  the whole formula and the key sets the same rows in `aligned` (or the other way round), and
+  reads `matrix`, `vmatrix`, `Vmatrix` and `Bmatrix` as the rows between the brackets their name
+  stands for, as `pmatrix` and `bmatrix` already were. On the recorded development runs (8,003
+  pairs, $0): right 7,237 before, 7,242 after; 5 pairs newly right, none newly wrong. The matrix
+  names move no pair. A row of `tests/test_equations_printed.py` for each.
+- The pieces of built-up brackets are one table (`output_chars.BRACKET_PIECES`, with
+  `ADOBE_PIECES` for the private-use form) read by the table check that takes a brace or matrix
+  for maths (`tables.py`) and by the sign check (`signs.py`), where each had its own code-point
+  test. Same characters, no change to any output. Measured on the 28 corpus files: of 427
+  private-use pieces (U+F8E5 to U+F8FF) 73 are read by glyph name before any reader sees the
+  text and 354 are U+F8FF in MathTime fonts (the font tables read those), so a reader never meets
+  the private-use form of a bracket piece in this set.
+- Labeled parts inside one display equation ("(a)" and "(b)" in one display) are not split. Counted
+  by the text of the layout's display equations: 7 of 65,817 (1 of 49,314 on 72 of the real-world
+  development papers, 6 of 16,429 on the 28 corpus files, 0 of 74 on the repository's PDFs).
+  Splitting a display changes its crop and so its recorded request, for under 0.02% of displays.
+- Overlines over a letter stay out of the accent comparison. The glyph facts of an equation
+  (`GlyphContext`) hold characters and their letter styles, not drawn rules, and layout's rules
+  reach an element only as the reasons "fraction bar" and "radical sign".
+- No recording or request changes. No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed, no
+  migration.
+## Unreleased: a page tool that splits a block into separate parts (O-030, O-035)
+
+- Options or list items that run together in one paragraph or list item (layout's `option_labels`)
+  could only be changed word by word. The page tools have "Split it": a box with the block's words
+  and a line break before each later label found, which the reviewer moves, and each line becomes
+  its own paragraph or list item. One page operation with Undo (`page_edits.split_block`, the
+  `edit/{element}` route with `action=split`, `templates/_page_tools.html`), recorded as "Split a
+  paragraph or list item into separate parts" with the words the block had, and carried onto a
+  document converted again where exactly one block says the same words
+  (`carry_edits._carry_split`). Only line breaks can change; a block with an inline equation,
+  right-to-left text, program code, a footnote or a link to it is refused with a sentence.
+- Counted at $0 before building: 9 blocks flagged `option_labels` in 5 of 360 PDFs (public sets
+  5 blocks in 3 of 332 files, none in the real-world sets; private corpus 4 blocks in 2 of 28
+  files). Of the 5 public blocks 3 are two-column options whose lines interleave, which a cut at the
+  labels cannot put right: the reviewer puts the words in order first (docs/web.md says so).
+- The two notice sentences for run-together options now name the tool.
+- Not built: text decisions on any other kind of text (no producer, nothing measured needs one),
+  and the reorder of right-to-left text (held).
+- No recording or request changes. A document stored before is unchanged. No `PIPELINE_VERSION`
+  or `RENDER_VERSION` raise is owed, no migration.
+## Unreleased: the A18 count (O-172)
+
+- New `readablestem eval pictures`: from the same replay as `eval outputs`, per upload and added
+  up, the pictures not converted by reason, the content pictures with empty alt, the regions
+  called handwriting (page and box only) and their notices, and those regions read against a
+  truth list of regions someone looked at (`data/eval/pen-truth.json`). The audit of each
+  result now also keeps these counts (`eval/pictures.py`, `eval/outputs.py`).
+- First count, on the 39 audit documents (144 images): 0 content pictures with empty alt (12 in
+  the audit); 15 pictures kept as images before any model step; 9 regions called handwriting
+  (8 on one textbook chapter, 1 on a journal header), and all 9 are printed, as is a tenth on a
+  slide file. The bar of 0 is not met. 13 of the 39 lack recorded answers for part of their
+  requests (the crops changed after the recordings), so their count by the model's answers
+  needs new recordings (docs/eval.md, "eval pictures").
+- No pipeline change: no recording or request changes, no stored document changes. No
+  `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed, no migration.
+## Unreleased: link-only blocks and the "For students" settings are framed (O-105, F-198)
+
+- On a finished document's page, the blocks that held only a heading and a link now look like the
+  rest of the app: "Share with a colleague" and "If you change the PDF" are two cards in a row
+  under "Settings and sharing" (one column on a phone), each with its link as a button at the
+  foot. "Record for your accessibility office" is a group with the same rule above it as the
+  others, and its two links are buttons. In "For students", the language and the title and
+  contact line are cards; the two fields sit side by side where there is room, and "Change" under
+  the language is a button instead of bare bold text far from its sentence. No route, wording of
+  a setting or stored value changes (`web/templates/_job_*.html`, `web/static/app.css`).
+- Not done: one form with one Save for the title and the contact line (D-025). They are two
+  routes (`/title`, `/contact`) and merging them changes what a request does.
+- No recording or request changes. No stored document changes. No `PIPELINE_VERSION` or
+  `RENDER_VERSION` bump.
+## Unreleased: pictures in LaTeX headings, links and cells; the scanned-page progress counter
+
+An independent review of wave 2b found these (finding 5). Each was reproduced on a small LaTeX
+source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.py`.
+
+- A picture in a LaTeX heading put "(picture below)" into the heading's text, so the outline, the
+  contents and the page title read it. A heading is now its words only; the picture follows it as a
+  figure of its own (a heading of only a picture makes no heading, as before the mark).
+- A link that holds only a picture, in a sentence, had "(picture below)" as its link text. It now
+  reads as the picture's alt text when the source has one, else as the address it goes to: a person
+  who hears the links read learns where it leads, which "(picture below)" never said. A link to a
+  place in the document has no words to give; the mark stands beside it, outside the link. A link
+  of only a picture on a line of its own is left as it was (no mark was written there).
+- A picture in a table cell of words left no mark; it now leaves "(picture below)" in the cell, as
+  a Word cell does. A cell of only a picture stays empty. The table is still a required decision
+  and the picture still follows it.
+- The scanned-page pass sent its progress on the "layout" counter, which the table search had just
+  finished, so the job page's bar stepped back (3 scanned pages: layout 2 of 3, then 1 of 3). The
+  pass now has a counter of its own, "pages" ("Reading the scanned pages: 7 of 20 pages"); the
+  layout's count never moves back. New stage name in `core.types.Stage`, `web/job_page.py`,
+  `web/states.py`, `docs/web.md`.
+- Measured: the 47 LaTeX sources of the repository (48 mains, one an include fragment LaTeXML
+  cannot read alone) read the same before and after, element for element; none of them holds a
+  picture in a heading, a picture-only link or a picture in a cell. The private corpus and the
+  real-world development sets hold no LaTeX source. The fault is found only in sources written
+  the way the reviewer's probe was.
+- Not built: a link of only a picture on a line of its own still loses its address with no word
+  (it never had a mark; giving it text would add a line to every such page); a cell that holds a
+  formula and a picture shows the picture mark in its text but not in its formula reading.
+- No recording or request changes. Stored LaTeX results made earlier keep the old text until the
+  source is converted again; stored progress rows are unchanged (a row has no "pages" until a scan
+  runs). No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed (the output of a PDF is not
+  changed; a LaTeX source made again differs only where it has these shapes), no migration.
+
+## Unreleased: columns under the head of a first page, a numbered line that runs full, a page read without its ActualText (O-024, O-018, O-157)
+
+- A first page with a head of centered lines (a title, the authors, their affiliations) across
+  both columns and the columns under it was read with no gutter: the head crosses the gap more
+  often than a column may, so the page was read top down, line by line across both columns. When
+  the page as a whole has no gutter, the columns are now looked for under each run of lines
+  across the page (up to eight, the top first), and the first that gives a gutter with about as
+  many lines on its thinner side as on the other (at least 0.4 of them, and at least four) and
+  that runs as columns do is used (`order._find_gutter`, `_columns_run`,
+  `MIN_HEAD_COLUMN_BALANCE`). Columns run unbroken: a line across the page that has lines of
+  both columns above it and below it, or breaks in the thinner column (a step from a line's top
+  to the next one's over 1.9 line pitches with one to three lines of the other column, or of
+  lines the gap runs through, beside it) that cut it into runs of fewer than five lines on
+  average, are not columns but the questions of an exam with their
+  options standing two by two under each (a, c, b, d was read), and the page is read as before.
+  A line across the page with lines on one side only (a note under the columns whose last line
+  is short and sits at the left; a caption with only a left remainder under it) or none above it
+  does not break them. An exam whose questions are short lines set at the pitch of their options
+  with no space between the questions (single spacing: a skipped line is 2 pitches top to top at
+  any leading), and one of two questions only, are read question by question too while the
+  exam is short: with more lines (six questions, or five with options that run on to a second
+  line, or four with three rows of options) the gutter of the page as a whole is found first,
+  the runs are not asked about, and the page is read left options first, as in 0.5.15. A step in the other side's
+  own lines over 1.9 of their line steps, with lines of the thinner side beside it but none of
+  its breaks (a figure or a heading's space in one column only), keeps the columns when there
+  are two or more such steps and at least half as many as breaks: an exam's questions cut both
+  sides at once, a section line set apart above the first question or under the last
+  ("Section A: Multiple choice") has no line of the thinner side beside its space, and one
+  option that runs on to a second line makes the other side skip a line once. The line pitch the breaks are measured in is the median step of both sides' lines,
+  each side measured on its own (an exam's thinner side alone skips a question's line at every
+  other step, so its own median lay between one pitch and two, and a left option that runs on
+  to a second line hid the breaks). Columns whose other side has fewer such holes (one, or
+  fewer than half the thinner side's breaks) are read across again, as in 0.5.15, and so are
+  columns whose thinner side is set at about twice the other's line pitch (a spaced list or
+  one-line paragraphs set a line apart beside running text: the pooled pitch finds a break at
+  every line). Left as it is: an exam of four questions with two options that run on to a
+  second line makes two holes beside three breaks and is read left options first (0.5.15 read
+  it question by question). An exam with one row of two options under each question has no
+  break in its option columns, and one with ten options under one or two questions has too few
+  breaks; both are read left options first (0.5.15 read them question by question). Columns
+  are still read across, as in 0.5.15, where the hole of the other side lies within a line of a
+  break of the thinner side, under the thinner column's end, or only in the thinner column. The balance keeps a page of one column with
+  a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
+  lines in the right ones, a sentence across the page above) read row by row: the thinner side
+  has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie
+  under a head. On the 267 gold pages of `layout-dev-1` three pages change, two of one
+  paper that were wrong and one page of another paper that stays as it was in what the gold
+  counts: right 140 to 141 of 267, faultless 72 to 72, blocks broken 106 to 99, joins across
+  columns 35 to 27; none of these pages went from right to not right (the set has no exam page
+  with options in a grid). The search is not limited to first
+  pages: a page whose columns lie under a row of figures reads the same way. On the 996 analyzed
+  files (every PDF of the corpus, three variants) 7 files change. Five pages in 3 papers are the
+  columns found (a join across the columns or alternating single lines gone; one page no longer
+  read as code), 3 other papers change by the numbered lines below (two of them also by the
+  notice), and the notice is the only change in 1 file. Of the 73 converted uploads 5 change, by
+  the notice alone. No page of a textbook changes: its four copies of a file, which this rule
+  once changed, are as they were. The condition of no line across the page between the columns
+  changes none of the 996 analyzed files or the 73 converted uploads.
+- A numbered line that runs to the right edge no longer takes the next number into its block when
+  it is the whole run so far: the affiliations of a paper, numbered 1, 2, 3 to the margin, were
+  one paragraph (`figures._starts_block`). Inside a run of numbered lines it still reads as the
+  line numbers of a passage. Of the 28 arXiv papers of `layout-dev-1`, two first pages had it (3
+  joins); the margin-numbered passages of the generated files are as they were.
+- A page that carries ActualText and is read without it (the two readings differ in more than
+  spaces and hyphens, and the plain reading has no more undecoded characters) has the optional
+  notice `actualtext_ignored`, "Worth a look", one per page. Counted on the corpus (counts only):
+  18 pages in 4 of 28 files are read plain with the readings differing; on the 60 public files of
+  `layout-dev-1` one page of one file keeps ActualText and says so by no notice.
+- No recording or request changes. A stored document is read as before until it is converted
+  again. `PIPELINE_VERSION` is owed (the first page reads, the blocks of numbered lines and the
+  notice change). No `RENDER_VERSION` raise, no migration.
+
 ## Pipeline 0.5.15, render 11 (2026-11-20)
 
 - `PIPELINE_VERSION` is 0.5.15 and `RENDER_VERSION` is 11: one raise each for every "Unreleased"
@@ -37,7 +540,6 @@
   from the result with its own rules and drops the cell's link (the cell shows its words); after
   a review change it writes the result back without the links, so going forward again does not
   bring them back. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-
 ## Unreleased: small web and output items (O-177, O-396, O-399, O-107)
 
 - Listen no longer says "Collapsed section: Contents" for the contents list, open or closed. The
