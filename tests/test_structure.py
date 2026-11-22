@@ -7,6 +7,7 @@ mark in the text links to the footnote. Pages are drawn with PyMuPDF so each sha
 from __future__ import annotations
 
 import pymupdf
+import pytest
 
 from readablestem.core.types import ConversionOptions, Kind
 from readablestem.pipeline import options as run_options
@@ -1522,7 +1523,8 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
     assert [e.text[0] for e in equations] == ["\u0393", "\u0393", "\u03a9"]  # all still maths
 
 
-def test_a_contents_title_that_wraps_is_one_entry():
+@pytest.mark.parametrize("tail", [["(Theo-", "rem 1)"], ["(Chapters", "1 and 2 again)"]])
+def test_a_contents_title_that_wraps_is_one_entry(tail):
     long_title = "2 Proof of the long result on the forces of a falling body through air and water"
 
     def fill(page):
@@ -1530,13 +1532,7 @@ def test_a_contents_title_that_wraps_is_one_entry():
         y = 120.0
         for lines, number in [
             (["1 Motion"], "3"),
-            (
-                [
-                    long_title + " (Theo-",
-                    "rem 1)",
-                ],
-                "9",
-            ),
+            ([long_title + " " + tail[0], tail[1]], "9"),
             (["3 Energy"], "15"),
             (["4 Waves"], "21"),
         ]:
@@ -1552,15 +1548,17 @@ def test_a_contents_title_that_wraps_is_one_entry():
     entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
     assert [e.text for e in entries] == [
         "1 Motion",
-        long_title + " (Theorem 1)",
+        long_title + " " + ("(Theorem 1)" if tail[0].endswith("-") else " ".join(tail)),
         "3 Energy",
         "4 Waves",
     ]
 
 
-def test_a_line_above_a_contents_list_is_not_fused_into_its_first_entry():
-    """A "Part One" line at the entries' size that runs to the right edge: the entry under it
-    starts with a section number like the others; a wrapped title's second line does not."""
+@pytest.mark.parametrize("label", ["{n} ", "Week {n}: ", "Module {n} ", ""])
+@pytest.mark.parametrize("heading", [True, False])
+def test_a_line_above_a_contents_list_is_not_fused_into_its_first_entry(label, heading):
+    """The last line of a paragraph, or a "Part One" line, at the entries' size and running to the
+    right edge: whatever the entries start with, it is not the first line of the first entry."""
 
     def justified(page, y, text):  # a line filled to the right edge
         words = text.split()
@@ -1572,24 +1570,42 @@ def test_a_line_above_a_contents_list_is_not_fused_into_its_first_entry():
             x += width + gap
 
     def fill(page):
-        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
-        justified(
-            page, 116, "Part One, the laws of thermodynamics and the quantities they are written in"
-        )
+        if heading:
+            page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+            justified(
+                page,
+                116,
+                "Part One, the laws of thermodynamics and the quantities they are written in",
+            )
+        else:
+            justified(
+                page,
+                90,
+                "This reader collects the notes for the whole term, and each unit has examples",
+            )
+            justified(
+                page,
+                104,
+                "and a problem set, and the list below says on which page each of them begins",
+            )
         for k, (title, number) in enumerate(
-            [("1 Temperature", "3"), ("2 The first law", "11"), ("3 Entropy", "19")]
+            [("Temperature", "3"), ("The first law", "11"), ("Entropy", "19")]
         ):
-            y = 130 + 14 * k
-            page.insert_text((72, y), title + " ." * 40, fontsize=BODY, fontname="helv")
+            y = (130 if heading else 118) + 14 * k
+            text = label.format(n=k + 1) + title
+            page.insert_text((72, y), text + " ." * 40, fontsize=BODY, fontname="helv")
             page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
 
     elements = analyze(page_of(fill)).elements
     assert [e.text for e in elements if "contents entry" in e.reasons] == [
-        "1 Temperature",
-        "2 The first law",
-        "3 Entropy",
+        label.format(n=k + 1) + title
+        for k, title in enumerate(["Temperature", "The first law", "Entropy"])
     ]
-    assert any(e.text.startswith("Part One") for e in elements if e.kind == Kind.PARAGRAPH)
+    assert any(
+        e.text.endswith(("written in", "each of them begins"))
+        for e in elements
+        if e.kind == Kind.PARAGRAPH
+    )
 
 
 def test_two_lines_of_prose_that_end_in_an_ellipsis_are_not_a_contents_page():

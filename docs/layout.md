@@ -2252,10 +2252,12 @@ bold). A line of prose that ends in dots but has no page number (a quotation cut
 an ellipsis) is not an entry, so two of them are no contents page. A title that wraps is one
 entry: the line right above an entry, at its size and no further right than it, stopping near
 the page numbers' edge and with no leaders or number of its own, is the first line of its
-title (`_title_head`; the hyphen at its end is repaired as in a paragraph). It is not one when
-the entry's own line starts with a section number ("1 Temperature", "A.4", "Part II") and
-most entries of the list do: a title's second line has no number, so the line above such an
-entry is a paragraph or a part line of its own (`_starts_with_label`). Items nest by
+title (`_title_head`; the hyphen at its end is repaired as in a paragraph). It is so only in
+the middle of a list, when the nearest line above it is an entry (`_entry_above`): above the
+first entry it may be the last line of a paragraph, a heading or a part line, which look the
+same, so it stays a line of its own. In a list whose entries start with a section number
+("1 Temperature", "A.4", "Part II"), a line without one above an entry that has one is a part
+line too (`_starts_with_label`). Items nest by
 indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document
