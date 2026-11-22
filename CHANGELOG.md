@@ -1,5 +1,38 @@
 # Changelog
 
+## Unreleased: what the file knows goes with the table, the figure and the page check, behind four switches (branch port/table-figure-scan-facts; SW55 c, d, f, WS6.12 part 3; O-219)
+
+Re-applied from `feat/table-figure-scan-facts` onto today's code (the layout package, the table
+step, image pages and the page audit changed since). Every change is behind a switch that is off
+in code and in the production profile; with all four off, every request is what it was. Turning
+a switch on needs a `PIPELINE_VERSION` bump (not made here). Each switch has its own prompt file,
+so no prompt is edited in place.
+
+- `TABLE_FILE_FACTS`: the reader's request carries the words the PDF prints inside the table's
+  box, each with its place in the crop and a raised digit written raised (`layout.table_words`,
+  `table_step.words_block`), under `table_facts.md`. The draft grid is not sent (wrong on about
+  half of tables). The answer's cell text is compared with those words both ways
+  (`printed_words_code`); the local-grid structure comparison stays where the grids agree in
+  shape. `table_facts.md` no longer calls a table of sentences "not a data table" and says what
+  the words are for and are not. A table whose size is known to pass the main model's output
+  limit is not sent to the main model after the cheap read. A reviewer's re-check of such a
+  table gets the words the stored element has (O-219, `web.review.table_checks`). Every table
+  request changes when it is on. The tables row of what is sent (`web/recipients.py`) now says
+  the words are sent, dated 2026-11-22.
+- `FIGURE_LABELS_ALWAYS`: the labels printed in the figure go with the figure request in every
+  mode and in all three prompts (`figure_facts.md`, `figure_long_facts.md`,
+  `figure_exam_facts.md`), not only with long descriptions on. Chart paths stay withheld.
+- `SCAN_LAYER_CHECK`: a scan's own text layer checks the page read (no extra call, never sent,
+  never text): a read that lacks 15 % or more of the layer's words gets the notice
+  `image_page_layer_differs`. It changes no request, only adds a notice, and ships off because real
+  scanners' layers are not measured (O-058).
+- `PAGE_CHECK_SIGNALS` (page check, shadow): the request carries counts code made of the page:
+  characters in the output that are not text, the page type, the file's words no element holds
+  (and how many recur on a neighboring page), the output's words the file does not print, and the
+  writing-order vote, under `page_audit_facts.md`.
+- The eval guard (`scripts/eval_guard.py`) flags the five new prompt files until their runs are
+  recorded.
+
 ## Pipeline 0.5.16, render 11 (2026-11-21)
 
 - `PIPELINE_VERSION` is 0.5.16 and `RENDER_VERSION` stays 11: one raise of the pipeline for every

@@ -2971,7 +2971,22 @@ with no fix (`IMAGE_PAGE_ORIGINAL_REASON`). A page the model cannot read (refuse
 invalid, no usable block, a spend cap) stays in `kept_pages` and is kept as its image. Each page
 has a record in `DocumentResult.image_pages` (outcome, model, calls, tokens, dollars, blocks by
 kind, markers, decisions and notes), its cost is in `DocumentStats` and its notice
-`image_page_converted` (optional) on the job page. When the box is checked the upload probe lets a
+`image_page_converted` (optional) on the job page. With `SCAN_LAYER_CHECK` on (off in code and in
+production), a scan's own text layer (an OCR program's, invisible or painted under the picture;
+not a tablet's on a handwritten page) is never sent to the model and never becomes text, but
+it checks the page read that was made anyway (`image_page.layer_missing`, `layout.page_words`,
+no extra call and no change to any request): its words of three letters or more that the read has
+no word like (within an edit or so, which a scanner's noise explains) are counted, and when they
+are 15 % or more of the layer's words (a layer of fewer than 20 words is left alone) the page
+gets the notice `image_page_layer_differs` (optional, with the count). It ships off because it
+adds a notice to the output and real scanners' layers are not measured (O-058). The threshold was
+chosen on the tracked scans with a layer (`tests/fixtures/handwriting/scan_ocr.pdf`,
+`scan_stamp_ocr.pdf`, `scan_text_under_image.pdf`, page 4 of `mixed_course.pdf`; 58 to 68 words
+each): layer words edited once in 5 to 40 % of them left at most 0.12 without a partner in the
+read; a read cut short by a tenth gave 0.12 to 0.15, by a fifth 0.24 to 0.26, by half 0.50. Words
+the read has and the layer lacks are not counted: a layer may lack text and the read adds none to
+it (0.19 to 0.20 for a read 30 % longer than the layer, against 0.15 for the noisiest layer: too
+close to separate). When the box is checked the upload probe lets a
 PDF of scans through and counts its scanned and handwritten pages (`pdf_probe MAX_PAGES
 image_pages`, `page_type.image_page_count`), and `worker.result_outcome` does not fail the result for
 being only scans; the job's spend allowance is wider ([web.md](web.md), "Scanned and handwritten
