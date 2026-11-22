@@ -987,11 +987,15 @@ def _starts_with_label(row: _Row) -> bool:
 
 
 def _entry_above(row: _Row, rows: Sequence[_Row], listed: set[int]) -> bool:
-    """Is the nearest line above `row`, in its column, an entry of the list (`listed`)?"""
+    """Is the nearest line right above `row` (over some of its width, so the text of another
+    column beside a list is no neighbor) an entry of the list (`listed`)?"""
     above = [
         r
         for r in rows
-        if not r.vertical and r.column == row.column and r.baseline < row.baseline - 0.35 * row.size
+        if not r.vertical
+        and r.x0 < row.x1
+        and r.x1 > row.x0
+        and r.baseline < row.baseline - 0.35 * row.size
     ]
     if not above:
         return False

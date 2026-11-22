@@ -1532,10 +1532,7 @@ def test_a_contents_title_that_wraps_is_one_entry(tail):
         y = 120.0
         for lines, number in [
             (["1 Motion"], "3"),
-            (
-                [long_title + " " + tail[0], tail[1]],
-                "9",
-            ),
+            ([long_title + " " + tail[0], tail[1]], "9"),
             (["3 Energy"], "15"),
             (["4 Waves"], "21"),
         ]:
