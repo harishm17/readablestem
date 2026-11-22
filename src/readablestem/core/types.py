@@ -980,6 +980,9 @@ NOTICE_CODES = frozenset(
         "block_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
         "image_page_converted",
+        # ... whose own OCR text layer has words the read lacks (`image_page.layer_missing`,
+        # `SCAN_LAYER_CHECK`).
+        "image_page_layer_differs",
         # A second reader of handwritten equations (pipeline.image_page_reconcile) that gave
         # no reading for some equations: `count` of them, one notice for the document.
         "second_reader_unavailable",

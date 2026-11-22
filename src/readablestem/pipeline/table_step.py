@@ -24,6 +24,21 @@ checked against, as the equation step keeps an equation's text layer from the mo
 model that copied them could pass the checks with a flattened exponent (10⁵ is "105" in
 most text layers).
 
+With `TABLE_FILE_FACTS` (`Settings.table_file_facts`, off) the request is another one: it also
+carries the words the PDF prints inside the table's box with their places (`words`, from
+`layout.table_words`: left, top, right and bottom edge in pixels of the crop, a raised digit
+written raised), fenced with the rest, under the prompt `table_facts` (`FACTS_PROMPT_NAME`).
+The words are what the file states, so they are for which characters, digits and exponents a
+cell holds. They are not the grid: the grid layout drew from them (`Element.table`, the local
+grid) is wrong on about half of the tables, and a reader that is shown a draft may copy it, so
+it is still not sent. The cell text of the answer is checked against the words by a plain
+comparison of words and numbers both ways (`printed_words_code`). Without words (a page with
+no text layer), the request is the crop and its context and the check is against the local
+grid. A table whose answer is known to pass the output limit (`too_long`) is not asked of the
+main model: a cheap answer that is a usable data table stands and its checks decide;
+otherwise the table is as one that could not be read (status rule 3: the local grid for a
+person).
+
 A row a page break split (`tables.join_split_row`) is read the way layout joined it:
 each crop shows one page, so on the table whose last row goes on (`REASON_ROW_SPLIT`) a
 last-row cell the model read as the start of the PDF's cell gets the PDF's whole text,
@@ -112,7 +127,7 @@ from __future__ import annotations
 import re
 import unicodedata
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
@@ -120,6 +135,7 @@ import defusedxml.ElementTree as DET
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from readablestem.config import Settings
+from readablestem.core.images import png_size
 from readablestem.core.types import (
     MAX_TABLE_CELLS,
     MAX_TABLE_COLS,
@@ -156,7 +172,12 @@ from readablestem.pipeline.equation_step import (
     text_layer_symbols_differ,
 )
 from readablestem.pipeline.signs import compare_signs
-from readablestem.pipeline.tables import REASON_EDGE_TEXT, REASON_ROW_CONTINUED, REASON_ROW_SPLIT
+from readablestem.pipeline.tables import (
+    REASON_EDGE_TEXT,
+    REASON_ROW_CONTINUED,
+    REASON_ROW_SPLIT,
+    PrintedWord,
+)
 from readablestem.pipeline.validate import (
     LatexConversionError,
     check_latex,
@@ -168,6 +189,10 @@ from readablestem.pipeline.validate import (
 PROMPT_NAME = "table"
 # "<name>-<sha8 of the prompt text>": changes whenever the prompt file changes.
 PROMPT_VERSION = load_prompt(PROMPT_NAME).version
+# The prompt of a request that carries the printed words (`TABLE_FILE_FACTS`): `table` with
+# the words described and a table of sentences no longer called a non-table.
+FACTS_PROMPT_NAME = "table_facts"
+FACTS_PROMPT_VERSION = load_prompt(FACTS_PROMPT_NAME).version
 
 # Output tokens: about 30 per cell plus reasoning (measured on 59 table crops: at most
 # 4,294 for 126 cells on gpt-6-luna). Sized from the local grid, so a small table does
@@ -247,11 +272,22 @@ def _call_once(
     return parsed, [call]
 
 
+def _wanted_tokens(element: Element) -> int:
+    """What the answer for this table is expected to need, from the size of the local grid."""
+    slots = element.table.rows * element.table.cols if element.table is not None else 0
+    return BASE_OUTPUT_TOKENS + OUTPUT_TOKENS_PER_SLOT * slots
+
+
 def output_tokens(element: Element) -> int:
     """The output budget of one request, from the size of the local grid (if any)."""
-    slots = element.table.rows * element.table.cols if element.table is not None else 0
-    wanted = BASE_OUTPUT_TOKENS + OUTPUT_TOKENS_PER_SLOT * slots
-    return max(MIN_OUTPUT_TOKENS, min(MAX_OUTPUT_TOKENS, wanted))
+    return max(MIN_OUTPUT_TOKENS, min(MAX_OUTPUT_TOKENS, _wanted_tokens(element)))
+
+
+def too_long(element: Element) -> bool:
+    """Is the answer for this table known to pass the output limit? The main model reasons
+    before it answers, and a table this size ran into the limit and returned nothing (2 of
+    33 main reads): with `TABLE_FILE_FACTS` it is not sent to the main model."""
+    return _wanted_tokens(element) > MAX_OUTPUT_TOKENS
 
 
 def caption_of(element: Element) -> str | None:
@@ -262,16 +298,57 @@ def caption_of(element: Element) -> str | None:
     return None
 
 
-def table_context(element: Element, context_text: str | None) -> str | None:
-    """Caption plus nearby text, for `VisionRequest.context_text` (fenced by the client).
-    Never the table's own words (see the module docstring)."""
+# `models.base.defang_context` keeps this many characters of a request's context; the fence
+# is told the same limit so the words are not cut by its smaller default.
+CONTEXT_CHARS = 8000
+# The share of it the words may use, after the caption and the nearby text.
+_WORDS_SHARE = 0.75
+# Our tag's name, in any case and spelling, is taken out of every untrusted text we put near it.
+_WORDS_TAG = re.compile(r"table[\s_\-]*words", re.IGNORECASE)
+
+
+def words_block(words: Sequence[PrintedWord], size: tuple[int, int], room: int) -> str:
+    """The words printed in the table's box as data for the request: one line a word, its
+    left, top, right and bottom edge in pixels of the image (as the model is sent it), then
+    the word, a raised digit written as a superscript character. As many as fit in `room`
+    characters; the block says how many it leaves out."""
+    lines: list[str] = []
+    used = 0
+    listed = 0
+    for word in words:
+        line = f"{round(word.x0)} {round(word.y0)} {round(word.x1)} {round(word.y1)} "
+        line += _WORDS_TAG.sub("", word.text)
+        if used + len(line) + 1 > room:
+            break
+        lines.append(line)
+        used += len(line) + 1
+        listed += 1
+    if listed < len(words):
+        lines.append(f"({len(words) - listed} more words are not listed)")
+    width, height = size
+    body = "\n".join(lines)
+    return f'<table_words image_width="{width}" image_height="{height}">\n{body}\n</table_words>'
+
+
+def table_context(
+    element: Element,
+    context_text: str | None,
+    words: Sequence[PrintedWord] | None = None,
+    size: tuple[int, int] | None = None,
+) -> str | None:
+    """Caption plus nearby text, for `VisionRequest.context_text` (fenced by the client);
+    with `words` (`TABLE_FILE_FACTS`), then the words printed in the table's box. Never the
+    grid layout read from those words (see the module docstring)."""
     caption = caption_of(element)
     nearby = (context_text or "").strip()
     parts = []
     if caption:
-        parts.append(f"Caption: {caption}")
+        parts.append(f"Caption: {_WORDS_TAG.sub('', caption) if words else caption}")
     if nearby:
-        parts.append(f"Nearby text: {nearby}")
+        parts.append(f"Nearby text: {_WORDS_TAG.sub('', nearby) if words else nearby}")
+    if words and size:
+        room = int(_WORDS_SHARE * CONTEXT_CHARS) - sum(len(p) for p in parts)
+        parts.append(words_block(words, size, max(room, 0)))
     return "\n\n".join(parts) or None
 
 
@@ -746,16 +823,93 @@ def text_differences(grid: TableGrid, element: Element) -> list[CellDifference]:
     return out
 
 
-def cell_text_code(grid: TableGrid, element: Element) -> str | None:
+def _made_of(word: str, pool: Counter[str], pieces: int = 4) -> list[str] | None:
+    """`word` as the run of at most `pieces` words of `pool` that it is made of, or None."""
+    if not word:
+        return []
+    if pieces == 0:
+        return None
+    for piece in [p for p in pool if pool[p] > 0 and word.startswith(p)]:
+        pool[piece] -= 1
+        rest = _made_of(word[len(piece) :], pool, pieces - 1)
+        pool[piece] += 1
+        if rest is not None:
+            return [piece, *rest]
+    return None
+
+
+def _spacing_only(added: Counter[str], lacking: Counter[str]) -> bool:
+    """Do the words the answer adds and the words it lacks differ only in where the spaces
+    are: "12345" for "12" and "345", "prelab" for "pre-" at the end of a line and "lab", or
+    the other way round? Each piece is used once."""
+    added, lacking = +added, +lacking
+    for word in sorted(added.elements(), key=len, reverse=True):
+        if (parts := _made_of(word, lacking)) is not None:
+            lacking.subtract(parts)
+            added[word] -= 1
+    for word in sorted((+lacking).elements(), key=len, reverse=True):
+        if (parts := _made_of(word, added)) is not None:
+            added.subtract(parts)
+            lacking[word] -= 1
+    return not +added and not +lacking
+
+
+def printed_words_code(grid: TableGrid, printed: Sequence[PrintedWord]) -> str | None:
+    """The plain comparison: the words and numbers of the model's non-maths cells, as a
+    multiset, against the words the PDF prints in the table's box, both ways (a word the
+    answer lacks, one it adds or changes). Where the answer has maths cells, the PDF words
+    no text cell accounts for must be those cells' letters and digits. When only the spacing
+    differs ("12 345" for "12345", a word broken at the end of a line), `whitespace_differs`."""
+    pdf = Counter(w for p in printed for w in words(p.text))
+    maths = [c for c in grid.cells if c.latex]
+    model = Counter(w for c in grid.cells if not c.latex for w in words(c.text))
+    added, lacking = model - pdf, pdf - model
+    if not added and not lacking:
+        return None
+    if not added and maths and _symbol_bag(" ".join(lacking.elements())) == _maths_symbols(maths):
+        return None
+    if not maths and _spacing_only(added, lacking):
+        return "whitespace_differs"
+    return "text_mismatch"
+
+
+def facts_were_sent(calls: Sequence[ModelCall]) -> bool:
+    """Whether a table was rebuilt with its printed words (`TABLE_FILE_FACTS`): a call of the
+    `table_facts` prompt."""
+    return any(call.prompt_version == FACTS_PROMPT_VERSION for call in calls)
+
+
+def stored_words(element: Element) -> tuple[PrintedWord, ...]:
+    """The words the PDF printed in a table's box as the stored element has them, for a
+    check made after the run (a reviewer's edit), when the PDF is no longer there to read:
+    the words of the grid read from the PDF, else of the element's text. The places are not
+    kept (the checks compare words only), so every box is empty."""
+    local = _local(element)
+    texts = [c.text for c in local.cells] if local is not None else [element.text or ""]
+    return tuple(PrintedWord(w, 0.0, 0.0, 0.0, 0.0) for text in texts for w in text.split())
+
+
+def cell_text_code(
+    grid: TableGrid, element: Element, printed: Sequence[PrintedWord] | None = None
+) -> str | None:
     """The cell-text bijection (see the module docstring). None when it holds.
 
-    PDF words: the local grid's cells, else the element's text (no rows then). With a
-    local grid of the same size the comparison is row by row; otherwise the whole table
-    at once, where the PDF words no text cell accounts for must be the maths cells'
-    letters and digits (a maths cell's text layer is flattened: 10^5 reads "105")."""
+    PDF words: the words printed in the table's box when they are known (`printed`: what the
+    model was given), else the local grid's cells, else the element's text (no rows then).
+    With the printed words the whole table is compared at once; where the answer has the local
+    grid's size, each cell is then also compared with the local cell in its place (the
+    structure check against the local grid stays until a positional one replaces it). With a
+    local grid of the same size and no printed words the comparison is row by row; otherwise
+    the whole table at once, where the PDF words no text cell accounts for must be the maths
+    cells' letters and digits (a maths cell's text layer is flattened: 10^5 reads "105")."""
     local = _local(element)
     if local is not None and not any(words(c.text) for c in local.cells):
         local = None
+    if printed:
+        code = printed_words_code(grid, printed)
+        if code == "text_mismatch" or local is None or not _aligned(grid, local):
+            return code
+        return _rows_code(grid, local) or code
     if local is None and not words(element.text):
         return "no_pdf_text"
     if local is not None and _aligned(grid, local):
@@ -951,8 +1105,11 @@ def _math_not_compared(cause: str | None) -> Check:
     return Check(name=MATH_NOT_COMPARED, passed=True, severity="warning", code=cause)
 
 
-def table_checks(grid: TableGrid, element: Element) -> list[Check]:
-    """Every check of a data table proposal against the PDF (see the module docstring)."""
+def table_checks(
+    grid: TableGrid, element: Element, printed: Sequence[PrintedWord] | None = None
+) -> list[Check]:
+    """Every check of a data table proposal against the PDF (see the module docstring).
+    `printed`: the words the reader was given, when it was given any."""
     checks = structure_checks(grid) + flattened_check(grid)
     local = _local(element)
     if local is not None:
@@ -965,7 +1122,7 @@ def table_checks(grid: TableGrid, element: Element) -> list[Check]:
                 code=agreement,
             )
         )
-    text_code = cell_text_code(grid, element)
+    text_code = cell_text_code(grid, element, printed)
     checks.append(
         Check(name="table.cell_text", passed=text_code is None, severity="warning", code=text_code)
     )
@@ -1121,6 +1278,7 @@ def _evaluate(
     element: Element,
     *,
     reconcile: bool = False,
+    printed: Sequence[PrintedWord] | None = None,
 ) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
@@ -1131,7 +1289,7 @@ def _evaluate(
             placed = (restyle_cells(placed[0], element), placed[1])
     candidate = _Candidate(output, calls, placed[0] if placed is not None else None)
     if candidate.grid is not None and output.is_data_table:
-        candidate.checks = table_checks(candidate.grid, element)
+        candidate.checks = table_checks(candidate.grid, element, printed)
         if placed is not None and placed[1]:
             candidate.checks.append(
                 Check(
@@ -1232,10 +1390,13 @@ def rebuild(
     client: VisionClient,
     settings: Settings,
     context_text: str | None = None,
+    words: Sequence[PrintedWord] | None = None,
 ) -> Fix:
     """Rebuild one table from its crop. Never raises for model or validation problems
     (they become NEEDS_REVIEW, ABSTAINED or FAILED fixes); raises BudgetExceeded when
-    spend is refused."""
+    spend is refused. `words`: what the PDF prints in the table's box, in pixels of `png`
+    (`layout.table_words`); only with `TABLE_FILE_FACTS` on do the request carry them and the
+    cell text get checked against them."""
     if not options.current().tables:
         return Fix(
             element_id=element.id,
@@ -1243,8 +1404,14 @@ def rebuild(
             status=Status.FAILED,
             reason="table_not_rebuilt",
         )
-    prompt = load_prompt(PROMPT_NAME)
-    context = table_context(element, context_text)
+    facts = settings.table_file_facts
+    prompt = load_prompt(FACTS_PROMPT_NAME if facts else PROMPT_NAME)
+    words = (words or None) if facts else None
+    context = (
+        table_context(element, context_text, words, png_size(png) if words else None)
+        if facts
+        else table_context(element, context_text)
+    )
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
@@ -1256,17 +1423,25 @@ def rebuild(
             context_text=context,
             max_output_tokens=output_tokens(element),
             image_detail="high",
+            context_limit=CONTEXT_CHARS if words else None,
         )
         if escalation:
             output, calls = _call_once(client, request, TableOutput)
         else:
             output, calls = _call(client, request, TableOutput, settings)
-        return _evaluate(output, calls, element, reconcile=settings.equation_glyph_reconcile)
+        return _evaluate(
+            output, calls, element, reconcile=settings.equation_glyph_reconcile, printed=words
+        )
 
     candidate = attempt(settings.cheap_model)
     calls = list(candidate.calls)
     if _needs_escalation(candidate, settings):
-        escalated = attempt(settings.main_model, escalation=True)
-        calls += escalated.calls
-        candidate = _prefer(escalated, candidate)
+        if not (facts and too_long(element)):
+            escalated = attempt(settings.main_model, escalation=True)
+            calls += escalated.calls
+            candidate = _prefer(escalated, candidate)
+        elif not (candidate.usable and candidate.data):
+            # Not asked of the main model (the answer would not fit its output limit), so a
+            # cheap answer that is no data table is no answer: the table could not be read.
+            candidate = _Candidate(None, candidate.calls)
     return _fix(element, candidate, calls)

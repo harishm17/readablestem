@@ -11,10 +11,11 @@ import statistics
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from itertools import pairwise
-from typing import Any
+from typing import Any, cast
 
 import pymupdf
 
+from readablestem.core.images import png_size
 from readablestem.core.mathchars import base_char
 from readablestem.core.types import BBox, Element, GlyphContext
 from readablestem.pipeline import (
@@ -24,14 +25,17 @@ from readablestem.pipeline import (
     glyph_reconcile,
     glyph_strokes,
     page_type,
+    tables,
 )
 from readablestem.pipeline.layout.access import (
     _CACHE,
     _LOCK,
+    CROP_PAD,
     TEXT_FLAGS,
     _ensure_probed,
     _line_clip,
     _quiet_mupdf,
+    _zoom,
 )
 from readablestem.pipeline.layout.glyphs import (
     _BRACKETS,
@@ -141,6 +145,84 @@ def line_glyphs(
             )
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
+
+
+@dataclass(frozen=True, slots=True)
+class _Placed:
+    """One glyph of a table's box in the frame of its crop (`table_words`): what
+    `tables.printed_words` reads, in pixels, with the table turned upright."""
+
+    c: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+    size: float
+    blank: bool
+    baseline: float  # the ink bottom stands for it in turned text
+
+
+def table_words(pdf_bytes: bytes, element: Element, png: bytes) -> list[tables.PrintedWord]:
+    """The words the PDF prints inside a table's box, with their boxes in pixels of `png`,
+    the crop `crop` made of that element (so a table set sideways is upright here, as the
+    model sees it), and each raised digit marked as raised (`tables.printed_words`).
+
+    What the file states about the region, for the table step to hand the reader and to
+    check its answer against. Not the grid: nothing here knows which cell a word is in."""
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= element.page < doc.page_count:
+                raise ValueError(f"element page {element.page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [element.page])
+            page = _CACHE.page(key, element.page)
+            x0, y0, x1, y1 = element.bbox
+            clip = pymupdf.Rect(x0 - CROP_PAD, y0 - CROP_PAD, x1 + CROP_PAD, y1 + CROP_PAD)
+            clip &= page.rect
+            if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
+                raise ValueError("element region is empty or outside the page")
+            turn = element.table.turned if element.table is not None else 0
+            rows = _page_rows(page)
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+    move = _zoom(1.0, turn)
+    frame = clip * move
+    scale = png_size(png)[0] / frame.width
+
+    def place(box: Sequence[float]) -> BBox:
+        (ax, ay), (bx, by) = (
+            pymupdf.Point(box[0], box[1]) * move,
+            pymupdf.Point(box[2], box[3]) * move,
+        )
+        return (
+            (min(ax, bx) - frame.x0) * scale,
+            (min(ay, by) - frame.y0) * scale,
+            (max(ax, bx) - frame.x0) * scale,
+            (max(ay, by) - frame.y0) * scale,
+        )
+
+    pieces: list[list[_Placed]] = []
+    for row in rows:
+        placed = []
+        for c in row.chars:
+            if not (x0 - 0.5 <= (c.x0 + c.x1) / 2 <= x1 + 0.5):
+                continue
+            if not (y0 - 0.5 <= (c.y0 + c.y1) / 2 <= y1 + 0.5):
+                continue
+            box = place((c.x0, c.y0, c.x1, c.y1))
+            baseline = box[3] if turn else (c.baseline - frame.y0) * scale
+            placed.append(_Placed(c.c, *box, c.size * scale, c.blank, baseline))
+        ink = [c for c in placed if not c.blank]
+        # Only text that reads along the crop: a line of rotated labels does not.
+        if ink and abs(ink[-1].x0 - ink[0].x0) >= abs(ink[-1].y0 - ink[0].y0):
+            pieces.append(placed)
+    words = tables.printed_words(cast("list[list[Any]]", pieces))
+    return [
+        tables.PrintedWord(w.text, round(w.x0), round(w.y0), round(w.x1), round(w.y1))
+        for w in words
+        if w.text.strip()
+    ]
 
 
 def _raw_blocks(page: pymupdf.Page) -> list[dict]:
