@@ -171,10 +171,11 @@
   "1" from a fraction, as their title.
   A line that is a formula or a bare number and nothing else is no title now, and no title slide
   (`slides._is_formula`: no word of three letters besides function names, and a math sign, an
-  italic math letter or no letter; a name in capitals with a plus, "C++" or "Q+A", is text and
-  stays a title). The deck's titles are the real ones, and a title that
+  italic math letter or no letter; a name that ends in a plus or two, "C++", "g++" or "A+", and
+  "Q+A", are not math signs, in a line of any other words too: "C++ 17", "C/C++" and "C++ vs. C#"
+  stay titles, and "A+B", "N+1" and "x + y = 2" are still formulas). The deck's titles are the real ones, and a title that
   layout read as a paragraph is no longer dropped as a headline above a "title" that was an
-  equation. The written output of that deck is the same (its titles were headings already).
+  equation. The written output of that deck is the same (its titles were headings already). Whether a file is a deck is counted as before: a page whose title is a formula is titled like a slide all the same (a deck of eight slides, three titled "A+B", "N+1" and "X+Y", is a deck, and those three have no title).
 - A deck with some scanned slides was not a deck: a page kept whole as its image has no text, so
   it counted as untitled, and 5 titled pages of 12 were not the 70 % a deck needs. Pages
   kept whole are left out of the share, so the mixed deck is one deck, with its title at level 1;
