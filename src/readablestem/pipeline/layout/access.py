@@ -224,6 +224,21 @@ def render_page(pdf_bytes: bytes, page: int, *, dpi: int = 150, max_side_px: int
             pymupdf.TOOLS.reset_mupdf_warnings()
 
 
+def page_words(pdf_bytes: bytes, page: int) -> list[str]:
+    """The words of the page's own text layer, visible or not (a scan's OCR layer is
+    invisible or painted under the picture), in the file's order. Same document cache and
+    lock as `render_page`; [] for a page the file does not have."""
+    with _LOCK:
+        _quiet_mupdf()
+        try:
+            _, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= page < doc.page_count:
+                return []
+            return [str(word[4]) for word in doc[page].get_text("words")]
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
+
+
 def page_ink(pdf_bytes: bytes, page: int, *, budget: Any = None) -> tuple[Any, BBox]:
     """The pen strokes of a page (`ink_strokes.PageInk`) and the page's box in points, read
     within the ink `budget` (`page_type.InkBudget`). Same document cache and lock as

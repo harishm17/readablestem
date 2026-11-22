@@ -50,3 +50,9 @@ def open_within_budget(data: bytes) -> Image:
         image.close()
         raise ImageTooLarge("image over the pixel budget")
     return image
+
+
+def png_size(data: bytes) -> tuple[int, int]:
+    """Width and height in pixels of an image, from its header (no pixel is decoded)."""
+    with open_within_budget(data) as image:
+        return image.size

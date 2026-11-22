@@ -186,6 +186,14 @@ same single call per attempt (`max_output_tokens` 4,096), and the context also g
 (`Element.text`, at most 600 characters, fenced like the rest). Routing, escalation and
 the status rules above are unchanged; the answer adds (`pipeline/figure_details.py`):
 
+With `FIGURE_LABELS_ALWAYS` on (off in code and in production; turning it on needs a
+`PIPELINE_VERSION` bump), the labels go with the figure request in every mode (off, on, an
+exam), and the step sends `figure_facts.md`, `figure_long_facts.md` or `figure_exam_facts.md`
+instead of `figure.md`, `figure_long.md` or `figure_exam.md`: the same text, with a part that
+says what the labels are for (spelling and reading a printed label or number exactly) and what
+they are not (a description, or an order of the labels; in an exam, no reason to state a
+result). Chart paths stay withheld. Off, every request is what it was.
+
 | Field on `FigureFix` | Stored when | Check and tier |
 |---|---|---|
 | `long_description` | the answer is usable after cleaning (one paragraph per line, invisible characters removed): 40-2,000 characters, at most 12 lines, no URL, markup, file name or placeholder (the alt-text rules of those codes). Anything else is dropped, never shown | `figure.long_description` passes; `long_description_unsure` (warning, a note in `NOTE_CODES`) when the model said part of the figure was hard to read: review "optional". A chart or diagram left without one gets the notice `long_description_missing` (optional; `figure_step.long_description_missing(fix)` says when) |
@@ -1108,12 +1116,35 @@ full description is in [tables.md](tables.md). In short:
   `JobBudget` reservations; `BudgetExceeded` propagates.
 - The answer is rows of cells (text, LaTeX for math cells, header flags, spans), placed
   as HTML places them. The PDF's own words for the table are not sent to the model: they
-  are the input of the checks, as an equation's text layer is.
+  are the input of the checks, as an equation's text layer is. With `TABLE_FILE_FACTS` on
+  (off in code and in production; turning it on needs a `PIPELINE_VERSION` bump) they are
+  sent, see "With `TABLE_FILE_FACTS`" below.
 - Checks: the grid and its headers (`grid_problems`, no header at all); agreement with
   the local grid from detection (rows x columns, merged cells); the cell-text bijection
   (the words, numbers and meaningful symbols of the text cells equal the PDF's words,
   row by row when the grids agree); math cells through the LaTeX and MathML validators
   and this page's symbol, sign and style rules against the PDF glyphs in their place.
+- With `TABLE_FILE_FACTS` on, the request carries the words the PDF prints inside the table's
+  box, each with its place in the crop (left, top, right, bottom in crop pixels, a raised
+  digit written raised, `10⁵`), fenced as `<table_words>` in the context (`layout.table_words`,
+  `table_step.words_block`, at most 8,000 characters; a longer list ends with "(N more words
+  are not listed)"), and the prompt is `table_facts.md`. They say which letter, digit, sign and
+  exponent a cell holds, not where the cells are: the draft grid from detection is not sent,
+  because it is wrong on about half of tables and a reading checked against a grid it was
+  shown is not checked. A page the file draws as vector strokes has no words and the request
+  is the crop and the caption. The cell text is compared with the printed words both ways by
+  words and numbers (`printed_words_code`: every word of the answer's text cells is printed in
+  the box, and every printed word is in a cell; a line-break hyphen or a split or glued word is
+  spacing only); when the answer's grid agrees with the local grid, its structure is still
+  compared (rows x columns, merged cells, row by row). A reviewer's re-check of such a table
+  (`web.review.table_checks`, O-219) gets the words the stored element has
+  (`table_step.stored_words`: the cells of the grid read from the PDF, else its text; the
+  places are not kept, the checks compare words only) and the same rule; a table rebuilt
+  without them keeps the checks it had. A table whose size is known to pass the main model's
+  output limit (`too_long`: its slots times `OUTPUT_TOKENS_PER_SLOT` over
+  `MAX_OUTPUT_TOKENS`) is never sent to the main model: a second reading would be cut off. The
+  cheap answer stands when it is usable and its checks decide; otherwise it is the case of no
+  usable answer below. Off, the request, the prompt and the checks are what they were.
 - Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic math style ->
   ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
   not a data table -> the grid read from the PDF written as its text in reading order,
@@ -1166,7 +1197,21 @@ data):
    `<id> (<kind>): <text>` with the id as stored in the result (`p3-e7`), and where it
    applies a `<joined_from_previous_page>` note;
 3. with `--rendered`, a picture of the page's output as a browser draws it, 800 pixels
-   wide (`eval.render.ChromiumRenderer.part_png`).
+   wide (`eval.render.ChromiumRenderer.part_png`);
+4. with `PAGE_CHECK_SIGNALS` on (off in code and in production; turning it on changes every
+   page-check request), after the listing, a `<page_signals>` block of numbers code counted on
+   the page (`page_audit.page_signals`, `Listing.signals`), one `name: number` a line, none of
+   them text of the document: characters in the output that are not text (U+FFFD, private-use
+   codes, controls); the page type's kind, trust and hidden characters left out; the file's
+   words of three letters or more that no element holds, and how many of those the file also
+   prints on a neighboring page (running heads, stamps: left out on purpose); the output's
+   prose words the file prints neither on the page nor on a neighbor; and the writing-order
+   vote, how many neighboring pairs of paragraphs and list items are read in the order the
+   file writes them. The prompt is then `page_audit_facts.md`, which says the numbers tell where
+   to look and are never a finding. Only this vote exists as an order voter in this release
+   (tag order and a second extractor's words are not built); there are no furniture lines
+   counted by layout, so the furniture count is the left-out words that recur on a
+   neighboring page.
 
 **The listing's rules.** Each was measured as a cause of false flags before it was a rule:
 

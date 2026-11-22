@@ -585,6 +585,9 @@ NOTICE_MESSAGES: dict[str, str] = {
     "image_page_converted": "A scanned or handwritten page was converted from an image of "
     "it: nothing in the PDF can confirm the reading, so compare it with the original, which "
     "is kept with the page.",
+    "image_page_layer_differs": "The text that a scanning program stored on a scanned page has "
+    "words that the reading of the page lacks, so some of the page's text may be missing: "
+    "compare the page with the original, which is kept with it.",
     "second_reader_unavailable": "A second reader could not read some handwritten equations, "
     "so they have only the first reading, and each one is still a decision for you.",
     "second_reader_budget": "The second reader's share of this document's budget ran out before "

@@ -190,7 +190,9 @@ def report(
         "client": client_label,
         "model": settings.page_audit_model,
         "effort": settings.anthropic_effort_page_audit or page_audit.DEFAULT_EFFORT,
-        "prompt_version": load_prompt(page_audit.PROMPT_NAME).version,
+        "prompt_version": load_prompt(
+            page_audit.FACTS_PROMPT_NAME if settings.page_check_signals else page_audit.PROMPT_NAME
+        ).version,
         "with_output_picture": with_output_picture,
         "per_page_ceiling_usd": settings.page_audit_max_usd_per_page,
         "shadow": True,  # nothing reads these verdicts: no output or decision changes

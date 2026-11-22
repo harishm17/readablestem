@@ -389,6 +389,7 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "MAX_OUTPUT_TOKENS",
         "NOTE_CODES",
         "NUMERIC_SHARE",
+        "CONTEXT_CHARS",
     ),
     "readablestem.pipeline.heading_step": (
         "ACCEPT_AT",
@@ -434,6 +435,10 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "AGREED_CONFIDENCE",
         "CONFIDENCE_VALUE",
         "RECOVERY_MARGIN",
+        "LAYER_MIN_WORDS",
+        "LAYER_MAX_MISSING",
+        "LAYER_SAME_WORD",
+        "LAYER_FUZZY_MAX",
     ),
     "readablestem.pipeline.image_page_check": (
         "CROPS_PER_REQUEST",

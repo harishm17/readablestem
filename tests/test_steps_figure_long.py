@@ -108,6 +108,21 @@ def test_on_sends_the_long_prompt_with_the_labels_fenced(long_on):
     assert LABELS not in request.instructions  # document text only travels as data
 
 
+def test_figure_labels_always_sends_the_labels_with_the_short_prompt_too():
+    on = make_settings(figure_labels_always=True)
+    client = FakeVisionClient(defaults={"figure": short()})
+    describe(element(), PNG, client=client, settings=on, context_text="Near.")
+    (request,) = client.requests
+    assert request.prompt_version.startswith("figure_facts-")
+    assert request.instructions == load_prompt("figure_facts").text
+    assert request.context_text is not None
+    assert request.context_text.endswith(f"Labels in the figure: {LABELS}")
+    # Off, a short description gets today's prompt and no labels.
+    _, plain = run(short())
+    assert plain.requests[0].prompt_version == PROMPT_VERSION
+    assert "Labels in the figure" not in (plain.requests[0].context_text or "")
+
+
 def test_a_long_description_is_stored_cleaned_and_needs_nothing(long_on):
     messy = f"  Line graph of the position of a car{ZWSP} against time.  \n\n" + LONG
     fix, _ = run(long(long_description=messy, data_table=None))

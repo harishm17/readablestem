@@ -165,6 +165,26 @@ class Settings(BaseSettings):
     # the recorded model answers of the pages it moves stop matching, and turning it on
     # comes with a re-recording and a `PIPELINE_VERSION` bump.
     region_tree: Literal["off", "on"] = "off"
+    # What the file knows goes with a request (SW55 parts c, d and f, WS6.12 part 3; docs/steps.md,
+    # docs/tables.md). Each is its own switch because the paid run measures each arm alone. Off:
+    # every request and every output is byte for byte what it was before. On, a switch that
+    # changes a request also changes its prompt (`models/prompts/*_facts.md`, beside today's),
+    # so the recorded answers of the requests it changes stop matching, and `PIPELINE_VERSION`
+    # must be bumped in the change that turns it on.
+    # (c) The table reader is given the words the PDF prints inside the table's box with their
+    # places, its cell text is compared with them both ways, the prompt no longer calls a table of
+    # sentences a non-table, and a table whose answer would pass the output limit is not asked of
+    # the main model.
+    table_file_facts: bool = False
+    # (d) A scan's own text layer checks the page read (never sent, never text): a read lacking
+    # 15 % of the layer's words gets the notice `image_page_layer_differs`. No request changes;
+    # a page's notices do.
+    scan_layer_check: bool = False
+    # (f) The page check is given the counts code makes of the page (`<page_signals>`).
+    page_check_signals: bool = False
+    # WS6.12 part 3: the labels printed inside a figure go with every figure request, not only
+    # with long descriptions, and all three figure prompts say what they are for.
+    figure_labels_always: bool = False
     # The table search without its time limit (pipeline.tables.DetectorBudget), for evals and
     # replays only (eval.measure.replay_settings): a score must not depend on how busy the
     # machine was. A job keeps the limit; a page it stops is listed in the job's facts.

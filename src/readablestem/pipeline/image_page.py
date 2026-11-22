@@ -46,6 +46,13 @@ What becomes of each block (`build`; the tiers are the table in the ADR):
   the pen strokes, not the picture, with the boxes; the pictures of lines are drawn from the
   strokes; and the reading of each display equation is checked against them (case, scripts).
 
+- A scan's own text layer (an OCR program's, invisible or under the picture) is never sent to
+  the model and never becomes text, but with `SCAN_LAYER_CHECK` on it checks the read already
+  made (`layer_missing`): the words of the layer that the read has no word like (a word within
+  an edit or so of it counts as the same, as a scanner's noise explains) are counted, and a
+  page where they are 15 % or more of the layer's words gets the notice
+  `image_page_layer_differs` ("Worth checking").
+
 The page also gets one figure element for the whole page (`ORIGINAL_REASON`): the output
 writes it as the "show the original page" toggle after the page's notice.
 
@@ -58,6 +65,7 @@ answer leaves the page in `kept_pages` and it is kept as its image, as before.
 
 from __future__ import annotations
 
+import difflib
 import logging
 import re
 import unicodedata
@@ -673,6 +681,8 @@ class Built:
     elements: list[Element]
     fixes: dict[str, Fix]
     record: ImagePageRecord
+    # Words of the page's own text layer that the read has no word like (`layer_missing`).
+    layer_missing: int = 0
 
 
 @dataclass
@@ -1461,6 +1471,70 @@ def no_crop(element: Element, fixes: Mapping[str, Fix]) -> bool:
     return NO_CROP_REASON in element.reasons and element.id in fixes
 
 
+# The check of the read against a scan's own text layer. Measured on the tracked scans with an
+# OCR layer (tests/fixtures/handwriting/scan_*.pdf, mixed_course.pdf page 4) with the layer's
+# words edited once in 5-40 % of them and the read cut short by 5-50 %: that noise left at
+# most 0.12 of the layer's words without a partner in the read, a read lacking a tenth of the
+# page gave 0.12-0.15 and one lacking a fifth gave 0.24 or more. A layer of fewer words than
+# LAYER_MIN_WORDS is left alone: a few words say nothing about the page. Real scanners' layers
+# are not measured (O-058), which is why `SCAN_LAYER_CHECK` ships off.
+LAYER_MIN_WORDS = 20
+LAYER_MAX_MISSING = 0.15
+LAYER_WORD = re.compile(r"[^\W_]{3,}")
+# Two words within an edit or so of each other are the same word read twice (ratio of
+# `difflib.SequenceMatcher`); the work is bounded on a page the two do not agree about.
+LAYER_SAME_WORD = 0.8
+LAYER_FUZZY_MAX = 600
+
+
+def _words_of(text: str) -> list[str]:
+    return LAYER_WORD.findall(unicodedata.normalize("NFKC", text).casefold())
+
+
+def read_words(output: ImagePageOutput) -> list[str]:
+    """The words the model printed for the page: headings, paragraphs, list items, table
+    cells, markers, labels and captions. Not figure descriptions (its own words) or LaTeX."""
+    parts: list[str] = []
+    for block in output.blocks:
+        parts.extend(run.value for run in block.runs if run.kind == "text")
+        parts.extend(cell.text for row in block.rows for cell in row.cells)
+        parts.extend((block.marker, block.label, block.caption))
+    return _words_of(" ".join(parts))
+
+
+def layer_missing(layer: Sequence[str], output: ImagePageOutput) -> int:
+    """How many words of the page's own text layer the read lacks, when that is at least
+    LAYER_MAX_MISSING of them (else 0). The layer is only compared with what is already
+    read: it is not sent, not used as text and not trusted."""
+    wanted = _words_of(" ".join(layer))
+    if len(wanted) < LAYER_MIN_WORDS:
+        return 0
+    read = Counter(read_words(output))
+    spare: dict[int, list[str]] = {}
+    for word in (read - Counter(wanted)).elements():
+        spare.setdefault(len(word), []).append(word)
+    missing = 0
+    for index, word in enumerate((Counter(wanted) - read).elements()):
+        partner = None
+        if index < LAYER_FUZZY_MAX:
+            for size in (len(word), len(word) - 1, len(word) + 1, len(word) - 2, len(word) + 2):
+                partner = next(
+                    (
+                        (size, i)
+                        for i, other in enumerate(spare.get(size, ()))
+                        if difflib.SequenceMatcher(None, word, other).ratio() >= LAYER_SAME_WORD
+                    ),
+                    None,
+                )
+                if partner:
+                    break
+        if partner:
+            del spare[partner[0]][partner[1]]
+        else:
+            missing += 1
+    return missing if missing / len(wanted) >= LAYER_MAX_MISSING else 0
+
+
 def kept_reads(kept: Mapping[int, str], types: Mapping[int, PageTypeResult]) -> list[int]:
     """The kept pages (page -> reason) this pass reads, in page order: those whose type is one
     the pass reads (`page_type.reads_image`) and that are kept for that reason (a page layout
@@ -1576,8 +1650,15 @@ def enforce_maths_required(elements: Sequence[Element], fixes: dict[str, Fix]) -
 
 
 def notices(built: Mapping[int, Built]) -> list[Notice]:
-    """One content-free notice per converted page: how many blocks were read from the image."""
-    return [
+    """One content-free notice per converted page: how many blocks were read from the image;
+    and, for a scan whose own text layer has words the read lacks, how many."""
+    found = [
         make("image_page_converted", page=page, count=max(1, b.record.blocks))
         for page, b in sorted(built.items())
     ]
+    found.extend(
+        make("image_page_layer_differs", page=page, count=b.layer_missing)
+        for page, b in sorted(built.items())
+        if b.layer_missing
+    )
+    return found

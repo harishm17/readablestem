@@ -97,7 +97,7 @@ import threading
 import time
 from bisect import bisect_left
 from collections import Counter, defaultdict
-from collections.abc import Callable, Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -165,6 +165,7 @@ from readablestem.pipeline import (
     step_facts,
     table_math,
     table_step,
+    tables,
     tagged,
     text_pass,
     witness_reconcile,
@@ -650,9 +651,11 @@ def step_key(
     context_text: str | None,
     options: ConversionOptions,
     settings: Settings,
+    words: Sequence[tables.PrintedWord] = (),
 ) -> str:
     """What a step's stored fix depends on, as a digest: the element (its text layer is
-    checked against the answer), the picture, the nearby text sent with it, the conversion
+    checked against the answer), the picture, the nearby text sent with it, a table's words
+    (`layout.table_words`, only when there are any), the conversion
     options (notation, exam mode, feature flags), every behaviour setting (models, efforts,
     switches) and the conversion code with its prompts (`code_identity`). Equal keys mean
     the same question, asked and handled the same way. Of the options, the key holds those
@@ -666,6 +669,8 @@ def step_key(
         _options_read(element.kind, options),
         _behaviour(settings),
     ]
+    if words:
+        parts.append(repr(words))
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
 
@@ -833,6 +838,9 @@ class _Task:
     context_text: str | None
     # An inline equation's line with its span boxed (`Settings.equation_line_context`).
     line_png: bytes | None = None
+    # A table's words with their places in its crop (`layout.table_words`, `TABLE_FILE_FACTS`);
+    # empty when the setting is off or the PDF prints none in the box.
+    words: tuple[tables.PrintedWord, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -892,7 +900,9 @@ def _run_step(
         page=element.page,
     ) as span:
         try:
-            extra = {"line_png": task.line_png} if task.line_png is not None else {}
+            extra: dict[str, Any] = {"line_png": task.line_png} if task.line_png is not None else {}
+            if task.words:
+                extra["words"] = task.words
             fix = step(
                 element,
                 task.png,
@@ -1216,6 +1226,20 @@ class _Run:
             log.warning("line crop failed: %s", type(exc).__name__)
             return None
 
+    def table_words(self, element: Element, png: bytes) -> tuple[tables.PrintedWord, ...]:
+        """The words the PDF prints in a table's box with their places in its crop, when
+        `TABLE_FILE_FACTS` is on; none otherwise, or for what is not a table, a page with no
+        text there, or a failed read (the step then works as it did)."""
+        if not self.settings.table_file_facts or element.kind is not Kind.TABLE:
+            return ()
+        if element.page in self.vector:
+            return ()  # (a handwritten page's strokes are drawn: its picture is not the PDF's)
+        try:
+            return tuple(layout.table_words(self.pdf_bytes, element, png))
+        except Exception as exc:
+            log.warning("table words failed: %s", type(exc).__name__)
+            return ()
+
     def read_glyphs(self, element: Element) -> None:
         """Keep the glyphs under an equation and beside it with the element, when the setting
         is on (`Element.glyphs`): the evidence of every check of a reading against the PDF.
@@ -1267,6 +1291,7 @@ class _Run:
             return
         self.raise_if_fatal()  # a step may have failed while this element was being cut
         line_png = self.line_crop(element)
+        words = self.table_words(element, png)
         self.read_glyphs(element)
         if self.cache is not None:
             key = step_key(
@@ -1275,6 +1300,7 @@ class _Run:
                 self.contexts.get(element.id),
                 self.options,
                 self.settings,
+                words,
             )
             if (kept := self.cache.lookup(element, key)) is not None:
                 self.fixes[element.id] = kept  # finished in an earlier run: no model call
@@ -1283,7 +1309,7 @@ class _Run:
             self.keys[element.id] = key
         work = partial(
             _run_step,
-            _Task(element, png, self.contexts.get(element.id), line_png),
+            _Task(element, png, self.contexts.get(element.id), line_png, words),
             client=self.client,
             settings=self.settings,
             stop=self.stop,
@@ -1897,6 +1923,7 @@ def _image_pages_pass(
     measured: list[CallFact],
     step_cache: StepCache | None = None,
     stage_progress: StageProgressFn | None = None,
+    scanned: frozenset[int] = frozenset(),
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept pages `pages` (`image_page.kept_reads`) from a picture of each (ADR 0007).
 
@@ -1966,6 +1993,13 @@ def _image_pages_pass(
                 log.warning("image page build failed: %s", type(exc).__name__)
                 page_built = None
             if page_built is not None:
+                if settings.scan_layer_check and number in scanned:
+                    # a scan's layer is OCR; a tablet's is not
+                    try:
+                        layer = layout.page_words(pdf_bytes, number)
+                        page_built.layer_missing = image_page.layer_missing(layer, read.output)
+                    except Exception as exc:  # a check of the read never costs the page
+                        log.warning("image page layer check failed: %s", type(exc).__name__)
                 built[number] = page_built
         summary = image_page.summarise(result.reads, built, settings, result.stopped)
         for number, read in result.reads.items():
@@ -2134,6 +2168,7 @@ def _convert(
                     step_cache=step_cache,
                     measured=measured,
                     stage_progress=stage_progress,
+                    scanned=frozenset(n for n in to_read if kept.get(n) == SCANNED_PAGE_REASON),
                 )
                 watch.stage("layout")
                 for number in image_built:

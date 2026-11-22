@@ -92,7 +92,9 @@ def _offline_figure(defaults: dict[str, dict | None]):
 
     def answer(request: VisionRequest) -> dict | None:
         base = defaults.get("figure")
-        if base is None or not request.prompt_version.startswith("figure_long-"):
+        if base is None or not request.prompt_version.startswith(
+            ("figure_long-", "figure_long_facts-")
+        ):
             return base
         return {**base, **_OFFLINE_LONG_FIGURE}
 
