@@ -375,9 +375,12 @@ so a heading is not, and a line that starts a block is not).
    (`hyphens.link_cut`, read per document by `document._link_cuts` into `_Document.link_cuts`,
    and so used only by the paragraph joins: not yet by the cells of a table, and not for one
    annotation drawn over two lines). Only printed text that is an address counts (it holds
-   `.`, `/`, `@` or `:`): a named link over two lines ("Smith" / "Jones", or "Khan" /
-   "Academy" under khanacademy.org) is not, and its break keeps its space, here and wherever
-   else those words break.
+   `.`, `/`, `@` or `:`; a sentence sign the second annotation covers after the address, as in
+   "Academy." or "tics.2022.11.009)", is left out, and so is a full stop before a capital,
+   "Dr." / "Smith"): a named link over two lines ("Smith" / "Jones", or "Khan" / "Academy"
+   under khanacademy.org, with or without a full stop under the link) is not, and its break
+   keeps its space, here and wherever else those words break. A middle line of a three-line
+   address that prints none of those signs keeps its space.
    Inline math that wraps from one line to the next is one equation (`_wrapped_inline`): a
    relation sign ends the first line or starts the second (`x + y =` / `z + w`), or a plus,
    minus or product does and its half is longer than one token. Two ions (`Na+` / `Cl-`),

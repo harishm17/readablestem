@@ -197,7 +197,12 @@
   counts (it holds ".", "/", "@" or ":"): a named link over two lines ("Smith" / "Jones", or
   "Khan" / "Academy" under khanacademy.org, whose words run together are in the address) is not
   one and keeps its space, there and wherever else those words break; an address not under a link
-  is decided as it was.
+  is decided as it was. A sentence sign the second annotation covers after the address
+  ("Academy." or "tics.2022.11.009.", also "," ";" ")") is left out before both tests, so a named
+  link that ends a sentence keeps its space and an address followed by a full stop still joins;
+  a break after a full stop before a capital ("Dr." / "Smith" under example.org/dr.smith) is not
+  an address either. A three-line address whose middle pair prints none of ". / @ :" joins at
+  its other break only; the middle break keeps its space, as in 0.5.15.
   On the 126 public papers and corpus files, 3 public files change (18 breaks, each a space
   removed inside an address, nothing else); no `full` replay of the 73 corpus documents changes,
   so no recorded request or answer stops matching.
