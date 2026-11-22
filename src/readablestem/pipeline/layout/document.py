@@ -5,6 +5,7 @@ the page picture a failed page is kept as, and the heading levels read from the 
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import math
 import re
@@ -601,7 +602,7 @@ def _analyze_document(
                     source=sources.get(n),
                     document=document,
                 )
-        pages.append(read if read is not None else _kept_page(doc[n], n))
+        pages.append(read if read is not None else _kept_page(doc, n, unrendered))
     forget()
     keep_failed()
     guard.settle()
@@ -619,7 +620,7 @@ def _analyze_document(
     guard.settle()
     # A page whose blocks could not be written as elements is its picture, as the others
     # that failed (the notices below read only the pages that stay).
-    pages = [p if guard.ok(p.number) else _kept_page(doc[p.number], p.number) for p in pages]
+    pages = [p if guard.ok(p.number) else _kept_page(doc, p.number, unrendered) for p in pages]
     footnote_marks: dict[str, _FootnoteMark] = {}
     notices = _layout_notices(pages, ctx, block_ids, footnote_marks)
     elements = _contents_links(_footnote_links(elements, footnote_marks))
@@ -813,9 +814,39 @@ def _kept_whole(kind: page_type.PageTypeResult) -> bool:
     return page_type.kept_reason(kind) is not None and not page_type.keeps_text(kind)
 
 
-def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:
-    """A page kept as its page image: no blocks."""
+def _kept_page(
+    doc: pymupdf.Document, number: int, unrendered: dict[int, LayoutError]
+) -> _PageBlocks:
+    """A page kept as its page image: no blocks. A page the probe could not draw is not
+    loaded: its size comes from the page tree (`_unloaded_size`)."""
+    if number in unrendered:
+        return _PageBlocks(number, _unloaded_size(doc, number), [])
+    page = doc[number]
     return _PageBlocks(number, (round(page.rect.width, 2), round(page.rect.height, 2)), [])
+
+
+def _unloaded_size(doc: pymupdf.Document, number: int) -> tuple[float, float]:
+    """(width, height) in points of a page, as `Page.rect` gives it, read from the page
+    tree: its CropBox (inside the MediaBox) and its Rotate, inherited from the pages above
+    it. MuPDF does not build the page for this, so a page that kills or hangs it when it is
+    built is not built. A page turned upright when read (`page_type.turn_page`) is not
+    turned here. US Letter if the tree cannot be read."""
+    with contextlib.suppress(Exception):  # a page tree MuPDF cannot read: not worth failing for
+        box = doc.page_cropbox(number)
+        turn, xref = 0, doc.page_xref(number)
+        for _ in range(32):  # the depth of any real page tree; a cycle stops here
+            kind, value = doc.xref_get_key(xref, "Rotate")
+            if kind == "int":
+                turn = int(value)
+                break
+            kind, value = doc.xref_get_key(xref, "Parent")
+            if kind != "xref":
+                break
+            xref = int(value.split()[0])
+        width, height = (box.height, box.width) if turn % 180 else (box.width, box.height)
+        if width > 0 and height > 0:
+            return round(width, 2), round(height, 2)
+    return 612.0, 792.0
 
 
 def _unread_ink(

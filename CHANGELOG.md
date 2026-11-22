@@ -90,9 +90,13 @@
   pages are single, and reads the others. Each failing page is kept with the new reason
   `page_not_rendered`: a figure with no picture, a required decision, the notice
   `page_not_rendered`, and in the student file "Not converted. This page could not be shown."
-  Nothing in the web process opens that page again (no crop, tags, links or images).
+  The conversion does not build that page again: no step, crop, tag, link or image reads it, the
+  page-number pass skips it, and its size comes from the page tree, not from the page. Its own
+  PDF page label is not read (it has the number its neighbours give it, or none).
 - The search is bounded: after the probe of all the pages, at most 40 probes (2 for each halving:
-  14 find one bad page of 100) and 300 s. A file in which every page fails, in which the halves
+  14 find one bad page of 100) and 300 s, each probe's own time limit cut to what is left of the
+  300 s (a file in which every probe hangs now fails 300 s after its first probe at the latest,
+  not up to a whole probe later). A file in which every page fails, in which the halves
   pass although the whole did not, or in which the search runs out of probes or time, fails with
   the first probe's error as before. On 100 plain pages with one page whose child dies, 15 probes
   take 2.7 s (0.7 s for the probe alone); a page that hangs costs its whole time limit each time

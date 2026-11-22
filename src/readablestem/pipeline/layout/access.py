@@ -7,6 +7,7 @@ page (`crop`, `crop_line`, `line_across`, `render_page`, `page_ink`, `release`).
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 import subprocess
 import sys
@@ -40,7 +41,9 @@ PROBE_PER_PAGE_S = 2.0
 # find one bad page of a file of any size up to 1,000,000 pages (2 per halving, so 2 *
 # ceil(log2 n)), two bad pages in 100, and every bad page of a file of up to 20 pages; a
 # page that hangs costs its whole time limit each time it is in a probe, so the clock is
-# the bound that matters there.
+# the bound that matters there. A probe's own time limit is cut to what is left of the
+# seconds, so the search never runs past them (the probe of all the pages before it has
+# its own limit).
 PROBE_SEARCH_MAX = 40
 PROBE_SEARCH_S = 300.0
 PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
@@ -458,12 +461,15 @@ def _halve(pdf_bytes: bytes, pages: list[int], first: LayoutError) -> dict[int, 
 
     def probe(group: list[int]) -> LayoutError | None:
         nonlocal probes
-        if probes >= PROBE_SEARCH_MAX or time.monotonic() - started > PROBE_SEARCH_S:
+        left = PROBE_SEARCH_S - (time.monotonic() - started)
+        if probes >= PROBE_SEARCH_MAX or left <= 0:
             raise first  # a search that cannot finish is the failure of the whole file
         probes += 1
         try:
-            _probe_pages(pdf_bytes, group)
+            _probe_pages(pdf_bytes, group, left)
         except LayoutError as exc:
+            if time.monotonic() - started >= PROBE_SEARCH_S:
+                raise first from None  # the clock ended it: not the fault of these pages
             return exc
         return None
 
@@ -482,8 +488,9 @@ def _halve(pdf_bytes: bytes, pages: list[int], first: LayoutError) -> dict[int, 
     return failed
 
 
-def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
+def _probe_pages(pdf_bytes: bytes, pages: list[int], at_most_s: float | None = None) -> None:
     """Extract and render `pages` in a child process; LayoutError("unreadable") if it dies.
+    `at_most_s` cuts the child's time limit to that many seconds.
 
     Some damaged PDFs make MuPDF abort the whole process (a glibc double free while
     building a page's display list) although they open and parse without an error. In the
@@ -509,7 +516,10 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
             command,
             input=pdf_bytes,
             capture_output=True,
-            timeout=PROBE_TIMEOUT_S + PROBE_PER_PAGE_S * max(0, len(pages) - 1),
+            timeout=min(
+                PROBE_TIMEOUT_S + PROBE_PER_PAGE_S * max(0, len(pages) - 1),
+                math.inf if at_most_s is None else at_most_s,
+            ),
             check=False,
             env=child_env(),  # no keys or secrets for the process that reads the PDF
         )

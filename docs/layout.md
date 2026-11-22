@@ -3676,15 +3676,23 @@ halves again, down to single pages; a page whose own probe fails is a page that 
 drawn. Both halves are always probed, so a failure that comes and goes (a time limit on a busy
 machine) is not pinned on a page that is not at fault: if the halves pass although the whole
 did not, the file fails as it did. Such a page is not read at all (the probe covers the text
-read as well as the drawing, so nothing of the page is trusted) and nothing in the web process
-opens it again (no crop, no tags, links or images). It is kept with the reason
+read as well as the drawing, so nothing of the page is trusted) and the conversion does not
+build it again: no step, crop, tag, link or image reads it, the page-number pass skips it (its
+number is the one its neighbours' printed numbers give it, if they bracket it; the PDF's own
+label for it is not read), and its size for the page list comes from the page tree (its CropBox
+inside the MediaBox and its inherited Rotate, `document._unloaded_size`; US Letter if the tree
+cannot be read; a page saved sideways that layout would turn upright is not turned). The web
+process has no PyMuPDF call of its own: the upload check and the review screen's page pictures
+run in child processes (`web/pdf_probe.py`), which is where a page that kills MuPDF may be
+opened. It is kept with the reason
 `page_not_rendered`: a figure for the page with no picture, a required decision (one decision for
 all such pages, like the other kept pages), the notice `page_not_rendered`, and in the student file
 the page break, the label "Not converted." and "This page could not be shown." The log names the
 page and the probe's error code, never anything of the page. The other pages are read as
 if the file had no such page. The search is bounded: after the probe of all the pages it starts at
-most `PROBE_SEARCH_MAX` (40) probes and runs at most `PROBE_SEARCH_S` (300 s); past either, and
-when every page fails or the halves find nothing, the file fails with the first probe's error, as
+most `PROBE_SEARCH_MAX` (40) probes and runs at most `PROBE_SEARCH_S` (300 s), each probe's
+own time limit cut to what is left of them (a probe the clock ends is not taken for a failing
+page); past either, and when every page fails or the halves find nothing, the file fails with the first probe's error, as
 before. Two probes for each halving, so 2 * ceil(log2 n) find one bad page of n (14 for 100
 pages), 40 find two bad pages in 100 and every bad page of a file of up to 20 pages. A
 file of 100 pages with every page bad costs 41 child processes, not 199, and then fails. Cost on
@@ -3693,8 +3701,9 @@ alone is 0.7 s); with three such pages, 33 probes in 5 s. A page that hangs cost
 the probe) each time it is in a probe that is run, which is why the search has a clock of its
 own: in a file of 5 pages, one such page is found in about four timeouts of 60 s or less; in a
 file of 100 pages the first timeout is 258 s and the halves (158, 108, 84 s ...) do not fit in
-the clock, so the file fails with the first probe's error after the search has used its 300 s.
-A page that makes MuPDF abort is quick: the child dies at once.
+the clock, so the file fails with the first probe's error after the search has used its 300 s
+(258 s for the first probe and 300 s for the search: 558 s at most; a probe that could start at
+299 s used to run its 158 s on top, 716 s). A page that makes MuPDF abort is quick: the child dies at once.
 
 The probe also guards table detection: `find_tables` renders the page for its layout
 model, where the known MuPDF aborts are, and it only ever runs on pages the probe passed.

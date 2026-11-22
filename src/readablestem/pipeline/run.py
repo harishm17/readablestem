@@ -1531,13 +1531,13 @@ def _source_facts(
         return None
 
 
-def _page_labels(pdf_bytes: bytes, pages: list[int]) -> dict[int, str]:
+def _page_labels(pdf_bytes: bytes, pages: list[int], unloaded: list[int]) -> dict[int, str]:
     """`page_labels.read`, which never raises; none if it did anyway (page markers are a
     convenience: a bug there must not cost the user a finished conversion)."""
     lock = getattr(layout, "_LOCK", None)
     try:
         with lock if lock is not None else contextlib.nullcontext():
-            return page_labels.read(pdf_bytes, pages)
+            return page_labels.read(pdf_bytes, pages, unloaded)
     except Exception as exc:
         log.warning("page labels failed: %s", type(exc).__name__)
         return {}
@@ -2252,7 +2252,7 @@ def _convert(
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
             measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))
-        labels = _page_labels(pdf_bytes, page_list)
+        labels = _page_labels(pdf_bytes, page_list, [p for p in page_list if p not in readable])
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, readable, elements, ordered)
         # A PDF repaired when it was opened whose last pages are empty looks cut off: the

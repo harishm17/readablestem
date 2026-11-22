@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import time
 from collections import Counter, OrderedDict
 from pathlib import Path
 
@@ -227,10 +228,20 @@ def page_two_cannot_be_drawn(monkeypatch):
 
 
 def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are_read(
-    page_two_cannot_be_drawn, caplog
+    page_two_cannot_be_drawn, caplog, monkeypatch
 ):
+    loaded: list[int] = []
+    real_load = pymupdf.Document.load_page
+
+    def load_page(self, page_id=0):
+        loaded.append(page_id)
+        return real_load(self, page_id)
+
+    monkeypatch.setattr(pymupdf.Document, "load_page", load_page)
     with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.layout"):
         result = _convert(_document(5))
+    assert 2 not in loaded and {0, 1, 3, 4} <= set(loaded)  # page 3 is never built
+    assert result.page_sizes[2] == (595.0, 842.0)
     (fix,) = [f for f in result.fixes if f.reason == "page_not_rendered"]
     assert fix.review == "required"
     assert [(n.code, n.page) for n in result.notices if n.code == "page_not_rendered"] == [
@@ -240,6 +251,21 @@ def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are
     assert "Page 3." not in result.html  # nothing was read from it
     assert all(f"Page {page}." in result.html for page in (1, 2, 4, 5))
     assert "page 3" in caplog.text and SENTENCE not in caplog.text
+
+
+def test_a_search_for_the_page_that_cannot_be_drawn_never_runs_past_its_seconds(monkeypatch):
+    """Every probe hangs: the file fails after the probe of all the pages and at most the
+    search's seconds, not after a whole time limit more."""
+    monkeypatch.setattr(access, "_PROBED", OrderedDict())
+    monkeypatch.setattr(access, "_PROBE_SCRIPT", "import time; time.sleep(60)")
+    monkeypatch.setattr(access, "PROBE_TIMEOUT_S", 2.0)
+    monkeypatch.setattr(access, "PROBE_PER_PAGE_S", 0.0)
+    monkeypatch.setattr(access, "PROBE_SEARCH_S", 0.5)
+    started = time.monotonic()
+    with pytest.raises(LayoutError) as exc:
+        layout.analyze(_document(4))
+    assert exc.value.code == "too_complex"
+    assert time.monotonic() - started < 2.0 + 0.5 + 1.0  # the first probe, the search, slack
 
 
 def test_a_document_in_which_no_page_can_be_drawn_still_fails(monkeypatch):
