@@ -93,8 +93,9 @@
   `page_not_rendered`, and in the student file "Not converted. This page could not be shown."
   The conversion does not build that page again: no step, crop, tag, link or image reads it, the
   page-number pass skips it, and its size comes from the page tree, not from the page (the
-  MediaBox cut to the CropBox, times the page's UserUnit, turned by Rotate: the size the page
-  gives when it is built). Its own
+  MediaBox cut to the CropBox, times the page's UserUnit, turned by Rotate, each read through an
+  object of its own where the tree refers to one: the size the page gives when it is built,
+  except that a UserUnit of 0, which MuPDF makes an empty page, is read as 1). Its own
   PDF page label is not read (it has the number its neighbors give it, or none).
 - The search is bounded: after the probe of all the pages, at most 40 probes (2 for each halving:
   14 find one bad page of 100) and 300 s, each probe's own time limit cut to what is left of the
@@ -175,7 +176,7 @@
   "Q+A", are not math signs, in a line of any other words too: "C++ 17", "C/C++" and "C++ vs. C#"
   stay titles, and "A+B", "N+1" and "x + y = 2" are still formulas). The deck's titles are the real ones, and a title that
   layout read as a paragraph is no longer dropped as a headline above a "title" that was an
-  equation. The written output of that deck is the same (its titles were headings already). Whether a file is a deck is counted as before: a page whose title is a formula is titled like a slide all the same (a deck of eight slides, three titled "A+B", "N+1" and "X+Y", is a deck, and those three have no title).
+  equation. The written output of that deck is the same (its titles were headings already). Whether a file is a deck is counted as before: a page whose title is a formula is titled like a slide all the same (a deck of eight slides, three titled "A+B", "N+1" and "X+Y", is a deck; of those three only "N+1" loses its title and is a paragraph, while "A+B" and "X+Y" stay headings by their font).
 - A deck with some scanned slides was not a deck: a page kept whole as its image has no text, so
   it counted as untitled, and 5 titled pages of 12 were not the 70 % a deck needs. Pages
   kept whole are left out of the share, so the mixed deck is one deck, with its title at level 1;
@@ -237,7 +238,7 @@
   and three more): a longer one lost its last lines, which then stood as a paragraph under the
   table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
   may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
-  where the next line starts a sentence after a step wider than the caption's own line step by
+  where the next line starts with a capital after a step wider than the caption's own line step by
   more than 1 pt (for a caption of one line, the next line's own); within its first four lines
   the caption's line must also end a sentence, so a line pushed down by a tall formula does not
   cut it mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`), steps measured from baseline to baseline so that a subscript or a
@@ -259,9 +260,11 @@
   (a schedule: "Week 1" with its description over three lines; the line above the label ends a
   sentence or is a paragraph's space away, or no other label stands on the line before or after
   it, as the labels of a schedule stand a description apart and a sidebar's lines follow one
-  another; `tables._labels_open_runs`): that is a table, as it was before this rule for the
-  schedules built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to four lines a
-  description, with or without full stops and space between rows, the label level with the first
+  another; or, where two or more labels head a description of several lines, a label stands on
+  the line before or after it, a week of one line such as "Week 6 Midterm";
+  `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
+  built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to five lines a
+  description and weeks of one line among weeks of three or five, with or without full stops and space between rows, the label level with the first
   or the middle line; a borderless schedule with no caption had become ten paragraphs). Of 827
   boxes of this kind that were kept on the public sets, 2 are two columns with prose and fewer
   than half their lines paired: this page and one page of an OpenStax book that was not a table in

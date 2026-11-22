@@ -522,7 +522,7 @@ def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_si
         "free fall near the surface of the Earth, case {week}",
     ]
 
-    def schedule(label, level, period, skip):
+    def schedule(label, level, period, skip, lines=(3, 3, 3, 3, 3)):
         def fill(page):
             write(page, 72, 90, "Course schedule", 15)
             write(
@@ -532,11 +532,12 @@ def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_si
                 "The term has five units. Each unit ends with a short quiz in its last class.",
             )
             y = 142.0
-            for week in range(1, 6):
-                for i, text in enumerate(description):
+            for week, n in enumerate(lines, 1):
+                for i, text in enumerate(description[:n]):
                     if i == level:
                         write(page, 72, y, label(week))
-                    write(page, 170, y, text.format(week=week) + ("." if period and i == 2 else ""))
+                    end = "." if period and i == n - 1 else ""
+                    write(page, 170, y, text.format(week=week) + end)
                     y += 14
                 y += skip
             write(
@@ -566,6 +567,8 @@ def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_si
         schedule(date, 0, False, 0),  # dates, no full stop and no extra space between rows
         schedule(week, 1, True, 8),  # the label level with the middle line
         schedule(date, 1, False, 0),
+        # a week of one line ("Week 2  Midterm") between weeks of three, no full stops
+        schedule(week, 0, False, 0, (3, 1, 3, 3, 3)),
     ):
         assert [e.kind for e in analyze(pdf(fill)).elements].count(Kind.TABLE) == 1
     assert Kind.TABLE not in [e.kind for e in analyze(pdf(sidebar)).elements]

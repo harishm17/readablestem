@@ -3711,8 +3711,10 @@ number is the one its neighbors' printed numbers give it, if they bracket it; th
 label for it is not read), and its size for the page list comes from the page tree, the size
 `Page.rect` gives (`document._unloaded_size`): the MediaBox cut to the CropBox where they overlap
 (both and Rotate inherited from the Pages nodes above), times the page's own UserUnit, turned by
-Rotate; US Letter where the MediaBox is missing or empty, where the CropBox leaves nothing of it,
-or if the tree cannot be read; a page saved sideways that layout would turn upright is not
+Rotate, each read through an object of its own where the tree refers to one ("12 0 R", for a
+whole box or one of its numbers); US Letter where the MediaBox is missing or empty, where the
+CropBox leaves nothing of it, or if the tree cannot be read; a UserUnit of 0 or less is read as
+1, where MuPDF makes the page empty; a page saved sideways that layout would turn upright is not
 turned). The web
 process has no PyMuPDF call of its own: the upload check and the review screen's page pictures
 run in child processes (`web/pdf_probe.py`), which is where a page that kills MuPDF may be

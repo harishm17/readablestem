@@ -2012,8 +2012,9 @@ def _conditions(grid: _Grid) -> bool:
 def _labels_open_runs(grid: _Grid) -> bool:
     """One of two columns is short labels, each level with the first line of a run of lines in
     the other (a schedule: "Week 1" and its description over three lines): the line above in
-    the other column ends a sentence or is a paragraph's space away. A body beside a sidebar
-    has lines of its own in both columns that stand level with nothing."""
+    the other column ends a sentence or is a paragraph's space away, or is a row of one line
+    ("Week 6" and "Midterm") where two or more labels each head a run of several lines. A body
+    beside a sidebar has lines of its own in both columns that stand level with nothing."""
     cells: dict[int, dict[int, _Seg]] = {}
     for seg in grid.segs:
         if len(seg.columns) == 1:
@@ -2024,12 +2025,16 @@ def _labels_open_runs(grid: _Grid) -> bool:
     for label, other in ((first, second), (second, first)):
         steps = [seg.y0 - other[line - 1].y0 for line, seg in other.items() if line - 1 in other]
         pitch = statistics.median(steps) if steps else 0.0
+        # labels whose run goes on past their own line: in a schedule, most; in a sidebar beside a
+        # body, the last line of each block of the sidebar
+        runs = sum(line + 1 not in label and line + 1 in other for line in label)
 
         def opens(
             line: int,
             label: dict[int, _Seg] = label,
             other: dict[int, _Seg] = other,
             pitch: float = pitch,
+            runs: int = runs,
         ) -> bool:
             above = other.get(line - 1)
             return (
@@ -2037,6 +2042,7 @@ def _labels_open_runs(grid: _Grid) -> bool:
                 or above.text.rstrip().endswith((".", "!", "?", ":", ";"))
                 or other[line].y0 - above.y0 > pitch + PARAGRAPH_STEP
                 or (line - 1 not in label and line + 1 not in label)
+                or ((line - 1 in label or line + 1 in label) and runs >= 2)
             )
 
         if len(label) >= BLOCK_MIN_LINES and all(

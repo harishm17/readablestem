@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import copy
 import logging
+import re
 import time
 from collections import Counter, OrderedDict
 from pathlib import Path
@@ -228,12 +229,22 @@ def page_two_cannot_be_drawn(monkeypatch):
 
 
 # What page 3's page tree says about its size: (keys on the page, keys on the Pages node above it).
+# A value in braces is an object of its own that the key refers to ("12 0 R").
 _PAGE_TREES = {
     "plain": ({}, {}),
-    "user unit 2": ({"UserUnit": "2"}, {}),
+    "user unit 2, it and a number of the media box objects of their own": (
+        {"UserUnit": "{2}", "MediaBox": "[0 0 {500} 700]"},
+        {},
+    ),
     "crop larger than the media box": ({"CropBox": "[-100 -100 750 950]"}, {}),
     "no media box, a crop": ({"MediaBox": "null", "CropBox": "[0 0 300 300]"}, {}),
 }
+
+
+def _object(doc, value):
+    xref = doc.get_new_xref()
+    doc.update_object(xref, value)
+    return f"{xref} 0 R"
 
 
 @pytest.mark.parametrize("tree", _PAGE_TREES)
@@ -245,7 +256,7 @@ def test_a_page_that_cannot_be_drawn_is_a_note_and_a_decision_and_the_others_are
     node = int(doc.xref_get_key(doc[2].xref, "Parent")[1].split()[0])
     for xref, keys in ((doc[2].xref, page_keys), (node, node_keys)):
         for key, value in keys.items():
-            doc.xref_set_key(xref, key, value)
+            doc.xref_set_key(xref, key, re.sub(r"\{(.*?)\}", lambda m: _object(doc, m[1]), value))
     pdf = doc.tobytes()
     doc.close()
     loaded: list[int] = []

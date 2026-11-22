@@ -828,8 +828,9 @@ def _kept_page(
 def _unloaded_size(doc: pymupdf.Document, number: int) -> tuple[float, float]:
     """(width, height) in points of a page, as `Page.rect` gives it, read from the page
     tree the way MuPDF reads it: the MediaBox cut to the CropBox, both and Rotate inherited
-    from the pages above the page, scaled by the page's own UserUnit (not inherited) and
-    turned by Rotate to the nearest quarter turn. US Letter where the MediaBox is missing
+    from the pages above the page, scaled by the page's own UserUnit (not inherited; 0 or
+    less is read as 1, where MuPDF makes the page empty) and turned by Rotate to the nearest
+    quarter turn. US Letter where the MediaBox is missing
     (the CropBox is then not read) or empty, and where the cut leaves nothing. MuPDF does not
     build the page for this, so a page that kills or hangs it when it is built is not built.
     A page turned upright when read (`page_type.turn_page`) is not turned here. US Letter if
@@ -847,7 +848,9 @@ def _unloaded_size(doc: pymupdf.Document, number: int) -> tuple[float, float]:
             )
         if not box or box[0] >= box[2] or box[1] >= box[3]:
             box = (0.0, 0.0, 612.0, 792.0)
-        _, unit = doc.xref_get_key(xref, "UserUnit")
+        kind, unit = doc.xref_get_key(xref, "UserUnit")
+        if kind == "xref":
+            unit = doc.xref_object(int(unit.split()[0])).strip()
         scale = float(unit) if unit not in ("null", "") and float(unit) > 0 else 1.0
         width, height = (box[2] - box[0]) * scale, (box[3] - box[1]) * scale
         kind, turn = _tree_value(doc, xref, "Rotate")
@@ -875,14 +878,19 @@ def _tree_value(doc: pymupdf.Document, xref: int, key: str) -> tuple[str, str]:
     return "null", ""
 
 
+_INDIRECT = re.compile(r"(\d+) \d+ R")
+
+
 def _tree_box(
     doc: pymupdf.Document, xref: int, key: str
 ) -> tuple[float, float, float, float] | None:
     """A box of the page tree as (x0, y0, x1, y1) with its corners in order (it may be
-    empty); None if it is missing. An array that is not four numbers is an empty box."""
+    empty); None if it is missing. An array that is not four numbers is an empty box; a number
+    given as an object of its own ("12 0 R") is read through."""
     kind, value = _tree_value(doc, xref, key)
     if kind != "array":
         return None
+    value = _INDIRECT.sub(lambda m: doc.xref_object(int(m[1])).strip(), value)
     try:
         x0, y0, x1, y1 = (float(n) for n in value.strip("[]").split())
     except ValueError:
