@@ -142,6 +142,9 @@
   without one above an entry that has one is a part line, not a title's first line
   (`blocks._starts_with_label`). A title whose second line starts with a number ("... of Chapters"
   over "1 and 2 done again") is one entry when its first line starts with a section number too.
+  Left as it is: in a list of unnumbered entries, a "Part Two, ..." line between two entries
+  that runs as far right as the entries' page numbers is still joined to the entry under it
+  (0.5.15 kept it apart); a shorter part line is not, since a title wraps only on a full line.
 - Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
   page number, its own or a line of its own beside it (`blocks._ends_in_number`).
 - A capital alone on its line heads an index section only when the first entry of its letter
