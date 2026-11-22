@@ -310,16 +310,21 @@ def test_a_caption_of_six_lines_under_its_table_is_whole(shift):
     assert found.caption is not None and found.caption.count("part") == 5
 
 
-def test_a_one_line_caption_under_its_table_leaves_the_paragraph_after_it():
+@pytest.mark.parametrize(
+    "caption",
+    # a caption that ends a sentence, and one with no full stop at its end
+    ["Table 1. Measured periods of the pendulum.", "Table 1: Measured periods of the pendulum"],
+)
+def test_a_one_line_caption_under_its_table_leaves_the_paragraph_after_it(caption):
     paragraph = [
         f"line {i} of the paragraph that follows the caption, which is body text" for i in range(6)
     ]
 
     def fill(page):
         grid_table(page, PENDULUM, y0=150)
-        write(page, 100, 250, "Table 1. Measured periods of the pendulum.", 10)
+        write(page, 100, 250, caption, 10)
         for i, line in enumerate(paragraph):  # 3 pt more than the line pitch before the first
             write(page, 100, 265 + 12 * i, line.capitalize(), 10)
 
     (found,) = data_tables(pdf(fill))
-    assert found.caption == "Table 1. Measured periods of the pendulum."
+    assert found.caption == caption
