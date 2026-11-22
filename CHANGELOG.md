@@ -246,7 +246,10 @@
   or the middle line; a borderless schedule with no caption had become ten paragraphs). Of 827
   boxes of this kind that were kept on the public sets, 2 are two columns with prose and fewer
   than half their lines paired: this page and one page of an OpenStax book that was not a table in
-  the end either; neither has labels that open runs, and the rule keeps the same two out. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,
+  the end either; neither has labels that open runs, and the rule keeps the same two out. On the
+  520 PDFs of the public sets 14 boxes reach the labels rule: it keeps 9 (8 before its second
+  condition), the ninth a brace of cases in one arXiv paper that later rules still drop, so no
+  result changes. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,
   with the new rule off (`tests/test_region_tree.py`).
 - Benchmark `table_tests`: 70.6 before and after (857 checks); baseline 100.0. The public table
   evaluation (`eval pipeline --task tables --mode local`, 5 real documents with 25 tables, 200
