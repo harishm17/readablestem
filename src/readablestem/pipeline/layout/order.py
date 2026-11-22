@@ -67,6 +67,7 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
     # step table on a page of one column) is no gutter.
     stops: list[float] = []
     across: float | None = None
+    wide = [b for b in boxes if b[2] - b[0] > 0.55 * width]
     for b in sorted(boxes, key=lambda b: b[1]):
         if b[2] - b[0] > 0.55 * width:
             across = b[3] if across is None else max(across, b[3])
@@ -79,7 +80,14 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
         if gutter is not None:
             lefts = sum(b[2] <= gutter[0] + 0.5 for b in under)
             rights = sum(b[0] >= gutter[1] - 0.5 for b in under)
-            if min(lefts, rights) >= MIN_HEAD_COLUMN_BALANCE * max(lefts, rights):
+            if min(lefts, rights) < MIN_HEAD_COLUMN_BALANCE * max(lefts, rights):
+                continue
+            # Columns under a head run unbroken: a line across the page between the top and the
+            # bottom of the two columns means these are not columns (an exam's questions, each
+            # a line across with its options standing two by two under it).
+            columns = [b for b in under if b[2] <= gutter[0] + 0.5 or b[0] >= gutter[1] - 0.5]
+            first, last = min(b[1] for b in columns), max(b[3] for b in columns)
+            if not any(w[1] < last and w[3] > first for w in wide):
                 return gutter
     return None
 

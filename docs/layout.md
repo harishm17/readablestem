@@ -257,7 +257,10 @@ reader, neither to find them nor as a second opinion
    eight runs, the top of the page first), the first run that gives a gutter whose thinner
    side holds at least 0.4 of the lines of the other (`MIN_HEAD_COLUMN_BALANCE`: two columns
    hold about as many lines; a column of steps beside a few lines is a ruled table on a page
-   of one column, and is read row by row). The lines of the head are then read in the
+   of one column, and is read row by row), and no line across the page lies between the top
+   and the bottom of the two columns (columns under a head run unbroken: an exam's questions,
+   each a line across the page with its options two by two under it, are no columns). The
+   lines of the head are then read in the
    segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the

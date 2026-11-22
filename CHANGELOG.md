@@ -349,15 +349,18 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   often than a column may, so the page was read top down, line by line across both columns. When
   the page as a whole has no gutter, the columns are now looked for under each run of lines
   across the page (up to eight, the top first), and the first that gives a gutter with about as
-  many lines on its thinner side as on the other (at least 0.4 of them) is used
-  (`order._find_gutter`, `MIN_HEAD_COLUMN_BALANCE`). The balance keeps a page of one column with
+  many lines on its thinner side as on the other (at least 0.4 of them) and with no line across
+  the page between the top and the bottom of its two columns is used (`order._find_gutter`,
+  `MIN_HEAD_COLUMN_BALANCE`). The second condition keeps an exam page of one column (questions
+  each a line across the page, their options standing two by two under it) read question by
+  question: its option pairs looked like two columns under the head. The balance keeps a page of one column with
   a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
   lines in the right ones, a sentence across the page above) read row by row: the thinner side
   has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie
   under a head. On the 267 gold pages of `layout-dev-1` three pages change, two of one
   paper that were wrong and one page of another paper that stays as it was in what the gold
   counts: right 140 to 141 of 267, faultless 72 to 72, blocks broken 106 to 99, joins across
-  columns 35 to 27; no page that was right is not right. The search is not limited to first
+  columns 35 to 27; none of these pages went from right to not right (the set has no exam page with options in a grid; the corpus below is the wider check). The search is not limited to first
   pages: a page whose columns lie under a row of figures reads the same way. On the 996 analyzed
   files (every PDF of the corpus, three variants) 7 files change. Five pages in 3 papers are the
   columns found (a join across the columns or alternating single lines gone; one page no longer

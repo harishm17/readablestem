@@ -110,3 +110,46 @@ def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column
     page.draw_line((300, top - 12), (300, top + 24 * 12))
     text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
     assert text.index("answer 0") < text.index("step 10")
+
+
+def test_options_standing_two_by_two_under_questions_are_not_read_as_columns():
+    # An exam page of one column: centered head lines, an instruction across the page, then
+    # questions each a line across the page with its options two by two under it. Every question
+    # crosses the gap between the option pairs, so these are not two columns under a head: the
+    # options of a question are read one after the other, not all of the left ones first.
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 90.0
+    for text in (
+        "Physics Midterm Examination",
+        "Department of Physics",
+        "Fall Semester",
+        "Ninety minutes",
+    ):
+        width = pymupdf.get_text_length(text, "helv", 11)
+        page.insert_text((306 - width / 2, y), text, fontsize=11, fontname="helv")
+        y += 16
+    y += 12
+    page.insert_text(
+        (72, y), "Answer every question and mark the single best option on the sheet.", fontsize=11
+    )
+    y += 28
+    for q in range(3):
+        page.insert_text(
+            (72, y),
+            f"{q + 1}. A question that runs the whole width of the page, number {q}?",
+            fontsize=11,
+        )
+        y += 18
+        for first, second in (("a", "b"), ("c", "d")):
+            page.insert_text((84, y), f"({first}) option {first}{q} of the answers", fontsize=11)
+            page.insert_text((320, y), f"({second}) option {second}{q} of the answers", fontsize=11)
+            y += 16
+        y += 12
+    items = [e.text or "" for e in layout.analyze(doc.tobytes()).elements]
+    assert not any("option a0" in t and "option c0" in t for t in items)
+    assert next(i for i, t in enumerate(items) if "option b0" in t) < next(
+        i for i, t in enumerate(items) if "option c0" in t
+    )
