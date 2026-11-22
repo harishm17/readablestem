@@ -1558,6 +1558,40 @@ def test_a_contents_title_that_wraps_is_one_entry():
     ]
 
 
+def test_a_line_above_a_contents_list_is_not_fused_into_its_first_entry():
+    """A "Part One" line at the entries' size that runs to the right edge: the entry under it
+    starts with a section number like the others; a wrapped title's second line does not."""
+
+    def justified(page, y, text):  # a line filled to the right edge
+        words = text.split()
+        widths = [pymupdf.get_text_length(w, fontname="helv", fontsize=BODY) for w in words]
+        gap = (468 - sum(widths)) / (len(words) - 1)
+        x = 72.0
+        for word, width in zip(words, widths, strict=True):
+            page.insert_text((x, y), word, fontsize=BODY, fontname="helv")
+            x += width + gap
+
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        justified(
+            page, 116, "Part One, the laws of thermodynamics and the quantities they are written in"
+        )
+        for k, (title, number) in enumerate(
+            [("1 Temperature", "3"), ("2 The first law", "11"), ("3 Entropy", "19")]
+        ):
+            y = 130 + 14 * k
+            page.insert_text((72, y), title + " ." * 40, fontsize=BODY, fontname="helv")
+            page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.text for e in elements if "contents entry" in e.reasons] == [
+        "1 Temperature",
+        "2 The first law",
+        "3 Entropy",
+    ]
+    assert any(e.text.startswith("Part One") for e in elements if e.kind == Kind.PARAGRAPH)
+
+
 def test_two_lines_of_prose_that_end_in_an_ellipsis_are_not_a_contents_page():
     def fill(page):
         page.insert_text(
