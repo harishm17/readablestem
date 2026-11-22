@@ -200,7 +200,11 @@ rules above.
    `CAPTION_ALIGNMENT`). And two text columns (a body and its sidebar, paired at their
    sentence ends) are not a table: two columns, prose in one of them, and fewer than half the
    lines with a cell in each (`TEXT_COLUMN_SHARE`; a line or two that stand level are no rows).
-   A "Table N" line under it still makes it one (`_text_block_dropped`).
+   A "Table N" line under it still makes it one, and so do short labels that each stand level
+   with the first line of a run in the other column (a schedule: "Week 1" and its description
+   over three lines; the line above the run ends a sentence or is a paragraph's space away):
+   a body beside a sidebar has lines of its own in both columns that stand level with nothing
+   (`_text_block_dropped`, `_labels_open_runs`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
    sides), **SLANet-plus** (PaddlePaddle's table-structure model, run as RapidTable does,
@@ -257,7 +261,9 @@ rules above.
    measured from the caption block's nearest edge: over the table, from the block's last line
    (a caption of up to eight lines), not from its first; under it, from its first line (a caption
    of up to eight lines there too: it was cut at four, so a long caption lost its last lines to the
-   text under the table, `CAPTION_LINES_BELOW`). Where
+   text under the table, `CAPTION_LINES_BELOW`), but a line that ends a sentence, with a sentence
+   starting on the next after a wider space than the caption's own line space (or, for a caption
+   of one line, the next line's own), ends it: the paragraph under the table. Where
    two tables are stacked, a caption goes to the nearer table. The pattern is
    `core/captions.py`, shared with the HTML check below and with figure captions. A caption is
    never invented.

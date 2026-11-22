@@ -16,7 +16,8 @@
   - A web address printed on two lines (O-046, O-156, O-021): one address, with no space where
     the file's link annotations run across the break.
   - Table captions and two text columns (O-061, O-150): a caption under a table keeps its first
-    eight lines; a body column beside a sidebar is two columns of text, not a table.
+    eight lines, up to the paragraph that follows it; a body column beside a sidebar is two columns
+    of text, not a table, but a schedule of labels and descriptions stays one.
   - Equation leftovers (O-042, O-048, O-134, O-129): nothing for a reader (the printed-equation
     score and one shared table of bracket pieces).
   - The page tool "Split it" (O-030, O-035): a paragraph or list item whose options run together
@@ -204,9 +205,15 @@
 - A caption under a table was cut at its fourth line (`CAPTION_LINES_BELOW` 3, so the first line
   and three more): a longer one lost its last lines, which then stood as a paragraph under the
   table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
-  may now run to eight lines, as it may over the table (`tables._caption_lines`). On the 519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole now;
-  of 123 captions under a table, 46 have more than one line and none of them was a one-line caption
-  with a paragraph taken in. The corpus replay (73 uploads): two differ, `r18_arxiv_opt`, whose
+  may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
+  where a line ends a sentence and the next starts one after a wider space than the caption's own
+  line space (for a caption of one line, the next line's own): a one-line "Table 1: ..." caption
+  over a paragraph set 3 pt or more looser than its lines does not take the paragraph in. A
+  paragraph set at the caption's own line pitch cannot be told from the caption's next line and
+  is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
+  519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole
+  now; of 123 captions under a table, 46 have more than one line, and the stop changes none of the
+  996 layout results or 73 replayed uploads. The corpus replay (73 uploads): two differ, `r18_arxiv_opt`, whose
   Table 1 caption is whole and whose dangling paragraph is gone (105 elements, now 103), and `s02_syllabus_sidebar` (below); the
   requests it cannot replay are 38 of 52 before and after, so no recorded answer stops matching
   because of this. Corpus layout (996 results): 23 differ, all in the 7 PDFs this change reaches.
@@ -214,9 +221,13 @@
   sidebar) gave a false two-column table, the sidebar's lines paired with body lines. A box found from text with two columns, prose in
   one and fewer than half its lines with a cell in each column is now two columns of text
   (`tables._text_block_dropped`, `TEXT_COLUMN_SHARE`), unless a "Table N" line says it is a
-  table. Of 827 boxes of this kind that were kept on the public sets, 2 are two columns with prose
-  and fewer than half their lines paired: this page and one page of an OpenStax book that was not
-  a table in the end either. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,
+  table, or short labels that each stand level with the first line of a run in the other column
+  (a schedule: "Week 1" with its description over three lines; the line above the run ends a
+  sentence or is a paragraph's space away; `tables._labels_open_runs`): that is a table, as it
+  was before this rule (a borderless schedule with no caption had become ten paragraphs). Of 827
+  boxes of this kind that were kept on the public sets, 2 are two columns with prose and fewer
+  than half their lines paired: this page and one page of an OpenStax book that was not a table in
+  the end either; neither has labels that open runs, and the rule keeps the same two out. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,
   with the new rule off (`tests/test_region_tree.py`).
 - Benchmark `table_tests`: 70.6 before and after (857 checks); baseline 100.0. The public table
   evaluation (`eval pipeline --task tables --mode local`, 5 real documents with 25 tables, 200
