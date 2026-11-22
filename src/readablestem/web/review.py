@@ -1654,12 +1654,9 @@ def table_checks(grid: TableGrid, element: Element | None, fix: Fix | None = Non
 
     if element is None:
         return []
-    printed = (
-        table_step.stored_words(element)
-        if fix is not None and table_step.facts_were_sent(fix.calls)
-        else None
-    )
-    return list(table_step.table_checks(grid, element, printed))
+    if fix is not None and table_step.facts_were_sent(fix.calls):
+        return list(table_step.table_checks(grid, element, table_step.stored_words(element)))
+    return list(table_step.table_checks(grid, element))
 
 
 def _refuse_new_problems(
