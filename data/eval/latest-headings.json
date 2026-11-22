@@ -182,6 +182,10 @@
       "medium": 0.7
     },
     "pipeline.image_page.DEFAULT_EFFORT": "low",
+    "pipeline.image_page.LAYER_FUZZY_MAX": 600,
+    "pipeline.image_page.LAYER_MAX_MISSING": 0.15,
+    "pipeline.image_page.LAYER_MIN_WORDS": 20,
+    "pipeline.image_page.LAYER_SAME_WORD": 0.8,
     "pipeline.image_page.MAX_OUTPUT_TOKENS": 6144,
     "pipeline.image_page.MAX_SIDE_PX": 2576,
     "pipeline.image_page.RECOVERY_MARGIN": 15,
@@ -215,6 +219,7 @@
     "pipeline.page_witness.SPLIT_MIN_ROWS": 6,
     "pipeline.run.CONTEXT_CHARS": 600,
     "pipeline.table_step.BASE_OUTPUT_TOKENS": 2048,
+    "pipeline.table_step.CONTEXT_CHARS": 8000,
     "pipeline.table_step.MAX_OUTPUT_TOKENS": 16384,
     "pipeline.table_step.MIN_OUTPUT_TOKENS": 4096,
     "pipeline.table_step.NOTE_CODES": [
@@ -236,7 +241,7 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "6eecee980724426cbe9a6b7dcd5407a69dd65119",
+    "commit": "bd11850d94a5f864bebbfd3c446b457f27a2dfa3",
     "clean": true,
     "pipeline_version": "0.5.16",
     "render_version": 11,
