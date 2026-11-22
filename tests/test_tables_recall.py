@@ -278,8 +278,13 @@ def test_a_long_caption_is_measured_from_its_nearest_line_and_stays_with_its_tab
     assert other.caption == " ".join(second)
 
 
-@pytest.mark.parametrize("shift", [0.0, 3.5, -4.5])  # a mark set off its line: none, below, above
-def test_a_caption_of_six_lines_under_its_table_is_whole(shift):
+@pytest.mark.parametrize(
+    ("shift", "pushed"),
+    # a mark set off its line: none, below, above; a line set 2 pt lower (a tall formula in it)
+    # that starts with a capital, after a line that ends no sentence
+    [(0.0, False), (3.5, False), (-4.5, False), (0.0, True)],
+)
+def test_a_caption_of_six_lines_under_its_table_is_whole(shift, pushed):
     # A line ends a sentence and the next starts one, as in a caption of several sentences: the
     # stop for the paragraph after a caption measures the step between baselines, so a
     # subscript or a raised mark on a line (its box reaches lower or higher) does not read as a
@@ -290,13 +295,15 @@ def test_a_caption_of_six_lines_under_its_table_is_whole(shift):
         "The part 2 of a caption that runs on",
         *(f"and the part {i} of a caption that runs on" for i in range(3, 6)),
     ]
+    if pushed:
+        lines[3] = lines[3].capitalize()
 
     marked = 0 if shift > 0 else 1  # the line whose box is taller: before the first, or after
 
     def fill(page):
         grid_table(page, PENDULUM, y0=150)
         for i, line in enumerate(lines):
-            y = 250 + 12 * i
+            y = 250 + 12 * i + (2 if pushed and i >= 3 else 0)
             if i != marked or not shift:
                 write(page, 100, y, line, 10)
                 continue
@@ -312,19 +319,30 @@ def test_a_caption_of_six_lines_under_its_table_is_whole(shift):
 
 @pytest.mark.parametrize(
     "caption",
-    # a caption that ends a sentence, and one with no full stop at its end
-    ["Table 1. Measured periods of the pendulum.", "Table 1: Measured periods of the pendulum"],
+    # one line that ends a sentence, and four lines with no full stop at their end (a caption was
+    # cut to four lines before it could run to eight)
+    [
+        ["Table 1. Measured periods of the pendulum."],
+        [
+            "Table 1: Measured periods of the pendulum",
+            "for the five lengths of string, each timed",
+            "twice over ten full swings, with the mean",
+            "of the two trials in the last column",
+        ],
+    ],
 )
-def test_a_one_line_caption_under_its_table_leaves_the_paragraph_after_it(caption):
+def test_a_caption_under_its_table_leaves_the_paragraph_after_it(caption):
     paragraph = [
         f"line {i} of the paragraph that follows the caption, which is body text" for i in range(6)
     ]
 
     def fill(page):
         grid_table(page, PENDULUM, y0=150)
-        write(page, 100, 250, caption, 10)
-        for i, line in enumerate(paragraph):  # 3 pt more than the line pitch before the first
-            write(page, 100, 265 + 12 * i, line.capitalize(), 10)
+        for i, line in enumerate(caption):
+            write(page, 100, 250 + 12 * i, line, 10)
+        top = 250 + 12 * len(caption) + 3  # 3 pt more than the line pitch before the paragraph
+        for i, line in enumerate(paragraph):
+            write(page, 100, top + 12 * i, line.capitalize(), 10)
 
     (found,) = data_tables(pdf(fill))
-    assert found.caption == caption
+    assert found.caption == " ".join(caption)

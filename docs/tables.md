@@ -265,8 +265,10 @@ rules above.
    of up to eight lines there too: it was cut at four, so a long caption lost its last lines to the
    text under the table, `CAPTION_LINES_BELOW`), but a sentence starting on the next line after a
    step more than 1 pt wider than the caption's own line step (or, for a caption of one line, the
-   next line's own) ends it, whether or not the caption's line ends with a full stop: the
-   paragraph under the table. Steps
+   next line's own) ends it: the paragraph under the table. Within the first four lines (where
+   the caption used to be cut, `CAPTION_LINES_CUT`) the caption's line must also end a sentence,
+   so a line pushed down by a tall formula does not cut a caption mid-sentence; past them any
+   line may end it. Steps
    are measured baseline to baseline (`_baseline`), so a subscript or a raised mark on a line does
    not change them. Where
    two tables are stacked, a caption goes to the nearer table. The pattern is

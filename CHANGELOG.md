@@ -238,8 +238,9 @@
   table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
   may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
   where the next line starts a sentence after a step wider than the caption's own line step by
-  more than 1 pt (for a caption of one line, the next line's own), whether or not the caption's
-  line ends with a full stop, steps measured from baseline to baseline so that a subscript or a
+  more than 1 pt (for a caption of one line, the next line's own); within its first four lines
+  the caption's line must also end a sentence, so a line pushed down by a tall formula does not
+  cut it mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`), steps measured from baseline to baseline so that a subscript or a
   raised mark on a line does not make a step look small or wide: a "Table 1: ..." caption over a
   paragraph set more than 1 pt looser than its lines does not take the paragraph in. A
   paragraph set at the caption's own line pitch cannot be told from the caption's next line and

@@ -110,6 +110,9 @@ EDGE_COLUMN_TOLERANCE = 3.0  # pt: it starts where a column of the grid starts, 
 CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (as figures)
 CAPTION_LINES_ABOVE = 7  # lines that may follow a caption's first line, over its table
 CAPTION_LINES_BELOW = 7  # ... under its table (as over it: a long caption runs to eight lines)
+# Lines a caption under a table was cut to before it could run to eight: past them, a wider step
+# to a line that starts a sentence ends it even when its line does not end one.
+CAPTION_LINES_CUT = 4
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
 WORD_GRID_ROWS = 6  # ... no more rows than this, no digit, and no "Table N" caption
@@ -3745,10 +3748,12 @@ def _caption_lines(
 ) -> list[int]:
     """The caption's first line and the lines that continue it (same size, line pitch,
     overlapping it), away from the table when below it, towards it when above. Under a table
-    it stops at a sentence's end when the next line starts a sentence and its step from the
-    line before (baseline to baseline, so a subscript or a raised mark does not change it) is
-    more than `PARAGRAPH_STEP` wider than the caption's own line step (or, for a one-line
-    caption, the next line's own): the paragraph that follows."""
+    it stops at a sentence's end (or, past `CAPTION_LINES_CUT` lines, at any line's end) when
+    the next line starts with a capital and its step from the line before (baseline to
+    baseline, so a subscript or a raised mark does not change it) is more than
+    `PARAGRAPH_STEP` wider than the caption's own line step (or, for a one-line caption, the
+    next line's own): the paragraph that follows. A line pushed down by a tall formula inside
+    the first lines of a caption does not end it unless the line before ends a sentence."""
     members = [first]
     current = view.lines[first]
     size = max((c.size for c in current.chars if not c.blank), default=10.0)
@@ -3776,7 +3781,11 @@ def _caption_lines(
         if found is None:
             break
         best, step = found
-        if side == "below" and _SENTENCE_START.match(_line_text(view.lines[best])):
+        if (
+            side == "below"
+            and (_SENTENCE_END.search(_line_text(current)) or len(members) >= CAPTION_LINES_CUT)
+            and _SENTENCE_START.match(_line_text(view.lines[best]))
+        ):
             if pitch is None:  # a one-line caption: the lines of the next paragraph
                 after = following(view.lines[best], [*members, best])
                 pitch = after[1] if after else None
