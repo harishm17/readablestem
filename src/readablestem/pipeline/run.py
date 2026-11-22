@@ -1228,7 +1228,13 @@ class _Run:
         parent = self.parents.get(element.parent_id or "")
         across = layout.line_across(parent, element)
         try:
-            glyphs = layout.line_glyphs(self.pdf_bytes, element, across, reach=reach)
+            glyphs = layout.line_glyphs(
+                self.pdf_bytes,
+                element,
+                across,
+                reach=reach,
+                facts=self.settings.equation_file_facts,
+            )
         except Exception as exc:
             log.warning("glyph read failed: %s", type(exc).__name__)
             return

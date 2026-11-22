@@ -151,7 +151,10 @@ UNTRUSTED_NOTICE = (
 )
 
 
-def fence_untrusted(text: str, limit: int = 2000, *, notice: bool = True) -> str:
+FENCE_LIMIT = 2000  # characters of document text a fence keeps unless a request says more
+
+
+def fence_untrusted(text: str, limit: int = FENCE_LIMIT, *, notice: bool = True) -> str:
     """Wrap document text as data. Strips our own tag names so text cannot close the fence.
 
     `notice` False leaves the fixed `UNTRUSTED_NOTICE` out: the caller then carries it in

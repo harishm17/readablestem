@@ -37,6 +37,7 @@ from readablestem.pipeline.layout.glyphs import (
     _BRACKETS,
     _TEXT_MAP,
     _Char,
+    _char_class,
     _font_traits,
     face_traits,
     glyph_style,
@@ -60,6 +61,36 @@ from readablestem.pipeline.parse import is_math_alphanumeric
 _BIG_OPERATORS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a")
 LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first
 LINE_GLYPH_ROW = 0.5  # x the span's height: how far off the span's row a neighbour may sit
+# `GlyphContext.how`: the raw character's "how" (`glyph_names`, `font_codes`) as one letter.
+_HOW_CODES = {None: "-", "name": "n", "font": "f", "gap": "g"}
+# Neighbours that are maths (`_char_class`: maths, digit, operator, bracket), not words.
+_MATHS_CLASSES = "MDOB"
+LIFT_RAISED = 0.2  # a script glyph this far (x the text size) above the box's baseline is raised
+LIFT_LOWERED = 0.08  # ... and this far below it, lowered
+
+
+def _lifts(chars: Sequence[_Char]) -> str:
+    """`GlyphContext.lift` of the glyphs of a box, one letter each: "^" for a glyph smaller than
+    the box's text (`SCRIPT_RATIO`) that sits above its baseline, "v" for one below, "-" for
+    any other. The box's text is its largest glyphs (those from 0.85 of the largest size) and
+    its baseline the median of theirs. A glyph as large as the text is never marked: a
+    fraction's numerator is on its own line, which the picture shows and this does not say."""
+    inked = [c for c in chars if not c.blank]
+    if not inked:
+        return "-" * len(chars)
+    size = max(c.size for c in inked)
+    baselines = sorted(c.baseline for c in inked if c.size >= SCRIPT_RATIO * size)
+    base = baselines[len(baselines) // 2]
+    marks = []
+    for c in chars:
+        rise = base - c.baseline
+        if c.blank or c.size >= SCRIPT_RATIO * size:
+            marks.append("-")
+        else:
+            marks.append(
+                "^" if rise > LIFT_RAISED * size else "v" if rise < -LIFT_LOWERED * size else "-"
+            )
+    return "".join(marks)
 
 
 def line_glyphs(
@@ -68,11 +99,14 @@ def line_glyphs(
     across: tuple[float, float] | None = None,
     *,
     reach: bool = True,
+    facts: bool = False,
 ) -> GlyphContext | None:
     """The glyphs of an equation's span and, for an inline equation, of the line it sits in
     (the region of `crop_line`, `_line_clip`): those on the span's own row, left and right of
     it, nearest first (`LINE_GLYPH_REACH` each; `reach` False: none). A display equation has its
-    own glyphs only.
+    own glyphs only. `facts` (`EQUATION_FILE_FACTS`): also how each glyph of the span was
+    recovered, whether it sits raised or lowered, and the maths glyphs beside it
+    (`GlyphContext.how`, `lift`, `math_before`, `math_after`); without it they stay empty.
     None when the page is turned, or no glyph lies under the span (a picture)."""
     with _LOCK:
         _quiet_mupdf()
@@ -91,6 +125,10 @@ def line_glyphs(
             height = max(y1 - y0, 4.0)
             row = (y0 - LINE_GLYPH_ROW * height, y1 + LINE_GLYPH_ROW * height)
             span: list[tuple[str, str | None]] = []
+            span_chars: list[_Char] = []
+            how: list[str] = []
+            math_left: list[tuple[float, tuple[str, str | None]]] = []
+            math_right: list[tuple[float, tuple[str, str | None]]] = []
             items: list[glyph_reconcile.Item] = []
             fonts_exact = page_type.producer_hint(doc) == "tex"
             scripts: set[str] = set()
@@ -118,19 +156,27 @@ def line_glyphs(
                             entry = (" " if glyph.blank else glyph.styled, glyph_style(glyph))
                             if x0 - 0.5 <= cx <= x1 + 0.5 and y0 - 0.5 <= cy <= y1 + 0.5:
                                 span.append(entry)
+                                if facts and entry[0]:  # one of each for each pair of `span`
+                                    span_chars.append(glyph)
+                                    how.append(
+                                        _HOW_CODES.get(ch.get("how"), "?" if "how" in ch else "-")
+                                    )
                                 items.append(glyph_reconcile.Item(text, gx0, gx1, cy, size))
                                 if not text.isascii() and not glyph_reconcile.tex_font(font):
                                     fonts_exact = False
                                 if text.isalpha() and glyph_reconcile.script_font(font):
                                     scripts.add(base_char(text))
                             elif inline and row[0] <= cy <= row[1]:
-                                (left if cx < x0 else right).append(
-                                    (abs(cx - (x0 if cx < x0 else x1)), entry)
-                                )
+                                nearest = (abs(cx - (x0 if cx < x0 else x1)), entry)
+                                (left if cx < x0 else right).append(nearest)
+                                if facts and _char_class(glyph) in _MATHS_CLASSES:
+                                    (math_left if cx < x0 else math_right).append(nearest)
             if not any(c.strip() for c, _ in span):
                 return None
             left.sort(key=lambda pair: pair[0])
             right.sort(key=lambda pair: pair[0])
+            math_left.sort(key=lambda pair: pair[0])
+            math_right.sort(key=lambda pair: pair[0])
             return GlyphContext(
                 span=GlyphContext.encode(span),
                 before=GlyphContext.encode(g for _, g in left[:LINE_GLYPH_REACH]),
@@ -138,6 +184,10 @@ def line_glyphs(
                 tex=fonts_exact,
                 labels=" ".join(glyph_reconcile.edge_labels(items)),
                 scr="".join(sorted(c for c in scripts if len(c) == 1 and c.isupper())),
+                how="".join(how),
+                lift=_lifts(span_chars) if facts else "",
+                math_before=GlyphContext.encode(g for _, g in math_left[:LINE_GLYPH_REACH]),
+                math_after=GlyphContext.encode(g for _, g in math_right[:LINE_GLYPH_REACH]),
             )
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()

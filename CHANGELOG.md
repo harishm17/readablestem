@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
+
+- New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
+  in the Railway web variables). Off, every request, recording key and result is what it was
+  (`hashrun.py full` and `analyze` against 9e16778c: no difference).
+- On, the equation step's request carries a `<file_characters>` block with the glyphs the PDF stores
+  under the box, one by one, with style, raised or lowered marks, `[gap]` for a glyph the file does not
+  name and a `{name}`, `{font}` or `{guess}` label on those recovered another way, and the count of
+  glyphs not named. The block is untrusted document text. More than 30% gaps, more than 250 glyphs or
+  no glyph: today's request. New prompts `equation_file.md` and `check_equation_file.md` (added to the
+  equation prompt and to the second check; the existing prompts are unchanged); the reply has
+  `characters_differ` and `difference`, kept as `EquationFix.file_difference`.
+- The second check gets the box's glyphs and the math glyphs beside the box
+  (`Verifier.equation_match(..., facts=)`); its recording key changes only when `facts` is given.
+- With the switch on, `EquationFix.restyled` counts the rules (`bold_italic`, `script`, `reconcile`)
+  that still change an answer. Nothing is removed.
+- `EQUATION_FILE_FACTS=true` in the environment turns the switch on in a replay
+  (`eval.measure.with_arm_from_environment`); `tests/workflows/harness.OWED_WITH_EQUATION_FILE_FACTS`
+  lists the recorded answers it would owe. No pipeline or render bump while it is off; turning it on
+  needs a `PIPELINE_VERSION` bump and a refresh of the equation answers.
+
 ## Pipeline 0.5.16, render 11 (2026-11-21)
 
 - `PIPELINE_VERSION` is 0.5.16 and `RENDER_VERSION` stays 11: one raise of the pipeline for every

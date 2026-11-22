@@ -131,6 +131,13 @@ class Settings(BaseSettings):
     # (docs/eval-dev-baseline-2026-11-03.md, "Reading push"); production's value is in the
     # profile.
     equation_glyph_reconcile: bool = False
+    # The equation request carries the characters the file stores under the box, glyph by glyph,
+    # as the file's own account (`pipeline/file_account.py`, prompt `equation_file`), and the
+    # second check is given the same account (SW55 a and b). Needs EQUATION_GLYPH_CHECKS, which
+    # reads the glyphs. Off: every request is what it was. Turning it on changes the equation
+    # request, so the recorded answers of the equations with glyphs stop matching; it comes with a
+    # re-recording and a PIPELINE_VERSION bump. Production's value is in the profile.
+    equation_file_facts: bool = False
     # One printed display, one element (`layout.analyze(display_grouping=True)`, docs/layout.md):
     # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
     # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to

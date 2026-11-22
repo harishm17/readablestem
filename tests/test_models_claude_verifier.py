@@ -68,6 +68,19 @@ def _router(monkeypatch):
 # ---------------------------------------------------------------- the request
 
 
+def test_the_equation_check_gets_the_files_account_of_the_box_only_when_there_is_one():
+    facts = (
+        "<file_characters>\nin the box:\nitalic: x 2\nleft of the box:\n(none)\n</file_characters>"
+    )
+    wire = Wire(message_body(text=MATCH))
+    verifier(wire).equation_match(PNG, latex="x^2", facts=facts)
+    verifier(wire).equation_match(PNG, latex="x^2")
+    sent, plain = (json.dumps(wire.body(i)) for i in (0, 1))
+    assert "in the box:" in sent and "x^2" in sent and "left of the box" in sent
+    assert "in the box:" not in plain and "file_characters" not in plain
+    assert plain.count("PDF's own record") == 0 and sent.count("PDF's own record") == 1
+
+
 # ---------------------------------------------------------------- the answers
 
 

@@ -293,8 +293,10 @@ class ProxyVerifier:
     def figure_alt(self, png: bytes, *, alt: str, caption: str | None) -> Any:
         return self._ask("figure_alt", png, alt=alt, caption=caption)
 
-    def equation_match(self, png: bytes, *, latex: str) -> Any:
-        return self._ask("equation_match", png, latex=latex)
+    def equation_match(self, png: bytes, *, latex: str, facts: str | None = None) -> Any:
+        if facts is None:
+            return self._ask("equation_match", png, latex=latex)
+        return self._ask("equation_match", png, latex=latex, facts=facts)
 
 
 class ProxyClient:

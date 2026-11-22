@@ -241,6 +241,16 @@ class EquationFix(BaseModel):
     # the PDF's own glyphs (`pipeline.glyph_reconcile`; the fix's `equation.pdf_correction` note
     # says which rule). `latex` is the corrected reading. None: nothing was corrected.
     model_latex: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # `EQUATION_FILE_FACTS`: what the reader said differs between the picture and the file's
+    # characters it was given (`pipeline.file_account`), a short statement kept as it came. None:
+    # it said nothing differs, or the request carried no characters.
+    file_difference: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # `EQUATION_FILE_FACTS`: the corrections after the answer that changed the reading and leave
+    # no note: "bold_italic" (`restyle_bold_italic`) and "script" (`restyle_script`).
+    # With the `equation.pdf_correction` notes and `model_latex`, which name the others
+    # (`_reconcile`), a job's stored fixes say how often each correction still acted when the
+    # request carried the file's characters. Empty when the setting is off.
+    restyled: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
 
 
 # --------------------------------------------------------------------------- tables
@@ -671,6 +681,17 @@ class GlyphContext(BaseModel):
     tex: bool = Field(default=False, exclude_if=lambda v: not v)
     labels: str = Field(default="", exclude_if=lambda v: not v)
     scr: str = Field(default="", exclude_if=lambda v: not v)
+    # For `EQUATION_FILE_FACTS` (`pipeline.file_account`), one character for each pair of `span`
+    # and in its order. `how`: how the character was recovered, "-" the file's own table, "n" read
+    # by the glyph's name, "f" by the font-code table, "g" a gap (the file does not name the
+    # glyph), "?" any other way (a guess). `lift`: "^" raised, "v" lowered, "-" on the line, for a
+    # glyph smaller than the box's text. `math_before` and `math_after`: the neighbours on the row
+    # that are maths (a digit, an operator, a bracket, a maths letter), nearest first, as `before`
+    # and `after`. All empty unless the setting is on.
+    how: str = Field(default="", exclude_if=lambda v: not v)
+    lift: str = Field(default="", exclude_if=lambda v: not v)
+    math_before: str = Field(default="", exclude_if=lambda v: not v)
+    math_after: str = Field(default="", exclude_if=lambda v: not v)
 
     @staticmethod
     def encode(glyphs: Iterable[tuple[str, str | None]]) -> str:

@@ -44,7 +44,7 @@ from sqlalchemy import select
 from fixtures.web.support import fetch, job_id_from, login, make_settings, token, upload
 from readablestem.config import Settings
 from readablestem.core.types import DocumentResult
-from readablestem.eval import corpus
+from readablestem.eval import corpus, measure
 from readablestem.observability.logging import FIELDS_ATTR
 from readablestem.ops import profile
 from readablestem.pipeline import table_model
@@ -56,6 +56,7 @@ from readablestem.web.worker import Worker, default_client_factory
 
 __all__ = [
     "OWED",
+    "OWED_WITH_EQUATION_FILE_FACTS",
     "UPLOADS",
     "Ran",
     "ReplaySite",
@@ -101,6 +102,20 @@ def owed_answers() -> dict[str, int]:
 
 
 OWED = owed_answers()
+
+# With `EQUATION_FILE_FACTS` on (arm B of SW55) the equation request carries the file's
+# characters, so a recorded equation answer no longer matches (rule 10): the files below owe
+# the count shown instead of `OWED`'s. Measured 2026-11-22 as `EQUATION_FILE_FACTS=true readablestem
+# eval burden` against the same run with the switch off, on the files this machine can replay;
+# a file whose answers are kept out of it is not measured here and keeps its `OWED` count, so
+# measure it where the private corpus is before the switch goes on. Used only when the replay site
+# has the switch on (`ReplaySite.owed`); the default list above is not touched by it.
+OWED_WITH_EQUATION_FILE_FACTS = OWED | {
+    "r15_openstax_chem_ch3": 94,
+    "s10_slides_boxes": 4,
+    "s13_textbook_margin": 4,
+    "s18_exam_twocol": 4,
+}
 
 
 # The audit's register of findings numbers its rows F-001 to F-558. A finding met while
@@ -214,7 +229,7 @@ class ReplaySite:
             # Replay sends nothing, so any key will do; a live refresh brings the real one.
             anthropic_api_key=os.environ.get("ANTHROPIC_API_KEY") or "sk-ant-replay-sends-nothing",
         )
-        applied = profile.load().apply(base)
+        applied = measure.with_arm_from_environment(profile.load().apply(base))
         self.settings = Settings(**(applied.model_dump() | overrides)) if overrides else applied
         self._clients: list[Any] = []
         self._folder = folder
@@ -286,6 +301,11 @@ class ReplaySite:
             self._clients.append(client.second_check)
         return client
 
+    def owed(self, entry_id: str) -> int:
+        """The answers `entry_id` still owes the recording under this site's settings."""
+        owed = OWED_WITH_EQUATION_FILE_FACTS if self.settings.equation_file_facts else OWED
+        return owed.get(entry_id, 0)
+
     def convert(self, entry_id: str, *, image_pages: bool = False, exam: bool = False) -> str:
         """Upload the corpus file as the owner and convert it. Returns the job's id. Fails
         the test when the upload is refused, or when the conversion needed an answer the
@@ -328,7 +348,7 @@ class ReplaySite:
             }
             with (Path(LOG) / f"{os.getpid()}.jsonl").open("a", encoding="utf-8") as out:
                 out.write(json.dumps(line) + "\n")
-        owed = OWED.get(entry_id, 0)
+        owed = self.owed(entry_id)
         if MODE != "live" and sum(missed.values()) != owed:
             lines = "".join(f"\n  {count} x {why}" for why, count in missed.most_common())
             pytest.fail(
