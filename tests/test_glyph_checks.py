@@ -156,8 +156,9 @@ def pdf():
     layout.release()
 
 
-def with_glyphs(pdf: bytes, element: Element) -> Element:
-    return element.model_copy(update={"glyphs": layout.line_glyphs(pdf, element, (72, 540))})
+def with_glyphs(pdf: bytes, element: Element, *, facts: bool = False) -> Element:
+    glyphs = layout.line_glyphs(pdf, element, (72, 540), facts=facts)
+    return element.model_copy(update={"glyphs": glyphs})
 
 
 def answer(latex: str):
@@ -204,6 +205,36 @@ def test_a_bold_italic_vector_read_as_bold_upright_is_written_as_the_page_has_it
     fix = run(with_glyphs(pdf, span_of(pdf, "w", y=430)), r"\mathbf{w}")
     assert fix.equation is not None and fix.equation.latex == r"\boldsymbol{w}"
     assert failed_codes(fix) == set()
+
+
+@pytest.mark.parametrize("facts", [True, False])
+def test_the_request_carries_the_files_characters_only_with_the_setting_on(pdf, facts):
+    # `w` is Times-BoldItalic on the page, with `v` before it; the reading says \mathbf{w}
+    element = with_glyphs(pdf, span_of(pdf, "w", y=430), facts=facts)
+    reply = {"is_equation": True, "latex": r"\mathbf{w}", "confidence": 0.95}
+    client = FakeVisionClient(
+        responders={
+            "equation": lambda req: (
+                reply | {"characters_differ": True, "difference": "w is bold italic"}
+                if "<file_characters>" in (req.context_text or "")
+                else reply
+            )
+        }
+    )
+    settings = make_settings(equation_file_facts=facts)
+    fix = transcribe(element, b"\x89PNG", client=client, settings=settings)
+    request = client.requests[0]
+    assert ("<file_characters>" in (request.context_text or "")) is facts
+    assert ("The file's characters" in request.instructions) is facts
+    assert ("+equation_file-" in request.prompt_version) is facts
+    assert fix.equation is not None
+    assert fix.equation.file_difference == ("w is bold italic" if facts else None)
+    assert fix.equation.restyled == (["bold_italic"] if facts else [])  # counted for the arm
+    if facts:
+        assert "unmapped characters in the box: 0 of 1" in (request.context_text or "")
+        assert "bold italic: \U0001d498" in (request.context_text or "")  # as the file writes it
+    else:
+        assert element.glyphs is not None and not element.glyphs.how  # nothing new is read
 
 
 def test_a_bold_upright_vector_read_as_bold_italic_is_a_decision(pdf):

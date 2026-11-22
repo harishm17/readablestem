@@ -865,6 +865,7 @@ equation with no glyph under its box (a picture), have none. Display equations k
 With `EQUATION_GLYPH_RECONCILE` the context also says whether the PDF is TeX-made with every non-ASCII
 glyph of the span in a TeX font (`tex`), the equation numbers printed at an edge of the box (`labels`) and
 the capitals drawn in an RSFS or EUSM face (`scr`): `docs/steps.md`, "Corrections from the glyphs".
+With `EQUATION_FILE_FACTS` it also says how each glyph's character was recovered (`how`: name, font table or guess), whether it sits raised or lowered off the baseline (`lift`) and the math glyphs on each side of the box on its row (`math_before`, `math_after`); with the switch off these stay empty and are not written: `docs/steps.md`, "The file's characters in the request".
 
 ### Lists
 
