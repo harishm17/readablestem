@@ -377,15 +377,14 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   that runs as columns do is used (`order._find_gutter`, `_columns_run`,
   `MIN_HEAD_COLUMN_BALANCE`). Columns run unbroken: a line across the page that has lines of
   both columns above it and below it, or two or more breaks in the thinner column (a gap over
-  two line pitches with one to three lines of the other column beside it) that cut it into runs
+  1.25 line pitches with one to three lines of the other column beside it) that cut it into runs
   of fewer than five lines on average, are not columns but the questions of an exam with their
   options standing two by two under each (a, c, b, d was read), and the page is read as before.
   A line across the page with lines on one side only (a note under the columns whose last line
   is short and sits at the left; a caption with only a left remainder under it) or none above it
-  does not break them. What this still reads wrongly: an exam whose questions are short lines
-  set at the pitch of their options with no space between the questions (breaks of 1.35 line
-  pitches); no condition that catches it keeps `ax_astrophga_240306409` page 5 (breaks of 1.0
-  and 1.7 pitches), so it is read as before. The balance keeps a page of one column with
+  does not break them. An exam whose questions are short lines set at the pitch of their options
+  with no space between the questions has breaks of 1.35 pitches and is read question by
+  question too. The balance keeps a page of one column with
   a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
   lines in the right ones, a sentence across the page above) read row by row: the thinner side
   has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie

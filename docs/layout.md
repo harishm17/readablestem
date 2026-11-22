@@ -263,13 +263,12 @@ reader, neither to find them nor as a second opinion
    the page that has lines of both sides above and below it breaks them (a note across the
    page under the columns, whose last line is short and sits at the left, has lines of one
    side below it, and does not), and so do two or more breaks in the thinner side (a gap over
-   two line pitches with one to three lines of the other side beside it) that cut it into runs
-   of fewer than five lines on average. An exam whose short questions are set at the pitch of
-   their options with no space between questions has breaks of 1.35 pitches and is still read
-   a, c, b, d; the five column pages of the development set include breaks of 1.0 and 1.7
-   pitches, so the threshold cannot be lowered. The
-   lines of the head are then read in the
-   segments the lines across the page make (`order._find_gutter`).
+   1.25 line pitches with one to three lines of the other side beside it,
+   `MIN_BREAK_PITCHES`; an exam whose short questions are set at the pitch of their options
+   with no space between questions has gaps of 1.35) that cut it into runs of fewer than five
+   lines on average. A column page of the development set with one such break (1.7 pitches)
+   keeps its columns, and one with three breaks in 28 lines does too. The lines of the head are
+   then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
    gutter. Small sub/superscript fragments are folded into their line as one block, after

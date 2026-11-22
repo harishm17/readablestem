@@ -42,8 +42,10 @@ MAX_HEAD_STOPS = 8  # runs of lines across the page that a page's columns are lo
 MIN_HEAD_COLUMN_BALANCE = 0.4
 # ... and at least this many lines: a few option lines under one question are no columns.
 MIN_HEAD_COLUMN_LINES = 4
-# A hole in a column (a gap over two line pitches) that this many lines or fewer of the other
-# column stand beside is a break between groups of lines, not a figure.
+# A hole in a column (a gap over this many line pitches: an exam whose questions are set at the
+# pitch of their options with no space between them has 1.35) that MAX_BREAK_LINES lines or
+# fewer of the other column stand beside is a break between groups of lines, not a figure.
+MIN_BREAK_PITCHES = 1.25
 MAX_BREAK_LINES = 3
 # Columns cut by such breaks hold runs of at least this many lines on average (an exam's option
 # pairs hold two to four; the columns of a paper's first page, seven or more).
@@ -122,7 +124,7 @@ def _columns_run(sides: tuple[list[BBox], list[BBox]], wide: list[BBox]) -> bool
     pitch = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(rows))
     beside = _visual_lines(other)
     breaks = sum(
-        b[1] - a[3] > 2 * pitch
+        b[1] - a[3] > MIN_BREAK_PITCHES * pitch
         and 1 <= sum(a[3] - 1.0 <= o[1] and o[3] <= b[1] + 1.0 for o in beside) <= MAX_BREAK_LINES
         for a, b in itertools.pairwise(rows)
     )
