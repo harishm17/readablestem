@@ -2022,12 +2022,18 @@ def _labels_open_runs(grid: _Grid) -> bool:
         steps = [seg.y0 - other[line - 1].y0 for line, seg in other.items() if line - 1 in other]
         pitch = statistics.median(steps) if steps else 0.0
 
-        def opens(line: int, other: dict[int, _Seg] = other, pitch: float = pitch) -> bool:
+        def opens(
+            line: int,
+            label: dict[int, _Seg] = label,
+            other: dict[int, _Seg] = other,
+            pitch: float = pitch,
+        ) -> bool:
             above = other.get(line - 1)
             return (
                 above is None
                 or above.text.rstrip().endswith((".", "!", "?", ":", ";"))
                 or other[line].y0 - above.y0 > pitch + PARAGRAPH_STEP
+                or (line - 1 not in label and line + 1 not in label)
             )
 
         if len(label) >= BLOCK_MIN_LINES and all(
@@ -3727,14 +3733,22 @@ def _line_text(line: LineLike) -> str:
     return _marked(line.chars, [i in raised for i in range(len(line.chars))])
 
 
+def _baseline(line: LineLike) -> float:
+    """The line's baseline: the middle one of its glyphs' (`layout._Char` has it; ink bottoms
+    otherwise), so a subscript or a raised mark, which sit off it, do not move it."""
+    marks = sorted(getattr(c, "baseline", c.y1) for c in line.chars if not c.blank)
+    return marks[len(marks) // 2] if marks else line.bbox[3]
+
+
 def _caption_lines(
     view: _PageView, first: int, side: str, table: BBox, taken: set[int]
 ) -> list[int]:
     """The caption's first line and the lines that continue it (same size, line pitch,
     overlapping it), away from the table when below it, towards it when above. Under a table
-    it stops at a sentence's end when the next line starts a sentence and the space before it
-    is wider than the caption's own line space (or, for a one-line caption, the next line's
-    own): the paragraph that follows."""
+    it stops at a sentence's end when the next line starts a sentence and its step from the
+    line before (baseline to baseline, so a subscript or a raised mark does not change it) is
+    more than `PARAGRAPH_STEP` wider than the caption's own line step (or, for a one-line
+    caption, the next line's own): the paragraph that follows."""
     members = [first]
     current = view.lines[first]
     size = max((c.size for c in current.chars if not c.blank), default=10.0)
@@ -3753,7 +3767,7 @@ def _caption_lines(
             if abs(line_size - size) > 0.6 or (side == "above" and ly1 > table[1] + 1):
                 continue
             if best is None or ly0 < view.lines[best[0]].bbox[1]:
-                best = (i, gap)
+                best = (i, _baseline(line) - _baseline(of))
         return best
 
     pitch: float | None = None
@@ -3761,7 +3775,7 @@ def _caption_lines(
         found = following(current, members)
         if found is None:
             break
-        best, gap = found
+        best, step = found
         if (
             side == "below"
             and _SENTENCE_END.search(_line_text(current))
@@ -3770,9 +3784,9 @@ def _caption_lines(
             if pitch is None:  # a one-line caption: the lines of the next paragraph
                 after = following(view.lines[best], [*members, best])
                 pitch = after[1] if after else None
-            if pitch is not None and gap > pitch + PARAGRAPH_STEP:
+            if pitch is not None and step > pitch + PARAGRAPH_STEP:
                 break
-        pitch = gap
+        pitch = step
         members.append(best)
         current = view.lines[best]
     return members

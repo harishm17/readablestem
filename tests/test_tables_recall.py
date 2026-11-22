@@ -278,18 +278,36 @@ def test_a_long_caption_is_measured_from_its_nearest_line_and_stays_with_its_tab
     assert other.caption == " ".join(second)
 
 
-def test_a_caption_of_six_lines_under_its_table_is_whole():
-    lines = ["Table 1. Measured periods of the pendulum,"] + [
-        f"and the part {i} of a caption that runs on" for i in range(1, 6)
+@pytest.mark.parametrize("shift", [0.0, 3.5, -4.5])  # a mark set off its line: none, below, above
+def test_a_caption_of_six_lines_under_its_table_is_whole(shift):
+    # A line ends a sentence and the next starts one, as in a caption of several sentences: the
+    # stop for the paragraph after a caption measures the step between baselines, so a
+    # subscript or a raised mark on a line (its box reaches lower or higher) does not read as a
+    # wider space (`tables._caption_lines`).
+    lines = [
+        "Table 1. Measured periods of the pendulum,",
+        "and the part 1 of a caption that runs on.",
+        "The part 2 of a caption that runs on",
+        *(f"and the part {i} of a caption that runs on" for i in range(3, 6)),
     ]
+
+    marked = 0 if shift > 0 else 1  # the line whose box is taller: before the first, or after
 
     def fill(page):
         grid_table(page, PENDULUM, y0=150)
         for i, line in enumerate(lines):
-            write(page, 100, 250 + 12 * i, line, 10)
+            y = 250 + 12 * i
+            if i != marked or not shift:
+                write(page, 100, y, line, 10)
+                continue
+            head, rest = line[:20], line[20:]
+            x = 100 + pymupdf.get_text_length(head, fontsize=10)
+            write(page, 100, y, head, 10)
+            write(page, x, y + shift, "a", 7)
+            write(page, x + 4, y, rest, 10)
 
     (found,) = data_tables(pdf(fill))
-    assert found.caption == " ".join(lines)
+    assert found.caption is not None and found.caption.count("part") == 5
 
 
 def test_a_one_line_caption_under_its_table_leaves_the_paragraph_after_it():

@@ -219,9 +219,11 @@
   and three more): a longer one lost its last lines, which then stood as a paragraph under the
   table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
   may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
-  where a line ends a sentence and the next starts one after a wider space than the caption's own
-  line space (for a caption of one line, the next line's own): a one-line "Table 1: ..." caption
-  over a paragraph set 3 pt or more looser than its lines does not take the paragraph in. A
+  where a line ends a sentence and the next starts one after a step wider than the caption's own
+  line step by more than 1 pt (for a caption of one line, the next line's own), steps measured
+  from baseline to baseline so that a subscript or a raised mark on a line does not make a step
+  look small or wide: a one-line "Table 1: ..." caption over a paragraph set more than 1 pt
+  looser than its lines does not take the paragraph in. A
   paragraph set at the caption's own line pitch cannot be told from the caption's next line and
   is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
   519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole
@@ -234,10 +236,14 @@
   sidebar) gave a false two-column table, the sidebar's lines paired with body lines. A box found from text with two columns, prose in
   one and fewer than half its lines with a cell in each column is now two columns of text
   (`tables._text_block_dropped`, `TEXT_COLUMN_SHARE`), unless a "Table N" line says it is a
-  table, or short labels that each stand level with the first line of a run in the other column
-  (a schedule: "Week 1" with its description over three lines; the line above the run ends a
-  sentence or is a paragraph's space away; `tables._labels_open_runs`): that is a table, as it
-  was before this rule (a borderless schedule with no caption had become ten paragraphs). Of 827
+  table, or short labels that each stand level with a line of the other column and open a run
+  (a schedule: "Week 1" with its description over three lines; the line above the label ends a
+  sentence or is a paragraph's space away, or no other label stands on the line before or after
+  it, as the labels of a schedule stand a description apart and a sidebar's lines follow one
+  another; `tables._labels_open_runs`): that is a table, as it was before this rule for the
+  schedules built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to four lines a
+  description, with or without full stops and space between rows, the label level with the first
+  or the middle line; a borderless schedule with no caption had become ten paragraphs). Of 827
   boxes of this kind that were kept on the public sets, 2 are two columns with prose and fewer
   than half their lines paired: this page and one page of an OpenStax book that was not a table in
   the end either; neither has labels that open runs, and the rule keeps the same two out. The tree's refusal of the same box (`REFUSED_PROSE`) is still tested,

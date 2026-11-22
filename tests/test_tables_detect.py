@@ -513,35 +513,40 @@ def test_a_two_column_grid_of_prose_is_a_layout_grid():
 
 def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_sidebar_is_not():
     # "Week 1" ... "Week 5" with a description of three lines each, no rules, no caption: every
-    # label stands level with the first line of its description. A body beside a sidebar has
-    # lines of its own in both columns (`tables._labels_open_runs`).
+    # label stands level with a line of its description, and no label stands on the line next to
+    # another. A body beside a sidebar has lines of its own in both columns that stand level
+    # with nothing (`tables._labels_open_runs`).
     description = [
         "Kinematics in one dimension, unit {week}: position, velocity and",
         "acceleration; graphs of motion and how to read them in {week};",
-        "free fall near the surface of the Earth, case {week}.",
+        "free fall near the surface of the Earth, case {week}",
     ]
 
-    def schedule(page):
-        write(page, 72, 90, "Course schedule", 15)
-        write(
-            page,
-            72,
-            116,
-            "The term has five units. Each unit ends with a short quiz in its last class.",
-        )
-        y = 142.0
-        for week in range(1, 6):
-            write(page, 72, y, f"Week {week}")
-            for text in description:
-                write(page, 170, y, text.format(week=week))
-                y += 14
-            y += 8
-        write(
-            page,
-            72,
-            y + 12,
-            "Bring a calculator to every quiz. Formula sheets come with the paper.",
-        )
+    def schedule(label, level, period, skip):
+        def fill(page):
+            write(page, 72, 90, "Course schedule", 15)
+            write(
+                page,
+                72,
+                116,
+                "The term has five units. Each unit ends with a short quiz in its last class.",
+            )
+            y = 142.0
+            for week in range(1, 6):
+                for i, text in enumerate(description):
+                    if i == level:
+                        write(page, 72, y, label(week))
+                    write(page, 170, y, text.format(week=week) + ("." if period and i == 2 else ""))
+                    y += 14
+                y += skip
+            write(
+                page,
+                72,
+                y + 12,
+                "Bring a calculator to every quiz. Formula sheets come with the paper.",
+            )
+
+        return fill
 
     def sidebar(page):
         write(page, 72, 90, "Course schedule", 15)
@@ -550,7 +555,19 @@ def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_si
         for i, y in enumerate((120, 148, 162, 190, 232)):
             write(page, 340, y, f"Sidebar {i}")
 
-    assert [e.kind for e in analyze(pdf(schedule)).elements].count(Kind.TABLE) == 1
+    def week(n):
+        return f"Week {n}"
+
+    def date(n):
+        return f"Sep {7 * n - 5}"
+
+    for fill in (
+        schedule(week, 0, True, 8),  # the label level with the first line, a sentence end between
+        schedule(date, 0, False, 0),  # dates, no full stop and no extra space between rows
+        schedule(week, 1, True, 8),  # the label level with the middle line
+        schedule(date, 1, False, 0),
+    ):
+        assert [e.kind for e in analyze(pdf(fill)).elements].count(Kind.TABLE) == 1
     assert Kind.TABLE not in [e.kind for e in analyze(pdf(sidebar)).elements]
 
 
