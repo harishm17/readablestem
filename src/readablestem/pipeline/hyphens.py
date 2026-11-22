@@ -177,10 +177,12 @@ def link_cut(uri: str, first: str, second: str) -> tuple[str, str] | None:
     """What a printed address, linked on two lines, says about its break: (end of `first`,
     start of `second`), or None. `first` and `second` are the texts under two link
     annotations of the same `uri` on neighbouring lines. They are the address itself when
-    the two, with their spaces taken out, run on one after the other in the `uri`; a named
-    link ("Smith" over two lines) is not, and its break keeps its space."""
+    the two, with their spaces taken out, run on one after the other in the `uri` and what
+    they print is an address (it holds ".", "/", "@" or ":"). A named link ("Smith" over two
+    lines, or "Khan" / "Academy" under khanacademy.org, whose words run together are in the
+    `uri` too) is not, and its break keeps its space."""
     a, b = "".join(first.split()), "".join(second.split())
-    if not a or not b:
+    if not a or not b or not any(c in a + b for c in "./@:"):
         return None
     shown = _SCHEME.sub("", a + b, count=1).removeprefix("mailto:").lower()
     if shown not in _SCHEME.sub("", uri, count=1).removeprefix("mailto:").lower():
