@@ -3776,11 +3776,7 @@ def _caption_lines(
         if found is None:
             break
         best, step = found
-        if (
-            side == "below"
-            and _SENTENCE_END.search(_line_text(current))
-            and _SENTENCE_START.match(_line_text(view.lines[best]))
-        ):
+        if side == "below" and _SENTENCE_START.match(_line_text(view.lines[best])):
             if pitch is None:  # a one-line caption: the lines of the next paragraph
                 after = following(view.lines[best], [*members, best])
                 pitch = after[1] if after else None
