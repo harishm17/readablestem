@@ -262,12 +262,17 @@ reader, neither to find them nor as a second opinion
    short line at the left with its options two by two under it, are no columns: a line across
    the page that has lines of both sides above and below it breaks them (a note across the
    page under the columns, whose last line is short and sits at the left, has lines of one
-   side below it, and does not), and so do two or more breaks in the thinner side (a gap over
-   1.25 line pitches with one to three lines of the other side beside it,
-   `MIN_BREAK_PITCHES`; an exam whose short questions are set at the pitch of their options
-   with no space between questions has gaps of 1.35) that cut it into runs of fewer than five
-   lines on average. A column page of the development set with one such break (1.7 pitches)
-   keeps its columns, and one with three breaks in 28 lines does too. The lines of the head are
+   side below it, and does not), and so do breaks in the thinner side (a step from a line's
+   top to the next one's over 1.9 line pitches, `MIN_BREAK_PITCHES`, with one to three lines
+   of the other side or across the gap beside it: a short question that the gap runs through
+   stands in the break too) that cut it into runs of fewer than five lines on average. Measured
+   top to top, a question set at the pitch of its options with no space between questions
+   skips one line, 2 pitches, at any leading. A column page of the development set has one
+   such break in 10 lines on its thinner side, just enough to keep its columns, and a step of
+   1.78 pitches where a heading's space stands beside one line, which is no break; one with
+   three breaks in 28 lines keeps its columns too. An exam with one row of two options under
+   each question has no break in its option columns and is still read as columns (left
+   options first). The lines of the head are
    then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the

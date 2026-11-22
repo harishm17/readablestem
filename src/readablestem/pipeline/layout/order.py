@@ -42,10 +42,13 @@ MAX_HEAD_STOPS = 8  # runs of lines across the page that a page's columns are lo
 MIN_HEAD_COLUMN_BALANCE = 0.4
 # ... and at least this many lines: a few option lines under one question are no columns.
 MIN_HEAD_COLUMN_LINES = 4
-# A hole in a column (a gap over this many line pitches: an exam whose questions are set at the
-# pitch of their options with no space between them has 1.35) that MAX_BREAK_LINES lines or
-# fewer of the other column stand beside is a break between groups of lines, not a figure.
-MIN_BREAK_PITCHES = 1.25
+# A hole in a column (a step from a line's top to the next one's over this many line pitches: an
+# exam whose questions are set at the pitch of their options with no space between them skips a
+# line, 2, at any leading) that MAX_BREAK_LINES lines or fewer of the other column, or lines
+# across the gutter, stand beside is a break between groups of lines, not a figure. Measured on
+# the corpus: a column of a paper's page has a step of 1.78 where a heading's space stands beside
+# one line, which is no break.
+MIN_BREAK_PITCHES = 1.9
 MAX_BREAK_LINES = 3
 # Columns cut by such breaks hold runs of at least this many lines on average (an exam's option
 # pairs hold two to four; the columns of a paper's first page, seven or more).
@@ -96,20 +99,23 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
             thin, thick = sorted(map(len, sides))
             if thin < MIN_HEAD_COLUMN_BALANCE * thick or thin < MIN_HEAD_COLUMN_LINES:
                 continue
-            if _columns_run(sides, wide):
+            crossing = [b for b in under if b[2] > gutter[0] + 0.5 and b[0] < gutter[1] - 0.5]
+            if _columns_run(sides, wide, crossing):
                 return gutter
     return None
 
 
-def _columns_run(sides: tuple[list[BBox], list[BBox]], wide: list[BBox]) -> bool:
+def _columns_run(
+    sides: tuple[list[BBox], list[BBox]], wide: list[BBox], crossing: list[BBox]
+) -> bool:
     """Whether the two sides of a gutter under a head run as columns do, and not as the
     option lines of an exam do: a question is a line across the page, or a short line at the
     left, with its options standing two by two under it.
 
     Columns run unbroken. Neither a line across the page with lines of both sides above and
     below it (a caption or a note at the foot of the columns has them on one side or none),
-    nor several breaks in the thinner side where a few lines of the other stand (the questions
-    between the option pairs) cut them up.
+    nor breaks in the thinner side where a few lines of the other side or across the gutter
+    stand (the questions between the option pairs) cut them up into short runs.
     """
     for w in wide:
         if all(
@@ -122,13 +128,13 @@ def _columns_run(sides: tuple[list[BBox], list[BBox]], wide: list[BBox]) -> bool
     if len(rows) < 3:
         return True
     pitch = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(rows))
-    beside = _visual_lines(other)
+    beside = _visual_lines(other + crossing)
     breaks = sum(
-        b[1] - a[3] > MIN_BREAK_PITCHES * pitch
+        b[1] - a[1] > MIN_BREAK_PITCHES * pitch
         and 1 <= sum(a[3] - 1.0 <= o[1] and o[3] <= b[1] + 1.0 for o in beside) <= MAX_BREAK_LINES
         for a, b in itertools.pairwise(rows)
     )
-    return breaks < 2 or len(rows) >= MIN_RUN_LINES * (breaks + 1)
+    return not breaks or len(rows) >= MIN_RUN_LINES * (breaks + 1)
 
 
 def _gutter_of(

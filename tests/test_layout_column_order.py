@@ -120,18 +120,20 @@ def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column
 
 
 @pytest.mark.parametrize(
-    ("question", "options", "questions", "space"),
+    ("question", "options", "questions", "space", "pitch"),
     [
         # a question that runs the whole width of the page; one that stops short of the gutter,
-        # set at the pitch of its options with no space between the questions
-        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12),
-        ("Which statement about the forces is correct?", 4, 4, 0),
+        # set at the pitch of its options (single spacing) with no space between the questions
+        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16),
+        ("Which statement about the forces is correct?", 4, 4, 0, 13.2),
+        # two short questions only: the gutter runs through them
+        ("Which statement about the forces is correct?", 4, 2, 12, 16),
         # one question, six options: three lines a side under it
-        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12),
+        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16),
     ],
 )
 def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
-    question, options, questions, space
+    question, options, questions, space, pitch
 ):
     # An exam page of one column: centered head lines, an instruction across the page, then
     # questions with their options two by two under each. The option pairs look like two columns
@@ -158,7 +160,7 @@ def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
     y += 28
     for q in range(questions):
         page.insert_text((72, y), f"{q + 1}. " + question.format(q=q), fontsize=11)
-        y += 18 if space else 16
+        y += 18 if space else pitch
         for row in range(options // 2):
             for x, k in ((84, 2 * row), (320, 2 * row + 1)):
                 page.insert_text(
@@ -166,7 +168,7 @@ def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
                     f"option {'abcdef'[k]}{q} the net force on the block is zero",
                     fontsize=11,
                 )
-            y += 16
+            y += pitch
         y += space
     text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
     assert text.index("option b0") < text.index("option c0")

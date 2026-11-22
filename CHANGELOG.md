@@ -404,15 +404,18 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   many lines on its thinner side as on the other (at least 0.4 of them, and at least four) and
   that runs as columns do is used (`order._find_gutter`, `_columns_run`,
   `MIN_HEAD_COLUMN_BALANCE`). Columns run unbroken: a line across the page that has lines of
-  both columns above it and below it, or two or more breaks in the thinner column (a gap over
-  1.25 line pitches with one to three lines of the other column beside it) that cut it into runs
-  of fewer than five lines on average, are not columns but the questions of an exam with their
+  both columns above it and below it, or breaks in the thinner column (a step from a line's top
+  to the next one's over 1.9 line pitches with one to three lines of the other column, or of
+  lines the gap runs through, beside it) that cut it into runs of fewer than five lines on
+  average, are not columns but the questions of an exam with their
   options standing two by two under each (a, c, b, d was read), and the page is read as before.
   A line across the page with lines on one side only (a note under the columns whose last line
   is short and sits at the left; a caption with only a left remainder under it) or none above it
   does not break them. An exam whose questions are short lines set at the pitch of their options
-  with no space between the questions has breaks of 1.35 pitches and is read question by
-  question too. The balance keeps a page of one column with
+  with no space between the questions (single spacing: a skipped line is 2 pitches top to top at
+  any leading), and one of two questions only, are read question by question too. An exam with
+  one row of two options under each question has no break in its option columns and is still
+  read left options first. The balance keeps a page of one column with
   a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
   lines in the right ones, a sentence across the page above) read row by row: the thinner side
   has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie
