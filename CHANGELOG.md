@@ -392,11 +392,8 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   read as code), 3 other papers change by the numbered lines below (two of them also by the
   notice), and the notice is the only change in 1 file. Of the 73 converted uploads 5 change, by
   the notice alone. No page of a textbook changes: its four copies of a file, which this rule
-  once changed, are as they were. A head-stop gutter is also refused when a line across the page
-  lies between the top and the bottom of its two columns (an exam page of one column whose
-  questions each cross the page, their options standing two by two under them, was read as two
-  columns, each question's options split between a left and a right run); on the 996 analyzed
-  files and the 73 converted uploads this changes no file.
+  once changed, are as they were. The condition of no line across the page between the columns
+  changes none of the 996 analyzed files or the 73 converted uploads.
 - A numbered line that runs to the right edge no longer takes the next number into its block when
   it is the whole run so far: the affiliations of a paper, numbered 1, 2, 3 to the margin, were
   one paragraph (`figures._starts_block`). Inside a run of numbered lines it still reads as the
