@@ -694,6 +694,10 @@ WRAPPED_TITLE_INDENT = 5.0  # x size: the most its last line is set in from its 
 WRAPPED_TITLE_REACH = 6.0  # x size: how far from the page numbers' edge its first line stops
 _CONTENTS_HEADING = re.compile(r"(table of )?contents( \(continued\))?", re.IGNORECASE)
 _SHAPE_NUMBER = re.compile(r"\d{1,4}|[ivx]{1,6}")
+_SECTION_LABEL = re.compile(
+    r"(?:(?:Chapter|Section|Part|Appendix|Unit|Lecture)\s+)?"
+    r"(?:\d+(?:\.\d+)*|[A-Z](?:\.\d+)+|[IVX]+)\.?\s"
+)
 
 
 def _page_order(word: str) -> tuple[int, int]:
@@ -902,6 +906,7 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         if id(row) not in split and twin is None and _numbered_line(row) is None
     }
     right = statistics.median([(twin or row).x1 for row, twin in pairs if id(row) in split])
+    labelled = 2 * sum(_starts_with_label(r) for r in rows if id(r) in split) > len(split)
     for row, twin in pairs:
         aligned = twin is not None and abs(twin.x1 - edge) <= 1.5 * row.size
         if id(row) in split:
@@ -910,7 +915,7 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
             new = row
         else:
             continue
-        if head := _title_head(row, heads, right):
+        if not (labelled and _starts_with_label(row)) and (head := _title_head(row, heads, right)):
             new.contents_wrap = head
             heads.pop(id(head))
             entries.append((head, head))
@@ -931,6 +936,13 @@ def _ends_in_number(row: _Row) -> bool:
         and bool(_PAGE_NUMBER.fullmatch("".join(c.c for c in chars[start:])))
         and chars[start - 1].c in LEADER_DOTS
     )
+
+
+def _starts_with_label(row: _Row) -> bool:
+    """Does the line start with a section label ("1", "2.3", "A.4", "Chapter 5", "Part II") and
+    then a space? The second line of a wrapped title does not: the first line stands over an
+    entry like that as a line of its own."""
+    return bool(_SECTION_LABEL.match(row.clean))
 
 
 def _title_head(row: _Row, heads: dict[int, _Row], right: float) -> _Row | None:
