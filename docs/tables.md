@@ -201,9 +201,11 @@ rules above.
    sentence ends) are not a table: two columns, prose in one of them, and fewer than half the
    lines with a cell in each (`TEXT_COLUMN_SHARE`; a line or two that stand level are no rows).
    A "Table N" line under it still makes it one, and so do short labels that each stand level
-   with the first line of a run in the other column (a schedule: "Week 1" and its description
-   over three lines; the line above the run ends a sentence or is a paragraph's space away):
-   a body beside a sidebar has lines of its own in both columns that stand level with nothing
+   with a line of the other column and open a run (a schedule: "Week 1" and its description
+   over three lines: the line above the label ends a sentence or is a paragraph's space
+   away, or no other label stands on the line before or after it, since a schedule's labels
+   stand a description apart): a body beside a sidebar has lines of its own in both columns
+   that stand level with nothing, and a sidebar's lines follow one another
    (`_text_block_dropped`, `_labels_open_runs`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
    rules, cells merged where a rule is missing; only for a table ruled on all four
@@ -261,9 +263,12 @@ rules above.
    measured from the caption block's nearest edge: over the table, from the block's last line
    (a caption of up to eight lines), not from its first; under it, from its first line (a caption
    of up to eight lines there too: it was cut at four, so a long caption lost its last lines to the
-   text under the table, `CAPTION_LINES_BELOW`), but a line that ends a sentence, with a sentence
-   starting on the next after a wider space than the caption's own line space (or, for a caption
-   of one line, the next line's own), ends it: the paragraph under the table. Where
+   text under the table, `CAPTION_LINES_BELOW`), but a sentence starting on the next line after a
+   step more than 1 pt wider than the caption's own line step (or, for a caption of one line, the
+   next line's own) ends it, whether or not the caption's line ends with a full stop: the
+   paragraph under the table. Steps
+   are measured baseline to baseline (`_baseline`), so a subscript or a raised mark on a line does
+   not change them. Where
    two tables are stacked, a caption goes to the nearer table. The pattern is
    `core/captions.py`, shared with the HTML check below and with figure captions. A caption is
    never invented.
