@@ -273,20 +273,25 @@ reader, neither to find them nor as a second opinion
    three breaks in 28 lines keeps its columns too (`ax_astrophga_240306409`, its tenth page,
    index 9). A step in the other side's own lines over 1.9 of their line steps, with lines of
    the thinner side beside it but none of its breaks within a line of it (a figure or a
-   heading's space in one column only), keeps the columns when there are at least half as
-   many such steps as breaks, and two where there are fewer than four breaks: an exam's
-   questions cut both sides at once, a section line set apart above the first question or
-   under the last has no line of the thinner side beside its space, and an option that runs on
-   to a second line makes the other side skip a line once. The pitch is the median step of
+   heading's space in one column only), keeps the columns when there are two or more such
+   steps and at least half as many as breaks: an exam's questions cut both sides at once, a
+   section line set apart above the first question or under the last has no line of the
+   thinner side beside its space, and one option that runs on to a second line makes the other
+   side skip a line once. The pitch is the median step of
    both sides' lines, each side measured on its own: an exam's thinner side skips a question's
    line at every other step, so its own median lies between one pitch and two. A hole under the thinner column's end, one within
    a line of a break of the thinner side, a hole only in the thinner column, fewer holes than
    that beside the breaks, and a heading's space under 1.9 steps leave the page to the breaks
-   (read across, as before).
-   Left as it is: an exam of six questions or more is taken
-   by the gutter of the page as a whole, before the runs are asked about; an exam with one row
+   (read across, as before), and so do columns whose thinner side is set at about twice the
+   other's pitch (a spaced list beside running text: the pooled pitch finds a break at every
+   line).
+   Left as it is: a longer exam (six questions; five with options that run on to a second
+   line; four with three rows of options) is taken by the gutter of the page as a whole,
+   before the runs are asked about, since a few lines across it are allowed for every ten
+   lines; an exam of four questions with two options that run on makes two holes beside three
+   breaks and keeps the columns; an exam with one row
    of two options under each question has no break in its option columns, and one with ten
-   options under one or two questions too few; all three are read as columns (left options
+   options under one or two questions too few; all of these are read as columns (left options
    first). The lines of the head are
    then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
@@ -2299,8 +2304,10 @@ line with the label is a chapter line over an entry of its own ("Chapter 2 ..." 
 `_wraps`). Left as it is: a chapter line whose label is a word ("Chapter Two", "Part Two:"),
 in capitals ("CHAPTER 2") or that has none is still joined to the entry under it, and so is
 one over an entry that starts in lower case or with a year, and one with the entries' own
-form of label over an entry with none ("2 ..." over "Introduction" among "1", "2", "3"), which
-looks like a title of entry 2 that wraps.
+form of label over an entry with none ("2 ..." over "Introduction" among "1", "2", "3", with
+or without leaders), which looks like a title of entry 2 that wraps. A wrapped title whose
+Roman label is the only Roman one among Arabic entries, or that starts with the word "I", is
+two lines (`_label_shape` gives the Roman numeral a form of its own).
 Items nest by
 indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own

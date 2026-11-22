@@ -138,9 +138,9 @@ def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column
         ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, 0, None),
         # a section line set a line apart above the first question
         ("Which statement about the forces is correct?", 4, 3, 12, 16, 1, None),
-        # an option runs on to a second line, single spacing: b of the first question (right),
-        # a of the second (left)
-        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, (0, 334)),
+        # an option runs on to a second line, single spacing: b of the first of three questions
+        # (right), a of the second of four (left)
+        ("Which statement about the forces is correct?", 4, 3, 0, 14, 0, (0, 334)),
         ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, (1, 98)),
     ],
 )

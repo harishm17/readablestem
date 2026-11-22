@@ -165,8 +165,10 @@
   and one over an entry that starts in lower case or with a year, are still joined to the entry
   under them (0.5.15 kept them apart), and so are a chapter line in capitals ("CHAPTER 2 ...")
   and one whose label has the entries' own form over an entry with no label ("2 ..." over
-  "Introduction" among entries "1", "2", "3"), which cannot be told from a title of entry 2
-  that wraps.
+  "Introduction" among entries "1", "2", "3", with or without leaders), which cannot be told
+  from a title of entry 2 that wraps. A wrapped title whose Roman label is the only Roman one
+  among Arabic entries ("II Proof of ... (after" / "Newton)" among "1" to "5"), or that starts
+  with the word "I", is two lines, as in 0.5.15.
 - Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
   page number, its own or a line of its own beside it (`blocks._ends_in_number`).
 - A capital alone on its line heads an index section only when the first entry of its letter
@@ -445,20 +447,25 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   is short and sits at the left; a caption with only a left remainder under it) or none above it
   does not break them. An exam whose questions are short lines set at the pitch of their options
   with no space between the questions (single spacing: a skipped line is 2 pitches top to top at
-  any leading), and one of two questions only, are read question by question too, up to five
-  questions: with six or more the gutter of the page as a whole is found first, the runs are not
-  asked about, and the page is read left options first, as in 0.5.15. A step in the other side's
+  any leading), and one of two questions only, are read question by question too while the
+  exam is short: with more lines (six questions, or five with options that run on to a second
+  line, or four with three rows of options) the gutter of the page as a whole is found first,
+  the runs are not asked about, and the page is read left options first, as in 0.5.15. A step in the other side's
   own lines over 1.9 of their line steps, with lines of the thinner side beside it but none of
   its breaks (a figure or a heading's space in one column only), keeps the columns when there
-  are at least half as many such steps as breaks, and two where there are fewer than four
-  breaks: an exam's questions cut both sides at once, a section line set apart above the first
-  question or under the last ("Section A: Multiple choice") has no line of the thinner side
-  beside its space, and an option that runs on to a second line makes the other side skip a
-  line once. The line pitch the breaks are measured in is the median step of both sides' lines,
+  are two or more such steps and at least half as many as breaks: an exam's questions cut both
+  sides at once, a section line set apart above the first question or under the last
+  ("Section A: Multiple choice") has no line of the thinner side beside its space, and one
+  option that runs on to a second line makes the other side skip a line once. The line pitch the breaks are measured in is the median step of both sides' lines,
   each side measured on its own (an exam's thinner side alone skips a question's line at every
   other step, so its own median lay between one pitch and two, and a left option that runs on
-  to a second line hid the breaks). Columns whose other side has fewer such holes (one beside
-  two or three breaks of the thinner side) are read across again, as in 0.5.15. Left as it is: an exam with one row of two options under each question has no
+  to a second line hid the breaks). Columns whose other side has fewer such holes (one, or
+  fewer than half the thinner side's breaks) are read across again, as in 0.5.15, and so are
+  columns whose thinner side is set at about twice the other's line pitch (a spaced list or
+  one-line paragraphs set a line apart beside running text: the pooled pitch finds a break at
+  every line). Left as it is: an exam of four questions with two options that run on to a
+  second line makes two holes beside three breaks and is read left options first (0.5.15 read
+  it question by question). An exam with one row of two options under each question has no
   break in its option columns, and one with ten options under one or two questions has too few
   breaks; both are read left options first (0.5.15 read them question by question). Columns
   are still read across, as in 0.5.15, where the hole of the other side lies within a line of a
