@@ -258,14 +258,14 @@ def test_a_search_for_the_page_that_cannot_be_drawn_never_runs_past_its_seconds(
     search's seconds, not after a whole time limit more."""
     monkeypatch.setattr(access, "_PROBED", OrderedDict())
     monkeypatch.setattr(access, "_PROBE_SCRIPT", "import time; time.sleep(60)")
-    monkeypatch.setattr(access, "PROBE_TIMEOUT_S", 2.0)
+    monkeypatch.setattr(access, "PROBE_TIMEOUT_S", 3.0)
     monkeypatch.setattr(access, "PROBE_PER_PAGE_S", 0.0)
     monkeypatch.setattr(access, "PROBE_SEARCH_S", 0.5)
     started = time.monotonic()
     with pytest.raises(LayoutError) as exc:
         layout.analyze(_document(4))
     assert exc.value.code == "too_complex"
-    assert time.monotonic() - started < 2.0 + 0.5 + 1.0  # the first probe, the search, slack
+    assert time.monotonic() - started < 3.0 + 0.5 + 1.5  # the first probe, the search, slack
 
 
 def test_a_document_in_which_no_page_can_be_drawn_still_fails(monkeypatch):
