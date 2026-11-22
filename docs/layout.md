@@ -2263,9 +2263,11 @@ the page numbers' edge and with no leaders or number of its own, is the first li
 title (`_title_head`; the hyphen at its end is repaired as in a paragraph). It is so only in
 the middle of a list, when the nearest line above it is an entry (`_entry_above`): above the
 first entry it may be the last line of a paragraph, a heading or a part line, which look the
-same, so it stays a line of its own. In a list whose entries start with a section number
-("1 Temperature", "A.4", "Part II"), a line without one above an entry that has one is a part
-line too (`_starts_with_label`). Items nest by
+same, so it stays a line of its own. In a list whose entries start with a label ("1
+Temperature", "A.4", "Part II", "Week 3:", "Module 4"), an entry that starts with one is never
+a title's second line: the line above it is a part, chapter or unit line with no page number
+of its own (`_starts_with_label`), and a title whose second line starts with a number is two
+lines. Items nest by
 indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document

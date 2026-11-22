@@ -1523,35 +1523,48 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
     assert [e.text[0] for e in equations] == ["\u0393", "\u0393", "\u03a9"]  # all still maths
 
 
-@pytest.mark.parametrize("tail", [["(Theo-", "rem 1)"], ["(Chapters", "1 and 2 again)"]])
-def test_a_contents_title_that_wraps_is_one_entry(tail):
-    long_title = "2 Proof of the long result on the forces of a falling body through air and water"
+@pytest.mark.parametrize(
+    ("label", "group"), [("{n} ", None), ("{n} ", "Chapter"), ("Week {n}: ", "Unit")]
+)
+def test_a_contents_title_that_wraps_is_one_entry(label, group):
+    # With a chapter (or unit) line that has no page number of its own between two entries: it
+    # runs as far right as a title's first line, starts with a label as the entries do, and is
+    # not one.
+    titles = [
+        "Motion",
+        "Proof of the long result on the forces of a falling body through air and water",
+        "Energy",
+        "Waves",
+    ]
+    first, second, third, fourth = (label.format(n=k + 1) + t for k, t in enumerate(titles))
+    group_line = (
+        f"{group} 4 The first law of thermodynamics and the conservation of energy in closed"
+        " systems"
+    )
 
     def fill(page):
         page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
         y = 120.0
         for lines, number in [
-            (["1 Motion"], "3"),
-            ([long_title + " " + tail[0], tail[1]], "9"),
-            (["3 Energy"], "15"),
-            (["4 Waves"], "21"),
+            ([first], "3"),
+            ([second + " (Theo-", "rem 1)"], "9"),
+            ([third], "15"),
+            ([group_line], None),
+            ([fourth], "21"),
         ]:
+            if number is None and not group:
+                continue
             for k, line in enumerate(lines):
                 last = k == len(lines) - 1
                 page.insert_text((72 + (14 if k else 0), y), line, fontsize=BODY, fontname="helv")
-                if last:
+                if last and number:
                     page.insert_text((150, y), " ." * 40, fontsize=BODY, fontname="helv")
                     page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
                 y += 13
-            y += 5
+            y += 5 if number else 0
 
     entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
-    assert [e.text for e in entries] == [
-        "1 Motion",
-        long_title + " " + ("(Theorem 1)" if tail[0].endswith("-") else " ".join(tail)),
-        "3 Energy",
-        "4 Waves",
-    ]
+    assert [e.text for e in entries] == [first, second + " (Theorem 1)", third, fourth]
 
 
 @pytest.mark.parametrize("label", ["{n} ", "Week {n}: ", "Module {n} ", ""])

@@ -694,10 +694,9 @@ WRAPPED_TITLE_INDENT = 5.0  # x size: the most its last line is set in from its 
 WRAPPED_TITLE_REACH = 6.0  # x size: how far from the page numbers' edge its first line stops
 _CONTENTS_HEADING = re.compile(r"(table of )?contents( \(continued\))?", re.IGNORECASE)
 _SHAPE_NUMBER = re.compile(r"\d{1,4}|[ivx]{1,6}")
-_SECTION_LABEL = re.compile(
-    r"(?:(?:Chapter|Section|Part|Appendix|Unit|Lecture)\s+)?"
-    r"(?:\d+(?:\.\d+)*|[A-Z](?:\.\d+)+|[IVX]+)\.?\s"
-)
+# A section label: a number ("2", "2.3", "A.4", "II"), after a word if any ("Chapter 5",
+# "Part II", "Week 3:", "Module 4").
+_SECTION_LABEL = re.compile(r"(?:[A-Z][a-z]+\s+)?(?:\d+(?:\.\d+)*|[A-Z](?:\.\d+)+|[IVX]+)[.:]?\s")
 
 
 def _page_order(word: str) -> tuple[int, int]:
@@ -927,9 +926,10 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         else:
             continue
         head = _title_head(row, heads, right, rows, listed)
-        # In a list whose entries start with a section number, a line without one above an entry
-        # that has one is no title's first line: a title's second line has none.
-        if head and not (labelled and _starts_with_label(row) and not _starts_with_label(head)):
+        # In a list whose entries start with a section number, a title's second line has none: an
+        # entry that has one is no title's second line, whatever stands above it (a part line, or
+        # a chapter line with no page number of its own, which starts with a number too).
+        if head and not (labelled and _starts_with_label(row)):
             new.contents_wrap = head
             heads.pop(id(head))
             entries.append((head, head))
@@ -981,8 +981,8 @@ def _title_head(
 
 
 def _starts_with_label(row: _Row) -> bool:
-    """Does the line start with a section label ("1", "2.3", "A.4", "Chapter 5", "Part II") and
-    then a space?"""
+    """Does the line start with a section label ("1", "2.3", "A.4", "Chapter 5", "Part II",
+    "Week 3:") and then a space?"""
     return bool(_SECTION_LABEL.match(row.clean))
 
 

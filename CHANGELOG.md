@@ -140,10 +140,12 @@
   its shape tells it from the first line of a title, so it stays as it was: a paragraph that runs
   to the right edge was fused into the first entry ("Week 1: ...", "Module 1 ...", "Temperature
   and heat", "1 Temperature and heat"). The first entry of a list whose first title wraps is
-  therefore not joined (as in 0.5.15). In a list whose entries start with a section number, a line
-  without one above an entry that has one is a part line, not a title's first line
-  (`blocks._starts_with_label`). A title whose second line starts with a number ("... of Chapters"
-  over "1 and 2 done again") is one entry when its first line starts with a section number too.
+  therefore not joined (as in 0.5.15). In a list whose entries start with a label (a section
+  number, "Chapter 5", "Week 3:", "Module 4"), an entry that starts with one is never a title's
+  second line: the line above it is a part, chapter or unit line with no page number of its own
+  ("Chapter 2 ...", "2 ...", "Part II ...", "Unit 2 ..." over "Week 4: ..."), not a title's first
+  line (`blocks._starts_with_label`). A title whose second line starts with a number ("... of
+  Chapters" over "1 and 2 done again") is therefore two lines, as in 0.5.15.
   Left as it is: in a list of unnumbered entries, a "Part Two, ..." line between two entries
   that runs as far right as the entries' page numbers is still joined to the entry under it
   (0.5.15 kept it apart); a shorter part line is not, since a title wraps only on a full line.
