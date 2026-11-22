@@ -219,11 +219,11 @@
   and three more): a longer one lost its last lines, which then stood as a paragraph under the
   table ("... global batch size in num-" and then "ber of tokens (Batch)." as a paragraph). It
   may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
-  where a line ends a sentence and the next starts one after a step wider than the caption's own
-  line step by more than 1 pt (for a caption of one line, the next line's own), steps measured
-  from baseline to baseline so that a subscript or a raised mark on a line does not make a step
-  look small or wide: a one-line "Table 1: ..." caption over a paragraph set more than 1 pt
-  looser than its lines does not take the paragraph in. A
+  where the next line starts a sentence after a step wider than the caption's own line step by
+  more than 1 pt (for a caption of one line, the next line's own), whether or not the caption's
+  line ends with a full stop, steps measured from baseline to baseline so that a subscript or a
+  raised mark on a line does not make a step look small or wide: a "Table 1: ..." caption over a
+  paragraph set more than 1 pt looser than its lines does not take the paragraph in. A
   paragraph set at the caption's own line pitch cannot be told from the caption's next line and
   is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
   519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole

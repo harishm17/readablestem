@@ -263,9 +263,10 @@ rules above.
    measured from the caption block's nearest edge: over the table, from the block's last line
    (a caption of up to eight lines), not from its first; under it, from its first line (a caption
    of up to eight lines there too: it was cut at four, so a long caption lost its last lines to the
-   text under the table, `CAPTION_LINES_BELOW`), but a line that ends a sentence, with a sentence
-   starting on the next after a step more than 1 pt wider than the caption's own line step (or,
-   for a caption of one line, the next line's own), ends it: the paragraph under the table. Steps
+   text under the table, `CAPTION_LINES_BELOW`), but a sentence starting on the next line after a
+   step more than 1 pt wider than the caption's own line step (or, for a caption of one line, the
+   next line's own) ends it, whether or not the caption's line ends with a full stop: the
+   paragraph under the table. Steps
    are measured baseline to baseline (`_baseline`), so a subscript or a raised mark on a line does
    not change them. Where
    two tables are stacked, a caption goes to the nearer table. The pattern is
