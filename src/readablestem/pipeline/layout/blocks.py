@@ -907,6 +907,17 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
     }
     right = statistics.median([(twin or row).x1 for row, twin in pairs if id(row) in split])
     labelled = 2 * sum(_starts_with_label(r) for r in rows if id(r) in split) > len(split)
+    listed = {
+        id(row)
+        for row, twin in pairs
+        if id(row) in split
+        or (
+            twin is not None
+            and abs(twin.x1 - edge) <= 1.5 * row.size
+            and row.kind == "text"
+            and len(split) >= 1
+        )
+    }
     for row, twin in pairs:
         aligned = twin is not None and abs(twin.x1 - edge) <= 1.5 * row.size
         if id(row) in split:
@@ -915,7 +926,10 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
             new = row
         else:
             continue
-        if not (labelled and _starts_with_label(row)) and (head := _title_head(row, heads, right)):
+        head = _title_head(row, heads, right, rows, listed)
+        # In a list whose entries start with a section number, a line without one above an entry
+        # that has one is no title's first line: a title's second line has none.
+        if head and not (labelled and _starts_with_label(row) and not _starts_with_label(head)):
             new.contents_wrap = head
             heads.pop(id(head))
             entries.append((head, head))
@@ -938,23 +952,23 @@ def _ends_in_number(row: _Row) -> bool:
     )
 
 
-def _starts_with_label(row: _Row) -> bool:
-    """Does the line start with a section label ("1", "2.3", "A.4", "Chapter 5", "Part II") and
-    then a space? The second line of a wrapped title does not: the first line stands over an
-    entry like that as a line of its own."""
-    return bool(_SECTION_LABEL.match(row.clean))
-
-
-def _title_head(row: _Row, heads: dict[int, _Row], right: float) -> _Row | None:
+def _title_head(
+    row: _Row, heads: dict[int, _Row], right: float, rows: Sequence[_Row], listed: set[int]
+) -> _Row | None:
     """The line right above an entry's line when the title wraps ("E.5 Proof of ... (Lemma" over
     "D.6) . . . 39"): in the same column, at the entry's size and no further right than it, and
     reaching the right edge of the entries (`right`: the page numbers' column). A title
-    that wraps has no leaders or number on its first line, so it was no entry."""
+    that wraps has no leaders or number on its first line, so it was no entry. Only in the
+    middle of a list: when what stands right above the line is no entry (`listed`), it is the
+    last line of a paragraph, a heading or a part line, or the first line of the first entry
+    ("Week 1: ..." or "Temperature ..." under a paragraph that runs to the right edge look the
+    same as a title that wraps), and the line stays as it was."""
     return next(
         (
             h
             for h in heads.values()
             if h.kind == "text"
+            and _entry_above(h, rows, listed)
             and h.column == row.column
             and 0 < row.baseline - h.baseline <= WRAPPED_TITLE_PITCH * row.size
             and abs(h.size - row.size) <= 0.5
@@ -964,6 +978,25 @@ def _title_head(row: _Row, heads: dict[int, _Row], right: float) -> _Row | None:
         ),
         None,
     )
+
+
+def _starts_with_label(row: _Row) -> bool:
+    """Does the line start with a section label ("1", "2.3", "A.4", "Chapter 5", "Part II") and
+    then a space?"""
+    return bool(_SECTION_LABEL.match(row.clean))
+
+
+def _entry_above(row: _Row, rows: Sequence[_Row], listed: set[int]) -> bool:
+    """Is the nearest line above `row`, in its column, an entry of the list (`listed`)?"""
+    above = [
+        r
+        for r in rows
+        if not r.vertical and r.column == row.column and r.baseline < row.baseline - 0.35 * row.size
+    ]
+    if not above:
+        return False
+    near = max(r.baseline for r in above)
+    return any(id(r) in listed for r in above if near - r.baseline <= 0.35 * row.size)
 
 
 def _shaped_rows(rows: list[_Row], number: int) -> list[_Row]:

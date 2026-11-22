@@ -132,11 +132,16 @@
 - A title that wraps in a contents list with leaders is one entry: the first line has no leaders
   and no number, so it was a paragraph or a heading and the second line an entry of its own
   ("tion", "orem 1)"). It is joined to the line under it (`blocks._title_head`, hyphen repaired).
-- The line above a contents list is not taken for the first line of an entry's title when the
-  entry starts with a section number like most of the list's entries ("1 Temperature and heat"):
-  the last line of a paragraph that runs to the right edge, or a "Part One, ..." line at the
-  entries' size, was fused into the first entry (`blocks._starts_with_label`). A title's second
-  line has no such number, so wrapped titles are joined as before.
+- A title that wraps is joined only in the middle of a list: when the line right above the
+  wrapped line is an entry of the list (`blocks._title_head`, `_entry_above`). Above the first
+  entry that line is a paragraph's last line, a heading or a "Part One, ..." line, and nothing in
+  its shape tells it from the first line of a title, so it stays as it was: a paragraph that runs
+  to the right edge was fused into the first entry ("Week 1: ...", "Module 1 ...", "Temperature
+  and heat", "1 Temperature and heat"). The first entry of a list whose first title wraps is
+  therefore not joined (as in 0.5.15). In a list whose entries start with a section number, a line
+  without one above an entry that has one is a part line, not a title's first line
+  (`blocks._starts_with_label`). A title whose second line starts with a number ("... of Chapters"
+  over "1 and 2 done again") is one entry when its first line starts with a section number too.
 - Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
   page number, its own or a line of its own beside it (`blocks._ends_in_number`).
 - A capital alone on its line heads an index section only when the first entry of its letter
