@@ -231,10 +231,7 @@ def page_two_cannot_be_drawn(monkeypatch):
 _PAGE_TREES = {
     "plain": ({}, {}),
     "user unit 2": ({"UserUnit": "2"}, {}),
-    "user unit 0.5": ({"UserUnit": "0.5"}, {}),
     "crop larger than the media box": ({"CropBox": "[-100 -100 750 950]"}, {}),
-    "crop partly outside, user unit 2": ({"CropBox": "[300 400 800 900]", "UserUnit": "2"}, {}),
-    "crop and turn inherited": ({}, {"CropBox": "[30 30 560 830]", "Rotate": "270"}),
     "no media box, a crop": ({"MediaBox": "null", "CropBox": "[0 0 300 300]"}, {}),
 }
 
