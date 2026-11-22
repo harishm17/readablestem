@@ -511,6 +511,49 @@ def test_a_two_column_grid_of_prose_is_a_layout_grid():
     assert not tables.is_layout_grid(grid([[*r, "9.8"] for r in terms]))
 
 
+def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_sidebar_is_not():
+    # "Week 1" ... "Week 5" with a description of three lines each, no rules, no caption: every
+    # label stands level with the first line of its description. A body beside a sidebar has
+    # lines of its own in both columns (`tables._labels_open_runs`).
+    description = [
+        "Kinematics in one dimension, unit {week}: position, velocity and",
+        "acceleration; graphs of motion and how to read them in {week};",
+        "free fall near the surface of the Earth, case {week}.",
+    ]
+
+    def schedule(page):
+        write(page, 72, 90, "Course schedule", 15)
+        write(
+            page,
+            72,
+            116,
+            "The term has five units. Each unit ends with a short quiz in its last class.",
+        )
+        y = 142.0
+        for week in range(1, 6):
+            write(page, 72, y, f"Week {week}")
+            for text in description:
+                write(page, 170, y, text.format(week=week))
+                y += 14
+            y += 8
+        write(
+            page,
+            72,
+            y + 12,
+            "Bring a calculator to every quiz. Formula sheets come with the paper.",
+        )
+
+    def sidebar(page):
+        write(page, 72, 90, "Course schedule", 15)
+        for i in range(12):
+            write(page, 72, 120 + 14 * i, f"The body of the page runs on in line {i} of its column")
+        for i, y in enumerate((120, 148, 162, 190, 232)):
+            write(page, 340, y, f"Sidebar {i}")
+
+    assert [e.kind for e in analyze(pdf(schedule)).elements].count(Kind.TABLE) == 1
+    assert Kind.TABLE not in [e.kind for e in analyze(pdf(sidebar)).elements]
+
+
 KEY_TERMS = [
     ["displacement", "distance", "kinematics", "magnitude"],
     ["position", "reference frame", "scalar", "vector"],
