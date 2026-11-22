@@ -93,7 +93,7 @@
   `page_not_rendered`, and in the student file "Not converted. This page could not be shown."
   The conversion does not build that page again: no step, crop, tag, link or image reads it, the
   page-number pass skips it, and its size comes from the page tree, not from the page. Its own
-  PDF page label is not read (it has the number its neighbours give it, or none).
+  PDF page label is not read (it has the number its neighbors give it, or none).
 - The search is bounded: after the probe of all the pages, at most 40 probes (2 for each halving:
   14 find one bad page of 100) and 300 s, each probe's own time limit cut to what is left of the
   300 s (a file in which every probe hangs now fails 300 s after its first probe at the latest,
