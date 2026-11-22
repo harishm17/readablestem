@@ -906,7 +906,6 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
     }
     right = statistics.median([(twin or row).x1 for row, twin in pairs if id(row) in split])
     labelled = 2 * sum(_starts_with_label(r) for r in rows if id(r) in split) > len(split)
-    shapes = {_label_shape(r) for r in rows if id(r) in split} - {None}
     listed = {
         id(row)
         for row, twin in pairs
@@ -918,6 +917,8 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
             and len(split) >= 1
         )
     }
+    # the forms of the entries' labels, with leaders or with a page number at the margin
+    shapes = {_label_shape(r) for r in rows if id(r) in listed} - {None}
     for row, twin in pairs:
         aligned = twin is not None and abs(twin.x1 - edge) <= 1.5 * row.size
         if id(row) in split:
@@ -986,9 +987,10 @@ def _wraps(head: _Row, row: _Row, *, labelled: bool, shapes: Set[str | None]) ->
     chapter line with no page number of its own, which starts with a label too). In any list,
     under a line with a label a line without one goes on from it when it is in lower case,
     after a hyphen ("2.1 Work and heat in closed" / "systems"), or when the label has the form
-    of the entries' own labels (`shapes`: "E.5 Proof of ... (Lemma" / "D.6)" among "E.4" and
-    "E.6"); otherwise the line with the label is a chapter line over an entry of its own
-    ("Chapter 2 ..." / "Introduction" among "1.1" and "2.1")."""
+    of the labels of the entries with leaders or a page number at the margin (`shapes`: "E.5
+    Proof of ... (Lemma" / "D.6)" among "E.4" and "E.6"); otherwise the line with the label is
+    a chapter line over an entry of its own ("Chapter 2 ..." / "Introduction" among "1.1" and
+    "2.1")."""
     if labelled and _starts_with_label(row):
         return False
     if not _starts_with_label(head) or _starts_with_label(row):
@@ -998,12 +1000,12 @@ def _wraps(head: _Row, row: _Row, *, labelled: bool, shapes: Set[str | None]) ->
 
 def _label_shape(row: _Row) -> str | None:
     """The form of the section label a line starts with, or None: "2.3" and "4.1" are "9.9",
-    "Chapter 5" is "Chapter 9", "B.2" is "A.9", "IV" is "9"."""
+    "Chapter 5" is "Chapter 9", "B.2" is "A.9", "IV" is "I" (a part line over "1", "2")."""
     found = _SECTION_LABEL.match(row.clean)
     if not found:
         return None
     label = found.group().strip().rstrip(".:")
-    return re.sub(r"^[A-Z](?=\.)", "A", re.sub(r"\d+|\b[IVX]+$", "9", label))
+    return re.sub(r"^[A-Z](?=\.)", "A", re.sub(r"\b[IVX]+$", "I", re.sub(r"\d+", "9", label)))
 
 
 def _starts_with_label(row: _Row) -> bool:

@@ -208,8 +208,12 @@ rules above.
    one line such as "Week 6 Midterm", two or more labels head a description of several
    lines and all labels but one in five start with a capital or hold a digit): a body beside a
    sidebar has lines of its own in both columns that stand level with nothing, and a sidebar's
-   lines follow one another in blocks and run on in lower case
-   (`_text_block_dropped`, `_labels_open_runs`). A sidebar of two or more blocks whose lines
+   lines follow one another in blocks and run on in lower case, so that more than one label in
+   five has neither a capital at its start nor a digit
+   (`_text_block_dropped`, `_labels_open_runs`). A sidebar whose labels all but one in five
+   start with a capital or hold a digit ("see fig. 3") is still made a table, and a schedule
+   with two lower-case labels in seven ("fall break", "exam week") is not one (its order is
+   kept). A sidebar of two or more blocks whose lines
    start with capitals (a margin list of key terms) is still taken for a schedule and made a
    table, as before.
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
@@ -275,7 +279,7 @@ rules above.
    or end three font sizes or more short of the next line's right edge (a caption's short last
    line over a paragraph that runs full, `CAPTION_LAST_LINE_SHORT`), so a full line pushed down
    by a tall formula does not cut a caption mid-sentence (a ragged caption's short line over
-   such a line does, and so does a short title line set 2 pt or more apart from its
+   such a line does, and so does a short title line set more than 1 pt apart from its
    description; the rest follows as a paragraph); past them any
    line may end it. Steps
    are measured baseline to baseline (`_baseline`), so a subscript or a raised mark on a line does

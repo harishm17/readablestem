@@ -152,15 +152,21 @@
   without a label under a line with one goes on from it when it starts in lower case, when the
   line above ends in a hyphen ("2.1 Work and heat in closed" / "systems"), or when the line
   above starts with a label of the form of the entries' own ("2" among "1" and "3", "E.5" among
-  "E.4" and "E.6": "E.5 Proof of ... (Lemma" / "D.6)"); otherwise the line with the label is a
-  chapter line over an entry of its own ("Chapter 2 ..." over "Introduction", or "2 ..." over it
-  among entries "2.1", "2.2"), and stays apart (`blocks._wraps`, `_label_shape`).
+  "E.4" and "E.6": "E.5 Proof of ... (Lemma" / "D.6)"; the entries are those with leaders or a
+  page number at the margin, so a LaTeX article's section lines, which have no leaders, count,
+  and a Roman numeral has a form of its own, so "IV" is not "1"); otherwise the line with the
+  label is a chapter line over an entry of its own ("Chapter 2 ..." over "Introduction", or "2
+  ..." over it among entries "2.1", "2.2", or "IV ..." over it among "1", "2"), and stays apart
+  (`blocks._wraps`, `_label_shape`).
   Left as it is: in a list of unnumbered entries, a "Part Two, ..." line between two entries
   that runs as far right as the entries' page numbers is still joined to the entry under it
   (0.5.15 kept it apart); a shorter part line is not, since a title wraps only on a full line.
   A chapter line whose label is a word ("Chapter Two ...", "Part Two: ...") or that has none,
   and one over an entry that starts in lower case or with a year, are still joined to the entry
-  under them (0.5.15 kept them apart).
+  under them (0.5.15 kept them apart), and so are a chapter line in capitals ("CHAPTER 2 ...")
+  and one whose label has the entries' own form over an entry with no label ("2 ..." over
+  "Introduction" among entries "1", "2", "3"), which cannot be told from a title of entry 2
+  that wraps.
 - Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
   page number, its own or a line of its own beside it (`blocks._ends_in_number`).
 - A capital alone on its line heads an index section only when the first entry of its letter
@@ -261,8 +267,8 @@
   caption's last line runs to within three font sizes of the paragraph's first line's right edge
   with no sentence end (the paragraph's first line is short, the paragraph is narrower than
   the caption, or the caption's last line nearly full). Left as it is: a ragged caption whose
-  short line stands over a line pushed down by a formula, and a short title line set 2 pt or
-  more apart from its description, end there (0.5.15 kept them whole); the rest follows as a
+  short line stands over a line pushed down by a formula, and a short title line set more than
+  1 pt apart from its description, end there (0.5.15 kept them whole); the rest follows as a
   paragraph, in order. A
   paragraph set at the caption's own line pitch cannot be told from the caption's next line and
   is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
@@ -283,7 +289,9 @@
   another; or, where two or more labels head a description of several lines, a label stands on
   the line before or after it, a week of one line such as "Week 6 Midterm", and all labels but
   one in five start with a capital or hold a digit ("fall break" among dates), as a sidebar's
-  running lines need not; `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
+  running lines need not (a sidebar whose labels all but one in five start with a capital or
+  hold a digit, "see fig. 3", is still a table, and a schedule with two lower-case labels in
+  seven, "fall break" and "exam week", is no table, its order kept); `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
   built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to five lines a
   description and weeks of one line among weeks of three or five, with or without full stops and space between rows, the label level with the first
   or the middle line; a borderless schedule with no caption had become ten paragraphs). Of 827
@@ -441,10 +449,16 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   questions: with six or more the gutter of the page as a whole is found first, the runs are not
   asked about, and the page is read left options first, as in 0.5.15. A step in the other side's
   own lines over 1.9 of their line steps, with lines of the thinner side beside it but none of
-  its breaks (a figure or a heading's space in one column only), keeps the columns: an exam's
-  questions cut both sides at once, and a section line set apart above the first question or
-  under the last ("Section A: Multiple choice") has no line of the thinner side beside its
-  space. Left as it is: an exam with one row of two options under each question has no
+  its breaks (a figure or a heading's space in one column only), keeps the columns when there
+  are at least half as many such steps as breaks, and two where there are fewer than four
+  breaks: an exam's questions cut both sides at once, a section line set apart above the first
+  question or under the last ("Section A: Multiple choice") has no line of the thinner side
+  beside its space, and an option that runs on to a second line makes the other side skip a
+  line once. The line pitch the breaks are measured in is the median step of both sides' lines,
+  each side measured on its own (an exam's thinner side alone skips a question's line at every
+  other step, so its own median lay between one pitch and two, and a left option that runs on
+  to a second line hid the breaks). Columns whose other side has fewer such holes (one beside
+  two or three breaks of the thinner side) are read across again, as in 0.5.15. Left as it is: an exam with one row of two options under each question has no
   break in its option columns, and one with ten options under one or two questions has too few
   breaks; both are read left options first (0.5.15 read them question by question). Columns
   are still read across, as in 0.5.15, where the hole of the other side lies within a line of a

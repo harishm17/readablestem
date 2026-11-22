@@ -116,7 +116,8 @@ def _columns_run(
     below it (a caption or a note at the foot of the columns has them on one side or none),
     nor breaks in the thinner side where a few lines of the other side or across the gutter
     stand (the questions between the option pairs) cut them up into short runs, unless the
-    other side has a hole of its own elsewhere (block paragraphs in both columns).
+    other side has holes of its own elsewhere, at least half as many as the breaks (block
+    paragraphs in both columns).
     """
     for w in wide:
         if all(
@@ -128,7 +129,14 @@ def _columns_run(
     rows = sorted(_visual_lines(thin), key=lambda line: line[1])
     if len(rows) < 3:
         return True
-    pitch = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(rows))
+    # the line pitch is the median step of both sides, each side's lines measured on their own:
+    # in an exam of two rows of options a question, half the steps of the thinner side skip a
+    # question's line, so its own median falls between one pitch and two
+    pitch = statistics.median(
+        b[1] - a[1]
+        for side in (rows, sorted(_visual_lines(other), key=lambda line: line[1]))
+        for a, b in itertools.pairwise(side)
+    )
     beside = _visual_lines(other + crossing)
     breaks = [
         (a[3], b[1])
@@ -138,20 +146,22 @@ def _columns_run(
     ]
     if not breaks:
         return True
-    # The other side has a hole of its own beside none of these breaks, with a line of the
-    # thinner side beside it: paragraphs set a line apart in both columns, each at its own
-    # place. An exam's other side (each question and the left options under it) runs unbroken,
-    # breaks where the thinner side does, or breaks above its first question or under its last
-    # ("Section A" and a blank line), where the thinner side has no line.
+    # The other side has holes of its own beside none of these breaks, with a line of the
+    # thinner side beside each, at least half as many as the breaks (and two where there are
+    # fewer than four): paragraphs set a line apart in both columns, each at its own place. An
+    # exam's other side (each question and the left options under it) runs unbroken, breaks
+    # where the thinner side does, breaks above its first question or under its last ("Section
+    # A" and a blank line), where the thinner side has no line, or skips a line once where an
+    # option of the thinner side runs on to a second line.
     lines = sorted(_visual_lines(other), key=lambda line: line[1])
     if len(lines) >= 3:
         step = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(lines))
-        if any(
+        if 2 * sum(
             b[1] - a[1] > MIN_BREAK_PITCHES * step
             and not any(a[3] < high and b[1] > low for low, high in breaks)
             and any(a[3] - 1.0 <= r[1] and r[3] <= b[1] + 1.0 for r in rows)
             for a, b in itertools.pairwise(lines)
-        ):
+        ) >= max(len(breaks), 2):
             return True
     return len(rows) >= MIN_RUN_LINES * (len(breaks) + 1)
 

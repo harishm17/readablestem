@@ -126,22 +126,26 @@ def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column
 
 
 @pytest.mark.parametrize(
-    ("question", "options", "questions", "space", "pitch", "section"),
+    ("question", "options", "questions", "space", "pitch", "section", "wrap"),
     [
         # a question that runs the whole width of the page; one that stops short of the gutter,
         # set at the pitch of its options (single spacing) with no space between the questions
-        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16, False),
-        ("Which statement about the forces is correct?", 4, 4, 0, 13.2, False),
+        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16, 0, None),
+        ("Which statement about the forces is correct?", 4, 4, 0, 13.2, 0, None),
         # two short questions only: the gutter runs through them
-        ("Which statement about the forces is correct?", 4, 2, 12, 16, False),
+        ("Which statement about the forces is correct?", 4, 2, 12, 16, 0, None),
         # one question, six options: three lines a side under it
-        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, False),
+        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, 0, None),
         # a section line set a line apart above the first question
-        ("Which statement about the forces is correct?", 4, 3, 12, 16, True),
+        ("Which statement about the forces is correct?", 4, 3, 12, 16, 1, None),
+        # an option runs on to a second line, single spacing: b of the first question (right),
+        # a of the second (left)
+        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, (0, 334)),
+        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, (1, 98)),
     ],
 )
 def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
-    question, options, questions, space, pitch, section
+    question, options, questions, space, pitch, section, wrap
 ):
     # An exam page of one column: centered head lines, an instruction across the page, then
     # questions with their options two by two under each. The option pairs look like two columns
@@ -179,6 +183,9 @@ def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
                     f"option {'abcdef'[k]}{q} the net force on the block is zero",
                     fontsize=11,
                 )
+            if wrap and wrap[0] == q and row == 0:
+                y += pitch
+                page.insert_text((wrap[1], y), "and the block moves at a steady speed", fontsize=11)
             y += pitch
         y += space
     text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)

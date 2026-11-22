@@ -1523,19 +1523,26 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
     assert [e.text[0] for e in equations] == ["\u0393", "\u0393", "\u03a9"]  # all still maths
 
 
+SUBS = ("1.1 Speed", "3.1 Work")
+
+
 @pytest.mark.parametrize(
-    ("label", "group", "intro", "wrap"),
+    ("label", "group", "intro", "wrap", "leaders"),
     [
-        ("{n} ", None, False, ("(Theo-", "rem 1)")),
-        ("{n} ", "Chapter", False, ("(Theo-", "rem 1)")),
-        ("Week {n}: ", "Unit", False, ("(Theo-", "rem 1)")),
+        ("{n} ", None, False, ("(Theo-", "rem 1)"), True),
+        ("{n} ", "Chapter 4", False, ("(Theo-", "rem 1)"), True),
+        ("Week {n}: ", "Unit 4", False, ("(Theo-", "rem 1)"), True),
         # the chapter's first entry has no number ("Introduction")
-        ("{n} ", "Chapter", True, ("(Theo-", "rem 1)")),
+        ("{n} ", "Chapter 4", True, ("(Theo-", "rem 1)"), True),
+        # ... under a part line with a Roman numeral, among entries numbered 1, 2, 3
+        ("{n} ", "IV", True, ("(Theo-", "rem 1)"), True),
         # the second line starts with a capital, under a label like the entries' own
-        ("{n} ", "Chapter", False, ("(after", "Newton)")),
+        ("{n} ", "Chapter 4", False, ("(after", "Newton)"), True),
+        # a LaTeX article: the sections carry no leaders, only their subsections do
+        ("{n} ", None, False, ("(after", "Newton)"), False),
     ],
 )
-def test_a_contents_title_that_wraps_is_one_entry(label, group, intro, wrap):
+def test_a_contents_title_that_wraps_is_one_entry(label, group, intro, wrap, leaders):
     # With a chapter (or unit) line that has no page number of its own between two entries: it
     # runs as far right as a title's first line, starts with a label as the entries do, and is
     # not one.
@@ -1549,8 +1556,7 @@ def test_a_contents_title_that_wraps_is_one_entry(label, group, intro, wrap):
     if intro:
         fourth = "Introduction"
     group_line = (
-        f"{group} 4 The first law of thermodynamics and the conservation of energy in closed"
-        " systems"
+        f"{group} The first law of thermodynamics and the conservation of energy in closed systems"
     )
 
     def fill(page):
@@ -1558,25 +1564,34 @@ def test_a_contents_title_that_wraps_is_one_entry(label, group, intro, wrap):
         y = 120.0
         for lines, number in [
             ([first], "3"),
+            *([] if leaders else [([SUBS[0]], "5")]),
             ([f"{second} {wrap[0]}", wrap[1]], "9"),
             ([third], "15"),
+            *([] if leaders else [([SUBS[1]], "17")]),
             ([group_line], None),
             ([fourth], "21"),
         ]:
             if number is None and not group:
                 continue
+            sub = lines[0] in SUBS
             for k, line in enumerate(lines):
                 last = k == len(lines) - 1
-                page.insert_text((72 + (14 if k else 0), y), line, fontsize=BODY, fontname="helv")
-                if last and number:
+                page.insert_text(
+                    (72 + (14 if k or sub else 0), y), line, fontsize=BODY, fontname="helv"
+                )
+                if last and number and (leaders or sub):
                     page.insert_text((150, y), " ." * 40, fontsize=BODY, fontname="helv")
+                if last and number:
                     page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
                 y += 13
             y += 5 if number else 0
 
     entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
     joined = wrap[0][:-1] + wrap[1] if wrap[0].endswith("-") else " ".join(wrap)
-    assert [e.text for e in entries] == [first, f"{second} {joined}", third, fourth]
+    expected = [first, f"{second} {joined}", third, fourth]
+    if not leaders:
+        expected[1:1], expected[4:4] = [SUBS[0]], [SUBS[1]]
+    assert [e.text for e in entries] == expected
 
 
 @pytest.mark.parametrize("label", ["{n} ", "Week {n}: ", "Module {n} ", ""])

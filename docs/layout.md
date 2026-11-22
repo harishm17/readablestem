@@ -273,11 +273,16 @@ reader, neither to find them nor as a second opinion
    three breaks in 28 lines keeps its columns too (`ax_astrophga_240306409`, its tenth page,
    index 9). A step in the other side's own lines over 1.9 of their line steps, with lines of
    the thinner side beside it but none of its breaks within a line of it (a figure or a
-   heading's space in one column only), keeps the columns: an exam's questions cut both sides
-   at once, and a section line set apart above the first question or under the last has no
-   line of the thinner side beside its space. A hole under the thinner column's end, one within
-   a line of a break of the thinner side, a hole only in the thinner column, and a heading's
-   space under 1.9 steps leave the page to the breaks (read across, as before).
+   heading's space in one column only), keeps the columns when there are at least half as
+   many such steps as breaks, and two where there are fewer than four breaks: an exam's
+   questions cut both sides at once, a section line set apart above the first question or
+   under the last has no line of the thinner side beside its space, and an option that runs on
+   to a second line makes the other side skip a line once. The pitch is the median step of
+   both sides' lines, each side measured on its own: an exam's thinner side skips a question's
+   line at every other step, so its own median lies between one pitch and two. A hole under the thinner column's end, one within
+   a line of a break of the thinner side, a hole only in the thinner column, fewer holes than
+   that beside the breaks, and a heading's space under 1.9 steps leave the page to the breaks
+   (read across, as before).
    Left as it is: an exam of six questions or more is taken
    by the gutter of the page as a whole, before the runs are asked about; an exam with one row
    of two options under each question has no break in its option columns, and one with ten
@@ -2287,11 +2292,15 @@ of its own (`_starts_with_label`), and a title whose second line starts with a n
 lines. In any list, a line without a label under a line with one goes on from it in lower
 case, after a hyphen ("2.1 Work and heat in closed" / "systems"), or under a label of the form
 of the entries' own (`_label_shape`: "2" among "1" and "3"; "E.5 Proof of ... (Lemma" / "D.6)"
-among "E.4" and "E.6"); otherwise the line with the label is a chapter line over an entry of
-its own ("Chapter 2 ..." / "Introduction", or "2 ..." over it among "2.1" and "2.2", `_wraps`).
-Left as it is: a chapter line whose label is a word ("Chapter Two", "Part Two:") or that has
-none is still joined to the entry under it, and so is one over an entry that starts in lower
-case or with a year.
+among "E.4" and "E.6"; the entries are those with leaders or a page number at the margin, so a
+LaTeX article's section lines count; a Roman numeral has a form of its own); otherwise the
+line with the label is a chapter line over an entry of its own ("Chapter 2 ..." /
+"Introduction", "2 ..." over it among "2.1" and "2.2", "IV ..." over it among "1" and "2",
+`_wraps`). Left as it is: a chapter line whose label is a word ("Chapter Two", "Part Two:"),
+in capitals ("CHAPTER 2") or that has none is still joined to the entry under it, and so is
+one over an entry that starts in lower case or with a year, and one with the entries' own
+form of label over an entry with none ("2 ..." over "Introduction" among "1", "2", "3"), which
+looks like a title of entry 2 that wraps.
 Items nest by
 indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
