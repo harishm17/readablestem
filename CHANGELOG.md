@@ -92,7 +92,9 @@
   `page_not_rendered`: a figure with no picture, a required decision, the notice
   `page_not_rendered`, and in the student file "Not converted. This page could not be shown."
   The conversion does not build that page again: no step, crop, tag, link or image reads it, the
-  page-number pass skips it, and its size comes from the page tree, not from the page. Its own
+  page-number pass skips it, and its size comes from the page tree, not from the page (the
+  MediaBox cut to the CropBox, times the page's UserUnit, turned by Rotate: the size the page
+  gives when it is built). Its own
   PDF page label is not read (it has the number its neighbours give it, or none).
 - The search is bounded: after the probe of all the pages, at most 40 probes (2 for each halving:
   14 find one bad page of 100) and 300 s, each probe's own time limit cut to what is left of the
