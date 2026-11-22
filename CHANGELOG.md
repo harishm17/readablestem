@@ -360,14 +360,19 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   under a head. On the 267 gold pages of `layout-dev-1` three pages change, two of one
   paper that were wrong and one page of another paper that stays as it was in what the gold
   counts: right 140 to 141 of 267, faultless 72 to 72, blocks broken 106 to 99, joins across
-  columns 35 to 27; none of these pages went from right to not right (the set has no exam page with options in a grid; the corpus below is the wider check). The search is not limited to first
+  columns 35 to 27; none of these pages went from right to not right (the set has no exam page
+  with options in a grid). The search is not limited to first
   pages: a page whose columns lie under a row of figures reads the same way. On the 996 analyzed
   files (every PDF of the corpus, three variants) 7 files change. Five pages in 3 papers are the
   columns found (a join across the columns or alternating single lines gone; one page no longer
   read as code), 3 other papers change by the numbered lines below (two of them also by the
   notice), and the notice is the only change in 1 file. Of the 73 converted uploads 5 change, by
   the notice alone. No page of a textbook changes: its four copies of a file, which this rule
-  once changed, are as they were.
+  once changed, are as they were. A head-stop gutter is also refused when a line across the page
+  lies between the top and the bottom of its two columns (an exam page of one column whose
+  questions each cross the page, their options standing two by two under them, was read as two
+  columns, each question's options split between a left and a right run); on the 996 analyzed
+  files and the 73 converted uploads this changes no file.
 - A numbered line that runs to the right edge no longer takes the next number into its block when
   it is the whole run so far: the affiliations of a paper, numbered 1, 2, 3 to the margin, were
   one paragraph (`figures._starts_block`). Inside a run of numbered lines it still reads as the
