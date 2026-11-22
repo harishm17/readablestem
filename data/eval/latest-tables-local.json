@@ -2,8 +2,8 @@
   "schema_version": 1,
   "task": "tables",
   "mode": "local",
-  "date": "2026-11-20",
-  "pipeline_version": "0.5.15",
+  "date": "2026-11-21",
+  "pipeline_version": "0.5.16",
   "profile": {
     "name": "development settings",
     "sha256": "e48df1a1dc7f72e7f0e18ee34c6bf1b7b44f8c22d528df14337492c42e8f11f2",
@@ -233,9 +233,9 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "ecb1bee043647dd1e5b15d09b5c02d5441441401",
+    "commit": "5298521e872f641884e1e3e09bb4ec4ae0e68e67",
     "clean": true,
-    "pipeline_version": "0.5.15",
+    "pipeline_version": "0.5.16",
     "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",
@@ -480,8 +480,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 6824.0,
-    "p95": 16300.999999999976,
+    "p50": 4298.0,
+    "p95": 10341.199999999984,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }

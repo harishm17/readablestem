@@ -824,6 +824,25 @@ safely is safe at any time; what a reviewer loses is the words of the newest che
 traffic goes forward again. Before you roll back, read the changelog entries of the releases
 in between.
 
+Each release is checked by running, not by reading: the release's code stores a result that holds
+every new value (every notice code its table knows, the new figure reason, each new stored field,
+a review change of the new kind), and the previous release's code, in a worktree of its own, is
+asked for the job page, the review screen and list, the record and its CSV, the student page and
+its download, with the stored page kept and with it cleared; then one review change is made, so
+that it writes the result back, and the keys it keeps and drops are compared. The result of 0.5.16
+(run on 2026-11-21 against 0.5.15, `07a10cbc`): a PDF result with a page that could not be drawn
+(`page_not_rendered`), all 58 notice codes and a split paragraph (`split_block`) loads, and every
+page above answers 200, with decisions pending and with all of them made. A review change made by
+0.5.15 keeps every key (it drops nothing), and 0.5.15 undoes the split. Two things are wrong
+there, and only for a document that holds the new reason or the split. 0.5.15 has no words for
+`page_not_rendered`: it serves the stored page as it is, but once it makes the page again (after a
+review change, as a draft, or with the page cleared) the page that could not be drawn reads "No
+description. This figure has no text description yet." and not "Not converted. This page could not
+be shown.", so a student's file no longer says that the page is missing. And the record 0.5.15
+writes leaves out the split. So roll back to 0.5.15 only before a document with a page that could
+not be drawn has been converted by 0.5.16; after that, fix forward. The limit of 0.5.12 stands
+for everything else.
+
 If data has to come back, restore a backup (this overwrites the instance's current
 data):
 
