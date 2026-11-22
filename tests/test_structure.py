@@ -1524,9 +1524,16 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
 
 
 @pytest.mark.parametrize(
-    ("label", "group"), [("{n} ", None), ("{n} ", "Chapter"), ("Week {n}: ", "Unit")]
+    ("label", "group", "intro"),
+    [
+        ("{n} ", None, False),
+        ("{n} ", "Chapter", False),
+        ("Week {n}: ", "Unit", False),
+        # the chapter's first entry has no number ("Introduction")
+        ("{n} ", "Chapter", True),
+    ],
 )
-def test_a_contents_title_that_wraps_is_one_entry(label, group):
+def test_a_contents_title_that_wraps_is_one_entry(label, group, intro):
     # With a chapter (or unit) line that has no page number of its own between two entries: it
     # runs as far right as a title's first line, starts with a label as the entries do, and is
     # not one.
@@ -1537,6 +1544,8 @@ def test_a_contents_title_that_wraps_is_one_entry(label, group):
         "Waves",
     ]
     first, second, third, fourth = (label.format(n=k + 1) + t for k, t in enumerate(titles))
+    if intro:
+        fourth = "Introduction"
     group_line = (
         f"{group} 4 The first law of thermodynamics and the conservation of energy in closed"
         " systems"

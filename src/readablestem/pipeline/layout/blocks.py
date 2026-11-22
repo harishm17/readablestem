@@ -926,10 +926,7 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         else:
             continue
         head = _title_head(row, heads, right, rows, listed)
-        # In a list whose entries start with a section number, a title's second line has none: an
-        # entry that has one is no title's second line, whatever stands above it (a part line, or
-        # a chapter line with no page number of its own, which starts with a number too).
-        if head and not (labelled and _starts_with_label(row)):
+        if head and _wraps(head, row, labelled=labelled):
             new.contents_wrap = head
             heads.pop(id(head))
             entries.append((head, head))
@@ -978,6 +975,22 @@ def _title_head(
         ),
         None,
     )
+
+
+def _wraps(head: _Row, row: _Row, *, labelled: bool) -> bool:
+    """Is `row` the second line of the title `head` starts, not an entry under a chapter line?
+
+    In a list whose entries start with a section label, a title's second line has none: an
+    entry that has one is no title's second line, whatever stands above it (a part line, or a
+    chapter line with no page number of its own, which starts with a label too). In any list,
+    under a line with a label a line without one goes on from it only in lower case or after
+    a hyphen ("2.1 Work and heat in closed" / "systems"); otherwise the line with the label is
+    a chapter line over an entry of its own ("Chapter 2 ..." / "Introduction")."""
+    if labelled and _starts_with_label(row):
+        return False
+    if not _starts_with_label(head) or _starts_with_label(row):
+        return True
+    return row.clean[:1].islower() or head.clean.endswith("-")
 
 
 def _starts_with_label(row: _Row) -> bool:

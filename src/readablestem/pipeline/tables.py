@@ -113,6 +113,9 @@ CAPTION_LINES_BELOW = 7  # ... under its table (as over it: a long caption runs 
 # Lines a caption under a table was cut to before it could run to eight: past them, a wider step
 # to a line that starts a sentence ends it even when its line does not end one.
 CAPTION_LINES_CUT = 4
+# ... and within them, a line that ends this many font sizes short of the next line's right edge
+# is a caption's last line ("Table 1: Measured periods" over a paragraph), so it may end it too.
+CAPTION_LAST_LINE_SHORT = 3.0
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
 WORD_GRID_ROWS = 6  # ... no more rows than this, no digit, and no "Table N" caption
@@ -2013,7 +2016,8 @@ def _labels_open_runs(grid: _Grid) -> bool:
     """One of two columns is short labels, each level with the first line of a run of lines in
     the other (a schedule: "Week 1" and its description over three lines): the line above in
     the other column ends a sentence or is a paragraph's space away, or is a row of one line
-    ("Week 6" and "Midterm") where two or more labels each head a run of several lines. A body
+    ("Week 6" and "Midterm") where two or more labels each head a run of several lines and
+    every label starts with a capital or a digit. A body
     beside a sidebar has lines of its own in both columns that stand level with nothing."""
     cells: dict[int, dict[int, _Seg]] = {}
     for seg in grid.segs:
@@ -2028,6 +2032,12 @@ def _labels_open_runs(grid: _Grid) -> bool:
         # labels whose run goes on past their own line: in a schedule, most; in a sidebar beside a
         # body, the last line of each block of the sidebar
         runs = sum(line + 1 not in label and line + 1 in other for line in label)
+        # ... and labels that each start with a capital or a digit ("Week 6", "Oct 3"), as a
+        # sidebar's running lines do not
+        named = all(
+            seg.text.lstrip()[:1].isupper() or seg.text.lstrip()[:1].isdigit()
+            for seg in label.values()
+        )
 
         def opens(
             line: int,
@@ -2035,6 +2045,7 @@ def _labels_open_runs(grid: _Grid) -> bool:
             other: dict[int, _Seg] = other,
             pitch: float = pitch,
             runs: int = runs,
+            named: bool = named,
         ) -> bool:
             above = other.get(line - 1)
             return (
@@ -2042,7 +2053,7 @@ def _labels_open_runs(grid: _Grid) -> bool:
                 or above.text.rstrip().endswith((".", "!", "?", ":", ";"))
                 or other[line].y0 - above.y0 > pitch + PARAGRAPH_STEP
                 or (line - 1 not in label and line + 1 not in label)
-                or ((line - 1 in label or line + 1 in label) and runs >= 2)
+                or ((line - 1 in label or line + 1 in label) and runs >= 2 and named)
             )
 
         if len(label) >= BLOCK_MIN_LINES and all(
@@ -3754,12 +3765,14 @@ def _caption_lines(
 ) -> list[int]:
     """The caption's first line and the lines that continue it (same size, line pitch,
     overlapping it), away from the table when below it, towards it when above. Under a table
-    it stops at a sentence's end (or, past `CAPTION_LINES_CUT` lines, at any line's end) when
+    it stops at a sentence's end, at a line that ends well short of the next one's right edge
+    (a last line: `CAPTION_LAST_LINE_SHORT`), or past `CAPTION_LINES_CUT` lines at any line, when
     the next line starts with a capital and its step from the line before (baseline to
     baseline, so a subscript or a raised mark does not change it) is more than
     `PARAGRAPH_STEP` wider than the caption's own line step (or, for a one-line caption, the
     next line's own): the paragraph that follows. A line pushed down by a tall formula inside
-    the first lines of a caption does not end it unless the line before ends a sentence."""
+    the first lines of a caption does not end it when the line before runs on to its full
+    width without ending a sentence."""
     members = [first]
     current = view.lines[first]
     size = max((c.size for c in current.chars if not c.blank), default=10.0)
@@ -3787,10 +3800,15 @@ def _caption_lines(
         if found is None:
             break
         best, step = found
+        nxt = view.lines[best]
         if (
             side == "below"
-            and (_SENTENCE_END.search(_line_text(current)) or len(members) >= CAPTION_LINES_CUT)
-            and _SENTENCE_START.match(_line_text(view.lines[best]))
+            and (
+                _SENTENCE_END.search(_line_text(current))
+                or len(members) >= CAPTION_LINES_CUT
+                or current.bbox[2] < nxt.bbox[2] - CAPTION_LAST_LINE_SHORT * size
+            )
+            and _SENTENCE_START.match(_line_text(nxt))
         ):
             if pitch is None:  # a one-line caption: the lines of the next paragraph
                 after = following(view.lines[best], [*members, best])

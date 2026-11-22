@@ -142,11 +142,18 @@
   to the right edge was fused into the first entry ("Week 1: ...", "Module 1 ...", "Temperature
   and heat", "1 Temperature and heat"). The first entry of a list whose first title wraps is
   therefore not joined (as in 0.5.15). In a list whose entries start with a label (a section
-  number, "Chapter 5", "Week 3:", "Module 4"), an entry that starts with one is never a title's
+  number, "Chapter 5", "Week 3:", "Module 4"; also "A.4", and a Roman numeral of I, V and X,
+  so a lone "I" counts, and so does any capitalised word before a number or numeral), an entry
+  that starts with one is never a title's
   second line: the line above it is a part, chapter or unit line with no page number of its own
   ("Chapter 2 ...", "2 ...", "Part II ...", "Unit 2 ..." over "Week 4: ..."), not a title's first
   line (`blocks._starts_with_label`). A title whose second line starts with a number ("... of
-  Chapters" over "1 and 2 done again") is therefore two lines, as in 0.5.15.
+  Chapters" over "1 and 2 done again") is therefore two lines, as in 0.5.15. In any list, a line
+  without a label under a line with one goes on from it only when it starts in lower case or the
+  line above ends in a hyphen ("2.1 Work and heat in closed" / "systems"); otherwise the line
+  with the label is a chapter line over an entry of its own ("Chapter 2 ..." over
+  "Introduction", in a list whose other entries have labels or have none), and stays apart
+  (`blocks._wraps`).
   Left as it is: in a list of unnumbered entries, a "Part Two, ..." line between two entries
   that runs as far right as the entries' page numbers is still joined to the entry under it
   (0.5.15 kept it apart); a shorter part line is not, since a title wraps only on a full line.
@@ -240,10 +247,13 @@
   may now run to eight lines, as it may over the table (`tables._caption_lines`). A caption stops
   where the next line starts with a capital after a step wider than the caption's own line step by
   more than 1 pt (for a caption of one line, the next line's own); within its first four lines
-  the caption's line must also end a sentence, so a line pushed down by a tall formula does not
-  cut it mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`), steps measured from baseline to baseline so that a subscript or a
+  the caption's line must also end a sentence or end three font sizes or more short of the next
+  line's right edge (a caption's short last line over a paragraph that runs full,
+  `CAPTION_LAST_LINE_SHORT`), so a line pushed down by a tall formula does not cut it
+  mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`), steps measured from baseline to baseline so that a subscript or a
   raised mark on a line does not make a step look small or wide: a "Table 1: ..." caption over a
-  paragraph set more than 1 pt looser than its lines does not take the paragraph in. A
+  paragraph set more than 1 pt looser than its lines does not take the paragraph in, unless the
+  caption's last line runs on to the paragraph's width with no sentence end. A
   paragraph set at the caption's own line pitch cannot be told from the caption's next line and
   is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
   519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole
@@ -261,7 +271,8 @@
   sentence or is a paragraph's space away, or no other label stands on the line before or after
   it, as the labels of a schedule stand a description apart and a sidebar's lines follow one
   another; or, where two or more labels head a description of several lines, a label stands on
-  the line before or after it, a week of one line such as "Week 6 Midterm";
+  the line before or after it, a week of one line such as "Week 6 Midterm", and every label
+  starts with a capital or a digit, as a sidebar's running lines need not;
   `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
   built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to five lines a
   description and weeks of one line among weeks of three or five, with or without full stops and space between rows, the label level with the first
@@ -416,9 +427,14 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   is short and sits at the left; a caption with only a left remainder under it) or none above it
   does not break them. An exam whose questions are short lines set at the pitch of their options
   with no space between the questions (single spacing: a skipped line is 2 pitches top to top at
-  any leading), and one of two questions only, are read question by question too. An exam with
-  one row of two options under each question has no break in its option columns and is still
-  read left options first. The balance keeps a page of one column with
+  any leading), and one of two questions only, are read question by question too, up to five
+  questions: with six or more the gutter of the page as a whole is found first, the runs are not
+  asked about, and the page is read left options first, as in 0.5.15. A step in the other side's
+  own lines over 1.9 of their line steps with no break of the thinner side beside it (a figure
+  or a heading's space in one column only) keeps the columns, since an exam's questions cut both
+  sides at once. Left as it is: an exam with one row of two options under each question has no
+  break in its option columns, and one with ten options under one or two questions has too few
+  breaks; both are read left options first (0.5.15 read them question by question). The balance keeps a page of one column with
   a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
   lines in the right ones, a sentence across the page above) read row by row: the thinner side
   has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie

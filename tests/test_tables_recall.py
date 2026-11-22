@@ -319,10 +319,11 @@ def test_a_caption_of_six_lines_under_its_table_is_whole(shift, pushed):
 
 @pytest.mark.parametrize(
     "caption",
-    # one line that ends a sentence, and four lines with no full stop at their end (a caption was
-    # cut to four lines before it could run to eight)
+    # one line that ends a sentence, one with no full stop, and four lines with no full stop at
+    # their end (a caption was cut to four lines before it could run to eight)
     [
         ["Table 1. Measured periods of the pendulum."],
+        ["Table 1: Measured periods of the pendulum"],
         [
             "Table 1: Measured periods of the pendulum",
             "for the five lengths of string, each timed",

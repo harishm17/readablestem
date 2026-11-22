@@ -205,8 +205,8 @@ rules above.
    over three lines: the line above the label ends a sentence or is a paragraph's space
    away, or no other label stands on the line before or after it, since a schedule's labels
    stand a description apart; or a label does stand on the line before or after it, a week of
-   one line such as "Week 6 Midterm", and two or more labels head a description of several
-   lines): a body beside a sidebar has lines of its own in both columns that stand level with
+   one line such as "Week 6 Midterm", two or more labels head a description of several
+   lines and every label starts with a capital or a digit): a body beside a sidebar has lines of its own in both columns that stand level with
    nothing, and a sidebar's lines follow one another in blocks
    (`_text_block_dropped`, `_labels_open_runs`).
 3. **Structure.** Up to three grids compete: the **drawn cell grid** (the lattice of the
@@ -268,8 +268,10 @@ rules above.
    text under the table, `CAPTION_LINES_BELOW`), but a next line that starts with a capital after a
    step more than 1 pt wider than the caption's own line step (or, for a caption of one line, the
    next line's own) ends it: the paragraph under the table. Within the first four lines (where
-   the caption used to be cut, `CAPTION_LINES_CUT`) the caption's line must also end a sentence,
-   so a line pushed down by a tall formula does not cut a caption mid-sentence; past them any
+   the caption used to be cut, `CAPTION_LINES_CUT`) the caption's line must also end a sentence
+   or end three font sizes or more short of the next line's right edge (a caption's short last
+   line over a paragraph that runs full, `CAPTION_LAST_LINE_SHORT`), so a line pushed down by a
+   tall formula does not cut a caption mid-sentence; past them any
    line may end it. Steps
    are measured baseline to baseline (`_baseline`), so a subscript or a raised mark on a line does
    not change them. Where

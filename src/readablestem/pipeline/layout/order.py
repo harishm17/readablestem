@@ -115,7 +115,8 @@ def _columns_run(
     Columns run unbroken. Neither a line across the page with lines of both sides above and
     below it (a caption or a note at the foot of the columns has them on one side or none),
     nor breaks in the thinner side where a few lines of the other side or across the gutter
-    stand (the questions between the option pairs) cut them up into short runs.
+    stand (the questions between the option pairs) cut them up into short runs, unless the
+    other side has a hole of its own elsewhere (block paragraphs in both columns).
     """
     for w in wide:
         if all(
@@ -129,12 +130,27 @@ def _columns_run(
         return True
     pitch = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(rows))
     beside = _visual_lines(other + crossing)
-    breaks = sum(
-        b[1] - a[1] > MIN_BREAK_PITCHES * pitch
-        and 1 <= sum(a[3] - 1.0 <= o[1] and o[3] <= b[1] + 1.0 for o in beside) <= MAX_BREAK_LINES
+    breaks = [
+        (a[3], b[1])
         for a, b in itertools.pairwise(rows)
-    )
-    return not breaks or len(rows) >= MIN_RUN_LINES * (breaks + 1)
+        if b[1] - a[1] > MIN_BREAK_PITCHES * pitch
+        and 1 <= sum(a[3] - 1.0 <= o[1] and o[3] <= b[1] + 1.0 for o in beside) <= MAX_BREAK_LINES
+    ]
+    if not breaks:
+        return True
+    # The other side has a hole of its own beside none of these breaks: paragraphs set a line
+    # apart in both columns, each at its own place. An exam's other side (each question and the
+    # left options under it) runs unbroken, or breaks where the thinner side does.
+    lines = sorted(_visual_lines(other), key=lambda line: line[1])
+    if len(lines) >= 3:
+        step = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(lines))
+        if any(
+            b[1] - a[1] > MIN_BREAK_PITCHES * step
+            and not any(a[3] < high and b[1] > low for low, high in breaks)
+            for a, b in itertools.pairwise(lines)
+        ):
+            return True
+    return len(rows) >= MIN_RUN_LINES * (len(breaks) + 1)
 
 
 def _gutter_of(

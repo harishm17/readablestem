@@ -270,9 +270,14 @@ reader, neither to find them nor as a second opinion
    skips one line, 2 pitches, at any leading. A column page of the development set has one
    such break in 10 lines on its thinner side, just enough to keep its columns, and a step of
    1.78 pitches where a heading's space stands beside one line, which is no break; one with
-   three breaks in 28 lines keeps its columns too. An exam with one row of two options under
-   each question has no break in its option columns and is still read as columns (left
-   options first). The lines of the head are
+   three breaks in 28 lines keeps its columns too (`ax_astrophga_240306409`, page 9). A step
+   in the other side's own lines over 1.9 of their line steps with no break of the thinner side
+   beside it (a figure or a heading's space in one column only) keeps the columns: an exam's
+   questions cut both sides at once. Left as it is: an exam of six questions or more is taken
+   by the gutter of the page as a whole, before the runs are asked about; an exam with one row
+   of two options under each question has no break in its option columns, and one with ten
+   options under one or two questions too few; all three are read as columns (left options
+   first). The lines of the head are
    then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
@@ -2269,10 +2274,15 @@ title (`_title_head`; the hyphen at its end is repaired as in a paragraph). It i
 the middle of a list, when the nearest line above it is an entry (`_entry_above`): above the
 first entry it may be the last line of a paragraph, a heading or a part line, which look the
 same, so it stays a line of its own. In a list whose entries start with a label ("1
-Temperature", "A.4", "Part II", "Week 3:", "Module 4"), an entry that starts with one is never
+Temperature", "A.4", "Part II", "Week 3:", "Module 4": a number, a letter and a number, a
+Roman numeral of I, V and X, alone or after a capitalised word, then a space; so a lone "I"
+counts, and so does any capitalised word before a number), an entry that starts with one is never
 a title's second line: the line above it is a part, chapter or unit line with no page number
 of its own (`_starts_with_label`), and a title whose second line starts with a number is two
-lines. Items nest by
+lines. In any list, a line without a label under a line with one goes on from it only in lower
+case or after a hyphen ("2.1 Work and heat in closed" / "systems"); otherwise the line with the
+label is a chapter line over an entry of its own ("Chapter 2 ..." / "Introduction", `_wraps`).
+Items nest by
 indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document

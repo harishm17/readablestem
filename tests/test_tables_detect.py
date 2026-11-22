@@ -12,6 +12,7 @@ it; the tests that need it skip without it.
 from __future__ import annotations
 
 import logging
+import textwrap
 from pathlib import Path
 
 import pymupdf
@@ -549,12 +550,24 @@ def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_si
 
         return fill
 
-    def sidebar(page):
+    def sidebar(page):  # a margin column of two blocks, each level with lines of the body
         write(page, 72, 90, "Course schedule", 15)
-        for i in range(12):
-            write(page, 72, 120 + 14 * i, f"The body of the page runs on in line {i} of its column")
-        for i, y in enumerate((120, 148, 162, 190, 232)):
-            write(page, 340, y, f"Sidebar {i}")
+        body = (
+            "a cart rolls down the ramp and its speed grows with every metre it travels, while"
+            " the force of gravity along the slope stays the same from the top of the ramp to"
+            " its foot, so the work done on it grows in step with the distance it covers on the"
+            " way down; friction takes a little of that work and turns it to heat in the wheels"
+            " and the track, and what is left shows up as the kinetic energy of the cart when it"
+            " reaches the bottom of the ramp, where a spring stops it and stores that energy for a"
+            " moment before it pushes the cart back up the slope again with a little less speed"
+            " than it had, since the friction took some of the energy on each trip, until at last"
+            " the cart comes to rest at the foot of the ramp with all its energy spent as heat"
+        )
+        for i, line in enumerate(textwrap.wrap(body, 62)):
+            write(page, 170, 120 + 14 * i, line)
+        labels = ("Key idea", "momentum is", "Remember", "units agree")
+        for i, text in zip((1, 2, 9, 10), labels, strict=True):
+            write(page, 72, 120 + 14 * i, text)
 
     def week(n):
         return f"Week {n}"
