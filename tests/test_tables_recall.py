@@ -290,3 +290,18 @@ def test_a_caption_of_six_lines_under_its_table_is_whole():
 
     (found,) = data_tables(pdf(fill))
     assert found.caption == " ".join(lines)
+
+
+def test_a_one_line_caption_under_its_table_leaves_the_paragraph_after_it():
+    paragraph = [
+        f"line {i} of the paragraph that follows the caption, which is body text" for i in range(6)
+    ]
+
+    def fill(page):
+        grid_table(page, PENDULUM, y0=150)
+        write(page, 100, 250, "Table 1. Measured periods of the pendulum.", 10)
+        for i, line in enumerate(paragraph):  # 3 pt more than the line pitch before the first
+            write(page, 100, 265 + 12 * i, line.capitalize(), 10)
+
+    (found,) = data_tables(pdf(fill))
+    assert found.caption == "Table 1. Measured periods of the pendulum."
