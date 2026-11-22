@@ -149,14 +149,18 @@
   ("Chapter 2 ...", "2 ...", "Part II ...", "Unit 2 ..." over "Week 4: ..."), not a title's first
   line (`blocks._starts_with_label`). A title whose second line starts with a number ("... of
   Chapters" over "1 and 2 done again") is therefore two lines, as in 0.5.15. In any list, a line
-  without a label under a line with one goes on from it only when it starts in lower case or the
-  line above ends in a hyphen ("2.1 Work and heat in closed" / "systems"); otherwise the line
-  with the label is a chapter line over an entry of its own ("Chapter 2 ..." over
-  "Introduction", in a list whose other entries have labels or have none), and stays apart
-  (`blocks._wraps`).
+  without a label under a line with one goes on from it when it starts in lower case, when the
+  line above ends in a hyphen ("2.1 Work and heat in closed" / "systems"), or when the line
+  above starts with a label of the form of the entries' own ("2" among "1" and "3", "E.5" among
+  "E.4" and "E.6": "E.5 Proof of ... (Lemma" / "D.6)"); otherwise the line with the label is a
+  chapter line over an entry of its own ("Chapter 2 ..." over "Introduction", or "2 ..." over it
+  among entries "2.1", "2.2"), and stays apart (`blocks._wraps`, `_label_shape`).
   Left as it is: in a list of unnumbered entries, a "Part Two, ..." line between two entries
   that runs as far right as the entries' page numbers is still joined to the entry under it
   (0.5.15 kept it apart); a shorter part line is not, since a title wraps only on a full line.
+  A chapter line whose label is a word ("Chapter Two ...", "Part Two: ...") or that has none,
+  and one over an entry that starts in lower case or with a year, are still joined to the entry
+  under them (0.5.15 kept them apart).
 - Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
   page number, its own or a line of its own beside it (`blocks._ends_in_number`).
 - A capital alone on its line heads an index section only when the first entry of its letter
@@ -249,11 +253,17 @@
   more than 1 pt (for a caption of one line, the next line's own); within its first four lines
   the caption's line must also end a sentence or end three font sizes or more short of the next
   line's right edge (a caption's short last line over a paragraph that runs full,
-  `CAPTION_LAST_LINE_SHORT`), so a line pushed down by a tall formula does not cut it
-  mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`), steps measured from baseline to baseline so that a subscript or a
+  `CAPTION_LAST_LINE_SHORT`), so a line of a caption set full width and pushed down by a tall
+  formula does not cut it mid-sentence, and past them any line may end it (`CAPTION_LINES_CUT`),
+  steps measured from baseline to baseline so that a subscript or a
   raised mark on a line does not make a step look small or wide: a "Table 1: ..." caption over a
   paragraph set more than 1 pt looser than its lines does not take the paragraph in, unless the
-  caption's last line runs on to the paragraph's width with no sentence end. A
+  caption's last line runs to within three font sizes of the paragraph's first line's right edge
+  with no sentence end (the paragraph's first line is short, the paragraph is narrower than
+  the caption, or the caption's last line nearly full). Left as it is: a ragged caption whose
+  short line stands over a line pushed down by a formula, and a short title line set 2 pt or
+  more apart from its description, end there (0.5.15 kept them whole); the rest follows as a
+  paragraph, in order. A
   paragraph set at the caption's own line pitch cannot be told from the caption's next line and
   is still taken in, as it was in the pipeline before (three lines of it, now up to seven). On the
   519 PDFs of the public sets, 6 captions of 5 files were cut at the fourth line, all read whole
@@ -271,9 +281,9 @@
   sentence or is a paragraph's space away, or no other label stands on the line before or after
   it, as the labels of a schedule stand a description apart and a sidebar's lines follow one
   another; or, where two or more labels head a description of several lines, a label stands on
-  the line before or after it, a week of one line such as "Week 6 Midterm", and every label
-  starts with a capital or a digit, as a sidebar's running lines need not;
-  `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
+  the line before or after it, a week of one line such as "Week 6 Midterm", and all labels but
+  one in five start with a capital or hold a digit ("fall break" among dates), as a sidebar's
+  running lines need not; `tables._labels_open_runs`): that is a table, as it was before this rule for the schedules
   built to test it (dates or "Week n" as labels, 3, 5 and 10 rows, one to five lines a
   description and weeks of one line among weeks of three or five, with or without full stops and space between rows, the label level with the first
   or the middle line; a borderless schedule with no caption had become ten paragraphs). Of 827
@@ -430,11 +440,15 @@ source through LaTeXML, then fixed in `source/ltx_reader.py` and `pipeline/run.p
   any leading), and one of two questions only, are read question by question too, up to five
   questions: with six or more the gutter of the page as a whole is found first, the runs are not
   asked about, and the page is read left options first, as in 0.5.15. A step in the other side's
-  own lines over 1.9 of their line steps with no break of the thinner side beside it (a figure
-  or a heading's space in one column only) keeps the columns, since an exam's questions cut both
-  sides at once. Left as it is: an exam with one row of two options under each question has no
+  own lines over 1.9 of their line steps, with lines of the thinner side beside it but none of
+  its breaks (a figure or a heading's space in one column only), keeps the columns: an exam's
+  questions cut both sides at once, and a section line set apart above the first question or
+  under the last ("Section A: Multiple choice") has no line of the thinner side beside its
+  space. Left as it is: an exam with one row of two options under each question has no
   break in its option columns, and one with ten options under one or two questions has too few
-  breaks; both are read left options first (0.5.15 read them question by question). The balance keeps a page of one column with
+  breaks; both are read left options first (0.5.15 read them question by question). Columns
+  are still read across, as in 0.5.15, where the hole of the other side lies within a line of a
+  break of the thinner side, under the thinner column's end, or only in the thinner column. The balance keeps a page of one column with
   a ruled step table (a textbook's worked example: the steps' lines in the left cells, a few
   lines in the right ones, a sentence across the page above) read row by row: the thinner side
   has 0.13 and 0.21 of the lines there, and 0.65 or more on the five pages whose columns lie

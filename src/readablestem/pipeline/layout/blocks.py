@@ -11,7 +11,7 @@ import re
 import statistics
 import unicodedata
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Sequence, Set
 from dataclasses import dataclass
 from itertools import pairwise
 
@@ -906,6 +906,7 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
     }
     right = statistics.median([(twin or row).x1 for row, twin in pairs if id(row) in split])
     labelled = 2 * sum(_starts_with_label(r) for r in rows if id(r) in split) > len(split)
+    shapes = {_label_shape(r) for r in rows if id(r) in split} - {None}
     listed = {
         id(row)
         for row, twin in pairs
@@ -926,7 +927,7 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         else:
             continue
         head = _title_head(row, heads, right, rows, listed)
-        if head and _wraps(head, row, labelled=labelled):
+        if head and _wraps(head, row, labelled=labelled, shapes=shapes):
             new.contents_wrap = head
             heads.pop(id(head))
             entries.append((head, head))
@@ -977,20 +978,32 @@ def _title_head(
     )
 
 
-def _wraps(head: _Row, row: _Row, *, labelled: bool) -> bool:
+def _wraps(head: _Row, row: _Row, *, labelled: bool, shapes: Set[str | None]) -> bool:
     """Is `row` the second line of the title `head` starts, not an entry under a chapter line?
 
     In a list whose entries start with a section label, a title's second line has none: an
     entry that has one is no title's second line, whatever stands above it (a part line, or a
     chapter line with no page number of its own, which starts with a label too). In any list,
-    under a line with a label a line without one goes on from it only in lower case or after
-    a hyphen ("2.1 Work and heat in closed" / "systems"); otherwise the line with the label is
-    a chapter line over an entry of its own ("Chapter 2 ..." / "Introduction")."""
+    under a line with a label a line without one goes on from it when it is in lower case,
+    after a hyphen ("2.1 Work and heat in closed" / "systems"), or when the label has the form
+    of the entries' own labels (`shapes`: "E.5 Proof of ... (Lemma" / "D.6)" among "E.4" and
+    "E.6"); otherwise the line with the label is a chapter line over an entry of its own
+    ("Chapter 2 ..." / "Introduction" among "1.1" and "2.1")."""
     if labelled and _starts_with_label(row):
         return False
     if not _starts_with_label(head) or _starts_with_label(row):
         return True
-    return row.clean[:1].islower() or head.clean.endswith("-")
+    return row.clean[:1].islower() or head.clean.endswith("-") or _label_shape(head) in shapes
+
+
+def _label_shape(row: _Row) -> str | None:
+    """The form of the section label a line starts with, or None: "2.3" and "4.1" are "9.9",
+    "Chapter 5" is "Chapter 9", "B.2" is "A.9", "IV" is "9"."""
+    found = _SECTION_LABEL.match(row.clean)
+    if not found:
+        return None
+    label = found.group().strip().rstrip(".:")
+    return re.sub(r"^[A-Z](?=\.)", "A", re.sub(r"\d+|\b[IVX]+$", "9", label))
 
 
 def _starts_with_label(row: _Row) -> bool:

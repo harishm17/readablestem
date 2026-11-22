@@ -59,11 +59,16 @@ def test_a_short_heading_beside_a_gap_in_the_other_column_still_breaks_the_colum
     assert read == [above_left, above_right, heading, below_left, below_right]
 
 
-@pytest.mark.parametrize("note", [False, True])
-def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other(note):
+@pytest.mark.parametrize(
+    ("note", "paragraphs"),
+    [(False, None), (True, None), (False, (5, 4))],
+)
+def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other(note, paragraphs):
     # A title, authors and affiliations centered over both columns (more lines across the
     # gutter than a column may have), an abstract across the page, then two columns; with a
-    # note across the page under them whose last line is short and sits at the left.
+    # note across the page under them whose last line is short and sits at the left; or with
+    # paragraphs set a line apart, of five lines on the left and four on the right, so each
+    # column has holes of its own at its own places.
     import pymupdf
 
     doc = pymupdf.open()
@@ -81,10 +86,11 @@ def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other
         page.insert_text((54, y + 8), "abstract " * 11, fontsize=10, fontname="helv")
         y += 12
     top = y + 20
-    for x, name in ((54.0, "left"), (317.0, "right")):
+    for side, (x, name) in enumerate(((54.0, "left"), (317.0, "right"))):
         for i in range(24):
             line = f"{name} column line {i} " + "word " * 7
-            page.insert_text((x, top + 12 * i), line, fontsize=10, fontname="helv")
+            gaps = i // paragraphs[side] if paragraphs else 0
+            page.insert_text((x, top + 12 * (i + gaps)), line, fontsize=10, fontname="helv")
     if note:
         page.insert_text((54, top + 12 * 25), "A note across the page. " * 9, fontsize=8)
         page.insert_text((54, top + 12 * 25 + 10), "The last line.", fontsize=8)
@@ -120,20 +126,22 @@ def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column
 
 
 @pytest.mark.parametrize(
-    ("question", "options", "questions", "space", "pitch"),
+    ("question", "options", "questions", "space", "pitch", "section"),
     [
         # a question that runs the whole width of the page; one that stops short of the gutter,
         # set at the pitch of its options (single spacing) with no space between the questions
-        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16),
-        ("Which statement about the forces is correct?", 4, 4, 0, 13.2),
+        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16, False),
+        ("Which statement about the forces is correct?", 4, 4, 0, 13.2, False),
         # two short questions only: the gutter runs through them
-        ("Which statement about the forces is correct?", 4, 2, 12, 16),
+        ("Which statement about the forces is correct?", 4, 2, 12, 16, False),
         # one question, six options: three lines a side under it
-        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16),
+        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, False),
+        # a section line set a line apart above the first question
+        ("Which statement about the forces is correct?", 4, 3, 12, 16, True),
     ],
 )
 def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
-    question, options, questions, space, pitch
+    question, options, questions, space, pitch, section
 ):
     # An exam page of one column: centered head lines, an instruction across the page, then
     # questions with their options two by two under each. The option pairs look like two columns
@@ -158,6 +166,9 @@ def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
         (72, y), "Answer every question and mark the single best option on the sheet.", fontsize=11
     )
     y += 28
+    if section:
+        page.insert_text((72, y), "Section A: Multiple choice", fontsize=11)
+        y += 36
     for q in range(questions):
         page.insert_text((72, y), f"{q + 1}. " + question.format(q=q), fontsize=11)
         y += 18 if space else pitch

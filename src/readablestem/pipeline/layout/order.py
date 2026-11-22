@@ -138,15 +138,18 @@ def _columns_run(
     ]
     if not breaks:
         return True
-    # The other side has a hole of its own beside none of these breaks: paragraphs set a line
-    # apart in both columns, each at its own place. An exam's other side (each question and the
-    # left options under it) runs unbroken, or breaks where the thinner side does.
+    # The other side has a hole of its own beside none of these breaks, with a line of the
+    # thinner side beside it: paragraphs set a line apart in both columns, each at its own
+    # place. An exam's other side (each question and the left options under it) runs unbroken,
+    # breaks where the thinner side does, or breaks above its first question or under its last
+    # ("Section A" and a blank line), where the thinner side has no line.
     lines = sorted(_visual_lines(other), key=lambda line: line[1])
     if len(lines) >= 3:
         step = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(lines))
         if any(
             b[1] - a[1] > MIN_BREAK_PITCHES * step
             and not any(a[3] < high and b[1] > low for low, high in breaks)
+            and any(a[3] - 1.0 <= r[1] and r[3] <= b[1] + 1.0 for r in rows)
             for a, b in itertools.pairwise(lines)
         ):
             return True

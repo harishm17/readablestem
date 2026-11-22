@@ -1524,16 +1524,18 @@ def test_a_contents_entry_keeps_its_numbers_out_of_the_maths_it_ends_in():
 
 
 @pytest.mark.parametrize(
-    ("label", "group", "intro"),
+    ("label", "group", "intro", "wrap"),
     [
-        ("{n} ", None, False),
-        ("{n} ", "Chapter", False),
-        ("Week {n}: ", "Unit", False),
+        ("{n} ", None, False, ("(Theo-", "rem 1)")),
+        ("{n} ", "Chapter", False, ("(Theo-", "rem 1)")),
+        ("Week {n}: ", "Unit", False, ("(Theo-", "rem 1)")),
         # the chapter's first entry has no number ("Introduction")
-        ("{n} ", "Chapter", True),
+        ("{n} ", "Chapter", True, ("(Theo-", "rem 1)")),
+        # the second line starts with a capital, under a label like the entries' own
+        ("{n} ", "Chapter", False, ("(after", "Newton)")),
     ],
 )
-def test_a_contents_title_that_wraps_is_one_entry(label, group, intro):
+def test_a_contents_title_that_wraps_is_one_entry(label, group, intro, wrap):
     # With a chapter (or unit) line that has no page number of its own between two entries: it
     # runs as far right as a title's first line, starts with a label as the entries do, and is
     # not one.
@@ -1556,7 +1558,7 @@ def test_a_contents_title_that_wraps_is_one_entry(label, group, intro):
         y = 120.0
         for lines, number in [
             ([first], "3"),
-            ([second + " (Theo-", "rem 1)"], "9"),
+            ([f"{second} {wrap[0]}", wrap[1]], "9"),
             ([third], "15"),
             ([group_line], None),
             ([fourth], "21"),
@@ -1573,7 +1575,8 @@ def test_a_contents_title_that_wraps_is_one_entry(label, group, intro):
             y += 5 if number else 0
 
     entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
-    assert [e.text for e in entries] == [first, second + " (Theorem 1)", third, fourth]
+    joined = wrap[0][:-1] + wrap[1] if wrap[0].endswith("-") else " ".join(wrap)
+    assert [e.text for e in entries] == [first, f"{second} {joined}", third, fourth]
 
 
 @pytest.mark.parametrize("label", ["{n} ", "Week {n}: ", "Module {n} ", ""])

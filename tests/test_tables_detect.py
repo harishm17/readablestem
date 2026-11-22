@@ -582,6 +582,8 @@ def test_a_schedule_of_labels_and_descriptions_is_a_table_but_a_body_beside_a_si
         schedule(date, 1, False, 0),
         # a week of one line ("Week 2  Midterm") between weeks of three, no full stops
         schedule(week, 0, False, 0, (3, 1, 3, 3, 3)),
+        # ... where that week's label is in lower case ("fall break")
+        schedule(lambda n: "fall break" if n == 2 else week(n), 0, False, 0, (3, 1, 3, 3, 3)),
     ):
         assert [e.kind for e in analyze(pdf(fill)).elements].count(Kind.TABLE) == 1
     assert Kind.TABLE not in [e.kind for e in analyze(pdf(sidebar)).elements]

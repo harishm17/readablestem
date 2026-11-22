@@ -2016,9 +2016,9 @@ def _labels_open_runs(grid: _Grid) -> bool:
     """One of two columns is short labels, each level with the first line of a run of lines in
     the other (a schedule: "Week 1" and its description over three lines): the line above in
     the other column ends a sentence or is a paragraph's space away, or is a row of one line
-    ("Week 6" and "Midterm") where two or more labels each head a run of several lines and
-    every label starts with a capital or a digit. A body
-    beside a sidebar has lines of its own in both columns that stand level with nothing."""
+    ("Week 6" and "Midterm") where two or more labels each head a run of several lines and all
+    labels but one in five start with a capital or hold a digit. A body beside a sidebar has
+    lines of its own in both columns that stand level with nothing."""
     cells: dict[int, dict[int, _Seg]] = {}
     for seg in grid.segs:
         if len(seg.columns) == 1:
@@ -2032,12 +2032,12 @@ def _labels_open_runs(grid: _Grid) -> bool:
         # labels whose run goes on past their own line: in a schedule, most; in a sidebar beside a
         # body, the last line of each block of the sidebar
         runs = sum(line + 1 not in label and line + 1 in other for line in label)
-        # ... and labels that each start with a capital or a digit ("Week 6", "Oct 3"), as a
-        # sidebar's running lines do not
-        named = all(
-            seg.text.lstrip()[:1].isupper() or seg.text.lstrip()[:1].isdigit()
+        # ... and labels that start with a capital or hold a digit ("Week 6", "Oct 3", "mon 9/2"),
+        # all but one in five ("fall break" among dates), as a sidebar's running lines do not
+        named = 5 * sum(
+            not (seg.text.lstrip()[:1].isupper() or any(ch.isdigit() for ch in seg.text))
             for seg in label.values()
-        )
+        ) <= len(label)
 
         def opens(
             line: int,
