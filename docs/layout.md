@@ -1322,8 +1322,9 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   deck's body size (the lines that follow it in the same size, each within half a line of the one
   before, are part of it). A line that is a formula or a bare number and nothing else (no
   word of three letters besides function names like "sin" and "log", and a math sign, an italic
-  math letter or no letter at all, but a name in capitals with a plus in it, "C++", "Q+A", is
-  text: `slides._is_formula`) is never a title, nor the title of a
+  math letter or no letter at all; a name that ends in a plus or two ("C++", "g++", "A+") and
+  "Q+A" are not math signs, in any line, so "C++ 17" and "C/C++" are text, while "A+B", "N+1"
+  and "x + y = 2" are formulas: `slides._is_formula`) is never a title, nor the title of a
   title slide: a slide with a large equation under its title is titled by the title (on the
   html-slides deck 17 of 22 slides took their equation or a lone "1"). It is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a

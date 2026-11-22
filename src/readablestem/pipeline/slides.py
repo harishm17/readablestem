@@ -88,8 +88,11 @@ _FUNCTION = re.compile(
     r"(?![^\W\d_])"
 )
 _WORD = re.compile(r"[^\W\d_]{3,}")
-# A name with a plus in it, in capitals ("C++", "Q+A", "A+"): text, not a sum.
-_NAME_WITH_PLUS = re.compile(r"[A-Z]+\+{1,2}[A-Z0-9]*")
+# A name that ends in a plus or two ("C++", "g++", "A+", "Notepad++"), and "Q+A": text, not a
+# sum. A plus between two letters or a letter and a digit ("A+B", "N+1") is a sum.
+_NAME_WITH_PLUS = re.compile(
+    r"(?<![A-Za-z0-9])(?:[A-Za-z][A-Za-z0-9]*(?:\+\+|\+(?![A-Za-z0-9]))|Q\+A(?![A-Za-z0-9]))"
+)
 
 
 @dataclass(frozen=True)
@@ -282,17 +285,16 @@ def _is_formula(text: str) -> bool:
     """A line that is a formula or a bare number and nothing else: it has no word of three
     letters that is not a function name ("sin", "log"), and it has a math sign or an italic
     math letter ("=", an integral sign, "x"), or no letter at all (the "1" over the bar of a
-    fraction). "Slopes and Rates", "Q & A", "AI", "C++" and "Q+A" are text; "x = -b / 2a",
-    "pH = -log10 [H+]" and "1" are not."""
-    if _NAME_WITH_PLUS.fullmatch(text.strip()):
-        return False
+    fraction). A name with a plus in it ("C++", "g++", "A+", "Q+A") is not a math sign, in
+    any line. "Slopes and Rates", "Q & A", "AI", "C++ 17", "C/C++" and "Q+A" are text;
+    "x = -b / 2a", "A+B", "N+1", "pH = -log10 [H+]" and "1" are not."""
     plain = "".join(c for c in text if not 0x1D400 <= ord(c) <= 0x1D7FF)
     if _WORD.search(_FUNCTION.sub(" ", plain)):
         return False
     return (
         len(plain) < len(text)
         or not any(c.isalpha() for c in text)
-        or any(unicodedata.category(c) == "Sm" for c in text)
+        or any(unicodedata.category(c) == "Sm" for c in _NAME_WITH_PLUS.sub(" ", text))
     )
 
 

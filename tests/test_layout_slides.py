@@ -15,6 +15,7 @@ from functools import cache
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from readablestem.core.types import Element, Kind
 from readablestem.pipeline import layout, slides
@@ -217,16 +218,33 @@ def test_a_formula_in_the_top_of_a_slide_is_not_its_title():
     assert [t.text for t in deck.titles.values()] == ["Alpha", "Beta", "Gamma"]
 
 
-def test_a_slide_titled_with_a_name_that_has_a_plus_in_it_keeps_its_title():
+@pytest.mark.parametrize(
+    "titles",
+    [
+        ["C++", "Q+A", "Alpha"],
+        ["C++", "C++ 17", "C++ II", "C/C++", "g++", "Q+A:", "C++ vs. C#", "C#", "A+ grade"],
+    ],
+)
+def test_a_slide_titled_with_a_name_that_has_a_plus_in_it_keeps_its_title(titles):
     pages = [
         view(
             n, [row(title, y=20, size=30.0), row("Body text of the slide goes in this line", y=200)]
         )
-        for n, title in enumerate(["C++", "Q+A", "Alpha"])
+        for n, title in enumerate(titles)
     ]
     deck = slides.detect(None, pages)
     assert deck is not None
-    assert [t.text for t in deck.titles.values()] == ["C++", "Q+A", "Alpha"]
+    assert [t.text for t in deck.titles.values()] == titles
+
+
+def test_slides_titled_with_a_sum_are_not_a_deck_by_their_titles():
+    pages = [
+        view(
+            n, [row(title, y=20, size=30.0), row("Body text of the slide goes in this line", y=200)]
+        )
+        for n, title in enumerate(["A+B", "X+Y", "N+1", "P+Q", "x + y = 2"])
+    ]
+    assert slides.detect(None, pages) is None
 
 
 # ------------------------------------------------------------------ non-slide files
