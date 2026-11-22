@@ -1326,7 +1326,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   "Q+A" are not math signs, in any line, so "C++ 17" and "C/C++" are text, while "A+B", "N+1"
   and "x + y = 2" are formulas: `slides._is_formula`) is never a title, nor the title of a
   title slide: a slide with a large equation under its title is titled by the title (on the
-  html-slides deck 17 of 22 slides took their equation or a lone "1"). It is always a heading (reason `slide_title`, plus `larger font` so the
+  html-slides deck 17 of 22 slides took their equation or a lone "1"). Whether a file is a deck is counted as before: a page whose largest top line is a formula is titled like a slide all the same (`detect`, `_title(formulas=True)`). A slide's title is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
   title that a theme's headline picture took as its label (Warsaw: the figure's text is "Waves
   Superposition Cases") becomes the heading in place of that figure. Every frame is therefore a

@@ -298,16 +298,17 @@ def _is_formula(text: str) -> bool:
     )
 
 
-def _title(view: PageView, body: float) -> Title | None:
+def _title(view: PageView, body: float, *, formulas: bool = False) -> Title | None:
     """The largest text in the top of the page, at least MIN_TITLE_RATIO x the body; the
     topmost when several are as large. A line that is a formula only is not a title: a slide
-    with a large formula under its title is titled by the title."""
+    with a large formula under its title is titled by the title. With `formulas`, it may be
+    (the line at a title's place and size, which says the page is titled like a slide)."""
     top = [
         row
         for row in view.rows
         if not row.vertical
         and row.text.strip()
-        and not _is_formula(row.text)
+        and (formulas or not _is_formula(row.text))
         and row.bbox[1] <= TITLE_ZONE * view.height
         and row.size >= MIN_TITLE_RATIO * body
     ]
@@ -404,7 +405,12 @@ def detect(creator: str | None, views: Sequence[PageView]) -> Deck | None:
     # A page kept whole has no text to be titled by: the pages that have text are judged, so a
     # deck with some scanned slides is still one (a file of no text pages is not).
     readable = [v for v in views if not v.kept_whole]
-    titled = sum(v.number in titles or v.number in title_slides for v in readable)
+    # A page whose title is a formula ("A+B") is titled like a slide all the same: the formula
+    # rule says which line titles a slide, not whether the file is a deck.
+    titled = sum(
+        v.number in titles or v.number in title_slides or _title(v, body, formulas=True) is not None
+        for v in readable
+    )
     if not by_label and (not readable or titled < TITLED_SHARE * len(readable)):
         return None
     # A title slide recurring starts a deck when the file starts with one.
