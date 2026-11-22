@@ -18,9 +18,9 @@
   ]
  },
  "pipeline_version": "0.5.16",
- "commit": "5298521e872f641884e1e3e09bb4ec4ae0e68e67",
+ "commit": "d0cc3e04ded9d8e48021d02d8877f1368a97a6c1",
  "provenance": {
-  "commit": "5298521e872f641884e1e3e09bb4ec4ae0e68e67",
+  "commit": "d0cc3e04ded9d8e48021d02d8877f1368a97a6c1",
   "clean": true,
   "pipeline_version": "0.5.16",
   "render_version": 11,
@@ -59,21 +59,21 @@
   },
   "kinds": {
    "scan": 158,
-   "table": 184,
+   "table": 185,
    "figure": 176,
-   "typical": 176,
+   "typical": 175,
    "dense_math": 49,
    "slide": 4
   },
-  "pages_that_asked_a_model": 602,
+  "pages_that_asked_a_model": 603,
   "requests_refused_by_step": {
    "equation": 2846,
    "figure": 1170,
    "image_page": 264,
-   "table": 548
+   "table": 550
   },
   "stopped_early": 0,
-  "seconds_median": 2.45
+  "seconds_median": 2.39
  },
  "metrics": {
   "multi_column": {
@@ -102,8 +102,8 @@
     "scan read from its picture (an OCR layer, if any, is not used)": 86,
     "scan with no text layer": 35
    },
-   "run_no_request": 220,
-   "score_no_request": 30.5,
+   "run_no_request": 218,
+   "score_no_request": 30.3,
    "pdfs": 266,
    "pdfs_run": 227,
    "column": "Hdr/Ftr"
@@ -150,7 +150,7 @@
     "scan read from its picture (an OCR layer, if any, is not used)": 101,
     "scan with no text layer": 60
    },
-   "run_no_request": 144,
+   "run_no_request": 143,
    "score_no_request": 100.0,
    "pdfs": 747,
    "pdfs_run": 586,

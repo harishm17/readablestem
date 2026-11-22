@@ -69,6 +69,9 @@
   baseline are as before; both movers are the columns under the head of a first page, O-024);
   `data/eval/order-layout-dev-1.json` (141 of 267 pages right, from 140, and 72 faultless; none
   made wrong; page 8 of `ax_astrophga_240306369` became right, O-024).
+  The parsing-benchmark record was made again at `d0cc3e04`, after the review fixes, with the
+  same scores; 603 pages asked a model, not 602 (one page's tables, read in this run and not
+  in the first; docs/eval-parsing-benchmark.md).
 - The corpus hash run against 0.5.15 (`07a10cbc`), with the version strings made equal: of the 73
   uploads, 63 give the same stored result; 10 differ, each by one entry above. The notice
   `actualtext_ignored` is added on `d3_arabic_doc`, `r09_handout_14451`, `r14_exam_513`,

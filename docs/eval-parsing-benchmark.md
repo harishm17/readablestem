@@ -57,9 +57,14 @@ the CHANGELOG entry "columns under the head of a first page" (O-024). Measured b
 layout of the four pages above and of the three table pages on the commit before that change
 and on it: every one changes there and on no other commit of the release, except page 18 of
 `0514f667…`, which changes at the commit for a printed address that the file links on both
-lines (O-046, O-156). table_tests keeps its 605 of 857. 602 pages (603 at 0.5.15) asked a model
-for something at $0. The median page took 2.45 s (3.55 at 0.5.15): a different load on the
-machine, not a measured change of the code.
+lines (O-046, O-156). table_tests keeps its 605 of 857. 603 pages asked a model for something
+at $0, as at 0.5.15. The record was made again on 2026-11-22 at `d0cc3e04` (the review fixes
+after the release), with the same scores: the first run at 0.5.16 (`5298521e`) read one
+headers_footers page (`a85bbe20…`, page 11, a list of references by year) with no table, so
+602 pages asked and two checks of the run without a model passed that fail now; the same
+commit reads the page's two tables today, three times out of three, as does `d0cc3e04`. The
+cause in that run was not traced; the code did not change it. The median page took 2.39 s
+(3.55 at 0.5.15): a different load on the machine, not a measured change of the code.
 
 From 0.5.14 to 0.5.15 two categories moved and none fell. table_tests passes 34 more checks, on
 8 pages (571 to 605 of 857): the tables with no ruling lines that the wave's table search now
