@@ -26,6 +26,7 @@ from readablestem.config import Settings
 from readablestem.core.types import Fix, Status, Verification
 from readablestem.models.verifier import (
     MEANING_CHANGING,
+    Verifier,
     VerifierVerdict,
     equation_check_on,
     verifier_of,
@@ -33,13 +34,21 @@ from readablestem.models.verifier import (
 
 
 def record(
-    fix: Fix, png: bytes, *, client: object, settings: Settings, cheap_latex: str | None
+    fix: Fix,
+    png: bytes,
+    *,
+    client: object,
+    settings: Settings,
+    cheap_latex: str | None,
+    facts: str | None = None,
 ) -> Fix:
     """`fix` with the shadow answers appended (cheap answer first, then the final one).
 
     `cheap_latex` is the cheap model's valid LaTeX when the equation was escalated away
     from it, else None. Answers are deterministic, so when it equals the final proposal
-    the final answer is reused for it instead of asking (and paying) twice.
+    the final answer is reused for it instead of asking (and paying) twice. `facts`
+    (`EQUATION_FILE_FACTS`): the file's account of the box and the maths beside it
+    (`file_account.account`), given to the check.
     """
     verifier = verifier_of(client)
     if verifier is None or not equation_check_on(settings):
@@ -51,19 +60,27 @@ def record(
     ):
         return fix  # a person looks at it anyway; the Claude check costs real money
     final_latex = fix.equation.latex if fix.equation is not None else None
-    final = verifier.equation_match(png, latex=final_latex) if final_latex else None
+    final = _match(verifier, png, final_latex, facts) if final_latex else None
     records: list[Verification] = []
     if cheap_latex:
         if final is not None and cheap_latex == final_latex:
             cheap = dataclasses.replace(final, input_tokens=0, cost_usd=0.0, latency_ms=0)
         else:
-            cheap = verifier.equation_match(png, latex=cheap_latex)
+            cheap = _match(verifier, png, cheap_latex, facts)
         records.append(_record(cheap, "cheap", settings))
     if final is not None:
         records.append(_record(final, "final", settings))
     if not records:
         return fix
     return fix.model_copy(update={"verifications": [*fix.verifications, *records]})
+
+
+def _match(verifier: Verifier, png: bytes, latex: str, facts: str | None) -> VerifierVerdict:
+    """One check; `facts` is passed only when there are some, so a verifier that knows nothing
+    of them (and a request without them) is called as it always was."""
+    if facts is None:
+        return verifier.equation_match(png, latex=latex)
+    return verifier.equation_match(png, latex=latex, facts=facts)
 
 
 def _record(verdict: VerifierVerdict, stage: str, settings: Settings) -> Verification:

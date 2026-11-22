@@ -49,7 +49,7 @@ from pydantic import BaseModel, ConfigDict
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core.budget import BudgetExceeded, JobBudget
-from readablestem.models.base import VisionClient, VisionRequest
+from readablestem.models.base import FENCE_LIMIT, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.models.verifier import (
     COSMETIC,
@@ -73,11 +73,15 @@ log = logging.getLogger(__name__)
 
 FIGURE_PROMPT = "check_figure"
 EQUATION_PROMPT = "check_equation"
+# Appended to `check_equation` when the request carries the file's account of the box
+# (`EQUATION_FILE_FACTS`); a request without it keeps the prompt it had.
+EQUATION_FILE_PROMPT = "check_equation_file"
 # A verdict is a few short fields; thinking has its own allowance on top (pricing).
 MAX_OUTPUT_TOKENS = 256
 CAPTION_LIMIT = 600
 ALT_LIMIT = 900
 LATEX_LIMIT = 1200
+FACTS_LIMIT = 3000
 
 FigureProblem = Literal[
     "none",
@@ -142,8 +146,11 @@ def figure_version() -> str:
     return load_prompt(FIGURE_PROMPT).version
 
 
-def equation_version() -> str:
-    return load_prompt(EQUATION_PROMPT).version
+def equation_version(facts: bool = False) -> str:
+    """The check's prompt version; with `facts`, the version of the prompt a request that
+    carries the file's account is sent under."""
+    version = load_prompt(EQUATION_PROMPT).version
+    return f"{version}+{load_prompt(EQUATION_FILE_PROMPT).version}" if facts else version
 
 
 def figure_request(model: str, png: bytes, *, alt: str, caption: str | None) -> VisionRequest:
@@ -164,16 +171,30 @@ def figure_request(model: str, png: bytes, *, alt: str, caption: str | None) -> 
     )
 
 
-def equation_request(model: str, png: bytes, *, latex: str) -> VisionRequest:
+def equation_request(
+    model: str, png: bytes, *, latex: str, facts: str | None = None
+) -> VisionRequest:
+    """The audit request: the image and the proposed LaTeX as fenced data. With `facts` (the file's
+    account of the glyphs in the box and the maths beside it, `pipeline.file_account`, from
+    `EQUATION_FILE_FACTS`) the account goes ahead of the LaTeX and the prompt gains the part that
+    says what it is for (`check_equation_file.md`); without it the request is what it was."""
     prompt = load_prompt(EQUATION_PROMPT)
+    instructions, version = prompt.text, prompt.version
+    text = f"Proposed LaTeX:\n{fence_data(latex, LATEX_LIMIT)}"
+    if facts:
+        file = load_prompt(EQUATION_FILE_PROMPT)
+        instructions = instructions.rstrip("\n") + "\n" + file.text
+        version = equation_version(True)
+        text = f"{fence_data(facts, FACTS_LIMIT)}\n\n{text}"
     return VisionRequest(
         step="check",
         model=model,
-        prompt_version=prompt.version,
-        instructions=prompt.text,
+        prompt_version=version,
+        instructions=instructions,
         images=[png],
-        context_text=f"Proposed LaTeX:\n{fence_data(latex, LATEX_LIMIT)}",
+        context_text=text,
         max_output_tokens=MAX_OUTPUT_TOKENS,
+        context_limit=FENCE_LIMIT + FACTS_LIMIT if facts else None,
     )
 
 
@@ -201,11 +222,13 @@ class ClaudeVerifier:
             figure_probabilities,
         )
 
-    def equation_match(self, png: bytes, *, latex: str) -> VerifierVerdict:
+    def equation_match(
+        self, png: bytes, *, latex: str, facts: str | None = None
+    ) -> VerifierVerdict:
         return self._ask(
             EQUATION_CHECK,
-            equation_version(),
-            lambda: equation_request(self.model, png, latex=latex),
+            equation_version(bool(facts)),
+            lambda: equation_request(self.model, png, latex=latex, facts=facts),
             EquationAudit,
             equation_probabilities,
         )
