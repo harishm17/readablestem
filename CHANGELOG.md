@@ -193,8 +193,11 @@
   where two annotations of one address (one per line, as hyperref writes them) run across the
   break, and the words under them, with their spaces taken out, are the address, the break joins
   with no space (`hyphens.link_cut`, read per document by `layout.document._link_cuts` into
-  `_Document.link_cuts`, used by `blocks._line_break`). A named link over two lines ("Smith" /
-  "Jones") is not an address and keeps its space; an address not under a link is decided as it was.
+  `_Document.link_cuts`, used by `blocks._line_break`). Only printed text that is an address
+  counts (it holds ".", "/", "@" or ":"): a named link over two lines ("Smith" / "Jones", or
+  "Khan" / "Academy" under khanacademy.org, whose words run together are in the address) is not
+  one and keeps its space, there and wherever else those words break; an address not under a link
+  is decided as it was.
   On the 126 public papers and corpus files, 3 public files change (18 breaks, each a space
   removed inside an address, nothing else); no `full` replay of the 73 corpus documents changes,
   so no recorded request or answer stops matching.

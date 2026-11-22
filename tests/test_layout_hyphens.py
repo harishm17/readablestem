@@ -39,12 +39,16 @@ def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_
         "https://doi.org/10.1103/PhysRevLett.1",
         "23.4567 for anyone who wants the data behind the figures and the tables in the text of",
         "this report, which was written by Smith",
-        "Jones and the rest of the group.",
+        "Jones and the rest of the group, who also recommend the unit on Khan",
+        "Academy and then the videos that were recorded for the Khan",
+        "Academy course, which follow the same order as our lectures in the class.",
     ]
     links = [(1, lines[1], address), (2, lines[2].split()[0], address)]
     links += [
         (3, "Smith", "https://example.org/people/x"),
         (4, "Jones", "https://example.org/people/x"),
+        (5, "Khan", "https://www.khanacademy.org/math"),
+        (6, "Academy", "https://www.khanacademy.org/math"),
     ]
 
     def converted(linked: bool) -> str:
@@ -54,7 +58,10 @@ def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_
             page.insert_text((72, 100 + 14 * i), line, fontsize=11)
         for i, part, uri in links if linked else []:
             width = pymupdf.get_text_length(part, fontsize=11)
-            rect = pymupdf.Rect(72, 100 + 14 * i - 9, 72 + width, 100 + 14 * i + 3)
+            x = 72
+            if lines[i].endswith(part) and lines[i] != part:
+                x += pymupdf.get_text_length(lines[i][: -len(part)], fontsize=11)
+            rect = pymupdf.Rect(x, 100 + 14 * i - 9, x + width, 100 + 14 * i + 3)
             page.insert_link({"kind": pymupdf.LINK_URI, "from": rect, "uri": uri})
         data = doc.tobytes()
         doc.close()
@@ -64,3 +71,4 @@ def test_a_break_inside_an_address_the_file_links_on_both_lines_joins_without_a_
     text = converted(linked=True)
     assert "PhysRevLett.123.4567 for anyone" in text
     assert "Smith Jones" in text
+    assert text.count("Khan Academy") == 2
