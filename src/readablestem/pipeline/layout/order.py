@@ -5,6 +5,7 @@ the order rows are read in.
 from __future__ import annotations
 
 import bisect
+import itertools
 import statistics
 from collections.abc import Iterable, Sequence
 from typing import Protocol
@@ -39,6 +40,16 @@ MAX_HEAD_STOPS = 8  # runs of lines across the page that a page's columns are lo
 # a page of one column with a ruled step table (a few lines in the right cell, the steps' text
 # in the left one) has 0.13 and 0.21, and was read column by column.
 MIN_HEAD_COLUMN_BALANCE = 0.4
+# ... and at least this many lines: a few option lines under one question are no columns.
+MIN_HEAD_COLUMN_LINES = 4
+# A hole in a column (a gap over this many line pitches: an exam whose questions are set at the
+# pitch of their options with no space between them has 1.35) that MAX_BREAK_LINES lines or
+# fewer of the other column stand beside is a break between groups of lines, not a figure.
+MIN_BREAK_PITCHES = 1.25
+MAX_BREAK_LINES = 3
+# Columns cut by such breaks hold runs of at least this many lines on average (an exam's option
+# pairs hold two to four; the columns of a paper's first page, seven or more).
+MIN_RUN_LINES = 5
 
 
 def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, float] | None:
@@ -78,18 +89,46 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
         under = [b for b in narrow if b[1] >= top - 1.0]
         gutter = _gutter_of(under, left, width, slide)
         if gutter is not None:
-            lefts = sum(b[2] <= gutter[0] + 0.5 for b in under)
-            rights = sum(b[0] >= gutter[1] - 0.5 for b in under)
-            if min(lefts, rights) < MIN_HEAD_COLUMN_BALANCE * max(lefts, rights):
+            sides = (
+                [b for b in under if b[2] <= gutter[0] + 0.5],
+                [b for b in under if b[0] >= gutter[1] - 0.5],
+            )
+            thin, thick = sorted(map(len, sides))
+            if thin < MIN_HEAD_COLUMN_BALANCE * thick or thin < MIN_HEAD_COLUMN_LINES:
                 continue
-            # Columns under a head run unbroken: a line across the page between the top and the
-            # bottom of the two columns means these are not columns (an exam's questions, each
-            # a line across with its options standing two by two under it).
-            columns = [b for b in under if b[2] <= gutter[0] + 0.5 or b[0] >= gutter[1] - 0.5]
-            first, last = min(b[1] for b in columns), max(b[3] for b in columns)
-            if not any(w[1] < last and w[3] > first for w in wide):
+            if _columns_run(sides, wide):
                 return gutter
     return None
+
+
+def _columns_run(sides: tuple[list[BBox], list[BBox]], wide: list[BBox]) -> bool:
+    """Whether the two sides of a gutter under a head run as columns do, and not as the
+    option lines of an exam do: a question is a line across the page, or a short line at the
+    left, with its options standing two by two under it.
+
+    Columns run unbroken. Neither a line across the page with lines of both sides above and
+    below it (a caption or a note at the foot of the columns has them on one side or none),
+    nor several breaks in the thinner side where a few lines of the other stand (the questions
+    between the option pairs) cut them up.
+    """
+    for w in wide:
+        if all(
+            any(b[3] <= w[1] + 1.0 for b in side) and any(b[1] >= w[3] - 1.0 for b in side)
+            for side in sides
+        ):
+            return False
+    thin, other = sorted(sides, key=len)
+    rows = sorted(_visual_lines(thin), key=lambda line: line[1])
+    if len(rows) < 3:
+        return True
+    pitch = statistics.median(b[1] - a[1] for a, b in itertools.pairwise(rows))
+    beside = _visual_lines(other)
+    breaks = sum(
+        b[1] - a[3] > MIN_BREAK_PITCHES * pitch
+        and 1 <= sum(a[3] - 1.0 <= o[1] and o[3] <= b[1] + 1.0 for o in beside) <= MAX_BREAK_LINES
+        for a, b in itertools.pairwise(rows)
+    )
+    return breaks < 2 or len(rows) >= MIN_RUN_LINES * (breaks + 1)
 
 
 def _gutter_of(
@@ -173,12 +212,12 @@ def _sparse_intervals(events: list[tuple[float, int]], allowed: int) -> list[tup
     return intervals
 
 
-def _line_widths(boxes: list[BBox]) -> list[float]:
-    """Widths of visual lines: boxes that overlap vertically by half the smaller height
-    are one line. TeX splits a line with inline maths into pieces whose bottom edges
-    differ (subscripts, fractions); counted apart, they made a column of full lines look
-    like a column of short ones."""
-    lines: list[list[float]] = []  # [x0, y0, x1, y1] per line, top to bottom
+def _visual_lines(boxes: list[BBox]) -> list[list[float]]:
+    """Visual lines, top to bottom, as [x0, y0, x1, y1]: boxes that overlap vertically by half
+    the smaller height are one line. TeX splits a line with inline maths into pieces whose
+    bottom edges differ (subscripts, fractions); counted apart, they made a column of full
+    lines look like a column of short ones."""
+    lines: list[list[float]] = []
     for x0, y0, x1, y1 in sorted(boxes, key=lambda b: (b[1] + b[3]) / 2):
         if lines:
             line = lines[-1]
@@ -188,7 +227,12 @@ def _line_widths(boxes: list[BBox]) -> list[float]:
                 line[1], line[3] = min(line[1], y0), max(line[3], y1)
                 continue
         lines.append([x0, y0, x1, y1])
-    return [x1 - x0 for x0, _, x1, _ in lines]
+    return lines
+
+
+def _line_widths(boxes: list[BBox]) -> list[float]:
+    """Widths of the visual lines (`_visual_lines`)."""
+    return [x1 - x0 for x0, _, x1, _ in _visual_lines(boxes)]
 
 
 def _reading_order(

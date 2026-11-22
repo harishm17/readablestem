@@ -257,11 +257,18 @@ reader, neither to find them nor as a second opinion
    eight runs, the top of the page first), the first run that gives a gutter whose thinner
    side holds at least 0.4 of the lines of the other (`MIN_HEAD_COLUMN_BALANCE`: two columns
    hold about as many lines; a column of steps beside a few lines is a ruled table on a page
-   of one column, and is read row by row), and no line across the page lies between the top
-   and the bottom of the two columns (columns under a head run unbroken: an exam's questions,
-   each a line across the page with its options two by two under it, are no columns). The
-   lines of the head are then read in the
-   segments the lines across the page make (`order._find_gutter`).
+   of one column, and is read row by row; and at least four lines), and the two columns run
+   unbroken (`order._columns_run`). An exam's questions, each a line across the page or a
+   short line at the left with its options two by two under it, are no columns: a line across
+   the page that has lines of both sides above and below it breaks them (a note across the
+   page under the columns, whose last line is short and sits at the left, has lines of one
+   side below it, and does not), and so do two or more breaks in the thinner side (a gap over
+   1.25 line pitches with one to three lines of the other side beside it,
+   `MIN_BREAK_PITCHES`; an exam whose short questions are set at the pitch of their options
+   with no space between questions has gaps of 1.35) that cut it into runs of fewer than five
+   lines on average. A column page of the development set with one such break (1.7 pitches)
+   keeps its columns, and one with three breaks in 28 lines does too. The lines of the head are
+   then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
    gutter. Small sub/superscript fragments are folded into their line as one block, after
