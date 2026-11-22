@@ -1317,7 +1317,8 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   deck's body size (the lines that follow it in the same size, each within half a line of the one
   before, are part of it). A line that is a formula or a bare number and nothing else (no
   word of three letters besides function names like "sin" and "log", and a math sign, an italic
-  math letter or no letter at all: `slides._is_formula`) is never a title, nor the title of a
+  math letter or no letter at all, but a name in capitals with a plus in it, "C++", "Q+A", is
+  text: `slides._is_formula`) is never a title, nor the title of a
   title slide: a slide with a large equation under its title is titled by the title (on the
   html-slides deck 17 of 22 slides took their equation or a lone "1"). It is always a heading (reason `slide_title`, plus `larger font` so the
   levels group the titles): a title the heading rules read as a paragraph is promoted, and a
@@ -2243,7 +2244,10 @@ bold). A line of prose that ends in dots but has no page number (a quotation cut
 an ellipsis) is not an entry, so two of them are no contents page. A title that wraps is one
 entry: the line right above an entry, at its size and no further right than it, stopping near
 the page numbers' edge and with no leaders or number of its own, is the first line of its
-title (`_title_head`; the hyphen at its end is repaired as in a paragraph). Items nest by
+title (`_title_head`; the hyphen at its end is repaired as in a paragraph). It is not one when
+the entry's own line starts with a section number ("1 Temperature", "A.4", "Part II") and
+most entries of the list do: a title's second line has no number, so the line above such an
+entry is a paragraph or a part line of its own (`_starts_with_label`). Items nest by
 indent (`list_level`). The page numbers are the printed book's; the
 converted file marks its source pages instead (docs/output.md "Navigation"), and its own
 contents list is not written when the PDF has a contents page. An entry links to the one heading later in the document

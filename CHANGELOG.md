@@ -127,6 +127,11 @@
 - A title that wraps in a contents list with leaders is one entry: the first line has no leaders
   and no number, so it was a paragraph or a heading and the second line an entry of its own
   ("tion", "orem 1)"). It is joined to the line under it (`blocks._title_head`, hyphen repaired).
+- The line above a contents list is not taken for the first line of an entry's title when the
+  entry starts with a section number like most of the list's entries ("1 Temperature and heat"):
+  the last line of a paragraph that runs to the right edge, or a "Part One, ..." line at the
+  entries' size, was fused into the first entry (`blocks._starts_with_label`). A title's second
+  line has no such number, so wrapped titles are joined as before.
 - Two lines of prose that end in an ellipsis are no contents page: a line with leaders needs a
   page number, its own or a line of its own beside it (`blocks._ends_in_number`).
 - A capital alone on its line heads an index section only when the first entry of its letter
@@ -149,7 +154,8 @@
   "1" from a fraction, as their title.
   A line that is a formula or a bare number and nothing else is no title now, and no title slide
   (`slides._is_formula`: no word of three letters besides function names, and a math sign, an
-  italic math letter or no letter). The deck's titles are the real ones, and a title that
+  italic math letter or no letter; a name in capitals with a plus, "C++" or "Q+A", is text and
+  stays a title). The deck's titles are the real ones, and a title that
   layout read as a paragraph is no longer dropped as a headline above a "title" that was an
   equation. The written output of that deck is the same (its titles were headings already).
 - A deck with some scanned slides was not a deck: a page kept whole as its image has no text, so
