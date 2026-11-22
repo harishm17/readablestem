@@ -257,9 +257,17 @@ reader, neither to find them nor as a second opinion
    eight runs, the top of the page first), the first run that gives a gutter whose thinner
    side holds at least 0.4 of the lines of the other (`MIN_HEAD_COLUMN_BALANCE`: two columns
    hold about as many lines; a column of steps beside a few lines is a ruled table on a page
-   of one column, and is read row by row), and no line across the page lies between the top
-   and the bottom of the two columns (columns under a head run unbroken: an exam's questions,
-   each a line across the page with its options two by two under it, are no columns). The
+   of one column, and is read row by row; and at least four lines), and the two columns run
+   unbroken (`order._columns_run`). An exam's questions, each a line across the page or a
+   short line at the left with its options two by two under it, are no columns: a line across
+   the page that has lines of both sides above and below it breaks them (a note across the
+   page under the columns, whose last line is short and sits at the left, has lines of one
+   side below it, and does not), and so do two or more breaks in the thinner side (a gap over
+   two line pitches with one to three lines of the other side beside it) that cut it into runs
+   of fewer than five lines on average. An exam whose short questions are set at the pitch of
+   their options with no space between questions has breaks of 1.35 pitches and is still read
+   a, c, b, d; the five column pages of the development set include breaks of 1.0 and 1.7
+   pitches, so the threshold cannot be lowered. The
    lines of the head are then read in the
    segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
