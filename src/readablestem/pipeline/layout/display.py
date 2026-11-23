@@ -848,10 +848,9 @@ def _line_over_number(label: _Row, lines: list[_Line]) -> _Line | None:
 def _trailing_number(label: _Row, line: _Line) -> bool:
     """Is `label`, level with a line that ends in a sign that goes on, a bracketed number set
     `NUMBERED_TRAILING_GAP` font sizes or more to its right (`LAYOUT_DISPLAY_GROUPING`)?"""
-    return (
-        bool(EQUATION_NUMBER.match(label.clean))
-        and label.x0 - line.box[2] >= NUMBERED_TRAILING_GAP * max(label.size, line.size)
-    )
+    return bool(EQUATION_NUMBER.match(label.clean)) and label.x0 - line.box[
+        2
+    ] >= NUMBERED_TRAILING_GAP * max(label.size, line.size)
 
 
 def _line_below_number(label: _Row, lines: list[_Line]) -> _Line | None:
