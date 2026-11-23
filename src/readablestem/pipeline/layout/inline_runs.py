@@ -56,6 +56,9 @@ SCRIPT_BASE_GAP = 0.35
 PICTURE_REACH = 3.0
 PICTURE_CHAR = "\ufffc"
 _OPENING = frozenset("([{")
+# A glyph of a Computer Modern or Latin Modern face ("CMR8", "ABCDEF+LMMathItalic8"): TeX set it,
+# whatever the producer field of the file says (a file re-written by a viewer or a converter).
+_TEX_FACE = re.compile(r"(?:^|\+)(?:CM|LM)[A-Za-z]+\d*", re.IGNORECASE)
 _MARKUP = re.compile(r"</?[A-Za-z][\w:.-]*\s*/?>|</")
 
 
@@ -481,6 +484,7 @@ def _inline_runs(
         start, depth = i, 0
         while i < n:
             c = chars[i].c
+            c_font = chars[i].font
             if c in _OPENING:
                 depth += 1
             elif c in ")]}":
@@ -497,7 +501,10 @@ def _inline_runs(
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
                 or _separator_in_bracket(chars, info, i, depth, document=document)
-                or (document.tex_made and glyph_math.script_punctuation(chars, info.script, i))
+                or (
+                    (document.tex_made or (document.inline_joins and _TEX_FACE.match(c_font)))
+                    and glyph_math.script_punctuation(chars, info.script, i)
+                )
                 or (
                     document.tex_made and glyph_math.percent_of_number(chars, i)
                 )  # the 5% of "phi = 5%"

@@ -96,6 +96,9 @@ WHOLE_INLINE_FORMULA = [
     # (f) a colon inside a bracket that closes on the row does not end the formula
     ("We compute _I_(_A_ : _B_) for the two halves of the whole system as shown.", TEX,
      ["I(A : B)"], ["B"]),
+    # "for" and "and" set in italic (a theorem's statement) are words, not the variables f, o, r
+    ("_a_ = 2, _for_ _j_ = 1, 2 _and_ _b_ = 3", TEX,
+     ["a = 2", "j = 1", "b = 3"], ["a = 2, for j = 1, 2 and b = 3"]),
 ]  # fmt: skip
 
 
@@ -103,3 +106,18 @@ WHOLE_INLINE_FORMULA = [
 def test_the_box_holds_the_whole_inline_formula(sentence, producer, whole, before):
     assert typeset(sentence, producer) == before
     assert typeset(sentence, producer, inline_joins=True) == whole
+
+
+def test_an_index_with_a_colon_stays_in_its_formula_in_a_converted_file():
+    """`dx_{1:T}` of a TeX paper whose producer field was rewritten (no `pdfTeX`): the colon of
+    the index is set in Computer Modern, which says TeX set it."""
+    from pathlib import Path
+
+    pdf = (Path(__file__).parent.parent / "data/real-tables/2407.13734.pdf").read_bytes()
+
+    def texts(**switches) -> list[str]:
+        elements = analyze(pdf, pages=[0], **switches).elements
+        return [e.text or "" for e in elements if e.kind == Kind.EQUATION]
+
+    assert not any(t.endswith("dx1:T") for t in texts())
+    assert any(t.endswith("dx1:T") for t in texts(inline_joins=True))
