@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: a number set far from its line numbers it (`LAYOUT_DISPLAY_GROUPING`, off; O-037, O-391, O-048, O-129)
+
+- With the display grouping switch on, a bracketed equation number set four font sizes or more
+  from a line with words in it, at the right margin or the left one, needs less of the line:
+  0.35 of it maths, one font size in from the text edge (was 0.45 and 1.5). The line becomes a
+  display and the number its label (`display._promote_numbered_lines`, `NUMBERED_FAR_*`). Off,
+  the output is what it was. On the 21 development papers' box score with the switch on:
+  display formulas whole 902 to 904, cut 38 to 35, split 32 to 33; none got worse. Of 18 loose
+  numbers counted on 94 public papers, 4 are taken ("(C11)", "(P2)", "(15)", "(3)").
+- Counted and not built: the other 14 loose numbers are of five shapes with 1 to 3 cases each
+  (docs/layout.md, "Loose equation numbers"); labeled parts in a display, none of 2,186 on those
+  papers (7 of 65,817 before); overlines as drawn rules, 127 of 12,826 gold formulas hold one and
+  4 labeled errors (docs/steps.md).
+- A switch-on reading change: a promoted line's inline formulas are no longer elements, and a
+  display is. No version raise is owed while the switch is off.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
