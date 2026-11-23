@@ -220,6 +220,34 @@ stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none
   of O-388.
 - Owed: a `PIPELINE_VERSION` bump (the result of a one-page upload changes); not made here. No
   migration, no render bump, no change to a prompt.
+## Unreleased: contents lines without leaders, numbered paragraphs, lettered titles that end in a full stop (branch fix/contents-headings-lists; O-409, O-408, O-418 b)
+
+Counted first (the public papers and documents of the repository's sets, the layout dev set and
+the private corpus by counts only); only what a real document showed was built, and probes only
+tested the fixes.
+
+- O-409: a line of a contents list that has no leaders and runs up to its page number ("D Ablation
+  study of a very long title 21" among entries with leaders) is an entry (`_contents_rows`,
+  `_leader_split(bare=True)`); it was a paragraph with its number in it. Real pages: 2 lines on 1
+  page of 1 public paper (`ax_physicsoptics`), 1 line in 1 private file.
+- O-408: the second line of a numbered paragraph set with an indented first line ("2) Prompt Design
+  With A Code Template: The controller ...") goes on from the first although it starts left of the
+  marker (`_numbered_paragraph_goes_on` in `_continues`). Real pages: 15 public paper or dev-set files
+  changed (the item and the rest of its paragraph are one block), and 14 such items in 3 private
+  files.
+- O-418 b: a lettered title of four words or more may end in a full stop, on its first row or on its
+  second ("B. Electron-phonon coupling and carrier mobility.", `MIN_STOPPED_TITLE_WORDS`); with fewer
+  words ("A. Yes.") it still ends an answer. Real pages: 4 titles in 2 public papers
+  (`ax_condmatmtrlsci`, `ax_cslg`).
+- Counted and not built (real documents decide, owner 2026-11-22): O-407 (only the authored
+  `html-slides` fixture shows bullets larger than the body of a deck; 0 of 332 public files and 0 of
+  286 bulleted deck lines in the private corpus; a first version without a deck limit also turned 4
+  "Key Terms" headings of OpenStax books into items), O-433 (the 5 public wrapped contents entries are all read right, none in the private corpus, the
+  probes differ in font only), O-418 a (numbered bold stems) and c (1 private
+  row), O-419 (0 found), O-033 (the cover headings of two OCW pages, not a reader fault).
+- These change the reader's output, so `PIPELINE_VERSION` needs a bump (not made here). No migration,
+  no prompt or request change.
+- Headings and tables-local evals before and after: identical (commit and timings differ only).
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 

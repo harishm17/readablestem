@@ -677,6 +677,33 @@ def test_a_numbered_line_that_runs_to_the_right_edge_does_not_take_the_next_numb
     assert [t[0] for t in texts[1:]] == ["1", "2", "3"]
 
 
+def test_a_numbered_paragraph_with_an_indented_first_line_is_not_cut_at_its_second_line():
+    # "2) Prompt Design: The controller ..." is set like a paragraph: its first line starts
+    # indented, runs to the right edge, and the next lines start at the margin: one block.
+    first = "2) Prompt Design With A Code Template: The controller of the system builds"
+    while pymupdf.get_text_length(first + " each", "helv", BODY) < 468 - 12:
+        first += " each"
+    second = "prompt from the template and the state of the run so far, then sends it on to"
+    while pymupdf.get_text_length(second + " the", "helv", BODY) < 468:
+        second += " the"
+    third = "the model that answers."
+
+    def fill(page):
+        page.insert_textbox(
+            pymupdf.Rect(72, 90, 540, 230), LONG, fontsize=BODY, fontname="helv", align=3
+        )
+        page.insert_text((84, 260), first, fontsize=BODY, fontname="helv")
+        page.insert_text((72, 274), second, fontsize=BODY, fontname="helv")
+        page.insert_text((72, 288), third, fontsize=BODY, fontname="helv")
+        page.insert_textbox(
+            pymupdf.Rect(72, 304, 540, 430), LONG, fontsize=BODY, fontname="helv", align=3
+        )
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.PARAGRAPH]
+    assert elements[1].text.endswith(third)
+
+
 def test_a_step_with_no_number_may_run_over_several_lines_and_text_under_the_last_is_no_step():
     title = "Algorithm 1 Count stressed syllables"
     given = (
@@ -1452,6 +1479,34 @@ def test_a_contents_page_with_dot_leaders_is_nested_links_to_the_headings_withou
     assert by_text["1.2 Velocity"].links == [] and by_text["2 Forces"].links == []
     html = html_of(pdf)
     assert f'<a href="#{heads[0].id}">1 Motion</a>' in html and ". . ." not in html
+
+
+def test_a_contents_entry_whose_title_runs_up_to_its_page_number_is_an_entry():
+    # "C ... air here 14" is one line of text with no leaders, ending where the other numbers do.
+    bare = (
+        "C Ablation study of the energy of a body that falls through a long column of cold dry air"
+        " here 14"
+    )
+
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        y = 120.0
+        for title, number in [
+            ("A Motion of a falling body", "3"),
+            ("B Forces on a body at rest", "9"),
+            (bare, ""),
+            ("D Waves", "21"),
+        ]:
+            if number:
+                page.insert_text((72, y), title + " ." * 40, fontsize=BODY, fontname="helv")
+                page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
+            else:
+                page.insert_text((72, y), title, fontsize=BODY, fontname="helv")
+            y += 18
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.kind for e in elements] == [Kind.HEADING] + [Kind.LIST_ITEM] * 4
+    assert elements[3].text.startswith("C Ablation study")
 
 
 def test_a_page_with_one_dotted_line_is_not_a_contents_page():

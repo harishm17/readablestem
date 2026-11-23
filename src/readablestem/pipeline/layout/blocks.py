@@ -495,6 +495,7 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
 
 
 MAX_LETTERED_TITLE_WORDS = 12
+MIN_STOPPED_TITLE_WORDS = 4  # words, the letter too, of a lettered title that ends in a stop
 WRAPPED_TITLE_GAP = 0.5  # x row height: how far under a title its second row stands
 
 
@@ -522,7 +523,10 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
         words = row.clean.split()
         if not value or not face or not 2 <= len(words) <= MAX_LETTERED_TITLE_WORDS:
             continue
-        if row.clean[-1:] in ".,;:":
+        # A full stop ends a title of three words or more set apart in its face ("B. Electron
+        # coupling and mobility."); with two words ("A. Yes.") it ends an answer.
+        stopped = row.clean[-1:] == "." and len(words) < MIN_STOPPED_TITLE_WORDS
+        if row.clean[-1:] in ",;:" or stopped:
             continue
         ahead = [r for r in rows[i + 1 :] if r.column == row.column]
         if (  # a title that goes on in a second row of its face, one line down
@@ -533,7 +537,10 @@ def _mark_lettered_titles(rows: list[_Row]) -> None:
             and ahead[0].y0 - row.y1 <= WRAPPED_TITLE_GAP * row.height
         ):
             more = ahead[0].clean.split()
-            if len(words) + len(more) > MAX_LETTERED_TITLE_WORDS or ahead[0].clean[-1:] in ".,;:":
+            if len(words) + len(more) > MAX_LETTERED_TITLE_WORDS or ahead[0].clean[-1:] in ",;:":
+                continue
+            # the second row ends the title, and a full stop there ends a title as in the first row
+            if ahead[0].clean[-1:] == "." and len(words) + len(more) < MIN_STOPPED_TITLE_WORDS:
                 continue
             ahead = ahead[1:]
         under = ahead[0] if ahead else None
@@ -661,10 +668,12 @@ MIN_CONTENTS_LEADER_ROWS = 2  # lines with leaders that make a page a contents p
 _PAGE_NUMBER = re.compile(r"\d{1,4}|[ivxlcdm]{1,7}", re.IGNORECASE)
 
 
-def _leader_split(row: _Row) -> list[_Char] | None:
+def _leader_split(row: _Row, *, bare: bool = False) -> list[_Char] | None:
     """The characters of the title of a line like "1.1 Drop times . . . . 4" (dot leaders,
     or ellipses, and then a page number, which may be a line of its own at the right
-    margin instead); None for any other line."""
+    margin instead); None for any other line. With `bare`, the line has no leaders: its title
+    runs on up to its page number ("D Ablation study on a long title 21"), which it must
+    have."""
     chars = row.chars
     end = len(chars)
     while end and chars[end - 1].blank:
@@ -672,8 +681,15 @@ def _leader_split(row: _Row) -> list[_Char] | None:
     start = end
     while start and chars[start - 1].c.isalnum():
         start -= 1
-    if _PAGE_NUMBER.fullmatch("".join(c.c for c in chars[start:end])):
+    numbered = bool(_PAGE_NUMBER.fullmatch("".join(c.c for c in chars[start:end])))
+    if numbered:
         end = start
+    if bare:
+        title = chars[:end]
+        while title and title[-1].blank:
+            title = title[:-1]
+        letters = sum(c.c.isalpha() for c in title)
+        return title if numbered and letters >= MIN_TITLE_LETTERS else None
     cut, dots = end, 0
     while cut and (chars[cut - 1].blank or chars[cut - 1].c in LEADER_DOTS):
         dots += 0 if chars[cut - 1].blank else 3 if chars[cut - 1].c == "\u2026" else 1
@@ -897,6 +913,20 @@ def _contents_rows(rows: list[_Row], number: int = 0) -> list[_Row]:
         return _shaped_rows(rows, number)
     # The numbers of a contents page stand at one right edge.
     edge = statistics.median([t.x1 for _, t in pairs if t is not None] or [0.0])
+    # A title that runs right up to its page number has no leaders (the number is part of the
+    # line): an entry when it ends at the numbers' edge and starts where the entries with
+    # leaders do ("D Ablation study on a very long title 21" among "C ... . . . 14").
+    indents = [r.x0 for r in rows if id(r) in split]
+    for row, twin in pairs:
+        if (
+            twin is None
+            and id(row) not in split
+            and row.kind == "text"
+            and abs(row.x1 - edge) <= 1.5 * row.size
+            and any(abs(row.x0 - x) <= 0.6 * row.size for x in indents)
+            and (title := _leader_split(row, bare=True))
+        ):
+            split[id(row)] = title
     entries: list[tuple[_Row, _Row]] = []  # (the line, the line it becomes)
     dropped: set[int] = set()
     heads = {
