@@ -535,7 +535,7 @@ class _Conversion:
             )
             while True:
                 if self.cancelled is not None and self.cancelled():
-                    raise BudgetExceeded("cancelled", "the job was deleted or taken over")
+                    raise BudgetExceeded("cancelled", "the document was deleted or taken over")
                 if deadline is not None and time.monotonic() > deadline:
                     log_event(logger, "conversion_child_timeout", logging.WARNING)
                     raise ConversionTimeout("the conversion ran past its time limit")

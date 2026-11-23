@@ -35,7 +35,7 @@ The call is made with no database transaction open and no row locked (it takes s
 the route locks the job afterwards, to check that nothing changed meanwhile, and applies
 the answer. Nothing here is logged but a category code.
 
-Each request that is really sent also tells the AI service's status how it ended
+Each request that is really sent also tells the model provider's status how it ended
 (`AppContext.record_provider_call`), as the worker's requests do: a reread is the only model
 call the web process makes, and when the provider is down it is the reader's first sign.
 """
@@ -174,10 +174,10 @@ class ReadBudget(JobBudget):
         if won:
             return
         if used is None:
-            raise BudgetExceeded("cancelled", "the job is gone")
+            raise BudgetExceeded("cancelled", "the document is gone")
         if calls and int(used.model_calls or 0) + calls > self.job_max_calls:
-            raise BudgetExceeded("job_calls", f"job call cap {self.job_max_calls} reached")
-        raise BudgetExceeded("job_usd", f"job spend cap ${self.job_max_usd:.2f} reached")
+            raise BudgetExceeded("job_calls", f"document call cap {self.job_max_calls} reached")
+        raise BudgetExceeded("job_usd", f"document spend cap ${self.job_max_usd:.2f} reached")
 
     def _adjust(self, cost_delta: float, calls_delta: int) -> None:
         if not cost_delta and not calls_delta:
@@ -341,7 +341,7 @@ def read_equation(
         sending = _CountsWhenSent(
             ctx.client_factory(ctx.settings, budget),
             lambda: _count_against_allowance(request, job.user_id),
-            # How each request ended counts toward the AI service's status, as the worker's do.
+            # How each request ended counts toward the model provider's status, as the worker's do.
             lambda call: ctx.record_provider_call(call.outcome),
         )
         # A question this document's model has already answered is answered from the record.

@@ -148,8 +148,10 @@ outside request. `tests/test_design_tokens.py` checks the contrast of every toke
 The hero's second column is `web/static/hero/product.png`: the public demo page in Chromium at a fixed
 720 x 462 window, light theme, scrolled to the paragraph that leads into equation 2.4 (`scripts/hero_screenshot.py`;
 no private file, nothing cropped or edited afterwards). It is shown whole, in a frame that keeps its paper colors
-in dark mode, and a click opens `/demo` (no lightbox). Below 60rem it drops under the text. Take it again when the
-demo page or the student page's look changes; `tests/test_hero_assets.py` does not compare it.
+in dark mode, and a click opens `/demo` (no lightbox). Below 60rem it drops under the text. On a phone it stays: it is a
+link to the demo, shown whole and never cropped, so at 320 px it is 288 px wide and its small text is a picture of the page,
+not something to read. Take it again when the
+demo page or the student page's look changes (a step of "Ship a new version" in `deploy.md`); `tests/test_hero_assets.py` does not compare it.
 The landing page's "Hear the difference" is built by `scripts/hero_assets.py` from `web/demo/` (an
 equation-only crop of the PDF page, text layer, MathML, reading, font subset into `web/static/hero/` and `vendor/fonts/`); the app never runs it and
 `tests/test_hero_assets.py` regenerates and compares. The proof tiles on /limits and the comparison chart (compact on the landing page) come from `web/proof_facts.py` (PROOF.md, parsed once into `proof_facts.json`).

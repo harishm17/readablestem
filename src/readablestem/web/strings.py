@@ -9,8 +9,14 @@ One word names one concept on every screen:
 - post: put the finished file where students get it. Share: give named people access inside
   ReadableSTEM.
 - sample: the practice document in the app. Demo: the public page `/demo`.
-- document, never "job". Notification is the browser's; notes are the list on the document
-  page.
+- document, never "job", in anything a person reads: the messages of a budget stop and the
+  `ops` reports too (names in code, such as `job_usd` or `MAX_USD_PER_JOB`, stay). Notification
+  is the browser's; notes are the list on the document page.
+- the model, with no maker's name, at first mention too: the provider is configurable, so a
+  fixed name could be false. The company that receives the pictures is named only where the
+  recipients list says it (`web/recipients.py`).
+- needs your decision: the state of an item that waits for a person, on its pill and in the
+  heading of the list of such items alike.
 
 The words that already have one home are read from there and not copied here: the state
 words (`web.states`), the sign-in words, the exam words, the refusals, the dates, the

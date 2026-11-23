@@ -1,7 +1,7 @@
 """The finished model steps of a job, kept in the database (T3-1).
 
-A conversion that stops half way (the process restarted, the time limit passed, the AI
-service did not answer for the last third of the document) has already paid for the
+A conversion that stops half way (the process restarted, the time limit passed, the model
+provider did not answer for the last third of the document) has already paid for the
 equations, figures and tables it finished. `DbStepCache` is the `pipeline.run.StepCache`
 the worker hands to the converter: it writes each finished step's `Fix` to `step_records`
 as the step ends, and when the same job is converted again it gives those back, so "Try

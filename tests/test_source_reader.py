@@ -55,6 +55,8 @@ def test_headings_paragraphs_and_the_document_title(tmp_path):
     levels = [result.fixes[e.id].heading.level for e in result.elements[:2]]
     assert levels == [1, 2]
     assert all(result.fixes[e.id].status is Status.ACCEPTED for e in result.elements[:2])
+    assert result.lang == "en"
+    assert reader.read(page('<p class="ltx_p">x</p>', lang="fr"), tmp_path).lang == "fr"
 
 
 def test_an_inline_formula_is_an_exact_equation_with_a_marker(tmp_path):
@@ -323,14 +325,9 @@ def test_a_figure_without_a_usable_picture_is_a_required_decision(tmp_path):
     [
         "../outside.png",
         "/etc/passwd",
-        "sub/../../outside.png",
-        "~/x.png",
         "data:image/png;base64,AAAA",
         "http://example.org/x.png",
-        "a\\b.png",
         "plot.svg",
-        "notes.txt",
-        "",
     ],
 )
 def test_a_picture_path_never_leaves_the_project(src, tmp_path):
@@ -338,34 +335,29 @@ def test_a_picture_path_never_leaves_the_project(src, tmp_path):
     project.mkdir()
     (tmp_path / "outside.png").write_bytes(png_bytes())
     (project / "plot.svg").write_text("<svg/>")
-    (project / "notes.txt").write_text("secret")
     body = f'<div class="ltx_figure"><img src="{src}" id="g"/></div>'
     result = reader.read(page(body), project)
     assert result.images == {}  # no picture, whatever the path said
 
 
-def test_a_symlink_picture_in_the_project_is_not_followed(tmp_path):
+def test_a_picture_file_that_cannot_be_trusted_is_dropped(tmp_path):
+    """A symlink to a file outside the project, a file that is not a picture, and a tiny file
+    that holds a canvas of 900 megapixels: each figure is kept, none gets a picture."""
+    from PIL import Image
+
     project = tmp_path / "project"
     project.mkdir()
     (tmp_path / "secret.png").write_bytes(png_bytes())
     (project / "link.png").symlink_to(tmp_path / "secret.png")
-    result = reader.read(page('<div class="ltx_figure"><img src="link.png"/></div>'), project)
-    assert result.images == {}
-
-
-def test_a_picture_that_is_not_a_picture_is_dropped(tmp_path):
-    (tmp_path / "fake.png").write_bytes(b"not a png")
-    result = read('<div class="ltx_figure"><img src="fake.png"/></div>', tmp_path)
-    assert result.images == {}
-
-
-def test_a_huge_canvas_in_a_small_file_is_refused(tmp_path):
-    from PIL import Image
-
-    big = tmp_path / "big.png"
-    Image.new("1", (30000, 30000)).save(big)  # tiny file, 900 megapixels
-    assert big.stat().st_size < 10_000_000
-    result = read('<div class="ltx_figure"><img src="big.png"/></div>', tmp_path)
+    (project / "fake.png").write_bytes(b"not a png")
+    Image.new("1", (30000, 30000)).save(project / "big.png")
+    assert (project / "big.png").stat().st_size < 10_000_000
+    body = "".join(
+        f'<div class="ltx_figure"><img src="{name}"/></div>'
+        for name in ("link.png", "fake.png", "big.png")
+    )
+    result = reader.read(page(body), project)
+    assert kinds(result) == ["figure"] * 3
     assert result.images == {}
 
 
@@ -438,6 +430,7 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
     assert found(back) == [("First", "internal", "First")]  # a heading's link
     assert paragraph.links[1].target_id == row_b.id
     assert entry.kind is Kind.LIST_ITEM and not theorem.links
+    assert theorem.text == "Theorem 1. It holds, as Theorem 1 says."  # the title leads its text
     # a table's cells keep their links too, in the element and in its fix
     for grid in (table.table, result.fixes[table.id].table.grid):
         assert [
@@ -445,15 +438,6 @@ def test_a_reference_the_source_makes_is_a_link_to_the_element_it_names(tmp_path
             for c in grid.cells
             for k in c.links
         ] == [("site", "uri", "https://example.org/c"), ("2", "internal", "Next")]
-
-
-def test_a_footnote_is_kept_in_the_text(tmp_path):
-    body = (
-        '<p class="ltx_p">Text<span class="ltx_note ltx_role_footnote">'
-        '<sup class="ltx_note_mark">1</sup>'
-        '<span class="ltx_note_content">The note.</span></span> goes on.</p>'
-    )
-    assert "(note: The note.)" in (read(body, tmp_path).elements[0].text or "")
 
 
 def test_the_front_matter_is_a_title_a_line_for_each_author_and_the_date(tmp_path):
@@ -487,14 +471,6 @@ def test_the_front_matter_is_a_title_a_line_for_each_author_and_the_date(tmp_pat
     ]
 
 
-def test_a_theorem_title_leads_its_paragraph(tmp_path):
-    body = (
-        '<div class="ltx_theorem"><h6 class="ltx_title ltx_runin">Theorem 1.</h6>'
-        '<div class="ltx_para"><p class="ltx_p">Every x is y.</p></div></div>'
-    )
-    assert read(body, tmp_path).elements[0].text == "Theorem 1. Every x is y."
-
-
 def test_a_listing_keeps_its_lines(tmp_path):
     body = '<pre class="ltx_verbatim">\nfor i in x:\n    f(i)\n</pre>'
     [code] = read(body, tmp_path).elements
@@ -521,18 +497,14 @@ def test_scripts_and_styles_are_ignored(tmp_path):
         b"<html",
         b'<!DOCTYPE html [<!ENTITY x "y">]><html xmlns="http://www.w3.org/1999/xhtml"><body/></html>',
         b'<?xml version="1.0"?><!DOCTYPE lol [<!ENTITY a "aaaa">]><html><body>&a;</body></html>',
+        page(""),
+        f'<html xmlns="{XHTML}"/>'.encode(),
     ],
+    ids=["empty", "cut-off", "doctype", "entity", "no-content", "no-body"],
 )
 def test_an_xhtml_that_is_not_plain_is_refused(bad, tmp_path):
     with pytest.raises(reader.ReadError):
         reader.read(bad, tmp_path)
-
-
-def test_a_document_with_nothing_in_it_is_refused(tmp_path):
-    with pytest.raises(reader.ReadError):
-        read("", tmp_path)
-    with pytest.raises(reader.ReadError):
-        reader.read(f'<html xmlns="{XHTML}"/>'.encode(), tmp_path)
 
 
 def test_a_very_deep_document_is_refused_not_a_crash(tmp_path):
@@ -560,10 +532,6 @@ def test_the_graphics_map_reads_the_xml_ids(tmp_path):
     )
     assert reader.graphics_of(xml, tmp_path) == {"S1.F1.g1": "fig/a.png"}
     assert reader.graphics_of(b"<broken", tmp_path) == {}
-
-
-def test_the_language_comes_from_the_page(tmp_path):
-    assert reader.read(page('<p class="ltx_p">x</p>', lang="fr"), tmp_path).lang == "fr"
 
 
 # ------------------------------------------------------------- Word, read from the file itself

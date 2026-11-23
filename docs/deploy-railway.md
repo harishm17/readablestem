@@ -763,6 +763,10 @@ more memory for each.
 
 ## Ship a new version
 
+If the change alters how the public demo page or the student page looks, take the landing
+page's picture again first (`scripts/hero_screenshot.py`, see "Ship a new version" in
+`deploy.md`) and commit it with the change.
+
 Production is deployed from a checkout; none of its services is connected to GitHub (`source` is empty
 in `railway.ts`, so `railway config apply` does not change that).
 

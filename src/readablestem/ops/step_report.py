@@ -226,8 +226,12 @@ def _table(head: Sequence[str], rows: Sequence[Sequence[str]]) -> list[str]:
 def render(made: Report) -> str:
     """The report as text for a terminal."""
     if not made.jobs:
-        return "no job with step facts"
-    lines = [f"{made.jobs} jobs, {made.pages} pages", "", "By step (a page is a page of a job):"]
+        return "no document with step facts"
+    lines = [
+        f"{made.jobs} documents, {made.pages} pages",
+        "",
+        "By step (a page is a page of a document):",
+    ]
     lines += _table(
         (
             "step",
@@ -265,7 +269,7 @@ def render(made: Report) -> str:
     )
     lines += ["", "By stage (seconds of wall time):"]
     lines += _table(
-        ("stage", "jobs", "job p50", "job p95", "page p50", "page p95", "share"),
+        ("stage", "documents", "doc p50", "doc p95", "page p50", "page p95", "share"),
         [
             (
                 row.stage,
@@ -285,13 +289,13 @@ def render(made: Report) -> str:
         f"charged at their reservation, no usage came back: {made.billed_unseen_calls} calls, "
         f"${made.billed_unseen_usd:.4f} (not in the dollars above)",
         f"calls: {made.calls} ({made.calls_per_page:.2f} a page), "
-        f"{made.counted_calls} in the jobs' call counts",
+        f"{made.counted_calls} in the documents' call counts",
         f"input read from the prompt cache: {_percent(made.cache_read)}",
     ]
     if made.settled_usd is not None:
         apart = made.settled_usd - made.usd - made.billed_unseen_usd
         lines.append(
-            f"settled on the job rows: ${made.settled_usd:.4f} and {made.settled_calls} calls"
+            f"settled on the document rows: ${made.settled_usd:.4f} and {made.settled_calls} calls"
             + (
                 f" (${apart:.4f} more than the steps: spent by tries that did not finish)"
                 if apart >= 0.00005
@@ -301,6 +305,6 @@ def render(made: Report) -> str:
     if made.s_per_page_p50 is not None and made.wall_s is not None:
         lines.append(
             f"seconds a page: p50 {made.s_per_page_p50:.2f}, p95 {made.s_per_page_p95:.2f}; "
-            f"the stages hold {made.stage_s:.1f} s of the jobs' {made.wall_s:.1f} s"
+            f"the stages hold {made.stage_s:.1f} s of the documents' {made.wall_s:.1f} s"
         )
     return "\n".join(lines)

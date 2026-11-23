@@ -1762,8 +1762,14 @@ read it as the `strings` global; Python modules import it). The words:
   service" is kept only for the status page's line about the provider answering.
 - **sample** is the practice document in the app ("Open the sample document"); **demo** is the
   public page `/demo`; **example** is a worked example in the showcase.
-- **document**, never "job", in anything a person reads. **Notification** is the browser's;
-  **notes** are the list on the document page.
+- **document**, never "job", in anything a person reads: the messages of a budget stop and
+  the `readablestem ops` reports too (names in code, such as `job_usd` or `MAX_USD_PER_JOB`,
+  stay). **Notification** is the browser's; **notes** are the list on the document page.
+- **the model**, with no maker's name, at first mention too: the provider is configurable,
+  so a fixed name could be false. Where a page must say who receives the pictures, it reads
+  the name from the settings (`web/recipients.py`).
+- **Needs your decision** is the state of an item that waits for a person, on the item's
+  pill and in the heading of the list of such items alike.
 - **Keep as image** is the one label for keeping the original picture, and the record says
   "Kept as image (your choice)". Status words are sentence case and come from `web/states.py`
   ("Not converted").
@@ -2407,7 +2413,7 @@ document.
   | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
 
   A finished job with no code whose equations, figures and tables mostly failed with
-  `model_api_error` or `model_timeout` has the note "Service outage" ("The AI service did
+  `model_api_error` or `model_timeout` has the note "Service outage" ("The model did
   not answer for N of M ..."; read from the stored result on the job page; nothing is
   stored on the job, and it goes away once enough of them are filled in). Each of those
   items is an open decision, so the lists, which read no result, show the job as "Needs
@@ -3794,7 +3800,7 @@ the last decision still works.
 
 **One fix.** Each card shows:
 
-- the status in words ("Needs review", "Not converted (error)"; the colored border
+- the status in words ("Needs your decision", "Not converted (error)"; the colored border
   only repeats it) and the confidence as a word and a number, "Low (45%)" (High from
   85%, the default auto-accept bar; Medium from 60%);
 - why it is here: each failed check and `Fix.reason` as a sentence from

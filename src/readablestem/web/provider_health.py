@@ -1,6 +1,6 @@
 """Is the model provider answering? (T3-1)
 
-When the AI service is down, conversions finish with their equations and figures "not
+When the model provider is down, conversions finish with their equations and figures "not
 converted", and the person is left to wonder whether the file or the tool is at fault.
 This module answers from what the worker already sees: the outcome of each request it
 sends (`ModelCall.outcome`), kept for a few minutes in memory.
@@ -10,13 +10,14 @@ the last `WINDOW_S` seconds and the most recent `MIN_CALLS` all ended in `api_er
 `timeout`. A refusal or an unusable answer is the model's, not an outage, and a single
 failure among successes is noise. One success ends it at once. Per process,
 forgotten on restart (with `WORKER_MODE=service` the worker process writes its requests to an
-`ops_heartbeat` row and the web process reads them, `web.worker_rows`; a "Read again" is the web
-process's own request and goes to a row of its own, which the reader adds): it is a hint for a
-status line, never a gate, and it holds only times and outcome words, nothing from a document.
+`ops_heartbeat` row and the web process reads them, `web.worker_rows`; an "Ask the model to read
+it again" is the web process's own request and goes to a row of its own, which the reader adds):
+it is a hint for a status line, never a gate, and it holds only times and outcome words,
+nothing from a document.
 
 The converter reports each request's `ModelCall` (`convert_pdf(call_observer=)`, passed by
-the worker, and by `web.reread` for a "Read again"); the public `/status` page and the job
-page read `HEALTH`.
+the worker, and by `web.reread` for an "Ask the model to read it again"); the public `/status`
+page and the job page read `HEALTH`.
 """
 
 from __future__ import annotations

@@ -514,7 +514,7 @@ def create_app(
     )
     if settings.worker_mode == "service":
         # The worker is another process (`readablestem worker`): what it says about itself, the
-        # AI service and the sandbox probe is read from `ops_heartbeat` (`web.worker_rows`).
+        # model provider and the sandbox probe is read from `ops_heartbeat` (`web.worker_rows`).
         ctx.rows = RowReader(factory)
         ctx.sandbox = SandboxStatus(read=ctx.rows.sandbox)
     inline_worker = settings.run_worker and ctx.rows is None

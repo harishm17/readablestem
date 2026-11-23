@@ -1,6 +1,6 @@
 """The weekly error-analysis report, from `error_aggregates` only (no document content).
 
-`readablestem ops report --days 7` prints, for the last N UTC days: jobs and their
+`readablestem ops report --days 7` prints, for the last N UTC days: documents and their
 outcomes, pages, cost per page and conversion times; the review load (decisions a
 person had to make per page, optional notes per page, by step); per step (equation,
 figure, table, heading) the status and review-tier mix, the most frequent reasons for each tier,
@@ -116,24 +116,24 @@ def render_report(counts: dict[tuple[str, str], int], *, since: date, until: dat
     pages, micro = job.get("pages", 0), job.get("cost_microusd", 0)
     lines = [f"ReadableSTEM error analysis, {since.isoformat()} to {until.isoformat()} (UTC)", ""]
     summary = [
-        ("jobs finished", str(done + failed)),
+        ("documents finished", str(done + failed)),
         ("done", _share(done, done + failed)),
         ("failed", _share(failed, done + failed)),
         ("pages converted", str(pages)),
         ("model cost", f"${micro / 1e6:.4f}"),
         ("cost per page", f"${micro / 1e6 / pages:.4f}" if pages else "n/a"),
     ]
-    lines += _table("Jobs", summary)
+    lines += _table("Documents", summary)
     outcomes = [
         (c.removeprefix("error:"), str(n)) for c, n in sorted(job.items()) if c.startswith("error:")
     ]
-    lines += _table("Job error and outcome codes", outcomes)
+    lines += _table("Document error and outcome codes", outcomes)
     latency = [
         (c.removeprefix("latency:"), str(n))
         for c, n in sorted(job.items())
         if c.startswith("latency:")
     ]
-    lines += _table("Conversion time (done jobs)", latency)
+    lines += _table("Conversion time (done documents)", latency)
     lines += _table("Review load (as the pipeline left it)", _review_load(counts, pages))
     for step in STEPS:
         statuses = {

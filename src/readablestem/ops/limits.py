@@ -234,7 +234,7 @@ def spend_findings(settings: Settings) -> list[Finding]:
         warning(
             f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is more than {RUNAWAY_FACTOR}x "
             f"a {settings.max_pages_per_job}-page dense document (${normal_job:.2f}): a "
-            f"runaway job would run on far past a normal one"
+            f"runaway document would run on far past a normal one"
         )
     daily = settings.daily_spend_cap_usd
     if daily is not None:
@@ -245,7 +245,7 @@ def spend_findings(settings: Settings) -> list[Finding]:
             )
         elif daily < settings.max_usd_per_job:
             warning(
-                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below one job's cap "
+                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below one document's cap "
                 f"(${settings.max_usd_per_job:.2f})"
             )
         quota = settings.per_user_daily_page_quota
@@ -266,8 +266,8 @@ def spend_findings(settings: Settings) -> list[Finding]:
     ):
         warning(
             f"IMAGE_PAGES_MAX_USD_PER_JOB ${settings.image_pages_max_usd_per_job:.2f} is below "
-            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f}: a job that asked for its scanned "
-            f"pages would be allowed less than one that did not"
+            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f}: a document that asked for its "
+            f"scanned pages would be allowed less than one that did not"
         )
     if settings.signup_open:
         _open_signup_findings(settings, largest, warning)

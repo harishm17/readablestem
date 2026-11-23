@@ -774,6 +774,11 @@ Railway (deploy-railway.md). It applies if you deploy on Cloud Run. In order:
 
 ## Ship a new version
 
+If the change alters how the public demo page or the student page looks, take the landing
+page's picture again first (`PYTHONPATH=tests uv run python scripts/hero_screenshot.py`, which
+writes `web/static/hero/product.png`), look at it, and commit it with the change. No test
+compares the picture with the page, so nothing else tells you it is out of date.
+
 Commit, then:
 
 ```sh

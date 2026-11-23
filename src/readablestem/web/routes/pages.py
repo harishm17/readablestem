@@ -397,7 +397,7 @@ def status(request: Request) -> Response:
         "next_reset": next_day_start(utcnow()),
         # When these facts were read: the page does not update itself.
         "checked_at": utcnow(),
-        # The AI service, as this server's own recent requests saw it (web.provider_health).
+        # The model provider, as this server's own recent requests saw it (web.provider_health).
         "provider_down_since": provider.down_since(),
         # Optional: the page reloads itself every minute while this is on (`?refresh=1`).
         "refresh": request.query_params.get("refresh") == "1",

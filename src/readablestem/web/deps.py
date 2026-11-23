@@ -90,7 +90,7 @@ class AppContext:
     rows: RowReader | None = None
 
     def provider_health(self) -> ProviderHealth:
-        """The AI service as the worker's recent requests saw it: this process's own memory
+        """The model provider as the worker's recent requests saw it: this process's own memory
         when the worker is a thread here, the worker process's `ops_heartbeat` row when not."""
         return HEALTH if self.rows is None else self.rows.provider()
 
