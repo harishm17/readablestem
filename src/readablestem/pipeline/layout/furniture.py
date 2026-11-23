@@ -218,9 +218,10 @@ class _MarginFilter:
         be clear of. A page number alone on its line counts on every file (a number set low
         on a tall page is outside the band of `drops`); lines with words, on files of at most
         `SHAPE_PAGES` pages (on longer ones the words repeat and `drops` has them), and only
-        with a number that says it is a page's ("Page 3", "3 of 9"): the name line and the
-        points of a one-page quiz end in a bare number too, and nothing repeats to tell them
-        from a running head."""
+        with a number that says it is a page's ("Page 3", "3 of 9") or with every word set
+        smaller than the body text, as a running head is: the name line and the points of a
+        one-page quiz end in a bare number too, but are set as the body is, and nothing
+        repeats to tell them from a running head."""
         # A row already taken (a page number the place rule has) is evidence, not a row to take.
         lines = _lines_of([f for f in frags if not f.vertical])
         taken: set[int] = set()
@@ -255,14 +256,18 @@ class _MarginFilter:
 
     def _is_furniture_stack(self, stack: list[list[_Row]]) -> bool:
         """Does one line of the stack end in a page number, and is nothing in it a heading?
-        Lines with words go only with a number that says it is a page's: "Points ... 25" at the
-        head of a quiz and "Total marks ... 50" at its foot end in a number too."""
+        Lines with words go only with a number that says it is a page's, or with words all set
+        smaller than the body text: "Points ... 25" at the head of a quiz and "Total marks ...
+        50" at its foot end in a number too, in the type of the body."""
         if not any(_ends_in_number(line) for line in stack):
             return False
         words = [r for line in stack for r in line if not _is_page_digits(r.clean)]
         if words and (
             self.pages > SHAPE_PAGES
-            or not any(_ends_in_number(line, worded=True) for line in stack)
+            or not (
+                any(_ends_in_number(line, worded=True) for line in stack)
+                or all(r.size <= self.body - MARGIN_SIZE_PT for r in words)
+            )
         ):
             return False
         return not any(self.prominent(r) for r in words) and all(

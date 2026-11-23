@@ -211,10 +211,11 @@ reader, neither to find them nor as a second opinion
    its line is taken on a file of any length (a number 90 % of the way down an A4 page is
    outside the 7 % band); the lines with words, only when the reference holds one page, since
    on a longer file their words repeat and the repeat rule has them, and only with a number
-   that says it is a page's (`Page 3`, `Page 3 of 9`, `3 of 9`): the name line and the points
-   of a one-page quiz end in a bare number as a running head does (`Points: ... 25`,
-   `Total marks ... 50`), and they stay. A journal's head with a bare page number beside its
-   name stays on a one-page file for the same reason. A head with no page
+   that says it is a page's (`Page 3`, `Page 3 of 9`, `3 of 9`) or with every word of the
+   stack set at least 0.5 pt smaller than the body text, as a running head is: the name line
+   and the points of a one-page quiz end in a bare number as a running head does (`Points:
+   ... 25`, `Total marks ... 50`), but they are set as the body is, and they stay. A journal's
+   head with a bare page number beside its name, in type smaller than the body, goes. A head with no page
    number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
    under it a line away, so it never stands clear. What goes is counted as `furniture` left
    out, as on a longer file. The
