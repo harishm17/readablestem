@@ -1221,18 +1221,24 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
 
     # Row 6: an exponent set tight against a math letter ("p1", "n2") on the page is not the mark of
     # note 1: the note keeps its link from the paragraph that holds its mark.
-    def exponent(page):
-        body_with_marks(page, after=".")
-        page.insert_text((72, 709), "1", fontsize=5.5, fontname="helv")
-        page.insert_text((77, 712), "Pressure matters.", fontsize=8)
-        x = 72 + pymupdf.get_text_length("The mass grows as ", fontname="helv", fontsize=BODY)
-        page.insert_text((72, 200), "The mass grows as ", fontsize=BODY, fontname="helv")
-        page.insert_text((x, 200), "n", fontsize=BODY, fontname="symb")
-        page.insert_text((x + 5.5, 195), "1", fontsize=7, fontname="helv")
+    # The same holds for a starred letter ("n" and a raised asterisk operator) under a star note.
+    marks = [("1", {"fontname": "helv"})]
+    if sans.is_file():
+        marks.append(("\u2217", {"fontname": "dj", "fontfile": str(sans)}))
+    for mark, font in marks:
 
-    layout = analyze(page_of(exponent))
-    (note,) = [n.element_id for n in layout.notices if n.code == "footnote"]
-    assert [k.target_id for k in layout.elements[0].links] == [note]
+        def exponent(page, mark=mark, font=font):
+            body_with_marks(page, mark=mark, after=".", **font)
+            page.insert_text((72, 709), mark, fontsize=5.5, **font)
+            page.insert_text((77, 712), "Pressure matters.", fontsize=8)
+            x = 72 + pymupdf.get_text_length("The mass grows as ", fontname="helv", fontsize=BODY)
+            page.insert_text((72, 200), "The mass grows as ", fontsize=BODY, fontname="helv")
+            page.insert_text((x, 200), "n", fontsize=BODY, fontname="symb")
+            page.insert_text((x + 5.5, 195), mark, fontsize=7, **font)
+
+        layout = analyze(page_of(exponent))
+        (note,) = [n.element_id for n in layout.notices if n.code == "footnote"]
+        assert [k.target_id for k in layout.elements[0].links] == [note], mark
 
     # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
     # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.

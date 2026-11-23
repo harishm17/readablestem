@@ -18,6 +18,9 @@
     words." is a heading.
   - Web addresses (O-410): no formula is read inside a typed address, so the address stays whole.
   - The status "Needs review" reads "Needs your decision" (O-417; web).
+  - Found in review before release: a raised star after a math letter ("n∗") is no note mark,
+    as a raised digit is not; a link in a table's caption or cell to a part left out of the
+    document is plain words, as a link in a paragraph or a figure caption already was.
   - Behind switches that stay off, no change: the inline-box rules (O-412, O-416), far equation
     numbers (O-037, O-391), panel marks (O-422) and the SW55 file facts.
   - Measured and written down as limits, nothing built (no real document shows them): tables and
@@ -346,8 +349,8 @@ so no prompt is edited in place.
   the words are for and are not. A table whose size is known to pass the main model's output
   limit is not sent to the main model after the cheap read. A reviewer's re-check of such a
   table gets the words the stored element has (O-219, `web.review.table_checks`). Every table
-  request changes when it is on. The tables row of what is sent (`web/recipients.py`) now says
-  the words are sent, dated 2026-11-22.
+  request changes when it is on. The tables row of what is sent (`web/recipients.py`) says the
+  words are sent only once the switch is on (it is off; docs/web.md).
 - `FIGURE_LABELS_ALWAYS`: the labels printed in the figure go with the figure request in every
   mode and in all three prompts (`figure_facts.md`, `figure_long_facts.md`,
   `figure_exam_facts.md`), not only with long descriptions on. Chart paths stay withheld.

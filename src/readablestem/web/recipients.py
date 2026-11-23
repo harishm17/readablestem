@@ -143,13 +143,12 @@ MATERIALS: tuple[Material, ...] = (
     Material(
         key="tables",
         switches=("feature_tables",),
-        what="Pictures of the tables cut from your file, with the words the file prints inside "
-        "each table and where they stand, to rebuild them as tables.",
+        what="Pictures of the tables cut from your file, to rebuild them as tables.",
         stored="The rebuilt table is kept with the document.",
-        short="table images and the words in them",
+        short="table images",
         label="Pictures of tables",
         vendor=(("parts", "tables"),),
-        stated=date(2026, 11, 22),
+        stated=date(2026, 10, 9),
     ),
     Material(
         key="notation",

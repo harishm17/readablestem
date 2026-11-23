@@ -372,12 +372,13 @@ log = logging.getLogger(__name__)
 # memory stops as `source_timeout`. The status "Needs review" reads "Needs your decision" (web).
 # Behind switches that stay off (no change): LAYOUT_INLINE_JOINS, LAYOUT_DISPLAY_GROUPING,
 # LAYOUT_JOIN_PANELS, REGION_TREE, EQUATION_FILE_FACTS, TABLE_FILE_FACTS, SCAN_LAYER_CHECK,
-# PAGE_CHECK_SIGNALS, FIGURE_LABELS_ALWAYS. No new notice code or figure reason. Results from
-# 0.5.10 to 0.5.16 load unchanged and their page is not made again (`assemble.RENDER_VERSION`
-# stays 11: a stored result has no caption links, and without them a caption is written as
-# before). 0.5.16 opens a 0.5.17 result (checked on 2026-11-23: an element and a table with
-# caption links load) but drops the caption links, so a caption written by 0.5.16 again has no
-# links. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+# PAGE_CHECK_SIGNALS, FIGURE_LABELS_ALWAYS. One new notice code, only behind SCAN_LAYER_CHECK:
+# `image_page_layer_differs`; no new figure reason. Results from 0.5.10 to 0.5.16 load
+# unchanged and their page is not made again (`assemble.RENDER_VERSION` stays 11: a stored
+# result has no caption links, and without them a caption is written as before). 0.5.16 opens
+# a 0.5.17 result (checked on 2026-11-23: an element and a table with caption links load) but
+# drops the caption links, so a caption written by 0.5.16 again has no links.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
 PIPELINE_VERSION = "0.5.17"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)

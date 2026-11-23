@@ -179,8 +179,10 @@ def _layout_notices(
                     ):
                         j += 1
                     for a, b in _mark_groups(row, i, j):  # "1,2" is two marks, "1)" is "1"
-                        if row.chars[a].c.isdigit() and _after_math_letter(row, a):
-                            continue  # the subscript or exponent of a math letter
+                        if (
+                            row.chars[a].c.isdigit() or row.chars[a].c == "\u2217"
+                        ) and _after_math_letter(row, a):
+                            continue  # the subscript or exponent of a math letter ("x\u2217")
                         token = "".join(c.c for c in row.chars[a:b])
                         before = _clean("".join(x.c for x in row.chars[:a]))[-FOOTNOTE_CONTEXT:]
                         raised[token] = _FootnoteMark(element_id, before, token)
