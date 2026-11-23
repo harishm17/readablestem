@@ -1120,9 +1120,9 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
     found: dict[int, int] = {}
     for group in groups:
         glyphs = sum(len(r.ink) for r in group)
-        if (
-            glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)
-        ) and not (_is_quotation(group) or _is_contact(group)):
+        if (glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)) and not (
+            _is_quotation(group) or _is_contact(group)
+        ):
             for row in group:
                 found[id(row)] = id(group[0])
     return found
