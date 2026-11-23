@@ -148,14 +148,15 @@ def _under_taller(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
     an integral or sum sign, at least twice its height)? The lower limit of a display's
     operator is read with it, not cut off below it."""
     (_, y0, _, y1), text = items[i]
-    if not text.strip() or not 0 < y1 - y0:
+    height = y1 - y0
+    if not text.strip() or height <= 0:
         return False
-    for j in band:
-        (_, top, _, bottom), held = items[j]
-        if held[:1] in _BIG_OPERATORS and bottom - top >= 2 * (y1 - y0):
-            if min(bottom, y1) - max(top, y0) >= 0.2 * (y1 - y0):
-                return True
-    return False
+    return any(
+        held[:1] in _BIG_OPERATORS
+        and bottom - top >= 2 * height
+        and min(bottom, y1) - max(top, y0) >= 0.2 * height
+        for (_, top, _, bottom), held in (items[j] for j in band)
+    )
 
 
 def _bands(items: Sequence[Item]) -> list[list[int]]:
