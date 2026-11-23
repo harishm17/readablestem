@@ -73,6 +73,63 @@ def test_a_run_of_monospaced_lines_is_one_code_block_with_its_indentation():
     assert [e.kind for e in elements] == [Kind.PARAGRAPH] * 3  # prose, code, prose
 
 
+def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
+    """LaTeX papers set listings in NimbusMonL, CMITT and t1xtt, not in a font called Courier;
+    the author's email on the title page, set in the same face, is not a listing."""
+
+    def fill(page):
+        y = prose(page, 100)
+        y = code(page, y, LOOP)
+        y = prose(page, y, "Run it and check that it prints 55. Write to the author:")
+        code(page, y, [(0, "vdh|ffn|nhma|esme@sdu.dk")])  # an address in the same face is no code
+
+    for font in ("NimbusMonL-Regu", "CMITT10", "t1xtt"):
+        doc = pymupdf.open(stream=page_of(fill))
+        for xref in range(1, doc.xref_length()):
+            if doc.xref_get_key(xref, "BaseFont")[1] == "/Courier":
+                doc.xref_set_key(xref, "BaseFont", f"/{font}")
+        found = analyze(doc.tobytes())
+        blocks = [e.text for e in found.elements if e.preformatted]
+        assert len(blocks) == 1, font  # the renamed face has other widths: compare the lines only
+        assert [n.code for n in found.notices].count("code_block") == 1, font  # not the address
+        assert [line.strip() for line in blocks[0].split("\n")] == [t for _, t in LOOP], font
+
+
+def test_a_numbered_listing_with_a_blank_line_is_one_block_and_a_list_of_names_is_not_code():
+    """A listing with a number on every line, the blank ones too, stays one block; task names
+    in the code face, with commas and nothing else, are prose."""
+    rows = [(0, "def total(xs):"), (4, "s = 0"), (4, ""), (4, "for x in xs:"), (8, "s += x")]
+
+    def fill(page):
+        y = prose(page, 100)
+        for n, (indent, text) in enumerate(rows, 1):
+            page.insert_text((50, y), str(n), fontsize=CODE, fontname="helv")
+            if text:
+                page.insert_text((72 + indent * ADVANCE, y), text, fontsize=CODE, fontname="cour")
+            y += 13
+        y = prose(page, y + 10, "The tasks are open_drawer, open_jar and the ones below:")
+        names = [
+            (0, "open_drawer, open_jar, open_wine_bottle, pick_up_cup,"),
+            (0, "stack_blocks, wipe_desk"),
+        ]
+        y = code(page, y, names)
+        # the tail of a wrapped paragraph, set in the code face, is no listing either
+        y += 10
+        page.insert_text(
+            (72, y),
+            "The tasks needing a turn of the gripper: close_drawer, open_drawer, take_usb_out_o-",
+            fontsize=CODE,
+            fontname="helv",
+        )
+        code(page, y + 13, [(0, "puter, unplug_charger")])
+
+    blocks = [e.text for e in analyze(page_of(fill)).elements if e.preformatted]
+    assert len(blocks) == 1
+    assert all(t in blocks[0] for _, t in rows if t)
+    assert "open_drawer" not in blocks[0]
+    assert "unplug_charger" not in blocks[0]
+
+
 def test_code_is_written_as_pre_code_and_escaped():
     def fill(page):
         y = prose(page, 100)
@@ -810,6 +867,61 @@ def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_
     (block,) = [e.text.split("\n") for e in analyze(page_of(body)).elements if e.preformatted]
     assert block[1] == "for each word w in the line do"
     assert block[2].startswith("  ") and block[3:] == ["end for", "return count"]
+
+
+def test_a_numbered_algorithm_whose_numbers_the_text_layer_lists_after_its_steps_stays_one_block():
+    sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+
+    def wide(page):  # a full-width algorithm under two columns of text: two steps cross the gutter
+        def columns(top: float, bottom: float) -> None:
+            for left in (72, 316):
+                rect = pymupdf.Rect(left, top, left + 224, bottom)
+                page.insert_textbox(rect, LONG, fontsize=BODY, fontname="helv", align=3)
+
+        columns(80, 260)
+        y = prose(page, 290, "Algorithm 1 Scan a verse") - 8
+        steps = [
+            "count = 0",
+            "for each word w in the line of the verse that the reader has marked for the scan do",
+            "if w is stressed in the way that the first reader marked it for the class then",
+            "count = count + 1",
+            "end if",
+            "end for",
+            "return count",
+        ]
+        for n, text in enumerate(steps, 1):
+            page.insert_text((130 if n in (2, 3) else 95, y), text, fontsize=BODY, fontname="helv")
+            page.insert_text((72, y), f"{n}:", fontsize=BODY - 1, fontname="helv")
+            y += 14
+        columns(y + 14, y + 190)
+
+    def formulas(page):  # steps 4 to 6 are formulas, all listed before their numbers
+        y = prose(page, 100, "Algorithm 1 Scan a verse") - 8
+        for n, text in enumerate(
+            ["count = 0", "for each word w in the line do", "if w is stressed"], 1
+        ):
+            page.insert_text((63, y), str(n), fontsize=7.5, fontname="helv")
+            page.insert_text((75, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        for formula in ("s ← ∑ w ∈ S", "t ← λ s + μ", "v ← s ∩ t"):
+            page.insert_text((122, y), formula, fontsize=BODY, fontname="dj", fontfile=str(sans))
+            y += 14
+        for n in (4, 5, 6):
+            page.insert_text((63, y - 14 * (7 - n) + 3.5), str(n), fontsize=7.5, fontname="helv")
+        y += 8
+        for n, text in enumerate(["end if", "return count"], 7):
+            page.insert_text((63, y), str(n), fontsize=7.5, fontname="helv")
+            page.insert_text((75, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        prose(page, y + 10, "The count is printed after the last word.")
+
+    (block,) = [e for e in analyze(page_of(wide)).elements if e.preformatted]
+    assert [line.split()[0] for line in block.text.split("\n")] == [f"{n}:" for n in range(1, 8)]
+
+    (block,) = [e for e in analyze(page_of(formulas)).elements if e.preformatted]
+    lines = block.text.split("\n")
+    assert [line.split()[0] for line in lines] == [str(n) for n in range(1, 9)]
+    assert all(len(line.split()) > 1 for line in lines)  # each formula stays with its number
 
 
 def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():

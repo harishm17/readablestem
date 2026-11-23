@@ -82,20 +82,29 @@ _PROSE_TWO_LETTER = frozenset(
 )
 
 
-def _prose_spans(row: _Row, info: _CharInfo) -> list[tuple[int, int, str]]:
+def _prose_spans(
+    row: _Row, info: _CharInfo, *, typewriter: bool = False
+) -> list[tuple[int, int, str]]:
     """Words that read as English: 3+ plain letters (not sin/log/...) or "is", "if", ...
-    as (first character, end, lower-case word)."""
+    as (first character, end, lower-case word). `typewriter`: the letters of a monospaced
+    face count too (a row of an algorithm, "for each Alg do")."""
     found: list[tuple[int, int, str]] = []
     i = 0
     chars = row.chars
+
+    def letter(t: int) -> bool:
+        return info.classes[t] == "L" or (
+            typewriter and info.classes[t] == "C" and chars[t].c.isalpha()
+        )
+
     while i < len(chars):
-        if info.classes[i] != "L" or info.script[i]:
+        if not letter(i) or info.script[i]:
             i += 1
             continue
         j = i
         letters = 0
         while True:
-            while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
+            while j < len(chars) and letter(j) and not info.script[j]:
                 letters += 1
                 j += 1
             after = _limit_end(chars, info.classes, info.script, j)
@@ -112,8 +121,8 @@ def _prose_spans(row: _Row, info: _CharInfo) -> list[tuple[int, int, str]]:
     return found
 
 
-def _prose_words(row: _Row, info: _CharInfo) -> int:
-    return len(_prose_spans(row, info))
+def _prose_words(row: _Row, info: _CharInfo, *, typewriter: bool = False) -> int:
+    return len(_prose_spans(row, info, typewriter=typewriter))
 
 
 def _raster_figures(

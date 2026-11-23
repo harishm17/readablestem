@@ -13,7 +13,7 @@ import pymupdf
 from readablestem.core.page_checks import make
 from readablestem.core.types import Notice
 from readablestem.pipeline import page_type
-from readablestem.pipeline.layout.blocks import _TEXT_BLOCKS
+from readablestem.pipeline.layout.blocks import _TEXT_BLOCKS, _is_addresses_or_names
 from readablestem.pipeline.layout.figures import CODE_MIN_GLYPHS
 from readablestem.pipeline.layout.glyphs import _Char, _clean
 from readablestem.pipeline.layout.page import (
@@ -159,6 +159,7 @@ def _layout_notices(
             elif block.code or (
                 len(ink) >= CODE_MIN_GLYPHS
                 and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(ink)
+                and not _is_addresses_or_names(block.rows)
             ):
                 notices.append(make("code_block", page=page.number, element_id=element_id))
             elif named is None and ink and _footnote(block, ink, page, ctx, raised.keys()):

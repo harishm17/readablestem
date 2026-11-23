@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased: code fonts the list did not name (O-440)
+
+- `glyphs._MONO_FONT` names NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor and Lucida Console as
+  monospaced. A numbered listing, an algorithm or an inline identifier set in them was read as
+  prose. The names are those counted on the public files and the corpus (docs/layout.md, "Code
+  fonts"); the font list matches no other name there.
+- Code rules (`layout/blocks.py`): a block of monospaced lines that are only addresses or a list
+  of names is not code, nor is a wrapped paragraph's last line in the code face, nor a numbered
+  line without a code line in its block. A numbered listing is one block, its blank lines
+  numbered too (`ax_csro_240306420`: 5 listings, 7 blocks, where each line was a paragraph). The
+  `code_block` notice leaves out addresses and name lists. A word of the code face counts as a
+  prose word in `_classify_row` only, so an algorithm in NimbusMonL stays one algorithm block
+  (2504.06207 p4 and 2405.15050 p4 read as builder 04 left them).
+- Corpus (against 55917ea2): `analyze` 996 results, 33 differ (11 files): 6 are builder 04's
+  (2504.06207, 2405.15050), 27 this change (9 files), each read, better or cosmetic, none worse.
+  `full`: 73 uploads, 2 differ from a run of 55917ea2 made for the purpose (`r18_arxiv_opt`,
+  cosmetic; `w_slides_60001_lec1`, better); equation, figure and table parts equal: no recorded
+  request moves. The shared baseline `full.json` is older than the rewrite of the kept-out
+  answers and differs from a fresh run of 55917ea2 on 9 uploads (Word files) this change does not touch.
+- Tests: two cases in `tests/test_structure.py`.
+- `PIPELINE_VERSION` (0.5.18) is owed a raise for the files that carry those fonts or listings
+  (layouts cached under the old version read their listings as prose); not made here.
+  `RENDER_VERSION` is not owed.
+
+## Unreleased: algorithms whose steps and numbers the text layer lists apart (O-442); the 'ti' ligature of one lecture measured (O-047)
+
+- Algorithms (O-442): two more shapes of a numbered algorithm are one block (`layout/blocks.py`),
+  each read on the pages that show it and on no other page looked at:
+  - A step whose words cross the gutter of a two-column page, listed before its number
+    (2504.06207 p4): the long steps of a full-width algorithm are spanning rows and the scan
+    stopped at the first; they now join when the number alone follows them on their baseline.
+  - A stack of formula steps listed before their numbers (2405.15050 p4): the numbers go ahead of
+    the formulas on their baseline for the scan only; the page's order is unchanged.
+  - Counted and not built, no second page shows them: a numbered tail at the top of the next
+    page, a heading taken into the last line, a `for ...:` line over an equation, an opener that
+    wraps flush, a one-line block, the boxed "TABLE III" and the garbled math of step 8 of
+    ax_csro_240306420 p9 (docs/layout.md, "Algorithms, wave 5").
+  - The corpus hash (`hashrun.py analyze`, 996 runs) differs on those two files only (3 modes
+    each): the steps join their block, and the formulas of the joined steps are read as the
+    formulas of any step, more and smaller equation items there (2405.15050 p4: six in place of
+    one). `hashrun.py full`: 73 compared, 0 differences, so no recorded request stops matching.
+- 'ti' read as 'A' (O-047, `w_slides_60001_lec10`): measured, not built. The file's Calibri
+  subsets are a simple TrueType font with no /Encoding, a ToUnicode with gaps and glyphs with no
+  names (no `post` or `GSUB` table). The codes are per subset ('A' is "ti", 'G' "tti", 'L' "tt" in
+  this file only), so no table keyed on the font name is exact. 1 public file of about 332 and 0
+  of 25 private files; a width rule would read 'L' as "ft".
+
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,
