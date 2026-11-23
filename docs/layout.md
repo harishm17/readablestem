@@ -1252,6 +1252,19 @@ math font, stay math.
   other 14 are no cluster, and none was built. The label that moved from the brace to the
   rows on 2210.13562 page 2 is a display cut into a brace, a paragraph and rows: the display
   rules cut it, not the number rules.
+  Two more shapes taken (wave 5, `LAYOUT_DISPLAY_GROUPING`; the count of 94 papers run again with
+  the four switches on, a number that is an equation of its own or a paragraph of its own): a
+  bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
+  "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
+  "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
+  it); it labels the row now (`display._trailing_number`). A bracketed number on a row of its
+  own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
+  "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
+  display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label
+  is not in the equation's crop or text, so no crop and no request moves; the number's own
+  element, a request for a picture of "(D4)", is gone. Still loose, one case each: "(A5)"
+  (under the display), "(63)", "(5)", "(3.7)", three glued tails, boxed digits, and the two
+  numbers on figure pages.
   Labeled parts inside one display ("(a) ... (b)", O-048), counted again on the 94 papers:
   none of the 2,186 displays holds them (12 have "(a)" and "(b)" in the text, all arguments
   of a function or proof-step marks). With the 7 of 65,817 of wave 3 the shape stays too rare
@@ -1275,6 +1288,8 @@ math font, stay math.
   6. *A colon inside a Computer Modern index* (`_TEX_FACE`): the colon of "dx_{1:T}" ended the formula after the "1" when the file's producer field does not say TeX (a paper re-written by a viewer or a converter, `data/real-tables/2407.13734.pdf`), because `glyph_math.script_punctuation` only ran for a file typeset by TeX. A glyph of a Computer Modern or Latin Modern face is TeX's whatever the producer says. No box of the 21 development papers changes (their producer says TeX); the public file's "dx1:T" is whole.
 
   Measured and not built (wave 4, 21 development papers, the four rules and the display rules on): the inline "extra" group is 394 boxes. Of 219 read (the five papers with most of them), 83 are a formula that wrapped from one line to the next (`_wrapped_inline`): its box is the union of the two pieces, a rectangle that holds the prose between them, and no change of a rule shrinks it (two boxes would be "split", and one element needs one crop); 31 are a multi-line display or a row of a display whose box holds a neighboring formula; 87 are a piece the gold leaves out of the formula (an unpainted bold letter, the isotope of "27Al", the "rank" of "rank r": the box is right); 18 hold prose, and the ones read are the same kind of piece ("CaWO4" for its "4"). The cuts at a spaced relation (285) and merged inline (144) were not taken.
+
+  Measured again and not built (wave 5, the base 55917ea2 with the four switches on, 21 development papers: whole 9,195 of 11,258, inline extra 375, inline cut 289): 75 of the 289 cuts leave one relation outside the box (69 "=", 4 "≥", 1 "≤", 1 ">"). Of 14 of them read, 2 end a row with "=" and the formula goes on in the next row, and 2 are a ":=" whose "=" the run leaves out; the other 10 were not sorted further. Joining a wrapped formula across rows makes one box that is the union of both rows and holds the words between them, which scores "extra" and moves a crop, so a cut becomes an extra and nothing is gained. Of the 375 extras, 200 swallow 25 or more characters; 74 of those are a one-row formula whose box also holds a neighboring piece (two boxes), the rest are the wrapped formulas and the gold's left-out pieces that wave 4 read.
 
   Not built: a part label "(a)", "(b)", "(iii)" that splits a run and stays text. A TeX word-space rule already splits "(a) x = 1" on TeX pages; on the other pages the narrowed rule changed no box on the development papers (a first version lost 29 whole boxes by taking a raised "(j)" and "V(f)" for labels), so it is not in the code.
 

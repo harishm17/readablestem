@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: equation numbers left after wave 4 (`LAYOUT_DISPLAY_GROUPING`; O-037, O-391, O-412, O-416)
+
+- With the display grouping switch on, two more equation numbers label their display and are no
+  element of their own: a bracketed number set three font sizes or more right of a row that ends
+  in "+" or a relation ("(D4)", "(D9)" in 2412.18448; `display._trailing_number`), and a bracketed
+  number on a row of its own right above its display at the display's left edge ("(10.20)" in
+  2412.12319; `display._line_below_number`). A label is outside the equation's crop and text, so no
+  crop moves. Off, the output is what it was.
+- Counted and not built: the other loose numbers are one case each (docs/layout.md, "Loose
+  equation numbers"). Inline boxes (O-412): of 289 inline cuts 75 leave one relation outside the
+  box, and the ones read are formulas that wrap with the "=" ending the row; no rule makes them
+  better than "extra". Raised digits (O-416): already answered, see the wave 4 entry (every
+  flat raised group has its notice, none silent).
+
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,
