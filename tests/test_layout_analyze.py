@@ -205,6 +205,18 @@ def test_inline_maths_becomes_child_equations_with_markers_in_the_paragraph():
         assert px0 <= x0 < x1 <= px1 and py0 <= y0 < y1 <= py1
 
 
+def test_a_relation_inside_a_typed_web_address_is_not_an_inline_equation():
+    layout = analyze(
+        html_page(
+            "<p>Video: https://www.youtube.com/watch?v=C-uekD6VTIQ</p>"
+            "<p>The speed is <i>v</i> = <i>d</i>/<i>t</i> on the road.</p>"
+        )
+    )
+    paragraphs = [e for e in layout.elements if e.kind == Kind.PARAGRAPH]
+    assert "https://www.youtube.com/watch?v=C-uekD6VTIQ" in paragraphs[0].text
+    assert [e.text for e in layout.elements if e.kind == Kind.EQUATION] == ["v = d/t"]
+
+
 def test_a_greek_sentence_is_prose_and_a_lone_greek_letter_is_still_maths():
     greek = analyze(
         html_page("<p>Δυνάμεις είναι η επιστήμη της κίνησης των σωμάτων και των δυνάμεων.</p>")

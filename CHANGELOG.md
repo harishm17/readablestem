@@ -248,6 +248,21 @@ tested the fixes.
 - These change the reader's output, so `PIPELINE_VERSION` needs a bump (not made here). No migration,
   no prompt or request change.
 - Headings and tables-local evals before and after: identical (commit and timings differ only).
+## Unreleased: a formula is not read inside a typed web address; strike, highlight and blank limits measured (branch fix/text-marks; O-410, O-021, O-025, O-027)
+
+- `layout/inline_runs._outside_addresses`: an inline-equation run that lies wholly inside a typed
+  address (`https://`, `http://`, `www.` to the next space) is dropped. `watch?v=C-uekD6VTIQ` was cut
+  at the "v=C" it read as a relation, and `text_pass._address_end` then ended the link at the marker
+  (public file `layout-dev-1/ax_csro_240306533.pdf` page 1). A PIPELINE_VERSION bump is owed once
+  this is merged, because layout text changes for files with such an address.
+  Measured on 996 corpus-and-public hashes against cf0729fc: 6 differ, all in two public files
+  (`ax_csro_240306533.pdf`: 1 address whole, 1 inline equation fewer; `os_astronomy_2e.pdf`: 6 to 10
+  whole YouTube addresses, 13 to 9 inline equations); `full` 73 compared, 0 differences; the private
+  corpus has none. Left alone: an address a line break splits at "?" (one, `os_astronomy_2e.pdf`
+  page 13 "watch? / v=w7TU1vFL8Us"): the guard reads one row at a time.
+- O-021 (blanks), O-025 (struck table cells and display equations), O-027 (paint order, highlights of
+  three or more touching pieces): measured on the public sets and the corpus, no real document shows
+  them, so nothing is built; the limits are written in `docs/layout.md` and on the limits page.
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 

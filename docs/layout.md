@@ -3664,6 +3664,15 @@ drawings and annotations, no second pass):
   bottom on a page are shading (a table's header row, a heat map) and none is a highlight
   (`text_pass.highlight_marks`).
 
+Two limits, measured on 2026-11-22 and not built because no real document shows them (the 332
+public files and the 25 corpus PDFs hold 928 and 116 pages with filled rectangles; none has a
+highlight dropped as shading, the 6 pages that lose rectangles to the row rule are table shading
+and a heat map): a real highlight drawn as three or more touching rectangles on one line (one per
+style run) is dropped with the shading, and paint order is not read. The second does not make a
+false highlight: a filled rectangle painted over text (after it) is opaque, so
+`page_type`'s cover rule ("Hidden text and page types" below) leaves that text out of the page,
+and a rectangle behind the text or a translucent one over it leaves the words and is a highlight.
+
 The glyphs map onto the text the way struck glyphs do (`labelled_runs`, `across_markers=False`:
 a run stops at an inline equation), trimmed of spaces and kept only with a letter or a digit in
 them. Table cells, headings, program code and glossary entries get none, because only
