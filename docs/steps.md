@@ -33,6 +33,19 @@ main model's fallback is the cheap model, which has already answered this exact 
 Every attempt becomes a `ModelCall` on the fix. `BudgetExceeded` is never caught here;
 the orchestrator (`pipeline.run`) decides what happens to the rest of the document.
 
+A job asks an identical request once. Two pictures that are the same pixels with the same text
+around them (the options of an exam question) make the same request, so the first is sent and
+the second gets that answer, whether it comes after the first or while the first is still out.
+Both pictures then have the same description, and the job pays for one call. The answer shared
+is one the model gave and the step could read; after a refusal, a timeout or an unreadable reply
+the second request is sent as it would be without this. The second fix's call is marked
+`shared`, costs nothing and is not in the job's call count (`DocumentStats.model_calls`, the
+step facts, the trace and the review counts). Which of two pictures asked first depends on
+thread timing, so when the job ends the paid call moves to the one first in reading order, and
+the same file gives the same fixes. A repeat of the same request is told apart from a different
+one by what the model is given (`models.question`), so the escalation, which asks another model,
+is never shared with the first call.
+
 ## Prompts
 
 Both prompts are constant instruction files, versioned by the loader as

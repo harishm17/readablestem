@@ -161,7 +161,7 @@ def of_call(call: ModelCall, page: int | None) -> CallFact:
 
 
 def of_calls(calls: Iterable[ModelCall], page: int | None) -> list[CallFact]:
-    return [of_call(call, page) for call in calls]
+    return [of_call(call, page) for call in calls if not call.shared]  # shared: never sent
 
 
 def of_fix(fix: Fix, page: int | None) -> list[CallFact]:

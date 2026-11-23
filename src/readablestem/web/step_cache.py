@@ -96,7 +96,7 @@ class DbStepCache:
         with self._lock:
             self.reused += 1
             self.reused_usd += fix.cost_usd
-            self.reused_calls += len(fix.calls)
+            self.reused_calls += sum(1 for c in fix.calls if not c.shared)
         return fix
 
     def store(self, element: Element, key: str, fix: Fix) -> None:

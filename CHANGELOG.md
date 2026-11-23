@@ -19,6 +19,11 @@
     the clip read in the upload probe and the strike and highlight read.
   - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
     bracketed number label their display instead of standing as an element of their own.
+  - One request, one answer (a job's identical requests): two pictures that are the same pixels
+    with the same text around them (the options of an exam question) are asked once and both get
+    that description; before, each was sent and they could differ. The second call is marked
+    `shared` on its `ModelCall` (left out of the JSON otherwise), costs nothing and is not in the
+    job's call count. A refused, timed-out or unreadable first answer is not shared.
 - No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
   stays as made at 0.5.18; the result's schema is the same.
 
