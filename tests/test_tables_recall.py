@@ -171,7 +171,31 @@ def test_numbered_equations_a_bibliography_and_algorithm_lines_are_not_tables():
             write(page, 72, 200 + 14 * k, f"{k + 1}:")
             write(page, 100, 200 + 14 * k, step)
 
-    assert data_tables(pdf(equations, references, algorithm)) == []
+    def questions(page):  # "Q1 ..." to "Q6 ...": a worksheet's items, with no rule and no caption
+        for k in range(6):
+            write(page, 100, 200 + 16 * k, f"Q{k + 1}")
+            write(page, 125, 200 + 16 * k, QUESTIONS[k])
+
+    assert data_tables(pdf(equations, references, algorithm, questions)) == []
+
+
+QUESTIONS = [
+    "State the law of inertia in your own words.",
+    "Give one example of it from the lab.",
+    "Why does the cart slow down on the flat?",
+    "Draw the forces on the cart on the ramp.",
+    "Which force does no work on the cart?",
+    "Estimate the friction from your data.",
+]
+
+
+def test_a_schedule_of_labelled_lines_stays_a_table():
+    def fill(page):  # the same shape as a list of questions, but the labels name rows
+        for k, day in enumerate(["Week 1", "Week 2", "Week 3", "Week 4", "Week 5", "Week 6"]):
+            write(page, 100, 200 + 16 * k, day)
+            write(page, 150, 200 + 16 * k, QUESTIONS[k])
+
+    assert len(data_tables(pdf(fill))) == 1
 
 
 def test_a_block_of_bare_numbers_is_a_matrix_not_a_table():
