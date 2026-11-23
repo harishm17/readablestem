@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: contents lines without leaders, numbered paragraphs, bulleted lines in formula decks and lettered titles that end in a full stop (branch fix/contents-headings-lists; O-409, O-408, O-407, O-418 b)
+
+Counted first (public papers under `data/`, the layout dev set, the review probes, the private
+corpus by counts only); only what a count asked for was built.
+
+- O-409: a line of a contents list that has no leaders and runs up to its page number ("D Ablation
+  study of a very long title 21" among entries with leaders) is an entry (`_contents_rows`,
+  `_leader_split(bare=True)`); it was a paragraph with its number in it.
+- O-408: the second line of a numbered paragraph set with an indented first line ("2) Prompt Design
+  With A Code Template: The controller ...") goes on from the first although it starts left of the
+  marker (`_numbered_paragraph_goes_on` in `_continues`).
+- O-407: a bulleted line is a list item whatever its size; in a deck of formulas the body size is the
+  commonest glyph size, and bullets set larger than 1.2 times it were headings (`_classify_run`).
+- O-418 b: a lettered title of four words or more may end in a full stop, on its first row or on its
+  second ("B. Electron-phonon coupling and carrier mobility.", `MIN_STOPPED_TITLE_WORDS`); with fewer
+  words ("A. Yes.") it still ends an answer.
+- Counted and not built: O-433 (the 5 public wrapped contents entries are all read right, none in the
+  private corpus, the probes differ in font only), O-418 a (numbered bold stems) and c (1 private
+  row), O-419 (0 found), O-033 (the cover headings of two OCW pages, not a reader fault).
+- These change the reader's output, so `PIPELINE_VERSION` needs a bump (not made here). No migration,
+  no prompt or request change.
+- Headings and tables-local evals before and after: identical (commit and timings differ only).
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and

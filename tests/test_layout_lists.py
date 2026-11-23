@@ -425,10 +425,16 @@ def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_i
         y = write(page, 72, y, ["In this paper we consider tasks with one robot arm."])
         wrapped = ["C. Offline, Online and Optimistic Learning with", "a Title on Two Rows"]
         y = write(page, 72, y + 10, wrapped, fontname="heit")  # a title that wraps is one heading
-        write(page, 72, y, ["The third title goes over two rows and its text is under it."])
+        y = write(page, 72, y, ["The third title goes over two rows and its text is under it."])
+        # a title of four words or more may end in a full stop, on its first row or its second
+        y = write(page, 72, y + 10, ["D. Electron coupling and carrier mobility."], fontname="heit")
+        y = write(page, 72, y, ["The fourth title ends in a full stop and its text is under it."])
+        stopped = ["E. Electronic properties and carrier mobility under", "strain."]
+        y = write(page, 72, y + 10, stopped, fontname="heit")
+        write(page, 72, y, ["The fifth title is a heading too, its second row ends in a stop."])
 
     got = [(e.kind, e.text) for e in analyze(one_page(fill)).elements]
-    assert [k for k, _ in got].count(Kind.HEADING) == 3
+    assert [k for k, _ in got].count(Kind.HEADING) == 5
     assert not items(analyze(one_page(fill)).elements)
 
     def options(page):  # the options of a question, set in italics, are still its options
@@ -458,6 +464,29 @@ def test_a_bullet_item_set_in_bold_is_a_list_item_not_a_heading():
     got = analyze(one_page(fill)).elements
     assert len(items(got)) == 3
     assert [e.text for e in got if e.kind == Kind.HEADING] == ["Questions for the datasheet"]
+
+
+def test_a_bulleted_line_set_larger_than_the_body_text_is_an_item_not_a_heading():
+    # A deck of formulas: most of its glyphs are small, so its bullets (and their text) are
+    # more than 1.2 times the body size, and still the bullets are list items.
+    def fill(page):
+        write(page, 72, 100, ["Results of the second experiment"], fontsize=24, fontname="hebo")
+        for i, text in enumerate(
+            [
+                "The loss falls with each pass over the data",
+                "The error stays flat after the third pass",
+                "The gap between the two curves is small",
+            ]
+        ):
+            page.insert_text((72, 160 + 30 * i), "•", fontsize=18)
+            page.insert_text((96, 160 + 30 * i), text, fontsize=18)
+        write(
+            page, 72, 280, ["Each curve is the mean of five runs of one model on one machine."] * 6
+        )
+
+    got = analyze(one_page(fill)).elements
+    assert len(items(got)) == 3
+    assert [e.text for e in got if e.kind == Kind.HEADING] == ["Results of the second experiment"]
 
 
 def test_a_bold_item_in_a_run_of_its_series_is_an_item_and_a_bold_title_over_text_is_a_heading():

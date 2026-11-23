@@ -972,8 +972,10 @@ and the nearest marker above it in its column is not the letter before with only
 own lines between them, which is the next item of a list. An option of a grid is never one.
 The title is a block of its own, apart from the text under it. A title that wraps onto a second
 row of its face (no marker, less than half a row height under it, at most 12 words in all, the
-second row not ending like a sentence) is one title of two rows; a title that ends in a full stop
-is still read as an item. The type alone does not make a heading of a lettered or numbered line
+second row not ending in a comma, a semicolon or a colon) is one title of two rows. A full stop
+may end a title of four words or more, the letter counting ("B. Electron coupling and mobility.",
+`MIN_STOPPED_TITLE_WORDS`), on its first row or its second; with fewer words ("A. Yes.") it ends
+an answer and the line is an item. The type alone does not make a heading of a lettered or numbered line
 that stands in a run of its series either (`_mark_series_items`, `_Row.in_series`): the next
 marker of its column, past its own lines, is the next value ("A.", "B.", "C."; "I." between "H."
 and "J."), or the marker nearest above is the value before with nothing but its own lines
@@ -985,7 +987,18 @@ ends a run, whatever stands in it: numbered items set that far apart, with room 
 between them, end their runs too, and set in bold they are headings (O-401). Two titles in
 a row, the first with no text of its own, are read as a list of two. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
-changes nothing).
+changes nothing), and so is a bulleted line of any size: a deck of formulas has a body size
+(the commonest glyph size) of 18 pt while its bullets are set at 25 pt, and the size alone
+no longer makes a heading of a line that has a bullet (`_classify_run`, O-407). A numbered
+line is still a heading when it is large.
+
+A numbered line that is the first line of a paragraph is not cut from its second line: when the
+numbered line is the only one of its run, starts indented (at most `INDENT_REACH` em right of the
+next line), runs to the right edge and ends in the middle of a sentence, and the next line is
+full width with no marker, that line goes on from it although it starts left of the marker. A list
+item that wraps goes on at its marker or its text, never left of both
+(`_numbered_paragraph_goes_on` in `_continues`; IEEE's "2) Prompt Design: The controller ..."
+was cut after its first line, and the rest was a paragraph of its own, O-408).
 
 The item text starts after the marker; continuation lines join the item (a hanging
 indent is fine). **Levels** come from the left edge of the item text, which is the same
@@ -2327,6 +2340,12 @@ lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
 A section number that starts an entry ("6.1") and a page number that ends it after math
 ("Forces on Σ 9") are the entry's own text, not part of its equation: before, the number next to
 the symbol was read into the formula (`_clear_of_entry_numbers`).
+
+In a list with leaders, a line that has none and runs up to its page number ("D Ablation study of
+a very long title 21" among "C Setup . . . . 14") is an entry too (`_contents_rows`, `_leader_split(bare=True)`):
+it ends at the edge of the numbers (within 1.5 em), starts where an entry with leaders does (within
+0.6 em) and ends in a page number after at least `MIN_TITLE_LETTERS` letters. Before, such a line
+was left a paragraph with its number in it.
 
 A contents list with no leaders is found by its shape (WS2.7, `_shape_entries`): three or
 more lines one after the other in one column, each ending in a page number (or followed on

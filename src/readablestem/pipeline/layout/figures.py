@@ -1923,7 +1923,11 @@ def _continues(
         )
     ):
         return False
-    if run.rows[0].marker is not None and row.x0 < left - 0.5 * size:
+    if (
+        run.rows[0].marker is not None
+        and row.x0 < left - 0.5 * size
+        and not _numbered_paragraph_goes_on(prev, row, run, edges)
+    ):
         return False  # a list item goes on at its marker or its text, never further left
     if edges is not None and len(run.rows) == 1 and _lead_end(run.rows[0]) is not None:
         right = max(right, edges.of(prev))  # an entry of one line: its line ends short of the edge
@@ -1933,6 +1937,30 @@ def _continues(
         row.marker is None
         and not CAPTION.match(row.clean)
         and not _starts_block(prev, row, run, ctx, edges)
+    )
+
+
+def _numbered_paragraph_goes_on(
+    prev: _Row, row: _Row, run: _Run, edges: _RightEdges | None
+) -> bool:
+    """Is `row` the second line of a paragraph that starts with a number or letter ("2) Prompt
+    Design: The controller ...") set with an indented first line, not of a list item?
+
+    The first line is the run's only one, indented from the line after it (the column's edge:
+    at most `INDENT_REACH` em), runs to the right edge and ends in the middle of a sentence;
+    the next line is full-width text with no marker. A list item that wraps goes on at its
+    marker or its text, never to the left of both."""
+    marker = run.rows[0].marker
+    return (
+        edges is not None
+        and marker is not None
+        and marker.ordered
+        and len(run.rows) == 1
+        and row.marker is None
+        and row.x0 >= run.box[0] - INDENT_REACH * prev.size
+        and prev.x1 >= edges.of(prev) - 1.5 * prev.size
+        and row.x1 >= prev.x1 - 3 * prev.size
+        and prev.clean[-1:] not in ".:?!"
     )
 
 
