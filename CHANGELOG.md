@@ -12,9 +12,10 @@
     the same captions.
 - Found when the region tree was turned on, on a slide of MIT 6.0001 lecture 1 that sets the
   20-point words "PROBLEM SOLVING" over an 80-point "PRACTICE":
-  - A row of its own is no sub- or superscript of a row more than 2.5 times its size
+  - A row of its own is no sub- or superscript of a row more than 3.3 times its size
     (`layout/rows.py` `_attach_scripts`), so the small words no longer read inside the large one
-    letter by letter ("PRACTSOLVINGICE"). TeX's smallest script is half the text, well inside it.
+    letter by letter ("PRACTSOLVINGICE"). The smallest real script measured, an exponent inside
+    a fraction in an inline fraction (OpenStax), is 0.36 of its line: inside the limit.
   - In a slide deck each page's largest heading is its slide's title, and every slide title is
     one level whatever its size (`layout.heading_levels`): an 80-point slide title no longer puts
     the deck's 48-point titles a level under it.
