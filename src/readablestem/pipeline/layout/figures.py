@@ -28,11 +28,11 @@ from readablestem.pipeline.layout.glyphs import _union
 from readablestem.pipeline.layout.shared import (
     _MATH_WORDS,
     _area,
+    _Block,
     _box_key,
     _CharInfo,
     _Context,
     _Display,
-    _Block,
     _Figure,
     _lead_end,
     _limit_end,

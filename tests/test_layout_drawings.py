@@ -735,12 +735,17 @@ def test_a_mark_row_that_a_paragraph_keeps_is_not_also_taken_as_a_panel_label():
     doc = pymupdf.open()
     page = _page(doc)
     y = _running_text(page, 72, 1)
-    _label(page, (72, y + 4), "Each panel plots the height of a ball against the time for the same value of", 11)
+    _label(
+        page,
+        (72, y + 4),
+        "Each panel plots the height of a ball against the time at one value of",
+        11,
+    )
     _label(page, (72, y + 17), "n", 11)
     top = y + 36
     _panel(page, 100, top, "A")
     _panel(page, 270, top, "B")
-    _label(page, (100, top + 140), "Figure 3: Height of the ball in two runs, one soft and one hard.", 10)
+    _label(page, (100, top + 140), "Figure 3: Height of the ball in two runs, soft and hard.", 10)
     out = layout.analyze(doc.tobytes(), join_panels=True)
     (figure,) = _figures(out)
     assert "B" in figure.text.split() and "n" not in figure.text.split()
