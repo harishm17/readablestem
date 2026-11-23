@@ -2139,8 +2139,8 @@ def review_action(
             _page_group_action(request, job_id, element_id, user, action, view, version), flt
         )
     if action in {REREAD, NOT_EQUATION}:
-        # "Read again" and "Not an equation" on an equation card: writes of the item, not
-        # decisions on its fix (`routes.edits`).
+        # "Ask the model to read it again" and "Not an equation" on an equation card: writes of the
+        # item, not decisions on its fix (`routes.edits`).
         from readablestem.web.routes import edits as item_edits
 
         if action == REREAD:
@@ -2657,7 +2657,7 @@ def undo(
 
     structural = [c for c in changes if isinstance(c, StructureChange)]
     if len(edits) == 1 and edits[0].action in ITEM_WRITES:
-        # Read again or "Not an equation": back on the item, where the choice was.
+        # Ask the model to read it again, or "Not an equation": back on the item (the choice).
         target = edits[0].element_id
         flash(request, UNDO_ITEM, element_id=target, undo=False, kind="success")
         if view == LIST_VIEW:

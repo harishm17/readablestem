@@ -43,10 +43,10 @@ def register(
     ops = group.add_parser("ops", help="cron tasks: error aggregation and retention")
     sub = ops.add_subparsers(dest="ops_command", required=True)
     sub.add_parser(
-        "aggregate", help="count finished jobs into daily error aggregates (idempotent)"
+        "aggregate", help="count finished documents into daily error aggregates (idempotent)"
     ).set_defaults(func=_cmd_aggregate)
     sub.add_parser(
-        "purge", help="delete jobs past their retention time, with uploads, crops and edits"
+        "purge", help="delete documents past their retention time, with uploads, crops and edits"
     ).set_defaults(func=_cmd_purge)
     sub.add_parser(
         "cron", help="aggregate, then purge (purge runs even if aggregation fails)"
@@ -120,16 +120,19 @@ def register(
     stored.set_defaults(func=_cmd_storage_report)
     steps = sub.add_parser(
         "step-report",
-        help="model calls, tokens, dollars and seconds of finished jobs, by step and by "
+        help="model calls, tokens, dollars and seconds of finished documents, by step and by "
         "stage (no content)",
     )
     steps.add_argument(
-        "--job", action="append", default=[], metavar="ID", help="only this job (repeatable)"
+        "--job", action="append", default=[], metavar="ID", help="only this document (repeatable)"
     )
     steps.add_argument(
-        "--days", type=float, default=7.0, help="jobs finished in the last DAYS days (default 7)"
+        "--days",
+        type=float,
+        default=7.0,
+        help="documents finished in the last DAYS days (default 7)",
     )
-    steps.add_argument("--last", type=int, help="at most this many jobs, the newest first")
+    steps.add_argument("--last", type=int, help="at most this many documents, the newest first")
     steps.add_argument("--json", action="store_true", help="the report as JSON")
     steps.set_defaults(func=_cmd_step_report)
     sub.add_parser(
@@ -146,11 +149,13 @@ def register(
     lookup.set_defaults(func=_cmd_lookup)
     export = sub.add_parser(
         "export-opted-in",
-        help="copy opted-in jobs (crops, results, review labels) for error analysis",
+        help="copy opted-in documents (crops, results, review labels) for error analysis",
     )
     mode = export.add_mutually_exclusive_group(required=True)
-    mode.add_argument("--out", type=Path, help="write one directory per job here")
-    mode.add_argument("--prune", type=Path, help="delete exported jobs past their retention date")
+    mode.add_argument("--out", type=Path, help="write one directory per document here")
+    mode.add_argument(
+        "--prune", type=Path, help="delete exported documents past their retention date"
+    )
     export.set_defaults(func=_cmd_export)
     canary = sub.add_parser(
         "decisions-canary",

@@ -359,7 +359,7 @@ class JobCancelled(BudgetExceeded):
     """
 
     def __init__(self) -> None:
-        super().__init__("cancelled", "the job was deleted or taken over by another worker")
+        super().__init__("cancelled", "the document was deleted or taken over by another worker")
 
 
 @dataclass
@@ -689,8 +689,8 @@ class Worker:
             self._cancel(attempt, "canceled")
             raise JobCancelled()
         if calls and int(row.model_calls or 0) + calls > attempt.max_calls:
-            raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")
-        raise BudgetExceeded("job_usd", f"job spend cap ${attempt.max_usd:.2f} reached")
+            raise BudgetExceeded("job_calls", f"document call cap {attempt.max_calls} reached")
+        raise BudgetExceeded("job_usd", f"document spend cap ${attempt.max_usd:.2f} reached")
 
     def _adjust_job(
         self, attempt: _Attempt, cost_delta: float, calls_delta: int, held_delta: float = 0.0

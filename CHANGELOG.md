@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased: one word for a decision, "document" in the stop texts and ops reports, release step for the hero picture, two test files pruned
+
+- The pill on an item that waits for a person says "Needs your decision", as the heading of the list
+  of such items does (`FIX_STATUS_LABELS` in `web/views.py`). It reaches the review cards, the
+  line a change reads back ("... is now: needs your decision."), the split view's lines and the
+  record. If the pill wraps at 390 px, the pill says "Your decision" (checked: it does not).
+- The texts of a budget stop (`BudgetExceeded`, the worker's, the re-read's and the cancel) and the
+  `readablestem ops` reports and their `--help` say "document" where they said "job" to a reader.
+  Names in code and setting names (`job_usd`, `MAX_USD_PER_JOB`) are as they were.
+- Code comments that quoted "Read again" or "AI service" use today's words ("Ask the model to read
+  it again", "model provider"). The status page keeps its "AI service" line. The string table
+  (`web/strings.py`, `docs/web.md`) now says the model's maker is not named at first mention, since
+  the provider is configurable.
+- `docs/deploy.md` ("Ship a new version") and `docs/deploy-railway.md` list `scripts/hero_screenshot.py`
+  as a step when the demo or the student page's look changes; `docs/site.md` says the picture stays
+  on phones, shown whole, as a link to the demo.
+- Tests: `tests/test_source_reader.py` and `tests/test_web_source.py`, two of the six files review 6
+  named as grown, lose rows that repeat a rule another file owns (the picture path, the archive and
+  the escape rules), the one-line tests that the larger ones hold, and a dead assertion.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and

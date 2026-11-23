@@ -122,8 +122,9 @@ ADD_DATA_TABLE = "add_data_table"
 # "Describe it in words" on an item kept as an image (T3-16): the text becomes the image's
 # alt text after the same checks as any alt text (`describe_in_words`).
 DESCRIBE = "describe"
-# "Read again" and "Not an equation" on an equation card (WS8.5, WS4.5): structural writes of
-# the decision route (`routes.edits.read_again`, `not_an_equation`), undone as one entry.
+# "Ask the model to read it again" and "Not an equation" on an equation card (WS8.5, WS4.5):
+# structural writes of the decision route (`routes.edits.read_again`, `not_an_equation`),
+# undone as one entry.
 REREAD = "reread"
 NOT_EQUATION = "not_equation"
 # The `ReviewEdit.action` of those two writes: Undo of one lands on the item, not on the page tools.

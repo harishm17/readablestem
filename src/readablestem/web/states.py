@@ -199,7 +199,7 @@ NO_RETRY_FAILURES = frozenset(
     {"upload_missing", "source_busy", "source_unavailable", "access_removed"}
 )
 # Finished jobs that "Convert the missing parts" can complete: stopped early by the day's
-# budget (and, read from the result, converted while the AI service was down).
+# budget (and, read from the result, converted while the model provider was down).
 RETRYABLE_STOPS = frozenset({"budget_daily"})
 LIMIT_STOPS = frozenset({"budget_job_usd", "budget_job_calls"})
 

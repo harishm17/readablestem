@@ -42,7 +42,7 @@ from readablestem.web.outcome import FAILED_MESSAGES
 
 FIX_STATUS_LABELS = {
     Status.ACCEPTED: "Accepted automatically",
-    Status.NEEDS_REVIEW: "Needs review",
+    Status.NEEDS_REVIEW: "Needs your decision",
     Status.ABSTAINED: "Not converted (no confident proposal)",
     Status.FAILED: "Not converted (error)",
     Status.EDITED: "Edited by you",

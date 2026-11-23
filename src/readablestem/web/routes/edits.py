@@ -655,10 +655,10 @@ def read_again(
     view: str,
     flt: str,
 ) -> Response:
-    """ "Read again" on an equation card: the equation step reads the item's own picture again
-    and the new reading replaces the proposal on the same item, still waiting for a decision
-    (`page_edits.read_again`). An empty answer changes nothing and is given back against the
-    day's count. Reached from the decision route (`routes.review.review_action`), so the
+    """ "Ask the model to read it again" on an equation card: the equation step reads the item's own
+    picture again and the new reading replaces the proposal on the same item, still waiting for a
+    decision (`page_edits.read_again`). An empty answer changes nothing and is given back against
+    the day's count. Reached from the decision route (`routes.review.review_action`), so the
     form's submit rule is that route's. One read at a time, the same spend controls as marking
     an equation, and one call made with no lock held."""
     from sqlalchemy import select

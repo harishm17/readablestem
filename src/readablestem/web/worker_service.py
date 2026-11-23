@@ -10,7 +10,7 @@ only thing the web process and this one share:
   poll the same table and each job goes to one of them.
 - A job whose worker died is requeued when its lease runs out (`Worker.requeue_expired`, run by
   every slot's loop), the same rule as when the worker was a thread.
-- Liveness, the AI service's health and the sandbox probe are rows of `ops_heartbeat`
+- Liveness, the model provider's health and the sandbox probe are rows of `ops_heartbeat`
   (`web.worker_rows`), which `/readyz`, `/status`, the job page and `/admin` read.
 
 SIGTERM or SIGINT: no new job is claimed, a job being converted is cancelled and its lease ends

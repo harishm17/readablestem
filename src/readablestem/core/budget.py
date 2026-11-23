@@ -140,9 +140,9 @@ class JobBudget:
         """One attempt at `reserve`."""
         with self._lock:
             if count_call and self.calls + 1 > self.max_calls:
-                raise BudgetExceeded("job_calls", f"job call cap {self.max_calls} reached")
+                raise BudgetExceeded("job_calls", f"document call cap {self.max_calls} reached")
             if self.spent_usd + self._held + amount_usd > self.max_usd + 1e-12:
-                raise BudgetExceeded("job_usd", f"job spend cap ${self.max_usd:.2f} reached")
+                raise BudgetExceeded("job_usd", f"document spend cap ${self.max_usd:.2f} reached")
             reservation = self.guard.reserve(amount_usd)  # may raise "daily"
             if count_call:
                 self.calls += 1

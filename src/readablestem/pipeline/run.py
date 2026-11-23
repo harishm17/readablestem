@@ -1132,7 +1132,7 @@ class _Run:
     # Finished steps kept between runs (T3-1), and the key each element's step was asked under.
     cache: StepCache | None = None
     keys: dict[str, str] = field(default_factory=dict)
-    # Told how each model request ended (`ModelCall`), for the status line about the AI service.
+    # Told how each model request ended (`ModelCall`), for the status line about the model provider.
     observer: Callable[[ModelCall], None] | None = None
     # The scale an equation's picture is shown at in the student file (T3-15).
     eq_scale: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)

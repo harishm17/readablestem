@@ -1,7 +1,7 @@
 """What the worker process tells the web process, in `ops_heartbeat` rows.
 
 With `WORKER_MODE=service` the conversions run in the `readablestem worker` process, so the
-web process cannot read the worker thread, the AI service's recent requests or the sandbox
+web process cannot read the worker thread, the model provider's recent requests or the sandbox
 probe from its own memory. The worker writes them to rows of `ops_heartbeat` (the table the
 backup and cron use, `ops.heartbeat`) and the web process reads them, so `/readyz`, `/status`,
 the job page and `/admin` answer the same whichever process serves the request:
