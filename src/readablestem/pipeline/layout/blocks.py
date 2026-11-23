@@ -1138,7 +1138,7 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
     for group in groups:
         glyphs = sum(len(r.ink) for r in group)
         if (glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)) and not (
-            _is_quotation(group) or _is_contact(group) or _is_name_list(group)
+            _is_quotation(group) or _is_addresses_or_names(group)
         ):
             for row in group:
                 found[id(row)] = id(group[0])
@@ -1203,6 +1203,12 @@ def _is_contact(group: Sequence[_Row]) -> bool:
     """Is a block of monospaced lines only email or web addresses (an author's contact line,
     not code)?"""
     return all(_CONTACT.match(r.clean) for r in group)
+
+
+def _is_addresses_or_names(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines only addresses or a list of names? It is no code, and the
+    notice that a page has code (`notices.py`) leaves it out too."""
+    return _is_contact(group) or _is_name_list(group)
 
 
 def _pitch(row: _Row) -> list[float]:

@@ -88,8 +88,10 @@ def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
         for xref in range(1, doc.xref_length()):
             if doc.xref_get_key(xref, "BaseFont")[1] == "/Courier":
                 doc.xref_set_key(xref, "BaseFont", f"/{font}")
-        blocks = [e.text for e in analyze(doc.tobytes()).elements if e.preformatted]
+        found = analyze(doc.tobytes())
+        blocks = [e.text for e in found.elements if e.preformatted]
         assert len(blocks) == 1, font  # the renamed face has other widths: compare the lines only
+        assert [n.code for n in found.notices].count("code_block") == 1, font  # not the address
         assert [line.strip() for line in blocks[0].split("\n")] == [t for _, t in LOOP], font
 
 

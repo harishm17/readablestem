@@ -424,7 +424,7 @@ def _classify_row(row: _Row, *, document: _Document = _PLAIN) -> None:
     # Punctuation after maths ("v ." at the end of a displayed fraction) counts neither way.
     counted = [i for i in ink if row.chars[i].c not in ",.;:"]
     ratio = sum(info.mathy(i) for i in counted) / max(1, len(counted))
-    prose = _prose_words(row, info)
+    prose = _prose_words(row, info, typewriter=True)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
     elif row.exercise_number:
