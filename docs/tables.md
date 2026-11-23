@@ -192,7 +192,10 @@ rules above.
    caption of the table that follows it is not a table). And the label of a numbered item is
    the cell that opens its line, not only the first column: a strip that a few cells cross
    is often an indent, so the "i." to "v." of a nested list, with blanks to write on after the
-   items, are list lines (`_numbered`). And a box it made that holds two lines of running
+   items, are list lines (`_numbered`), and so is a column of item numbers with a word before
+   the number ("Q1", "Question 2:", "Step 3", `_ITEM_LABEL`) before sentences, with no rule and
+   no "Table N" line (a worksheet's questions); "Week 1" or "Mon" before sentences name the
+   rows of a schedule and stay a table. And a box it made that holds two lines of running
    text across its columns (`_running_text`) is a table with the paragraph under it taken in,
    not a table. A second rule: a box under a "Table N" line with no rules, of
    three columns or more, six grid lines and alignment 0.5 (not 0.75) is a table: the caption
