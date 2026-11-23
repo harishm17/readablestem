@@ -22,7 +22,8 @@ stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none
   of the 30 has its `scripts_flattened` notice (none silent); on the 331 other PDFs 312 blocks, none
   silent. Nothing built for them; `Element.text` is as it was.
 - Hash runs on cf0729fc's replay of the corpus (`hashrun.py full`, 73 uploads, recorded answers): with
-  both switches off no upload differs from the baseline, so no recorded request key moves. With both
+  both switches off no upload differs from the baseline (and `analyze` of the 332 other PDFs in its three
+  variants, 996 results: 0 differences), so no recorded request key moves. With both
   switches on, 8 uploads differ from switches-off (the switches' own change, the same at the base), and
   the two rules above change no upload beyond that: 0 of 73 differ from the base tree with
   the switches on, so no recorded request key is moved by them.
