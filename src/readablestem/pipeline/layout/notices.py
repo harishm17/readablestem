@@ -19,10 +19,12 @@ from readablestem.pipeline.layout.page import (
     _FOOTNOTE_MARKS,
     FOOTNOTE_SIZE,
     FOOTNOTE_ZONE,
+    _after_unit,
     _covers,
     _lead_mark,
     _mark_chars,
     _mark_groups,
+    _range_marks,
 )
 from readablestem.pipeline.layout.shared import (
     CODE_MONO_SHARE,
@@ -176,9 +178,19 @@ def _layout_notices(
                     ):
                         j += 1
                     for a, b in _mark_groups(row, i, j):  # "1,2" is two marks, "1)" is "1"
+                        if row.chars[a].c.isdigit() and _after_unit(row, a):
+                            continue  # the exponent of a unit, or of a math letter
                         token = "".join(c.c for c in row.chars[a:b])
                         before = _clean("".join(x.c for x in row.chars[:a]))[-FOOTNOTE_CONTEXT:]
                         raised[token] = _FootnoteMark(element_id, before, token)
+                        # a raised range "1 to 3" marks notes 1, 2 and 3
+                        ends, between = _range_marks(row, a, b)
+                        for x, y in ends:
+                            end = "".join(c.c for c in row.chars[x:y])
+                            near = _clean("".join(c.c for c in row.chars[:x]))[-FOOTNOTE_CONTEXT:]
+                            raised[end] = _FootnoteMark(element_id, near, end)
+                        for number in between:
+                            raised.setdefault(number, _FootnoteMark(element_id, before, number))
                     i = j
                 if row.note:
                     continue

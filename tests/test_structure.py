@@ -1131,6 +1131,33 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
         linked = {link.target_id for e in layout.elements for link in e.links}
         assert linked == notes, mark
 
+    # Row 5: a raised range over notes 1 to 3 finds all three; its two ends link, the one
+    # between has no place of its own in the text.
+    def span(page):
+        body_with_marks(page, mark="1-3", after="  at sea level.")
+        for n, text in enumerate(["See the first report.", "The tool was set.", "A third run."]):
+            page.insert_text((72, 709 + 12 * n), str(n + 1), fontsize=5.5, fontname="helv")
+            page.insert_text((77, 712 + 12 * n), text, fontsize=8, fontname="helv")
+
+    layout = analyze(page_of(span))
+    notes = [n.element_id for n in layout.notices if n.code == "footnote"]
+    assert len(notes) == 3
+    linked = [link.target_id for link in layout.elements[0].links]
+    assert linked == [notes[0], notes[2]]
+
+    # Row 6: the nearest thing, a unit's exponent ("25 cm" and a "2" raised after it) over a row of
+    # axis numbers in small type, is no note; nor is a line of small type that opens with a number.
+    for low in ("2 4 6 8 10 time in seconds", "2 500 mL beakers were set out."):
+
+        def exponent(page, low=low):
+            body_with_marks(page, mark="3", after="  at sea level.")
+            page.insert_text((72, 160), "The plate has an area of 25 cm", fontsize=BODY)
+            page.insert_text((72 + 134, 156), "2", fontsize=7, fontname="helv")
+            page.insert_text((72, 712), low, fontsize=8, fontname="helv")
+
+        layout = analyze(page_of(exponent))
+        assert not [n for n in layout.notices if n.code == "footnote"], low
+
     # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
     # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.
     def nearest(page):
