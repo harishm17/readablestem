@@ -242,7 +242,7 @@ def test_a_number_set_far_from_a_line_with_words_numbers_it_when_display_groupin
     margin away, was a paragraph of its own and the line a paragraph with an inline formula."""
 
     def fill(page):
-        prose(page, 100, "The probability of the first event is approximated, to the second order, by")
+        prose(page, 100, "The probability of the first event is approximated to second order by")
         page.insert_text(
             (150, 140), "P(crossing) = c + d for all n", fontsize=12, fontname="Times-Italic"
         )
