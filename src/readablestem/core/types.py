@@ -334,6 +334,9 @@ class TableGrid(BaseModel):
     header_rows: int = Field(default=0, ge=0)
     header_cols: int = Field(default=0, ge=0)
     caption: str | None = None
+    # Words of `caption` that link to a web address or to a place in the document (a Word or
+    # LaTeX table's caption; offsets into `caption`). A PDF's captions have none.
+    caption_links: list[Link] = Field(default_factory=list, exclude_if=lambda v: not v)
     is_data: bool = True
     source: Literal["model", "local"] = "local"
     # Degrees clockwise to turn the picture of the table to read it: 90 or 270 for a table set
@@ -746,6 +749,10 @@ class Element(BaseModel):
     # Figures whose caption has inline maths: the caption with an inline marker where each
     # formula was (`parent_id` of those equations is the figure). `caption` stays plain text.
     caption_marked: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Figures of a Word or LaTeX source: words of `caption` that link to a web address or to a
+    # place in the document ("uri" and "internal" links, offsets into `caption`). `caption`
+    # stays plain text; a PDF's captions have none.
+    caption_links: list[Link] = Field(default_factory=list, exclude_if=lambda v: not v)
     # Equations: letters of `text` the PDF draws, not bold, in a font known to have a bold
     # face (Computer Modern, Times, ...), sorted, no repeats. Such a letter is known to be
     # plain, so a bold reading of it (a scalar read as a vector) is a real difference.

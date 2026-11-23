@@ -1649,10 +1649,12 @@ class _Renderer:
             return self.image_page_note(element)
         fix = self.fixes.get(element.id)
         caption_text = element.caption_marked or element.caption
+        if caption_text and element.caption_links and caption_text == element.caption:
+            words = inline_text.render_linked_words(caption_text, element.caption_links)
+        else:
+            words = self.rich(caption_text) if caption_text else ""
         caption = (
-            f"<figcaption>{self.rich(caption_text)}</figcaption>"
-            if caption_text and caption_text.strip()
-            else ""
+            f"<figcaption>{words}</figcaption>" if caption_text and caption_text.strip() else ""
         )
         proposal = fix.figure if fix is not None else None
 
@@ -2114,9 +2116,11 @@ def _without_dead_links(ordered: list[Element]) -> list[Element]:
     known = {e.id for e in ordered}
     out = []
     for element in ordered:
-        if any(link.target_id and link.target_id not in known for link in element.links):
-            links = [k for k in element.links if not k.target_id or k.target_id in known]
-            element = element.model_copy(update={"links": links})
+        for name in ("links", "caption_links"):
+            held = getattr(element, name)
+            if any(link.target_id and link.target_id not in known for link in held):
+                kept = [k for k in held if not k.target_id or k.target_id in known]
+                element = element.model_copy(update={name: kept})
         out.append(element)
     return out
 
