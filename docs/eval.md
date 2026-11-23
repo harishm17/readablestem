@@ -3127,7 +3127,9 @@ read on 57 pages and not 145, and 17 pages that were right are not (12 of papers
 textbooks; 5 others became right), with more blocks cut (293, from 207; in textbooks 201,
 from 123) and more broken (113, from 98). The 17 pages were lost between 0.5.10 and 0.5.13
 (0.5.13 reads 137 right and 69 faultless; 0.5.14 changes two pages to faultless and loses
-none); which change lost them has not been traced. From 0.5.14 to 0.5.15 three pages became
+none); the causes are the three of O-388: 3 pages with the page markers of a paragraph that runs
+over pages, 1 with a labeled tab joined to the figure under it, and 13 joined continuations
+the scorer expects on their own page (below). From 0.5.14 to 0.5.15 three pages became
 right (140 of 267) and one of them faultless (72), and none was made wrong: pages 3 and 18 of
 `ax_hepth_240306652`, where a figure, a note or a footnote stood under the next page's marker
 (the marker of a page a paragraph goes on over is written before the next element on that
@@ -3144,6 +3146,36 @@ each of the two documents, run on the commit before it and on it, changes there.
 fall from 106 to 99 and cross-joins from 35 to 27, all of them in the papers (38 to 31 and 16
 to 8). Builder 11 measured 141 of 267 and 72 faultless for this change; the record gives the
 same.
+
+What the reading-order record left open (O-420), settled on 2026-11-22:
+
+- **`ax_econem_240306657` page 47** stopped being right at `ea72076d` (the glyph-name reader of
+  SW56; found by running the page at the commits between the 0.5.10 and 0.5.13 records). The
+  page's equations held replacement characters; the reader now gives the symbols the file means
+  (a sum, a double bar, a tilde). The gold block was made from the text layer and still holds the
+  replacement characters, so its 4-grams no longer match. The output is the better one and the
+  gold is the limit; the page stays wrong in the record and nothing is built for it.
+- **The 13 continuation pages are not scored differently, and the scorer is not changed.** A
+  paragraph that runs over a page break is one element, placed on the page it starts, so the
+  first gold block of the next page (its carried-on half) is "not found" there. It is the
+  intended output. The scorer would have to credit a block that stands at the end of the
+  previous page's last element; that moves 13 pages from wrong to right on one set, makes
+  every earlier record (the 141 of 267, what `--against` compares) another measure, and
+  changes nothing a reader hears. Not built (VERSION stays 5). The 13 are the count of O-388's
+  builder; this run did not repeat it, because nothing is decided on the number.
+- **`work_budget` stops do not make a run depend on load.** `work_budget` is a count (the
+  path items and the pieces they are cut into, `INK_MAX_ITEMS` and `INK_MAX_SEGMENTS`), the same
+  on every machine, so the same pages stop in every run (the record's two: page 2 of
+  `ax_astrophga_240306369` and page 3 of `ax_condmatmtrlsci_240306379`). Only a `time_limit`
+  stop (the 60 s guard of one page's ink analysis, the table search's clock, a job's limit)
+  depends on how busy the machine is, and the record has none; `eval order` reports the number
+  of those when it has any.
+- **Recordings whose figure crop changed** are not counted. The commit that changed the crops
+  (`d44eecc6`, the labeled tab) has no corpus hash beside it that differs by that commit alone;
+  the nearest baselines are 67 and 81 commits apart and mix other changes. Counting needs two
+  `analyze` runs of the two commits (about 70 minutes through the slot), and no change that
+  depends on the count is waiting.
+
 `layout-heldout-1` has not been scored.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
