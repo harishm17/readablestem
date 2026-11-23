@@ -1404,6 +1404,25 @@ class _Steps:
         )
 
 
+def _spills(row: _Row, steps: _Steps, following: _Row | None) -> bool:
+    """Is `row` the words of the next numbered step that cross the gutter of a two-column page
+    (a full-width algorithm: the reader calls a row wider than a column "S")? Only the words the
+    text layer lists before the step's number, which stands alone in the row after them on the
+    same baseline (`_lone_number`), count: a wide line of the page's text has no such number."""
+    size = steps.anchor.size
+    return (
+        row.column == "S"
+        and row.kind == "text"
+        and steps.expect is not None
+        and row.x0 > steps.number_x + 0.5 * size
+        and following is not None
+        and following.column == steps.anchor.column
+        and following.x0 < row.x0
+        and abs(following.baseline - row.baseline) <= ALGORITHM_SAME_LINE * size
+        and _lone_number(following, steps.expect) is not None
+    )
+
+
 def _step_kind(
     row: _Row, steps: _Steps, edges: _RightEdges, following: _Row | None, soon: bool
 ) -> str | None:
@@ -1422,7 +1441,7 @@ def _step_kind(
         and steps.on_line(row)
     ):
         return "piece"
-    if row.column != anchor.column:
+    if row.column != anchor.column and not _spills(row, steps, following):
         return None
     number = steps.number(row)
     # The item of a list is no step: a bullet anywhere, and a "1." or "2)" with no caption over
@@ -1761,6 +1780,33 @@ def _lines(steps: _Steps) -> list[list[_Row]]:
     return [sorted(line, key=lambda r: r.x0) for line in lines]
 
 
+def _numbers_first(rows: Sequence[_Row]) -> list[_Row]:
+    """`rows` with each line number that stands alone in its row put ahead of the formula rows
+    the text layer listed before it on its baseline, right of it: a stack of formula steps is
+    listed in one run (one math region) and then the numbers of its lines, so a step's number
+    came after its words and a number is no longer where the scan expects it. Only the scan
+    reads this order; the page's own order is the one given."""
+    out = list(rows)
+    for at, row in enumerate(out):
+        if row.kind != "text" or _LONE_NUMBER.fullmatch(row.clean) is None:
+            continue
+        stack = at
+        region = out[at - 1].region if at else None
+        while stack and region is not None and out[stack - 1].kind == "math":
+            if out[stack - 1].region is not region:
+                break
+            stack -= 1
+        for first in range(stack, at):
+            above = out[first]
+            if (
+                abs(above.baseline - row.baseline) <= ALGORITHM_SAME_LINE * above.size
+                and above.x0 > row.x1
+            ):
+                out.insert(first, out.pop(at))
+                break
+    return out
+
+
 def _algorithm_groups(
     rows: Sequence[_Row], edges: _RightEdges, code: dict[int, int]
 ) -> tuple[dict[int, int], list[_Row]]:
@@ -1796,6 +1842,7 @@ def _algorithm_groups(
     (an inline equation)."""
     found: dict[int, int] = {}
     order = list(rows)
+    rows = _numbers_first(rows)
     index = 0
     while index < len(rows):
         start = index

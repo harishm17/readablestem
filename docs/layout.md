@@ -2671,14 +2671,40 @@ Output lines join the numbered steps (before this they were headings). Measured 
 page and not built: a numbered tail at the top of the next page (2504.06207 p5 step 9; the page
 has no caption and starts at a number), a heading under an algorithm that its last line
 absorbs, a `for ...:` line over an equation, an opener that wraps flush, a one-line block,
-2504.06207 p4 steps 9 to 13 (the content of a numbered step listed by the text layer before its
-number), 2405.15050 p4 steps 10 to 12 (a stacked math region listed before the numbers), the
+2504.06207 p4 steps 9 to 13 and 2405.15050 p4 steps 10 to 12 (both built in wave 5, below), the
 boxed "TABLE III" algorithm of ax_eesssp_240306423 p6 (two columns interleaved), and the garbled
 math of step 8 in ax_csro_240306420 p9 (a math-region fault, not the algorithm's). Found beside
 them and outside the algorithm functions: `glyphs._MONO_FONT` does not name "NimbusMonL"
 (`Mon` + `L`), "CMITT", "TeXGyreCursor" or "t1xtt", so a listing set in those fonts (the numbered
 listing of 2505.13042 p3; 42 pages of 8 files carry NimbusMonL) is not taken for code and is read
 as prose. One regex line, a reader change over those files that needs its own corpus run.
+
+**Algorithms, wave 5 (O-442).** The shapes wave 4 measured and left are counted again on the
+public pages that hold an algorithm (75 pages of 47 documents; the dev copies of one paper count
+each time) and on the private corpus (25 documents, counts only: no numbered algorithm block in
+any). Two have real pages and are read, each on those pages and on no other page looked at:
+
+- *A step's words listed before its line number, across the gutter of a two-column page*
+  (2504.06207 p4, steps 9 to 13). The long steps of a full-width algorithm are wider than a column,
+  so the reader calls them spanning rows ("S") and the scan, which took only the anchor's column,
+  stopped at the first. `_spills` lets such a row in when the row after it is the expected number
+  alone, in the anchor's column, left of it on the same baseline: only a step's words are listed
+  that way, and a wide line of the page's own text has no number beside it.
+- *A stack of formula steps listed before their numbers* (2405.15050 p4, steps 10 to 12). The math
+  region is listed first and the small numbers after it, so the scan met formulas with no number and
+  numbers with no step. `_numbers_first` puts a lone number ahead of the formula rows of one region
+  on its baseline, right of it, for the scan only; `_place` still gives each row its own slot, so
+  the page's order is unchanged.
+
+Before, those steps stood outside their algorithm; the block now holds them. Counted and not
+built, because no second page shows them: a numbered tail at the top of the next page (the
+line-number pattern finds 13 public pages and 1 private one; of the public ones 2504.06207 p5
+step 9 is the tail, the rest are lists and proofs; the private one was not read further), a
+heading taken into the last line, a `for ...:` line over an equation, an opener that wraps flush,
+a one-line block (ax_statme_240307124 p12 step 3, after an equation), the boxed "TABLE III" and
+the garbled math of ax_csro_240306420 p9 step 8 (one public page each, the pages wave 4 named).
+The mono-font names are O-440 (brief 02).
+
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a

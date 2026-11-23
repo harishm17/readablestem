@@ -812,6 +812,61 @@ def test_an_equation_inside_an_algorithm_leaves_two_blocks_with_the_same_indent_
     assert block[2].startswith("  ") and block[3:] == ["end for", "return count"]
 
 
+def test_a_numbered_algorithm_whose_numbers_the_text_layer_lists_after_its_steps_stays_one_block():
+    sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+
+    def wide(page):  # a full-width algorithm under two columns of text: two steps cross the gutter
+        def columns(top: float, bottom: float) -> None:
+            for left in (72, 316):
+                rect = pymupdf.Rect(left, top, left + 224, bottom)
+                page.insert_textbox(rect, LONG, fontsize=BODY, fontname="helv", align=3)
+
+        columns(80, 260)
+        y = prose(page, 290, "Algorithm 1 Scan a verse") - 8
+        steps = [
+            "count = 0",
+            "for each word w in the line of the verse that the reader has marked for the scan do",
+            "if w is stressed in the way that the first reader marked it for the class then",
+            "count = count + 1",
+            "end if",
+            "end for",
+            "return count",
+        ]
+        for n, text in enumerate(steps, 1):
+            page.insert_text((130 if n in (2, 3) else 95, y), text, fontsize=BODY, fontname="helv")
+            page.insert_text((72, y), f"{n}:", fontsize=BODY - 1, fontname="helv")
+            y += 14
+        columns(y + 14, y + 190)
+
+    def formulas(page):  # steps 4 to 6 are formulas, all listed before their numbers
+        y = prose(page, 100, "Algorithm 1 Scan a verse") - 8
+        for n, text in enumerate(
+            ["count = 0", "for each word w in the line do", "if w is stressed"], 1
+        ):
+            page.insert_text((63, y), str(n), fontsize=7.5, fontname="helv")
+            page.insert_text((75, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        for formula in ("s ← ∑ w ∈ S", "t ← λ s + μ", "v ← s ∩ t"):
+            page.insert_text((122, y), formula, fontsize=BODY, fontname="dj", fontfile=str(sans))
+            y += 14
+        for n in (4, 5, 6):
+            page.insert_text((63, y - 14 * (7 - n) + 3.5), str(n), fontsize=7.5, fontname="helv")
+        y += 8
+        for n, text in enumerate(["end if", "return count"], 7):
+            page.insert_text((63, y), str(n), fontsize=7.5, fontname="helv")
+            page.insert_text((75, y), text, fontsize=BODY, fontname="helv")
+            y += 14
+        prose(page, y + 10, "The count is printed after the last word.")
+
+    (block,) = [e for e in analyze(page_of(wide)).elements if e.preformatted]
+    assert [line.split()[0] for line in block.text.split("\n")] == [f"{n}:" for n in range(1, 8)]
+
+    (block,) = [e for e in analyze(page_of(formulas)).elements if e.preformatted]
+    lines = block.text.split("\n")
+    assert [line.split()[0] for line in lines] == [str(n) for n in range(1, 9)]
+    assert all(len(line.split()) > 1 for line in lines)  # each formula stays with its number
+
+
 def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():
     def exercises(page):
         y = prose(
