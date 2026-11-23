@@ -201,6 +201,8 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
         raise SourceFailed("source_timeout")
     if outcome.busy:
         raise SourceFailed("source_busy")
+    if not outcome.ok and latexml.ran_out_of_memory(out):  # perl's own stop at the memory cap
+        raise SourceFailed("source_timeout")
     document = out / latexml.DOC_PATH
     if not outcome.ok or not document.is_file():
         raise SourceFailed("source_failed")

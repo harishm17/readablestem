@@ -154,7 +154,8 @@ def test_a_program_stopped_by_its_memory_limit_ends_as_the_time_or_memory_code(
     monkeypatch, tmp_path
 ):
     """A loop the log does not name looks like a very large source: both read the limit, of time
-    or of memory, as `source_timeout` (LaTeXML's `over_memory`, pandoc's `not_finished`)."""
+    or of memory, as `source_timeout` (LaTeXML's `over_memory` or perl's own "Out of memory",
+    pandoc's `not_finished`)."""
     from readablestem.core import sandbox
     from readablestem.source import convert, latexml
     from readablestem.source import pandoc as pandoc_step
@@ -163,6 +164,16 @@ def test_a_program_stopped_by_its_memory_limit_ends_as_the_time_or_memory_code(
     monkeypatch.setattr(latexml, "convert", lambda *a, **k: sandbox.Outcome(-9, over_memory=True))
     with pytest.raises(SourceFailed) as raised:
         convert.run_latexml(tmp_path, "main.tex", tmp_path / "out")
+    assert raised.value.code == "source_timeout"
+
+    # perl at its address-space cap says so and exits 1: the sandbox sets no flag (measured on
+    # a command that only grows)
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "latexml.out").write_text("(Loading article.cls... 0.01 sec)Out of memory in perl\n")
+    monkeypatch.setattr(latexml, "convert", lambda *a, **k: sandbox.Outcome(1))
+    with pytest.raises(SourceFailed) as raised:
+        convert.run_latexml(tmp_path, "main.tex", out)
     assert raised.value.code == "source_timeout"
 
     monkeypatch.setattr(

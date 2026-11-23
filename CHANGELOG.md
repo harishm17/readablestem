@@ -9,8 +9,10 @@
   `<a>` in `<figcaption>` and `<caption>`. Links in headings, footnotes and table cells were
   already read. Results of documents with no caption link store the same JSON as before.
 - LaTeXML or pandoc stopped by the memory limit now ends as `source_timeout` (it was
-  `source_failed` for LaTeXML and, for Word, unless the clock ran out), and the sentence says "time or
-  memory". A loop the log does not name still cannot be told from a very large source.
+  `source_failed`: a command that only grows, `\def\a{x\a}\a`, ends in 23 s with perl's
+  "Out of memory" and exit 1, which LaTeXML's run now reads from the tail of its output; for Word,
+  a stop other than the clock was `source_failed`), and the sentence says "time or memory". A loop
+  the log does not name still cannot be told from a very large source.
 - Owed, not made here: raising `PIPELINE_VERSION` and `RENDER_VERSION` (a source's stored result
   gains caption links only when it is converted again). No migration.
 
