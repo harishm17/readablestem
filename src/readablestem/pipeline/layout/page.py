@@ -204,13 +204,16 @@ def _accepted(
     return accepted
 
 
-def _option_boxes(kept: Sequence[_Row], height: float) -> list[BBox]:
-    """The boxes of the body lines that start with the label of an option, "(a)" or "b)"."""
-    return [
-        f.bbox
+def _option_boxes(kept: Sequence[_Row], height: float) -> dict[BBox, str]:
+    """The body lines that start with the label of an option, "(a)" or "b)": their boxes, with
+    the label's letter in lower case."""
+    return {
+        f.bbox: (label.group(1) or label.group(2)).lower()
         for f in kept
-        if not f.vertical and _margin_zone(f, height) is None and OPTION_LABEL.match(f.clean)
-    ]
+        if not f.vertical
+        and _margin_zone(f, height) is None
+        and (label := OPTION_LABEL.match(f.clean))
+    }
 
 
 def _prepare_rows(

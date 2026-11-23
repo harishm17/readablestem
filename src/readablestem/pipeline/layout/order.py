@@ -8,7 +8,7 @@ import bisect
 import itertools
 import re
 import statistics
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from typing import Protocol
 
 from readablestem.core.types import BBox
@@ -62,16 +62,16 @@ MIN_RUN_LINES = 4
 # question has a step of twice the pitch like a spaced list), so a gutter with at least this many
 # label pairs, and with a label on at least this share of the lines of its thinner side, is no
 # gutter: the options of a question are read one after the other, a, b, c, d.
-OPTION_LABEL = re.compile(r"^(\([A-Ha-h]\)|[A-Ha-h][.)])(\s|$)")
+OPTION_LABEL = re.compile(r"^(?:\(([A-Ha-h])\)|([A-Ha-h])[.)])(?:\s|$)")
 MIN_OPTION_PAIRS = 3
 MIN_OPTION_SHARE = 0.4
 
 
 def _find_gutter(
-    boxes: list[BBox], *, slide: bool = False, options: Sequence[BBox] = ()
+    boxes: list[BBox], *, slide: bool = False, options: Mapping[BBox, str] | None = None
 ) -> tuple[float, float] | None:
     """The white vertical gap between two text columns, or None for one column. `options`
-    are the boxes that start with the label of an option ("(a)", `OPTION_LABEL`).
+    map the boxes that start with the label of an option ("(a)", `OPTION_LABEL`).
 
     Looks for an x-interval near the middle that (almost) no narrow line touches, with at
     least three lines on each side whose left edges line up (a real column has a margin)
@@ -86,7 +86,7 @@ def _find_gutter(
         return None
     narrow = [b for b in boxes if b[2] - b[0] <= 0.55 * width]
     gutter = _gutter_of(narrow, left, width, slide)
-    if gutter is not None and not slide and _option_pairs(gutter, narrow, options):
+    if gutter is not None and not slide and _option_pairs(gutter, narrow, options or {}):
         return None
     if gutter is not None or slide:
         return gutter
@@ -116,7 +116,7 @@ def _find_gutter(
             thin, thick = sorted(map(len, sides))
             if thin < MIN_HEAD_COLUMN_BALANCE * thick or thin < MIN_HEAD_COLUMN_LINES:
                 continue
-            if _option_pairs(gutter, under, options):
+            if _option_pairs(gutter, under, options or {}):
                 continue
             crossing = [b for b in under if b[2] > gutter[0] + 0.5 and b[0] < gutter[1] - 0.5]
             if _columns_run(sides, wide, crossing):
@@ -124,22 +124,27 @@ def _find_gutter(
     return None
 
 
-def _option_pairs(gutter: tuple[float, float], boxes: list[BBox], options: Sequence[BBox]) -> bool:
+def _option_pairs(
+    gutter: tuple[float, float], boxes: list[BBox], options: Mapping[BBox, str]
+) -> bool:
     """Whether the lines either side of `gutter` are the options of an exam standing two by
-    two (`OPTION_LABEL`): labels level with each other, on a good share of the lines of the
-    thinner side. A paper's lists of (a), (b), (c) in its columns do not stand level."""
-    labeled = set(options)
+    two: a label on one side level with the next letter's label on the other, "(a)" and "(b)",
+    on a good share of the lines of the thinner side. `options` are the boxes that start with
+    a label (`OPTION_LABEL`), with its letter. A paper's lists of (a), (b), (c) in its columns
+    do not stand level, and options set in columns (a, b on the left, c, d on the right) skip
+    a letter."""
     sides = (
         [b for b in boxes if b[2] <= gutter[0] + 0.5],
         [b for b in boxes if b[0] >= gutter[1] - 0.5],
     )
-    marked = [sorted(_visual_lines([b for b in side if b in labeled])) for side in sides]
+    left, right = ([b for b in side if b in options] for side in sides)
     pairs = sum(
         any(
-            min(a[3], b[3]) - max(a[1], b[1]) >= 0.5 * min(a[3] - a[1], b[3] - b[1])
-            for b in marked[1]
+            ord(options[r]) == ord(options[a]) + 1
+            and min(a[3], r[3]) - max(a[1], r[1]) >= 0.5 * min(a[3] - a[1], r[3] - r[1])
+            for r in right
         )
-        for a in marked[0]
+        for a in left
     )
     thin = min(len(_visual_lines(side)) for side in sides)
     return pairs >= MIN_OPTION_PAIRS and pairs >= MIN_OPTION_SHARE * thin
