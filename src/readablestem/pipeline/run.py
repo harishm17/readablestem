@@ -359,7 +359,26 @@ log = logging.getLogger(__name__)
 # "No description. This figure has no text description yet." (as a draft, "Needs a description.")
 # as soon as it makes the page again (a review change, a draft, a cleared page), and its record
 # leaves the split change out. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.16"
+# 0.5.17 (2026-11-23): one raise for wave 4 (CHANGELOG.md has each change). What a PDF's result
+# holds moves: the head or foot of a one-page file set smaller than the body and ending in a bare
+# page number leaves the text; a contents line with no leaders that runs up to its page number
+# is an entry; a numbered paragraph whose first line is indented keeps its second line; a
+# lettered title of four words or more may end in a full stop; no inline equation is read inside
+# a typed web address; the asterisk operator is a note sign, a number and a sign printed together
+# are two marks, and a raised digit after a math letter is no note mark; five more algorithm
+# shapes are one block. A Word or LaTeX file's result: a figure's or a table's caption keeps its
+# links (`Element.caption_links`, `TableGrid.caption_links`, left out of the JSON when empty); a
+# bracketed expression to the power T no longer stops a LaTeX source; a source that runs out of
+# memory stops as `source_timeout`. The status "Needs review" reads "Needs your decision" (web).
+# Behind switches that stay off (no change): LAYOUT_INLINE_JOINS, LAYOUT_DISPLAY_GROUPING,
+# LAYOUT_JOIN_PANELS, REGION_TREE, EQUATION_FILE_FACTS, TABLE_FILE_FACTS, SCAN_LAYER_CHECK,
+# PAGE_CHECK_SIGNALS, FIGURE_LABELS_ALWAYS. No new notice code or figure reason. Results from
+# 0.5.10 to 0.5.16 load unchanged and their page is not made again (`assemble.RENDER_VERSION`
+# stays 11: a stored result has no caption links, and without them a caption is written as
+# before). 0.5.16 opens a 0.5.17 result (checked on 2026-11-23: an element and a table with
+# caption links load) but drops the caption links, so a caption written by 0.5.16 again has no
+# links. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.17"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

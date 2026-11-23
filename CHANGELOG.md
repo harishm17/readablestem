@@ -1,5 +1,30 @@
 # Changelog
 
+## Pipeline 0.5.17, render 11 (2026-11-23)
+
+- `PIPELINE_VERSION` is 0.5.17 and `RENDER_VERSION` stays 11: one raise of the pipeline for every
+  "Unreleased" entry below down to the 0.5.16 entry. What changes for a reader, one line for each:
+  - Note signs and exponents (O-034, O-054, O-429): a star printed with a number is a note's
+    mark of its own, a raised digit after a math letter is no note mark; author notes are found
+    and linked.
+  - Links in captions (O-073, O-424): a Word or LaTeX source's figure and table captions keep
+    their links. A source that runs out of memory stops with the time-limit message (O-395).
+  - `(A+B)^T` in a LaTeX source: the reading no longer stops (it crashed since 0.5.12).
+  - Algorithms (O-394): five more shapes of a numbered algorithm are one block.
+  - One-page files (O-001, O-389): a journal head or foot set smaller than the body with a bare
+    page number leaves the text.
+  - Contents, numbered paragraphs, lettered titles (O-409, O-408, O-418): a contents line with
+    no leaders is an entry, an indented numbered paragraph is one paragraph, "B. A title of four
+    words." is a heading.
+  - Web addresses (O-410): no formula is read inside a typed address, so the address stays whole.
+  - The status "Needs review" reads "Needs your decision" (O-417; web).
+  - Behind switches that stay off, no change: the inline-box rules (O-412, O-416), far equation
+    numbers (O-037, O-391), panel marks (O-422) and the SW55 file facts.
+  - Measured and written down as limits, nothing built (no real document shows them): tables and
+    captions (O-434, O-435, O-056, O-404), exams and columns (O-431, O-432, O-436), bulleted
+    slide lines (O-407), struck, highlighted and blank marks (O-021, O-025, O-027), note ranges
+    and numbered series (O-401, O-402, O-403).
+
 ## Unreleased: a bracketed expression to the power T no longer stops the reading (branch fix/source-deep-math)
 
 - `pipeline/speech.py` `_transposable` asked, for a bracketed expression such as `(A+B)^T`, whether
