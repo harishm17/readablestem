@@ -74,12 +74,14 @@ def test_a_run_of_monospaced_lines_is_one_code_block_with_its_indentation():
 
 
 def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
-    """LaTeX papers set listings in NimbusMonL, CMITT and t1xtt, not in a font called Courier."""
+    """LaTeX papers set listings in NimbusMonL, CMITT and t1xtt, not in a font called Courier;
+    the author's email on the title page, set in the same face, is not a listing."""
 
     def fill(page):
         y = prose(page, 100)
         y = code(page, y, LOOP)
-        prose(page, y, "Run it and check that it prints 55.")
+        y = prose(page, y, "Run it and check that it prints 55. Write to the author:")
+        code(page, y, [(0, "vdh|ffn|nhma|esme@sdu.dk")])  # an address in the same face is no code
 
     for font in ("NimbusMonL-Regu", "CMITT10", "t1xtt"):
         doc = pymupdf.open(stream=page_of(fill))

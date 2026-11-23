@@ -1122,7 +1122,7 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
         glyphs = sum(len(r.ink) for r in group)
         if (
             glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)
-        ) and not _is_quotation(group):
+        ) and not (_is_quotation(group) or _is_contact(group)):
             for row in group:
                 found[id(row)] = id(group[0])
     return found
@@ -1147,6 +1147,16 @@ def _is_quotation(group: Sequence[_Row]) -> bool:
     if spread > 0.5 * group[0].size and any(line.endswith(":") for line in lines):
         return False  # a block: "else:" and its body
     return len(text.split()) >= QUOTATION_MIN_WORDS and any(c in text for c in ".,?!")
+
+
+# An address set in a typewriter face on a title page: one word, an email or a web address.
+_CONTACT = re.compile(r"^(?:[\w.+|{},-]+@[\w-]+(?:\.[\w-]+)+|(?:https?://|www\.)\S+)[.,;]?$")
+
+
+def _is_contact(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines only email or web addresses (an author's contact line,
+    not code)?"""
+    return all(_CONTACT.match(r.clean) for r in group)
 
 
 def _pitch(row: _Row) -> list[float]:
