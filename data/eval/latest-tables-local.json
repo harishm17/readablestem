@@ -247,8 +247,8 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "7484f25d9b95ee5ef0c90da0b91ebffc3df99c6a",
-    "clean": false,
+    "commit": "5345004d762c940fec846b6dad9f0c6680a6745d",
+    "clean": true,
     "pipeline_version": "0.5.18",
     "render_version": 11,
     "tools": {
@@ -494,8 +494,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 4525.0,
-    "p95": 10951.399999999985,
+    "p50": 5251.0,
+    "p95": 13999.59999999998,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }
