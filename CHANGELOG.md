@@ -263,6 +263,26 @@ tested the fixes.
 - O-021 (blanks), O-025 (struck table cells and display equations), O-027 (paint order, highlights of
   three or more touching pieces): measured on the public sets and the corpus, no real document shows
   them, so nothing is built; the limits are written in `docs/layout.md` and on the limits page.
+## Unreleased: note signs and exponents (branch fix/footnotes-and-series; O-034, O-054, O-429, O-401, O-402, O-403)
+
+- The asterisk operator (U+2217, the star TeX sets for an author note) is a note sign, and a raised
+  number and sign printed together ("1∗", "∗1") are two marks. The star of an author note is
+  text now, not a stray equation (ax_condmatmtrlsci_240306379 and 389, ax_csro_240306533), has its
+  space after it (ax_mathco_240306383, 2505.03022), and two author notes are found and linked
+  (ax_mathap_240306449 and 464). A note that opens with the sign must go on in two words: a norm's
+  subscript with a raised star under a display made 2 false notes on 2411.07613 (none now).
+- A raised digit right after a letter set in a math font ("p1", "m0") is a subscript or an
+  exponent, not a note's mark: the link of a real note on w_notes_6042_ch2 went to the page header
+  and goes to the note.
+- Public footnote gold (158 PDFs): 131 destinations, notes 139 to 141, linked 135 to 137, false 0,
+  none lost. Corpus hash against cf0729fc: 22 differences in 1069 (7 public files, three variants
+  each, and one upload), every one read.
+- Measured and not built, no real file shows them: a raised note range ("1-3"), a unit's
+  exponent over a low line that opens with a digit, and a numbered series that the white of a
+  worksheet ends (O-401: the review probes only). The numbers and the shapes are in
+  `docs/layout.md` (footnotes, numbered series).
+- Owed: a `PIPELINE_VERSION` bump (stored documents of the files above change: a link, a star, a
+  note); no `RENDER_VERSION` bump, no migration.
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 

@@ -1341,7 +1341,7 @@ def _drawn_rules(paths: Sequence[_Path]) -> set[int]:
 # raised in the text above it on the same page.
 FOOTNOTE_ZONE = 0.6
 FOOTNOTE_SIZE = 0.92
-_FOOTNOTE_MARKS = frozenset("*\u2020\u2021\u00a7")
+_FOOTNOTE_MARKS = frozenset("*\u2217\u2020\u2021\u00a7")
 
 
 def _row_at(rows: Sequence[_Row], point: tuple[float, float]) -> _Row | None:
@@ -1403,8 +1403,9 @@ def _lead_mark(row: _Row, named: bool) -> int:
 
 def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
     """The marks in the run of raised glyphs `row.chars[start:end]`, as char ranges: two marks
-    printed with a comma between them ("1,2") are two, and a closing bracket or a full stop
-    after a mark ("1)") is not part of it."""
+    printed with a comma between them ("1,2") are two, so are a number and a footnote sign
+    ("1" and "*") or two signs, and a closing bracket or a full stop after a mark ("1)") is not
+    part of it."""
     groups: list[tuple[int, int]] = []
     at = start
     for i in range(start, end + 1):
@@ -1413,10 +1414,22 @@ def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
         stop = i
         while stop > at and row.chars[stop - 1].c in ").":
             stop -= 1
-        if stop > at:
-            groups.append((at, stop))
+        piece = at
+        for k in range(at + 1, stop):  # a footnote sign is a mark of its own: "1\u2217" is two
+            if row.chars[k].c in _FOOTNOTE_MARKS or row.chars[k - 1].c in _FOOTNOTE_MARKS:
+                groups.append((piece, k))
+                piece = k
+        if stop > piece:
+            groups.append((piece, stop))
         at = i + 1
     return groups
+
+
+def _after_math_letter(row: _Row, at: int) -> bool:
+    """Does the raised glyph at `at` follow a letter set in a math font ("p1", "m0", "n2")? It is a
+    subscript or an exponent then, not a note's mark: such a glyph was taken for the mark of the
+    note that opens with the same digit, and the link of that note went to the wrong block."""
+    return at > 0 and row.chars[at - 1].math and row.chars[at - 1].c.isalpha()
 
 
 def _place_by_mark(
@@ -1489,8 +1502,10 @@ def _flag_text_marks(row: _Row, marks: set[str]) -> None:
         while j < len(chars) and row.is_script(chars[j]) and chars[j].c.strip():
             j += 1
         before = chars[i - 1] if i else None
-        if before is not None and (
-            before.c in ".,;:?!" or (before.c.isalpha() and not before.math)
+        if (
+            before is not None
+            and not _after_math_letter(row, i)
+            and (before.c in ".,;:?!" or (before.c.isalpha() and not before.math))
         ):
             for a, b in _mark_groups(row, i, j):
                 if "".join(c.c for c in chars[a:b]) in marks:
