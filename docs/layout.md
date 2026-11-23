@@ -1401,7 +1401,9 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   (`slides.DECK_REASON`) and a deck title also `slide_deck_title`. `layout.heading_levels` then
   judges heading sizes deck by deck: a deck's title is level 1, each page's largest heading is
   its slide's title, one level under the deck's title whatever its size (one slide sets its
-  title in 80 points, the next in 48), the page's other headings are clustered by size under the
+  title in 80 points, the next in 48; two headings of that largest size, "Pros" beside "Cons",
+  are both titles; a slide whose only heading is small has it as its title, and so does a title
+  slide's subtitle), the page's other headings are clustered by size under the
   slide titles, and a heading with no deck (the pages of a portrait part between two decks) is
   judged on its own. So two lectures in one file have titles at one level
   and slide titles one level below, whatever sizes each uses; `assemble.title_plan` (the one H1,

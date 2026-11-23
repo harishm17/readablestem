@@ -18,7 +18,11 @@
     a fraction in an inline fraction (OpenStax), is 0.36 of its line: inside the limit.
   - In a slide deck each page's largest heading is its slide's title, and every slide title is
     one level whatever its size (`layout.heading_levels`): an 80-point slide title no longer puts
-    the deck's 48-point titles a level under it.
+    the deck's 48-point titles a level under it. With it, in every deck and with the switches
+    off too: two headings of a slide's largest size are both its titles (peers stay one level);
+    a slide whose only heading is set in a sub-heading's size has it as its title, so every
+    slide with a heading can be reached at the slide titles' level; and a title slide's subtitle
+    is at that level, where a deck of many sizes had it up to three levels deeper.
 - Each switch can go back off alone. The pipeline is raised so results made under 0.5.17 are not
   read as results of the new layout; 0.5.17 results still open.
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many

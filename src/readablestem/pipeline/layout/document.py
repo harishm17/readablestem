@@ -252,13 +252,16 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             if REASON_LARGER_FONT in e.reasons and slides.DECK_TITLE_REASON not in e.reasons
         ]
         if group is not None:
-            on_page: dict[int, Element] = {}
+            # Two headings of the page's largest size ("Pros" beside "Cons") are both titles:
+            # peers stay one level.
+            largest: dict[int, float] = {}
             for e in sized_in:
-                if e.page not in on_page or (e.font_size or 0.0) > (
-                    on_page[e.page].font_size or 0.0
-                ):
-                    on_page[e.page] = e
-            slide_title.update((e.id, int(titled) + 1) for e in on_page.values())
+                largest[e.page] = max(largest.get(e.page, 0.0), round(e.font_size or 0.0, 1))
+            slide_title.update(
+                (e.id, int(titled) + 1)
+                for e in sized_in
+                if round(e.font_size or 0.0, 1) == largest[e.page]
+            )
             sized_in = [e for e in sized_in if e.id not in slide_title]
         sized = sorted({round(e.font_size or 0.0, 1) for e in sized_in}, reverse=True)
         # the deck's title is level 1: the rest start at 2, under the slide titles when there are
