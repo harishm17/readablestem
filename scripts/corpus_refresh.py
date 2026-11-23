@@ -39,6 +39,7 @@ from readablestem.eval import corpus  # noqa: E402
 from readablestem.proof.bundle import dump_line  # noqa: E402
 
 MOST_USD = 1.00
+HOSTILE = "tests/workflows/test_wf49_hostile_input.py"
 
 
 def parse(argv: list[str] | None) -> argparse.Namespace:
@@ -123,6 +124,10 @@ def main(argv: list[str] | None = None) -> int:
         }
         # One process: the tests append to one file, and the limit on paying is per process.
         tests = [sys.executable, "-m", "pytest", "tests/workflows", "-m", "workflow"]
+        if args.live:
+            # A hostile case states how many of its parts stay unanswered; paid answers would
+            # be recorded for it and break that count on every later replay.
+            tests += ["--ignore", HOSTILE]
         quiet = ["-q", "-p", "no:cacheprovider", "-p", "no:xdist", "--show-capture=no"]
         code = subprocess.run([*tests, *quiet], cwd=REPO, env=env, check=False).returncode
         conversions = [

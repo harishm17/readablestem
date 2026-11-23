@@ -26,8 +26,9 @@ back a `Deck`, and then applies it (`layout._analyze_document`). Deterministic, 
    page is one too. A deck that starts on a title slide has that slide's title as its title
    (`Deck.starts`). When the file holds more than one deck, or a deck has a title, each heading
    on a deck's pages says which deck it is in (`DECK_REASON`), and `layout.heading_levels`
-   judges heading sizes deck by deck: a deck's title is level 1 and every other heading of the
-   deck is level 2 or lower, so the written outline is the document's title, then each deck's
+   judges heading sizes deck by deck: a deck's title is level 1, each page's largest heading
+   is its slide's title, one level for every slide whatever its size, and every other heading
+   of the deck is under them, so the written outline is the document's title, then each deck's
    title, then its slide titles (`assemble.title_plan` places the one H1).
 3. Frames: consecutive pages with the same page label, or without labels the same title text,
    are one frame; in a deck found by (c) alone, a frame is a run of pages each of which extends

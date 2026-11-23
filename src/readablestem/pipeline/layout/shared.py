@@ -31,6 +31,9 @@ SCRIPT_OFFSET = 0.04
 # set it at 0, the least a script is lowered is about 0.1 (`mark_small_capitals`).
 SMALL_CAP_BASELINE = 0.05
 SCRIPT_MIN_RATIO = 0.62  # the smallest a script is, beside the text it belongs to
+# A row of its own is no script of a row more than this many times its size: TeX's second
+# level of script is half the text, while a slide sets 20-point words over an 80-point one.
+SCRIPT_ROW_FLOOR = 0.4
 SCRIPT_MAX_LIFT = 0.7  # the furthest off the baseline a script is (x the text size)
 _DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
 

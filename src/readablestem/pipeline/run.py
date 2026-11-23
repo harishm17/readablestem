@@ -379,7 +379,16 @@ log = logging.getLogger(__name__)
 # a 0.5.17 result (checked on 2026-11-23: an element and a table with caption links load) but
 # drops the caption links, so a caption written by 0.5.16 again has no links.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.17"
+# 0.5.18 (2026-11-23): the production profile turns on REGION_TREE,
+# LAYOUT_INLINE_JOINS, LAYOUT_DISPLAY_GROUPING and LAYOUT_JOIN_PANELS (docs/eval.md "The switch
+# release of 2026-11-23"), so a PDF's columns are found by the region tree, an inline formula or
+# a display set over several lines is one equation box, and the panels of one figure are one
+# figure: what a PDF's result holds and what its equation and figure requests carry move. The
+# result's schema is the same, so results from 0.5.10 to 0.5.17 load unchanged and their page is
+# not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.17 opens a 0.5.18 result. Each
+# switch goes back off alone with its profile row and the Railway variable of the same name.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.18"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

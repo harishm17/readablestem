@@ -1399,9 +1399,11 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   lines are one title when they follow each other in one size. When the file has more than one
   deck, or a deck has a title, every heading on a deck's pages gets the reason `slide_deck N`
   (`slides.DECK_REASON`) and a deck title also `slide_deck_title`. `layout.heading_levels` then
-  judges heading sizes deck by deck: a deck's title is level 1, the other headings of the deck
-  are clustered by size from level 2, and a heading with no deck (the pages of a portrait part
-  between two decks) is judged on its own. So two lectures in one file have titles at one level
+  judges heading sizes deck by deck: a deck's title is level 1, each page's largest heading is
+  its slide's title, one level under the deck's title whatever its size (one slide sets its
+  title in 80 points, the next in 48), the page's other headings are clustered by size under the
+  slide titles, and a heading with no deck (the pages of a portrait part between two decks) is
+  judged on its own. So two lectures in one file have titles at one level
   and slide titles one level below, whatever sizes each uses; `assemble.title_plan` (the one H1,
   SW6c) then writes the document's title above the deck titles, or makes the only deck title the
   H1. A file with one deck and no title slide gets no reasons and the levels it had.

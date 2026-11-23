@@ -1,5 +1,28 @@
 # Changelog
 
+## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
+
+- The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,
+  `LAYOUT_DISPLAY_GROUPING` and `LAYOUT_JOIN_PANELS`, each measured at $0 against 0.5.17 with it
+  off (docs/eval.md, "The switch release of 2026-11-23"):
+  - Reading order: 161 of 267 pages right (was 141) and 81 faultless (was 72); no page made wrong.
+  - Formulas kept whole: 9,186 of 11,258 (was 8,989); 198 made whole, 1 made not whole, no paper
+    worse. Displays kept whole: 904 of 1,004 (was 803).
+  - Figures: the panels of one figure are one figure (1,611 to 1,320 on the public files), with
+    the same captions.
+- Found when the region tree was turned on, on a slide of MIT 6.0001 lecture 1 that sets the
+  20-point words "PROBLEM SOLVING" over an 80-point "PRACTICE":
+  - A row of its own is no sub- or superscript of a row more than 2.5 times its size
+    (`layout/rows.py` `_attach_scripts`), so the small words no longer read inside the large one
+    letter by letter ("PRACTSOLVINGICE"). TeX's smallest script is half the text, well inside it.
+  - In a slide deck each page's largest heading is its slide's title, and every slide title is
+    one level whatever its size (`layout.heading_levels`): an 80-point slide title no longer puts
+    the deck's 48-point titles a level under it.
+- Each switch can go back off alone. The pipeline is raised so results made under 0.5.17 are not
+  read as results of the new layout; 0.5.17 results still open.
+- `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many
+  pictures stay unanswered, and a paid answer recorded for one broke that count on every replay.
+
 ## Pipeline 0.5.17, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.17 and `RENDER_VERSION` stays 11: one raise of the pipeline for every

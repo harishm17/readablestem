@@ -164,3 +164,17 @@ def test_small_capitals_are_text_and_real_capital_scripts_are_not():
         ("T", "sup"),
         ("N", "sub"),
     ]
+
+
+def test_small_words_set_over_a_far_larger_word_are_no_script_of_it():
+    # A slide (MIT 6.0001 lecture 1) sets "PROBLEM SOLVING" in 20 points over an 80-point
+    # "PRACTICE": the small line is its own text, not read inside the large word letter by letter.
+    doc = pymupdf.open()
+    page = doc.new_page(width=720, height=540)
+    page.insert_text((108, 240), "PRACTICE", fontsize=80, fontname="hebo")
+    page.insert_text((304, 152), "PROBLEM", fontsize=20, fontname="helv")
+    page.insert_text((309, 176), "SOLVING", fontsize=20, fontname="helv")
+    pdf = doc.tobytes()
+    doc.close()
+    words = [w for e in layout.analyze(pdf).elements for w in (e.text or "").split()]
+    assert sorted(words) == ["PRACTICE", "PROBLEM", "SOLVING"]

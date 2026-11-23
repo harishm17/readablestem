@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.17 as of 2026-11-23; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.18 as of 2026-11-23; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -4038,6 +4038,44 @@ which every report lists.
 Not covered: a document long enough to reach the limits by its size. The corpus's longest
 upload is short of that, so a 100-page math-heavy document converted under several CPU
 limits is still owed.
+
+## The switch release of 2026-11-23
+
+Pipeline 0.5.18 changes no code. It turns on four layout switches in the production profile
+(`src/readablestem/ops/production.profile.toml`) that 0.5.17 shipped off: `REGION_TREE`,
+`LAYOUT_INLINE_JOINS`, `LAYOUT_DISPLAY_GROUPING` and `LAYOUT_JOIN_PANELS`. Each was measured
+at $0 against the same code with it off, and each can go back off alone.
+
+**Reading order** (`eval order --set layout-dev-1`, 267 pages, the production profile edited
+in a separate worktree):
+
+| Profile | Right pages | Faultless pages | Made right | Made wrong |
+|---|---|---|---|---|
+| all four off (0.5.17) | 141 | 72 | | |
+| `REGION_TREE` on | 159 | 80 | 18 | 0 |
+| all four on (0.5.18) | 161 | 81 | 20 | 0 |
+
+One page stops being faultless and stays right (`ax_qbionc_240307089` page 8).
+
+**Formulas kept whole** (box score of the 21 development papers, 11,258 formulas):
+
+| Profile | Whole | Made whole | Made not whole | Papers worse |
+|---|---|---|---|---|
+| off | 8,989 | | | |
+| `LAYOUT_DISPLAY_GROUPING` | | 103 | 1 | none |
+| `LAYOUT_INLINE_JOINS` | | 96 | 1 | none |
+| both | 9,186 | 198 | 1 | none |
+
+Displays kept whole go from 803 to 904 of 1,004, and units from 15 to 33 of 47.
+
+**Figures** (`LAYOUT_JOIN_PANELS`, O-422, measured 2026-11-20 and 2026-11-22): the public
+files' figures go from 1,611 to 1,320 as the panels of one figure are joined, and the
+captioned figures are the same.
+
+**Recordings.** The workflow corpus was re-recorded under the four switches with
+`scripts/corpus_refresh.py --live`, at most $1.00 a call. A live refresh leaves out the
+hostile-file tests (`tests/workflows/test_wf49_hostile_input.py`): their cases state how many
+pictures stay unanswered, and paid answers would break that count.
 
 ## What the numbers do not show
 
