@@ -191,6 +191,46 @@ on the private corpus 2 lines on 2 of 3. Candidate (ii), no removal and a notice
 furniture with a put-back, is not measured: it needs a notice and a way back in the student page,
 which this layout change does not touch.
 
+**A bare page number with small-type words (2026-11-22, `_MarginFilter._is_furniture_stack`).**
+The same measurement, narrowed to the line the paragraph above left open: a stack at the edge of
+a one-page file that ends in a bare page number and whose words are all set at least 0.5 pt under
+the body size. Probed on all 747 pages ($0, nothing removed): a bare number at any size would
+reach 300 pages and read 26 lines that a table or order check names, and would take lines set at
+body size (a quiz's own); with the 0.5 pt rule 231 pages are reached. Its 310 stacks were read
+by their text (about 120 different lines, and every stack with more than one line of words):
+they are heads and feet (journal and volume lines, "Downloaded from", copyright and license
+lines, DOIs, "by guest on"), except one footnote of one article, found on two pages (its first
+row carries a sentence on from the page before: "run this analysis, omits observations ...").
+A row of eight words or more that opens in lower case keeps the stack, which leaves those 2
+pages as they were.
+Run of all 747 pages at `cf0729fc` and at the commit with the rule (the 231 pages converted
+again, the rest kept):
+
+| Category | At `cf0729fc` | With the rule | Note |
+|---|---|---|---|
+| headers_footers | 38.4 (243 of 632) | 47.5 (300 of 632) | 57 more absent checks pass, none fails that passed |
+| multi_column | 70.2 (497 of 708) | 70.4 (501 of 712) | 4 order checks of one page now run and pass (below) |
+| baseline | 100.0 (586 of 586) | 100.0 (587 of 587) | the same page |
+| long_tiny_text, table_tests | 37.3 (31 of 83), 70.6 (605 of 857) | the same | no check changed |
+
+The page whose checks now run is `0be9ba925bc2e3164ce649b02e3e29a07239_page_5_pg1`: a journal
+page with its foot ("Environment Conservation Journal", "53", a small logo drawing). At the
+base the foot was two paragraphs and an empty equation and the page was counted a scan; with the
+foot taken, the drawing and the number are one figure across the foot band (a crop of the foot,
+with "53" as its text) and the page is not a scan. It is the one page of the 98 whose html
+changed where a foot becomes a figure. What a model is asked changes on 3 pages: 6 equation
+questions fewer (2 on each page; a foot's logo or number had been read as an equation) and 2
+figure questions more (the foot figure above). A figure that holds only the foot is not dropped
+here: one page, and the figure rule is another file's.
+
+Left out: the 332 headers_footers checks that still fail are as in the paragraphs above (a line
+with words and no page number, a head in a heading size, more than 4 lines, a line further in
+than 12 %). The 2- and 3-page files are not reached (the rule took figure labels and a
+line-number column on 2 of 11 gold files). A notice that lists the furniture with a put-back
+(candidate ii) is not built: the measurement does not need it, and it changes the student
+page. A quiz or a handout with a line set under the body size that ends in a bare number would
+go with this rule; none of the 48 public one-page files or the one private one has such a line.
+
 ### long_tiny_text: 52 failed of 83
 
 | Cause | Checks | Step | In the plan |

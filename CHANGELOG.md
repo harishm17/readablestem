@@ -1,5 +1,34 @@
 # Changelog
 
+## Unreleased: running heads on one-page files with a bare page number, and what O-420 left (branch fix/furniture-and-order; O-001, O-389, O-420)
+
+- A head or foot of a one-page file now goes when it ends in a bare page number and every word of
+  the stack is set at least 0.5 pt smaller than the body (`_MarginFilter._is_furniture_stack`,
+  `pipeline/layout/furniture.py`). Before, lines with words went only with a number that says it is
+  a page's ("Page 3", "3 of 9"), so a journal head such as "Environment Conservation Journal 53"
+  stayed. A name line or a points line set as the body is (a quiz) still stays. A row of eight
+  words or more that opens in lower case (the rest of a sentence a footnote carries on) keeps the
+  stack. No new setting; the layout of a file of more than one page is as it was.
+- On the parsing benchmark (747 pages, $0, the same pages at `cf0729fc` and at this commit):
+  headers_footers 38.4 (243 of 632) to 47.5 (300 of 632); multi_column 70.2 (497 of 708) to 70.4
+  (501 of 712); baseline 586 of 586 to 587 of 587; long_tiny_text and table_tests are the same
+  checks. 62 checks pass that did not, none that passed fails. The 5 checks of multi_column and
+  baseline that ran now are one page that was typed a scan before and is not (its foot drawing was
+  grouped with the page number; see docs/eval-parsing-benchmark.md). The html differs on 98 pages;
+  the questions asked of a model differ on 3 (2 fewer equations on two pages, 2 more figures and 2
+  fewer equations on the third).
+- 48 public one-page files and the private corpus's one one-page file: 0 lines taken. layout-dev-1
+  has no file of one page, so its record is unchanged.
+- O-420: `ax_econem_240306657` page 47 stopped being right at `ea72076d` (the glyph-name reader):
+  the replacement characters of its equations became the symbols the file means, and the gold,
+  made from the text layer, still holds the replacement character. The output is better; the gold
+  is the limit. The reading-order scorer is not changed (docs/eval.md). `work_budget` stops do not
+  depend on load (a count); only `time_limit` stops do, and the layout-dev-1 record has none.
+  The docs sentence "which change lost them has not been traced" is replaced by the three causes
+  of O-388.
+- Owed: a `PIPELINE_VERSION` bump (the result of a one-page upload changes); not made here. No
+  migration, no render bump, no change to a prompt.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
