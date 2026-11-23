@@ -96,9 +96,9 @@ JOB_ERROR_MESSAGES = {
     # is kept.
     "source_failed": "This source file could not be converted. Upload the PDF instead.",
     "source_unreadable": "This source file could not be converted. Upload the PDF instead.",
-    "source_timeout": "This source file did not finish in the time one conversion may take, "
-    "which usually means a macro that calls itself or a file that is very large. Trying again "
-    "will not change that. Fix it, or compile it and upload the PDF.",
+    "source_timeout": "This source file did not finish in the time or memory one conversion "
+    "may use, which usually means a macro that calls itself or a file that is very large. "
+    "Trying again will not change that. Fix it, or compile it and upload the PDF.",
     "source_refused": "This source file uses something this tool will not run. Remove it, "
     "or upload the PDF instead.",
     "source_busy": "The server is busy right now and could not start converting this source "
@@ -161,8 +161,9 @@ WORD_STOP_MESSAGES = {
     + WORD_SAVE_AS_PDF,
     "source_unreadable": "This Word file could not be read, so nothing was converted. "
     + WORD_SAVE_AS_PDF,
-    "source_timeout": "This Word file did not finish in the time one conversion may take, "
-    "which usually means a very large file. Trying again will not change that. " + WORD_SAVE_AS_PDF,
+    "source_timeout": "This Word file did not finish in the time or memory one conversion may "
+    "use, which usually means a very large file. Trying again will not change that. "
+    + WORD_SAVE_AS_PDF,
     "source_refused": "This Word file has something this tool will not read, so nothing was "
     "converted. " + WORD_SAVE_AS_PDF,
 }

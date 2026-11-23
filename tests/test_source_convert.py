@@ -150,6 +150,38 @@ def test_a_second_conversion_waits_for_the_first_and_gives_up_as_a_timeout(monke
     assert raised.value.code == "timeout"
 
 
+def test_a_program_stopped_by_its_memory_limit_ends_as_the_time_or_memory_code(
+    monkeypatch, tmp_path
+):
+    """A loop the log does not name looks like a very large source: both read the limit, of time
+    or of memory, as `source_timeout` (LaTeXML's `over_memory`, pandoc's `not_finished`)."""
+    from readablestem.core import sandbox
+    from readablestem.source import convert, latexml
+    from readablestem.source import pandoc as pandoc_step
+
+    monkeypatch.setattr(latexml, "installed", lambda: True)
+    monkeypatch.setattr(latexml, "convert", lambda *a, **k: sandbox.Outcome(-9, over_memory=True))
+    with pytest.raises(SourceFailed) as raised:
+        convert.run_latexml(tmp_path, "main.tex", tmp_path / "out")
+    assert raised.value.code == "source_timeout"
+
+    monkeypatch.setattr(
+        pandoc_step,
+        "read",
+        lambda *a, **k: pandoc_step.Result(None, pandoc_step.NOT_FINISHED),
+    )
+    blob = envelope.wrap("docx", "a.docx", None, b"PK")
+    monkeypatch.setattr(convert.intake, "unwrap", lambda b: ("docx", "a.docx", b"PK"))
+    from readablestem.source import docx_package
+
+    monkeypatch.setattr(
+        docx_package, "prepare", lambda data: type("P", (), {"working": tmp_path})()
+    )
+    with pytest.raises(SourceFailed) as raised:
+        convert._read_word(blob)
+    assert raised.value.code == "source_timeout"
+
+
 def test_conversions_one_after_another_each_get_the_gate():
     for _ in range(2):
         assert convert("bib").stats.required_decisions == 0

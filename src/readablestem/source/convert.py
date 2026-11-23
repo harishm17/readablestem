@@ -195,7 +195,9 @@ def run_latexml(project: Path, main: str, out: Path, *, beamer: bool = False) ->
         raise SourceFailed("timeout") from None
     except (sandbox.SandboxUnavailable, OSError):
         raise SourceFailed("source_unavailable") from None
-    if outcome.timed_out:  # the program hit its own limit: a macro that calls itself, say
+    # The program hit its own limit, of time or of memory: a macro that calls itself, say.
+    # The log cannot tell that from a very large source, so both end here.
+    if outcome.timed_out or outcome.over_memory:
         raise SourceFailed("source_timeout")
     if outcome.busy:
         raise SourceFailed("source_busy")
@@ -230,7 +232,7 @@ def _read_word(blob: bytes) -> ltx_reader.Reading:
     except (sandbox.SandboxUnavailable, OSError):
         raise SourceFailed("source_unavailable") from None
     if result.tree is None:
-        if result.timed_out:
+        if result.timed_out or result.failure == pandoc_step.NOT_FINISHED:  # time, memory or size
             raise SourceFailed("source_timeout")
         code = {
             pandoc_step.NO_PANDOC: "source_unavailable",
