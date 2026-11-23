@@ -6,6 +6,8 @@ mark in the text links to the footnote. Pages are drawn with PyMuPDF so each sha
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pymupdf
 import pytest
 
@@ -1045,7 +1047,9 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
     assert layout_module._footnote_links([inside, note], marks)[0].links == []
 
 
-def body_with_marks(page, mark: str = "1", after: str = " at sea level.", font: str = "helv"):
+def body_with_marks(
+    page, mark: str = "1", after: str = " at sea level.", font: str = "helv", **mark_font
+):
     """A line of text with a raised mark after "degrees" (and a raised "0", as in "P0"), and the
     note under it that opens with the mark: the page every row below changes a little."""
     lead = "Water boils at one hundred degrees"
@@ -1054,7 +1058,7 @@ def body_with_marks(page, mark: str = "1", after: str = " at sea level.", font: 
     )
     page.insert_text((72, 115), lead, fontsize=BODY, fontname="helv")
     end = 72 + pymupdf.get_text_length(lead, fontname="helv", fontsize=BODY)
-    page.insert_text((end + 0.5, 110), mark, fontsize=7, fontname="helv")
+    page.insert_text((end + 0.5, 110), mark, fontsize=7, **({"fontname": "helv"} | mark_font))
     page.insert_text((end + 5, 115), after, fontsize=BODY, fontname=font)
     page.insert_text((72, 140), "The curve P", fontsize=BODY, fontname="helv")
     page.insert_text((72 + 52, 143), "0", fontsize=7, fontname="helv")
@@ -1162,6 +1166,21 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
 
         layout = analyze(page_of(exponent))
         assert not [n for n in layout.notices if n.code == "footnote"], low
+
+    # Row 7: the star of a script (a raised asterisk operator over a low one-word line, "Fro" under
+    # a norm) is no note, while the same sign over a line of words is.
+    sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    for low, count in (("\u2217 Fro", 0), ("\u2217 Corresponding author.", 1)):
+
+        def star(page, low=low):
+            body_with_marks(
+                page, mark="\u2217", fontname="dj", fontfile=str(sans), after="  at sea level."
+            )
+            page.insert_text((72, 712), low, fontsize=8, fontname="dj", fontfile=str(sans))
+
+        if sans.is_file():
+            layout = analyze(page_of(star))
+            assert len([n for n in layout.notices if n.code == "footnote"]) == count, low
 
     # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
     # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.
