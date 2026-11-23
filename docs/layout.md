@@ -1257,7 +1257,7 @@ math font, stay math.
   bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
   "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
   "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
-  it); it labels the row now (`display._trailing_number`). A bracketed number on a row of its
+  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). A bracketed number on a row of its
   own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
   "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
   display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label

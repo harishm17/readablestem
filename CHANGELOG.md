@@ -8,6 +8,15 @@
   number on a row of its own right above its display at the display's left edge ("(10.20)" in
   2412.12319; `display._line_below_number`). A label is outside the equation's crop and text, so no
   crop moves. Off, the output is what it was.
+- Measured: box score of the 21 development papers with the four switches on, whole 9,195 of 11,258
+  before and after (12,012 predicted boxes, 12,008 after: four number boxes gone). Corpus hashes
+  against 55917ea2: `analyze` of 996 results, 4 differ in 3 files, each read ("(21)" in
+  ax_eesssp_240306423, a number beside a cases piece, now a label; "(10.20)" in 2412.12319;
+  "(10)" in ax_eesssp_240306460, no longer glued into a paragraph that spans the column, the
+  display now holds "(10) (11)", its two equations' numbers); `full` of 73 uploads, 0 differences
+  from an unchanged tree run the same day, so no recorded request moves. No raise of
+  `PIPELINE_VERSION` is owed while the switch is off; it is on in production, so a raise is
+  owed with the next release (results of these files change).
 - Counted and not built: the other loose numbers are one case each (docs/layout.md, "Loose
   equation numbers"). Inline boxes (O-412): of 289 inline cuts 75 leave one relation outside the
   box, and the ones read are formulas that wrap with the "=" ending the row; no rule makes them
