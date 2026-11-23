@@ -88,14 +88,18 @@ def _prose_spans(row: _Row, info: _CharInfo) -> list[tuple[int, int, str]]:
     found: list[tuple[int, int, str]] = []
     i = 0
     chars = row.chars
+
+    def letter(t: int) -> bool:  # a word of a typewriter face is a word too ("for each Alg do")
+        return info.classes[t] == "L" or (info.classes[t] == "C" and chars[t].c.isalpha())
+
     while i < len(chars):
-        if info.classes[i] != "L" or info.script[i]:
+        if not letter(i) or info.script[i]:
             i += 1
             continue
         j = i
         letters = 0
         while True:
-            while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
+            while j < len(chars) and letter(j) and not info.script[j]:
                 letters += 1
                 j += 1
             after = _limit_end(chars, info.classes, info.script, j)

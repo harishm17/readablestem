@@ -93,6 +93,31 @@ def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
         assert [line.strip() for line in blocks[0].split("\n")] == [t for _, t in LOOP], font
 
 
+def test_a_numbered_listing_with_a_blank_line_is_one_block_and_a_list_of_names_is_not_code():
+    """A listing with a number on every line, the blank ones too, stays one block; task names
+    in the code face, with commas and nothing else, are prose."""
+    rows = [(0, "def total(xs):"), (4, "s = 0"), (4, ""), (4, "for x in xs:"), (8, "s += x")]
+
+    def fill(page):
+        y = prose(page, 100)
+        for n, (indent, text) in enumerate(rows, 1):
+            page.insert_text((50, y), str(n), fontsize=CODE, fontname="helv")
+            if text:
+                page.insert_text((72 + indent * ADVANCE, y), text, fontsize=CODE, fontname="cour")
+            y += 13
+        y = prose(page, y + 10, "The tasks are open_drawer, open_jar and the ones below:")
+        names = [
+            (0, "open_drawer, open_jar, open_wine_bottle, pick_up_cup,"),
+            (0, "stack_blocks, wipe_desk"),
+        ]
+        code(page, y, names)
+
+    blocks = [e.text for e in analyze(page_of(fill)).elements if e.preformatted]
+    assert len(blocks) == 1
+    assert all(t in blocks[0] for _, t in rows if t)
+    assert "open_drawer" not in blocks[0]
+
+
 def test_code_is_written_as_pre_code_and_escaped():
     def fill(page):
         y = prose(page, 100)

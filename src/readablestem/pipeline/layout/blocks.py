@@ -55,6 +55,7 @@ from readablestem.pipeline.layout.shared import (
     _MATH_WORDS,
     _ROW_RELATIONS,
     _SUPERSCRIPT_FLAG,
+    CODE_MONO_SHARE,
     SCRIPT_RATIO,
     _Block,
     _CharInfo,
@@ -1098,12 +1099,25 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
     in the code is a gap of up to two) and of one size, with at least `CODE_MIN_GLYPHS`
     glyphs, or `CODE_MIN_SHORT` in two lines or more. Whatever their indentation: a
     Python loop's body is a line that starts further right, not a new paragraph. A single
-    short monospaced line ("print") is not a block.
+    short monospaced line ("print") is not a block. A listing's line numbers, set in a
+    small face of their own, are part of its lines (`_numbered_code`), and the number of a
+    blank line, alone in its row, between two lines of code does not end the block.
     """
     groups: list[list[_Row]] = []
+    gap: list[_Row] = []  # numbers of blank lines, in the block only when code goes on
     for row in rows:
-        if row.kind != "text" or not row.code:
+        if row.kind != "text" or not (row.code or _numbered_code(row)):
+            last = groups[-1] if groups else []
+            if (
+                last
+                and row.kind == "text"
+                and row.column == last[-1].column
+                and _blank_line_number(row)
+            ):
+                gap.append(row)
+                continue
             groups.append([])  # ends the block
+            gap = []
             continue
         last = groups[-1] if groups else []
         if last:
@@ -1114,18 +1128,40 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
                 and abs(row.size - prev.size) <= 0.5
                 and 0.5 * prev.size <= pitch <= CODE_MAX_PITCH * prev.size
             ):
+                last.extend(gap)
                 last.append(row)
+                gap = []
                 continue
         groups.append([row])
+        gap = []
     found: dict[int, int] = {}
     for group in groups:
         glyphs = sum(len(r.ink) for r in group)
         if (glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)) and not (
-            _is_quotation(group) or _is_contact(group)
+            _is_quotation(group) or _is_contact(group) or _is_name_list(group)
         ):
             for row in group:
                 found[id(row)] = id(group[0])
     return found
+
+
+def _numbered_code(row: _Row) -> bool:
+    """Is the row a line of a listing that numbers its lines: a number in a face of its own
+    ("21") and then monospaced code? The number is not counted in the share of monospaced
+    glyphs, so `_Row.code` (which counts it) has said no."""
+    if row.vertical or row.diagonal or (number := _line_number(row)) is None:
+        return False
+    body = [c for c in row.chars[number[2] :] if not c.blank]
+    return bool(body) and sum(c.mono for c in body) >= CODE_MONO_SHARE * len(body)
+
+
+def _blank_line_number(row: _Row) -> bool:
+    """Is the row only the number of a blank line of a listing ("22")?"""
+    return (
+        not row.vertical
+        and not any(c.mono for c in row.ink)
+        and re.fullmatch(r"\d{1,4}", row.clean.strip()) is not None
+    )
 
 
 # What only code has: brackets, operators, an assignment, a call ("print("), an option
@@ -1147,6 +1183,16 @@ def _is_quotation(group: Sequence[_Row]) -> bool:
     if spread > 0.5 * group[0].size and any(line.endswith(":") for line in lines):
         return False  # a block: "else:" and its body
     return len(text.split()) >= QUOTATION_MIN_WORDS and any(c in text for c in ".,?!")
+
+
+def _is_name_list(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines a list of names (the task names in a table cell, "A, B
+    and C" in the text) and not code? Only when, leaving the underscores of the names aside, it
+    has none of the punctuation code has, and about every second word is followed by a comma."""
+    text = " ".join(r.clean for r in group).replace("_", "")
+    words = text.split()
+    commas = text.count(",")
+    return commas >= 2 and 2 * commas >= len(words) and not _CODE_PUNCTUATION.search(text)
 
 
 # An address set in a typewriter face on a title page: one word, an email or a web address.
