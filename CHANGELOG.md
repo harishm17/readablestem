@@ -24,7 +24,10 @@
     slide with a heading can be reached at the slide titles' level; and a title slide's subtitle
     is at that level, where a deck of many sizes had it up to three levels deeper.
 - Each switch can go back off alone. The pipeline is raised so results made under 0.5.17 are not
-  read as results of the new layout; 0.5.17 results still open.
+  read as results of the new layout; 0.5.17 results still open. The switches reach production
+  through four Railway variables (the code defaults stay off), so the version says which layout
+  made a result only while the variables match the profile: the release steps end with
+  `readablestem ops profile-check` (docs/deploy-railway.md).
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many
   pictures stay unanswered, and a paid answer recorded for one broke that count on every replay.
 - The workflow corpus was re-recorded under the four switches (three capped calls, $2.59), so no

@@ -3514,9 +3514,9 @@ record's 3 tables are 2 and its 57 decisions 56): the body column beside a sideb
 table and sent for a decision, and is two columns of text now
 (CHANGELOG "two text columns whose lines mostly hold one cell are not a table", O-150). The same 30
 uploads are left out, for the same 1,324 answers missing, upload by upload: no recorded request
-stops matching. **A paid recording of the
-answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
-the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
+stops matching. A paid recording of the
+answers was owed then (about 1,300 requests) to bring those uploads back into
+the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost, order and outputs records are still the 0.5.10 ones, and CI does not
 compare them.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
@@ -4080,7 +4080,8 @@ files' figures go from 1,611 to 1,320 as the panels of one figure are joined, an
 captioned figures are the same.
 
 **Recordings.** The workflow corpus was re-recorded under the four switches with
-`scripts/corpus_refresh.py --live`, at most $1.00 a call. A live refresh leaves out the
+`scripts/corpus_refresh.py --live`, each call capped at $1.00 (the cap refuses new requests; the
+first call ended one cent over it). A live refresh leaves out the
 hostile-file tests (`tests/workflows/test_wf49_hostile_input.py`): their cases state how many
 pictures stay unanswered, and paid answers would break that count. Three calls paid $1.01,
 $1.00 and $0.58 ($2.59); the last asked 101 answers and stopped under its cap, so nothing it

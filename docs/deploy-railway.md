@@ -218,10 +218,15 @@ The first profile was written from what the repository states, not from the dash
 values and their `source` lines, and set `confirmed = true`; from then on a difference refuses the
 start. `readablestem ops profile-check` prints the same comparison for the environment it runs in
 (`railway ssh -s web -- readablestem ops profile-check`). To change a setting in production, change
-the profile and the variable in Railway in the same change. `/admin/health` and `/admin` show the
-profile's hash to an admin (the public `/healthz/ops` gives the status word only); the image build
-writes the image facts (`readablestem ops image-facts --write`, Dockerfile), which changes that
-hash with what the image carries.
+the profile and the variable in Railway in the same change. A release that changes a profile row
+sets the variable first, then deploys, then runs that check: the release is live when the
+setting's name is not among the names that differ. The code defaults are not the profile's
+values, so a deploy with a variable missing starts normally, stamps its results with the new
+`PIPELINE_VERSION` and reads them the old way; only this check (and the names on /admin) shows
+it. `/admin/health` and `/admin` show the profile's hash to an admin (the public `/healthz/ops`
+gives the status word only); the image build writes the image facts
+(`readablestem ops image-facts --write`, Dockerfile), which changes that hash with what the
+image carries.
 
 A row of the profile that switches a behavior or picks a model may carry `reason` (one sentence,
 why production has that value) and `eval` (the repository path of the report that measured it,

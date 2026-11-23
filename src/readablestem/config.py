@@ -161,9 +161,9 @@ class Settings(BaseSettings):
     # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
     # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
     # tree of regions from the unmerged line fragments first and orders the pages by it. Off:
-    # output is byte-identical to before. Off in production: a changed box changes a crop, so
-    # the recorded model answers of the pages it moves stop matching, and turning it on
-    # comes with a re-recording and a `PIPELINE_VERSION` bump.
+    # output is byte-identical to before. Production's value is in the profile. A changed box
+    # changes a crop, so the recorded model answers of the pages it moves stop matching, and
+    # changing it comes with a re-recording and a `PIPELINE_VERSION` bump.
     region_tree: Literal["off", "on"] = "off"
     # What the file knows goes with a request (SW55 parts c, d and f, WS6.12 part 3; docs/steps.md,
     # docs/tables.md). Each is its own switch because the paid run measures each arm alone. Off:

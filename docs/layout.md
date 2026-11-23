@@ -479,7 +479,7 @@ so a heading is not, and a line that starts a block is not).
    `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
    unchanged.
 
-### The region tree (`REGION_TREE`, off in code and in production)
+### The region tree (`REGION_TREE`, off in code, on in production since 0.5.18)
 
 `pipeline/layout/regions.py` (and `entries.py`). The reader above finds one gutter for the page,
 merges the page's fragments into lines and then orders the lines. A page with three columns, a
@@ -1163,7 +1163,7 @@ math font, stay math.
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Seven patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code, on in production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump).** Seven patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behavior.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
@@ -1264,7 +1264,7 @@ math font, stay math.
   row); a display set with function names in a text font (`PMI`, `Unif` in Times) is still
   cut at the word, and an equation number set above the first row of a tall display is still
   an element of its own.
-- **Inline formulas kept whole (`LAYOUT_INLINE_JOINS`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Four rules for the places where an inline run ended inside one printed formula, all behind `analyze(inline_joins=True)`; with the switch off the output is byte for byte what it was (the layout of 996 files, hashed before and after). Measured on the position truth of 21 development papers (a development box score kept outside the repository; 11,258 formulas, 8,990 whole before), each rule alone, and none made a paper worse:
+- **Inline formulas kept whole (`LAYOUT_INLINE_JOINS`, off in code, on in production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump).** Four rules for the places where an inline run ended inside one printed formula, all behind `analyze(inline_joins=True)`; with the switch off the output is byte for byte what it was (the layout of 996 files, hashed before and after). Measured on the position truth of 21 development papers (a development box score kept outside the repository; 11,258 formulas, 8,990 whole before), each rule alone, and none made a paper worse:
   1. *Operator names* (`_MORE_MATH_WORDS` in `shared.py`): `erfi`, `erfc`, `supp`, `diam`, `codim`, `coker` and `arccot` count as math words, like `sin` or `max`. +2 whole, none lost.
   2. *A colon or semicolon inside a bracket* (`_separator_in_bracket`): "I(A : B)", "W(P; G)". A TeX-made page's separator inside a bracket the run opened, with math in between and the bracket closing on the same row, does not end the run. +76 whole, none lost.
   3. *A math word between formulas* (`_math_word_joins`): "a = b mod n". A word space next to a math word, with math on the other side, does not end the run: the spaces around `\bmod` and `\pmod` are the author's. The run before it must be math on its own evidence. +3 whole, none lost.
@@ -2166,8 +2166,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).
-- **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code and in
-  production; bump `PIPELINE_VERSION` when it is turned on). A figure printed as panels
+- **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code, on in
+  production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump). A figure printed as panels
   (a), (b), (c) under one caption was found as one figure for each panel, and only the one
   nearest the caption took the caption (`_attach_captions`), so the others were figures
   with a picture and no words: a reader got one description for each panel and the caption
