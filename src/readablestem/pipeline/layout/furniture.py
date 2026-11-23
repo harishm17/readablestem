@@ -38,6 +38,7 @@ MARGIN_SHAPE_BAND = 0.12  # top/bottom share of the page where a head or foot is
 SHAPE_CLEAR = 1.0  # x line height: a head or foot stands this far clear of the text block
 SHAPE_PAGES = 1  # heads with words are found by shape on files of at most this many pages
 SHAPE_LINES = 4  # a head or foot found by shape is at most this many lines
+NOTE_WORDS = 8  # a row of this many words that opens in lower case continues a sentence
 WATERMARK_RATIO = 2.0  # diagonal text this many times the body size is a watermark
 
 PAGE_NUMBER = re.compile(
@@ -105,6 +106,13 @@ def _ends_in_number(line: Sequence[_Row], *, worded: bool = False) -> bool:
     if len(numbers) != 1 or not (numbers[0] is line[0] or numbers[0] is line[-1]):
         return False
     return not worded or bool(_PAGE_WORDS.match(numbers[0].clean.strip(" -\u2013\u2014|")))
+
+
+def _is_note_text(row: _Row) -> bool:
+    """A row of a sentence's length that opens in lower case: the rest of a sentence from the
+    page before (a footnote's lines), never the words of a head or foot."""
+    text = row.clean.lstrip()
+    return text[:1].islower() and len(text.split()) >= NOTE_WORDS
 
 
 def _line_box(line: Sequence[_Row]) -> BBox:
@@ -266,7 +274,10 @@ class _MarginFilter:
             self.pages > SHAPE_PAGES
             or not (
                 any(_ends_in_number(line, worded=True) for line in stack)
-                or all(r.size <= self.body - MARGIN_SIZE_PT for r in words)
+                or (
+                    all(r.size <= self.body - MARGIN_SIZE_PT for r in words)
+                    and not any(_is_note_text(r) for r in words)
+                )
             )
         ):
             return False

@@ -512,6 +512,24 @@ def test_the_name_line_and_the_points_of_a_one_page_quiz_are_not_a_head_or_foot(
     )
 
 
+def test_the_footnote_above_the_page_number_of_a_one_page_file_is_kept():
+    # Set smaller than the body and standing clear above a bare page number, as a foot does; but
+    # its first line carries on a sentence from the page before, which a foot's words never do.
+    note = "run this analysis, omits observations that are missing data on the variables."
+
+    def fill(page):
+        write(
+            page,
+            72,
+            120,
+            ["The only body paragraph on this page, set long enough to be the body."] * 3,
+        )
+        page.insert_text((72, 708), note, fontsize=8)
+        page.insert_text((500, 720), "20", fontsize=8)
+
+    assert note in " ".join(texts(analyze(one_page(fill)).elements))
+
+
 @pytest.mark.parametrize("turn", [90, 270])
 def test_a_page_saved_sideways_with_no_rotate_is_read_as_the_page_it_shows(turn):
     # A landscape page printed to PDF: every line runs up (or down) the page and /Rotate is 0.

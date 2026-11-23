@@ -215,7 +215,9 @@ reader, neither to find them nor as a second opinion
    stack set at least 0.5 pt smaller than the body text, as a running head is: the name line
    and the points of a one-page quiz end in a bare number as a running head does (`Points:
    ... 25`, `Total marks ... 50`), but they are set as the body is, and they stay. A journal's
-   head with a bare page number beside its name, in type smaller than the body, goes. A head with no page
+   head with a bare page number beside its name, in type smaller than the body, goes; a
+   footnote above a bare number stays when one of its rows is eight words or more that open
+   in lower case (the rest of a sentence from the page before). A head with no page
    number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
    under it a line away, so it never stands clear. What goes is counted as `furniture` left
    out, as on a longer file. The
