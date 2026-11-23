@@ -1669,11 +1669,6 @@ _ENUMERATION = re.compile(
     r"|\[[^\]]{1,12}\]"  # [3], [JP14], [ABC+20]: a reference
     r"|[-\u2013\u2014*+>\u2022\u00b7\u25e6\u25aa])$"  # a bullet, a dash, a prompt
 )
-# "Q1", "Question 2:", "Step 3": the number of an item that is told apart from the next by it
-# alone ("Week 1" and "Mon" name a row of a schedule, a table; these name the items of a list).
-_ITEM_LABEL = re.compile(
-    r"^(?:Q|Qu|Question|Problem|Exercise|Step|Task|Item)\.?\s?\d{1,3}[.:)]?$", re.IGNORECASE
-)
 _BARE_TAG = re.compile(r"^\d{1,3}\.\d{1,3}$")
 _EQUATION_TAG = re.compile(r"^\([A-Za-z]{0,6}\d{0,3}(?:[.-]\d{1,3})*[a-z]?\)$")
 
@@ -1994,8 +1989,7 @@ def _numbered(grid: _Grid) -> bool:
         )
     return any(
         len(labels) >= 2
-        and sum(bool(_ENUMERATION.match(t) or _ITEM_LABEL.match(t)) for t in labels)
-        >= 0.7 * len(labels)
+        and sum(bool(_ENUMERATION.match(t)) for t in labels) >= 0.7 * len(labels)
         and bool(others)
         and sum(_wordy(m.text) for m in others) >= 0.5 * len(others)
         for labels, others in readings
