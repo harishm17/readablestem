@@ -982,7 +982,13 @@ no line of the item, and a figure or a table, which is no row of text, shows as 
 leaves, where a run ends (more than `SERIES_GAP` times the type size between two rows of the
 column: "1. Setup" over a picture and "2. Procedure" under it are two titles). The white alone
 ends a run, whatever stands in it: numbered items set that far apart, with room to answer
-between them, end their runs too, and set in bold they are headings (O-401). Two titles in
+between them, end their runs too, and set in bold they are headings (O-401, a limit: on the
+review probes `l_questions_bold_space20/40/80` and `l_bold_items_lead36/44` the questions are
+headings at white of 36 pt and more; a rule that ends a run only at white that holds a picture,
+drawing or table read them as items and the picture case ("1. Setup", a picture of 6 to 120 pt,
+"2. Procedure") as two titles, but not one of the 996 PDFs of the layout runs (the gold sets,
+the layout-gold files, the repository's PDFs and the page cache, three variants each) or of the
+73 uploads changed with it, so it was not built, wave 4). Two titles in
 a row, the first with no text of its own, are read as a list of two. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
 changes nothing).
@@ -2276,6 +2282,40 @@ link; `[1]` of 2503.22999 is a bibliography item the file names `footnote`. The 
 2407.04005 p10 (p10-e50), "a mark inside a heading" and the 17 not found could not be measured
 on the public papers: none of them has a false note, a heading mark that is not linked, or a
 named note not found (131 destinations, 131 found).
+
+**Note signs and exponents (wave 4: O-034, O-054, O-429).** The asterisk operator (U+2217, the
+star TeX sets for an author note) is a note sign (`_FOOTNOTE_MARKS`), and a number and a sign
+printed raised together ("1∗", "∗1") are two marks (`_mark_groups`). Real files: the star of
+an author note was a stray equation in ax_condmatmtrlsci_240306379 and 389 and in
+ax_csro_240306533 and sat against its word in ax_mathco_240306383 and 2505.03022 ("∗Email"); two author
+notes were not found and are now, with their links (ax_mathap_240306449 "∗ Corresponding
+author.", ax_mathap_240306464 "∗ Institut de recherche XLIM ..."). A note that opens with
+that sign must go on in two words (`_footnote`): a norm's subscript ("∥M∥Fro" under a
+display, a raised "∗" on the page) made 2 false notes on 2411.07613 p3, none now. A raised
+digit right after a letter set in a math font ("p1", "m0", "n2") is a subscript or an exponent,
+no mark (`_after_math_letter`; `_layout_notices` and `_flag_text_marks`): the 29 of them on
+w_notes_6042_ch2 had taken the place of the raised "1" of a real note, and the link of that note
+(p4-e21) went to the page header (p4-e0); it goes to the note (p4-e44). Count on the public gold
+(the 158 PDFs of `docs/eval.md`): 131 destinations, notes 139 to 141, linked 135 to 137, false 0
+before and after, no note lost. Measured and not built, because no real file shows them (the review
+probes do): a raised range over notes ("1-3", review 13 `n_range.pdf`, whose separator is a middle
+dot, which no file prints) marks no note (0.5.14 marked the two ends); and a unit's exponent
+("25 cm" and a raised 2) over a low line that opens with a digit (axis numbers, a row number:
+`x_exp_axis_words.pdf`, `x_exp_then_small_row_number.pdf`, `note_unit_exponent.pdf`) is a note.
+Rules for both were built and taken out again: with them on, none of the 996 files and 73
+uploads of the corpus hash changed because of them. Also not built: the "Mathematics Subject
+Classification" and "Key words" lines of the front matter (about 14 low front-matter label lines
+on the public set, "Mathematics Subject Classification" on 2 files: they are no notes and a mark
+standing above is what made one a note, so the line of ax_mathap_240306449 stays lost); the
+one-line email note at the foot of the left column of ax_condmatmtrlsci_240306379 and 389 that
+is read in one run with the right column's first lines (the file names no footnotes; the
+footnote zone rule of the region tree that would set it apart is off in the reading order; it
+needs a rule that cuts a run at a low, smaller line opening with a sign, which touches every
+two-column page: 2 of the 158 files show it); the note "∗ Email: ..." of
+ax_mathco_240306383, whose mark stands in the author heading (1 file: still no note). The bottom
+notes of the private documents s06 and s17 and the 7 notes of O-054 (two in r18_arxiv_opt) were
+not looked at one by one: no upload of the private corpus changed in the corpus hash (one upload
+of 73 changed, the public notes chapter w_notes_6042_ch2).
 
 **Contents pages.** A page with at least two lines that end in dot leaders (five dots, or
 an ellipsis counting for three) is a contents page (`_contents_rows`). Each such line is a
