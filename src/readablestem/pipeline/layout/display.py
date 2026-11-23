@@ -806,11 +806,16 @@ def _equation_regions(
             for line in lines
             if _number_beside(label, line.box, line.size, far=label.far_number)
             and not (label.far_number and _level_with_numbered(line, lines))
-            and (
-                line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
-                or (document.grouping and _trailing_number(label, line))
-            )
+            and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
         ]
+        if not beside and document.grouping:
+            # only a row that goes on stands beside it: the first row of a display in several
+            beside = [
+                line
+                for line in lines
+                if _number_beside(label, line.box, line.size, far=label.far_number)
+                and _trailing_number(label, line)
+            ]
         # Another column's maths only when the number's own column has no content beside it.
         own_column = [ln for ln in beside if ln.rows[0].column == label.column]
         if not own_column and not _column_content_near(label, rows):
