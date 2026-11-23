@@ -1,5 +1,22 @@
 # Changelog
 
+## Unreleased: a bracketed expression to the power T no longer stops the reading (branch fix/source-deep-math)
+
+- `pipeline/speech.py` `_transposable` asked, for a bracketed expression such as `(A+B)^T`, whether
+  anything inside it is a matrix or a vector, but walked `base.iter()`, which starts at the
+  expression itself, so it called itself on the same node without end. Every bracketed run of three
+  or more signs with a plain `T` or `\top` over it raised `RecursionError`: the equation's speech
+  could not be made. It now looks below the brackets only. Nothing else in the speech changes: an
+  expression that read before takes none of the changed lines.
+- On a LaTeX source the error was not caught: `ltx_reader.read` stopped the whole conversion. Of the 73
+  public arXiv sources, 7 hit it (the reason is the one equation form, not the depth of the
+  maths; MathML nested more than `MAX_DEPTH` is a `SpeechError` as before). Six of the seven now
+  read end to end (the seventh, 2504.00755, is refused by the upload check before any reading).
+  The same function serves the PDF path, the editor's speech check and the listen page, which had
+  the same crash on such an equation.
+- No version bump is owed for the reading itself. A stored equation of this form that came out with
+  no speech is made again only when `SPEECH_VERSION` next rises.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
