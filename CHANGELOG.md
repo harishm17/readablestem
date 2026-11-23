@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: two more inline-box rules behind `LAYOUT_INLINE_JOINS` (wave 4, builder 05; O-412, O-413, O-416)
+
+Both rules are behind `LAYOUT_INLINE_JOINS`, off in code and in the production profile; with it off
+the layout of every file is what it was (`hashrun.py full` and `analyze` against cf0729fc: see below).
+Turning the switch on moves equation boxes, so the recorded equation requests of the pages it moves
+stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none made here).
+
+- Italic "for", "and", "any", "all", "the", "let", "are" and "not" between blanks are words, not the
+  variables f, o, r (`shared._ITALIC_CONNECTIVES`). A theorem's statement set in italic had one maths
+  row and one box for "x >= 2, for j = 1, ..., d and k = 3"; now the formulas are boxes of their own.
+  Box score of 21 development papers, both switches on: 9,174 whole before, 9,183 after (+10, 1 lost).
+- A colon inside a Computer Modern or Latin Modern index stays in the formula when the file's producer
+  field does not say TeX (`inline_runs._TEX_FACE`): "dx_{1:T}" of `data/real-tables/2407.13734.pdf`
+  was cut after the "1". No box of the 21 papers changes.
+- Measured and not built: the inline "extra" group (83 of 219 read are wrapped formulas whose box is the
+  union of two lines), widening the host box in `display._absorb_contained_regions` (9 boxes grow, no
+  score changes), and counting set-off words without connectives (+1, 1 lost). Counts in
+  docs/layout.md.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and

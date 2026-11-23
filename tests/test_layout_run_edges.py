@@ -114,8 +114,10 @@ def test_an_index_with_a_colon_stays_in_its_formula_in_a_converted_file():
     from pathlib import Path
 
     pdf = (Path(__file__).parent.parent / "data/real-tables/2407.13734.pdf").read_bytes()
-    texts = lambda **switches: [  # noqa: E731
-        e.text or "" for e in analyze(pdf, pages=[0], **switches).elements if e.kind == Kind.EQUATION
-    ]
+
+    def texts(**switches) -> list[str]:
+        elements = analyze(pdf, pages=[0], **switches).elements
+        return [e.text or "" for e in elements if e.kind == Kind.EQUATION]
+
     assert not any(t.endswith("dx1:T") for t in texts())
     assert any(t.endswith("dx1:T") for t in texts(inline_joins=True))

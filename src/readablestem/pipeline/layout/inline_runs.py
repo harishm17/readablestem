@@ -484,6 +484,7 @@ def _inline_runs(
         start, depth = i, 0
         while i < n:
             c = chars[i].c
+            c_font = chars[i].font
             if c in _OPENING:
                 depth += 1
             elif c in ")]}":
@@ -501,7 +502,7 @@ def _inline_runs(
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
                 or _separator_in_bracket(chars, info, i, depth, document=document)
                 or (
-                    (document.tex_made or (document.inline_joins and _TEX_FACE.match(chars[i].font)))
+                    (document.tex_made or (document.inline_joins and _TEX_FACE.match(c_font)))
                     and glyph_math.script_punctuation(chars, info.script, i)
                 )
                 or (
