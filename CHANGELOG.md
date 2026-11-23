@@ -13,8 +13,10 @@
     page, a heading taken into the last line, a `for ...:` line over an equation, an opener that
     wraps flush, a one-line block, the boxed "TABLE III" and the garbled math of step 8 of
     ax_csro_240306420 p9 (docs/layout.md, "Algorithms, wave 5").
-  - A reader change on those pages only; the text sent for an item does not change, so no recorded
-    request stops matching (checked with `hashrun.py full`).
+  - The corpus hash (`hashrun.py analyze`, 996 runs) differs on those two files only (3 modes
+    each): the steps join their block, and the formulas of the joined steps are read as the
+    formulas of any step, more and smaller equation items there (2405.15050 p4: six in place of
+    one). `hashrun.py full`: 73 compared, 0 differences, so no recorded request stops matching.
 - 'ti' read as 'A' (O-047, `w_slides_60001_lec10`): measured, not built. The file's Calibri
   subsets are a simple TrueType font with no /Encoding, a ToUnicode with gaps and glyphs with no
   names (no `post` or `GSUB` table). The codes are per subset ('A' is "ti", 'G' "tti", 'L' "tt" in
