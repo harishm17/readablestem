@@ -532,6 +532,7 @@ class _SharedAnswers:
         self._settings = settings
         self._lock = threading.Lock()
         self._asked: dict[str, _Asked] = {}
+        self._handed: dict[str, list[ModelCall]] = {}  # every call given out, by question
 
     def run(
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
@@ -546,35 +547,61 @@ class _SharedAnswers:
             entry.done.wait()
             if entry.answer is not None:
                 parsed, call = entry.answer
-                return cast(T, parsed.model_copy(deep=True)), _shared(call)
+                handed = _shared(call)
+                with self._lock:
+                    self._handed[key].append(handed)
+                return cast(T, parsed.model_copy(deep=True)), handed
             return self._inner.run(request, schema, is_fallback=is_fallback)
         try:
             parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
             if parsed is not None and call.outcome == "ok":
                 entry.answer = (parsed.model_copy(deep=True), call)
+                with self._lock:
+                    self._handed[key] = [call]
             return parsed, call
         finally:
             entry.done.set()  # also when the call raised: a waiter sends its own
+
+    def settle(self, fixes: Sequence[Fix]) -> None:
+        """Put what an answer cost on the first fix of the document that has it. Which of two
+        identical pictures asked first is a matter of thread timing, and the one that did is
+        the one that paid; here the money moves to the one that comes first in reading order,
+        so the same file gives the same fixes whatever the timing (`fixes` are in reading
+        order). The total is what it was."""
+        of = {id(call): n for n, fix in enumerate(fixes) for call in fix.calls}
+        for calls in self._handed.values():
+            kept = [call for call in calls if id(call) in of]
+            paid = next((call for call in kept if not call.shared), None)
+            first = min(kept, key=lambda call: of[id(call)], default=None)
+            if paid is None or first is None or first is paid:
+                continue
+            for name in _PAID_FIELDS:
+                one, other = getattr(paid, name), getattr(first, name)
+                setattr(paid, name, other)
+                setattr(first, name, one)
 
     def __getattr__(self, name: str) -> Any:  # anything else a step may read
         return getattr(self._inner, name)
 
 
+# What a request cost and whether it was sent: the fields a shared call has none of.
+_PAID_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "cache_creation_input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "cost_usd",
+    "latency_ms",
+    "billed_unseen_usd",
+    "shared",
+)
+
+
 def _shared(call: ModelCall) -> ModelCall:
     """The call a caller is given for an answer that was already paid for."""
-    return call.model_copy(
-        update={
-            "input_tokens": 0,
-            "cached_input_tokens": 0,
-            "cache_creation_input_tokens": 0,
-            "output_tokens": 0,
-            "reasoning_tokens": 0,
-            "cost_usd": 0.0,
-            "latency_ms": 0,
-            "billed_unseen_usd": 0.0,
-            "shared": True,
-        }
-    )
+    none = {"cost_usd": 0.0, "billed_unseen_usd": 0.0, "shared": True}
+    return call.model_copy(update={**dict.fromkeys(_PAID_FIELDS, 0), **none})
 
 
 class _Stop:
@@ -2318,12 +2345,13 @@ def _convert(
             fixes = {f.element_id: f for f in scan_fixes}
             for page_built in image_built.values():
                 fixes.update(page_built.fixes)
+            shared_answers = _SharedAnswers(client, settings)
             run = _Run(
                 pdf_bytes=pdf_bytes,
                 settings=settings,
                 options=options,
                 stage_progress=stage_progress,
-                client=_SharedAnswers(client, settings),
+                client=shared_answers,
                 tracer=tracer,
                 pages=_Pages(page_list, progress),
                 contexts=context_texts(elements),
@@ -2406,6 +2434,7 @@ def _convert(
             run.fixes[fix.element_id] = fix
         triage.stamp(run.fixes.values())  # the risk band each decision was asked at
         ordered = _ordered_fixes(elements, run.fixes)
+        shared_answers.settle(ordered)
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
             measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))

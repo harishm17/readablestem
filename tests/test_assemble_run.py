@@ -567,33 +567,49 @@ def test_list_items_are_context_for_a_display_equation_between_them():
 
 
 def twin_figures(
-    monkeypatch, answers: list[dict | None]
+    monkeypatch, answers: list[dict | None], *, first_is_late: bool = False
 ) -> tuple[FakeVisionClient, PipelineOutput]:
     """Two figures that are the same picture with the same text around them, on a client that
-    answers a different thing each time it is asked."""
+    answers a different thing each time it is asked. `first_is_late`: the first figure's step
+    is slower to ask, so the second asks first."""
     elements = [
         el("p1-e0", Kind.FIGURE, 0, 0, caption="Option A"),
         el("p1-e1", Kind.FIGURE, 0, 1, caption="Option A"),
     ]
     pipeline = FakePipeline(layout=Layout(elements=elements, page_count=1, pages=[0], lang="en"))
     pipeline.install(monkeypatch)
-    monkeypatch.setattr(pipeline, "crop", lambda pdf, element, **kw: PNG_SIGNATURE + b"same")
-    monkeypatch.setattr(layout, "crop", pipeline.crop)
+    monkeypatch.setattr(layout, "crop", lambda pdf, element, **kw: PNG_SIGNATURE + b"same")
+    if first_is_late:
+        describe = pipeline.describe
+
+        def slow_first(element, png, **kw):
+            if element.id == "p1-e0":
+                time.sleep(0.3)
+            return describe(element, png, **kw)
+
+        monkeypatch.setattr(figure_step, "describe", slow_first)
     asked = iter(answers)
     client = FakeVisionClient(responders={"figure": lambda request: next(asked)})
-    return client, convert_pdf(b"%PDF", settings=settings(), client=client, concurrency=1)
+    output = convert_pdf(
+        b"%PDF", settings=settings(), client=client, concurrency=2 if first_is_late else 1
+    )
+    return client, output
 
 
-def test_one_job_asks_an_identical_request_once(monkeypatch):
+@pytest.mark.parametrize("first_is_late", [False, True])
+def test_one_job_asks_an_identical_request_once(monkeypatch, first_is_late):
     client, output = twin_figures(
         monkeypatch,
         [{"alt": "A cart.", "confidence": 0.9}, {"alt": "A ball.", "confidence": 0.9}],
+        first_is_late=first_is_late,
     )
     fixes = fixes_by_id(output)
     assert len(client.requests) == 1
-    assert fixes["p1-e0"].figure.alt == fixes["p1-e1"].figure.alt == "A cart."
+    assert fixes["p1-e0"].figure.alt == fixes["p1-e1"].figure.alt
+    # the first figure in reading order has the call, whichever asked first
     asked, shared = fixes["p1-e0"].calls[0], fixes["p1-e1"].calls[0]
-    assert asked.cost_usd > 0 and shared.cost_usd == 0 and shared.input_tokens == 0
+    assert asked.cost_usd > 0 and not asked.shared
+    assert shared.cost_usd == 0 and shared.input_tokens == 0 and shared.shared
     assert output.result.stats.cost_usd == asked.cost_usd
     assert output.result.stats.model_calls == 1
     assert [c.step for c in output.facts.calls] == ["figure"]
