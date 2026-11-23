@@ -236,6 +236,27 @@ def test_a_number_that_the_row_around_it_hides_is_still_the_equations_label(fill
     assert [text for text in paragraphs if "(106)" in text or len(text) < 9] == []
 
 
+@pytest.mark.parametrize("number_x", [520, 72])  # at the right margin, or at the left one
+def test_a_number_set_far_from_a_line_with_words_numbers_it_when_display_grouping_is_on(number_x):
+    """ "P(crossing) = c + d for all n" is less than half maths, so the number beside it, a
+    margin away, was a paragraph of its own and the line a paragraph with an inline formula."""
+
+    def fill(page):
+        prose(page, 100, "The probability of the first event is approximated, to the second order, by")
+        page.insert_text(
+            (150, 140), "P(crossing) = c + d for all n", fontsize=12, fontname="Times-Italic"
+        )
+        page.insert_text((number_x, 140), "(106)", fontsize=12)
+        prose(page, 180, "and the second one in the same way, as the text goes on and on.")
+
+    pdf = one_page(fill)
+    assert not any(e.equation_label for e in analyze(pdf).elements)  # the switch is off
+    [equation] = equations(analyze(pdf, display_grouping=True).elements)
+    assert equation.display == "block"
+    assert equation.equation_label == "(106)"
+    assert "(106)" not in (equation.text or "")
+
+
 # ---------------------------------------------------------------- rows of a table
 
 
