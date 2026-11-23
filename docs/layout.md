@@ -292,7 +292,17 @@ reader, neither to find them nor as a second opinion
    breaks and keeps the columns; an exam with one row
    of two options under each question has no break in its option columns, and one with ten
    options under one or two questions too few; all of these are read as columns (left options
-   first). The lines of the head are
+   first). Not built, since no real document shows them (checked 2026-11-22 on the 81 public
+   PDFs of the development set and `data/`, where no page reaches the shapes; on the 996
+   analyzed files and 73 replayed uploads of the corpus a fix for them changes nothing): a
+   label test (a pair of option lines level with each other, "(a)" beside "(b)", on 0.4 of the
+   thinner side's lines) reads all 127 exam probes of reviews 18 to 21 question by question
+   (95 before) and a run length of four lines instead of five reads 96 of the 117 column probes
+   as columns (70 before), with none made worse; the patch is kept outside the repository. What it
+   cannot tell apart on spacing alone, and so would still read wrongly if a real page showed it:
+   columns whose thinner side is set at twice the other's pitch (the steps of an exam whose left
+   option runs on), and columns of paragraphs of two or three lines (the groups of an exam's
+   options). The lines of the head are
    then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the

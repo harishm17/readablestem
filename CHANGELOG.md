@@ -57,6 +57,41 @@
   and was taken out again: it was measured on generated pages only.
 - No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed; no stored result, recording or request
   changes.
+## Unreleased: exams and columns measured, nothing built (O-431, O-432, O-436, O-012)
+
+- No change to the reader. The exam shapes 0.5.16 left read left options first (four questions
+  with two wrapped options, one row of two options under each question, ten options under one or
+  two questions, six questions) and the columns it reads across (one figure space in a column of
+  nine lines, a thinner side at twice the other's pitch) were found on generated probe PDFs of
+  reviews 19 to 21 only. Counted on real documents: of the 81 public PDFs of the development set
+  and `data/` no page reaches any of them (no option label pair on any page, five head-column
+  tests none of which changes with a shorter run), `hashrun.py` over the corpus against 9e16778c
+  plus SW55 (cf0729fc) changes none of the 996 analyzed files or 73 replayed uploads, and
+  `eval order --set layout-dev-1` is the same page for page (141 of 267 right, 72 faultless). A
+  fault no real document shows is a limit, not a fix (BUILDERS.md, 2026-11-22).
+- What a fix would do, tried and not kept (patch outside the repository): taking a gutter with
+  three or more pairs of option lines level with each other, the label of one the next letter of
+  the other ("(a)" and "(b)"), on at least 0.4 of the thinner side's lines, for no gutter reads
+  all 127 exam probes question by question (95 before); a run length of four lines instead of
+  five reads 96 of 117 column probes as columns (70 before) and loses none of either kind. Spacing
+  alone does not tell the rest: columns whose thinner side is set at twice the other's pitch (7
+  probes) have the steps of an exam whose left option runs on, and paragraphs of two or three
+  lines in one column (7 probes) have an exam's option groups; 7 more probes are decided by a
+  figure or the end of the page, not by the gutter. `docs/layout.md` says so.
+- O-012, the region tree re-measured on the development set (`eval order --set layout-dev-1`,
+  `REGION_TREE` on against off, profile edited for the run only and restored): 159 of 267 pages
+  right and 80 faultless with the tree on, 141 and 72 off. 22 pages become right, one gets worse
+  (`ax_qbionc_240307089` p8, a figure page: a heading joined to the block above it; right still,
+  no longer faultless). Of the 108 pages still not right with the tree on, the causes named by the
+  evaluation are blocks not found (44 pages), neighbours out of order (49), blocks broken (42),
+  stamps read in the text (28), entries joined (19) and joins across columns (7: `ax_cslg_240306367`
+  p3, `ax_csro_240306533` p4, `ax_eesssp_240306460` p1, 2 and 7, `sm_index_b` p1 and 2). The seven
+  are the same with the tree off; the one looked at (csro p4, two clean columns under a figure,
+  gutter found) is not a gutter fault. The line-number pages (`sm_lineno_a`, `_b`) are as they were
+  off. Nothing was built: the switch stays off until the re-recording (O-421), the one page the
+  tree makes worse is a figure page and not a column page, and the other causes were not
+  diagnosed page by page here (left open for the owner's ranking).
+- No recording or request changes; no version raise owed; no migration.
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
