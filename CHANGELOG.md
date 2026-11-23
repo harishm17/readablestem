@@ -1,5 +1,23 @@
 # Changelog
 
+## Pipeline 0.5.19, render 11 (2026-11-23)
+
+- `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  four "Unreleased" entries below down to the 0.5.18 entry (wave 5: faults real documents show).
+  What changes for a reader, one line for each:
+  - Code fonts (O-440): listings set in NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor or Lucida
+    Console are code; a numbered listing is one block; an address, a list of names or the last
+    line of a wrapped paragraph in the code face is not code.
+  - Algorithms (O-442): a step whose words the text layer lists before its number, and formula
+    stacks listed before their numbers, stay in the algorithm's block.
+  - Figures (O-441): art a clip leaves unpainted is no figure over the text; a hand-drawn figure
+    that typed labels name is a figure, not "handwriting, not converted"; a figure keeps the
+    header labels of the panel it sits on and a title its edge cuts through.
+  - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
+    bracketed number label their display instead of standing as an element of their own.
+- No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
+  stays as made at 0.5.18; the result's schema is the same.
+
 ## Unreleased: code fonts the list did not name (O-440)
 
 - `glyphs._MONO_FONT` names NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor and Lucida Console as
@@ -64,6 +82,7 @@
 - Figures of pictures alone on a filled panel claim the panel's header labels
   (`ax_physicsoptics` page 13), and a row cut by a drawing's edge belongs to it (2407.09859
   page 3), so no figure loses a label the page paints.
+
 ## Unreleased: equation numbers left after wave 4 (`LAYOUT_DISPLAY_GROUPING`; O-037, O-391, O-412, O-416)
 
 - With the display grouping switch on, two more equation numbers label their display and are no

@@ -388,7 +388,15 @@ log = logging.getLogger(__name__)
 # not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.17 opens a 0.5.18 result. Each
 # switch goes back off alone with its profile row and the Railway variable of the same name.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.18"
+# 0.5.19 (2026-11-23): one raise for wave 5 (CHANGELOG.md has each change). What a PDF's result
+# holds moves: six more code font names, numbered listings one block, addresses and name lists
+# not code; algorithm steps listed before their numbers stay in the block; art a clip hides is
+# no figure, a hand-drawn figure named by typed labels is a figure, panel header labels and
+# edge-cut titles belong to their figure; two more equation-number shapes label their display.
+# The result's schema is the same: results from 0.5.10 to 0.5.18 load unchanged and their page
+# is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.18 opens a 0.5.19 result.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.19"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
