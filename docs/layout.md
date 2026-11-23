@@ -2430,7 +2430,7 @@ pseudo-code typed with a word processor's automatic numbers is one block with it
 and "Algorithm 5.1 (Euclid)" written as numbered sentences stays a list. Two lines whose
 numbers differ in length ("9." and "10.") prove nothing: typed with no tab stop, the longer
 number sets its words a digit further right. A caption here is a line that opens "Algorithm" and
-a number: under "Procedure 2 ...", "Algorithm: Scan a verse" or "Algorithm A (...)" pseudo-code
+a number ("Algorithm 2", and an appendix's "Algorithm A-1" or "Algorithm B.2": `_ALGORITHM_CAPTION`): under "Procedure 2 ...", "Algorithm: Scan a verse" or "Algorithm A (...)" pseudo-code
 numbered "1." is still a list, with no indentation and its "count = count + 1" step not an
 item of its own. The lines are in one column and one size, within
 `ALGORITHM_MAX_PITCH` (2.2) lines
@@ -2457,7 +2457,8 @@ Line numbers ("3:", "12") are cut off the words and written in a gutter, right-a
 of the step ("3:   if x then"). The levels come from where the words start, not from the numbers,
 and the steps must carry consecutive numbers (`_Steps.expect`), so a numbered list of sentences, a
 table with a line-number column and line numbers in a page margin (which no step follows) are not
-taken. Up to `ALGORITHM_PREAMBLE` (4) lines (Input, Output) may come before the first number. A
+taken. Up to `ALGORITHM_PREAMBLE` (4) lines (Input, Output; a line that wraps is one line) may come
+before the first number. A
 step that goes on in a second line (the line before it ran to within `ALGORITHM_WRAPPED` (3) em of
 the column's right edge, and the new line has no number, does not start with a capital or a step
 word) is joined to its step; a word broken by a hyphen across the wrap is mended. A line with no
@@ -2506,10 +2507,38 @@ caption whose only nesting is between lines 9 and 10 is a list. An "=" step that
 of its block after an equation is not picked up when the line that opens the block wraps
 into a second line that starts where it does. Counted on the public pages (wave 2b: the 22 pages
 of `layout-dev-1`, the arXiv gold and the repository's own with an "Algorithm" or "Procedure" line)
-and not built, each on one page: a step after a monospaced comment row (2405.15050 p4), an
-Input list of two-row math regions that stops after the first line and leaves the steps from
-the seventh on as paragraphs (2504.06207 p4), and a step whose second line is a paragraph of its
-own between the steps (Algorithm 1 of ax_statme_240307124, p12).
+and not built, each on one page: a step whose second line is a paragraph of its own between the
+steps (Algorithm 1 of ax_statme_240307124, p12). The other two (a step after a monospaced comment
+row, 2405.15050 p4; an Input list of two-row math regions, 2504.06207 p4) are built, below.
+
+**Algorithms, wave 4 (O-394).** Five shapes counted on public pages are read (the 27 pages that
+hold an algorithm were read before and after; the pages the change touches are 2405.15050 p4,
+2504.06207 p4 and p5, ax_csro_240306420 p9 and ax_eesssp_240306460 p6):
+a *line number alone in its row* ("7:" with the step's words, formula or comment in rows of their
+own on its baseline: the text layer lists them apart; `_lone_number`) is the next number when it
+is the one expected (`_Steps.number`), and the rows right of it on its line are pieces of its step
+(`_Steps.after_lone_number`), as small rows and rows of math are; a lone number is not the
+equation's end (`_after_equation`) nor a proof of nesting or of a step word (`_is_algorithm`), and
+the paragraph writer gives it an empty step that its pieces fill (`_paragraph_pieces`). A
+*comment that opens with "▷"* ("▷ set of HPs to apply") belongs to the step on whose line it
+stands, whichever row the page lists it in (`_COMMENT_MARK`; any step taken, not only the last
+four). A *monospaced row between two numbered steps* is a step's comment when the next number is
+just below it (`_scan`: a code row is free only then). A *row of math under a numbered "Input:"*
+list is the rest of that step, as text rows are (`_step_kind`: right of the numbers with the next
+number just below it). A *number a little smaller than the steps* (a gutter in 8 pt over 10 pt
+text) resumes after an equation (`_resumes`). "Algorithm A-1" is a caption, so its Input and
+Output lines join the numbered steps (before this they were headings). Measured on a counted
+page and not built: a numbered tail at the top of the next page (2504.06207 p5 step 9; the page
+has no caption and starts at a number), a heading under an algorithm that its last line
+absorbs, a `for ...:` line over an equation, an opener that wraps flush, a one-line block,
+2504.06207 p4 steps 9 to 13 (the content of a numbered step listed by the text layer before its
+number), 2405.15050 p4 steps 10 to 12 (a stacked math region listed before the numbers), the
+boxed "TABLE III" algorithm of ax_eesssp_240306423 p6 (two columns interleaved), and the garbled
+math of step 8 in ax_csro_240306420 p9 (a math-region fault, not the algorithm's). Found beside
+them and outside the algorithm functions: `glyphs._MONO_FONT` does not name "NimbusMonL"
+(`Mon` + `L`), "CMITT", "TeXGyreCursor" or "t1xtt", so a listing set in those fonts (the numbered
+listing of 2505.13042 p3; 42 pages of 8 files carry NimbusMonL) is not taken for code and is read
+as prose. One regex line, a reader change over those files that needs its own corpus run.
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a

@@ -107,6 +107,32 @@
   the log does not name still cannot be told from a very large source.
 - Owed, not made here: raising `PIPELINE_VERSION` and `RENDER_VERSION` (a source's stored result
   gains caption links only when it is converted again). No migration.
+## Unreleased: algorithms with line numbers alone in their rows, comments and math under Input (O-394)
+
+- `blocks._algorithm_groups` reads five more shapes counted on the public pages (docs/layout.md,
+  "Algorithms, wave 4"): a line number alone in its row, whose step's words, formulas or comment
+  are in rows of their own on its baseline (2405.15050 p4, 2504.06207 p4 and p5); a comment that
+  opens with "▷" (2504.06207), including one the text layer lists after the steps below its line;
+  a monospaced comment row between two numbered steps (2405.15050 p4); a list of math rows under
+  a numbered "Input:" (2504.06207 p4); and an appendix caption, "Algorithm A-1" or "Algorithm
+  B.2", whose "Input:" and "Output:" lines now join the numbered steps (ax_csro_240306420 p9),
+  with a wrapped preamble line counted once. A number a little smaller than the steps resumes
+  after an equation, and a number alone in its row is not the end of an equation. This also puts
+  the 14 steps of Algorithm 2 of ax_eesssp_240306460 p6 in one block (a step with a display
+  equation had split it in two).
+- Measured with `hashrun.py` against cf0729fc: `full` (73 uploads, recorded answers) has no
+  difference, so no recorded request key stops matching and no switch is needed. `analyze` (996
+  runs) differs on four files, all of them pages with an algorithm and each difference read:
+  ax_csro_240306420 p9, ax_eesssp_240306460 p6, 2405.15050 p4, 2504.06207 p4 and p5. The other
+  22 algorithm pages (27 in all) read as before. Crops are unchanged.
+- `PIPELINE_VERSION` (0.5.16) is owed one raise for these four documents' cached layouts; not made
+  here. `RENDER_VERSION` is not owed.
+- Not built, counted and measured (docs/layout.md): a numbered tail at a page top, a heading
+  under an algorithm, a `for ...:` line over an equation, an opener that wraps flush, one-line
+  blocks, a paragraph between steps (ax_statme_240307124 p12), content listed before its number
+  (2504.06207 p4 steps 9 to 13, 2405.15050 p4 steps 10 to 12), and the mono font names
+  (`glyphs._MONO_FONT` misses "NimbusMonL", "CMITT", "TeXGyreCursor" and "t1xtt": one regex line
+  that changes 8 files and needs its own run).
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
