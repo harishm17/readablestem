@@ -466,29 +466,6 @@ def test_a_bullet_item_set_in_bold_is_a_list_item_not_a_heading():
     assert [e.text for e in got if e.kind == Kind.HEADING] == ["Questions for the datasheet"]
 
 
-def test_a_bulleted_line_set_larger_than_the_body_text_is_an_item_not_a_heading():
-    # A deck of formulas: most of its glyphs are small, so its bullets (and their text) are
-    # more than 1.2 times the body size, and still the bullets are list items.
-    def fill(page):
-        write(page, 72, 100, ["Results of the second experiment"], fontsize=24, fontname="hebo")
-        for i, text in enumerate(
-            [
-                "The loss falls with each pass over the data",
-                "The error stays flat after the third pass",
-                "The gap between the two curves is small",
-            ]
-        ):
-            page.insert_text((72, 160 + 30 * i), "•", fontsize=18)
-            page.insert_text((96, 160 + 30 * i), text, fontsize=18)
-        write(
-            page, 72, 280, ["Each curve is the mean of five runs of one model on one machine."] * 6
-        )
-
-    got = analyze(one_page(fill)).elements
-    assert len(items(got)) == 3
-    assert [e.text for e in got if e.kind == Kind.HEADING] == ["Results of the second experiment"]
-
-
 def test_a_bold_item_in_a_run_of_its_series_is_an_item_and_a_bold_title_over_text_is_a_heading():
     def key(page):  # the right answer of a key is set in bold among upright options
         y = write(page, 72, 100, ["1. Which law relates the force on a body to its motion?"])

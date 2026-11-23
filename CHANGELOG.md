@@ -11,8 +11,11 @@ corpus by counts only); only what a count asked for was built.
 - O-408: the second line of a numbered paragraph set with an indented first line ("2) Prompt Design
   With A Code Template: The controller ...") goes on from the first although it starts left of the
   marker (`_numbered_paragraph_goes_on` in `_continues`).
-- O-407: a bulleted line is a list item whatever its size; in a deck of formulas the body size is the
-  commonest glyph size, and bullets set larger than 1.2 times it were headings (`_classify_run`).
+- O-407: in a slide deck a bulleted line is a list item whatever its size; in a deck of formulas the
+  body size is the commonest glyph size, and bullets set larger than 1.2 times it were headings
+  (`_classify_run`). Outside a deck the rule is not applied: a bullet glyph before "Key Terms" in an
+  OpenStax book is decoration (a first version without this limit turned 4 such headings and 2
+  headings of figures into items in the scan of 332 files).
 - O-418 b: a lettered title of four words or more may end in a full stop, on its first row or on its
   second ("B. Electron-phonon coupling and carrier mobility.", `MIN_STOPPED_TITLE_WORDS`); with fewer
   words ("A. Yes.") it still ends an answer.
