@@ -1454,7 +1454,9 @@ def _label_owners(
                     continue
                 gap = _stroke_gap(row.bbox, figure, held[id(figure)])
                 if not inside and _cut_by(row.bbox, figure.drawing):
-                    gap = 0.0  # the drawing's edge cuts through it: an axis title under a plot
+                    # the drawing's edge cuts through it (an axis title under a plot): a label
+                    # at the longest reach, so a figure whose stroke is nearer still takes it
+                    gap = min(gap, reach)
                 if (inside or gap <= reach) and (best is None or gap < best[0]):
                     best = (gap, figure, inside)
             if best is None:

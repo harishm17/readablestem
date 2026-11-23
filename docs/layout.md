@@ -1947,6 +1947,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
 - **A row cut by a drawing's edge** belongs to that drawing when at least a quarter of it lies
   inside and its center is between the drawing's sides (`figures._cut_by`; 2407.09859 page 3:
   an axis title straddling the figure's bottom edge once the hidden art no longer extended it).
+  It counts at the longest reach only, so a figure with a stroke nearer to the row takes it
+  (2309.01229 page 4: the "−0.1" tick of one panel, cut by the edge of its neighbor's box).
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
   along all four edges of its own box and nowhere else: a rectangle, rounded corners, a
