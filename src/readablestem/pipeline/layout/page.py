@@ -88,6 +88,7 @@ from readablestem.pipeline.layout.furniture import (
 from readablestem.pipeline.layout.glyphs import _MATH_SYMBOL_FONT, NOTE_MARK_FLAG, _Char, _union
 from readablestem.pipeline.layout.inline_runs import _classify_row, _equation_pictures
 from readablestem.pipeline.layout.order import (
+    OPTION_LABEL,
     Gutter,
     _find_gutter,
     _reading_order,
@@ -203,6 +204,15 @@ def _accepted(
     return accepted
 
 
+def _option_boxes(kept: Sequence[_Row], height: float) -> list[BBox]:
+    """The boxes of the body lines that start with the label of an option, "(a)" or "b)"."""
+    return [
+        f.bbox
+        for f in kept
+        if not f.vertical and _margin_zone(f, height) is None and OPTION_LABEL.match(f.clean)
+    ]
+
+
 def _prepare_rows(
     page: pymupdf.Page,
     frags: list[_Row],
@@ -223,7 +233,7 @@ def _prepare_rows(
         # No gutter orders the page here, but a rule at the head of one column must still not
         # become the blank of a line in the other (it would reach across the channel).
         body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
-        _mark_blanks(kept, rules, _find_gutter(body))
+        _mark_blanks(kept, rules, _find_gutter(body, options=_option_boxes(kept, height)))
         rows, tree, rest = regions.prepare(
             page, kept, dropped, rules, tables=tables, document=document
         )
@@ -235,7 +245,7 @@ def _prepare_rows(
         return rows, tree, rest
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
-    gutter = _find_gutter(body)
+    gutter = _find_gutter(body, options=_option_boxes(kept, height))
     if gutter is None and document.slide_deck:
         # A slide's columns are short (`_find_gutter`, `slide`), so they must also hold words:
         # the brace and the cases of a piecewise function are not two columns of text.

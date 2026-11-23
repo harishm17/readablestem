@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import bisect
 import itertools
+import re
 import statistics
 from collections.abc import Iterable, Sequence
 from typing import Protocol
@@ -51,12 +52,26 @@ MIN_HEAD_COLUMN_LINES = 4
 MIN_BREAK_PITCHES = 1.9
 MAX_BREAK_LINES = 3
 # Columns cut by such breaks hold runs of at least this many lines on average (an exam's option
-# pairs hold two to four; the columns of a paper's first page, seven or more).
-MIN_RUN_LINES = 5
+# pairs hold two or three; the columns of a paper's first page, seven or more). Four, not five:
+# a column with one or two figure spaces or headings, nine lines in all, is two runs of four and
+# a half, and an exam of option pairs with no labels has runs of three at most.
+MIN_RUN_LINES = 4
+# The options of an exam are labeled "(a)", "b)" or "C." and stand two by two, a label level with
+# a label of the other side. Geometry alone cannot tell them from two columns (an option that
+# runs on to a second line is a hole like a paragraph's space, one row of options under each
+# question has a step of twice the pitch like a spaced list), so a gutter with at least this many
+# label pairs, and with a label on at least this share of the lines of its thinner side, is no
+# gutter: the options of a question are read one after the other, a, b, c, d.
+OPTION_LABEL = re.compile(r"^(\([A-Ha-h]\)|[A-Ha-h][.)])(\s|$)")
+MIN_OPTION_PAIRS = 3
+MIN_OPTION_SHARE = 0.4
 
 
-def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, float] | None:
-    """The white vertical gap between two text columns, or None for one column.
+def _find_gutter(
+    boxes: list[BBox], *, slide: bool = False, options: Sequence[BBox] = ()
+) -> tuple[float, float] | None:
+    """The white vertical gap between two text columns, or None for one column. `options`
+    are the boxes that start with the label of an option ("(a)", `OPTION_LABEL`).
 
     Looks for an x-interval near the middle that (almost) no narrow line touches, with at
     least three lines on each side whose left edges line up (a real column has a margin)
@@ -71,6 +86,8 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
         return None
     narrow = [b for b in boxes if b[2] - b[0] <= 0.55 * width]
     gutter = _gutter_of(narrow, left, width, slide)
+    if gutter is not None and not slide and _option_pairs(gutter, narrow, options):
+        return None
     if gutter is not None or slide:
         return gutter
     # A first page: a title, the authors and their affiliations, an abstract across the page,
@@ -99,10 +116,33 @@ def _find_gutter(boxes: list[BBox], *, slide: bool = False) -> tuple[float, floa
             thin, thick = sorted(map(len, sides))
             if thin < MIN_HEAD_COLUMN_BALANCE * thick or thin < MIN_HEAD_COLUMN_LINES:
                 continue
+            if _option_pairs(gutter, under, options):
+                continue
             crossing = [b for b in under if b[2] > gutter[0] + 0.5 and b[0] < gutter[1] - 0.5]
             if _columns_run(sides, wide, crossing):
                 return gutter
     return None
+
+
+def _option_pairs(gutter: tuple[float, float], boxes: list[BBox], options: Sequence[BBox]) -> bool:
+    """Whether the lines either side of `gutter` are the options of an exam standing two by
+    two (`OPTION_LABEL`): labels level with each other, on a good share of the lines of the
+    thinner side. A paper's lists of (a), (b), (c) in its columns do not stand level."""
+    labeled = set(options)
+    sides = (
+        [b for b in boxes if b[2] <= gutter[0] + 0.5],
+        [b for b in boxes if b[0] >= gutter[1] - 0.5],
+    )
+    marked = [sorted(_visual_lines([b for b in side if b in labeled])) for side in sides]
+    pairs = sum(
+        any(
+            min(a[3], b[3]) - max(a[1], b[1]) >= 0.5 * min(a[3] - a[1], b[3] - b[1])
+            for b in marked[1]
+        )
+        for a in marked[0]
+    )
+    thin = min(len(_visual_lines(side)) for side in sides)
+    return pairs >= MIN_OPTION_PAIRS and pairs >= MIN_OPTION_SHARE * thin
 
 
 def _columns_run(
