@@ -10,9 +10,13 @@
     line of a wrapped paragraph in the code face is not code.
   - Algorithms (O-442): a step whose words the text layer lists before its number, and formula
     stacks listed before their numbers, stay in the algorithm's block.
-  - Figures (O-441): art a clip leaves unpainted is no figure over the text; a hand-drawn figure
-    that typed labels name is a figure, not "handwriting, not converted"; a figure keeps the
-    header labels of the panel it sits on and a title its edge cuts through.
+  - Figures (O-441): a hand-drawn figure that typed labels name is a figure, not "handwriting,
+    not converted"; a figure of pictures keeps the header labels of the panel it sits on.
+  - Behind a new switch that stays off, no change: `LAYOUT_FIGURE_ART` (art a clip leaves
+    unpainted is no figure over the text; a row a figure's edge cuts through is its label). It
+    moved one recorded figure request on each of three corpus uploads; turning it on is owed a
+    re-recording, a pipeline raise, the reading order of two figures on one lecture page, and
+    the clip read in the upload probe and the strike and highlight read.
   - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
     bracketed number label their display instead of standing as an element of their own.
 - No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
