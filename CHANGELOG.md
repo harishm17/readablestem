@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: a formula is not read inside a typed web address; strike, highlight and blank limits measured (branch fix/text-marks; O-410, O-021, O-025, O-027)
+
+- `layout/inline_runs._outside_addresses`: an inline-equation run that lies wholly inside a typed
+  address (`https://`, `http://`, `www.` to the next space) is dropped. `watch?v=C-uekD6VTIQ` was cut
+  at the "v=C" it read as a relation, and `text_pass._address_end` then ended the link at the marker
+  (public file `layout-dev-1/ax_csro_240306533.pdf` page 1). A PIPELINE_VERSION bump is owed once
+  this is merged, because layout text changes for files with such an address.
+- O-021 (blanks), O-025 (struck table cells and display equations), O-027 (paint order, highlights of
+  three or more touching pieces): measured on the public sets and the corpus, no real document shows
+  them, so nothing is built; the limits are written in `docs/layout.md` and on the limits page.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
