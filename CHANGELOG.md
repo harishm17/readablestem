@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: table and caption leftovers measured, none built (O-434, O-435, O-061, O-056, O-404)
+
+- Counted before building, on 332 public PDFs (the layout development set, the repository's own,
+  the real-document set), the 188 table PDFs of the parsing benchmark and, as counts only, 25
+  corpus PDFs. No code changes; `docs/tables.md` ("Known limits") has the numbers.
+- Schedules and sidebars (O-434): 14 boxes of the public sets reach the labels rule, 5 of the
+  corpus; none is a schedule with lower-case labels. Case stays the measure.
+- Captions under a table (O-435, O-061): of 115 captions in the public sets and 8 in the benchmark,
+  none is ended by the step test, so a pushed line and a title set apart are not seen. A pushed
+  line and a paragraph's first line have the same shape on the page, so a measure would trade
+  one for the other; the 4-line cut is already gone (0.5.16); inline math in a caption changes the
+  request and the one-line case has no instance, as before.
+- Thick borders (O-056): none of 332 public and 25 corpus PDFs has a table with filled borders
+  over 1.6 pt; a 4 pt cap changes 4 of the 6 benchmark files that have a 2 to 4 pt box near a
+  table, one for the worse (a table lost). Generated tables with borders of 2, 3 and 4 pt still
+  give a table and a figure.
+- Labeled lines with no rule (O-404): "Q1" to "Q6" before sentences is found in none of the
+  545 PDFs; the unruled two-column tables found are schedules, key and value pairs and notation
+  lists. A rule that makes it a list (item words before a number) was built on the probe, passed,
+  and was taken out again: it was measured on generated pages only.
+- No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed; no stored result, recording or request
+  changes.
+
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
 - New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
