@@ -19,6 +19,15 @@
   - In a slide deck each page's largest heading is its slide's title, and every slide title is
     one level whatever its size (`layout.heading_levels`): an 80-point slide title no longer puts
     the deck's 48-point titles a level under it.
+  - Found by an independent review of the release (`layout/regions.py`). A question number and
+    its options at tab stops, with a Name / Date line on the same stops, are no two columns: a
+    matching exercise is cut in two only when each column holds one kind of label (terms 1. 2.
+    3. beside definitions A. B. C.). `data/authored/tables/handout-word` page 1 read option d)
+    before a), and b) inside the Name line, with the tree on; it reads as 0.5.17 read it.
+  - The lower limit of an integral or sum sign is read with the sign, not cut off below it:
+    "∫ab f′(x) dx = f(b) −f(a)" on two slides of `latex-slides` no longer read as "∫b f′(x) dx =
+    f(b) −f(a) a". A limit that hangs under a binomial or stands over the sign without touching it
+    (a sum's `i=1` on page 20 of that deck and the two-column fixture) still reads out of place.
 - Each switch can go back off alone. The pipeline is raised so results made under 0.5.17 are not
   read as results of the new layout; 0.5.17 results still open.
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many

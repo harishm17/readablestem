@@ -43,7 +43,7 @@ from readablestem.pipeline.layout.order import (
     _section_break,
     _top_down,
 )
-from readablestem.pipeline.layout.rows import _merge_baselines
+from readablestem.pipeline.layout.rows import _BIG_OPERATORS, _merge_baselines
 from readablestem.pipeline.layout.shared import _Display, _Path, _Row
 
 CHANNEL_PT = 7.0  # narrowest white channel that cuts a segment into columns
@@ -144,15 +144,15 @@ def _over_shorter(items: Sequence[Item], band: Sequence[int], y0: float, y1: flo
 
 
 def _under_taller(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
-    """Does the text item `i` hang inside a text member of `band` at least twice its
-    height? The lower limit of a display's big operator (an integral sign taller than the
-    limit, with the upper limit in its own line) is read with it, not cut off below it."""
+    """Does the text item `i` hang inside a big operator of `band` (a fragment that opens with
+    an integral or sum sign, at least twice its height)? The lower limit of a display's
+    operator is read with it, not cut off below it."""
     (_, y0, _, y1), text = items[i]
     if not text.strip() or not 0 < y1 - y0:
         return False
     for j in band:
         (_, top, _, bottom), held = items[j]
-        if held.strip() and bottom - top >= 2 * (y1 - y0):
+        if held[:1] in _BIG_OPERATORS and bottom - top >= 2 * (y1 - y0):
             if min(bottom, y1) - max(top, y0) >= 0.2 * (y1 - y0):
                 return True
     return False

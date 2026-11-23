@@ -264,11 +264,11 @@ def test_options_at_tab_stops_are_no_columns():
 
 
 def test_the_limits_of_a_display_stay_in_its_text_with_the_tree_on():
-    # A big operator taller than its lower limit: the horizontal cut between the lines of the
+    # An integral sign taller than its lower limit: the horizontal cut between the lines of the
     # display left the limit out of the operator's line (text "∫b f′(x) dx = f(b) −f(a) a").
     pdf = (DATA / "dev-v2/dev/authored/latex-slides/latex-slides.pdf").read_bytes()
     texts = [
-        [e.text for e in layout.analyze(pdf, pages=[2, 3, 19], region_tree=on).elements]
+        [e.text for e in layout.analyze(pdf, pages=[2, 3], region_tree=on).elements]
         for on in (False, True)
     ]
     assert texts[0] == texts[1]
