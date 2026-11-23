@@ -721,6 +721,8 @@ class _Figure:
     number: str | None = None  # ... and the equation number printed beside it
     fragments: bool = False  # a region of text fragments and short strokes (`_fragment_figures`)
     members: list[_Path] = field(default_factory=list)  # the vector paths it is drawn with
+    # The filled panel a figure of pictures alone sits on, with its header labels (`_panels`).
+    panel: BBox | None = None
     # The box of what is drawn (the box before any label is added to it).
     drawing: BBox = field(init=False)
 

@@ -69,6 +69,7 @@ from readablestem.pipeline.layout.figures import (
     _merge_figures,
     _pad,
     _page_furniture,
+    _panels,
     _raster_figures,
     _RightEdges,
     _round_page,
@@ -415,6 +416,7 @@ def _page_blocks(
     strokes: Sequence[BBox] = (),
     dropped: Sequence[_Row] = (),
     ink_sources: Collection[int] = frozenset(),
+    pen_paths: Sequence[_Path] = (),
     mixed_ink: bool = False,
     label_keys: Collection[tuple] = frozenset(),
     covers: Sequence[tuple[float, float]] = (),
@@ -473,7 +475,11 @@ def _page_blocks(
         _classify_row(row, document=document)
     rows = [*rows, *restored]
     figures = [f for f in figures if not _backdrop(f, rows, ctx, page.parent, document=document)]
+    _panels(figures, paths)
     _claim_labels(figures, rows, ctx, document=document)
+    figures, ink = _pen_figures(
+        figures, ink, pen_paths, loose, rows, page_rect, ctx, document=document
+    )
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures, document=document)
     figures += _fragment_figures(
         rows,
@@ -1060,6 +1066,61 @@ def _at_edge(box: BBox, frame: BBox, reach: float) -> bool:
     return (
         box[0] <= x0 + reach or box[2] >= x1 - reach or box[1] <= y0 + reach or box[3] >= y1 - reach
     )
+
+
+def _pen_figures(
+    figures: list[_Figure],
+    regions: Sequence[BBox],
+    pen_paths: Sequence[_Path],
+    others: Sequence[_Path],
+    rows: list[_Row],
+    page_rect: pymupdf.Rect,
+    ctx: _Context,
+    *,
+    document: _Document,
+) -> tuple[list[_Figure], Sequence[BBox]]:
+    """A hand-drawn figure on a typed page is a figure, not handwriting ("Pen figures" in
+    docs/layout.md). A page with handwriting (mixed_ink) holds its pen drawings back from
+    the figure rules (`pen_paths`) and cuts each region of strokes out as "handwriting, not
+    converted". But a drawing a pen made that the page's own typed labels name (a sphere
+    with its radius and charge, the world-lines of a particle beside the plane they cross)
+    is a figure like any other. Each region, the largest first, is read again with every
+    path that touches it (`others`: the drawing's strokes that failed the pen tests too) as
+    the figure rules read a page: its drawings become one figure, and when a typed label
+    belongs to it by the one rule for labels (`_label_owners`), that is the figure, with
+    its labels and the whole of its extent (the region held only the strokes that passed
+    the pen tests, so the typed labels stood off from it as stray equations). The regions
+    inside it are no handwriting. A drawing no typed label names stays handwriting: writing
+    on a typed page has no typed labels. A drawing that meets a figure the page has
+    already is part of that figure's page, not a second one."""
+    if not pen_paths or not regions:
+        return figures, regions
+    chosen: list[_Figure] = []
+    for region in sorted(regions, key=lambda r: -(r[2] - r[0]) * (r[3] - r[1])):
+        if any(_centre_inside(region, f.bbox) for f in chosen):
+            continue
+        pool = [p for p in (*pen_paths, *others) if _within(p.bbox, region, 0.0)]
+        found = _vector_figures(pool, rows, page_rect, ctx, page_sized=False, document=document)
+        if not found:
+            continue
+        box = _union(f.bbox for f in found)
+        if any(_within(box, f.bbox, 0.0) for f in figures):
+            continue
+        one = _Figure(
+            box,
+            paths=sum(f.paths for f in found),
+            members=[p for f in found for p in f.members],
+        )
+        if any(
+            owner is one for owner in _label_owners([one], rows, ctx, document=document).values()
+        ):
+            chosen.append(one)
+    if not chosen:
+        return figures, regions
+    _claim_labels(chosen, rows, ctx, document=document)
+    held = [f.bbox for f in chosen]
+    left = [r for r in regions if not any(_centre_inside(r, b) for b in held)]
+    return [*figures, *chosen], left
 
 
 def _ink_blocks(regions: Sequence[BBox], page_rect: pymupdf.Rect) -> list[_Block]:

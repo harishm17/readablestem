@@ -46,6 +46,24 @@
   names (no `post` or `GSUB` table). The codes are per subset ('A' is "ti", 'G' "tti", 'L' "tt" in
   this file only), so no table keyed on the font name is exact. 1 public file of about 332 and 0
   of 25 private files; a width rule would read 'L' as "ft".
+## Unreleased: art that a clip hides is no figure (O-441)
+
+- A PDF that carries a figure's art on every page clips each page to its own part and leaves the
+  rest in the page's drawings, painted nowhere. Layout read that art as painted: a figure box
+  over the text beside it (arXiv 2407.20815 pages 2 and 4, 2401.11209 page 2, 2504.03499 page 3,
+  ax_astrophga_240306409 page 11, where three lines of a paragraph were in no element), and ink from it that made a
+  typed page look like handwriting. `page_type.page_drawings` reads the page's clips and gives a
+  drawing wholly outside its clip opacity 0, which every reader of paint already leaves out
+  (`pipeline/layout/document.py`, `drawings.py`, `rows.py`, the upload probe and the page-type
+  eval). 15 public files and 34 pages are affected, 4 of 25 corpus files; see docs/layout.md,
+  "Figures". A pipeline raise is owed with the release that carries it.
+- Two pages that the clip fix turned into mixed ink would have lost their figures: 2407.20815
+  pages 2 and 4 (a hand-drawn sphere and world lines, then "handwriting, not converted", the
+  sphere with its top cut off). A handwriting region that a typed label of the page names is a
+  figure again, with its whole extent and labels (`page._pen_figures`).
+- Figures of pictures alone on a filled panel claim the panel's header labels
+  (`ax_physicsoptics` page 13), and a row cut by a drawing's edge belongs to it (2407.09859
+  page 3), so no figure loses a label the page paints.
 
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 

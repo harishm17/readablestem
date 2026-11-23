@@ -1250,6 +1250,51 @@ _ART_SLACK = 1.0  # pt: an appearance is inside its annotation's box, bar roundi
 _NOT_SHOWN = pymupdf.mupdf.PDF_ANNOT_IS_HIDDEN | pymupdf.mupdf.PDF_ANNOT_IS_NO_VIEW
 
 
+_PAINT = frozenset({"f", "s", "fs"})
+
+
+def page_drawings(page: pymupdf.Page) -> list[dict[str, Any]]:
+    """`page.get_cdrawings()` with the paint that no clip lets through made invisible.
+
+    A PDF that embeds the art of several pages (an editor's export of a lecture's figures)
+    can clip each page to its own part and still carry the rest: painted nowhere, yet listed
+    (arXiv 2407.20815 pages 2 and 4: figure rules boxed the text over such art). The extended
+    list holds the clips between the drawings, `level` saying how deep each nests; a drawing
+    whose box, with half its line width, lies outside the box of a clip it is inside of is
+    hidden, and gets opacity 0, which every reader of paint already takes as not seen
+    (`paint_visibility`, the ink analysis). The extended list is read for the clips only: it
+    splits a filled and stroked path in two where the plain list keeps one, so the plain list
+    is the one returned, with the same drawings in the same places (`seqno` ties the two)."""
+    drawn = page.get_cdrawings()
+    if not drawn:
+        return drawn
+    clips: list[Sequence[float] | None] = []  # the clip box (None: no box) of each open level
+    shown: set[int] = set()
+    hidden: set[int] = set()
+    for d in page.get_cdrawings(extended=True):
+        level = int(d.get("level", 0))
+        if d["type"] not in _PAINT:
+            del clips[level:]
+            clips.append(d.get("scissor") if d["type"] == "clip" else None)
+            continue
+        pad = float(d.get("width") or 0.0) / 2 if d.get("color") is not None else 0.0
+        x0, y0, x1, y1 = d["rect"]
+        outside = any(
+            box is not None
+            and (x1 + pad < box[0] or x0 - pad > box[2] or y1 + pad < box[1] or y0 - pad > box[3])
+            for box in clips[:level]
+        )
+        (hidden if outside else shown).add(d["seqno"])
+    gone = hidden - shown
+    if gone:
+        for d in drawn:
+            if d.get("seqno") in gone:
+                for key in ("fill_opacity", "stroke_opacity"):
+                    if key in d:
+                        d[key] = 0.0
+    return drawn
+
+
 def without_annotation_art(
     page: pymupdf.Page, drawings: list[dict[str, Any]]
 ) -> list[dict[str, Any]]:
@@ -2429,7 +2474,7 @@ def _probe_ink(page: pymupdf.Page, budget: InkBudget) -> InkStats:
         return InkStats(analysed=False, cause=INK_TIME, paths=1, marks=1)  # unknown
     if budget.items_left == 0:  # the allowance is spent: reading the drawings would cost more
         return InkStats(analysed=False, cause=INK_WORK, paths=1, marks=1)  # than analysing them
-    return ink_stats(page, without_annotation_art(page, page.get_cdrawings()), budget)
+    return ink_stats(page, without_annotation_art(page, page_drawings(page)), budget)
 
 
 def document_refusal(doc: pymupdf.Document, *, budget_s: float = PROBE_GUARD_S) -> str | None:

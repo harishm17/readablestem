@@ -1407,6 +1407,22 @@ def _stroke_gap(box: BBox, figure: _Figure, labels: Sequence[BBox] = ()) -> floa
     return best
 
 
+CUT_MIN = 0.25  # of a row's area: lying on a drawing's box this much, the edge cuts it
+
+
+def _cut_by(row: BBox, box: BBox) -> bool:
+    """The edge of `box` cuts through the row: at least CUT_MIN of the row lies in the box,
+    though not most of it, and its middle is between the box's sides. A crop of the box
+    would show half a line; what the row says is the figure's (the axis title of a plot
+    whose tick labels are drawn as outlines stands further than a label's reach from any
+    stroke, and the box ends in the middle of it)."""
+    area = max(1e-6, _area(row))
+    inter = max(0.0, min(row[2], box[2]) - max(row[0], box[0])) * max(
+        0.0, min(row[3], box[3]) - max(row[1], box[1])
+    )
+    return inter >= CUT_MIN * area and box[0] <= (row[0] + row[2]) / 2 <= box[2]
+
+
 def _label_owners(
     figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
 ) -> dict[int, _Figure]:
@@ -1439,13 +1455,17 @@ def _label_owners(
             reach = LABEL_REACH * row.size * (LABEL_TURNED if row.vertical else 1.0)
             best: tuple[float, _Figure, bool] | None = None
             for figure in figures:
-                inside = _mostly_in(row.bbox, figure.drawing)
+                inside = _mostly_in(row.bbox, figure.panel or figure.drawing)
                 if not inside and not (
                     _within(row.bbox, figure.drawing, reach)
                     or any(_within(row.bbox, b, reach) for b in held[id(figure)])
                 ):
                     continue
                 gap = _stroke_gap(row.bbox, figure, held[id(figure)])
+                if not inside and _cut_by(row.bbox, figure.drawing):
+                    # the drawing's edge cuts through it (an axis title under a plot): a label
+                    # at the longest reach, so a figure whose stroke is nearer still takes it
+                    gap = min(gap, reach)
                 if (inside or gap <= reach) and (best is None or gap < best[0]):
                     best = (gap, figure, inside)
             if best is None:
@@ -1455,7 +1475,11 @@ def _label_owners(
             if inside:  # a line of a paragraph among the rows inside the drawing
                 if id(figure) not in in_drawing:
                     in_drawing[id(figure)] = _running_text(
-                        [r for r in rows if not r.absorbed and _mostly_in(r.bbox, figure.drawing)],
+                        [
+                            r
+                            for r in rows
+                            if not r.absorbed and _mostly_in(r.bbox, figure.panel or figure.drawing)
+                        ],
                         ctx,
                         document=document,
                     )
@@ -1496,6 +1520,34 @@ def _whole_blocks_only(found: Collection[int], blocks: Sequence[_Block] | None) 
         if mine and not all(r.absorbed or id(r) in taken for r in block.rows):
             taken.difference_update(mine)
     return taken
+
+
+PANEL_MAX_AREA = 1.5  # x a picture's area: the most a panel it sits on may cover
+
+
+def _panels(figures: Sequence[_Figure], paths: Sequence[_Path]) -> None:
+    """Set `panel` of each figure of pictures alone (no drawn stroke, so `_stroke_gap` finds
+    no text near it) to the filled box it lies on: a box that holds the pictures, covers no
+    more than PANEL_MAX_AREA times their area (a page's backdrop is none) and holds no other
+    figure. The short rows on the panel (the titles above a grid of pictures, painted on the
+    panel behind them) are the figure's labels, as they are when strokes draw it."""
+    for figure in figures:
+        if figure.members or not figure.images or figure.equation:
+            continue
+        held = [
+            p.bbox
+            for p in paths
+            if p.kind == "shape"
+            and p.filled
+            and not p.curved
+            and _inside(figure.drawing, p.bbox)
+            and _area(p.bbox) <= PANEL_MAX_AREA * _area(figure.drawing)
+            and not any(
+                other is not figure and _within(other.bbox, p.bbox, -1.0) for other in figures
+            )
+        ]
+        if held:
+            figure.panel = min(held, key=_area)
 
 
 def _claim_labels(

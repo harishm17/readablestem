@@ -13,6 +13,7 @@ import itertools
 import math
 import re
 from html import unescape
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -415,6 +416,47 @@ def test_a_labelled_tab_over_a_sentence_is_not_swallowed_by_the_figure_below_it(
     plot, formula = sorted(_figures(out), key=lambda e: e.bbox[1])
     assert plot.bbox[3] < 304 < 318 < formula.bbox[1]
     assert "reciprocal of the sine function" in _text_of(out)
+
+
+def test_art_that_a_clip_leaves_unpainted_is_no_figure_over_the_text_it_lies_on():
+    # An export that carries a figure's art on every page clips each page to its own part
+    # (arXiv 2407.20815): the rest of the art is in the page's drawings, painted nowhere. Its
+    # box lay over the paragraphs and the figure rules took their text into a picture.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _scatter(page, 72)
+    end = _running_text(page, 300, n=2)
+    ops = ["q 110 62 370 220 re W n", "0.1 0.3 0.8 rg"]  # the clip holds the plot, not the text
+    for i in range(24):
+        x, y = 140 + 13 * i, 340 + 9 * i + 12 * math.sin(i * 1.7)
+        ops.append(f"{x:.1f} {792 - y:.1f} 3 3 re f")
+    ops += ["120 530 m 470 530 l S", "120 530 m 120 330 l S", "Q"]
+    contents = page.get_contents()
+    doc.update_stream(contents[0], doc.xref_stream(contents[0]) + "\n".join(["", *ops]).encode())
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out)
+    assert figure.bbox[3] < 300 < end
+    assert "Displacement is the change in position" in _text_of(out)
+    assert "Average velocity is displacement divided" in _text_of(out)
+
+
+def test_a_pen_drawing_that_typed_labels_name_is_a_figure_not_handwriting():
+    # A figure drawn with a pen on a typed page (arXiv 2407.20815: a ball with its radius and
+    # charge) was cut out as "handwriting, not converted" from the strokes alone, and its typed
+    # labels stood off as stray equations. The labels name it: it is a figure with them. The
+    # same strokes with no typed label by them are still handwriting.
+    path = Path(__file__).parent / "fixtures" / "handwriting" / "typed_with_ink.pdf"
+    plain = layout.analyze(path.read_bytes())
+    (note,) = _regions(plain)
+    assert _figures(plain) == []
+    doc = pymupdf.open(path)
+    _label(doc[0], (note.bbox[0] + 40, note.bbox[1] + 12), "R", 11)
+    _label(doc[0], (note.bbox[0] + 140, note.bbox[3] - 14), "O(0)", 11)
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out)
+    assert _regions(out) == []
+    assert _holds(figure, note.bbox, slack=8)
+    assert "R" in (figure.text or "") and "O(0)" in (figure.text or "")
 
 
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():

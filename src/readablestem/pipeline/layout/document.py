@@ -366,7 +366,7 @@ def _read_page(
     turn = page_type.turn_page(page)
     fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
-    drawn = page.get_cdrawings()
+    drawn = page_type.page_drawings(page)
     strokes = glyph_strokes.strokes(page, raw)
     # What a reviewer's annotations paint (an icon, a caret, a highlight) is not the page's art:
     # figures and handwriting are read without it. The hidden-text check is given the whole list
@@ -402,6 +402,7 @@ def _analyze_document(
 ) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
+    pen: dict[int, list[_Path]] = {}  # a mixed_ink page's pen drawings, held back from `paths`
     types: dict[int, page_type.PageTypeResult] = {}
     producer = page_type.producer_hint(doc)
     document.tex_made = producer == "tex"
@@ -509,6 +510,7 @@ def _analyze_document(
                 paths[number] = []
             if types[number].kind == "mixed_ink":
                 ink = types[number].ink.ink_drawings
+                pen[number] = [p for p in paths[number] if p.source in ink]
                 paths[number] = [p for p in paths[number] if p.source not in ink]
             # A page kept as its image beside its text reads no drawings (no rules to judge a
             # grid by), and the detector is the slowest step on the pen-stroke pages these are.
@@ -608,6 +610,7 @@ def _analyze_document(
                     strokes=_light_ink(types[n]),
                     dropped=prepared[n][2],
                     ink_sources=types[n].ink.ink_drawings,
+                    pen_paths=pen.get(n, ()),
                     mixed_ink=types[n].kind == "mixed_ink",
                     label_keys=label_keys,
                     covers=_covered_points(doc[n], types[n]),
