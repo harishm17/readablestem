@@ -117,7 +117,7 @@ def test_a_numbered_listing_with_a_blank_line_is_one_block_and_a_list_of_names_i
         y += 10
         page.insert_text(
             (72, y),
-            "The grasp tasks need a turn of the gripper: close_drawer, open_drawer, take_usb_out_of_com-",
+            "The grasp tasks need a turn of the gripper: close_drawer, open_drawer, take_usb_out_of_c-",
             fontsize=CODE,
             fontname="helv",
         )
