@@ -511,7 +511,7 @@ def _page_blocks(
     _attach_captions(blocks, figures, document=document)
     if document.panels:
         taken = {b.text: b.bbox for b in blocks if b.kind == "attached" and b.text is not None}
-        figures = _join_panels(figures, taken, rows, ctx, document=document)
+        figures = _join_panels(figures, taken, rows, ctx, document=document, blocks=blocks)
         blocks = [b for b in blocks if not (b.rows and all(r.absorbed for r in b.rows))]
     captions = [b.bbox for b in blocks if b.kind == "attached"]
     blocks = [b for b in blocks if b.kind != "attached"]

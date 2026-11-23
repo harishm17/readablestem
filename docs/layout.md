@@ -500,7 +500,10 @@ development pages and the 91 corpus gold pages: no page's reading order changed,
 across the figure. On generated pages with a drawing between two columns of short lines it read
 worse (the rows of the two columns alternated, as they do with the tree on for a narrow raster
 picture there), so the code was not kept. A figure between narrow columns has to be cut like a
-column first.
+column first. Wave 4 (2026-11-22, O-013) did not build it again: that count stands (0 pages
+changed, 1 page better, a worse read where a drawing stands between two columns of short
+lines), no page asking for it is known, and the tree is off, so the item would change
+nothing in production.
 
 **The cuts.**
 
@@ -2157,6 +2160,39 @@ math by the document's evidence; the equation step's own tiers then decide it.
   a gap wider than the reach). The other half of the fault, an axis label or a part mark
   found as a figure of its own (`drawing_fragments`), is on no file of either set (0
   figures), so nothing was built for it. Off, the output is byte-identical to before.
+  *What the rows were in* (2026-11-22, O-422). The marks and the rows among the panels are
+  claimed after the blocks are built, so a claimed row could sit in a block that keeps its
+  text. Counted with the switch on over the 228 real public documents (the openstax pages,
+  the layout development papers, the real-world sets and the real tables; the repository's
+  generated sheets and fixtures are left out of every count here) and the 72 corpus uploads:
+  128 rows claimed among the panels in 14 files and 70 marks in 19 files (corpus: 16 marks in 6
+  files, none among the panels). By the block the row was in: a one-row paragraph 165 (panel
+  letters, ticks and part names), a one-row equation 1 ("−0.1", a tick), a one-row list item
+  4 (ticks read as "0.0"), 22 rows of blocks that are all tick numbers of plots, and 5
+  marks in 2 papers (`ax_cscl_240306350`: a bar "|" four times in a paragraph;
+  `ax_qbionc_240307089`: a list marker "2.") and 1 corpus mark in a block that kept other
+  rows. Those 6 were written twice, in the block and as a figure label. None was inside a
+  table's box (0 of 198 public and 0 of 16 corpus). So a row is now claimed only when every
+  other row of its block is claimed or already a label (`_whole_blocks_only`, for both the
+  rows among the panels and the marks); the rest stay text. The shape also appears on a
+  generated lecture-notes fixture (the symbol of a display equation, the last line of a
+  paragraph), which is the test's case, not evidence. Captions are keyed by their text in the
+  join (`captions`), but no page of either set has two figures with the same caption text
+  (552 attached captions in the real public documents, 41 corpus; 0 repeated), so that part
+  is not changed.
+  *What the join leaves* (same counts): after the join 135 captionless figures stand in
+  39 public files that have a captioned figure on the page (the 83 candidates above and
+  figures of other captions); `drawing_fragments` figures with the join on: 0, so axis labels
+  found as figures are still on no file, and nothing is built for them. A one- or
+  two-character row left 2.5 to 4 body sizes from a figure: 22 rows in 14 real public files
+  (corpus 4 in 3), 4 to 6 body sizes: 35 rows in 23 files (corpus 10 in 5). Among them are the
+  entries of a matrix and the "n" of a formula next to a small drawing, so a wider reach would
+  take text that is not a label; the corpus page with two arrow diagrams is one figure each
+  now and keeps 13 one- or two-character rows 2 to 8 body sizes from them. A wider reach is
+  not built (O-057, O-173): the counts do not separate the labels from the matrix entries, and
+  nothing here measures a gain. The generated sheet's triangle
+  (`tests/workflows/corpus/selfmade/f2_figures.pdf`) is one figure with all of its labels,
+  switch off and on; a generated probe, so it is a limit noted here, not a fault built for.
 - **Shapes that vanished** (WS6.15, 2026-11-18). A timeline's ruler (a long thin line
   with ticks, 5 pt tall) fell under the 24 pt a figure needs on both sides, so it was a
   small drawing; no label was held for it and the paragraph's block took its labels, so

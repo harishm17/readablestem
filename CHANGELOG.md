@@ -175,6 +175,23 @@ stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none
   4 labeled errors (docs/steps.md).
 - A switch-on reading change: a promoted line's inline formulas are no longer elements, and a
   display is. No version raise is owed while the switch is off.
+## Unreleased: panel joins and marks leave a row a longer block keeps (O-422, O-055, O-173, O-013, O-057; `LAYOUT_JOIN_PANELS`, off)
+
+- With `LAYOUT_JOIN_PANELS` on, the rows among the panels and the one- or two-character marks were
+  claimed after the blocks were built. A row in a block that kept other rows (a bar in a
+  paragraph, a list marker) was
+  marked taken while the block kept its text, so it was written in the block and as a figure
+  label. Counted on 228 real public documents and 72 corpus uploads: 5 marks in 2 papers and 1
+  corpus mark. A row is now taken only when every other row of its block is taken or already a
+  label (`figures._whole_blocks_only`). Switch off, nothing changes.
+- Counted and not built: two figures with the same caption text on one page (0 of 552
+  captions in real public documents, 0 of 41 corpus); a mark row in a table's box (0); a wider reach for a lone
+  label (O-057: 22 rows 2.5 to 4 body sizes from a figure in 14 public files and 35 rows 4 to 6 in 23,
+  many of them matrix entries); vector figures as items of the region tree (O-013, the
+  earlier count stands). The generated sheet's triangle is one figure with all of its labels
+  (O-173); `docs/layout.md` "Panels of one figure" has the counts.
+- Turning the switch on still needs recorded figure answers for the pages it moves and a
+  `PIPELINE_VERSION` bump (O-423).
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
