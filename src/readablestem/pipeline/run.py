@@ -103,9 +103,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache, partial
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core import triage
@@ -483,7 +483,7 @@ class _RecordingClient:
         ) as span:
             parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
             self.calls.append(call)
-            if self._observer is not None:
+            if self._observer is not None and not call.shared:  # a shared answer was not sent
                 self._observer(call)
             _annotate(
                 span,
@@ -496,11 +496,85 @@ class _RecordingClient:
                 reasoning_tokens=call.reasoning_tokens,
                 cost_usd=call.cost_usd,
                 latency_ms=call.latency_ms,
+                shared=call.shared,
             )
         return parsed, call
 
     def __getattr__(self, name: str) -> Any:  # anything else a step may read
         return getattr(self._inner, name)
+
+
+class _Asked:
+    """One request of the job, while it is in flight and after: the first caller's answer,
+    given to every caller of the same request once it has one."""
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.answer: tuple[BaseModel, ModelCall] | None = None
+
+
+class _SharedAnswers:
+    """The job's model client: a request this job already asked is not sent again.
+
+    Equal `question.question_key`s (and the same fallback flag) are the same question. The
+    first caller sends it; a caller that arrives while it is out waits for it, and one that
+    arrives later does not wait. Each gets the first answer, as a copy, with a `ModelCall`
+    that costs nothing and says `shared`, so the job's money and call count are the first
+    call's. Only an answer that was read and whose call ended "ok" is given again: after
+    any other end (a refusal, a timeout, an unreadable reply, or the first caller raising)
+    the waiting caller sends its own request, as it would without this, so a retry or a
+    fallback never meets a stored failure. Two identical pictures therefore get one
+    description. Shared by every thread of the job; it sits above the recording client.
+    """
+
+    def __init__(self, inner: VisionClient, settings: Settings) -> None:
+        self._inner = inner
+        self._settings = settings
+        self._lock = threading.Lock()
+        self._asked: dict[str, _Asked] = {}
+
+    def run(
+        self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
+    ) -> tuple[T | None, ModelCall]:
+        key = f"{question.question_key(self._settings, request, schema)}:{is_fallback}"
+        with self._lock:
+            entry = self._asked.get(key)
+            first = entry is None
+            if entry is None:
+                entry = self._asked[key] = _Asked()
+        if not first:
+            entry.done.wait()
+            if entry.answer is not None:
+                parsed, call = entry.answer
+                return cast(T, parsed.model_copy(deep=True)), _shared(call)
+            return self._inner.run(request, schema, is_fallback=is_fallback)
+        try:
+            parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+            if parsed is not None and call.outcome == "ok":
+                entry.answer = (parsed.model_copy(deep=True), call)
+            return parsed, call
+        finally:
+            entry.done.set()  # also when the call raised: a waiter sends its own
+
+    def __getattr__(self, name: str) -> Any:  # anything else a step may read
+        return getattr(self._inner, name)
+
+
+def _shared(call: ModelCall) -> ModelCall:
+    """The call a caller is given for an answer that was already paid for."""
+    return call.model_copy(
+        update={
+            "input_tokens": 0,
+            "cached_input_tokens": 0,
+            "cache_creation_input_tokens": 0,
+            "output_tokens": 0,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.0,
+            "latency_ms": 0,
+            "billed_unseen_usd": 0.0,
+            "shared": True,
+        }
+    )
 
 
 class _Stop:
@@ -969,7 +1043,7 @@ def _run_step(
             status=fix.status.value,
             reason=fix.reason,
             model=_single_model(fix.calls),
-            calls=len(fix.calls),
+            calls=sum(1 for c in fix.calls if not c.shared),
             cost_usd=fix.cost_usd,
             latency_ms=elapsed_ms,
         )
@@ -1460,7 +1534,7 @@ def _stats(
         pages=len(pages),
         cost_usd=round(sum(f.cost_usd for f in fixes), 8),
         latency_ms=wall_ms,
-        model_calls=sum(len(f.calls) for f in fixes),
+        model_calls=sum(1 for f in fixes for c in f.calls if not c.shared),
         by_kind=dict(Counter(f.kind.value for f in fixes)),
         by_status=dict(Counter(f.status.value for f in fixes)),
         by_review=dict(Counter(f.review for f in fixes)),
@@ -2249,7 +2323,7 @@ def _convert(
                 settings=settings,
                 options=options,
                 stage_progress=stage_progress,
-                client=client,
+                client=_SharedAnswers(client, settings),
                 tracer=tracer,
                 pages=_Pages(page_list, progress),
                 contexts=context_texts(elements),
