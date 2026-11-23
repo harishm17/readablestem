@@ -5,9 +5,14 @@
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,
   `LAYOUT_DISPLAY_GROUPING` and `LAYOUT_JOIN_PANELS`, each measured at $0 against 0.5.17 with it
   off (docs/eval.md, "The switch release of 2026-11-23"):
-  - Reading order: 161 of 267 pages right (was 141) and 81 faultless (was 72); no page made wrong.
-  - Formulas kept whole: 9,186 of 11,258 (was 8,989); 198 made whole, 1 made not whole, no paper
-    worse. Displays kept whole: 904 of 1,004 (was 803).
+  - Reading order, the layout development set: 161 of 267 pages right (was 141) and 81
+    faultless (was 72); no page made wrong. The corpus gold pages: 83 of 91 right (71 with the
+    switches off), 13 made right and one made wrong, the self-made `e1_mc_columns` page 1 (a
+    full-width line under a matching exercise is split; known since the tree was first
+    measured, docs/layout.md "Measured").
+  - Formulas kept whole, all four switches: 9,195 of 11,258 (was 8,989); 217 made whole and 11
+    made not whole (8 of them in one paper), no paper worse. Displays kept whole: 903 of 1,004
+    (was 803). The two formula switches alone give 9,186, with 198 made whole and 1 not.
   - Figures: the panels of one figure are one figure (1,611 to 1,320 on the public files), with
     the same captions.
 - Found when the region tree was turned on, on a slide of MIT 6.0001 lecture 1 that sets the
@@ -38,6 +43,13 @@
   through four Railway variables (the code defaults stay off), so the version says which layout
   made a result only while the variables match the profile: the release steps end with
   `readablestem ops profile-check` (docs/deploy-railway.md).
+- These are counts on development sets, which the rules were written against; no held-out
+  set was scored, and what a model reads from the larger equation boxes was not measured
+  (docs/eval.md, "The switch release of 2026-11-23", the last paragraph). The two reading-order
+  records, `data/eval/order-layout-dev-1.json` and `data/eval/order-corpus.json`, are re-made at
+  0.5.18; the corpus one measures all 91 gold pages (3 were apart) and shows what 0.5.11 to
+  0.5.17 changed with the switches off: 8 pages made right and one made wrong
+  (`r05_labmanual_5310_lab1` page 2, in the student page only).
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many
   pictures stay unanswered, and a paid answer recorded for one broke that count on every replay.
 - The workflow corpus was re-recorded under the four switches (three capped calls, $2.59), so no
