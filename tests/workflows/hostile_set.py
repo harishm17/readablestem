@@ -131,8 +131,8 @@ CASES: tuple[Case, ...] = (
     refused("hostile-shell.tex", "source_unsafe"),
     failed("hostile-input-built-name.tex", "source_missing_file", source=True, never=(HOST_FILE,)),
     failed("hostile-read-built-name.tex", "source_undefined", source=True, never=(HOST_FILE,)),
-    failed("hostile-grows.tex", "source_failed", source=True),
-    failed("hostile-loop.tex", "source_failed", source=True),
+    failed("hostile-grows.tex", "source_timeout", source=True),  # perl at its memory cap (O-395)
+    failed("hostile-loop.tex", "source_timeout", source=True),
     # ------------------------------------------------- Word, read from the file (WS18.14)
     # Each is refused at the upload by the Word gate (`source.docx_package.check`), before
     # pandoc or LibreOffice sees it. The first and last two are the gate's own rules (a ratio,
