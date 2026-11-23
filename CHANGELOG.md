@@ -6,6 +6,13 @@
   monospaced. A numbered listing, an algorithm or an inline identifier set in them was read as
   prose (the pattern had "mono" but not "Mon" + "L"). The names are those counted on the public
   files and the corpus (docs/layout.md, "Code fonts"); the font list matches no other name there.
+- A block of monospaced lines that are all one email or web address is not code
+  (`blocks._is_contact`): with the font known, an author's address set in NimbusMonL on a title
+  page (1 corpus upload, 1 public file) was a one-line code block.
+- Corpus (against 55917ea2): `full` 73 uploads, 0 differences with the address rule (1 with the
+  font names alone, the address line), no recorded request moves (equation, figure and table
+  parts equal); `analyze`: see the report of this branch for the files that change (SQL
+  snippets, Python and algorithm listings now read as code).
 - Tests: one case in `tests/test_structure.py`.
 - `PIPELINE_VERSION` (0.5.18) is owed a raise for the files that carry those fonts (layouts cached
   under the old version read their listings as prose); not made here. `RENDER_VERSION` is not owed.

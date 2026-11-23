@@ -2324,6 +2324,21 @@ listing, an inline identifier or a URL (a URL stays inline, see below). No other
 files has all glyphs of one advance and a name the list misses. A new name enters the list only
 when a real document sets code in it.
 
+A block of monospaced lines that are all one email or web address (`_is_contact`: an author's
+contact line on a title page, set in NimbusMonL, was a one-line code block once the font was
+known) is not code. Measured on the corpus hash set, with the names in: 5 of 332 files change
+(a SQL snippet set as a heading or a paragraph is code, in ax_cslg_240306367 7 times; the Python
+listings of ax_csro_240306420; the listings of 2505.13042 pp2-3; the algorithms of 2504.06207);
+one corpus upload changed by an address line, which `_is_contact` now leaves alone. Measured and
+not built: in 2504.06207 p4 the algorithm (its rows are NimbusMonL) is now taken by the code rule
+before the algorithm rule can see it (`_algorithm_groups` skips rows that are code), so the block
+holds the first seven steps, the comments right of the steps and "for each algorithm" are
+paragraphs beside it, and its steps 12 and 13 are a block of their own. Before, the algorithm
+rule read the page too, with steps 9 to 13 outside the block already. The algorithm rule would
+need to take an algorithm set in a monospaced face; 1 page of 1 file of 332. The listing of
+ax_csro_240306420 p11 to p16 comes out as 100 short blocks (a wrapped argument line, or a comment,
+each its own block) where it was prose lines before.
+
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
 its mark in the text above it also links to it (the output writes the mark as `doc-noteref`, the note as `doc-footnote`, with a `doc-backlink`, docs/output.md "Navigation"): the mark is found again in the element's
 text by the ten characters printed before it, and a mark that cannot be found exactly once
