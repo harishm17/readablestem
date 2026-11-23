@@ -19,9 +19,11 @@ What each part becomes:
   internal link to the element that id became (`link_internal`): a heading, a numbered
   equation, a theorem's paragraph, a figure, a table, a bibliography or list item, or the
   paragraph that holds the id. The words stay as they are; an id that became no element
-  (`Reading` made nothing there), a link inside the element it names and one in a place that
-  holds no links (a caption: `caption` is plain text) make no link. A link in a heading, in a
-  footnote (written after its sentence) or in a table cell (`TableCell.links`) is kept;
+  (`Reading` made nothing there) and a link inside the element it names make no link. A link
+  in a heading, in a footnote (written after its sentence), in a table cell (`TableCell.links`)
+  or in a caption is kept: `caption` stays plain text and the links of a caption are beside it
+  (`Element.caption_links` for a figure, `TableGrid.caption_links` for a table), as offsets
+  into it;
 - a table (`tabular`): a grid with its header rows and spans, an accepted fix;
 - a figure: one element per picture; the picture is the project's image file as a PNG; with
   no usable picture the figure is a required decision (`source_figure_missing`). A picture
@@ -399,6 +401,8 @@ class _Reader:
         self.refs: list[tuple[Element, int, int, str]] = []
         # the same for words in a table's cells: table element id, row, col, start, end, id
         self.cell_refs: list[tuple[str, int, int, int, int, str]] = []
+        # and for the words of a figure's or table's caption: element id, start, end, id
+        self.caption_refs: list[tuple[str, int, int, str]] = []
 
     def _take(self, node: Node) -> str:
         """The text of `node` and all below it, now read."""
@@ -1129,7 +1133,12 @@ class _Reader:
 
     # ------------------------------------------------------------------ tables
 
-    def _table(self, node: Node, caption: str | None) -> Element | None:
+    def _table(
+        self,
+        node: Node,
+        caption: str | None,
+        spans: list[tuple[str, int, int, object]] | None = None,
+    ) -> Element | None:
         """A grid (one table element), or one list item per row when it is too large; the
         pictures in its cells follow it as figures (`self.loose`). The table element."""
         cell_refs: list[tuple[int, int, int, int, str]] = []
@@ -1146,6 +1155,8 @@ class _Reader:
                 self._mark(inner, element)
         element.table = grid
         self.cell_refs += [(element.id, *ref) for ref in cell_refs]
+        if grid.caption:
+            caption_links(element.id, grid.caption_links, self.caption_refs, spans or [])
         fix = Fix(
             element_id=element.id,
             kind=Kind.TABLE,
@@ -1203,6 +1214,7 @@ class _Reader:
             if _local(c.tag) == "figcaption" or "ltx_caption" in _classes(c)
         ]  # fmt: skip
         caption = _squash(_text_without_tag(captions[-1])) if captions else ""
+        spans = _caption_spans(captions[-1], caption) if captions else []
         for cap in captions:
             self._take(cap)
         nested = self._outermost(node, _is_figure)
@@ -1213,14 +1225,16 @@ class _Reader:
                 node, lambda n: _local(n.tag) == "table" and "ltx_tabular" in _classes(n)
             )
             for table in (t for t in tables if id(t) not in inside):
-                element = self._table(table, None if holders else caption or None)
+                element = self._table(
+                    table, None if holders else caption or None, None if holders else spans
+                )
                 self.done.update(id(n) for n in table.iter())
                 if element is not None:
                     holders.append(element)
                 self._flush_pictures()  # a picture in a cell follows its table
         for picture in self._pictures_in(node):
             if id(picture) not in inside:
-                holders.append(self._picture_element(picture, None if holders else caption))
+                holders.append(self._picture_element(picture, None if holders else caption, spans))
         previous = self.out.elements[-1] if self.out.elements else None
         if holders and captions and (number := _printed_tag(captions[-1])):
             self.out.printed[holders[0].id] = number  # the caption went to the first
@@ -1235,11 +1249,12 @@ class _Reader:
         ):
             # `\captionof` after a picture: a float that is only a caption, the picture's own
             previous.caption = caption
+            caption_links(previous.id, previous.caption_links, self.caption_refs, spans)
             holders.append(previous)
         if not holders and not nested and not _float_words(node, captions):
             # a float with nothing in it but its caption (a drawing LaTeX could not make): a
             # figure with no picture. One with words of its own is read as those words.
-            holders.append(self._picture_element(None, caption))
+            holders.append(self._picture_element(None, caption, spans))
         if holders:
             # an error in the caption, or one in the float's text that is not a formula, is
             # the float's own (`_mark` keeps the first tie)
@@ -1255,7 +1270,8 @@ class _Reader:
                 self.walk(child, depth + 1)
         if not holders and caption:
             # subfigures, or words, with no picture of the float's own: its caption follows
-            self._new(Kind.PARAGRAPH, text=caption)
+            words = self._new(Kind.PARAGRAPH, text=caption)
+            self._apply_spans(words, spans, links_only=True)
             self.chars += len(caption)
 
     def _outermost(self, node: Node, match) -> list[Node]:
@@ -1274,10 +1290,17 @@ class _Reader:
         visit(node, 0)
         return found
 
-    def _picture_element(self, picture: Node | None, caption: str | None) -> Element:
+    def _picture_element(
+        self,
+        picture: Node | None,
+        caption: str | None,
+        spans: list[tuple[str, int, int, object]] | None = None,
+    ) -> Element:
         """A figure element for `picture` (None: a float with no picture at all). A picture
         that cannot be read is a required decision (`UNKNOWN_FIGURE_REASON`) naming its file."""
         element = self._new(Kind.FIGURE, caption=caption or None)
+        if caption:
+            caption_links(element.id, element.caption_links, self.caption_refs, spans or [])
         png = None
         if picture is not None:
             self.pictured.add(element.id)
@@ -1793,6 +1816,37 @@ def _grid(
     return grid if not grid_problems(grid) else _lenient(grid)
 
 
+def caption_links(
+    owner: str,
+    links: list[Link],
+    refs: list[tuple[str, int, int, str]],
+    spans: Sequence[tuple[str, int, int, object]],
+) -> None:
+    """The links of a caption's words (`spans`, offsets into the caption) on `links` (a figure's
+    or a table's `caption_links`): a web address now, a reference to a place in the document
+    in `refs` for `link_internal`, with the id of `owner`, the element that holds the caption."""
+    for kind, start, end, extra in spans:
+        if kind == "ref":
+            refs.append((owner, start, end, str(extra)))
+        elif kind == "uri" and not any(k.start < end and start < k.end for k in links):
+            try:
+                links.append(Link(kind="uri", start=start, end=end, href=str(extra)))
+            except ValueError:
+                continue
+
+
+def _caption_spans(node: Node, caption: str) -> list[tuple[str, int, int, object]]:
+    """The links in a caption's words as spans of `caption` (the text `_text_without_tag` gives,
+    squashed). Empty when the caption holds no link, or when its words read differently here:
+    the caption's text is never changed by its links."""
+    if not caption or not any(_local(a.tag) == "a" for a in node.iter()):
+        return []
+    text, spans = squashed(*_cell_text(node, _SKIP_CLASSES))
+    if text != caption:
+        return []
+    return [span for span in spans if span[0] in ("uri", "ref")]
+
+
 def _header_cols(cells: list[TableCell], header_rows: int, n_cols: int) -> int:
     """How many leading columns are row headers: those whose every filled cell below the header
     rows LaTeXML wrote as `th` (a `ltx_th_row` cell). Nothing is guessed from the look of the
@@ -1822,13 +1876,16 @@ def _lenient(grid: TableGrid) -> TableGrid | None:
     return plain if not grid_problems(plain) else None
 
 
-def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
+def _cell_text(
+    cell: Node, skip: frozenset[str] = frozenset()
+) -> tuple[str, list[tuple[str, int, int, object]]]:
     """The text of a cell as written and the spans of its styled words and links (offsets into
-    it)."""
+    it). With `skip`, what has one of those classes is left out and a picture leaves no mark
+    (a caption's words, `_caption_spans`)."""
     parts: list[str] = []
     spans: list[tuple[str, int, int, object]] = []
     length = 0
-    beside_words = _has_words(cell)  # a picture in a cell of words leaves the mark (as Word's)
+    beside_words = not skip and _has_words(cell)  # a picture in a cell of words leaves a mark
     in_link = False  # inside a link that holds only a picture (`_picture_link_label`)
 
     def visit(item: Node) -> None:
@@ -1838,7 +1895,9 @@ def _cell_text(cell: Node) -> tuple[str, list[tuple[str, int, int, object]]]:
             length += len(item.text)
         for child in _children(item):
             start = length
-            if _is_picture(child):  # a figure of its own after the table (`_table`)
+            if skip and _classes(child) & skip:
+                pass
+            elif _is_picture(child):  # a figure of its own after the table (`_table`)
                 if beside_words and not in_link:
                     parts.append(PICTURE_MARK)
                     length += len(PICTURE_MARK)
@@ -2012,12 +2071,16 @@ def link_internal(
     refs: list[tuple[Element, int, int, str]],
     cell_refs: Sequence[tuple[str, int, int, int, int, str]] = (),
     fixes: dict[str, Fix] | None = None,
+    *,
+    caption_refs: Sequence[tuple[str, int, int, str]] = (),
 ) -> None:
     """The links a source file makes to a place in itself (`\\ref`, `\\eqref`, `\\cite`,
     `\\autoref`, a contents entry; a Word link to a bookmark) as internal links. `refs`: where
     each one is (element, start, end) and the id it names, which `ids` maps to the element
     that place became; `cell_refs`: the same for the words of a table's cell (the table's
-    element id, the cell's row and column, start, end, the id). An id that became no element,
+    element id, the cell's row and column, start, end, the id); `caption_refs`: the same for the
+    words of a figure's or table's caption (its element id, start, end, the id). An id that
+    became no element,
     a link inside the element it points to and one that overlaps another link make none: the
     words stay as text."""
     made = {e.id for e in elements}
@@ -2029,6 +2092,19 @@ def link_internal(
             continue
         inline.add(element, Link(kind="internal", start=start, end=end, target_id=target))
     by_id = {e.id: e for e in elements}
+    for owner_id, start, end, name in caption_refs:
+        target = ids.get(name)
+        owner = by_id.get(owner_id)
+        if target is None or target not in made or target == owner_id or owner is None:
+            continue
+        fix = (fixes or {}).get(owner_id)
+        # a table's grid is in the element and in its fix; a figure holds its own links
+        grids = [g for g in (owner.table, fix.table.grid if fix and fix.table else None) if g]
+        for holder in {id(h): h for h in (grids or [owner])}.values():
+            if not any(k.start < end and start < k.end for k in holder.caption_links):
+                holder.caption_links.append(
+                    Link(kind="internal", start=start, end=end, target_id=target)
+                )
     for table_id, row, col, start, end, name in cell_refs:
         target = ids.get(name)
         table = by_id.get(table_id)
@@ -2065,7 +2141,10 @@ def read(
     in_formula = {id(n) for m in body.iter() if _local(m.tag) == "math" for n in m.iter()}
     error_nodes = [n for n in body.iter() if "ltx_ERROR" in _classes(n)]
     reader.walk(body)
-    link_internal(reader.out.elements, reader.ids, reader.refs, reader.cell_refs, reader.out.fixes)
+    link_internal(
+        reader.out.elements, reader.ids, reader.refs, reader.cell_refs, reader.out.fixes,
+        caption_refs=reader.caption_refs,
+    )  # fmt: skip
     out = reader.out
     out.errors = reader.errors
     out.error_nodes = len(error_nodes)
@@ -2109,4 +2188,4 @@ def read(
     return out
 
 
-__all__ = ["ReadError", "Reading", "link_internal", "read"]
+__all__ = ["ReadError", "Reading", "caption_links", "link_internal", "read"]

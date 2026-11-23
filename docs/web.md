@@ -1034,7 +1034,7 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   and `/app?revises=` and a `revises` upload for one are refused with `revise_source` (WS18.8).
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
-  room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time limit: a macro that
+  room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time or memory limit: a macro that
   calls itself, a very large file; not offered "Try again") or `timeout` and the message "Upload
   the PDF instead"; nothing half-made is kept. A Word file read from the file itself that fails has no
   PDF route to fall back to (with the switch off the PDF is made at upload, by LibreOffice, and
@@ -1052,8 +1052,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   never closes; the sentence names the command when LaTeXML does, and says that trying again
   will not help and to look for the command on one's own computer; a loop LaTeXML does not name,
   like two commands calling each other, or one that only grows, is told from a very large source
-  by nothing in the log and ends at the time or memory limit as `source_timeout` or
-  `source_failed`), `source_syntax_error` (an unclosed brace or environment,
+  by nothing in the log and ends at the time or memory limit as `source_timeout`, which says
+  "time or memory"), `source_syntax_error` (an unclosed brace or environment,
   with its file and line; or a `^`, `_`, `&` or `#` in running text, named with what to write
   instead), `source_unsupported_class` / `source_unsupported_package` (no binding,
   and the document used what it defines; a `.sty` in the upload is not read either; a class read

@@ -22,7 +22,8 @@ What each part of the file becomes (WS18.15; "exact" means the file says it, no 
   note's own relationships hold, `docx_package`); a link to a bookmark on a heading is an
   internal link to that heading (pandoc keeps a bookmark only on a heading, and the words of a
   `REF` field are plain text), and a link to any other bookmark is its words. A link in a table
-  cell is kept (`TableCell.links`), a link in a caption is its words. Struck text is kept and
+  cell is kept (`TableCell.links`), and so is one in a caption (`Element.caption_links`,
+  `TableGrid.caption_links`). Struck text is kept and
   marked deleted, whether the run, its character style or its paragraph style strikes it
   (`docx_package._keep_strikes`); superscripts and subscripts are runs. A picture in a sentence
   leaves `(picture below)` where it stood.
@@ -98,6 +99,7 @@ from readablestem.source.ltx_reader import (
     UNKNOWN_FIGURE_REASON,
     ReadError,
     Reading,
+    caption_links,
     equation_fix,
     headers_to_choose,
     link_internal,
@@ -176,6 +178,9 @@ class _Reader:
         # end, name (`staged` holds those of the grid being made, without the element's id)
         self.cell_refs: list[tuple[str, int, int, int, int, str]] = []
         self.staged: list[tuple[int, int, int, int, str]] = []
+        # and for a figure's or table's caption: element id, start, end, name
+        self.caption_refs: list[tuple[str, int, int, str]] = []
+        self.caption_inlines: dict[str, list[Any]] = {}  # a caption paragraph's id -> its inlines
 
     # ------------------------------------------------------------------ elements
 
@@ -603,7 +608,8 @@ class _Reader:
             rows.extend(body[2])
             rows.extend(body[3])
         rows.extend(foot[1])
-        caption_text = _plain(_first_inlines(caption[1])) or None
+        caption_inlines = _first_inlines(caption[1])
+        caption_text = _plain(caption_inlines) or None
         element = self._new(Kind.TABLE, text=None)
         failed_before = self.report.math_failed
         grid = self._grid(rows, caption_text)
@@ -631,6 +637,7 @@ class _Reader:
         else:
             grid = grid.model_copy(update={"header_source": "none"})
         element.table = grid
+        self._caption_links(element.id, grid.caption_links, caption_inlines, grid.caption)
         fix = Fix(
             element_id=element.id,
             kind=Kind.TABLE,
@@ -796,12 +803,14 @@ class _Reader:
         it made (or a paragraph when it made none)."""
         before = len(self.out.elements)
         self.blocks(content[2], depth + 1)
-        text = _plain(_first_inlines(content[1][1])) or None
+        inlines = _first_inlines(content[1][1])
+        text = _plain(inlines) or None
         if not text:
             return
         pictured = [e for e in self.out.elements[before:] if e.kind is Kind.FIGURE]
         if pictured and not pictured[-1].caption:
             pictured[-1].caption = text
+            self._caption_links(pictured[-1].id, pictured[-1].caption_links, inlines, text)
         else:
             self._new(Kind.PARAGRAPH, text=text)
             self.chars += len(text)
@@ -845,12 +854,29 @@ class _Reader:
         self.chars += CHARS_PER_PAGE // 3
 
     def _caption(self, blocks: list[Any]) -> None:
-        text = _plain(_first_inlines(blocks))
+        inlines = _first_inlines(blocks)
+        text = _plain(inlines)
         if not text:
             return
         element = self._new(Kind.PARAGRAPH, text=text)
         self.chars += len(text)
         self.captions[element.id] = text
+        self.caption_inlines[element.id] = inlines
+
+    def _caption_links(
+        self, owner: str, links: list[Link], inlines: list[Any], text: str | None
+    ) -> None:
+        """The links in the words of a caption (`inlines`, whose plain text is `text`) on
+        `links`, a figure's or a table's `caption_links`, and in `caption_refs` for the
+        references to a place in the document. Only while the words read the same here: the
+        caption's text is never changed by its links."""
+        if not text:
+            return
+        loose = list(self.loose)  # a picture in a caption makes no figure here
+        found, spans, _ = self._inline_text(inlines, owner=None)
+        self.loose = loose
+        if found == text:
+            caption_links(owner, links, self.caption_refs, spans)
 
     def attach_captions(self) -> None:
         """A caption paragraph straight after a picture or a table, or straight before one, is
@@ -864,15 +890,18 @@ class _Reader:
             after = elements[at - 1] if at > 0 else None
             before = elements[at + 1] if at + 1 < len(elements) else None
             for target in (after, before):
-                if target is None or not self._captioned(target, element.text or ""):
+                if target is None or not self._captioned(target, element):
                     continue
                 elements.remove(element)
                 self.report.captions += 1
                 break
 
-    def _captioned(self, target: Element, text: str) -> bool:
+    def _captioned(self, target: Element, paragraph: Element) -> bool:
+        text = paragraph.text or ""
+        inlines = self.caption_inlines.get(paragraph.id, [])
         if target.kind is Kind.FIGURE and not target.caption:
             target.caption = text
+            self._caption_links(target.id, target.caption_links, inlines, text)
             return True
         fix = self.out.fixes.get(target.id)
         if (
@@ -882,8 +911,10 @@ class _Reader:
             and fix is not None
             and fix.table is not None
         ):
-            target.table = target.table.model_copy(update={"caption": text})
-            fix.table = fix.table.model_copy(update={"grid": target.table})
+            grid = target.table.model_copy(update={"caption": text})
+            target.table = grid
+            fix.table = fix.table.model_copy(update={"grid": grid})
+            self._caption_links(target.id, grid.caption_links, inlines, text)
             return True
         return False
 
@@ -1159,7 +1190,10 @@ def read(prepared: docx_package.Prepared, tree: dict[str, Any]) -> tuple[Reading
     reader.meta(tree.get("meta", {}))
     reader.blocks(tree.get("blocks", []))
     reader.attach_captions()
-    link_internal(reader.out.elements, reader.ids, reader.refs, reader.cell_refs, reader.out.fixes)
+    link_internal(
+        reader.out.elements, reader.ids, reader.refs, reader.cell_refs, reader.out.fixes,
+        caption_refs=reader.caption_refs,
+    )  # fmt: skip
     out, report = reader.out, reader.report
     out.lang = _language(facts)
     report.math_held = facts.equations

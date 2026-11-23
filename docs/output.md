@@ -1075,9 +1075,9 @@ items and headings; offsets are into the stored text, markers included.
   the words are LaTeXML's, usually just the number, and `source_links` widens them to the
   word before them, as it does a PDF's: "Section 2", "equation (1)"). The guessed link is made
   only where the file had no reference, and never overlaps one. An id that became no element,
-  a link inside the element it names (a theorem citing itself), and a reference in a place
-  that holds no links (a table cell, a caption, a footnote, a heading) make no link; the words
-  stay text. `\pageref` prints the number of its target (LaTeXML has no pages), so its words
+  and a link inside the element it names (a theorem citing itself) make no link; the words
+  stay text. A reference in a table cell, a caption, a footnote or a heading is a link like
+  one in a paragraph (see "Links of a Word or LaTeX source" below). `\pageref` prints the number of its target (LaTeXML has no pages), so its words
   say "page 2.1" and the link goes to that target. A Word hyperlink to a bookmark on a heading
   is the same kind of link (`docx_reader`; pandoc keeps no other bookmark, and the words of a
   `REF` field are plain text).
@@ -1378,9 +1378,16 @@ heading, equation, theorem, figure or table of the document is an internal link,
 paragraph (a cell's link to its own table makes none). The table's page writes them as
 `<a>` inside the cell, and a cell edit in the review screen drops them with the runs. A table
 too large for a grid is a list, one item a row: its rows keep their runs and links, and a
-formula in a row is an equation of its own item. A caption (`Element.caption`) holds plain
-text, so a link there is its words; none of the public development LaTeX sources has a web
-address in a caption.
+formula in a row is an equation of its own item. A caption (`Element.caption`,
+`TableGrid.caption`) stays plain text, which the figure and table steps and the readers of it
+take as they did; its links are beside it, as offsets into it: `Element.caption_links` for a
+figure and `TableGrid.caption_links` for a table, left out of a stored result when empty. A
+web address and a reference to a place in the document (a heading, equation, theorem, figure
+or table) are links as in a cell; the figure's `<figcaption>` and the table's `<caption>` write
+them as `<a>`, and the page writer leaves a link whose target is not in the document off. The
+reader keeps a caption's links only while the words it reads them from are the caption's own
+words (a caption that holds a picture reads differently and gets none), and a caption turned into a paragraph (a float with no picture or table) holds its links like any
+paragraph. A PDF's captions have none.
 A picture in the middle of a sentence is a figure straight after the block that holds it (the
 output has no place for a picture inside a sentence), and the sentence reads "(picture below)"
 where it stood, so the words do not run together (a picture on its own line leaves nothing). A

@@ -779,6 +779,10 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
         '<w:p><w:pPr><w:pStyle w:val="Heading2"/></w:pPr>'
         '<w:r><w:t xml:space="preserve">Again </w:t></w:r><w:hyperlink w:anchor="_Ref1">'
         "<w:r><w:t>Motion</w:t></w:r></w:hyperlink></w:p>"
+        '<w:p><w:pPr><w:pStyle w:val="Caption"/></w:pPr>'
+        '<w:r><w:t xml:space="preserve">Data from </w:t></w:r><w:hyperlink r:id="rId30">'
+        '<w:r><w:t>the page</w:t></w:r></w:hyperlink><w:r><w:t xml:space="preserve">, see </w:t>'
+        '</w:r><w:hyperlink w:anchor="_Ref1"><w:r><w:t>Motion</w:t></w:r></w:hyperlink></w:p>'
         + _cells("Page|Part", "LINK|BACK", marked=True)
         .replace(
             "<w:r><w:t>LINK</w:t></w:r>",
@@ -789,7 +793,10 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
             '<w:hyperlink w:anchor="_Ref1"><w:r><w:t>Motion</w:t></w:r></w:hyperlink>',
         )
     )
-    data = with_footnote(word(body, rels=link + 'TargetMode="External"/>'))
+    caption_style = (
+        '<w:style w:type="paragraph" w:styleId="Caption"><w:name w:val="caption"/></w:style>'
+    )
+    data = with_footnote(word(body, rels=link + 'TargetMode="External"/>', styles=caption_style))
     blob = envelope.wrap("docx", "notes.docx", None, data)
     result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
     heading, first, theorem, last, back, again, table = result.elements
@@ -813,6 +820,12 @@ def test_a_word_files_typed_addresses_and_references_are_linked_and_its_own_link
         (c.text[k.start : k.end], k.kind, k.href or k.target_id)
         for c in table.table.cells
         for k in c.links
+    ] == [("the page", "uri", "https://example.org/x"), ("Motion", "internal", heading.id)]
+    # and so do the words of its caption
+    assert table.table.caption == "Data from the page, see Motion"
+    assert [
+        (table.table.caption[k.start : k.end], k.kind, k.href or k.target_id)
+        for k in table.table.caption_links
     ] == [("the page", "uri", "https://example.org/x"), ("Motion", "internal", heading.id)]
 
 

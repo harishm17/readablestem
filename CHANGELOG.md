@@ -92,6 +92,21 @@
   tree makes worse is a figure page and not a column page, and the other causes were not
   diagnosed page by page here (left open for the owner's ranking).
 - No recording or request changes; no version raise owed; no migration.
+## Unreleased: links in the captions of a Word or LaTeX source; a memory stop reads as the time limit
+
+- A Word or LaTeX source's figure and table captions keep their links (web addresses, typed
+  addresses, `\ref` and `\hyperref` to a section, equation, figure or table, a Word bookmark). They
+  are held beside the plain caption (`caption_links`, offsets into `caption`), so `caption`, every
+  request and every recording are what they were; the page writers (figure and table) write the
+  `<a>` in `<figcaption>` and `<caption>`. Links in headings, footnotes and table cells were
+  already read. Results of documents with no caption link store the same JSON as before.
+- LaTeXML or pandoc stopped by the memory limit now ends as `source_timeout` (it was
+  `source_failed`: a command that only grows, `\def\a{x\a}\a`, ends in 23 s with perl's
+  "Out of memory" and exit 1, which LaTeXML's run now reads from the tail of its output; for Word,
+  a stop other than the clock was `source_failed`), and the sentence says "time or memory". A loop
+  the log does not name still cannot be told from a very large source.
+- Owed, not made here: raising `PIPELINE_VERSION` and `RENDER_VERSION` (a source's stored result
+  gains caption links only when it is converted again). No migration.
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
