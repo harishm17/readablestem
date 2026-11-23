@@ -13,6 +13,7 @@ import itertools
 import math
 import re
 from html import unescape
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -437,6 +438,25 @@ def test_art_that_a_clip_leaves_unpainted_is_no_figure_over_the_text_it_lies_on(
     assert figure.bbox[3] < 300 < end
     assert "Displacement is the change in position" in _text_of(out)
     assert "Average velocity is displacement divided" in _text_of(out)
+
+
+def test_a_pen_drawing_that_typed_labels_name_is_a_figure_not_handwriting():
+    # A figure drawn with a pen on a typed page (arXiv 2407.20815: a ball with its radius and
+    # charge) was cut out as "handwriting, not converted" from the strokes alone, and its typed
+    # labels stood off as stray equations. The labels name it: it is a figure with them. The
+    # same strokes with no typed label by them are still handwriting.
+    path = Path(__file__).parent / "fixtures" / "handwriting" / "typed_with_ink.pdf"
+    plain = layout.analyze(path.read_bytes())
+    (note,) = _regions(plain)
+    assert _figures(plain) == []
+    doc = pymupdf.open(path)
+    _label(doc[0], (note.bbox[0] + 40, note.bbox[1] + 12), "R", 11)
+    _label(doc[0], (note.bbox[0] + 140, note.bbox[3] - 14), "O(0)", 11)
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out)
+    assert _regions(out) == []
+    assert _holds(figure, note.bbox, slack=8)
+    assert "R" in (figure.text or "") and "O(0)" in (figure.text or "")
 
 
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():

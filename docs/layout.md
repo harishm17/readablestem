@@ -1927,8 +1927,26 @@ math by the document's evidence; the equation step's own tiers then decide it.
   dropped: art that is cut by the clip but reaches into it stays, as does anything under a
   clip that is not a box (its box is what is tested). A page that the hidden art made an ink
   page (2407.20815 page 4: 138 pen-like strokes of which 19 are painted) is read from the
-  painted strokes: that page is now mixed ink, its pen-drawn sphere a handwriting region like
-  the world lines of page 2.
+  painted strokes: that page is now mixed ink; its pen-drawn sphere and page 2's world lines
+  are figures again ("Pen figures").
+- **Pen figures** (`page._pen_figures`). On a `mixed_ink` page the pen drawings are cut out of
+  the figure rules (`document.py` holds them back in `pen`), and a handwriting region comes
+  from the pen strokes alone, so the typed labels of a hand-drawn figure cut its region short
+  (2407.20815 page 4: the sphere lost its top, y518-605 for y461-617) and the drawing was
+  "handwriting, not converted". Each region is read again with the figure rules over the pen
+  paths and the loose paths inside it; if a typed label belongs to the result
+  (`_label_owners`), the result is a figure with its whole extent, claims its labels, and the
+  region is dropped. A drawing that no typed label names stays handwriting, and so does
+  handwriting with no typed label in it; handwriting with a short typed label in it (a letter
+  beside a hand-drawn ball) is now a figure for the figure step.
+- **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
+  panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
+  no other figure) claims the rows on the panel, its header labels included, short or long
+  (`ax_physicsoptics` page 13: the header labels were paragraphs and a spurious italic "C"
+  equation).
+- **A row cut by a drawing's edge** belongs to that drawing when at least a quarter of it lies
+  inside and its center is between the drawing's sides (`figures._cut_by`; 2407.09859 page 3:
+  an axis title straddling the figure's bottom edge once the hidden art no longer extended it).
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
   along all four edges of its own box and nowhere else: a rectangle, rounded corners, a
@@ -2909,7 +2927,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count, or `hidden_text_check` (required) from `page_type.HIDDEN_BLOCK` (400) characters on |
-| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text") |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text"); a region that a typed label of the page names is a figure, not a handwriting region ("Pen figures") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analyzed in time; its visible text is read, its drawings are not sent to the figure model |

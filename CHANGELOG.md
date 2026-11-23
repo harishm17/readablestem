@@ -11,6 +11,13 @@
   (`pipeline/layout/document.py`, `drawings.py`, `rows.py`, the upload probe and the page-type
   eval). 15 public files and 34 pages are affected, 4 of 25 corpus files; see docs/layout.md,
   "Figures". A pipeline raise is owed with the release that carries it.
+- Two pages that the clip fix turned into mixed ink would have lost their figures: 2407.20815
+  pages 2 and 4 (a hand-drawn sphere and world lines, then "handwriting, not converted", the
+  sphere with its top cut off). A handwriting region that a typed label of the page names is a
+  figure again, with its whole extent and labels (`page._pen_figures`).
+- Figures of pictures alone on a filled panel claim the panel's header labels
+  (`ax_physicsoptics` page 13), and a row cut by a drawing's edge belongs to it (2407.09859
+  page 3), so no figure loses a label the page paints.
 
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 
