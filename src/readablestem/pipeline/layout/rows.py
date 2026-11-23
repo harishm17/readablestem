@@ -1295,7 +1295,7 @@ def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
         marks.extend(Strike(box, True) for box in _quads(annot, display))
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_HIGHLIGHT]) or ():
         lit.extend(Highlight(box) for box in _quads(annot, display))
-    drawings = page_type.page_drawings(page)
+    drawings = page.get_cdrawings()
     if page_type.too_complex(drawings):
         return marks, lit
     seen = page_type.paint_visibility(drawings)

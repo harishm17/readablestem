@@ -433,7 +433,7 @@ def test_art_that_a_clip_leaves_unpainted_is_no_figure_over_the_text_it_lies_on(
     ops += ["120 530 m 470 530 l S", "120 530 m 120 330 l S", "Q"]
     contents = page.get_contents()
     doc.update_stream(contents[0], doc.xref_stream(contents[0]) + "\n".join(["", *ops]).encode())
-    out = layout.analyze(doc.tobytes())
+    out = layout.analyze(doc.tobytes(), figure_art=True)
     (figure,) = _figures(out)
     assert figure.bbox[3] < 300 < end
     assert "Displacement is the change in position" in _text_of(out)

@@ -1911,7 +1911,21 @@ math by the document's evidence; the equation step's own tiers then decide it.
   pairs of neighboring pixels differ by more than 16 levels, and what is seen, alpha
   above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
-- **Art a clip hides** is no figure and no ink (`page_type.page_drawings`). A
+- **`LAYOUT_FIGURE_ART`** (`layout.analyze(figure_art=True)`, off in code and in the production
+  profile) holds the two rules below that moved a recorded figure request on the corpus: "Art a
+  clip hides" and "A row cut by a drawing's edge". Off, the output is what it was before them.
+  Measured by replay on the 73 uploads of the corpus against release 5d081fcc (0.5.18): with it
+  off, 0 uploads differ (the whole result's hash is the same on all 73); with it on, one upload
+  differs in a request (w_lecture_5111 page 4, counted from 0 as the corpus pages in this
+  section are: one figure's crop is 12 pt shorter, the same five
+  words, and its request has no recorded answer until it is re-recorded), and one in a note
+  (r21_infographic_orcid: a figure's reason reads 866 paths for 867). The other parts of
+  this section (pen figures, panel labels) move no request and are not behind it. Turning it on
+  needs a re-recording and a `PIPELINE_VERSION` bump, and, first, an order for figures that stand
+  side by side: on w_lecture_5111 the figure that is 12 pt shorter now starts below its neighbor
+  and `order._top_down` puts the neighbor first (the middle figure of three before the left one).
+- **Art a clip hides** is no figure and no ink (`page_type.page_drawings`; behind
+  `LAYOUT_FIGURE_ART`). A
   PDF that carries a figure's art on every page (an editor's export) clips each page to its
   own part; the rest is in the page's drawings, painted nowhere. `get_cdrawings()` does not
   say so, so a drawing was read as painted and the figure rules boxed it with the body text
@@ -1920,8 +1934,10 @@ math by the document's evidence; the equation step's own tiers then decide it.
   both columns of the page). The extended list holds the clips between the drawings, each
   with its depth (`level`); a drawing whose box, with half its line width, lies wholly
   outside the box of a clip it is inside of is painted at opacity 0, the way the page already
-  leaves out paint nobody sees (`paint_visibility`, the ink analysis, the strike and highlight
-  marks, the upload probe). The list keeps its length and order. Counted on the public sets
+  leaves out paint nobody sees (`paint_visibility`, the ink analysis). Only layout's own read of
+  a page uses it (`document._read_page`); the text pass's strike and highlight marks, the upload
+  probe, the furniture pass and the page-type eval read the plain list. The list keeps its
+  length and order. Counted on the public sets
   (302 files, 2,628 pages): 15 files and 34 pages hold such art on the page; on the private
   corpus 4 of 25 files and 5 of 1,202 pages. Only a drawing wholly outside its clip is
   dropped: art that is cut by the clip but reaches into it stays, as does anything under a
@@ -1944,11 +1960,17 @@ math by the document's evidence; the equation step's own tiers then decide it.
   no other figure) claims the rows on the panel, its header labels included, short or long
   (`ax_physicsoptics` page 13: the header labels were paragraphs and a spurious italic "C"
   equation).
-- **A row cut by a drawing's edge** belongs to that drawing when at least a quarter of it lies
-  inside and its center is between the drawing's sides (`figures._cut_by`; 2407.09859 page 3:
-  an axis title straddling the figure's bottom edge once the hidden art no longer extended it).
-  It counts at the longest reach only, so a figure with a stroke nearer to the row takes it
-  (2309.01229 page 4: the "−0.1" tick of one panel, cut by the edge of its neighbor's box).
+- **A row cut by a drawing's edge** (behind `LAYOUT_FIGURE_ART`) belongs to that drawing when at
+  least a quarter of it lies inside and its center is between the drawing's sides
+  (`figures._cut_by`; 2407.09859 page 3: an axis title straddling the figure's bottom edge once
+  the hidden art no longer extended it). It counts at the longest reach only, so a figure with a
+  stroke nearer to the row takes it (2309.01229 page 4: the "−0.1" tick of one panel, cut by the
+  edge of its neighbor's box). The page's own text is not taken (`figures._text_of_page`): a
+  list item (a slide's bullet whose picture starts on its line: w_slides_60001_lec10 page 27) and
+  a line of a column of text, with `CUT_COLUMN` (6) other rows starting where it does (a display
+  equation of a column that the box of a figure beside it runs into by 15 pt: w_exam_5111 page
+  7, 21 rows on its edge). The rows this rule is for are short labels with three rows on their
+  edge at most (the public files and the corpus hold no other row it takes).
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
   along all four edges of its own box and nowhere else: a rectangle, rounded corners, a

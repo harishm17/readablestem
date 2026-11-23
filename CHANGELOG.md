@@ -8,16 +8,23 @@
   ax_astrophga_240306409 page 11, where three lines of a paragraph were in no element), and ink from it that made a
   typed page look like handwriting. `page_type.page_drawings` reads the page's clips and gives a
   drawing wholly outside its clip opacity 0, which every reader of paint already leaves out
-  (`pipeline/layout/document.py`, `drawings.py`, `rows.py`, the upload probe and the page-type
-  eval). 15 public files and 34 pages are affected, 4 of 25 corpus files; see docs/layout.md,
-  "Figures". A pipeline raise is owed with the release that carries it.
+  (`pipeline/layout/document.py`, the read of a page). 15 public files and 34 pages are
+  affected, 4 of 25 corpus files; see docs/layout.md, "Figures". This part and the rule for a
+  row cut by a drawing's edge (below) are behind the new switch `LAYOUT_FIGURE_ART`
+  (`layout.analyze(figure_art=True)`), off in code and in the production profile: in the replay
+  of the 0.5.18 recording they moved one figure's request on each of w_exam_5111,
+  w_slides_60001_lec10 and w_lecture_5111, and a request that moves is behind a switch that is
+  off. With it off the output of all 73 corpus uploads is that of 5d081fcc; turning it on comes
+  with a re-recording and a pipeline raise (docs/layout.md, "Figures").
 - Two pages that the clip fix turned into mixed ink would have lost their figures: 2407.20815
   pages 2 and 4 (a hand-drawn sphere and world lines, then "handwriting, not converted", the
   sphere with its top cut off). A handwriting region that a typed label of the page names is a
   figure again, with its whole extent and labels (`page._pen_figures`).
 - Figures of pictures alone on a filled panel claim the panel's header labels
   (`ax_physicsoptics` page 13), and a row cut by a drawing's edge belongs to it (2407.09859
-  page 3), so no figure loses a label the page paints.
+  page 3), so no figure loses a label the page paints. The cut-row rule is behind
+  `LAYOUT_FIGURE_ART` and takes no list item and no line of a column of text (a slide's bullet
+  under a picture's top, a display equation beside a figure whose box runs into its column).
 
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 

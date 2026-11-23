@@ -135,6 +135,7 @@ def analyze(
     inline_joins: bool = False,
     region_tree: bool = False,
     join_panels: bool = False,
+    figure_art: bool = False,
     table_search_limited: bool = True,
     on_page: Callable[[int, int], None] | None = None,
 ) -> Layout:
@@ -167,6 +168,12 @@ def analyze(
     by side or in a grid are one figure, and the panel marks beside it are its labels ("Panels
     of one figure" in docs/layout.md). Off, the output is what it was before the rule existed.
 
+    `figure_art` (`LAYOUT_FIGURE_ART`, off): the page's drawings are read without the paint that
+    no clip lets through ("Art a clip hides" in docs/layout.md), and a row the edge of a figure's
+    box cuts through is the figure's label, unless it is a list item or a line of a column of
+    text ("A row cut by a drawing's edge"). Off, the output is what it was before the rules
+    existed.
+
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
     search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
     machine.
@@ -196,6 +203,7 @@ def analyze(
                         inline_joins=inline_joins,
                         region_tree=region_tree,
                         panels=join_panels,
+                        figure_art=figure_art,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
                         trace=PageTrace(),
                     ),
@@ -366,7 +374,7 @@ def _read_page(
     turn = page_type.turn_page(page)
     fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
-    drawn = page_type.page_drawings(page)
+    drawn = page_type.page_drawings(page) if document.figure_art else page.get_cdrawings()
     strokes = glyph_strokes.strokes(page, raw)
     # What a reviewer's annotations paint (an icon, a caret, a highlight) is not the page's art:
     # figures and handwriting are read without it. The hidden-text check is given the whole list
