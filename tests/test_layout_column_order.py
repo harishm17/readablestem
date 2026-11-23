@@ -60,19 +60,10 @@ def test_a_short_heading_beside_a_gap_in_the_other_column_still_breaks_the_colum
 
 
 @pytest.mark.parametrize(
-    ("note", "paragraphs", "lines"),
-    [
-        (False, None, (24, 24)),
-        (True, None, (24, 24)),
-        (False, (5, 4), (24, 24)),
-        # a column of nine lines with one skipped line (a figure's space, a heading's) beside
-        # one of fourteen: two runs of four and a half lines, not the option pairs of an exam
-        (False, (99, 5), (14, 9)),
-    ],
+    ("note", "paragraphs"),
+    [(False, None), (True, None), (False, (5, 4))],
 )
-def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other(
-    note, paragraphs, lines
-):
+def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other(note, paragraphs):
     # A title, authors and affiliations centered over both columns (more lines across the
     # gutter than a column may have), an abstract across the page, then two columns; with a
     # note across the page under them whose last line is short and sits at the left; or with
@@ -96,7 +87,7 @@ def test_the_columns_under_the_head_of_a_first_page_are_read_one_after_the_other
         y += 12
     top = y + 20
     for side, (x, name) in enumerate(((54.0, "left"), (317.0, "right"))):
-        for i in range(lines[side]):
+        for i in range(24):
             line = f"{name} column line {i} " + "word " * 7
             gaps = i // paragraphs[side] if paragraphs else 0
             page.insert_text((x, top + 12 * (i + gaps)), line, fontsize=10, fontname="helv")
@@ -135,31 +126,26 @@ def test_a_ruled_step_table_on_a_page_of_one_column_is_not_read_column_by_column
 
 
 @pytest.mark.parametrize(
-    ("question", "options", "questions", "space", "pitch", "section", "wraps", "labeled"),
+    ("question", "options", "questions", "space", "pitch", "section", "wrap"),
     [
         # a question that runs the whole width of the page; one that stops short of the gutter,
         # set at the pitch of its options (single spacing) with no space between the questions
-        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16, 0, (), 0),
-        ("Which statement about the forces is correct?", 4, 4, 0, 13.2, 0, (), 0),
+        ("A question that runs the whole width of the page, number {q}?", 4, 3, 12, 16, 0, None),
+        ("Which statement about the forces is correct?", 4, 4, 0, 13.2, 0, None),
         # two short questions only: the gutter runs through them
-        ("Which statement about the forces is correct?", 4, 2, 12, 16, 0, (), 0),
+        ("Which statement about the forces is correct?", 4, 2, 12, 16, 0, None),
         # one question, six options: three lines a side under it
-        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, 0, (), 0),
+        ("A question that runs the whole width of the page, number {q}?", 6, 1, 12, 16, 0, None),
         # a section line set a line apart above the first question
-        ("Which statement about the forces is correct?", 4, 3, 12, 16, 1, (), 0),
+        ("Which statement about the forces is correct?", 4, 3, 12, 16, 1, None),
         # an option runs on to a second line, single spacing: b of the first of three questions
         # (right), a of the second of four (left)
-        ("Which statement about the forces is correct?", 4, 3, 0, 14, 0, ((0, 334),), 0),
-        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, ((1, 98),), 0),
-        # options with labels, "(a)": four questions of which two have a right option that runs
-        # on (two holes beside three breaks); five questions, two with a wrapped option (taken
-        # by the gutter of the whole page)
-        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, ((0, 334), (2, 334)), 1),
-        ("Which statement about the forces is correct?", 4, 5, 0, 14, 0, ((1, 334), (3, 334)), 1),
+        ("Which statement about the forces is correct?", 4, 3, 0, 14, 0, (0, 334)),
+        ("Which statement about the forces is correct?", 4, 4, 0, 14, 0, (1, 98)),
     ],
 )
 def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
-    question, options, questions, space, pitch, section, wraps, labeled
+    question, options, questions, space, pitch, section, wrap
 ):
     # An exam page of one column: centered head lines, an instruction across the page, then
     # questions with their options two by two under each. The option pairs look like two columns
@@ -192,19 +178,15 @@ def test_options_standing_two_by_two_under_questions_are_not_read_as_columns(
         y += 18 if space else pitch
         for row in range(options // 2):
             for x, k in ((84, 2 * row), (320, 2 * row + 1)):
-                label = f"({'abcdef'[k]}) " if labeled else ""
                 page.insert_text(
                     (x, y),
-                    f"{label}option {'abcdef'[k]}{q} the net force on the block is zero",
+                    f"option {'abcdef'[k]}{q} the net force on the block is zero",
                     fontsize=11,
                 )
-            for wrap_q, wrap_x in wraps:
-                if wrap_q == q and row == 0:
-                    y += pitch
-                    page.insert_text(
-                        (wrap_x, y), "and the block moves at a steady speed", fontsize=11
-                    )
+            if wrap and wrap[0] == q and row == 0:
+                y += pitch
+                page.insert_text((wrap[1], y), "and the block moves at a steady speed", fontsize=11)
             y += pitch
         y += space
     text = " ".join(e.text or "" for e in layout.analyze(doc.tobytes()).elements)
-    assert text.index("option b0") < text.index("option c0" if options > 2 else "option a1")
+    assert text.index("option b0") < text.index("option c0")

@@ -265,8 +265,7 @@ reader, neither to find them nor as a second opinion
    side below it, and does not), and so do breaks in the thinner side (a step from a line's
    top to the next one's over 1.9 line pitches, `MIN_BREAK_PITCHES`, with one to three lines
    of the other side or across the gap beside it: a short question that the gap runs through
-   stands in the break too) that cut it into runs of fewer than four lines on average
-   (`MIN_RUN_LINES`). Measured
+   stands in the break too) that cut it into runs of fewer than five lines on average. Measured
    top to top, a question set at the pitch of its options with no space between questions
    skips one line, 2 pitches, at any leading. A column page of the development set has one
    such break in 10 lines on its thinner side, just enough to keep its columns, and a step of
@@ -286,22 +285,24 @@ reader, neither to find them nor as a second opinion
    (read across, as before), and so do columns whose thinner side is set at about twice the
    other's pitch (a spaced list beside running text: the pooled pitch finds a break at every
    line).
-   Options with labels are told by their labels, whatever the spacing: a gutter with at least
-   three pairs of option lines level with each other, a line starting "(a)", "b)" or "C." on
-   each side, and such a line on at least 0.4 of the lines of its thinner side, is no gutter,
-   found for the page as a whole or under a head (`order._option_pairs`, `OPTION_LABEL`,
-   `MIN_OPTION_PAIRS`, `MIN_OPTION_SHARE`), and the options of a question are read one after
-   the other. This holds for the shapes geometry cannot tell from columns: a left option that
-   runs on to a second line (a hole like a paragraph's space), one row of options under each
-   question (a step of twice the pitch like a spaced list), ten options under one or two
-   questions, and a longer exam that the gutter of the page as a whole takes before the runs
-   are asked about. Left as it is: an exam whose options carry no label ("A question ... Option
-   one ...") is judged by the breaks alone, as above, and of the shapes above is still read
-   as columns (left options first) where two or more options run on to a second line, where
-   there are five questions or more, or where there are three rows of options a question;
-   columns whose thinner side is set at about twice the other's pitch and
-   columns whose paragraphs run two or three lines on one side cannot be told from such an exam
-   by their spacing and are read across.
+   Left as it is: a longer exam (six questions; five with options that run on to a second
+   line; four with three rows of options) is taken by the gutter of the page as a whole,
+   before the runs are asked about, since a few lines across it are allowed for every ten
+   lines; an exam of four questions with two options that run on makes two holes beside three
+   breaks and keeps the columns; an exam with one row
+   of two options under each question has no break in its option columns, and one with ten
+   options under one or two questions too few; all of these are read as columns (left options
+   first). Not built, since no real document shows them (checked 2026-11-22 on the 81 public
+   PDFs of the development set and `data/`, where no page reaches the shapes; on the 996
+   analyzed files and 73 replayed uploads of the corpus a fix for them changes nothing): a
+   label test (a pair of option lines level with each other, "(a)" beside "(b)", on 0.4 of the
+   thinner side's lines) reads all 127 exam probes of reviews 18 to 21 question by question
+   (95 before) and a run length of four lines instead of five reads 96 of the 117 column probes
+   as columns (70 before), with none made worse; the patch is kept outside the repository. What it
+   cannot tell apart on spacing alone, and so would still read wrongly if a real page showed it:
+   columns whose thinner side is set at twice the other's pitch (the steps of an exam whose left
+   option runs on), and columns of paragraphs of two or three lines (the groups of an exam's
+   options). The lines of the head are
    then read in the segments the lines across the page make (`order._find_gutter`).
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline math). Fragments on the same baseline are joined, never across the
