@@ -8,7 +8,7 @@ Turning the switch on moves equation boxes, so the recorded equation requests of
 stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none made here).
 
 - Italic "for", "and", "any", "all", "the", "let", "are" and "not" between blanks are words, not the
-  variables f, o, r (`shared._ITALIC_CONNECTIVES`). A theorem's statement set in italic had one maths
+  variables f, o, r (`shared._ITALIC_CONNECTIVES`). A theorem's statement set in italic had one math
   row and one box for "x >= 2, for j = 1, ..., d and k = 3"; now the formulas are boxes of their own.
   Box score of 21 development papers, both switches on: 9,174 whole before, 9,183 after (+10, 1 lost).
 - A colon inside a Computer Modern or Latin Modern index stays in the formula when the file's producer
@@ -18,6 +18,14 @@ stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none
   union of two lines), widening the host box in `display._absorb_contained_regions` (9 boxes grow, no
   score changes), and counting set-off words without connectives (+1, 1 lost). Counts in
   docs/layout.md.
+- Raised digits (O-416): on the 72 corpus entries 30 blocks keep raised or lowered text flat, and each
+  of the 30 has its `scripts_flattened` notice (none silent); on the 331 other PDFs 312 blocks, none
+  silent. Nothing built for them; `Element.text` is as it was.
+- Hash runs on cf0729fc's replay of the corpus (`hashrun.py full`, 73 uploads, recorded answers): with
+  both switches off no upload differs from the baseline, so no recorded request key moves. With both
+  switches on, 8 uploads differ from switches-off (the switches' own change, the same at the base), and
+  the two rules above change no upload beyond that: 0 of 73 differ from the base tree with
+  the switches on, so no recorded request key is moved by them.
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
 
