@@ -150,6 +150,49 @@ def test_a_second_conversion_waits_for_the_first_and_gives_up_as_a_timeout(monke
     assert raised.value.code == "timeout"
 
 
+def test_a_program_stopped_by_its_memory_limit_ends_as_the_time_or_memory_code(
+    monkeypatch, tmp_path
+):
+    """A loop the log does not name looks like a very large source: both read the limit, of time
+    or of memory, as `source_timeout` (LaTeXML's `over_memory` or perl's own "Out of memory",
+    pandoc's `not_finished`)."""
+    from readablestem.core import sandbox
+    from readablestem.source import convert, latexml
+    from readablestem.source import pandoc as pandoc_step
+
+    monkeypatch.setattr(latexml, "installed", lambda: True)
+    monkeypatch.setattr(latexml, "convert", lambda *a, **k: sandbox.Outcome(-9, over_memory=True))
+    with pytest.raises(SourceFailed) as raised:
+        convert.run_latexml(tmp_path, "main.tex", tmp_path / "out")
+    assert raised.value.code == "source_timeout"
+
+    # perl at its address-space cap says so and exits 1: the sandbox sets no flag (measured on
+    # a command that only grows)
+    out = tmp_path / "out"
+    out.mkdir()
+    (out / "latexml.out").write_text("(Loading article.cls... 0.01 sec)Out of memory in perl\n")
+    monkeypatch.setattr(latexml, "convert", lambda *a, **k: sandbox.Outcome(1))
+    with pytest.raises(SourceFailed) as raised:
+        convert.run_latexml(tmp_path, "main.tex", out)
+    assert raised.value.code == "source_timeout"
+
+    monkeypatch.setattr(
+        pandoc_step,
+        "read",
+        lambda *a, **k: pandoc_step.Result(None, pandoc_step.NOT_FINISHED),
+    )
+    blob = envelope.wrap("docx", "a.docx", None, b"PK")
+    monkeypatch.setattr(convert.intake, "unwrap", lambda b: ("docx", "a.docx", b"PK"))
+    from readablestem.source import docx_package
+
+    monkeypatch.setattr(
+        docx_package, "prepare", lambda data: type("P", (), {"working": tmp_path})()
+    )
+    with pytest.raises(SourceFailed) as raised:
+        convert._read_word(blob)
+    assert raised.value.code == "source_timeout"
+
+
 def test_conversions_one_after_another_each_get_the_gate():
     for _ in range(2):
         assert convert("bib").stats.required_decisions == 0
@@ -491,8 +534,11 @@ def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_
         "Mail a@b.org or see www.example.org and \\href{https://example.org/h}{the page}.\n"
         "See Section 1, Equation (1), Table 1 and Figure 1, and $x=3$ in Table~\\ref{tab:d}.\n"
         "\\begin{equation}v=v_0+at\\end{equation}\n"
-        "\\begin{table}\\caption{Data}\\label{tab:d}\\begin{tabular}{lc}\\href{https://example.org/c}{A}&\\ref{sec:next}\\\\\\end{tabular}"
-        "\\end{table}\n\\section{Next}\\label{sec:next}Back to Section 1.\n\\end{document}\n"
+        "\\begin{table}\\caption{Data from \\href{https://example.org/t}{the lab}, "
+        "see Section~\\ref{sec:next}}"
+        "\\label{tab:d}\\begin{tabular}{lc}\\href{https://example.org/c}{A}&\\ref{sec:next}\\\\\\end{tabular}"
+        "\\end{table}\n\\begin{figure}\\caption{Setup of Table~\\ref{tab:d}}\\end{figure}\n"
+        "\\section{Next}\\label{sec:next}Back to Section 1.\n\\end{document}\n"
     )
     blob = envelope.wrap("tex", "refs.tex", None, tex.encode())
     result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
@@ -517,6 +563,18 @@ def test_addresses_typed_in_the_text_and_references_by_number_are_linked_like_a_
         ("2", next_heading),
     ]
     assert 'href="https://example.org/c"' in result.html
+    # and so do a table's and a figure's captions (`caption_links`, beside the plain `caption`)
+    grid = next(e for e in result.elements if e.table).table
+    figure = next(e for e in result.elements if e.kind is Kind.FIGURE)
+    assert [(grid.caption[k.start : k.end], k.href or k.target_id) for k in grid.caption_links] == [
+        ("the lab", "https://example.org/t"),
+        ("2", next_heading),
+    ]
+    assert [(figure.caption[k.start : k.end], k.target_id) for k in figure.caption_links] == [
+        ("1", table)
+    ]
+    assert f'<a href="#{next_heading}">2</a></caption>' in result.html
+    assert f'<a href="#{table}">1</a></figcaption>' in result.html
     for target in (heading, equation, table):  # every link goes to a place in the file
         assert f'href="#{target}"' in result.html and f'id="{target}"' in result.html
     # the count the job page keeps ("links kept of N in the file") is the file's own: the \href

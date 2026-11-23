@@ -205,6 +205,18 @@ def test_inline_maths_becomes_child_equations_with_markers_in_the_paragraph():
         assert px0 <= x0 < x1 <= px1 and py0 <= y0 < y1 <= py1
 
 
+def test_a_relation_inside_a_typed_web_address_is_not_an_inline_equation():
+    layout = analyze(
+        html_page(
+            "<p>Video: https://www.youtube.com/watch?v=C-uekD6VTIQ</p>"
+            "<p>The speed is <i>v</i> = <i>d</i>/<i>t</i> on the road.</p>"
+        )
+    )
+    paragraphs = [e for e in layout.elements if e.kind == Kind.PARAGRAPH]
+    assert "https://www.youtube.com/watch?v=C-uekD6VTIQ" in paragraphs[0].text
+    assert [e.text for e in layout.elements if e.kind == Kind.EQUATION] == ["v = d/t"]
+
+
 def test_a_greek_sentence_is_prose_and_a_lone_greek_letter_is_still_maths():
     greek = analyze(
         html_page("<p>Δυνάμεις είναι η επιστήμη της κίνησης των σωμάτων και των δυνάμεων.</p>")
@@ -477,35 +489,57 @@ def test_a_single_page_keeps_unrepeated_margin_text_but_drops_the_page_number():
     ]
 
 
-def test_a_single_page_cut_from_a_journal_loses_its_head_and_foot_found_by_their_shape():
-    # No other page repeats them, but the head stands clear of the text and carries "Page 3
-    # of 9", the foot "11 of 14"; a title line under the head is kept.
+@pytest.mark.parametrize(("head_number", "foot_number"), [("Page 3 of 9", "11 of 14"), ("3", "11")])
+def test_a_single_page_cut_from_a_journal_loses_its_head_and_foot_found_by_their_shape(
+    head_number, foot_number
+):
+    # No other page repeats them, but the head stands clear of the text and carries a page
+    # number ("Page 3 of 9", or a bare "3" in type smaller than the body), the foot the same;
+    # a title line under the head is kept.
     def fill(page):
         page.insert_text((72, 30), "Journal of Rare Diseases 2010", fontsize=8)
-        page.insert_text((440, 30), "Page 3 of 9", fontsize=8)
+        page.insert_text((440, 30), head_number, fontsize=8)
         page.insert_text((72, 41), "http://www.example.org/content/5/1/10", fontsize=8)
         write(page, 72, 120, ["The only body paragraph on this page."])
         page.insert_text((72, 715), "Journal of Rare Diseases", fontsize=8)
-        page.insert_text((300, 715), "11 of 14", fontsize=8)  # 90% down: past the band of drops
+        page.insert_text((300, 715), foot_number, fontsize=8)  # 90% down: past the band of drops
 
     assert texts(analyze(one_page(fill)).elements) == ["The only body paragraph on this page."]
 
 
 def test_the_name_line_and_the_points_of_a_one_page_quiz_are_not_a_head_or_foot():
     # They stand clear at the edges and end in a number, as a running head does; the number
-    # does not say it is a page's, and nothing repeats to say so.
+    # does not say it is a page's, they are set as the body is, and nothing repeats to say so.
     def fill(page):
-        page.insert_text((72, 30), "Quiz 3: Limits and continuity", fontsize=9)
-        page.insert_text((440, 30), "Points:", fontsize=9)
-        page.insert_text((500, 30), "25", fontsize=9)
+        page.insert_text((72, 30), "Quiz 3: Limits and continuity", fontsize=BODY)
+        page.insert_text((440, 30), "Points:", fontsize=BODY)
+        page.insert_text((500, 30), "25", fontsize=BODY)
         write(page, 72, 120, ["The only body paragraph on this page."])
-        page.insert_text((72, 715), "Total marks for this paper", fontsize=9)
-        page.insert_text((500, 715), "50", fontsize=9)
+        page.insert_text((72, 715), "Total marks for this paper", fontsize=BODY)
+        page.insert_text((500, 715), "50", fontsize=BODY)
 
     assert " ".join(texts(analyze(one_page(fill)).elements)) == (
         "Quiz 3: Limits and continuity Points: 25 The only body paragraph on this page."
         " Total marks for this paper 50"
     )
+
+
+def test_the_footnote_above_the_page_number_of_a_one_page_file_is_kept():
+    # Set smaller than the body and standing clear above a bare page number, as a foot does; but
+    # its first line carries on a sentence from the page before, which a foot's words never do.
+    note = "run this analysis, omits observations that are missing data on the variables."
+
+    def fill(page):
+        write(
+            page,
+            72,
+            120,
+            ["The only body paragraph on this page, set long enough to be the body."] * 3,
+        )
+        page.insert_text((72, 708), note, fontsize=8)
+        page.insert_text((500, 720), "20", fontsize=8)
+
+    assert note in " ".join(texts(analyze(one_page(fill)).elements))
 
 
 @pytest.mark.parametrize("turn", [90, 270])

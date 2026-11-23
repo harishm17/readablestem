@@ -220,7 +220,7 @@ def render_table(
     )
     parts = ["<table>"]
     if grid.caption and grid.caption.strip():
-        caption = escape_text(" ".join(grid.caption.split()))
+        caption = _caption_html(grid)
         parts.append(f'<caption id="{id_prefix}-caption">{caption}</caption>')
     if layout.colgroup_headers():
         for group in layout.top_groups():
@@ -234,6 +234,18 @@ def render_table(
             parts.append(f"<tbody>{writer.rows(range(start, end))}</tbody>")
     parts.append("</table>")
     return "".join(parts)
+
+
+def _caption_html(grid: TableGrid) -> str:
+    """The table's caption as HTML: its words on one line, with the links of a Word or LaTeX
+    source's caption (offsets into `caption`, so only while the words are as the reader made
+    them)."""
+    words = " ".join((grid.caption or "").split())
+    if grid.caption_links and words == grid.caption:
+        from readablestem.pipeline.inline_text import render_linked_words  # it imports us
+
+        return render_linked_words(words, grid.caption_links)
+    return escape_text(words)
 
 
 def _layout_table(layout: _Layout, math_display: Display, math_alttext: bool) -> str:

@@ -52,6 +52,11 @@ _MATH_WORDS = frozenset(
 # More operator names, taken as maths words only when `analyze(inline_joins=True)`.
 _MORE_MATH_WORDS = frozenset(("erfi", "erfc", "supp", "diam", "codim", "coker", "arccot"))
 
+# Words of a sentence that no formula multiplies out of three italic letters: set in italic (a
+# theorem's statement), "for" and "and" are words, not the variables f, o, r. Only when
+# `analyze(inline_joins=True)`.
+_ITALIC_CONNECTIVES = frozenset(("for", "and", "any", "all", "the", "let", "are", "not"))
+
 
 _SUPERSCRIPT_FLAG = 1
 
@@ -441,6 +446,8 @@ def _word_lengths(
         italic_variables = upright and len(letters) <= 3 and all(c.italic for c in letters)
         word = "".join(c.c for c in letters).lower()
         if italic_variables and italic_text and len(letters) > 1 and word in hyphens.words():
+            italic_variables = False
+        if italic_variables and document.inline_joins and word in _ITALIC_CONNECTIVES:
             italic_variables = False
         named = (
             document.tex_made

@@ -251,9 +251,15 @@ class RecordingVerifier:
         self._record(key, verdict)
         return verdict
 
-    def equation_match(self, png: bytes, *, latex: str) -> VerifierVerdict:
-        verdict = self._inner.equation_match(png, latex=latex)
-        self._record(verify_key(EQUATION_CHECK, EQUATION_VERSION, png, latex), verdict)
+    def equation_match(
+        self, png: bytes, *, latex: str, facts: str | None = None
+    ) -> VerifierVerdict:
+        if facts is None:
+            verdict = self._inner.equation_match(png, latex=latex)
+            self._record(verify_key(EQUATION_CHECK, EQUATION_VERSION, png, latex), verdict)
+        else:  # a request with the file's account is another question: its key says so
+            verdict = self._inner.equation_match(png, latex=latex, facts=facts)
+            self._record(verify_key(EQUATION_CHECK, EQUATION_VERSION, png, latex, facts), verdict)
         return verdict
 
     def _record(self, key: str, verdict: VerifierVerdict) -> None:
@@ -287,8 +293,11 @@ class ReplayVerifier:
         key = verify_key(FIGURE_CHECK, FIGURE_VERSION, png, alt, caption)
         return self._lookup(key, FIGURE_CHECK, FIGURE_VERSION)
 
-    def equation_match(self, png: bytes, *, latex: str) -> VerifierVerdict:
-        key = verify_key(EQUATION_CHECK, EQUATION_VERSION, png, latex)
+    def equation_match(
+        self, png: bytes, *, latex: str, facts: str | None = None
+    ) -> VerifierVerdict:
+        texts = (latex,) if facts is None else (latex, facts)
+        key = verify_key(EQUATION_CHECK, EQUATION_VERSION, png, *texts)
         return self._lookup(key, EQUATION_CHECK, EQUATION_VERSION)
 
     def _lookup(self, key: str, check: str, version: str) -> VerifierVerdict:

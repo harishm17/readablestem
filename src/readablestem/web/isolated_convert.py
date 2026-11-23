@@ -535,7 +535,7 @@ class _Conversion:
             )
             while True:
                 if self.cancelled is not None and self.cancelled():
-                    raise BudgetExceeded("cancelled", "the job was deleted or taken over")
+                    raise BudgetExceeded("cancelled", "the document was deleted or taken over")
                 if deadline is not None and time.monotonic() > deadline:
                     log_event(logger, "conversion_child_timeout", logging.WARNING)
                     raise ConversionTimeout("the conversion ran past its time limit")
@@ -801,7 +801,13 @@ class _Conversion:
                     caption=caption if isinstance(caption, str) else None,
                 )
             elif header["check"] == "equation_match":
-                value = verifier.equation_match(blobs[0], latex=str(header["latex"]))
+                facts = header.get("facts")
+                if isinstance(facts, str):
+                    value = verifier.equation_match(
+                        blobs[0], latex=str(header["latex"]), facts=facts
+                    )
+                else:
+                    value = verifier.equation_match(blobs[0], latex=str(header["latex"]))
             else:
                 raise _Protocol("verify")
         except Exception as exc:

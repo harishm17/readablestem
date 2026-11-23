@@ -104,10 +104,11 @@ from readablestem.core.mathchars import (
 )
 from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
 from readablestem.models import router
-from readablestem.models.base import T, VisionClient, VisionRequest
+from readablestem.models.base import FENCE_LIMIT, T, VisionClient, VisionRequest
 from readablestem.models.prompts import load_prompt
 from readablestem.pipeline import (
     equation_images,
+    file_account,
     flag_policy,
     glyph_reconcile,
     layout,
@@ -145,6 +146,9 @@ NOTATION_PROMPT_VERSION = load_prompt(NOTATION_PROMPT_NAME).version
 # Appended to either prompt when an inline equation comes with its line, span boxed
 # (`Settings.equation_line_context`, `layout.crop_line`); the version names both parts.
 LINE_PROMPT_NAME = "equation_line"
+# Appended to either prompt, before the line part, when the request carries the file's account of
+# the box (`Settings.equation_file_facts`, `pipeline.file_account`); the version names it too.
+FILE_PROMPT_NAME = "equation_file"
 
 # A cheap answer with passing checks and a confidence from here to the accept bar is not
 # asked again (`_needs_escalation`).
@@ -214,6 +218,21 @@ class EquationOutput(BaseModel):
     )
     confidence: float = Field(
         ge=0, le=1, description="Probability that the LaTeX matches the image symbol for symbol."
+    )
+
+
+class EquationFromFileOutput(EquationOutput):
+    """`EquationOutput` plus the report of a request that carried the file's characters
+    (prompt `equation_file.md`): where the picture and the characters differ, the reply says so
+    instead of settling it silently. Not asked for when the request has no characters."""
+
+    characters_differ: bool = Field(
+        description="True when the picture shows a letter, digit, symbol or style that the "
+        "file's characters do not, or the characters have one the picture does not."
+    )
+    difference: str = Field(
+        description="At most 200 characters: what differs, naming the symbols. Empty when "
+        "characters_differ is false."
     )
 
 
@@ -954,6 +973,10 @@ class _Candidate:
     corrections: list[str] = field(default_factory=list)
     model_latex: str | None = None
     label: str | None = None
+    # The restyles that changed the reading (`EquationFix.restyled`) and what the reader said
+    # differs between the picture and the file's characters (`EquationFix.file_difference`).
+    restyled: list[str] = field(default_factory=list)
+    file_difference: str | None = None
 
     @property
     def valid(self) -> bool:
@@ -1053,9 +1076,17 @@ def _evaluate(
     if not output.is_equation:
         return candidate
     span = element.glyphs.span_glyphs if element.glyphs is not None else ()
-    candidate.latex = restyle_bold_italic(read_latex(output.latex), element.text, span)
+    read = read_latex(output.latex)
+    candidate.latex = restyle_bold_italic(read, element.text, span)
+    if candidate.latex != read:
+        candidate.restyled.append("bold_italic")
     if reconcile and element.glyphs is not None:
+        before = candidate.latex
         candidate.latex = glyph_reconcile.restyle_script(candidate.latex, element.glyphs.scr)
+        if candidate.latex != before:
+            candidate.restyled.append("script")
+    if isinstance(output, EquationFromFileOutput) and output.characters_differ:
+        candidate.file_difference = output.difference.strip() or "differs"
     if display == "inline":
         candidate.latex = strip_trailing_punctuation(candidate.latex)
         candidate.latex = drop_neighbour_brackets(candidate.latex, element.text)
@@ -1469,6 +1500,8 @@ def _fix(
                 speech_version=SPEECH_VERSION,
                 display=display,
                 model_latex=candidate.model_latex if candidate.corrections else None,
+                file_difference=candidate.file_difference,
+                restyled=candidate.restyled if settings.equation_file_facts else [],
             )
         return Fix(
             element_id=element.id,
@@ -1541,12 +1574,24 @@ def transcribe(
         prompt = load_prompt(PROMPT_NAME)
     images = [png]
     instructions, version = prompt.text, prompt.version
+    # The file's own account of the box, when the setting is on and it has one worth sending
+    # (`file_account`): without it the request, its prompt and its reply schema are today's.
+    account = file_account.account(element.glyphs) if settings.equation_file_facts else None
+    schema: type[EquationOutput] = EquationOutput
+    if account is not None:
+        file = load_prompt(FILE_PROMPT_NAME)
+        instructions = instructions.rstrip("\n") + "\n" + file.text
+        version = f"{version}+{file.version}"
+        schema = EquationFromFileOutput
     if line_png is not None:
         line = load_prompt(LINE_PROMPT_NAME)
         images.append(line_png)
-        instructions = prompt.text.rstrip("\n") + "\n" + line.text
-        version = f"{prompt.version}+{line.version}"
+        instructions = instructions.rstrip("\n") + "\n" + line.text
+        version = f"{version}+{line.version}"
     display: Display = element.display or "block"
+
+    def with_account(text: str | None) -> str | None:
+        return text if account is None else f"{account}\n\n{text}" if text else account
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
@@ -1555,15 +1600,17 @@ def transcribe(
             prompt_version=version,
             instructions=instructions,
             images=images,
-            context_text=first_context if not escalation else context_text,
+            context_text=with_account(first_context if not escalation else context_text),
             max_output_tokens=output_limit(model),
             image_detail="high",
             effort=settings.anthropic_effort_equation,
+            # the account is data too: the fence's own limit is for the text around the box
+            context_limit=None if account is None else FENCE_LIMIT + len(account) + 2,
         )
         if escalation:
-            output, calls = _call_once(client, request, EquationOutput)
+            output, calls = _call_once(client, request, schema)
         else:
-            output, calls = _call(client, request, EquationOutput, settings)
+            output, calls = _call(client, request, schema, settings)
         return _evaluate(
             output,
             calls,
@@ -1687,5 +1734,14 @@ def transcribe(
 
     escalated_from = first.latex if first is not candidate and first.valid else None
     return equation_shadow.record(
-        fix, png, client=client, settings=settings, cheap_latex=escalated_from
+        fix,
+        png,
+        client=client,
+        settings=settings,
+        cheap_latex=escalated_from,
+        facts=(
+            file_account.account(element.glyphs, beside=True)
+            if settings.equation_file_facts
+            else None
+        ),
     )

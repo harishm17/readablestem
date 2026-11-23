@@ -783,6 +783,28 @@ class _Word:
         self.marked = self.marked or self.text
 
 
+@dataclass(frozen=True)
+class PrintedWord:
+    """One word printed inside a table's box, with its place and its raised digits marked
+    (`text` writes a run of superscripts in superscript characters, as a grid cell does).
+    The box is in whatever frame the glyphs were given in; `layout.table_words` gives it in
+    pixels of the table's crop."""
+
+    text: str
+    x0: float
+    y0: float
+    x1: float
+    y1: float
+
+
+def printed_words(pieces: list[list[GlyphLike]]) -> list[PrintedWord]:
+    """The words of the glyphs in a table's box, line by line and left to right, split and
+    marked as the grid read from the same glyphs is (`_visual_lines`, `_segments`), but not
+    placed in any cell: the grid is what a reader that is given these words must not see."""
+    _, words, _ = _segments(_visual_lines(pieces), [])
+    return [PrintedWord(w.marked, w.x0, w.y0, w.x1, w.y1) for w in words]
+
+
 def _raised(chars: Sequence[GlyphLike]) -> set[int]:
     """Indexes (into `chars`, one visual line, left to right) of the superscript glyphs:
     smaller than the full-size glyph before them (after them at the start of the line)

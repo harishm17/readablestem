@@ -1,7 +1,7 @@
 """Trying a stopped or partly converted document again (T3-1).
 
 A conversion can stop for reasons that are nobody's fault: the process restarted, the time
-limit passed, the day's model budget ran out part way, or the AI service did not answer for
+limit passed, the day's model budget ran out part way, or the model provider did not answer for
 a third of the document. The person should not have to upload the file again, lose the
 decisions they made, or pay for the pages a second time.
 

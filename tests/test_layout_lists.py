@@ -425,10 +425,16 @@ def test_a_lettered_title_set_in_italics_is_a_heading_and_text_under_it_is_not_i
         y = write(page, 72, y, ["In this paper we consider tasks with one robot arm."])
         wrapped = ["C. Offline, Online and Optimistic Learning with", "a Title on Two Rows"]
         y = write(page, 72, y + 10, wrapped, fontname="heit")  # a title that wraps is one heading
-        write(page, 72, y, ["The third title goes over two rows and its text is under it."])
+        y = write(page, 72, y, ["The third title goes over two rows and its text is under it."])
+        # a title of four words or more may end in a full stop, on its first row or its second
+        y = write(page, 72, y + 10, ["D. Electron coupling and carrier mobility."], fontname="heit")
+        y = write(page, 72, y, ["The fourth title ends in a full stop and its text is under it."])
+        stopped = ["E. Electronic properties and carrier mobility under", "strain."]
+        y = write(page, 72, y + 10, stopped, fontname="heit")
+        write(page, 72, y, ["The fifth title is a heading too, its second row ends in a stop."])
 
     got = [(e.kind, e.text) for e in analyze(one_page(fill)).elements]
-    assert [k for k, _ in got].count(Kind.HEADING) == 3
+    assert [k for k, _ in got].count(Kind.HEADING) == 5
     assert not items(analyze(one_page(fill)).elements)
 
     def options(page):  # the options of a question, set in italics, are still its options

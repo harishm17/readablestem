@@ -268,8 +268,13 @@ class Verifier(Protocol):
         """P(ok) and P(factual_error) for an alt text of the figure in `png`."""
         ...
 
-    def equation_match(self, png: bytes, *, latex: str) -> VerifierVerdict:
-        """P(match), P(cosmetic) and P(meaning_changing) for LaTeX of the crop `png`."""
+    def equation_match(
+        self, png: bytes, *, latex: str, facts: str | None = None
+    ) -> VerifierVerdict:
+        """P(match), P(cosmetic) and P(meaning_changing) for LaTeX of the crop `png`.
+        `facts` (`EQUATION_FILE_FACTS`): the file's own account of the box and its row
+        (`pipeline.file_account`), for a check that can use it; the Decisions question has
+        fixed wording and does not."""
         ...
 
 
@@ -300,7 +305,9 @@ class DecisionsVerifier:
             FIGURE_CHECK, FIGURE_VERSION, lambda: figure_request(png, alt=alt, caption=caption)
         )
 
-    def equation_match(self, png: bytes, *, latex: str) -> VerifierVerdict:
+    def equation_match(
+        self, png: bytes, *, latex: str, facts: str | None = None
+    ) -> VerifierVerdict:
         return self._ask(
             EQUATION_CHECK, EQUATION_VERSION, lambda: equation_request(png, latex=latex)
         )
@@ -407,7 +414,9 @@ class FakeVerifier:
             figure_request(png, alt=alt, caption=caption),
         )
 
-    def equation_match(self, png: bytes, *, latex: str) -> VerifierVerdict:
+    def equation_match(
+        self, png: bytes, *, latex: str, facts: str | None = None
+    ) -> VerifierVerdict:
         return self._answer(
             EQUATION_CHECK,
             EQUATION_VERSION,

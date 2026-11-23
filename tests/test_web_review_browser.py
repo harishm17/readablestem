@@ -47,7 +47,7 @@ sync_api = pytest.importorskip("playwright.sync_api")
 LONG_NAME = "Physics_Unit_2_Kinematics_Lecture_Notes_With_Worked_Examples_Fall_2026_FINAL_v3.pdf"
 NARROW = {"width": 320, "height": 640}
 WIDE = {"width": 1280, "height": 900}
-# "Needs review", "Kept as an image by you", ..., "Accepted by you"
+# "Needs your decision", "Kept as an image by you", ..., "Accepted by you"
 REJECTED = [*REJECT_WORDS.values(), BOLD_TEXT_WORDS, PLAIN_TEXT_WORDS, OTHER_WORDS]
 
 

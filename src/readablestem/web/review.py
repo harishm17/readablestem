@@ -122,8 +122,9 @@ ADD_DATA_TABLE = "add_data_table"
 # "Describe it in words" on an item kept as an image (T3-16): the text becomes the image's
 # alt text after the same checks as any alt text (`describe_in_words`).
 DESCRIBE = "describe"
-# "Read again" and "Not an equation" on an equation card (WS8.5, WS4.5): structural writes of
-# the decision route (`routes.edits.read_again`, `not_an_equation`), undone as one entry.
+# "Ask the model to read it again" and "Not an equation" on an equation card (WS8.5, WS4.5):
+# structural writes of the decision route (`routes.edits.read_again`, `not_an_equation`),
+# undone as one entry.
 REREAD = "reread"
 NOT_EQUATION = "not_equation"
 # The `ReviewEdit.action` of those two writes: Undo of one lands on the item, not on the page tools.
@@ -1546,7 +1547,7 @@ def edit_table(
         found = any(c.header for c in grid.cells)
         source = "layout" if found else "none"
         fix.table = TableFix(grid=grid.model_copy(deep=True, update={"header_source": source}))
-        fix.checks = table_checks(fix.table.grid, element)
+        fix.checks = table_checks(fix.table.grid, element, fix)
         failed = [c for c in fix.checks if not c.passed]
         return failed, USE_LOCAL_NOTE
     if change == "not_a_table":
@@ -1636,7 +1637,7 @@ def table_still_open(failed: list[Check]) -> bool:
     return any(c.code not in table_step.NOTE_CODES for c in failed)
 
 
-def table_checks(grid: TableGrid, element: Element | None) -> list[Check]:
+def table_checks(grid: TableGrid, element: Element | None, fix: Fix | None = None) -> list[Check]:
     """The table step's own checks of a grid against the PDF, run again after a change, so
     the card shows what is still wrong with the table as it is now (a cell put right
     clears its finding; one still wrong keeps it).
@@ -1645,11 +1646,17 @@ def table_checks(grid: TableGrid, element: Element | None) -> list[Check]:
     headers, agreement with the grid read from the PDF, the cells' words, the maths
     cells), pure functions of the stored grid and element, looked up at call time like
     the other validators. A table whose element is gone has none; structural problems
-    are refused by the edit itself either way (`_refuse_new_problems`)."""
+    are refused by the edit itself either way (`_refuse_new_problems`).
+
+    A table that was rebuilt with its printed words (`fix` made under the `table_facts`
+    prompt, `TABLE_FILE_FACTS`) is checked against the words the stored element has, by the
+    same rule the run used, not against the grid cell by cell."""
     from readablestem.pipeline import table_step
 
     if element is None:
         return []
+    if fix is not None and table_step.facts_were_sent(fix.calls):
+        return list(table_step.table_checks(grid, element, table_step.stored_words(element)))
     return list(table_step.table_checks(grid, element))
 
 
@@ -1680,7 +1687,7 @@ def _edit_headers(
     chosen = any(c.header for c in edited.cells)  # a person unticking both leaves no header
     edited = edited.model_copy(update={"header_source": "reviewer" if chosen else "none"})
     fix.table = TableFix(grid=edited)
-    fix.checks = table_checks(edited, element)
+    fix.checks = table_checks(edited, element, fix)
     first_row = "The first row is a header" if row else "The first row is not a header"
     first_col = "the first column is a header" if col else "the first column is not a header"
     return [c for c in fix.checks if not c.passed], f"{first_row}, and {first_col}."
@@ -1758,7 +1765,7 @@ def _edit_cell(
     after = grid.model_copy(update={"cells": cells})
     _refuse_new_problems(grid, after, fid, "The cell was", values)
     fix.table = TableFix(grid=after)
-    fix.checks = checks + table_checks(after, element)
+    fix.checks = checks + table_checks(after, element, fix)
     return [c for c in fix.checks if not c.passed], f"{cell_label(cell)} changed."
 
 

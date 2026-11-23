@@ -6,6 +6,8 @@ mark in the text links to the footnote. Pages are drawn with PyMuPDF so each sha
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pymupdf
 import pytest
 
@@ -521,16 +523,29 @@ NUMBERED = [
 
 
 def numbered_algorithm(
-    page, y: float, steps=NUMBERED, caption="Algorithm 2 Scan a verse", wrapped=None, stop=":"
+    page,
+    y: float,
+    steps=NUMBERED,
+    caption="Algorithm 2 Scan a verse",
+    wrapped=None,
+    stop=":",
+    preamble=None,
+    apart=None,
 ):
     """Steps numbered "1:", "2:" in a left gutter, indented by level; a step listed in `wrapped`
-    goes on at the left edge of the text on a second line."""
+    goes on at the left edge of the text on a second line. `preamble`: a line under the caption,
+    in the gutter (an "Input:" line). `apart`: the number of a step whose words are set far from
+    its number (the text layer then lists the number in a row of its own)."""
     if caption:
         page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
         y += 14
+    if preamble:
+        page.insert_text((72, y), preamble, fontsize=BODY, fontname="helv")
+        y += 14
     for n, (level, text) in enumerate(steps, 1):
         page.insert_text((72, y), f"{n}{stop}", fontsize=BODY - 1, fontname="helv")
-        page.insert_text((95 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+        x = 300 if n == apart else 95 + 11 * level
+        page.insert_text((x, y), text, fontsize=BODY, fontname="helv")
         y += 14
         if wrapped and n in wrapped:
             page.insert_text((95, y), wrapped[n], fontsize=BODY, fontname="helv")
@@ -547,6 +562,9 @@ NUMBERED_LINES = [
     "6: end for",
     "7: return count",
 ]
+
+
+NUMBERED_LINES_PLAIN = [" ".join(line.split()) for line in NUMBERED_LINES]
 
 
 def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_without_a_caption():
@@ -568,6 +586,27 @@ def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_w
         assert len(steps) == 1
         assert steps[0].text.split("\n") == [n.replace(":", stop, 1) for n in NUMBERED_LINES]
         assert caption is None or any(e.text == caption for e in elements)
+
+    # An appendix's caption ("Algorithm A-1") takes the "Input:" line under it into the block,
+    # and a number alone in its row (its step's words are set far to the right) keeps its step.
+    for caption, extra in (
+        ("Algorithm A-1 Scan a verse", {"preamble": "Input: a line of verse"}),
+        ("Algorithm 2 Scan a verse", {"apart": 4}),
+    ):
+
+        def appendix(page, caption=caption, extra=extra):
+            y = prose(page, 100, "The scan of a verse is listed below.")
+            y = numbered_algorithm(page, y + 10, caption=caption, **extra)
+            prose(page, y + 10, "The count is printed after the last word.")
+
+        elements = analyze(page_of(appendix)).elements
+        (block,) = [e for e in elements if e.preformatted]
+        lines = [" ".join(line.split()) for line in block.text.split("\n")]
+        assert lines == [
+            *([extra["preamble"]] if "preamble" in extra else []),
+            *NUMBERED_LINES_PLAIN,
+        ]
+        assert any(e.text == caption for e in elements)
 
 
 def test_a_step_that_wraps_back_to_the_left_edge_stays_one_step():
@@ -638,6 +677,33 @@ def test_a_numbered_line_that_runs_to_the_right_edge_does_not_take_the_next_numb
 
     texts = [e.text for e in analyze(page_of(fill)).elements]
     assert [t[0] for t in texts[1:]] == ["1", "2", "3"]
+
+
+def test_a_numbered_paragraph_with_an_indented_first_line_is_not_cut_at_its_second_line():
+    # "2) Prompt Design: The controller ..." is set like a paragraph: its first line starts
+    # indented, runs to the right edge, and the next lines start at the margin: one block.
+    first = "2) Prompt Design With A Code Template: The controller of the system builds"
+    while pymupdf.get_text_length(first + " each", "helv", BODY) < 468 - 12:
+        first += " each"
+    second = "prompt from the template and the state of the run so far, then sends it on to"
+    while pymupdf.get_text_length(second + " the", "helv", BODY) < 468:
+        second += " the"
+    third = "the model that answers."
+
+    def fill(page):
+        page.insert_textbox(
+            pymupdf.Rect(72, 90, 540, 230), LONG, fontsize=BODY, fontname="helv", align=3
+        )
+        page.insert_text((84, 260), first, fontsize=BODY, fontname="helv")
+        page.insert_text((72, 274), second, fontsize=BODY, fontname="helv")
+        page.insert_text((72, 288), third, fontsize=BODY, fontname="helv")
+        page.insert_textbox(
+            pymupdf.Rect(72, 304, 540, 430), LONG, fontsize=BODY, fontname="helv", align=3
+        )
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.PARAGRAPH]
+    assert elements[1].text.endswith(third)
 
 
 def test_a_step_with_no_number_may_run_over_several_lines_and_text_under_the_last_is_no_step():
@@ -1045,7 +1111,9 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
     assert layout_module._footnote_links([inside, note], marks)[0].links == []
 
 
-def body_with_marks(page, mark: str = "1", after: str = " at sea level.", font: str = "helv"):
+def body_with_marks(
+    page, mark: str = "1", after: str = " at sea level.", font: str = "helv", **mark_font
+):
     """A line of text with a raised mark after "degrees" (and a raised "0", as in "P0"), and the
     note under it that opens with the mark: the page every row below changes a little."""
     lead = "Water boils at one hundred degrees"
@@ -1054,7 +1122,7 @@ def body_with_marks(page, mark: str = "1", after: str = " at sea level.", font: 
     )
     page.insert_text((72, 115), lead, fontsize=BODY, fontname="helv")
     end = 72 + pymupdf.get_text_length(lead, fontname="helv", fontsize=BODY)
-    page.insert_text((end + 0.5, 110), mark, fontsize=7, fontname="helv")
+    page.insert_text((end + 0.5, 110), mark, fontsize=7, **({"fontname": "helv"} | mark_font))
     page.insert_text((end + 5, 115), after, fontsize=BODY, fontname=font)
     page.insert_text((72, 140), "The curve P", fontsize=BODY, fontname="helv")
     page.insert_text((72 + 52, 143), "0", fontsize=7, fontname="helv")
@@ -1115,6 +1183,11 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
             [("2", 5.5, 0), ("Height matters too.", 8, 5)],
         ),
         ("1)", [("1 Pressure matters.", 8, 0)]),
+        (  # a number and a sign printed together after a name: two marks
+            "1*",
+            [("1", 5.5, 0), ("Pressure matters.", 8, 5)],
+            [("*", 5.5, 0), ("Corresponding author.", 8, 5)],
+        ),
     ]
     for mark, *lines in shapes:
 
@@ -1130,6 +1203,42 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
         assert len(notes) == len(lines), mark
         linked = {link.target_id for e in layout.elements for link in e.links}
         assert linked == notes, mark
+
+    # Row 5: the star of a script (a raised asterisk operator over a low one-word line, "Fro" under
+    # a norm) is no note, while the same sign over a line of words is.
+    sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    for low, count in (("\u2217 Fro", 0), ("\u2217 Corresponding author.", 1)):
+
+        def star(page, low=low):
+            body_with_marks(
+                page, mark="\u2217", fontname="dj", fontfile=str(sans), after="  at sea level."
+            )
+            page.insert_text((72, 712), low, fontsize=8, fontname="dj", fontfile=str(sans))
+
+        if sans.is_file():
+            layout = analyze(page_of(star))
+            assert len([n for n in layout.notices if n.code == "footnote"]) == count, low
+
+    # Row 6: an exponent set tight against a math letter ("p1", "n2") on the page is not the mark of
+    # note 1: the note keeps its link from the paragraph that holds its mark.
+    # The same holds for a starred letter ("n" and a raised asterisk operator) under a star note.
+    marks = [("1", {"fontname": "helv"})]
+    if sans.is_file():
+        marks.append(("\u2217", {"fontname": "dj", "fontfile": str(sans)}))
+    for mark, font in marks:
+
+        def exponent(page, mark=mark, font=font):
+            body_with_marks(page, mark=mark, after=".", **font)
+            page.insert_text((72, 709), mark, fontsize=5.5, **font)
+            page.insert_text((77, 712), "Pressure matters.", fontsize=8)
+            x = 72 + pymupdf.get_text_length("The mass grows as ", fontname="helv", fontsize=BODY)
+            page.insert_text((72, 200), "The mass grows as ", fontsize=BODY, fontname="helv")
+            page.insert_text((x, 200), "n", fontsize=BODY, fontname="symb")
+            page.insert_text((x + 5.5, 195), mark, fontsize=7, **font)
+
+        layout = analyze(page_of(exponent))
+        (note,) = [n.element_id for n in layout.notices if n.code == "footnote"]
+        assert [k.target_id for k in layout.elements[0].links] == [note], mark
 
     # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
     # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.
@@ -1415,6 +1524,34 @@ def test_a_contents_page_with_dot_leaders_is_nested_links_to_the_headings_withou
     assert by_text["1.2 Velocity"].links == [] and by_text["2 Forces"].links == []
     html = html_of(pdf)
     assert f'<a href="#{heads[0].id}">1 Motion</a>' in html and ". . ." not in html
+
+
+def test_a_contents_entry_whose_title_runs_up_to_its_page_number_is_an_entry():
+    # "C ... air here 14" is one line of text with no leaders, ending where the other numbers do.
+    bare = (
+        "C Ablation study of the energy of a body that falls through a long column of cold dry air"
+        " here 14"
+    )
+
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        y = 120.0
+        for title, number in [
+            ("A Motion of a falling body", "3"),
+            ("B Forces on a body at rest", "9"),
+            (bare, ""),
+            ("D Waves", "21"),
+        ]:
+            if number:
+                page.insert_text((72, y), title + " ." * 40, fontsize=BODY, fontname="helv")
+                page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
+            else:
+                page.insert_text((72, y), title, fontsize=BODY, fontname="helv")
+            y += 18
+
+    elements = analyze(page_of(fill)).elements
+    assert [e.kind for e in elements] == [Kind.HEADING] + [Kind.LIST_ITEM] * 4
+    assert elements[3].text.startswith("C Ablation study")
 
 
 def test_a_page_with_one_dotted_line_is_not_a_contents_page():

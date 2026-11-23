@@ -1649,10 +1649,12 @@ class _Renderer:
             return self.image_page_note(element)
         fix = self.fixes.get(element.id)
         caption_text = element.caption_marked or element.caption
+        if caption_text and element.caption_links and caption_text == element.caption:
+            words = inline_text.render_linked_words(caption_text, element.caption_links)
+        else:
+            words = self.rich(caption_text) if caption_text else ""
         caption = (
-            f"<figcaption>{self.rich(caption_text)}</figcaption>"
-            if caption_text and caption_text.strip()
-            else ""
+            f"<figcaption>{words}</figcaption>" if caption_text and caption_text.strip() else ""
         )
         proposal = fix.figure if fix is not None else None
 
@@ -2107,6 +2109,10 @@ def _authored_in_english(part: str, lang: str) -> str:
     return part
 
 
+def _live(links: list[Link], known: Collection[str]) -> list[Link]:
+    return [k for k in links if not k.target_id or k.target_id in known]
+
+
 def _without_dead_links(ordered: list[Element]) -> list[Element]:
     """The elements with every internal link and cross-reference whose target is not in
     the document taken off (the target is on a page the instructor left out, T3-16): a
@@ -2114,10 +2120,31 @@ def _without_dead_links(ordered: list[Element]) -> list[Element]:
     known = {e.id for e in ordered}
     out = []
     for element in ordered:
-        if any(link.target_id and link.target_id not in known for link in element.links):
-            links = [k for k in element.links if not k.target_id or k.target_id in known]
-            element = element.model_copy(update={"links": links})
+        for name in ("links", "caption_links"):
+            held = getattr(element, name)
+            if len(kept := _live(held, known)) < len(held):
+                element = element.model_copy(update={name: kept})
         out.append(element)
+    return out
+
+
+def _without_dead_table_links(fixes: dict[str, Fix], known: Collection[str]) -> dict[str, Fix]:
+    """The fixes with the links of a table's caption and cells whose target is not in the
+    document taken off, as `_without_dead_links` does for the elements: a Word or LaTeX
+    table is written from the grid of its fix."""
+    out = dict(fixes)
+    for key, fix in fixes.items():
+        if fix.table is None:
+            continue
+        grid = fix.table.grid
+        cells = [c.model_copy(update={"links": _live(c.links, known)}) for c in grid.cells]
+        caption_links = _live(grid.caption_links, known)
+        if len(caption_links) < len(grid.caption_links) or any(
+            len(new.links) < len(old.links) for new, old in zip(cells, grid.cells, strict=True)
+        ):
+            grid = grid.model_copy(update={"caption_links": caption_links, "cells": cells})
+            table = fix.table.model_copy(update={"grid": grid})
+            out[key] = fix.model_copy(update={"table": table})
     return out
 
 
@@ -2249,6 +2276,7 @@ def render_html(
     first_fix: dict[str, Fix] = {}
     for fix in fixes:  # first wins, like DocumentResult.fix_for
         first_fix.setdefault(fix.element_id, fix)
+    first_fix = _without_dead_table_links(first_fix, {e.id for e in ordered})
     ordered = _kept_prose(ordered, first_fix)
     first_fix = table_math.with_cell_readings(ordered, first_fix)  # a table's maths cells
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}

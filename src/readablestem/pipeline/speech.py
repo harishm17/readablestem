@@ -607,7 +607,8 @@ def _transposable(base: ET.Element) -> bool:
         return _transposable(base[-1])  # `\\boldsymbol{BB}^T` is printed as `BB^T`
     if base.tag == "mrow" and len(base) > 2:
         bracketed = _mo_text(base[0]) in {"(", "["} and _mo_text(base[-1]) in {")", "]"}
-        return bracketed and any(n.tag == "mtable" or _transposable(n) for n in base.iter())
+        inside = base.iterfind(".//*")  # below the brackets: `iter()` would start at `base`
+        return bracketed and any(n.tag == "mtable" or _transposable(n) for n in inside)
     return False
 
 

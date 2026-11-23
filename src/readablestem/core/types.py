@@ -241,6 +241,16 @@ class EquationFix(BaseModel):
     # the PDF's own glyphs (`pipeline.glyph_reconcile`; the fix's `equation.pdf_correction` note
     # says which rule). `latex` is the corrected reading. None: nothing was corrected.
     model_latex: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # `EQUATION_FILE_FACTS`: what the reader said differs between the picture and the file's
+    # characters it was given (`pipeline.file_account`), a short statement kept as it came. None:
+    # it said nothing differs, or the request carried no characters.
+    file_difference: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # `EQUATION_FILE_FACTS`: the corrections after the answer that changed the reading and leave
+    # no note: "bold_italic" (`restyle_bold_italic`) and "script" (`restyle_script`).
+    # With the `equation.pdf_correction` notes and `model_latex`, which name the others
+    # (`_reconcile`), a job's stored fixes say how often each correction still acted when the
+    # request carried the file's characters. Empty when the setting is off.
+    restyled: list[str] = Field(default_factory=list, exclude_if=lambda v: not v)
 
 
 # --------------------------------------------------------------------------- tables
@@ -324,6 +334,9 @@ class TableGrid(BaseModel):
     header_rows: int = Field(default=0, ge=0)
     header_cols: int = Field(default=0, ge=0)
     caption: str | None = None
+    # Words of `caption` that link to a web address or to a place in the document (a Word or
+    # LaTeX table's caption; offsets into `caption`). A PDF's captions have none.
+    caption_links: list[Link] = Field(default_factory=list, exclude_if=lambda v: not v)
     is_data: bool = True
     source: Literal["model", "local"] = "local"
     # Degrees clockwise to turn the picture of the table to read it: 90 or 270 for a table set
@@ -671,6 +684,17 @@ class GlyphContext(BaseModel):
     tex: bool = Field(default=False, exclude_if=lambda v: not v)
     labels: str = Field(default="", exclude_if=lambda v: not v)
     scr: str = Field(default="", exclude_if=lambda v: not v)
+    # For `EQUATION_FILE_FACTS` (`pipeline.file_account`), one character for each pair of `span`
+    # and in its order. `how`: how the character was recovered, "-" the file's own table, "n" read
+    # by the glyph's name, "f" by the font-code table, "g" a gap (the file does not name the
+    # glyph), "?" any other way (a guess). `lift`: "^" raised, "v" lowered, "-" on the line, for a
+    # glyph smaller than the box's text. `math_before` and `math_after`: the neighbours on the row
+    # that are maths (a digit, an operator, a bracket, a maths letter), nearest first, as `before`
+    # and `after`. All empty unless the setting is on.
+    how: str = Field(default="", exclude_if=lambda v: not v)
+    lift: str = Field(default="", exclude_if=lambda v: not v)
+    math_before: str = Field(default="", exclude_if=lambda v: not v)
+    math_after: str = Field(default="", exclude_if=lambda v: not v)
 
     @staticmethod
     def encode(glyphs: Iterable[tuple[str, str | None]]) -> str:
@@ -725,6 +749,10 @@ class Element(BaseModel):
     # Figures whose caption has inline maths: the caption with an inline marker where each
     # formula was (`parent_id` of those equations is the figure). `caption` stays plain text.
     caption_marked: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Figures of a Word or LaTeX source: words of `caption` that link to a web address or to a
+    # place in the document ("uri" and "internal" links, offsets into `caption`). `caption`
+    # stays plain text; a PDF's captions have none.
+    caption_links: list[Link] = Field(default_factory=list, exclude_if=lambda v: not v)
     # Equations: letters of `text` the PDF draws, not bold, in a font known to have a bold
     # face (Computer Modern, Times, ...), sorted, no repeats. Such a letter is known to be
     # plain, so a bold reading of it (a scalar read as a vector) is a real difference.
@@ -980,6 +1008,9 @@ NOTICE_CODES = frozenset(
         "block_omitted",
         # A scanned or handwritten page converted from an image of it (ADR 0007).
         "image_page_converted",
+        # ... whose own OCR text layer has words the read lacks (`image_page.layer_missing`,
+        # `SCAN_LAYER_CHECK`).
+        "image_page_layer_differs",
         # A second reader of handwritten equations (pipeline.image_page_reconcile) that gave
         # no reading for some equations: `count` of them, one notice for the document.
         "second_reader_unavailable",

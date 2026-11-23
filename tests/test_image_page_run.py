@@ -6,6 +6,7 @@ of the display equations, the fallback to a kept image, the cost, and the output
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 from typing import Any
 
 import pymupdf
@@ -146,6 +147,27 @@ def test_the_output_page_has_the_notice_and_the_original_page_to_open():
     assert "<script" not in html
     assert "Page 1 was converted from an image of the page" in html  # the note for students
     assert "verified" not in html.lower()
+
+
+def test_scan_layer_check_compares_a_scans_own_text_layer_with_the_read_and_never_sends_it():
+    path = Path(__file__).parent / "fixtures" / "handwriting" / "scan_ocr.pdf"
+    with pymupdf.open(path) as doc:
+        words = [w[4] for w in doc[0].get_text("words")]
+
+    def differs(share: float, *, on: bool = True) -> tuple[list[int], FakeVisionClient]:
+        said = " ".join(words[: int(len(words) * share)])
+        fake = client({"blocks": [block("paragraph", runs=[text(said)])]})
+        result = convert(path.read_bytes(), fake=fake, config={"scan_layer_check": on})
+        return [n.count for n in result.notices if n.code == "image_page_layer_differs"], fake
+
+    assert differs(1.0)[0] == []  # the read has every word the layer has
+    assert differs(0.9)[0] == []  # a tenth short is inside what a scanner's noise explains
+    counts, fake = differs(0.5)
+    assert counts and counts[0] >= 15  # half the page left out: a notice, counting the words
+    assert differs(0.5, on=False)[0] == []  # off, nothing is compared
+    layer = {w for w in words if len(w) > 4}
+    sent = " ".join(r.context_text or "" for r in fake.requests)
+    assert fake.requests and not any(w in sent for w in layer)
 
 
 # ----------------------------------------------------------------------------- fallback

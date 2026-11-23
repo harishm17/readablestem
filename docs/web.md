@@ -65,7 +65,8 @@ value and where that value came from. This page does not repeat those values.
 | `CONTENT_RUNS` | Struck text (WS16.1, F-509) stored and written as a `deleted` run (docs/output.md "Struck, bold and other marked text"). On by default since 2026-11-18; off is the old shadow rollout, where struck runs are found and counted in the trace but not written |
 | `FEATURE_PAGE_MATH`, `PAGE_MATH_MODEL`, `ANTHROPIC_EFFORT_PAGE_MATH`, `PAGE_MATH_UNCONFIRMED_FACTOR` | The page math pass (ADR 0006, docs/eval-page-math.md): one cheap-model call per page places the equations; off by default |
 | `FEATURE_PAGE_WITNESS`, `PAGE_WITNESS_MODEL`, `PAGE_WITNESS_MAX_OUTPUT_TOKENS`, `PAGE_WITNESS_TIMEOUT_S`, `ANTHROPIC_EFFORT_PAGE_WITNESS` | The page witness (docs/steps.md): one call per math page to the model `PAGE_WITNESS_MODEL` names (`config.py`) reads every formula; disagreements and formulas only it found are required decisions. Off by default; first dev measurement in docs/eval-equation-round5.md |
-| `EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `LAYOUT_INLINE_JOINS` | Equation reading flags (docs/steps.md, docs/layout.md, docs/eval-flag-policy.md), all off by default in code; production's values are in the production profile. Turning `LAYOUT_DISPLAY_GROUPING` on needs a `PIPELINE_VERSION` bump |
+| `EQUATION_FILE_FACTS`, `EQUATION_LINE_CONTEXT`, `EQUATION_GLYPH_CHECKS`, `EQUATION_GLYPH_RECONCILE`, `FLAG_POLICY`, `LAYOUT_DISPLAY_GROUPING`, `LAYOUT_INLINE_JOINS` | Equation reading flags (docs/steps.md, docs/layout.md, docs/eval-flag-policy.md), all off by default in code; production's values are in the production profile. Turning `LAYOUT_DISPLAY_GROUPING` or `EQUATION_FILE_FACTS` on needs a `PIPELINE_VERSION` bump |
+| `TABLE_FILE_FACTS`, `SCAN_LAYER_CHECK`, `PAGE_CHECK_SIGNALS`, `FIGURE_LABELS_ALWAYS` | What the file knows goes with the table, the scan, the page check and the figure (docs/steps.md, docs/tables.md, docs/layout.md), all off by default in code and in the production profile. Each one that is turned on needs a `PIPELINE_VERSION` bump: `TABLE_FILE_FACTS`, `PAGE_CHECK_SIGNALS` and `FIGURE_LABELS_ALWAYS` change the request of their step (and its prompt), `SCAN_LAYER_CHECK` adds the notice `image_page_layer_differs`. `TABLE_FILE_FACTS` on also sends the words printed in each table, so the tables row of `web/recipients.py` (the privacy page) must say so, with a new `stated` day, in the same release |
 | `LAYOUT_JOIN_PANELS` | The panels of one captioned figure are one figure, and one- or two-letter panel marks near a figure are its labels (docs/layout.md "Panels of one figure"), `false` by default in code and in the production profile. Turning it on moves figure crops, so it needs a `PIPELINE_VERSION` bump and the recorded figure answers of the pages it moves are made again |
 | `REGION_TREE` | Reading order from a tree of regions instead of one gutter (docs/layout.md "The region tree"), `off` or `on`, `off` by default in code and in the production profile. Turning it on changes the order of some pages, so it needs a `PIPELINE_VERSION` bump |
 | `FONT_CODE_TABLES` | The codes of symbol and TeX fonts read as what the font draws, by font name (`pipeline/font_codes.py`, docs/layout.md "Font code tables"). **On by default in code**; set `false` on `web` to turn it off without a deploy. It changes element text on documents with these fonts, so stored step answers for them are asked again. Production's value is in the production profile |
@@ -1033,7 +1034,7 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   and `/app?revises=` and a `revises` upload for one are refused with `revise_source` (WS18.8).
 - **Failure.** A source that cannot be converted fails the job with `source_failed`,
   `source_unreadable`, `source_refused`, `source_unavailable`, `source_busy` (the machine had no
-  room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time limit: a macro that
+  room for the conversion's tasks: "The server is busy ... Try again") `source_timeout` (the program's own time or memory limit: a macro that
   calls itself, a very large file; not offered "Try again") or `timeout` and the message "Upload
   the PDF instead"; nothing half-made is kept. A Word file read from the file itself that fails has no
   PDF route to fall back to (with the switch off the PDF is made at upload, by LibreOffice, and
@@ -1051,8 +1052,8 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   never closes; the sentence names the command when LaTeXML does, and says that trying again
   will not help and to look for the command on one's own computer; a loop LaTeXML does not name,
   like two commands calling each other, or one that only grows, is told from a very large source
-  by nothing in the log and ends at the time or memory limit as `source_timeout` or
-  `source_failed`), `source_syntax_error` (an unclosed brace or environment,
+  by nothing in the log and ends at the time or memory limit as `source_timeout`, which says
+  "time or memory"), `source_syntax_error` (an unclosed brace or environment,
   with its file and line; or a `^`, `_`, `&` or `#` in running text, named with what to write
   instead), `source_unsupported_class` / `source_unsupported_package` (no binding,
   and the document used what it defines; a `.sty` in the upload is not read either; a class read
@@ -1761,8 +1762,14 @@ read it as the `strings` global; Python modules import it). The words:
   service" is kept only for the status page's line about the provider answering.
 - **sample** is the practice document in the app ("Open the sample document"); **demo** is the
   public page `/demo`; **example** is a worked example in the showcase.
-- **document**, never "job", in anything a person reads. **Notification** is the browser's;
-  **notes** are the list on the document page.
+- **document**, never "job", in anything a person reads: the messages of a budget stop and
+  the `readablestem ops` reports too (names in code, such as `job_usd` or `MAX_USD_PER_JOB`,
+  stay). **Notification** is the browser's; **notes** are the list on the document page.
+- **the model**, with no maker's name, at first mention too: the provider is configurable,
+  so a fixed name could be false. Where a page must say who receives the pictures, it reads
+  the name from the settings (`web/recipients.py`).
+- **Needs your decision** is the state of an item that waits for a person, on the item's
+  pill and in the heading of the list of such items alike.
 - **Keep as image** is the one label for keeping the original picture, and the record says
   "Kept as image (your choice)". Status words are sentence case and come from `web/states.py`
   ("Not converted").
@@ -2406,7 +2413,7 @@ document.
   | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
 
   A finished job with no code whose equations, figures and tables mostly failed with
-  `model_api_error` or `model_timeout` has the note "Service outage" ("The AI service did
+  `model_api_error` or `model_timeout` has the note "Service outage" ("The model did
   not answer for N of M ..."; read from the stored result on the job page; nothing is
   stored on the job, and it goes away once enough of them are filled in). Each of those
   items is an open decision, so the lists, which read no result, show the job as "Needs
@@ -3793,7 +3800,7 @@ the last decision still works.
 
 **One fix.** Each card shows:
 
-- the status in words ("Needs review", "Not converted (error)"; the colored border
+- the status in words ("Needs your decision", "Not converted (error)"; the colored border
   only repeats it) and the confidence as a word and a number, "Low (45%)" (High from
   85%, the default auto-accept bar; Medium from 60%);
 - why it is here: each failed check and `Fix.reason` as a sentence from

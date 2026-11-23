@@ -286,7 +286,17 @@ def replay_settings(answers: Path) -> Settings:
         table_search_unlimited=True,
         **ROOM,
     )
-    return profile.load().apply(base)
+    return with_arm_from_environment(profile.load().apply(base))
+
+
+def with_arm_from_environment(settings: Settings) -> Settings:
+    """`settings` with `EQUATION_FILE_FACTS` on when the environment says `true`: the arm that
+    is off in the production profile (SW55 a and b), measured by replay at $0 (how many recorded
+    equation requests it changes, `tests/workflows/harness.py`). The production profile names the
+    value everywhere else, so nothing else is read from the environment here."""
+    if os.environ.get("EQUATION_FILE_FACTS", "").lower() == "true":
+        return settings.model_copy(update={"equation_file_facts": True})
+    return settings
 
 
 def answers_file(folder: Path) -> Path:

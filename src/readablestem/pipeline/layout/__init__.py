@@ -72,6 +72,7 @@ from readablestem.pipeline.layout.access import (
     crop_line,
     line_across,
     page_ink,
+    page_words,
     release,
     render_page,
 )
@@ -156,6 +157,7 @@ from readablestem.pipeline.layout.rows import (
     line_glyphs,
     page_glyphs,
     page_paint,
+    table_words,
     take_form_fields,
 )
 from readablestem.pipeline.layout.shared import (
@@ -238,8 +240,10 @@ __all__ = [
     "page_glyphs",
     "page_ink",
     "page_paint",
+    "page_words",
     "release",
     "render_page",
+    "table_words",
     "tagged_level",
     "take_form_fields",
 ]

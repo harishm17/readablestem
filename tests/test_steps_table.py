@@ -12,6 +12,7 @@ import json
 import re
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from readablestem.config import CHEAP_MODEL, MAIN_MODEL
@@ -33,6 +34,7 @@ from readablestem.pipeline import options, table_step
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.html_checks import static_checks
 from readablestem.pipeline.table_step import (
+    FACTS_PROMPT_VERSION,
     PROMPT_VERSION,
     TableOutput,
     apply_header_policy,
@@ -40,6 +42,7 @@ from readablestem.pipeline.table_step import (
     output_tokens,
     rebuild,
 )
+from readablestem.pipeline.tables import PrintedWord
 from test_steps_support import make_settings
 
 PNG = b"\x89PNG table crop"
@@ -815,6 +818,39 @@ def test_the_request_carries_the_prompt_caption_and_nearby_text_but_not_the_tabl
     )
     assert "Ignore" not in request.instructions and "19.6" not in request.context_text
     assert {c.prompt_version for c in run(by_model(cheap=free_fall())).calls} == {PROMPT_VERSION}
+
+
+def test_table_file_facts_send_the_printed_words_and_check_every_cell_against_them():
+    png = pymupdf.Pixmap(pymupdf.csRGB, (0, 0, 200, 100)).tobytes("png")
+    flat = [w for row in FREE_FALL for cell_text in row for w in cell_text.split()]
+    printed = tuple(PrintedWord(w, 10.0 * i, 5.0, 10.0 * i + 8, 15.0) for i, w in enumerate(flat))
+    on = make_settings(table_file_facts=True)
+
+    def go(client: FakeVisionClient, **kw) -> Fix:
+        return rebuild(element(None), png, client=client, settings=on, words=printed, **kw)
+
+    client = by_model(cheap=free_fall())
+    fix = go(client)
+    (request,) = client.requests
+    assert request.prompt_version == FACTS_PROMPT_VERSION != PROMPT_VERSION
+    assert '<table_words image_width="200" image_height="100">' in request.context_text
+    assert "19.6" in request.context_text  # the words are sent, with the places they stand
+    assert (fix.status, fix.review) == (Status.ACCEPTED, "none")
+    # A number changed: the cheap model's answer is not accepted and the main model is asked.
+    bad = free_fall(**{"3_2": "19.8"})
+    fix = go(by_model(cheap=bad, main=bad))
+    assert models(fix) == [CHEAP_MODEL, MAIN_MODEL] and codes(fix) == {"text_mismatch"}
+    # With the switch off, the words and their prompt are not sent.
+    off = by_model(cheap=free_fall())
+    rebuild(element(None), png, client=off, settings=SETTINGS, words=printed)
+    assert off.requests[0].prompt_version == PROMPT_VERSION
+    assert "table_words" not in (off.requests[0].context_text or "")
+    # A reviewer's re-check of that table (`web.review.table_checks`) gets the same words, kept
+    # with the element; a table rebuilt without them keeps the checks it had.
+    assert table_step.facts_were_sent(fix.calls) and not table_step.facts_were_sent(
+        run(by_model(cheap=free_fall())).calls
+    )
+    assert [w.text for w in table_step.stored_words(element(local(FREE_FALL)))] == flat
 
 
 def test_the_output_budget_grows_with_the_table():

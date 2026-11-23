@@ -62,6 +62,7 @@ from readablestem.core.types import (
     INLINE_MARKER_RE,
     ColourRun,
     Element,
+    Kind,
     Link,
     Run,
     ScriptRun,
@@ -224,6 +225,18 @@ def render_inline_text(
     return _write(
         text, segments, [href for _, href in links], [k for k, _ in links], link_attrs, tokens
     )
+
+
+def render_linked_words(text: str, links: Sequence[Link]) -> str:
+    """`text` as HTML with `links` (offsets into `text`) written: a caption of a Word or LaTeX
+    source, which holds words and links and nothing else. Escaped text when there is no link."""
+    if not links:
+        return escape_text(text)
+    holder = Element(
+        id="words", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 0, 0), order=0,
+        text=text, links=list(links),
+    )  # fmt: skip
+    return render_inline_text(text, element=holder, equation=lambda _id: None)
 
 
 def _plain(text: str, placed: dict[int, tuple[int, str]]) -> str:

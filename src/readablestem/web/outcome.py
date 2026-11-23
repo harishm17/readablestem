@@ -5,7 +5,7 @@ The worker records outcomes on *finished* jobs (`worker.result_outcome`): a spen
 stopped model work part way ("budget_<scope>") or pages kept as images, not converted
 ("pages_not_converted": handwritten, scanned, or with nothing readable on them, and
 handwriting on typed pages; jobs from before page types say "scanned_pages"). A finished job
-converted during an AI service outage, with most of its equations and figures failed, is read
+converted during a model provider outage, with most of its equations and figures failed, is read
 from the stored result (the job carries no code), and so is a LaTeX source job whose reader
 left words or pictures unread (`SOURCE_UNREAD`). Each of these is a gap note on the job's
 state (`states.gaps_of`), and a note with nothing in it is not produced. The messages of a
@@ -98,7 +98,7 @@ KEPT_IMAGE_REASONS = frozenset(
         "handwriting_on_page",
     }
 )
-# A finished job converted while the AI service was down: most of its equations, figures
+# A finished job converted while the model provider was down: most of its equations, figures
 # and tables failed because the service returned errors or did not answer in time. Read
 # from the stored result (the job itself carries no code); every such item is an open
 # decision, so a list that reads no result shows the job as needing decisions, and the
@@ -231,7 +231,7 @@ WAITING_BUDGET = (
 
 
 def outage_message(result_json: dict[str, Any] | None, *, offered: bool = True) -> str:
-    """The gap note of a finished job converted while the AI service was down, or "".
+    """The gap note of a finished job converted while the model provider was down, or "".
     `offered`: "Convert the missing parts" is offered, so the note may say to use it."""
     outage = _outage(result_json)
     if outage is None:

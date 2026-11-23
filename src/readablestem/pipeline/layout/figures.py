@@ -28,6 +28,7 @@ from readablestem.pipeline.layout.glyphs import _union
 from readablestem.pipeline.layout.shared import (
     _MATH_WORDS,
     _area,
+    _Block,
     _box_key,
     _CharInfo,
     _Context,
@@ -1473,8 +1474,28 @@ def _label_owners(
     return owner
 
 
+def _whole_blocks_only(found: Collection[int], blocks: Sequence[_Block] | None) -> set[int]:
+    """The ids of the rows in `found` that a figure may take once the blocks are built: a row
+    of a block whose other rows are not taken too (or not taken already) stays, since the
+    block keeps its text, and the row would be written twice, in the block and as a label (a
+    part of a display equation, a list marker, a bar in a paragraph)."""
+    if blocks is None:
+        return set(found)
+    taken = set(found)
+    for block in blocks:
+        mine = [id(r) for r in block.rows if id(r) in taken]
+        if mine and not all(r.absorbed or id(r) in taken for r in block.rows):
+            taken.difference_update(mine)
+    return taken
+
+
 def _claim_labels(
-    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
+    figures: Sequence[_Figure],
+    rows: Sequence[_Row],
+    ctx: _Context,
+    *,
+    document: _Document,
+    blocks: Sequence[_Block] | None = None,
 ) -> None:
     """Give each figure its labels (`_label_owners`) and grow its box, and so the picture
     cut for the figure step, to hold them. Before, a chart's tick labels and category
@@ -1483,8 +1504,9 @@ def _claim_labels(
     an axis title or a part's name on a diagram became equations and one-letter paragraphs
     (F-549, F-248)."""
     owner = _label_owners(figures, rows, ctx, document=document)
+    allowed = _whole_blocks_only(owner, blocks)
     for row in rows:
-        if figure := owner.get(id(row)):
+        if id(row) in allowed and (figure := owner.get(id(row))):
             row.absorbed = True
             figure.labels.append(row)
     for figure in figures:
@@ -1504,6 +1526,7 @@ def _join_panels(
     ctx: _Context,
     *,
     document: _Document,
+    blocks: Sequence[_Block],
 ) -> list[_Figure]:
     """The panels of one figure are one figure ("Panels of one figure" in docs/layout.md).
 
@@ -1570,22 +1593,31 @@ def _join_panels(
             host.bbox = _union([f.bbox for f in group])
     kept = [f for f in figures if id(f) not in joined]
     if joined:
-        _claim_labels(kept, rows, ctx, document=document)  # the rows among the panels
+        # the rows among the panels
+        _claim_labels(kept, rows, ctx, document=document, blocks=blocks)
+    marks: list[tuple[_Figure, _Row]] = []
     for figure in kept:
         if figure.equation:
             continue
         near = _pad(figure.bbox, PANEL_MARK_REACH * ctx.body)
-        for row in rows:
-            if (
-                not row.absorbed
-                and not row.vertical
-                and len(row.clean) <= PANEL_MARK_CHARS
-                and row.clean.lower() not in _PROSE_TWO_LETTER
-                and not _starts_like_item(row)
-                and _inside(row.bbox, near)
-            ):
-                row.absorbed = True
-                figure.labels.append(row)
+        marks += [
+            (figure, row)
+            for row in rows
+            if not row.absorbed
+            and not row.vertical
+            and len(row.clean) <= PANEL_MARK_CHARS
+            and row.clean.lower() not in _PROSE_TWO_LETTER
+            and not _starts_like_item(row)
+            and _inside(row.bbox, near)
+        ]
+    allowed = _whole_blocks_only({id(r) for _, r in marks}, blocks)
+    for figure, row in marks:
+        if id(row) in allowed and not row.absorbed:
+            row.absorbed = True
+            figure.labels.append(row)
+    for figure in kept:
+        if figure.equation:
+            continue
         if figure.labels:
             figure.bbox = _union([figure.bbox, *(r.bbox for r in figure.labels)])
     return kept
@@ -1923,7 +1955,11 @@ def _continues(
         )
     ):
         return False
-    if run.rows[0].marker is not None and row.x0 < left - 0.5 * size:
+    if (
+        run.rows[0].marker is not None
+        and row.x0 < left - 0.5 * size
+        and not _numbered_paragraph_goes_on(prev, row, run, edges)
+    ):
         return False  # a list item goes on at its marker or its text, never further left
     if edges is not None and len(run.rows) == 1 and _lead_end(run.rows[0]) is not None:
         right = max(right, edges.of(prev))  # an entry of one line: its line ends short of the edge
@@ -1933,6 +1969,30 @@ def _continues(
         row.marker is None
         and not CAPTION.match(row.clean)
         and not _starts_block(prev, row, run, ctx, edges)
+    )
+
+
+def _numbered_paragraph_goes_on(
+    prev: _Row, row: _Row, run: _Run, edges: _RightEdges | None
+) -> bool:
+    """Is `row` the second line of a paragraph that starts with a number or letter ("2) Prompt
+    Design: The controller ...") set with an indented first line, not of a list item?
+
+    The first line is the run's only one, indented from the line after it (the column's edge:
+    at most `INDENT_REACH` em), runs to the right edge and ends in the middle of a sentence;
+    the next line is full-width text with no marker. A list item that wraps goes on at its
+    marker or its text, never to the left of both."""
+    marker = run.rows[0].marker
+    return (
+        edges is not None
+        and marker is not None
+        and marker.ordered
+        and len(run.rows) == 1
+        and row.marker is None
+        and row.x0 >= run.box[0] - INDENT_REACH * prev.size
+        and prev.x1 >= edges.of(prev) - 1.5 * prev.size
+        and row.x1 >= prev.x1 - 3 * prev.size
+        and prev.clean[-1:] not in ".:?!"
     )
 
 

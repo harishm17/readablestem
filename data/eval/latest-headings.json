@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-11-21",
-  "pipeline_version": "0.5.16",
+  "date": "2026-11-23",
+  "pipeline_version": "0.5.17",
   "profile": {
     "name": "development settings",
-    "sha256": "e48df1a1dc7f72e7f0e18ee34c6bf1b7b44f8c22d528df14337492c42e8f11f2",
+    "sha256": "2cc33760813253f02c2900d2d8173e598aca69ce549685a653ae2ca16d526235",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -53,6 +53,7 @@
     "DECISIONS_MODEL": "gpt-6-luna",
     "EQUATION_CONTEXT_ON_ESCALATION": false,
     "EQUATION_DISPLAY_FIRST_CHEAP": false,
+    "EQUATION_FILE_FACTS": false,
     "EQUATION_GLYPH_CHECKS": false,
     "EQUATION_GLYPH_RECONCILE": false,
     "EQUATION_LINE_CONTEXT": false,
@@ -62,6 +63,7 @@
     "FEATURE_PAGE_MATH": false,
     "FEATURE_PAGE_WITNESS": false,
     "FEATURE_TABLES": false,
+    "FIGURE_LABELS_ALWAYS": false,
     "FIGURE_MODEL_MAX_EDGE_PX": null,
     "FLAG_POLICY": false,
     "FONT_CODE_TABLES": true,
@@ -86,6 +88,7 @@
     "MATH_READER_OPENAI_MODEL": "gpt-6-luna",
     "PAGE_AUDIT_MAX_OUTPUT_TOKENS": 1500,
     "PAGE_AUDIT_MODEL": "claude-sonnet-5-5",
+    "PAGE_CHECK_SIGNALS": false,
     "PAGE_MATH_AGREEMENT_LIFT": true,
     "PAGE_MATH_MAX_OUTPUT_TOKENS": 4096,
     "PAGE_MATH_MODEL": null,
@@ -93,6 +96,8 @@
     "PAGE_WITNESS_MAX_OUTPUT_TOKENS": 12288,
     "PAGE_WITNESS_MODEL": "claude-opus-5-5",
     "REGION_TREE": "off",
+    "SCAN_LAYER_CHECK": false,
+    "TABLE_FILE_FACTS": false,
     "models.anthropic_client.FALLBACK_BETA": "server-side-fallback-2026-07-01",
     "models.anthropic_client.FALLBACK_MODELS": [
       "claude-opus-5-5",
@@ -178,6 +183,10 @@
       "medium": 0.7
     },
     "pipeline.image_page.DEFAULT_EFFORT": "low",
+    "pipeline.image_page.LAYER_FUZZY_MAX": 600,
+    "pipeline.image_page.LAYER_MAX_MISSING": 0.15,
+    "pipeline.image_page.LAYER_MIN_WORDS": 20,
+    "pipeline.image_page.LAYER_SAME_WORD": 0.8,
     "pipeline.image_page.MAX_OUTPUT_TOKENS": 6144,
     "pipeline.image_page.MAX_SIDE_PX": 2576,
     "pipeline.image_page.RECOVERY_MARGIN": 15,
@@ -211,6 +220,7 @@
     "pipeline.page_witness.SPLIT_MIN_ROWS": 6,
     "pipeline.run.CONTEXT_CHARS": 600,
     "pipeline.table_step.BASE_OUTPUT_TOKENS": 2048,
+    "pipeline.table_step.CONTEXT_CHARS": 8000,
     "pipeline.table_step.MAX_OUTPUT_TOKENS": 16384,
     "pipeline.table_step.MIN_OUTPUT_TOKENS": 4096,
     "pipeline.table_step.NOTE_CODES": [
@@ -232,9 +242,9 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "5298521e872f641884e1e3e09bb4ec4ae0e68e67",
+    "commit": "1189ebaa4c1adea3c068b864cf3adb7bcc32ece9",
     "clean": true,
-    "pipeline_version": "0.5.16",
+    "pipeline_version": "0.5.17",
     "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",

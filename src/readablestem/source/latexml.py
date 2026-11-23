@@ -61,6 +61,24 @@ HTML5_NAME = "doc.html"
 HTML5_PATH = f"html/{HTML5_NAME}"
 
 
+def ran_out_of_memory(out: Path) -> bool:
+    """Whether a program's own words say it ran out of memory. Perl at the address-space limit
+    prints `Out of memory in perl:util:safesysmalloc` and exits 1, so the sandbox's `over_memory`
+    (the group's resident memory) is not set: measured 2026-11-22 on `\\def\\a{x\\a}\\a`, which
+    ends so in 23 s. Only the tail of the program's output is read, and only for this one phrase:
+    what it says never reaches a page."""
+    for name in ("latexml.out", "post.out"):
+        try:
+            with (out / name).open("rb") as handle:
+                handle.seek(0, 2)
+                handle.seek(max(0, handle.tell() - 2048))
+                if b"Out of memory" in handle.read():
+                    return True
+        except OSError:
+            continue
+    return False
+
+
 def _dev_root() -> Path | None:
     value = os.environ.get(DEV_ROOT_VAR)
     if not value:

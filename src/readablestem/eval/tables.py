@@ -83,6 +83,7 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.ops import profile as run_profile
 from readablestem.pipeline import layout, page_type, run, table_step
 from readablestem.pipeline import options as run_options
+from readablestem.pipeline.tables import PrintedWord
 
 TASK = "tables"
 TABLE_STYLES = ("grid", "booktabs", "norules")
@@ -1353,16 +1354,23 @@ def _table_options(mode: Mode) -> ConversionOptions:
     return ConversionOptions(tables=mode == "model")
 
 
-def _rebuild(element: Element, png: bytes, cfg: TablesConfig, context: str | None) -> Fix:
+def _rebuild(
+    element: Element,
+    png: bytes,
+    cfg: TablesConfig,
+    context: str | None,
+    words: tuple[PrintedWord, ...] = (),
+) -> Fix:
     """The step's fix, isolated as `run` isolates it: an error in the step is a FAILED
     fix ("internal_error"), not a broken run. Spend and configuration errors propagate."""
     from readablestem.config import ConfigError
     from readablestem.core.types import Status
 
     client = cfg.client if cfg.mode == "model" and cfg.client is not None else _no_model_client()
+    extra = {"words": words} if words else {}
     try:
         return table_step.rebuild(
-            element, png, client=client, settings=cfg.settings, context_text=context
+            element, png, client=client, settings=cfg.settings, context_text=context, **extra
         )
     except (BudgetExceeded, ConfigError):
         raise
@@ -1386,10 +1394,17 @@ def _table_fixes(cfg: TablesConfig, pdf: bytes, elements: list[Element]) -> dict
         crops = {e.id: layout.crop(pdf, e) for e in tables}
         if cfg.mode == "local":
             return {e.id: _rebuild(e, crops[e.id], cfg, None) for e in tables}
+        # What the pipeline sends with each crop (`run._Run.table_words`), when it is on.
+        printed = {
+            e.id: tuple(layout.table_words(pdf, e, crops[e.id]))
+            if cfg.settings.table_file_facts
+            else ()
+            for e in tables
+        }
         with ThreadPoolExecutor(max_workers=max(1, cfg.concurrency)) as pool:
             futures = {}
             for e in tables:
-                work = partial(_rebuild, e, crops[e.id], cfg, contexts.get(e.id))
+                work = partial(_rebuild, e, crops[e.id], cfg, contexts.get(e.id), printed[e.id])
                 context = contextvars.copy_context()
                 futures[e.id] = pool.submit(context.run, work)
             return {element_id: future.result() for element_id, future in futures.items()}

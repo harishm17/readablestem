@@ -4,6 +4,7 @@ footnote marks.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Collection, Sequence
 from dataclasses import dataclass
 
@@ -19,6 +20,7 @@ from readablestem.pipeline.layout.page import (
     _FOOTNOTE_MARKS,
     FOOTNOTE_SIZE,
     FOOTNOTE_ZONE,
+    _after_math_letter,
     _covers,
     _lead_mark,
     _mark_chars,
@@ -32,6 +34,7 @@ from readablestem.pipeline.layout.shared import (
     _Row,
 )
 
+_WORD = re.compile(r"[^\W\d_]{2,}")
 NOT_ANALYSED = "drawings_not_analysed"
 TABLES_NOT_SEARCHED = "tables_not_searched"
 
@@ -176,6 +179,10 @@ def _layout_notices(
                     ):
                         j += 1
                     for a, b in _mark_groups(row, i, j):  # "1,2" is two marks, "1)" is "1"
+                        if (
+                            row.chars[a].c.isdigit() or row.chars[a].c == "\u2217"
+                        ) and _after_math_letter(row, a):
+                            continue  # the subscript or exponent of a math letter ("x\u2217")
                         token = "".join(c.c for c in row.chars[a:b])
                         before = _clean("".join(x.c for x in row.chars[:a]))[-FOOTNOTE_CONTEXT:]
                         raised[token] = _FootnoteMark(element_id, before, token)
@@ -228,10 +235,15 @@ def _footnote(
     small = block.font_size is not None and block.font_size < FOOTNOTE_SIZE * ctx.body
     low = block.bbox[1] >= FOOTNOTE_ZONE * page.size[1]
     mark = _lead_token(block.rows[0]) if block.rows else ""
+    text = " ".join("".join(c.c for c in row.chars) for row in block.rows)
+    words = _WORD.findall(text.lstrip()[len(mark) :])
+    # the asterisk operator is a note's sign in a class of TeX, and also the star of a script in
+    # a formula ("\u2225M\u2225Fro" under a display): as a note's mark it goes on in two words
     return (
         small
         and low
         and bool(mark)
         and mark in raised
         and any(c.c.isalpha() for c in ink[len(mark) :])
+        and (len(words) >= 2 or "\u2217" not in mark)
     )

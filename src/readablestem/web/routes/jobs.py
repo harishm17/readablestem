@@ -1847,7 +1847,7 @@ def status_context(request: Request, job: JobView) -> dict[str, Any]:
     state = job.state
     assert state is not None  # `load_job_status` always works it out
     version = f"{job.version}-{state.key}"
-    # The AI service is not answering right now (T3-1, `web.provider_health`): said on a
+    # The model provider is not answering right now (T3-1, `web.provider_health`): said on a
     # document that is waiting or converting, and beside "Try again". The status version
     # changes with it, so a page left open hears when it starts and stops.
     down = get_ctx(request).provider_health().is_down()

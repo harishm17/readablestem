@@ -7,7 +7,18 @@ import re
 
 import pytest
 
-from readablestem.core.types import Element, Fix, HeadingFix, Kind, Link, Status, inline_marker
+from readablestem.core.types import (
+    Element,
+    Fix,
+    HeadingFix,
+    Kind,
+    Link,
+    Status,
+    TableCell,
+    TableFix,
+    TableGrid,
+    inline_marker,
+)
 from readablestem.pipeline.assemble import render_html
 from readablestem.pipeline.html_checks import axe_checks, static_checks
 
@@ -262,6 +273,28 @@ def test_without_footnotes_a_link_between_blocks_is_an_ordinary_link():
     html = render(pairs)
     assert "doc-noteref" not in html and "doc-footnote" not in html
     assert '<a href="#p1-e1">1</a>' in html
+
+
+def test_a_link_to_a_part_left_out_of_the_document_is_plain_words_wherever_it_stands():
+    # a paragraph, a figure's caption, a table's caption and a table's cell of a Word or LaTeX
+    # source, each linking to p9-e9, a part the instructor left out
+    gone = [Link(start=4, end=9, kind="internal", target_id="p9-e9")]
+    grid = TableGrid(
+        rows=1, cols=1, caption="See there.", caption_links=gone,
+        cells=[TableCell(row=0, col=0, text="See there.", links=gone)],
+    )  # fmt: skip
+    table = block(2, Kind.TABLE, "")
+    fix = Fix(
+        element_id=table.id, kind=Kind.TABLE, status=Status.ACCEPTED, table=TableFix(grid=grid)
+    )
+    pairs: list[Element | tuple[Element, Fix]] = [
+        block(0, Kind.PARAGRAPH, "See there.", links=gone),
+        block(1, Kind.FIGURE, "", caption="See there.", caption_links=gone),
+        (table, fix),
+    ]
+    html = render(pairs)
+    assert html.count("See there.") >= 4
+    assert "p9-e9" not in html
 
 
 def test_a_typed_address_and_a_section_reference_reach_the_html_with_working_ids():

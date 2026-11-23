@@ -546,7 +546,7 @@ answer is strict structured output (`TableOutput`, `extra="forbid"`):
 
 | Field | What it holds |
 |---|---|
-| `is_data_table` | true for values read against row or column labels; false for text in boxes, a list of terms, a form, a figure, a table of contents, an equation or a matrix |
+| `is_data_table` | true for values read against row or column labels; false for text in boxes, a list of terms, a form, a figure, a table of contents, an equation or a matrix. With `TABLE_FILE_FACTS` on (`table_facts.md`): true for cells in rows and columns read against row or column labels, a cell holding a number, a word or a whole sentence; false only for something else: a figure or diagram, a form with blanks, a table of contents, an equation, a matrix, or running text set in columns with no cells (layout has already decided the crop is a table) |
 | `caption` | a caption printed inside the image, else empty (never used: see below) |
 | `rows[].cells[]` | each printed cell once, left to right, top to bottom: `text` exactly as printed, `latex` for a math cell (words in `\text{}`), `header` (`col`, `row` or `none`), `row_span`, `col_span` |
 
@@ -559,6 +559,43 @@ untrusted data by the client. It is **not** sent the PDF's own words for the tab
 those are what its answer is checked against, as the equation step keeps an equation's
 text layer from the model. A model that had copied them could pass the checks with a
 flattened exponent (10⁵ is "105" in most text layers).
+
+**With `TABLE_FILE_FACTS` on** (off in code and in production; the prompt is `table_facts.md`,
+and turning it on needs a `PIPELINE_VERSION` bump) the model also sees the words the PDF prints
+inside the table's box, fenced as untrusted data by the client. The words come with their places
+(left, top, right and bottom in pixels of the crop) and with a raised digit or sign written
+raised (`10⁵`; `layout.table_words`, built from the same glyph grouping the local grid uses).
+They are the file's account of which letter, digit, sign and exponent a cell holds; they are not
+an account of structure: the prompt says the image decides rows, columns, spans and headers.
+The **draft grid** from detection is not sent. It is wrong on about half of tables, and a
+reading checked against a grid it was shown is not checked. The cell text of the answer is
+compared with the words both ways (every word of the answer's text cells is printed in the box
+and every printed word is in a cell), so a model that copied the list wrongly still fails the
+check. A list over 8,000 characters is cut (`words_block`: "N more words are not listed"), and a
+page drawn as vector strokes has no words and no list. One known gap: `table_words` reads the
+page's text rows without the set of glyphs that layout has covered by a picture, so a word under
+a drawing in the box may be listed. A reviewer's re-check of such a table (O-219) is made
+against the words the stored element has, with the same rule (`table_step.stored_words`).
+
+A table whose size is known to pass the main model's output limit (`table_step.too_long`)
+is not sent to the main model after the cheap read, when the switch is on: a second reading would
+be cut off. The cheap answer stands when it is a usable data table and its checks decide;
+otherwise the table takes the existing "could not be read" path (the local grid with first-row
+headers, NEEDS_REVIEW, or FAILED with the image kept when there is no local grid).
+
+A positional check of the structure (each cell's words fall in one rectangle that holds no
+other cell's words, the cells of a column share a vertical band with the columns running left
+to right, the cells of a row share a horizontal band with the rows running top to bottom) is
+not built. It was counted at $0 on the recorded development readings of the repository and
+the corpus cache (2026-11-17, on the branch this was ported from): 38 answers on 27 crops, 27
+by the cheap model and 11 by the main model. 13 said "not a data table" (8 cheap, 5 main). Of
+the 25 that gave rows, 4 have a cell whose words are not all printed in the box (math or split
+words), so no place can be given; of the other 21, 19 pass all three tests and 2 (both cheap)
+fail the columns, in one of them by a 14-pixel gap that a tolerance would remove, in the other
+in every column. The local-grid structure comparison differs from 2 of the 21 (one cheap, one
+main), and positional passes both; it agrees with the 2 that fail the columns. Without hand
+labels these counts do not say which reading is right, and the set is too small for a rate. The
+local-grid structure comparison stays where the answer's grid and the local grid agree in shape.
 
 ### Routing
 
@@ -811,7 +848,28 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
   raised: on 519 public PDFs a cap of 3 pt gives no table that was missed and makes a plot whose
   axes are drawn 2 to 3 pt thick (`ax_astrophga`, page 8) a table with seven headings, and a cap
   of 2 pt turns the section rules of a minutes form into a second table. Thick rules are rules of
-  a table only together with a grid; no set has such a table to measure a rule on.
+  a table only together with a grid; no set has such a table to measure a rule on. Measured
+  again at 4 pt on the 6 of the benchmark's 188 table PDFs that have a 2 to 4 pt filled box near
+  a found table: 4 of them read differently, some better, some worse (one loses a table), and
+  the 332 public PDFs have only small squares near a table (a textbook's markers, 3 to 4 pt
+  across) and the 25 corpus PDFs have none.
+- Labeled lines with no rule and no caption. A column of item numbers before sentences ("Q1" to
+  "Q6" of a worksheet, "Step 1") is a table when the detector or the text grid proposes it, and a
+  schedule's "Week 1" lines are a table too; the two differ only in the label's word. Counted:
+  none of 332 public PDFs, 188 benchmark table PDFs and 25 corpus PDFs has the first shape (the
+  unruled two-column tables found there are schedules, key and value pairs, notation lists and a
+  matching exercise), so no rule is built for it. A schedule with two or more lower-case labels
+  in seven is no table and a sidebar of labels that start with a capital or hold a digit is one
+  (`_labels_open_runs`): 14 boxes of the public sets reach that rule (9 kept: bullets, numbers,
+  a brace; 5 not, among them the syllabus sidebar that the rule is for) and 5 of the corpus
+  (all kept). None of the public ones is a schedule with lower-case labels or a sidebar of the
+  probes' shape, so the clause that tells them apart by case is not measured on a real page.
+- A caption under a table is cut where a line starts a sentence after a step of more than 1 pt
+  wider than its own, so a short title line set 1.2 pt or more from its description, and a line
+  pushed down by a formula in the fifth line or later of a caption, end it there. A line pushed
+  down and the first line of a paragraph at the same step are the same shape on the page. None
+  of the 115 captions under a table in the public sets is ended by that step, nor any of the 8
+  in the benchmark's table PDFs, so nothing is changed.
 
 ### Tests
 

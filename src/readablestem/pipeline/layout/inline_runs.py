@@ -56,7 +56,11 @@ SCRIPT_BASE_GAP = 0.35
 PICTURE_REACH = 3.0
 PICTURE_CHAR = "\ufffc"
 _OPENING = frozenset("([{")
+# A glyph of a Computer Modern or Latin Modern face ("CMR8", "ABCDEF+LMMathItalic8"): TeX set it,
+# whatever the producer field of the file says (a file re-written by a viewer or a converter).
+_TEX_FACE = re.compile(r"(?:^|\+)(?:CM|LM)[A-Za-z]+\d*", re.IGNORECASE)
 _MARKUP = re.compile(r"</?[A-Za-z][\w:.-]*\s*/?>|</")
+_ADDRESS = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)  # a typed web address
 
 
 def _bracket_base(chars: list[_Char], info: _CharInfo, at: int) -> bool:
@@ -481,6 +485,7 @@ def _inline_runs(
         start, depth = i, 0
         while i < n:
             c = chars[i].c
+            c_font = chars[i].font
             if c in _OPENING:
                 depth += 1
             elif c in ")]}":
@@ -497,7 +502,10 @@ def _inline_runs(
                 or (c in _ELLIPSIS_CHARS and _in_ellipsis(chars, i))
                 or (c == ":" and i + 1 < n and chars[i + 1].c == "=")  # ":=", from \\coloneqq
                 or _separator_in_bracket(chars, info, i, depth, document=document)
-                or (document.tex_made and glyph_math.script_punctuation(chars, info.script, i))
+                or (
+                    (document.tex_made or (document.inline_joins and _TEX_FACE.match(c_font)))
+                    and glyph_math.script_punctuation(chars, info.script, i)
+                )
                 or (
                     document.tex_made and glyph_math.percent_of_number(chars, i)
                 )  # the 5% of "phi = 5%"
@@ -528,11 +536,29 @@ def _inline_runs(
             reasons = _inline_evidence(chars, info, start, end, kinds, document=document)
             if reasons:
                 runs.append((start, end, reasons))
+    runs = _outside_addresses(chars, runs)
     if document.inline_joins:
         runs = _joined_labels(chars, info, runs)
     joined = _with_simple_maths(row, info, _join_signatures(chars, runs), document=document)
     found = _with_chemistry(row, kinds, _with_nuclides(row, kinds, joined))
     return _clear_of_entry_numbers(row, found) if row.contents_level else found
+
+
+def _outside_addresses(
+    chars: list[_Char], runs: list[tuple[int, int, list[str]]]
+) -> list[tuple[int, int, list[str]]]:
+    """The runs that are not inside a typed web address.
+
+    "watch?v=C-uekD6VTIQ" has a relation between operands, but it is a word of the address:
+    a formula there cuts the address in two (`text_pass._address_end` stops at the marker).
+    """
+    if not runs:
+        return runs
+    text = "".join(" " if c.blank else c.c for c in chars)
+    if len(text) != len(chars):  # a ligature glyph: the indexes no longer line up
+        return runs
+    spans = [m.span() for m in _ADDRESS.finditer(text)]
+    return [r for r in runs if not any(a <= r[0] and r[1] <= b for a, b in spans)]
 
 
 _ENTRY_PAGE = re.compile(r"\d{1,4}|[ivx]{1,6}", re.IGNORECASE)

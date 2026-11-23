@@ -97,7 +97,7 @@ import threading
 import time
 from bisect import bisect_left
 from collections import Counter, defaultdict
-from collections.abc import Callable, Generator, Iterable, Mapping
+from collections.abc import Callable, Generator, Iterable, Mapping, Sequence
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -165,6 +165,7 @@ from readablestem.pipeline import (
     step_facts,
     table_math,
     table_step,
+    tables,
     tagged,
     text_pass,
     witness_reconcile,
@@ -358,7 +359,27 @@ log = logging.getLogger(__name__)
 # "No description. This figure has no text description yet." (as a draft, "Needs a description.")
 # as soon as it makes the page again (a review change, a draft, a cleared page), and its record
 # leaves the split change out. The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.16"
+# 0.5.17 (2026-11-23): one raise for wave 4 (CHANGELOG.md has each change). What a PDF's result
+# holds moves: the head or foot of a one-page file set smaller than the body and ending in a bare
+# page number leaves the text; a contents line with no leaders that runs up to its page number
+# is an entry; a numbered paragraph whose first line is indented keeps its second line; a
+# lettered title of four words or more may end in a full stop; no inline equation is read inside
+# a typed web address; the asterisk operator is a note sign, a number and a sign printed together
+# are two marks, and a raised digit after a math letter is no note mark; five more algorithm
+# shapes are one block. A Word or LaTeX file's result: a figure's or a table's caption keeps its
+# links (`Element.caption_links`, `TableGrid.caption_links`, left out of the JSON when empty); a
+# bracketed expression to the power T no longer stops a LaTeX source; a source that runs out of
+# memory stops as `source_timeout`. The status "Needs review" reads "Needs your decision" (web).
+# Behind switches that stay off (no change): LAYOUT_INLINE_JOINS, LAYOUT_DISPLAY_GROUPING,
+# LAYOUT_JOIN_PANELS, REGION_TREE, EQUATION_FILE_FACTS, TABLE_FILE_FACTS, SCAN_LAYER_CHECK,
+# PAGE_CHECK_SIGNALS, FIGURE_LABELS_ALWAYS. One new notice code, only behind SCAN_LAYER_CHECK:
+# `image_page_layer_differs`; no new figure reason. Results from 0.5.10 to 0.5.16 load
+# unchanged and their page is not made again (`assemble.RENDER_VERSION` stays 11: a stored
+# result has no caption links, and without them a caption is written as before). 0.5.16 opens
+# a 0.5.17 result (checked on 2026-11-23: an element and a table with caption links load) but
+# drops the caption links, so a caption written by 0.5.16 again has no links.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.17"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -650,9 +671,11 @@ def step_key(
     context_text: str | None,
     options: ConversionOptions,
     settings: Settings,
+    words: Sequence[tables.PrintedWord] = (),
 ) -> str:
     """What a step's stored fix depends on, as a digest: the element (its text layer is
-    checked against the answer), the picture, the nearby text sent with it, the conversion
+    checked against the answer), the picture, the nearby text sent with it, a table's words
+    (`layout.table_words`, only when there are any), the conversion
     options (notation, exam mode, feature flags), every behaviour setting (models, efforts,
     switches) and the conversion code with its prompts (`code_identity`). Equal keys mean
     the same question, asked and handled the same way. Of the options, the key holds those
@@ -666,6 +689,8 @@ def step_key(
         _options_read(element.kind, options),
         _behaviour(settings),
     ]
+    if words:
+        parts.append(repr(words))
     return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
 
@@ -833,6 +858,9 @@ class _Task:
     context_text: str | None
     # An inline equation's line with its span boxed (`Settings.equation_line_context`).
     line_png: bytes | None = None
+    # A table's words with their places in its crop (`layout.table_words`, `TABLE_FILE_FACTS`);
+    # empty when the setting is off or the PDF prints none in the box.
+    words: tuple[tables.PrintedWord, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -892,7 +920,9 @@ def _run_step(
         page=element.page,
     ) as span:
         try:
-            extra = {"line_png": task.line_png} if task.line_png is not None else {}
+            extra: dict[str, Any] = {"line_png": task.line_png} if task.line_png is not None else {}
+            if task.words:
+                extra["words"] = task.words
             fix = step(
                 element,
                 task.png,
@@ -1122,7 +1152,7 @@ class _Run:
     # Finished steps kept between runs (T3-1), and the key each element's step was asked under.
     cache: StepCache | None = None
     keys: dict[str, str] = field(default_factory=dict)
-    # Told how each model request ended (`ModelCall`), for the status line about the AI service.
+    # Told how each model request ended (`ModelCall`), for the status line about the model provider.
     observer: Callable[[ModelCall], None] | None = None
     # The scale an equation's picture is shown at in the student file (T3-15).
     eq_scale: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
@@ -1216,6 +1246,20 @@ class _Run:
             log.warning("line crop failed: %s", type(exc).__name__)
             return None
 
+    def table_words(self, element: Element, png: bytes) -> tuple[tables.PrintedWord, ...]:
+        """The words the PDF prints in a table's box with their places in its crop, when
+        `TABLE_FILE_FACTS` is on; none otherwise, or for what is not a table, a page with no
+        text there, or a failed read (the step then works as it did)."""
+        if not self.settings.table_file_facts or element.kind is not Kind.TABLE:
+            return ()
+        if element.page in self.vector:
+            return ()  # (a handwritten page's strokes are drawn: its picture is not the PDF's)
+        try:
+            return tuple(layout.table_words(self.pdf_bytes, element, png))
+        except Exception as exc:
+            log.warning("table words failed: %s", type(exc).__name__)
+            return ()
+
     def read_glyphs(self, element: Element) -> None:
         """Keep the glyphs under an equation and beside it with the element, when the setting
         is on (`Element.glyphs`): the evidence of every check of a reading against the PDF.
@@ -1228,7 +1272,13 @@ class _Run:
         parent = self.parents.get(element.parent_id or "")
         across = layout.line_across(parent, element)
         try:
-            glyphs = layout.line_glyphs(self.pdf_bytes, element, across, reach=reach)
+            glyphs = layout.line_glyphs(
+                self.pdf_bytes,
+                element,
+                across,
+                reach=reach,
+                facts=self.settings.equation_file_facts,
+            )
         except Exception as exc:
             log.warning("glyph read failed: %s", type(exc).__name__)
             return
@@ -1261,6 +1311,7 @@ class _Run:
             return
         self.raise_if_fatal()  # a step may have failed while this element was being cut
         line_png = self.line_crop(element)
+        words = self.table_words(element, png)
         self.read_glyphs(element)
         if self.cache is not None:
             key = step_key(
@@ -1269,6 +1320,7 @@ class _Run:
                 self.contexts.get(element.id),
                 self.options,
                 self.settings,
+                words,
             )
             if (kept := self.cache.lookup(element, key)) is not None:
                 self.fixes[element.id] = kept  # finished in an earlier run: no model call
@@ -1277,7 +1329,7 @@ class _Run:
             self.keys[element.id] = key
         work = partial(
             _run_step,
-            _Task(element, png, self.contexts.get(element.id), line_png),
+            _Task(element, png, self.contexts.get(element.id), line_png, words),
             client=self.client,
             settings=self.settings,
             stop=self.stop,
@@ -1891,6 +1943,7 @@ def _image_pages_pass(
     measured: list[CallFact],
     step_cache: StepCache | None = None,
     stage_progress: StageProgressFn | None = None,
+    scanned: frozenset[int] = frozenset(),
 ) -> tuple[dict[int, image_page.Built], ImagePagesSummary | None]:
     """Read the kept pages `pages` (`image_page.kept_reads`) from a picture of each (ADR 0007).
 
@@ -1960,6 +2013,13 @@ def _image_pages_pass(
                 log.warning("image page build failed: %s", type(exc).__name__)
                 page_built = None
             if page_built is not None:
+                if settings.scan_layer_check and number in scanned:
+                    # a scan's layer is OCR; a tablet's is not
+                    try:
+                        layer = layout.page_words(pdf_bytes, number)
+                        page_built.layer_missing = image_page.layer_missing(layer, read.output)
+                    except Exception as exc:  # a check of the read never costs the page
+                        log.warning("image page layer check failed: %s", type(exc).__name__)
                 built[number] = page_built
         summary = image_page.summarise(result.reads, built, settings, result.stopped)
         for number, read in result.reads.items():
@@ -2128,6 +2188,7 @@ def _convert(
                     step_cache=step_cache,
                     measured=measured,
                     stage_progress=stage_progress,
+                    scanned=frozenset(n for n in to_read if kept.get(n) == SCANNED_PAGE_REASON),
                 )
                 watch.stage("layout")
                 for number in image_built:

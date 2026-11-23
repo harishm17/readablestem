@@ -1,5 +1,370 @@
 # Changelog
 
+## Pipeline 0.5.17, render 11 (2026-11-23)
+
+- `PIPELINE_VERSION` is 0.5.17 and `RENDER_VERSION` stays 11: one raise of the pipeline for every
+  "Unreleased" entry below down to the 0.5.16 entry. What changes for a reader, one line for each:
+  - Note signs and exponents (O-034, O-054, O-429): a star printed with a number is a note's
+    mark of its own, a raised digit after a math letter is no note mark; author notes are found
+    and linked.
+  - Links in captions (O-073, O-424): a Word or LaTeX source's figure and table captions keep
+    their links. A source that runs out of memory stops with the time-limit message (O-395).
+  - `(A+B)^T` in a LaTeX source: the reading no longer stops (it crashed since 0.5.12).
+  - Algorithms (O-394): five more shapes of a numbered algorithm are one block.
+  - One-page files (O-001, O-389): a journal head or foot set smaller than the body with a bare
+    page number leaves the text.
+  - Contents, numbered paragraphs, lettered titles (O-409, O-408, O-418): a contents line with
+    no leaders is an entry, an indented numbered paragraph is one paragraph, "B. A title of four
+    words." is a heading.
+  - Web addresses (O-410): no formula is read inside a typed address, so the address stays whole.
+  - The status "Needs review" reads "Needs your decision" (O-417; web).
+  - Found in review before release: a raised star after a math letter ("n∗") is no note mark,
+    as a raised digit is not; a link in a table's caption or cell to a part left out of the
+    document is plain words, as a link in a paragraph or a figure caption already was.
+  - Behind switches that stay off, no change: the inline-box rules (O-412, O-416), far equation
+    numbers (O-037, O-391), panel marks (O-422) and the SW55 file facts.
+  - Measured and written down as limits, nothing built (no real document shows them): tables and
+    captions (O-434, O-435, O-056, O-404), exams and columns (O-431, O-432, O-436), bulleted
+    slide lines (O-407), struck, highlighted and blank marks (O-021, O-025, O-027), note ranges
+    and numbered series (O-401, O-402, O-403).
+
+## Unreleased: a bracketed expression to the power T no longer stops the reading (branch fix/source-deep-math)
+
+- `pipeline/speech.py` `_transposable` asked, for a bracketed expression such as `(A+B)^T`, whether
+  anything inside it is a matrix or a vector, but walked `base.iter()`, which starts at the
+  expression itself, so it called itself on the same node without end. Every bracketed run of three
+  or more signs with a plain `T` or `\top` over it raised `RecursionError`: the equation's speech
+  could not be made. It now looks below the brackets only. Nothing else in the speech changes: an
+  expression that read before takes none of the changed lines.
+- On a LaTeX source the error was not caught: `ltx_reader.read` stopped the whole conversion. Of the 73
+  public arXiv sources, 7 hit it (the reason is the one equation form, not the depth of the
+  maths; MathML nested more than `MAX_DEPTH` is a `SpeechError` as before). Six of the seven now
+  read end to end (the seventh, 2504.00755, is refused by the upload check before any reading).
+  The same function serves the PDF path, the editor's speech check and the listen page, which had
+  the same crash on such an equation.
+- No version bump is owed for the reading itself. A stored equation of this form that came out with
+  no speech is made again only when `SPEECH_VERSION` next rises.
+## Unreleased: one word for a decision, "document" in the stop texts and ops reports, release step for the hero picture, two test files pruned
+
+- The pill on an item that waits for a person says "Needs your decision", as the heading of the list
+  of such items does (`FIX_STATUS_LABELS` in `web/views.py`). It reaches the review cards, the
+  line a change reads back ("... is now: needs your decision."), the split view's lines and the
+  record. If the pill wraps at 390 px, the pill says "Your decision" (checked: it does not).
+- The texts of a budget stop (`BudgetExceeded`, the worker's, the re-read's and the cancel) and the
+  `readablestem ops` reports and their `--help` say "document" where they said "job" to a reader.
+  Names in code and setting names (`job_usd`, `MAX_USD_PER_JOB`) are as they were.
+- Code comments that quoted "Read again" or "AI service" use today's words ("Ask the model to read
+  it again", "model provider"). The status page keeps its "AI service" line. The string table
+  (`web/strings.py`, `docs/web.md`) now says the model's maker is not named at first mention, since
+  the provider is configurable.
+- `docs/deploy.md` ("Ship a new version") and `docs/deploy-railway.md` list `scripts/hero_screenshot.py`
+  as a step when the demo or the student page's look changes; `docs/site.md` says the picture stays
+  on phones, shown whole, as a link to the demo.
+- Tests: `tests/test_source_reader.py` and `tests/test_web_source.py`, two of the six files review 6
+  named as grown, lose rows that repeat a rule another file owns (the picture path, the archive and
+  the escape rules), the one-line tests that the larger ones hold, and a dead assertion.
+## Unreleased: table and caption leftovers measured, none built (O-434, O-435, O-061, O-056, O-404)
+
+- Counted before building, on 332 public PDFs (the layout development set, the repository's own,
+  the real-document set), the 188 table PDFs of the parsing benchmark and, as counts only, 25
+  corpus PDFs. No code changes; `docs/tables.md` ("Known limits") has the numbers.
+- Schedules and sidebars (O-434): 14 boxes of the public sets reach the labels rule, 5 of the
+  corpus; none is a schedule with lower-case labels. Case stays the measure.
+- Captions under a table (O-435, O-061): of 115 captions in the public sets and 8 in the benchmark,
+  none is ended by the step test, so a pushed line and a title set apart are not seen. A pushed
+  line and a paragraph's first line have the same shape on the page, so a measure would trade
+  one for the other; the 4-line cut is already gone (0.5.16); inline math in a caption changes the
+  request and the one-line case has no instance, as before.
+- Thick borders (O-056): none of 332 public and 25 corpus PDFs has a table with filled borders
+  over 1.6 pt; a 4 pt cap changes 4 of the 6 benchmark files that have a 2 to 4 pt box near a
+  table, one for the worse (a table lost). Generated tables with borders of 2, 3 and 4 pt still
+  give a table and a figure.
+- Labeled lines with no rule (O-404): "Q1" to "Q6" before sentences is found in none of the
+  545 PDFs; the unruled two-column tables found are schedules, key and value pairs and notation
+  lists. A rule that makes it a list (item words before a number) was built on the probe, passed,
+  and was taken out again: it was measured on generated pages only.
+- No `PIPELINE_VERSION` or `RENDER_VERSION` raise is owed; no stored result, recording or request
+  changes.
+## Unreleased: exams and columns measured, nothing built (O-431, O-432, O-436, O-012)
+
+- No change to the reader. The exam shapes 0.5.16 left read left options first (four questions
+  with two wrapped options, one row of two options under each question, ten options under one or
+  two questions, six questions) and the columns it reads across (one figure space in a column of
+  nine lines, a thinner side at twice the other's pitch) were found on generated probe PDFs of
+  reviews 19 to 21 only. Counted on real documents: of the 81 public PDFs of the development set
+  and `data/` no page reaches any of them (no option label pair on any page, five head-column
+  tests none of which changes with a shorter run), `hashrun.py` over the corpus against 9e16778c
+  plus SW55 (cf0729fc) changes none of the 996 analyzed files or 73 replayed uploads, and
+  `eval order --set layout-dev-1` is the same page for page (141 of 267 right, 72 faultless). A
+  fault no real document shows is a limit, not a fix (BUILDERS.md, 2026-11-22).
+- What a fix would do, tried and not kept (patch outside the repository): taking a gutter with
+  three or more pairs of option lines level with each other, the label of one the next letter of
+  the other ("(a)" and "(b)"), on at least 0.4 of the thinner side's lines, for no gutter reads
+  all 127 exam probes question by question (95 before); a run length of four lines instead of
+  five reads 96 of 117 column probes as columns (70 before) and loses none of either kind. Spacing
+  alone does not tell the rest: columns whose thinner side is set at twice the other's pitch (7
+  probes) have the steps of an exam whose left option runs on, and paragraphs of two or three
+  lines in one column (7 probes) have an exam's option groups; 7 more probes are decided by a
+  figure or the end of the page, not by the gutter. `docs/layout.md` says so.
+- O-012, the region tree re-measured on the development set (`eval order --set layout-dev-1`,
+  `REGION_TREE` on against off, profile edited for the run only and restored): 159 of 267 pages
+  right and 80 faultless with the tree on, 141 and 72 off. 22 pages become right, one gets worse
+  (`ax_qbionc_240307089` p8, a figure page: a heading joined to the block above it; right still,
+  no longer faultless). Of the 108 pages still not right with the tree on, the causes named by the
+  evaluation are blocks not found (44 pages), neighbours out of order (49), blocks broken (42),
+  stamps read in the text (28), entries joined (19) and joins across columns (7: `ax_cslg_240306367`
+  p3, `ax_csro_240306533` p4, `ax_eesssp_240306460` p1, 2 and 7, `sm_index_b` p1 and 2). The seven
+  are the same with the tree off; the one looked at (csro p4, two clean columns under a figure,
+  gutter found) is not a gutter fault. The line-number pages (`sm_lineno_a`, `_b`) are as they were
+  off. Nothing was built: the switch stays off until the re-recording (O-421), the one page the
+  tree makes worse is a figure page and not a column page, and the other causes were not
+  diagnosed page by page here (left open for the owner's ranking).
+- No recording or request changes; no version raise owed; no migration.
+## Unreleased: links in the captions of a Word or LaTeX source; a memory stop reads as the time limit
+
+- A Word or LaTeX source's figure and table captions keep their links (web addresses, typed
+  addresses, `\ref` and `\hyperref` to a section, equation, figure or table, a Word bookmark). They
+  are held beside the plain caption (`caption_links`, offsets into `caption`), so `caption`, every
+  request and every recording are what they were; the page writers (figure and table) write the
+  `<a>` in `<figcaption>` and `<caption>`. Links in headings, footnotes and table cells were
+  already read. Results of documents with no caption link store the same JSON as before.
+- LaTeXML or pandoc stopped by the memory limit now ends as `source_timeout` (it was
+  `source_failed`: a command that only grows, `\def\a{x\a}\a`, ends in 23 s with perl's
+  "Out of memory" and exit 1, which LaTeXML's run now reads from the tail of its output; for Word,
+  a stop other than the clock was `source_failed`), and the sentence says "time or memory". A loop
+  the log does not name still cannot be told from a very large source.
+- Owed, not made here: raising `PIPELINE_VERSION` and `RENDER_VERSION` (a source's stored result
+  gains caption links only when it is converted again). No migration.
+## Unreleased: algorithms with line numbers alone in their rows, comments and math under Input (O-394)
+
+- `blocks._algorithm_groups` reads five more shapes counted on the public pages (docs/layout.md,
+  "Algorithms, wave 4"): a line number alone in its row, whose step's words, formulas or comment
+  are in rows of their own on its baseline (2405.15050 p4, 2504.06207 p4 and p5); a comment that
+  opens with "▷" (2504.06207), including one the text layer lists after the steps below its line;
+  a monospaced comment row between two numbered steps (2405.15050 p4); a list of math rows under
+  a numbered "Input:" (2504.06207 p4); and an appendix caption, "Algorithm A-1" or "Algorithm
+  B.2", whose "Input:" and "Output:" lines now join the numbered steps (ax_csro_240306420 p9),
+  with a wrapped preamble line counted once. A number a little smaller than the steps resumes
+  after an equation, and a number alone in its row is not the end of an equation. This also puts
+  the 14 steps of Algorithm 2 of ax_eesssp_240306460 p6 in one block (a step with a display
+  equation had split it in two).
+- Measured with `hashrun.py` against cf0729fc: `full` (73 uploads, recorded answers) has no
+  difference, so no recorded request key stops matching and no switch is needed. `analyze` (996
+  runs) differs on four files, all of them pages with an algorithm and each difference read:
+  ax_csro_240306420 p9, ax_eesssp_240306460 p6, 2405.15050 p4, 2504.06207 p4 and p5. The other
+  22 algorithm pages (27 in all) read as before. Crops are unchanged.
+- `PIPELINE_VERSION` (0.5.16) is owed one raise for these four documents' cached layouts; not made
+  here. `RENDER_VERSION` is not owed.
+- Not built, counted and measured (docs/layout.md): a numbered tail at a page top, a heading
+  under an algorithm, a `for ...:` line over an equation, an opener that wraps flush, one-line
+  blocks, a paragraph between steps (ax_statme_240307124 p12), content listed before its number
+  (2504.06207 p4 steps 9 to 13, 2405.15050 p4 steps 10 to 12), and the mono font names
+  (`glyphs._MONO_FONT` misses "NimbusMonL", "CMITT", "TeXGyreCursor" and "t1xtt": one regex line
+  that changes 8 files and needs its own run).
+## Unreleased: two more inline-box rules behind `LAYOUT_INLINE_JOINS` (wave 4, builder 05; O-412, O-413, O-416)
+
+Both rules are behind `LAYOUT_INLINE_JOINS`, off in code and in the production profile; with it off
+the layout of every file is what it was (`hashrun.py full` and `analyze` against cf0729fc: see below).
+Turning the switch on moves equation boxes, so the recorded equation requests of the pages it moves
+stop matching; it needs a re-recording and a `PIPELINE_VERSION` bump first (none made here).
+
+- Italic "for", "and", "any", "all", "the", "let", "are" and "not" between blanks are words, not the
+  variables f, o, r (`shared._ITALIC_CONNECTIVES`). A theorem's statement set in italic had one math
+  row and one box for "x >= 2, for j = 1, ..., d and k = 3"; now the formulas are boxes of their own.
+  Box score of 21 development papers, both switches on: 9,174 whole before, 9,183 after (+10, 1 lost).
+- A colon inside a Computer Modern or Latin Modern index stays in the formula when the file's producer
+  field does not say TeX (`inline_runs._TEX_FACE`): "dx_{1:T}" of `data/real-tables/2407.13734.pdf`
+  was cut after the "1". No box of the 21 papers changes.
+- Measured and not built: the inline "extra" group (83 of 219 read are wrapped formulas whose box is the
+  union of two lines), widening the host box in `display._absorb_contained_regions` (9 boxes grow, no
+  score changes), and counting set-off words without connectives (+1, 1 lost). Counts in
+  docs/layout.md.
+- Raised digits (O-416): on the 72 corpus entries 30 blocks keep raised or lowered text flat, and each
+  of the 30 has its `scripts_flattened` notice (none silent); on the 331 other PDFs 312 blocks, none
+  silent. Nothing built for them; `Element.text` is as it was.
+- Hash runs on cf0729fc's replay of the corpus (`hashrun.py full`, 73 uploads, recorded answers): with
+  both switches off no upload differs from the baseline (and `analyze` of the 332 other PDFs in its three
+  variants, 996 results: 0 differences), so no recorded request key moves. With both
+  switches on, 8 uploads differ from switches-off (the switches' own change, the same at the base), and
+  the two rules above change no upload beyond that: 0 of 73 differ from the base tree with
+  the switches on, so no recorded request key is moved by them.
+## Unreleased: a number set far from its line numbers it (`LAYOUT_DISPLAY_GROUPING`, off; O-037, O-391, O-048, O-129)
+
+- With the display grouping switch on, a bracketed equation number set four font sizes or more
+  from a line with words in it, at the right margin or the left one, needs less of the line:
+  0.35 of it maths, one font size in from the text edge (was 0.45 and 1.5). The line becomes a
+  display and the number its label (`display._promote_numbered_lines`, `NUMBERED_FAR_*`). Off,
+  the output is what it was. On the 21 development papers' box score with the switch on:
+  display formulas whole 902 to 904, cut 38 to 35, split 32 to 33; none got worse. Of 18 loose
+  numbers counted on 94 public papers, 4 are taken ("(C11)", "(P2)", "(15)", "(3)").
+- Counted and not built: the other 14 loose numbers are of five shapes with 1 to 3 cases each
+  (docs/layout.md, "Loose equation numbers"); labeled parts in a display, none of 2,186 on those
+  papers (7 of 65,817 before); overlines as drawn rules, 127 of 12,826 gold formulas hold one and
+  4 labeled errors (docs/steps.md).
+- A switch-on reading change: a promoted line's inline formulas are no longer elements, and a
+  display is. No version raise is owed while the switch is off.
+## Unreleased: panel joins and marks leave a row a longer block keeps (O-422, O-055, O-173, O-013, O-057; `LAYOUT_JOIN_PANELS`, off)
+
+- With `LAYOUT_JOIN_PANELS` on, the rows among the panels and the one- or two-character marks were
+  claimed after the blocks were built. A row in a block that kept other rows (a bar in a
+  paragraph, a list marker) was
+  marked taken while the block kept its text, so it was written in the block and as a figure
+  label. Counted on 228 real public documents and 72 corpus uploads: 5 marks in 2 papers and 1
+  corpus mark. A row is now taken only when every other row of its block is taken or already a
+  label (`figures._whole_blocks_only`). Switch off, nothing changes.
+- Counted and not built: two figures with the same caption text on one page (0 of 552
+  captions in real public documents, 0 of 41 corpus); a mark row in a table's box (0); a wider reach for a lone
+  label (O-057: 22 rows 2.5 to 4 body sizes from a figure in 14 public files and 35 rows 4 to 6 in 23,
+  many of them matrix entries); vector figures as items of the region tree (O-013, the
+  earlier count stands). The generated sheet's triangle is one figure with all of its labels
+  (O-173); `docs/layout.md` "Panels of one figure" has the counts.
+- Turning the switch on still needs recorded figure answers for the pages it moves and a
+  `PIPELINE_VERSION` bump (O-423).
+## Unreleased: running heads on one-page files with a bare page number, and what O-420 left (branch fix/furniture-and-order; O-001, O-389, O-420)
+
+- A head or foot of a one-page file now goes when it ends in a bare page number and every word of
+  the stack is set at least 0.5 pt smaller than the body (`_MarginFilter._is_furniture_stack`,
+  `pipeline/layout/furniture.py`). Before, lines with words went only with a number that says it is
+  a page's ("Page 3", "3 of 9"), so a journal head such as "Environment Conservation Journal 53"
+  stayed. A name line or a points line set as the body is (a quiz) still stays. A row of eight
+  words or more that opens in lower case (the rest of a sentence a footnote carries on) keeps the
+  stack. No new setting; the layout of a file of more than one page is as it was.
+- On the parsing benchmark (747 pages, $0, the same pages at `cf0729fc` and at this commit):
+  headers_footers 38.4 (243 of 632) to 47.5 (300 of 632); multi_column 70.2 (497 of 708) to 70.4
+  (501 of 712); baseline 586 of 586 to 587 of 587; long_tiny_text and table_tests are the same
+  checks. 62 checks pass that did not, none that passed fails. The 5 checks of multi_column and
+  baseline that ran now are one page that was typed a scan before and is not (its foot drawing was
+  grouped with the page number; see docs/eval-parsing-benchmark.md). The html differs on 98 pages;
+  the questions asked of a model differ on 3 (2 fewer equations on two pages, 2 more figures and 2
+  fewer equations on the third).
+- 48 public one-page files and the private corpus's one one-page file: 0 lines taken. layout-dev-1
+  has no file of one page, so its record is unchanged.
+- O-420: `ax_econem_240306657` page 47 stopped being right at `ea72076d` (the glyph-name reader):
+  the replacement characters of its equations became the symbols the file means, and the gold,
+  made from the text layer, still holds the replacement character. The output is better; the gold
+  is the limit. The reading-order scorer is not changed (docs/eval.md). `work_budget` stops do not
+  depend on load (a count); only `time_limit` stops do, and the layout-dev-1 record has none.
+  The docs sentence "which change lost them has not been traced" is replaced by the three causes
+  of O-388.
+- Owed: a `PIPELINE_VERSION` bump (the result of a one-page upload changes); not made here. No
+  migration, no render bump, no change to a prompt.
+## Unreleased: contents lines without leaders, numbered paragraphs, lettered titles that end in a full stop (branch fix/contents-headings-lists; O-409, O-408, O-418 b)
+
+Counted first (the public papers and documents of the repository's sets, the layout dev set and
+the private corpus by counts only); only what a real document showed was built, and probes only
+tested the fixes.
+
+- O-409: a line of a contents list that has no leaders and runs up to its page number ("D Ablation
+  study of a very long title 21" among entries with leaders) is an entry (`_contents_rows`,
+  `_leader_split(bare=True)`); it was a paragraph with its number in it. Real pages: 2 lines on 1
+  page of 1 public paper (`ax_physicsoptics`), 1 line in 1 private file.
+- O-408: the second line of a numbered paragraph set with an indented first line ("2) Prompt Design
+  With A Code Template: The controller ...") goes on from the first although it starts left of the
+  marker (`_numbered_paragraph_goes_on` in `_continues`). Real pages: 15 public paper or dev-set files
+  changed (the item and the rest of its paragraph are one block), and 14 such items in 3 private
+  files.
+- O-418 b: a lettered title of four words or more may end in a full stop, on its first row or on its
+  second ("B. Electron-phonon coupling and carrier mobility.", `MIN_STOPPED_TITLE_WORDS`); with fewer
+  words ("A. Yes.") it still ends an answer. Real pages: 4 titles in 2 public papers
+  (`ax_condmatmtrlsci`, `ax_cslg`).
+- Counted and not built (real documents decide, owner 2026-11-22): O-407 (only the authored
+  `html-slides` fixture shows bullets larger than the body of a deck; 0 of 332 public files and 0 of
+  286 bulleted deck lines in the private corpus; a first version without a deck limit also turned 4
+  "Key Terms" headings of OpenStax books into items), O-433 (the 5 public wrapped contents entries are all read right, none in the private corpus, the
+  probes differ in font only), O-418 a (numbered bold stems) and c (1 private
+  row), O-419 (0 found), O-033 (the cover headings of two OCW pages, not a reader fault).
+- These change the reader's output, so `PIPELINE_VERSION` needs a bump (not made here). No migration,
+  no prompt or request change.
+- Headings and tables-local evals before and after: identical (commit and timings differ only).
+## Unreleased: a formula is not read inside a typed web address; strike, highlight and blank limits measured (branch fix/text-marks; O-410, O-021, O-025, O-027)
+
+- `layout/inline_runs._outside_addresses`: an inline-equation run that lies wholly inside a typed
+  address (`https://`, `http://`, `www.` to the next space) is dropped. `watch?v=C-uekD6VTIQ` was cut
+  at the "v=C" it read as a relation, and `text_pass._address_end` then ended the link at the marker
+  (public file `layout-dev-1/ax_csro_240306533.pdf` page 1). A PIPELINE_VERSION bump is owed once
+  this is merged, because layout text changes for files with such an address.
+  Measured on 996 corpus-and-public hashes against cf0729fc: 6 differ, all in two public files
+  (`ax_csro_240306533.pdf`: 1 address whole, 1 inline equation fewer; `os_astronomy_2e.pdf`: 6 to 10
+  whole YouTube addresses, 13 to 9 inline equations); `full` 73 compared, 0 differences; the private
+  corpus has none. Left alone: an address a line break splits at "?" (one, `os_astronomy_2e.pdf`
+  page 13 "watch? / v=w7TU1vFL8Us"): the guard reads one row at a time.
+- O-021 (blanks), O-025 (struck table cells and display equations), O-027 (paint order, highlights of
+  three or more touching pieces): measured on the public sets and the corpus, no real document shows
+  them, so nothing is built; the limits are written in `docs/layout.md` and on the limits page.
+## Unreleased: note signs and exponents (branch fix/footnotes-and-series; O-034, O-054, O-429, O-401, O-402, O-403)
+
+- The asterisk operator (U+2217, the star TeX sets for an author note) is a note sign, and a raised
+  number and sign printed together ("1∗", "∗1") are two marks. The star of an author note is
+  text now, not a stray equation (ax_condmatmtrlsci_240306379 and 389, ax_csro_240306533), has its
+  space after it (ax_mathco_240306383, 2505.03022), and two author notes are found and linked
+  (ax_mathap_240306449 and 464). A note that opens with the sign must go on in two words: a norm's
+  subscript with a raised star under a display made 2 false notes on 2411.07613 (none now).
+- A raised digit right after a letter set in a math font ("p1", "m0") is a subscript or an
+  exponent, not a note's mark: the link of a real note on w_notes_6042_ch2 went to the page header
+  and goes to the note.
+- Public footnote gold (158 PDFs): 131 destinations, notes 139 to 141, linked 135 to 137, false 0,
+  none lost. Corpus hash against cf0729fc: 22 differences in 1069 (7 public files, three variants
+  each, and one upload), every one read.
+- Measured and not built, no real file shows them: a raised note range ("1-3"), a unit's
+  exponent over a low line that opens with a digit, and a numbered series that the white of a
+  worksheet ends (O-401: the review probes only). The numbers and the shapes are in
+  `docs/layout.md` (footnotes, numbered series).
+- Owed: a `PIPELINE_VERSION` bump (stored documents of the files above change: a link, a star, a
+  note); no `RENDER_VERSION` bump, no migration.
+
+## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
+
+- New setting `EQUATION_FILE_FACTS` (off in code, in `.env.example`, in the production profile and
+  in the Railway web variables). Off, every request, recording key and result is what it was
+  (`hashrun.py full` and `analyze` against 9e16778c: no difference).
+- On, the equation step's request carries a `<file_characters>` block with the glyphs the PDF stores
+  under the box, one by one, with style, raised or lowered marks, `[gap]` for a glyph the file does not
+  name and a `{name}`, `{font}` or `{guess}` label on those recovered another way, and the count of
+  glyphs not named. The block is untrusted document text. More than 30% gaps, more than 250 glyphs or
+  no glyph: today's request. New prompts `equation_file.md` and `check_equation_file.md` (added to the
+  equation prompt and to the second check; the existing prompts are unchanged); the reply has
+  `characters_differ` and `difference`, kept as `EquationFix.file_difference`.
+- The second check gets the box's glyphs and the math glyphs beside the box
+  (`Verifier.equation_match(..., facts=)`); its recording key changes only when `facts` is given.
+- With the switch on, `EquationFix.restyled` counts the rules (`bold_italic`, `script`, `reconcile`)
+  that still change an answer. Nothing is removed.
+- `EQUATION_FILE_FACTS=true` in the environment turns the switch on in a replay
+  (`eval.measure.with_arm_from_environment`); `tests/workflows/harness.OWED_WITH_EQUATION_FILE_FACTS`
+  lists the recorded answers it would owe. No pipeline or render bump while it is off; turning it on
+  needs a `PIPELINE_VERSION` bump and a refresh of the equation answers.
+## Unreleased: what the file knows goes with the table, the figure and the page check, behind four switches (branch port/table-figure-scan-facts; SW55 c, d, f, WS6.12 part 3; O-219)
+
+Re-applied from `feat/table-figure-scan-facts` onto today's code (the layout package, the table
+step, image pages and the page audit changed since). Every change is behind a switch that is off
+in code and in the production profile; with all four off, every request is what it was. Turning
+a switch on needs a `PIPELINE_VERSION` bump (not made here). Each switch has its own prompt file,
+so no prompt is edited in place.
+
+- `TABLE_FILE_FACTS`: the reader's request carries the words the PDF prints inside the table's
+  box, each with its place in the crop and a raised digit written raised (`layout.table_words`,
+  `table_step.words_block`), under `table_facts.md`. The draft grid is not sent (wrong on about
+  half of tables). The answer's cell text is compared with those words both ways
+  (`printed_words_code`); the local-grid structure comparison stays where the grids agree in
+  shape. `table_facts.md` no longer calls a table of sentences "not a data table" and says what
+  the words are for and are not. A table whose size is known to pass the main model's output
+  limit is not sent to the main model after the cheap read. A reviewer's re-check of such a
+  table gets the words the stored element has (O-219, `web.review.table_checks`). Every table
+  request changes when it is on. The tables row of what is sent (`web/recipients.py`) says the
+  words are sent only once the switch is on (it is off; docs/web.md).
+- `FIGURE_LABELS_ALWAYS`: the labels printed in the figure go with the figure request in every
+  mode and in all three prompts (`figure_facts.md`, `figure_long_facts.md`,
+  `figure_exam_facts.md`), not only with long descriptions on. Chart paths stay withheld.
+- `SCAN_LAYER_CHECK`: a scan's own text layer checks the page read (no extra call, never sent,
+  never text): a read that lacks 15 % or more of the layer's words gets the notice
+  `image_page_layer_differs`. It changes no request, only adds a notice, and ships off because real
+  scanners' layers are not measured (O-058).
+- `PAGE_CHECK_SIGNALS` (page check, shadow): the request carries counts code made of the page:
+  characters in the output that are not text, the page type, the file's words no element holds
+  (and how many recur on a neighboring page), the output's words the file does not print, and the
+  writing-order vote, under `page_audit_facts.md`.
+- The eval guard (`scripts/eval_guard.py`) flags the five new prompt files until their runs are
+  recorded.
+
 ## Pipeline 0.5.16, render 11 (2026-11-21)
 
 - `PIPELINE_VERSION` is 0.5.16 and `RENDER_VERSION` stays 11: one raise of the pipeline for every

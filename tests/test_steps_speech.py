@@ -165,6 +165,9 @@ def test_every_gold_equation_has_speech(record):
         (r"\mathbf{a} \times \mathbf{b}", "bold a cross bold b"),
         (r"2 \cdot 3", "2 times 3"),
         (r"A^T", "cap A transpose"),
+        # a bracketed run of matrices is a matrix too (it once recursed without end)
+        (r"(A+B)^T", "open parenthesis cap A plus cap B close parenthesis transpose"),
+        (r"(x+y)^T", "open parenthesis x plus y close parenthesis to the power cap T"),
         (r"x^*", "x star"),
         (r"\sin^{-1} x", "inverse sine x"),
         (r"\lim_{x \to 0^+} f", "the limit as x approaches 0 plus of f"),

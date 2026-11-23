@@ -11,7 +11,12 @@ What one request carries, and nothing else (no other page, no file name, no acco
 2. the page's converted text as a list of its elements in reading order, each with its id
    as stored in the result, its kind and its text (`listing`);
 3. when the caller has one, a picture of the page's output as a browser draws it, 800
-   pixels wide.
+   pixels wide;
+4. with `PAGE_CHECK_SIGNALS` on, the numbers code counted on the page (`page_signals`):
+   characters in the output that are not text, the page type, the file's words that no
+   element holds, words of the output that the file does not print, and the writing-order
+   vote. Counts, never text of the document. The request then uses the prompt
+   `page_audit_facts`, which says what the numbers are and are not.
 
 The listing follows rules that were each measured as a cause of false flags: a table's text
 is shown once, in its table; list markers are shown; text joined from the previous page is
@@ -39,7 +44,9 @@ release it runs only from `readablestem eval page-audit`, on public and generate
 
 from __future__ import annotations
 
+import itertools
 import re
+import unicodedata
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Literal
@@ -66,6 +73,8 @@ if TYPE_CHECKING:
 
 STEP = "page_audit"
 PROMPT_NAME = "page_audit"
+# Sent instead with `PAGE_CHECK_SIGNALS`: the same, and a part on the counts of the page.
+FACTS_PROMPT_NAME = "page_audit_facts"
 DPI = 110
 OUTPUT_WIDTH_PX = 800
 DEFAULT_EFFORT = "low"
@@ -137,10 +146,13 @@ class PageVerdict(BaseModel):
 
 @dataclass(frozen=True)
 class Listing:
-    """A page's output as the request shows it, and the ids a reply may name."""
+    """A page's output as the request shows it, and the ids a reply may name. `signals` is
+    what code counted on the page (`page_signals`, only when asked for); it is sent after
+    `text`."""
 
     text: str
     ids: frozenset[str]
+    signals: str = ""
 
 
 @dataclass
@@ -158,7 +170,8 @@ class Audit:
 # ----------------------------------------------------------------------------- the listing
 
 _OWN_TAGS = re.compile(
-    r"</?\s*(?:elements|joined[\s_\-]*from[\s_\-]*previous[\s_\-]*page|page[\s_\-]*info)\s*>",
+    r"</?\s*(?:elements|joined[\s_\-]*from[\s_\-]*previous[\s_\-]*page|page[\s_\-]*info"
+    r"|page[\s_\-]*signals)\s*>",
     re.IGNORECASE,
 )
 _PROSE = (Kind.PARAGRAPH, Kind.LIST_ITEM)
@@ -326,10 +339,88 @@ def _line(
     return f"{element.id} ({label}): {shown}"
 
 
-def listing(result: DocumentResult, page: int, words_of: Callable[[int], Sequence[str]]) -> Listing:
+_LETTERS = re.compile(r"[a-z]{3,}")
+_NOT_TEXT = frozenset({"Co", "Cc", "Cs"})  # private-use codes and controls
+
+
+def page_signals(
+    result: DocumentResult,
+    page: int,
+    shown: Sequence[Element],
+    equations: Mapping[str, Element],
+    words_of: Callable[[int], Sequence[str]],
+) -> str:
+    """What code counts on a page, as `name: number` lines for the model to weigh against the
+    pictures. Counts only: they are not findings, and none of them is text of the document.
+
+    - the output's characters that are not text (U+FFFD, private-use codes, controls);
+    - the page type's kind, how far its text layer is trusted and the hidden characters left
+      out of it (`page_type`, when the result has one);
+    - the words of 3 or more letters the file prints on the page that no element holds, and
+      how many of those the file also prints on a neighboring page (a running head or a
+      stamp, which the program leaves out on purpose; the others may be text that was lost);
+    - the words of 3 or more letters of the prose elements that the file prints neither on
+      the page nor on a neighboring one (garbled or invented text);
+    - the writing order vote: of the neighboring pairs of prose elements whose first three
+      words are printed on the page, how many are read in the order the file writes them
+      (the content stream's order: the one extractor of this release that gives an order)."""
+    heard = [(e, _heard(e, equations)) for e in shown]
+    odd = sum(unicodedata.category(c) in _NOT_TEXT or c == "\ufffd" for _, t in heard for c in t)
+    lines = [f"characters_in_output_that_are_not_text: {odd}"]
+    kinds = {t.page: t for t in result.page_types}
+    if page in kinds:
+        kind = kinds[page]
+        lines += [
+            f"page_kind: {kind.kind}",
+            f"text_layer_trust: {kind.trust}",
+            f"hidden_characters_left_out: {kind.invisible_chars + kind.covered_chars}",
+        ]
+    here = list(words_of(page))
+    if here:
+        held = {
+            w
+            for e in result.elements
+            if e.page <= page <= (e.last_page or e.page)
+            for w in _tokens(_heard(e, equations))
+        }
+        near = set(words_of(page - 1)) | set(words_of(page + 1))
+        left_out = [w for w in here if _LETTERS.fullmatch(w) and w not in held]
+        printed = set(here) | near
+        prose = [w for e, t in heard if e.kind in (*_PROSE, Kind.HEADING) for w in _tokens(t)]
+        starts: dict[tuple[str, ...], int] = {}
+        for k in range(len(here) - 2):
+            starts.setdefault(tuple(here[k : k + 3]), k)
+        found = [
+            starts[tuple(words[:3])]
+            for e, t in heard
+            if e.kind in _PROSE and len(words := _tokens(t)) >= 3 and tuple(words[:3]) in starts
+        ]
+        pairs = list(itertools.pairwise(found))
+        lines += [
+            f"file_words_no_element_holds: {len(left_out)}",
+            f"  of_these_also_printed_on_a_neighboring_page: {sum(w in near for w in left_out)}",
+            f"output_words_the_file_does_not_print: "
+            f"{sum(bool(_LETTERS.fullmatch(w)) and w not in printed for w in prose)}",
+        ]
+        if pairs:
+            lines.append(
+                f"prose_pairs_read_in_the_files_writing_order: {sum(a < b for a, b in pairs)} of "
+                f"{len(pairs)}"
+            )
+    return "\n".join(["<page_signals>", *lines, "</page_signals>"])
+
+
+def listing(
+    result: DocumentResult,
+    page: int,
+    words_of: Callable[[int], Sequence[str]],
+    *,
+    signals: bool = False,
+) -> Listing:
     """What the request says of `page` (0-based): where it is in the document, the text
     read with an earlier page, and its elements in reading order. An inline formula is
-    shown inside its text and not a second time."""
+    shown inside its text and not a second time. With `signals`, also the counts of the
+    page (`page_signals`)."""
     equations = {e.id: e for e in result.elements if e.kind is Kind.EQUATION}
     inline = {
         match.group(1) for e in result.elements for match in INLINE_MARKER_RE.finditer(e.text or "")
@@ -346,7 +437,8 @@ def listing(result: DocumentResult, page: int, words_of: Callable[[int], Sequenc
         parts.append(f"<joined_from_previous_page>{joined}</joined_from_previous_page>")
     lines = [_line(e, result, equations, words_of) for e in shown]
     parts += ["<elements>", *lines, "</elements>"]
-    return Listing("\n".join(parts), frozenset(e.id for e in shown))
+    counts = page_signals(result, page, shown, equations, words_of) if signals else ""
+    return Listing("\n".join(parts), frozenset(e.id for e in shown), counts)
 
 
 # -------------------------------------------------------------------------------- the call
@@ -366,16 +458,17 @@ def build_request(
 ) -> VisionRequest:
     """The request for one page: its picture, the listing, and the picture of its output
     when there is one."""
-    prompt = load_prompt(PROMPT_NAME)
+    facts = settings.page_check_signals
+    prompt = load_prompt(FACTS_PROMPT_NAME if facts else PROMPT_NAME)
     return VisionRequest(
         step=STEP,
         model=settings.page_audit_model,
         prompt_version=prompt.version,
         instructions=prompt.text,
         images=[page_picture] if output_picture is None else [page_picture, output_picture],
-        context_text=shown.text,
+        context_text=f"{shown.text}\n{shown.signals}" if facts else shown.text,
         max_output_tokens=settings.page_audit_max_output_tokens,
-        context_limit=LISTING_CHARS,
+        context_limit=LISTING_CHARS + (len(shown.signals) + 1 if facts else 0),
         image_detail="high",
         effort=settings.anthropic_effort_page_audit or DEFAULT_EFFORT,
     )
@@ -420,7 +513,7 @@ def audit_page(
 ) -> tuple[PageVerdict, ModelCall | None]:
     """The verdict on one page (0-based), and the request's record when one was sent.
     Raises `BudgetExceeded` when the spend reservation is refused; never for a bad answer."""
-    shown = listing(result, page, words_of)
+    shown = listing(result, page, words_of, signals=settings.page_check_signals)
     if not shown.ids:
         if not has_ink(result, page, words_of):
             return PageVerdict(page=page, verdict="pass", by="code"), None

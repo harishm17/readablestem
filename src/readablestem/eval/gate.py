@@ -389,6 +389,7 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "MAX_OUTPUT_TOKENS",
         "NOTE_CODES",
         "NUMERIC_SHARE",
+        "CONTEXT_CHARS",
     ),
     "readablestem.pipeline.heading_step": (
         "ACCEPT_AT",
@@ -434,6 +435,10 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "AGREED_CONFIDENCE",
         "CONFIDENCE_VALUE",
         "RECOVERY_MARGIN",
+        "LAYER_MIN_WORDS",
+        "LAYER_MAX_MISSING",
+        "LAYER_SAME_WORD",
+        "LAYER_FUZZY_MAX",
     ),
     "readablestem.pipeline.image_page_check": (
         "CROPS_PER_REQUEST",
@@ -474,7 +479,11 @@ _SAFETY_LIMIT = "a size limit that refuses an input; the gate leaves safety limi
 _VERSION_NUMBER = "a version number of the spoken reading, not a bar or a request's content"
 _AS_ITS_SETTING = "borrowed from a module that guards it"
 UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
-    "readablestem.pipeline.equation_step": {"SPEECH_VERSION": _VERSION_NUMBER},
+    "readablestem.pipeline.equation_step": {
+        "SPEECH_VERSION": _VERSION_NUMBER,
+        "FENCE_LIMIT": "imported from `models.base`: how much document text any fence keeps, "
+        "shared by every step, not an accept rule",
+    },
     "readablestem.pipeline.table_step": {
         "MAX_TABLE_CELLS": _SAFETY_LIMIT,
         "MAX_TABLE_COLS": _SAFETY_LIMIT,

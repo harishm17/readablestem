@@ -91,6 +91,7 @@ class _Recorder:
         if report.when == "call" or (report.when == "setup" and report.outcome != "passed"):
             self.ran.add(report.nodeid)
 
+    @pytest.hookimpl(optionalhook=True)  # an xdist hook: a run with xdist off must still start
     def pytest_testnodedown(self, node, error):
         seen = getattr(node, "workeroutput", {}).get("routes")
         if seen:

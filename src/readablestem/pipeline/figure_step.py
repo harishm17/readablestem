@@ -122,6 +122,13 @@ LONG_PROMPT_VERSION = load_prompt(LONG_PROMPT_NAME).version
 # fields, and alt text rules that describe what is shown and never the result.
 EXAM_PROMPT_NAME = "figure_exam"
 EXAM_PROMPT_VERSION = load_prompt(EXAM_PROMPT_NAME).version
+# The three prompts sent instead with `FIGURE_LABELS_ALWAYS`: the same, and the context
+# part says what "Labels in the figure:" is for and is not.
+FACTS_PROMPT_NAMES = {
+    PROMPT_NAME: "figure_facts",
+    LONG_PROMPT_NAME: "figure_long_facts",
+    EXAM_PROMPT_NAME: "figure_exam_facts",
+}
 
 TINY_FIGURE_MAX_SIDE_PT = 72.0  # one inch on the page
 DECORATIVE_ACCEPT_CONFIDENCE = 0.95
@@ -224,8 +231,9 @@ def figure_context(
     element: Element, context_text: str | None, *, labels: bool = False
 ) -> str | None:
     """Caption plus nearby text, for `VisionRequest.context_text` (fenced by the client).
-    With `labels` (long descriptions on), also the text printed in the figure itself, so
-    the model can read tick labels and values exactly."""
+    With `labels` (long descriptions on, or `FIGURE_LABELS_ALWAYS`), also the text printed in
+    the figure itself, so the model can read tick labels, category names and values exactly.
+    A chart's own values are not read from the file's drawing paths."""
     caption = (element.caption or "").strip()
     nearby = (context_text or "").strip()
     printed = " ".join((element.text or "").split()) if labels else ""
@@ -501,10 +509,12 @@ def describe(
     options = run_options.current()
     exam = options.exam_mode
     long = options.long_descriptions and not exam  # values and trends are results
-    prompt = load_prompt(EXAM_PROMPT_NAME if exam else LONG_PROMPT_NAME if long else PROMPT_NAME)
+    name = EXAM_PROMPT_NAME if exam else LONG_PROMPT_NAME if long else PROMPT_NAME
+    always = settings.figure_labels_always
+    prompt = load_prompt(FACTS_PROMPT_NAMES[name] if always else name)
     schema: type[FigureOutput] = FigureLongOutput if long else FigureOutput
     tiny = is_tiny(element)
-    context = figure_context(element, context_text, labels=long)
+    context = figure_context(element, context_text, labels=long or always)
     # The model reads a reduced copy when `figure_model_max_edge_px` is set; `png` itself is
     # what the second check and everything a person sees keep using.
     sent = shrink_png(png, settings.figure_model_max_edge_px)
@@ -543,7 +553,8 @@ def describe(
 
 def described_with_long_prompt(fix: Fix) -> bool:
     """The fix's proposal came from the long-description prompt (the option was on)."""
-    return any(call.prompt_version.startswith(f"{LONG_PROMPT_NAME}-") for call in fix.calls)
+    names = (LONG_PROMPT_NAME, FACTS_PROMPT_NAMES[LONG_PROMPT_NAME])
+    return any(call.prompt_version.startswith(tuple(f"{n}-" for n in names)) for call in fix.calls)
 
 
 def long_description_missing(fix: Fix) -> bool:

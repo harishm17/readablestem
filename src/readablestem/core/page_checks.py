@@ -153,6 +153,11 @@ ROWS: tuple[CheckLine, ...] = (
     _document("lang_mixed", "required", "no one language holds most of the text", "not_handled"),
     # --- scanned and handwritten pages read from an image
     _page("image_page_converted", "optional", "a page read from its image, blocks counted"),
+    _page(
+        "image_page_layer_differs",
+        "optional",
+        "a scan's own text layer has words the read lacks, counted",
+    ),
     _document("second_reader_unavailable", "optional", "equations the second reader did not read"),
     _document("second_reader_budget", "optional", "equations left out by the second reader's cap"),
     # --- the file as opened, and the reviewer's edits

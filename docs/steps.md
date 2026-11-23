@@ -49,6 +49,8 @@ tell the model that text between `<document_text>` tags is data, not instruction
 |---|---|---|
 | `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only, except `\ce{...}` for chemical species ("Chemistry" in the prompt); calibrated confidence bands; a best partial reading with low confidence when unreadable. |
 | `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
+| `equation_file.md` (`EQUATION_FILE_FACTS`) | `EquationFromFileOutput`: `EquationOutput` plus `characters_differ: bool`, `difference: str` | Added after the equation prompt when the request carries the file's characters ("The file's characters in the request" below): what they are good for (letter, digit, style) and not (order, structure); report a difference, do not settle it silently |
+| `check_equation_file.md` (`EQUATION_FILE_FACTS`) | The check's own output | Added to `check_equation.md` when the second check gets the file's account of the box and its neighbors |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
 | `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labeled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by color alone. |
 | `figure_exam.md` (`ConversionOptions.exam_mode`) | `FigureOutput`, as `figure.md` | The same output fields, and alt text rules for an exam or graded assessment: describe what is shown, never the result. Charts: type, the quantity and unit on each axis, the scale range, what is drawn; no trend, extreme, slope, intercept, total, comparison or value read off the graph unless the figure prints it. Diagrams: parts, printed labels and values, arrangement; no resultant, sum, net quantity or consequence. Never calculate a number; never answer a question in the caption or the nearby text. Long descriptions and data tables are not asked for in exam mode, even with long descriptions on (a trend or a table of values is a result). The default `figure.md` is unchanged, so the recorded runs and every job without the flag are as before. |
@@ -184,6 +186,14 @@ same single call per attempt (`max_output_tokens` 4,096), and the context also g
 (`Element.text`, at most 600 characters, fenced like the rest). Routing, escalation and
 the status rules above are unchanged; the answer adds (`pipeline/figure_details.py`):
 
+With `FIGURE_LABELS_ALWAYS` on (off in code and in production; turning it on needs a
+`PIPELINE_VERSION` bump), the labels go with the figure request in every mode (off, on, an
+exam), and the step sends `figure_facts.md`, `figure_long_facts.md` or `figure_exam_facts.md`
+instead of `figure.md`, `figure_long.md` or `figure_exam.md`: the same text, with a part that
+says what the labels are for (spelling and reading a printed label or number exactly) and what
+they are not (a description, or an order of the labels; in an exam, no reason to state a
+result). Chart paths stay withheld. Off, every request is what it was.
+
 | Field on `FigureFix` | Stored when | Check and tier |
 |---|---|---|
 | `long_description` | the answer is usable after cleaning (one paragraph per line, invisible characters removed): 40-2,000 characters, at most 12 lines, no URL, markup, file name or placeholder (the alt-text rules of those codes). Anything else is dropped, never shown | `figure.long_description` passes; `long_description_unsure` (warning, a note in `NOTE_CODES`) when the model said part of the figure was hard to read: review "optional". A chart or diagram left without one gets the notice `long_description_missing` (optional; `figure_step.long_description_missing(fix)` says when) |
@@ -291,6 +301,13 @@ flags are real, over the development parts and the public corpus files together.
   too little to stand on, so primes are not compared.
 - Script ℓ read as a plain l (1 flag), a bar or a vector arrow (drawn, not characters; 1 flag),
   a dot or double dot (1 flag, not decided), acute and grave accents (none).
+- An overline drawn as a rule (`\overline{AB}`; O-129). The glyph facts hold characters, not
+  drawn rules, and a rule over a letter cannot be told from a fraction bar or an underline
+  without the row it stands in, so the check would need a new fact from layout on every
+  equation. Counted on the 21 development papers' gold: 127 of 12,826 formulas hold an
+  `\overline` or `\widebar` (70 of them in one paper, 35 in another), and the labeled errors
+  it would catch are 4. Not built: 4 errors do not pay for a new fact on every element and a new
+  source of false flags.
 
 One way is kept on less than the rule asks: a tilde the reading dropped has 1 flag, a real one.
 A hat and a tilde are the same glyphs of the same fonts read the same way, and the dropped hat
@@ -538,6 +555,49 @@ replays to the same result (docs/eval-equation-rootcause.md):
   italic font (the text layer has the bold-italic code point and no upright bold one for that letter; layout:
   `CMMIB`, newtx's `bmi`, Nimbus `MediItal`, any `BoldItalic`). A crop shows a bold vector as bold and the model
   writes `\mathbf`; `\bm` and `\boldsymbol` are what the author typed (62 equations of the development set).
+
+## The file's characters in the request (equations; `EQUATION_FILE_FACTS`, off in code)
+
+SW55 parts (a) and (b) of the plan: a model step is given what the file knows about the region it
+reads. Today the equation step sends the crop and the model reads it; the file's own characters
+under the box are used only after the answer, by the checks above. With `EQUATION_FILE_FACTS` they
+travel with the crop (arm B of SW55's measurement; arm A is today's request). Off, every request is
+byte for byte what it was: no new field is read from the PDF, no prompt line changes, and recorded
+answers replay. On, the request changes, so a recorded equation answer no longer matches (rule 10;
+`harness.OWED_WITH_EQUATION_FILE_FACTS` in `tests/workflows/harness.py` says how many per file).
+
+- **What is sent** (`pipeline/file_account.py`, in `VisionRequest.context_text`, fenced as untrusted
+  document text, the PDF's characters being data). A `<file_characters>` block: a first line with the
+  count of glyphs the file does not name ("unmapped characters in the box: N of M"), then the glyphs
+  of the box in the file's order, glyph by glyph, as the file writes them (a Unicode bold italic
+  letter stays one). Runs of one letter style (italic, upright, bold, bold italic, script,
+  blackboard, fraktur) are on a line of their own, with `raised` or `lowered` where the glyphs sit
+  off the box's baseline (0.2 and 0.08 of the font size: `layout.rows.LIFT_RAISED`, `LIFT_LOWERED`).
+  How a glyph's character was recovered travels with it (`GlyphContext.how`): plain when the file's
+  own table decodes it, `{name}` when read by the glyph's name, `{font}` by the font-code table,
+  `{guess}` when guessed; a glyph the file does not name is `[gap]`, in its place, never dropped. `<`
+  and `>` are written `[less-than]` and `[greater-than]`, and control and invisible format
+  characters are left out, so no run can spell a tag.
+- **When there is no account.** More than `MAX_GAP_SHARE` (30%) of the glyphs are gaps, or more than
+  `MAX_GLYPHS` (250) lie under the box, or the box has no glyph: the request is today's request.
+- **The prompt** (`equation_file.md`, added after the equation prompt as `equation_notation.md`
+  is): the characters are good for which letter, which digit and which style, and not for order or
+  structure (a fraction, a root and limits are flat or scrambled in a text layer); the picture
+  decides structure. The reply has two more fields (`EquationFromFileOutput`), `characters_differ`
+  and `difference`, so a disagreement between the picture and the file is reported, not settled
+  silently. The comparison in code after the answer stays: `EquationFix.file_difference` keeps the
+  model's words and the checks above still run.
+- **The second check** (`Verifier.equation_match(..., facts=)`, `check_equation_file.md`) gets the
+  same box's glyphs and, beside them, the math glyphs left and right of the box on its row. The
+  check's recording key adds `facts` only when it is given, so with the switch off keys are
+  unchanged. It stays shadow, as above.
+- **Accounting.** With the switch on, `EquationFix.restyled` lists the rules that still changed the
+  answer after the model read the file's characters: `bold_italic` (`restyle_bold_italic`),
+  `script` (`restyle_script`) and `reconcile` (`glyph_reconcile`). Nothing is removed; the counts say
+  whether those corrections are still needed. Off, the list is empty and not written.
+- **Replay.** `EQUATION_FILE_FACTS=true` in the environment turns the switch on in a replay
+  (`eval.measure.with_arm_from_environment`, used by `hashrun.py`, `eval burden` and the workflow
+  harness). The production profile names it off; a live run takes it from the settings.
 
 ## Flag policy (equations; `FLAG_POLICY`, off in code)
 
@@ -1063,12 +1123,35 @@ full description is in [tables.md](tables.md). In short:
   `JobBudget` reservations; `BudgetExceeded` propagates.
 - The answer is rows of cells (text, LaTeX for math cells, header flags, spans), placed
   as HTML places them. The PDF's own words for the table are not sent to the model: they
-  are the input of the checks, as an equation's text layer is.
+  are the input of the checks, as an equation's text layer is. With `TABLE_FILE_FACTS` on
+  (off in code and in production; turning it on needs a `PIPELINE_VERSION` bump) they are
+  sent, see "With `TABLE_FILE_FACTS`" below.
 - Checks: the grid and its headers (`grid_problems`, no header at all); agreement with
   the local grid from detection (rows x columns, merged cells); the cell-text bijection
   (the words, numbers and meaningful symbols of the text cells equal the PDF's words,
   row by row when the grids agree); math cells through the LaTeX and MathML validators
   and this page's symbol, sign and style rules against the PDF glyphs in their place.
+- With `TABLE_FILE_FACTS` on, the request carries the words the PDF prints inside the table's
+  box, each with its place in the crop (left, top, right, bottom in crop pixels, a raised
+  digit written raised, `10⁵`), fenced as `<table_words>` in the context (`layout.table_words`,
+  `table_step.words_block`, at most 8,000 characters; a longer list ends with "(N more words
+  are not listed)"), and the prompt is `table_facts.md`. They say which letter, digit, sign and
+  exponent a cell holds, not where the cells are: the draft grid from detection is not sent,
+  because it is wrong on about half of tables and a reading checked against a grid it was
+  shown is not checked. A page the file draws as vector strokes has no words and the request
+  is the crop and the caption. The cell text is compared with the printed words both ways by
+  words and numbers (`printed_words_code`: every word of the answer's text cells is printed in
+  the box, and every printed word is in a cell; a line-break hyphen or a split or glued word is
+  spacing only); when the answer's grid agrees with the local grid, its structure is still
+  compared (rows x columns, merged cells, row by row). A reviewer's re-check of such a table
+  (`web.review.table_checks`, O-219) gets the words the stored element has
+  (`table_step.stored_words`: the cells of the grid read from the PDF, else its text; the
+  places are not kept, the checks compare words only) and the same rule; a table rebuilt
+  without them keeps the checks it had. A table whose size is known to pass the main model's
+  output limit (`too_long`: its slots times `OUTPUT_TOKENS_PER_SLOT` over
+  `MAX_OUTPUT_TOKENS`) is never sent to the main model: a second reading would be cut off. The
+  cheap answer stands when it is usable and its checks decide; otherwise it is the case of no
+  usable answer below. Off, the request, the prompt and the checks are what they were.
 - Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic math style ->
   ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
   not a data table -> the grid read from the PDF written as its text in reading order,
@@ -1121,7 +1204,21 @@ data):
    `<id> (<kind>): <text>` with the id as stored in the result (`p3-e7`), and where it
    applies a `<joined_from_previous_page>` note;
 3. with `--rendered`, a picture of the page's output as a browser draws it, 800 pixels
-   wide (`eval.render.ChromiumRenderer.part_png`).
+   wide (`eval.render.ChromiumRenderer.part_png`);
+4. with `PAGE_CHECK_SIGNALS` on (off in code and in production; turning it on changes every
+   page-check request), after the listing, a `<page_signals>` block of numbers code counted on
+   the page (`page_audit.page_signals`, `Listing.signals`), one `name: number` a line, none of
+   them text of the document: characters in the output that are not text (U+FFFD, private-use
+   codes, controls); the page type's kind, trust and hidden characters left out; the file's
+   words of three letters or more that no element holds, and how many of those the file also
+   prints on a neighboring page (running heads, stamps: left out on purpose); the output's
+   prose words the file prints neither on the page nor on a neighbor; and the writing-order
+   vote, how many neighboring pairs of paragraphs and list items are read in the order the
+   file writes them. The prompt is then `page_audit_facts.md`, which says the numbers tell where
+   to look and are never a finding. Only this vote exists as an order voter in this release
+   (tag order and a second extractor's words are not built); there are no furniture lines
+   counted by layout, so the furniture count is the left-out words that recur on a
+   neighboring page.
 
 **The listing's rules.** Each was measured as a cause of false flags before it was a rule:
 

@@ -131,6 +131,13 @@ class Settings(BaseSettings):
     # (docs/eval-dev-baseline-2026-11-03.md, "Reading push"); production's value is in the
     # profile.
     equation_glyph_reconcile: bool = False
+    # The equation request carries the characters the file stores under the box, glyph by glyph,
+    # as the file's own account (`pipeline/file_account.py`, prompt `equation_file`), and the
+    # second check is given the same account (SW55 a and b). Needs EQUATION_GLYPH_CHECKS, which
+    # reads the glyphs. Off: every request is what it was. Turning it on changes the equation
+    # request, so the recorded answers of the equations with glyphs stop matching; it comes with a
+    # re-recording and a PIPELINE_VERSION bump. Production's value is in the profile.
+    equation_file_facts: bool = False
     # One printed display, one element (`layout.analyze(display_grouping=True)`, docs/layout.md):
     # two formulas joined by "and"/"for all", the right half of a long aligned row, a row that
     # starts with "=", and a trailing ellipsis stay together. Off: output is byte-identical to
@@ -158,6 +165,26 @@ class Settings(BaseSettings):
     # the recorded model answers of the pages it moves stop matching, and turning it on
     # comes with a re-recording and a `PIPELINE_VERSION` bump.
     region_tree: Literal["off", "on"] = "off"
+    # What the file knows goes with a request (SW55 parts c, d and f, WS6.12 part 3; docs/steps.md,
+    # docs/tables.md). Each is its own switch because the paid run measures each arm alone. Off:
+    # every request and every output is byte for byte what it was before. On, a switch that
+    # changes a request also changes its prompt (`models/prompts/*_facts.md`, beside today's),
+    # so the recorded answers of the requests it changes stop matching, and `PIPELINE_VERSION`
+    # must be bumped in the change that turns it on.
+    # (c) The table reader is given the words the PDF prints inside the table's box with their
+    # places, its cell text is compared with them both ways, the prompt no longer calls a table of
+    # sentences a non-table, and a table whose answer would pass the output limit is not asked of
+    # the main model.
+    table_file_facts: bool = False
+    # (d) A scan's own text layer checks the page read (never sent, never text): a read lacking
+    # 15 % of the layer's words gets the notice `image_page_layer_differs`. No request changes;
+    # a page's notices do.
+    scan_layer_check: bool = False
+    # (f) The page check is given the counts code makes of the page (`<page_signals>`).
+    page_check_signals: bool = False
+    # WS6.12 part 3: the labels printed inside a figure go with every figure request, not only
+    # with long descriptions, and all three figure prompts say what they are for.
+    figure_labels_always: bool = False
     # The table search without its time limit (pipeline.tables.DetectorBudget), for evals and
     # replays only (eval.measure.replay_settings): a score must not depend on how busy the
     # machine was. A job keeps the limit; a page it stops is listed in the job's facts.
@@ -400,7 +427,7 @@ class Settings(BaseSettings):
     # Where conversions run. "inline": the web process starts the worker thread (`run_worker`),
     # as always. "service": the web process starts none and the `readablestem worker` command,
     # a process of its own, converts (`web.worker_service`); the web process then reads the
-    # worker's liveness, the AI service's health and the sandbox probe from `ops_heartbeat`
+    # worker's liveness, the model provider's health and the sandbox probe from `ops_heartbeat`
     # (`web.worker_rows`). Rolling back is this one setting.
     worker_mode: Literal["inline", "service"] = "inline"
     # How many conversions the `worker` command runs at once (`worker_mode=service`); the web
