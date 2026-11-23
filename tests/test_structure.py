@@ -521,16 +521,29 @@ NUMBERED = [
 
 
 def numbered_algorithm(
-    page, y: float, steps=NUMBERED, caption="Algorithm 2 Scan a verse", wrapped=None, stop=":"
+    page,
+    y: float,
+    steps=NUMBERED,
+    caption="Algorithm 2 Scan a verse",
+    wrapped=None,
+    stop=":",
+    preamble=None,
+    apart=None,
 ):
     """Steps numbered "1:", "2:" in a left gutter, indented by level; a step listed in `wrapped`
-    goes on at the left edge of the text on a second line."""
+    goes on at the left edge of the text on a second line. `preamble`: a line under the caption,
+    in the gutter (an "Input:" line). `apart`: the number of a step whose words are set far from
+    its number (the text layer then lists the number in a row of its own)."""
     if caption:
         page.insert_text((72, y), caption, fontsize=BODY, fontname="helv")
         y += 14
+    if preamble:
+        page.insert_text((72, y), preamble, fontsize=BODY, fontname="helv")
+        y += 14
     for n, (level, text) in enumerate(steps, 1):
         page.insert_text((72, y), f"{n}{stop}", fontsize=BODY - 1, fontname="helv")
-        page.insert_text((95 + 11 * level, y), text, fontsize=BODY, fontname="helv")
+        x = 300 if n == apart else 95 + 11 * level
+        page.insert_text((x, y), text, fontsize=BODY, fontname="helv")
         y += 14
         if wrapped and n in wrapped:
             page.insert_text((95, y), wrapped[n], fontsize=BODY, fontname="helv")
@@ -547,6 +560,9 @@ NUMBERED_LINES = [
     "6: end for",
     "7: return count",
 ]
+
+
+NUMBERED_LINES_PLAIN = [" ".join(line.split()) for line in NUMBERED_LINES]
 
 
 def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_without_a_caption():
@@ -568,6 +584,27 @@ def test_numbered_steps_keep_their_numbers_apart_and_their_indentation_with_or_w
         assert len(steps) == 1
         assert steps[0].text.split("\n") == [n.replace(":", stop, 1) for n in NUMBERED_LINES]
         assert caption is None or any(e.text == caption for e in elements)
+
+    # An appendix's caption ("Algorithm A-1") takes the "Input:" line under it into the block,
+    # and a number alone in its row (its step's words are set far to the right) keeps its step.
+    for caption, extra in (
+        ("Algorithm A-1 Scan a verse", {"preamble": "Input: a line of verse"}),
+        ("Algorithm 2 Scan a verse", {"apart": 4}),
+    ):
+
+        def appendix(page, caption=caption, extra=extra):
+            y = prose(page, 100, "The scan of a verse is listed below.")
+            y = numbered_algorithm(page, y + 10, caption=caption, **extra)
+            prose(page, y + 10, "The count is printed after the last word.")
+
+        elements = analyze(page_of(appendix)).elements
+        (block,) = [e for e in elements if e.preformatted]
+        lines = [" ".join(line.split()) for line in block.text.split("\n")]
+        assert lines == [
+            *([extra["preamble"]] if "preamble" in extra else []),
+            *NUMBERED_LINES_PLAIN,
+        ]
+        assert any(e.text == caption for e in elements)
 
 
 def test_a_step_that_wraps_back_to_the_left_edge_stays_one_step():
