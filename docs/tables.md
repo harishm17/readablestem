@@ -848,7 +848,28 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
   raised: on 519 public PDFs a cap of 3 pt gives no table that was missed and makes a plot whose
   axes are drawn 2 to 3 pt thick (`ax_astrophga`, page 8) a table with seven headings, and a cap
   of 2 pt turns the section rules of a minutes form into a second table. Thick rules are rules of
-  a table only together with a grid; no set has such a table to measure a rule on.
+  a table only together with a grid; no set has such a table to measure a rule on. Measured
+  again at 4 pt on the 6 of the benchmark's 188 table PDFs that have a 2 to 4 pt filled box near
+  a found table: 4 of them read differently, some better, some worse (one loses a table), and
+  the 332 public PDFs have only small squares near a table (a textbook's markers, 3 to 4 pt
+  across) and the 25 corpus PDFs have none.
+- Labeled lines with no rule and no caption. A column of item numbers before sentences ("Q1" to
+  "Q6" of a worksheet, "Step 1") is a table when the detector or the text grid proposes it, and a
+  schedule's "Week 1" lines are a table too; the two differ only in the label's word. Counted:
+  none of 332 public PDFs, 188 benchmark table PDFs and 25 corpus PDFs has the first shape (the
+  unruled two-column tables found there are schedules, key and value pairs, notation lists and a
+  matching exercise), so no rule is built for it. A schedule with two or more lower-case labels
+  in seven is no table and a sidebar of labels that start with a capital or hold a digit is one
+  (`_labels_open_runs`): 14 boxes of the public sets reach that rule (9 kept: bullets, numbers,
+  a brace; 5 not, among them the syllabus sidebar that the rule is for) and 5 of the corpus
+  (all kept). None of the public ones is a schedule with lower-case labels or a sidebar of the
+  probes' shape, so the clause that tells them apart by case is not measured on a real page.
+- A caption under a table is cut where a line starts a sentence after a step of more than 1 pt
+  wider than its own, so a short title line set 1.2 pt or more from its description, and a line
+  pushed down by a formula in the fifth line or later of a caption, end it there. A line pushed
+  down and the first line of a paragraph at the same step are the same shape on the page. None
+  of the 115 captions under a table in the public sets is ended by that step, nor any of the 8
+  in the benchmark's table PDFs, so nothing is changed.
 
 ### Tests
 
