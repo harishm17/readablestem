@@ -637,6 +637,39 @@ def test_highlights_by_annotation_and_rectangle_are_runs_and_a_shaded_box_is_not
     assert result.counts()["highlight_runs"] == 2
 
 
+def phrase_page(*, whole_line: bool, touching: bool = True) -> bytes:
+    """One line with a phrase highlighted by three rectangles, one for each run of a style, as a
+    word processor draws it: they touch (`touching`), or stand apart as cells would."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    line = "marked phrase here" if whole_line else "Words before the marked phrase here and after."
+    page.insert_text((72, 100), line, fontsize=12, fontname="helv")
+    clip = pymupdf.Rect(0, 85, 612, 110)
+    first, second, third = (page.search_for(w, clip=clip)[0] for w in ("marked", "phrase", "here"))
+    spans = (
+        [(first.x0, second.x0), (second.x0, third.x0), (third.x0, third.x1)]
+        if touching
+        else [(r.x0, r.x1) for r in (first, second, third)]
+    )
+    for x0, x1 in spans:
+        rect = pymupdf.Rect(x0, first.y0, x1, first.y1)
+        page.draw_rect(rect, color=None, fill=(1, 0.9, 0.1), overlay=False)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_a_highlight_of_three_touching_pieces_is_kept_and_a_row_of_cells_is_not():
+    # A phrase half bold is three rectangles that touch, with the line going on beside them.
+    found, _ = styled(phrase_page(whole_line=False))
+    assert found["Words"] == [("highlight", "marked phrase here")]
+    # The same rectangles apart, or filling the whole line, are shading.
+    assert not styled(phrase_page(whole_line=False, touching=False))[0]
+    assert not styled(phrase_page(whole_line=True))[0]
+
+
 def test_colour_that_is_not_kept_is_counted_and_said_once():
     found, result = styled(styled_page())
     assert [(n.code, n.count) for n in result.notices if n.code == "colour_used"] == [

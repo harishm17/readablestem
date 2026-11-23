@@ -76,6 +76,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
+from itertools import pairwise
 from typing import Literal, get_args
 from urllib.parse import urlsplit
 
@@ -1159,19 +1160,63 @@ def is_highlight_colour(rgb: tuple[int, int, int]) -> bool:
 
 
 # Filled rectangles of one color and height that stand side by side in a row of this many or
-# more are shading (a table's header row, a heat map, a bar), not a highlight of words.
+# more are shading (a table's header row, a heat map, a bar), not a highlight of words, unless
+# the row is one phrase of a line (`_one_phrase`): a word processor draws a rectangle for each
+# run of one style, so a phrase that is partly bold or italic is three or more that touch.
 HIGHLIGHT_ROW = 3
+HIGHLIGHT_TOUCH_EM = 0.1  # pieces of one phrase touch: a gap of at most this many em
+HIGHLIGHT_HUG_EM = 1.0  # a piece is no wider than its glyphs plus this many em
+HIGHLIGHT_REACH_EM = 1.0  # text of the line goes on beside the phrase, this near (em)
 
 
-def highlight_marks(marks: Sequence[Highlight]) -> list[Highlight]:
+def _one_phrase(pieces: Sequence[Highlight], glyphs: Sequence[Glyph]) -> bool:
+    """Is a row of rectangles (one color, top and bottom) one highlighted phrase inside a line
+    of text, not a row of shaded cells? The pieces touch, each hugs the glyphs it holds (a cell
+    is wider than its words), and the line's text goes on beside the row, within a word's
+    reach, on one side at least: a header row or a heat map is the whole line."""
+    ordered = sorted(pieces, key=lambda m: m.bbox[0])
+    top, bottom = ordered[0].bbox[1], ordered[0].bbox[3]
+    line = [g for g in glyphs if top <= (g.bbox[1] + g.bbox[3]) / 2 <= bottom]
+    inside = [g for g in line if any(_centre_in(g.bbox, m.bbox, 0.0) for m in ordered)]
+    if not inside:
+        return False
+    size = sorted(g.size for g in inside)[len(inside) // 2]
+    if any(b.bbox[0] - a.bbox[2] > HIGHLIGHT_TOUCH_EM * size for a, b in pairwise(ordered)):
+        return False
+    for piece in ordered:
+        held = [g for g in inside if _centre_in(g.bbox, piece.bbox, 0.0)]
+        if held:
+            extent = max(g.bbox[2] for g in held) - min(g.bbox[0] for g in held)
+            if piece.bbox[2] - piece.bbox[0] > extent + HIGHLIGHT_HUG_EM * size:
+                return False
+    left, right = ordered[0].bbox[0], ordered[-1].bbox[2]
+    reach = HIGHLIGHT_REACH_EM * size
+    held = {id(g) for g in inside}
+    return any(
+        0 <= left - g.bbox[2] <= reach or 0 <= g.bbox[0] - right <= reach
+        for g in line
+        if id(g) not in held
+    )
+
+
+def highlight_marks(marks: Sequence[Highlight], glyphs: Sequence[Glyph] = ()) -> list[Highlight]:
     """`marks` without the filled rectangles that are shading: those of the same color, top and
-    bottom (to the point) that make a row of `HIGHLIGHT_ROW` or more on the page. A highlight
-    annotation is always kept."""
-    rows = Counter((m.rgb, round(m.bbox[1]), round(m.bbox[3])) for m in marks if m.rgb is not None)
+    bottom (to the point) that make a row of `HIGHLIGHT_ROW` or more on the page, unless the
+    row is one phrase of a line of `glyphs` (`_one_phrase`). A highlight annotation is always
+    kept."""
+    rows: dict[tuple[tuple[int, int, int], int, int], list[Highlight]] = {}
+    for m in marks:
+        if m.rgb is not None:
+            rows.setdefault((m.rgb, round(m.bbox[1]), round(m.bbox[3])), []).append(m)
+    shading = {
+        key
+        for key, row in rows.items()
+        if len(row) >= HIGHLIGHT_ROW and not _one_phrase(row, glyphs)
+    }
     return [
         m
         for m in marks
-        if m.rgb is None or rows[(m.rgb, round(m.bbox[1]), round(m.bbox[3]))] < HIGHLIGHT_ROW
+        if m.rgb is None or (m.rgb, round(m.bbox[1]), round(m.bbox[3])) not in shading
     ]
 
 
@@ -1807,7 +1852,10 @@ def annotate(
         if found_struck := deleted_runs(element, aligner, strikes, inline_equations):
             struck[element.id] = found_struck
     styled: dict[str, list[Run]] = {}
-    marks = {page: highlight_marks(found_marks) for page, found_marks in pdf.highlights.items()}
+    marks = {
+        page: highlight_marks(found_marks, pdf.glyphs.get(page, ()))
+        for page, found_marks in pdf.highlights.items()
+    }
     for element in elements:
         if element.kind not in RUNNING_KINDS or not element.text:
             continue
