@@ -32,6 +32,7 @@ from readablestem.pipeline.layout.shared import (
     _CharInfo,
     _Context,
     _Display,
+    _Block,
     _Figure,
     _lead_end,
     _limit_end,
@@ -1473,8 +1474,28 @@ def _label_owners(
     return owner
 
 
+def _whole_blocks_only(found: Collection[int], blocks: Sequence[_Block] | None) -> set[int]:
+    """The ids of the rows in `found` that a figure may take once the blocks are built: a row
+    of a block whose other rows are not taken too (or not taken already) stays, since the
+    block keeps its text, and the row would be written twice, in the block and as a label (a
+    part of a display equation, a list marker, a bar in a paragraph)."""
+    if blocks is None:
+        return set(found)
+    taken = set(found)
+    for block in blocks:
+        mine = [id(r) for r in block.rows if id(r) in taken]
+        if mine and not all(r.absorbed or id(r) in taken for r in block.rows):
+            taken.difference_update(mine)
+    return taken
+
+
 def _claim_labels(
-    figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
+    figures: Sequence[_Figure],
+    rows: Sequence[_Row],
+    ctx: _Context,
+    *,
+    document: _Document,
+    blocks: Sequence[_Block] | None = None,
 ) -> None:
     """Give each figure its labels (`_label_owners`) and grow its box, and so the picture
     cut for the figure step, to hold them. Before, a chart's tick labels and category
@@ -1483,8 +1504,9 @@ def _claim_labels(
     an axis title or a part's name on a diagram became equations and one-letter paragraphs
     (F-549, F-248)."""
     owner = _label_owners(figures, rows, ctx, document=document)
+    allowed = _whole_blocks_only(owner, blocks)
     for row in rows:
-        if figure := owner.get(id(row)):
+        if id(row) in allowed and (figure := owner.get(id(row))):
             row.absorbed = True
             figure.labels.append(row)
     for figure in figures:
@@ -1504,6 +1526,7 @@ def _join_panels(
     ctx: _Context,
     *,
     document: _Document,
+    blocks: Sequence[_Block],
 ) -> list[_Figure]:
     """The panels of one figure are one figure ("Panels of one figure" in docs/layout.md).
 
@@ -1570,22 +1593,31 @@ def _join_panels(
             host.bbox = _union([f.bbox for f in group])
     kept = [f for f in figures if id(f) not in joined]
     if joined:
-        _claim_labels(kept, rows, ctx, document=document)  # the rows among the panels
+        # the rows among the panels
+        _claim_labels(kept, rows, ctx, document=document, blocks=blocks)
+    marks: list[tuple[_Figure, _Row]] = []
     for figure in kept:
         if figure.equation:
             continue
         near = _pad(figure.bbox, PANEL_MARK_REACH * ctx.body)
-        for row in rows:
-            if (
-                not row.absorbed
-                and not row.vertical
-                and len(row.clean) <= PANEL_MARK_CHARS
-                and row.clean.lower() not in _PROSE_TWO_LETTER
-                and not _starts_like_item(row)
-                and _inside(row.bbox, near)
-            ):
-                row.absorbed = True
-                figure.labels.append(row)
+        marks += [
+            (figure, row)
+            for row in rows
+            if not row.absorbed
+            and not row.vertical
+            and len(row.clean) <= PANEL_MARK_CHARS
+            and row.clean.lower() not in _PROSE_TWO_LETTER
+            and not _starts_like_item(row)
+            and _inside(row.bbox, near)
+        ]
+    allowed = _whole_blocks_only({id(r) for _, r in marks}, blocks)
+    for figure, row in marks:
+        if id(row) in allowed and not row.absorbed:
+            row.absorbed = True
+            figure.labels.append(row)
+    for figure in kept:
+        if figure.equation:
+            continue
         if figure.labels:
             figure.bbox = _union([figure.bbox, *(r.bbox for r in figure.labels)])
     return kept
