@@ -4,13 +4,13 @@
 
 - With `LAYOUT_JOIN_PANELS` on, the rows among the panels and the one- or two-character marks were
   claimed after the blocks were built. A row in a block that kept other rows (a bar in a
-  paragraph, a list marker, the symbol of a display equation, the last line of a paragraph) was
+  paragraph, a list marker) was
   marked taken while the block kept its text, so it was written in the block and as a figure
-  label. Counted on 332 public PDFs and 72 corpus uploads: 6 public marks in 4 files and 1
+  label. Counted on 228 real public documents and 72 corpus uploads: 5 marks in 2 papers and 1
   corpus mark. A row is now taken only when every other row of its block is taken or already a
   label (`figures._whole_blocks_only`). Switch off, nothing changes.
-- Counted and not built: two figures with the same caption text on one page (0 of 571
-  captions public, 0 of 41 corpus); a mark row in a table's box (0); a wider reach for a lone
+- Counted and not built: two figures with the same caption text on one page (0 of 552
+  captions in real public documents, 0 of 41 corpus); a mark row in a table's box (0); a wider reach for a lone
   label (O-057: 22 rows 2.5 to 4 body sizes from a figure in 14 public files and 35 rows 4 to 6 in 23,
   many of them matrix entries); vector figures as items of the region tree (O-013, the
   earlier count stands). The generated sheet's triangle is one figure with all of its labels
