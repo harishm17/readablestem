@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased: art that a clip hides is no figure (O-441)
+
+- A PDF that carries a figure's art on every page clips each page to its own part and leaves the
+  rest in the page's drawings, painted nowhere. Layout read that art as painted: a figure box
+  over the text beside it (arXiv 2407.20815 pages 2 and 4, 2401.11209 page 2, 2504.03499 page 3,
+  ax_astrophga_240306409 page 11, where three lines of a paragraph were in no element), and ink from it that made a
+  typed page look like handwriting. `page_type.page_drawings` reads the page's clips and gives a
+  drawing wholly outside its clip opacity 0, which every reader of paint already leaves out
+  (`pipeline/layout/document.py`, `drawings.py`, `rows.py`, the upload probe and the page-type
+  eval). 15 public files and 34 pages are affected, 4 of 25 corpus files; see docs/layout.md,
+  "Figures". A pipeline raise is owed with the release that carries it.
+
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,

@@ -1911,6 +1911,24 @@ math by the document's evidence; the equation step's own tiers then decide it.
   pairs of neighboring pixels differ by more than 16 levels, and what is seen, alpha
   above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
+- **Art a clip hides** is no figure and no ink (`page_type.page_drawings`). A
+  PDF that carries a figure's art on every page (an editor's export) clips each page to its
+  own part; the rest is in the page's drawings, painted nowhere. `get_cdrawings()` does not
+  say so, so a drawing was read as painted and the figure rules boxed it with the body text
+  over it (arXiv 2407.20815 pages 2 and 4: a figure took "(II.10)" with its display, and
+  a paragraph of page 4 became an "equation image"; 2401.11209 page 2: one figure box over
+  both columns of the page). The extended list holds the clips between the drawings, each
+  with its depth (`level`); a drawing whose box, with half its line width, lies wholly
+  outside the box of a clip it is inside of is painted at opacity 0, the way the page already
+  leaves out paint nobody sees (`paint_visibility`, the ink analysis, the strike and highlight
+  marks, the upload probe). The list keeps its length and order. Counted on the public sets
+  (302 files, 2,628 pages): 15 files and 34 pages hold such art on the page; on the private
+  corpus 4 of 25 files and 5 of 1,202 pages. Only a drawing wholly outside its clip is
+  dropped: art that is cut by the clip but reaches into it stays, as does anything under a
+  clip that is not a box (its box is what is tested). A page that the hidden art made an ink
+  page (2407.20815 page 4: 138 pen-like strokes of which 19 are painted) is read from the
+  painted strokes: that page is now mixed ink, its pen-drawn sphere a handwriting region like
+  the world lines of page 2.
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
   along all four edges of its own box and nowhere else: a rectangle, rounded corners, a
