@@ -23,6 +23,11 @@
   read as results of the new layout; 0.5.17 results still open.
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many
   pictures stay unanswered, and a paid answer recorded for one broke that count on every replay.
+- The workflow corpus was re-recorded under the four switches (three capped calls, $2.59), so no
+  recorded replay lacks an answer and the replay record `data/eval/burden-corpus.json` measures
+  all 73 uploads (338 pages, 536 decisions) where it measured 43. Those 43 ask 51 decisions where
+  they asked 56, none of band 1 or 2 made optional: the arrows between the boxes of a flow chart
+  are part of the boxes' figures, not two "equations" a person had to rule out.
 
 ## Pipeline 0.5.17, render 11 (2026-11-23)
 
