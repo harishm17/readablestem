@@ -1179,7 +1179,10 @@ math font, stay math.
      prose line that ends in a reference stands a word space from it, so it is never this
      case. Box score of the 21 development papers, switch on, before and after this rule:
      display formulas whole 902 to 904, cut 38 to 35, split 32 to 33; one formula changed from
-     cut to split, two from cut to whole, none got worse.
+     cut to split, two from cut to whole, none got worse. Layout hashes of 1,069 files before
+     and after: 0 differences with the switch off, 4 files with it on (ax_mathap_240306464:
+     twenty numbers at the left margin become labels; ax_hepth_240306509: a sum and its
+     "(B.3)"; ax_qbionc_240306496: "(21)"; 2411.07613: "(62)"), each read and each better.
 
   Measured on the 21 development papers (a development box score kept outside the repository; 11,258 formulas, display
   class 1,004): whole 80.0% with the switch off, 83.9% with rules 1 to 3, and with 4, 5 and 6
