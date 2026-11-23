@@ -113,9 +113,14 @@ def _split_labels(rows: list[_Row], *, document: _Document) -> list[_Row]:
 NUMBERED_REASON = "equation number beside it"
 NUMBERED_SHARE = 0.45  # share of a numbered line's characters that must read as maths
 NUMBERED_INDENT = 1.5  # x font size: how far a display stands in from its column's text edge
+# `LAYOUT_DISPLAY_GROUPING`: a number set far from its line (at the margin, a display's own
+# distance from it) is better evidence than one a word space away, so the line needs less.
+NUMBERED_FAR_GAP = 4.0  # x font size: the space between the line and a number set off from it
+NUMBERED_FAR_SHARE = 0.35
+NUMBERED_FAR_INDENT = 1.0
 
 
-def _promote_numbered_lines(rows: list[_Row]) -> None:
+def _promote_numbered_lines(rows: list[_Row], *, document: _Document) -> None:
     """Make a line of maths and a few words a display equation when its number stands beside it.
 
     A line with an English word in it ("DiD Estimate = ...", "x = ... times switch", "... i.i.d.
@@ -125,6 +130,10 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
     (`NUMBERED_SHARE`, and the score of a maths row), is not a list item, is not another number,
     and stands in from the text edge of its column (a last line of prose that ends in a mark
     such as "(5)" starts at the edge). Only a bracketed number does this, not a bare "2.4".
+
+    With `LAYOUT_DISPLAY_GROUPING`, a number set `NUMBERED_FAR_GAP` font sizes or more from its
+    line, on either side ("(3)" at the left margin of a centered line), asks less of the line:
+    `NUMBERED_FAR_SHARE` of it maths, `NUMBERED_FAR_INDENT` in from the text edge.
     """
     for number in rows:
         if (
@@ -134,16 +143,20 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
             or not EQUATION_NUMBER.match(number.clean)
         ):
             continue
+        size = max(number.size, 1.0)
         beside = [
             r
             for r in rows
             if r is not number
             and not r.absorbed
             and not r.vertical
-            and r.x1 <= number.x0
+            and (
+                r.x1 <= number.x0
+                or (document.grouping and number.x1 + NUMBERED_FAR_GAP * size <= r.x0)
+            )
             and _number_beside(number, r.bbox, max(r.size, number.size))
         ]
-        line = max(beside, key=lambda r: r.x1, default=None)
+        line = min(beside, key=lambda r: _gap_between(number, r), default=None)
         if (
             line is None
             or line.kind != "text"
@@ -153,15 +166,23 @@ def _promote_numbered_lines(rows: list[_Row]) -> None:
             or line.score < EQUATION_THRESHOLD
         ):
             continue
+        far = document.grouping and _gap_between(number, line) >= NUMBERED_FAR_GAP * size
+        share = NUMBERED_FAR_SHARE if far else NUMBERED_SHARE
+        indent = NUMBERED_FAR_INDENT if far else NUMBERED_INDENT
         info = _CharInfo.of(line)
         counted = [i for i, c in enumerate(line.chars) if not c.blank and c.c not in ",.;:"]
-        if not counted or sum(info.mathy(i) for i in counted) < NUMBERED_SHARE * len(counted):
+        if not counted or sum(info.mathy(i) for i in counted) < share * len(counted):
             continue
         edge = min(r.x0 for r in rows if r.kind == "text" and r.column == line.column)
-        if line.x0 - edge < NUMBERED_INDENT * line.size:
+        if line.x0 - edge < indent * line.size:
             continue
         line.kind = number.kind = "math"
         line.reasons = [*line.reasons, NUMBERED_REASON]
+
+
+def _gap_between(a: _Row, b: _Row) -> float:
+    """The horizontal space between two rows (negative when they overlap)."""
+    return max(a.x0 - b.x1, b.x0 - a.x1)
 
 
 SET_OFF_REASON = "set off like a display"

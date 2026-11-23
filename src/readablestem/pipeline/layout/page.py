@@ -438,7 +438,7 @@ def _page_blocks(
     _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
-    _promote_numbered_lines(rows)
+    _promote_numbered_lines(rows, document=document)
     if document.grouping:
         _promote_set_off_lines(rows)
     lap("rows")

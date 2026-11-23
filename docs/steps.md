@@ -301,6 +301,13 @@ flags are real, over the development parts and the public corpus files together.
   too little to stand on, so primes are not compared.
 - Script ℓ read as a plain l (1 flag), a bar or a vector arrow (drawn, not characters; 1 flag),
   a dot or double dot (1 flag, not decided), acute and grave accents (none).
+- An overline drawn as a rule (`\overline{AB}`; O-129). The glyph facts hold characters, not
+  drawn rules, and a rule over a letter cannot be told from a fraction bar or an underline
+  without the row it stands in, so the check would need a new fact from layout on every
+  equation. Counted on the 21 development papers' gold: 127 of 12,826 formulas hold an
+  `\overline` or `\widebar` (70 of them in one paper, 35 in another), and the labeled errors
+  it would catch are 4. Not built: 4 errors do not pay for a new fact on every element and a new
+  source of false flags.
 
 One way is kept on less than the rule asks: a tilde the reading dropped has 1 flag, a real one.
 A hat and a tilde are the same glyphs of the same fonts read the same way, and the dropped hat

@@ -1135,7 +1135,7 @@ math font, stay math.
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Six patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Seven patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behavior.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
@@ -1181,6 +1181,18 @@ math font, stay math.
      a sum at 7 pt) gave it nothing to go by. `_limits_of` joins a line that hangs right under
      (or sits right over) a big operator (sum, product, integral, union, intersection),
      centered on it and no wider than twice its sign.
+  7. *A line far from its number.* `_promote_numbered_lines` makes a line with words in it a
+     display when a bracketed number stands beside it and the line is `NUMBERED_SHARE` math. A
+     number set `NUMBERED_FAR_GAP` (4) font sizes or more from its line, at the right margin or
+     at the left one ("(3)" beside a centered line), asks less of the line: `NUMBERED_FAR_SHARE`
+     (0.35) of it math and `NUMBERED_FAR_INDENT` (1.0) font sizes in from the text edge. A
+     prose line that ends in a reference stands a word space from it, so it is never this
+     case. Box score of the 21 development papers, switch on, before and after this rule:
+     display formulas whole 902 to 904, cut 38 to 35, split 32 to 33; one formula changed from
+     cut to split, two from cut to whole, none got worse. Layout hashes of 1,069 files before
+     and after: 0 differences with the switch off, 4 files with it on (ax_mathap_240306464:
+     twenty numbers at the left margin become labels; ax_hepth_240306509: a sum and its
+     "(B.3)"; ax_qbionc_240306496: "(21)"; 2411.07613: "(62)"), each read and each better.
 
   Measured on the 21 development papers (a development box score kept outside the repository; 11,258 formulas, display
   class 1,004): whole 80.0% with the switch off, 83.9% with rules 1 to 3, and with 4, 5 and 6
@@ -1191,13 +1203,31 @@ math font, stay math.
   writes its aligned rows one by one and the layout reads them as one array that holds every
   row, the form kept below.
 
-  Loose equation numbers (O-037, O-391), counted on the same papers with the switch on: 6
-  numbers left at the end of an equation's text with no label (2103.06872, 2305.10416 twice,
-  2308.10321, 2411.03309, 2412.18448), and 6 numbers that are a paragraph of their own: 2 at
-  the left margin of a display ("(3)" in 2309.01468), 1 right of a display, and 3 with no
-  equation level with them (2411.03309: "(10)" beside a line of digits, "11 00 ,", that is
-  read as text). They are no cluster, none was built, and the rules above leave them as they
-  were.
+  Loose equation numbers (O-037, O-391), counted again (2026-11-22) on 94 papers (the 21
+  development papers of the box score and the public development and fresh papers of the
+  real-world set: 2,327 displays, 956 with a label), with the switch off: 18 bracketed numbers
+  that are a paragraph of their own or stand at the end of a display's text with no label,
+  of six shapes. 6 stand beside a line with words in it that reads as text; rule 7 takes 4
+  of them with the switch on ("(C11)" in 2103.06872, "(P2)" in 2308.10321, "(15)" in
+  2412.00753, "(3)" in 2309.01468). "(5)" in 2309.01468 is beside a line that is mostly words,
+  and "(3.7)" in 2305.10416 is beside a line the display rules make text again. 3 are glued
+  to the end of a display's text, under a font size from it ("(A.28)" in 2305.10416, "(8)" in
+  2412.18448, "(12b)" in 2411.03309; "(8)" misses `_closes_display` by 0.6 pt, and in the
+  other two the display does not fill its column, so no distance rule takes them without
+  taking prose). 1 is set right-aligned under a display at the right end of the display's
+  longest row, not of its last ("(A5)" in 2412.18448: `_number_under` measures the line the
+  number stands under). 1 stands above and left of its display on a row of its own
+  ("(10.18)" in 2412.12319). 1 stands beside a group of lines that each start with a word
+  ("(63)" in 2411.07613). 3 stand beside a line of digits with a drawn box that is not read
+  as math ("(10)", "(11)", "(B.2)" in 2411.03309). 2 are on pages where a figure took the text
+  in ("(IV.14)", "(II.10)" in 2407.20815: the figure rules, not the number rules). The
+  other 14 are no cluster, and none was built. The label that moved from the brace to the
+  rows on 2210.13562 page 2 is a display cut into a brace, a paragraph and rows: the display
+  rules cut it, not the number rules.
+  Labeled parts inside one display ("(a) ... (b)", O-048), counted again on the 94 papers:
+  none of the 2,186 displays holds them (12 have "(a)" and "(b)" in the text, all arguments
+  of a function or proof-step marks). With the 7 of 65,817 of wave 3 the shape stays too rare
+  for a change that moves crops.
 
   Display groups left (wave 4, 21 development papers, switch on: cut 38, extra 29, split 32, whole 902 of 1,004): 20 of the 38 cuts leave a connective ("where", "for", "and", "subject to") outside the box, some of them in a line of inline items that the gold reads as one display; 29 extras are 19 in one paper (2305.10416) around sub-formulas the gold painted apart. Widening the host's box in `_absorb_contained_regions` was tried: 30 pieces are absorbed on the 21 papers, 9 hosts grow (by up to 7.4 pt), and the box score of 7 papers (one with a host that grew 7.4 pt) did not change, so it is not built. Counting the words of a set-off line without its connectives (`SET_OFF_WORDS`) was tried: +1 whole in one paper, 1 lost in another, so not built.
 
