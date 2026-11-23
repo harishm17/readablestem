@@ -2324,20 +2324,49 @@ listing, an inline identifier or a URL (a URL stays inline, see below). No other
 files has all glyphs of one advance and a name the list misses. A new name enters the list only
 when a real document sets code in it.
 
-A block of monospaced lines that are all one email or web address (`_is_contact`: an author's
-contact line on a title page, set in NimbusMonL, was a one-line code block once the font was
-known) is not code. Measured on the corpus hash set, with the names in: 5 of 332 files change
-(a SQL snippet set as a heading or a paragraph is code, in ax_cslg_240306367 7 times; the Python
-listings of ax_csro_240306420; the listings of 2505.13042 pp2-3; the algorithms of 2504.06207);
-one corpus upload changed by an address line, which `_is_contact` now leaves alone. Measured and
-not built: in 2504.06207 p4 the algorithm (its rows are NimbusMonL) is now taken by the code rule
-before the algorithm rule can see it (`_algorithm_groups` skips rows that are code), so the block
-holds the first seven steps, the comments right of the steps and "for each algorithm" are
-paragraphs beside it, and its steps 12 and 13 are a block of their own. Before, the algorithm
-rule read the page too, with steps 9 to 13 outside the block already. The algorithm rule would
-need to take an algorithm set in a monospaced face; 1 page of 1 file of 332. The listing of
-ax_csro_240306420 p11 to p16 comes out as 100 short blocks (a wrapped argument line, or a comment,
-each its own block) where it was prose lines before.
+With the names in, the code rules had to stop reading four things as code, which the known
+fonts had always let through (each seen on a file of the hash set):
+
+- A block of monospaced lines that are only email or web addresses (`_is_contact`: an author's
+  contact line on a title page).
+- A list of names (`_is_name_list`): no code punctuation but the underscores of the names, and
+  a comma after about every second word (the task names in the cells of a table, "PandaPush,
+  PandaSlide, and PandaPickAndPlace.").
+- The last line of a wrapped paragraph that is one line of the code face (a URL, names) under a
+  full line of the same column at the line pitch (`_code_groups`, a group of one row). The
+  `code_block` notice leaves out addresses and name lists too (`_is_addresses_or_names`), so a
+  page does not report code that is not.
+- A numbered line without a code line in its block: "173 [quant-ph/9809078]." in a reference
+  list is not a listing.
+
+A numbered listing (a number in front of every line, the blank lines numbered too) is one
+block: a row of a number and code of the code face goes on a block (`_numbered_code`), and the
+number alone of a blank line (`_blank_line_number`) stays in it when code goes on. Measured on
+`ax_csro_240306420`: its five Python listings (pp11, 12, 14-15, 15-16, 18) are one block each,
+two blocks where a listing crosses a page (66 + 37 lines, 32 + 64): 7 blocks of 32 to 69 lines
+in all, where each line or wrapped argument was a paragraph of its own (826 elements on the
+file before, 553 now). Two line numbers in them read wrong (p16 "2930", p18 "34 def"): the
+number of a blank line and the next one are 9 pt apart and 6 pt high, and the row builder makes
+one row of them.
+
+A word of the code face counts as a prose word when a row is classified (`_classify_row`,
+`_prose_words(typewriter=True)`): "for each Alg do" in an algorithm set in NimbusMonL
+(2504.06207 p4) made its rows "math" and its step numbers fragments attached to them, and the
+algorithm rule then lost the page. The figure and display rules do not count them: the labels
+of a diagram set in Courier New would be prose. 2504.06207 p4 and 2405.15050 p4 read as builder
+04 left them (the same elements with the old font list and with the new).
+
+Measured on the 332 files of the corpus hash set (996 results, 3 modes of each file): 33
+differ, 11 files. 6 results are builder 04's algorithm changes (2504.06207, 2405.15050); 27 are
+this change, in 9 files, each read: the Python listings of ax_csro_240306420; the SQL snippets
+of ax_cslg_240306367 (paragraphs, equations and fragments before; code now, the prose after
+them a paragraph of its own); the numbered listings of 2505.13042 pp2-3; and URL, email and
+wrapped-line tails that were one-line code blocks and are part of their reference or list item
+now (ax_cscl_240306350, ax_cscv_240306361, ax_statme_240307158, ax_econem_240306657,
+2502.08443, 2405.20573). In the 73 uploads, 2 differ from a run of 55917ea2 made for the
+purpose: `r18_arxiv_opt` (a URL in a footnote is set as code: cosmetic) and
+`w_slides_60001_lec1` (a wrapped line of a list item is no more a code block); no recorded
+request moves (the equation, figure and table parts are equal).
 
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
 its mark in the text above it also links to it (the output writes the mark as `doc-noteref`, the note as `doc-footnote`, with a `doc-backlink`, docs/output.md "Navigation"): the mark is found again in the element's

@@ -4,18 +4,26 @@
 
 - `glyphs._MONO_FONT` names NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor and Lucida Console as
   monospaced. A numbered listing, an algorithm or an inline identifier set in them was read as
-  prose (the pattern had "mono" but not "Mon" + "L"). The names are those counted on the public
-  files and the corpus (docs/layout.md, "Code fonts"); the font list matches no other name there.
-- A block of monospaced lines that are all one email or web address is not code
-  (`blocks._is_contact`): with the font known, an author's address set in NimbusMonL on a title
-  page (1 corpus upload, 1 public file) was a one-line code block.
-- Corpus (against 55917ea2): `full` 73 uploads, 0 differences with the address rule (1 with the
-  font names alone, the address line), no recorded request moves (equation, figure and table
-  parts equal); `analyze`: see the report of this branch for the files that change (SQL
-  snippets, Python and algorithm listings now read as code).
-- Tests: one case in `tests/test_structure.py`.
-- `PIPELINE_VERSION` (0.5.18) is owed a raise for the files that carry those fonts (layouts cached
-  under the old version read their listings as prose); not made here. `RENDER_VERSION` is not owed.
+  prose. The names are those counted on the public files and the corpus (docs/layout.md, "Code
+  fonts"); the font list matches no other name there.
+- Code rules (`layout/blocks.py`): a block of monospaced lines that are only addresses or a list
+  of names is not code, nor is a wrapped paragraph's last line in the code face, nor a numbered
+  line without a code line in its block. A numbered listing is one block, its blank lines
+  numbered too (`ax_csro_240306420`: 5 listings, 7 blocks, where each line was a paragraph). The
+  `code_block` notice leaves out addresses and name lists. A word of the code face counts as a
+  prose word in `_classify_row` only, so an algorithm in NimbusMonL stays one algorithm block
+  (2504.06207 p4 and 2405.15050 p4 read as builder 04 left them).
+- Corpus (against 55917ea2): `analyze` 996 results, 33 differ (11 files): 6 are builder 04's
+  (2504.06207, 2405.15050), 27 this change (9 files), each read, better or cosmetic, none worse.
+  `full`: 73 uploads, 2 differ from a run of 55917ea2 made for the purpose (`r18_arxiv_opt`,
+  cosmetic; `w_slides_60001_lec1`, better); equation, figure and table parts equal: no recorded
+  request moves. The shared baseline `full.json` is older than the rewrite of the kept-out
+  answers and differs from a fresh run of 55917ea2 on 9 uploads (Word files) this change does not touch.
+- Tests: two cases in `tests/test_structure.py`.
+- `PIPELINE_VERSION` (0.5.18) is owed a raise for the files that carry those fonts or listings
+  (layouts cached under the old version read their listings as prose); not made here.
+  `RENDER_VERSION` is not owed.
+
 ## Unreleased: algorithms whose steps and numbers the text layer lists apart (O-442); the 'ti' ligature of one lecture measured (O-047)
 
 - Algorithms (O-442): two more shapes of a numbered algorithm are one block (`layout/blocks.py`),
