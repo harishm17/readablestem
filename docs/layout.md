@@ -515,7 +515,14 @@ nothing in production.
   picture that starts a little below the first line beside it is in that line's band). A run of bands that
   keep one set of white channels is a segment. A band that does not (a line that spans the
   region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
-  only when the band below is side by side (rule 6).
+  only when the band below is side by side (rule 6). A fragment that hangs inside an
+  integral or sum sign at least twice its height (the lower limit of `∫ab`, where the sign
+  and the upper limit are one fragment) is in the sign's band: the cut between the lines of
+  the display left the limit out of its text ("∫b f′(x) dx = f(b) −f(a) a" on a slide). Only a
+  big operator counts: a general "short item inside a tall one" moved an equation in a recorded upload
+  (`w_solutions_1802`). A limit that hangs under a binomial's bracket, or stands
+  over the sign without touching it, is not covered (page 20 of `latex-slides`, the
+  two-column fixture).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
   lines each side (two on a slide) that have a line of the other side at their height (the pieces
   a formula cuts a line into are one line), and a line of three words or more, cuts it in two.
@@ -540,7 +547,15 @@ nothing in production.
    it, are read at the end of the page.
 6. Wide gap (above).
 8. Options in label order: `(A) (B)` over `(C) (D)` and `(A) (C)` over `(B) (D)` read A, B, C, D;
-   a grid of labeled cells is a `grid` node.
+   a grid of labeled cells is a `grid` node. Two columns of labels of different kinds are cut
+   only when each column holds one kind (terms `1.` `2.` `3.` beside definitions `A.` `B.` `C.`,
+   a matching exercise). A question number with its options at tab stops, over the next
+   options (`2.` `a)` `d)` against `b)` `c)`, and a Name / Date line on the same stops), has two
+   kinds on one side: it is one line of labels, not two columns, and stays in one leaf. The
+   cases: `data/authored/tables/handout-word` page 1 read option d) before a), and b) inside the
+   Name line; of the 332 PDFs counted (public files, the layout development set, the real-world
+   development parts, the workflow corpus), only that page has a column with two kinds, and the
+   two matching exercises (`e1_mc_columns`, `s04_worksheet`) are cut as before.
 9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
