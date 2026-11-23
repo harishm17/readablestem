@@ -1407,8 +1407,9 @@ def _lead_mark(row: _Row, named: bool) -> int:
 
 def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
     """The marks in the run of raised glyphs `row.chars[start:end]`, as char ranges: two marks
-    printed with a comma between them ("1,2") are two, and a closing bracket or a full stop
-    after a mark ("1)") is not part of it."""
+    printed with a comma between them ("1,2") are two, so are a number and a footnote sign
+    ("1" and "*") or two signs, and a closing bracket or a full stop after a mark ("1)") is not
+    part of it."""
     groups: list[tuple[int, int]] = []
     at = start
     for i in range(start, end + 1):
@@ -1417,8 +1418,13 @@ def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
         stop = i
         while stop > at and row.chars[stop - 1].c in ").":
             stop -= 1
-        if stop > at:
-            groups.append((at, stop))
+        piece = at
+        for k in range(at + 1, stop):  # a footnote sign is a mark of its own: "1\u2217" is two
+            if row.chars[k].c in _FOOTNOTE_MARKS or row.chars[k - 1].c in _FOOTNOTE_MARKS:
+                groups.append((piece, k))
+                piece = k
+        if stop > piece:
+            groups.append((piece, stop))
         at = i + 1
     return groups
 

@@ -1115,6 +1115,11 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
             [("2", 5.5, 0), ("Height matters too.", 8, 5)],
         ),
         ("1)", [("1 Pressure matters.", 8, 0)]),
+        (  # a number and a sign printed together after a name: two marks
+            "1*",
+            [("1", 5.5, 0), ("Pressure matters.", 8, 5)],
+            [("*", 5.5, 0), ("Corresponding author.", 8, 5)],
+        ),
     ]
     for mark, *lines in shapes:
 
