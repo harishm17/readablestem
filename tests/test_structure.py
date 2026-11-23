@@ -112,12 +112,22 @@ def test_a_numbered_listing_with_a_blank_line_is_one_block_and_a_list_of_names_i
             (0, "open_drawer, open_jar, open_wine_bottle, pick_up_cup,"),
             (0, "stack_blocks, wipe_desk"),
         ]
-        code(page, y, names)
+        y = code(page, y, names)
+        # the tail of a wrapped paragraph, set in the code face, is no listing either
+        y += 10
+        page.insert_text(
+            (72, y),
+            "The grasp tasks need a turn of the gripper: close_drawer, open_drawer, take_usb_out_of_com-",
+            fontsize=CODE,
+            fontname="helv",
+        )
+        code(page, y + 13, [(0, "puter, unplug_charger")])
 
     blocks = [e.text for e in analyze(page_of(fill)).elements if e.preformatted]
     assert len(blocks) == 1
     assert all(t in blocks[0] for _, t in rows if t)
     assert "open_drawer" not in blocks[0]
+    assert "unplug_charger" not in blocks[0]
 
 
 def test_code_is_written_as_pre_code_and_escaped():

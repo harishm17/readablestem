@@ -1135,10 +1135,28 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
         groups.append([row])
         gap = []
     found: dict[int, int] = {}
+    place = {id(r): i for i, r in enumerate(rows)}
+    right: dict[str, float] = {}
+    for r in rows:
+        right[r.column] = max(right.get(r.column, 0.0), r.x1)
     for group in groups:
         glyphs = sum(len(r.ink) for r in group)
-        if (glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)) and not (
-            _is_quotation(group) or _is_addresses_or_names(group)
+        if len(group) == 1 and place.get(id(group[0]), 0) > 0:
+            row, above = group[0], rows[place[id(group[0])] - 1]
+            if (  # the last line of a wrapped paragraph that has names in a typewriter face
+                above.kind == "text"
+                and not above.code
+                and above.column == row.column
+                and abs(above.size - row.size) <= 0.5
+                and 0.5 * row.size <= row.baseline - above.baseline <= 1.5 * row.size
+                and above.x1 >= right[row.column] - 1.5 * row.size
+            ):
+                continue
+        # a numbered line only goes on a listing: a reference "173 [quant-ph/9809078]." is not one
+        if (
+            any(r.code for r in group)
+            and (glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT))
+            and not (_is_quotation(group) or _is_addresses_or_names(group))
         ):
             for row in group:
                 found[id(row)] = id(group[0])
