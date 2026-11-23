@@ -2696,12 +2696,7 @@ def _classify_run(run: _Run, ctx: _Context, *, document: _Document) -> _Block:
     letters = sum(c.isalpha() for c in text)
     bold = all(r.bold for r in rows)
     ratio = size / ctx.body
-    # In a slide deck a bulleted line is an item whatever its size: its bullets are set larger than
-    # the body size of a deck whose pages are mostly formulas (the body is the commonest glyph
-    # size). Elsewhere a bullet glyph before a large line is decoration ("▪ Key Terms").
-    marker = rows[0].marker
-    bulleted = document.slide_deck and marker is not None and not marker.ordered
-    larger = ratio >= HEADING_SIZE_RATIO and not bulleted
+    larger = ratio >= HEADING_SIZE_RATIO
     # A section number is strong evidence in a large font ("3 Forces" is a chapter title);
     # at body size only a real section shape counts, not "2 kg", "12 Metres" or a date.
     number = section_number(text)

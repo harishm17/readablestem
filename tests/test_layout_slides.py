@@ -167,21 +167,6 @@ def test_a_powerpoint_style_deck_loses_its_earlier_steps_and_only_when_it_has_ti
         assert analyze(deck_pdf(plain)).pages == [0, 1, 2, 3]
 
 
-def test_a_bulleted_line_larger_than_the_body_size_of_a_deck_is_an_item_not_a_heading():
-    # A deck of formulas: most of its glyphs are the small print of a footer, so the bullets
-    # are more than 1.2 times the body size of the deck.
-    small = "Source of the figures in this lecture: the course notes, chapter four, second edition."
-
-    def page(title: str) -> tuple:
-        bullets = [(f"\u2022 {text}", 150 + 50 * i, 24) for i, text in enumerate(BULLETS)]
-        return SLIDE, [(title, 80, 40), *bullets, *[(small, 330 + 14 * i, 9) for i in range(12)]]
-
-    BULLETS = ["The loss falls with each pass", "The error stays flat later", "The gap is small"]
-    result = analyze(deck_pdf([page("Waves"), page("Energy")]))
-    assert [e.text for e in result.elements if e.kind == Kind.HEADING] == ["Waves", "Energy"]
-    assert [e.kind for e in result.elements].count(Kind.LIST_ITEM) == 6
-
-
 def test_a_second_title_slide_or_a_new_page_size_starts_a_second_deck_at_the_same_level():
     for second in (SLIDE, WIDE):
         pages = [

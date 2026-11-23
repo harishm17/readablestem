@@ -987,11 +987,13 @@ ends a run, whatever stands in it: numbered items set that far apart, with room 
 between them, end their runs too, and set in bold they are headings (O-401). Two titles in
 a row, the first with no text of its own, are read as a list of two. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
-changes nothing). In a slide deck a bulleted line is an item whatever its size: a deck whose pages
-are mostly formulas has a body size (the commonest glyph size) of 18 pt while its bullets are set
-at 25 pt, and the size alone made headings of them (`_classify_run`, O-407). Outside a deck a
-bullet glyph before a large line is decoration ("▪ Key Terms" in a textbook) and the line stays
-a heading. A numbered line is still a heading when it is large.
+changes nothing). Known limit (O-407): a deck of formulas has a body size (the commonest glyph
+size) of 18 pt while its bullets are set at 25 pt, and the size alone makes headings of the
+bulleted lines. Only the authored `html-slides` fixture shows it: none of the 332 files of the
+public sets, and none of the 286 bulleted lines of the slide decks in the private corpus, has a
+bullet larger than 1.2 times the body size, so it is not built. A bullet glyph before a large line
+is also decoration in a textbook ("▪ Key Terms"), so a rule on the bullet alone would be wrong
+outside decks.
 
 A numbered line that is the first line of a paragraph is not cut from its second line: when the
 numbered line is the only one of its run, starts indented (at most `INDENT_REACH` em right of the
