@@ -21,6 +21,19 @@
   probes) have the steps of an exam whose left option runs on, and paragraphs of two or three
   lines in one column (7 probes) have an exam's option groups; 7 more probes are decided by a
   figure or the end of the page, not by the gutter. `docs/layout.md` says so.
+- O-012, the region tree re-measured on the development set (`eval order --set layout-dev-1`,
+  `REGION_TREE` on against off, profile edited for the run only and restored): 159 of 267 pages
+  right and 80 faultless with the tree on, 141 and 72 off. 22 pages become right, one gets worse
+  (`ax_qbionc_240307089` p8, a figure page: a heading joined to the block above it; right still,
+  no longer faultless). Of the 108 pages still not right with the tree on, the causes named by the
+  evaluation are blocks not found (44 pages), neighbours out of order (49), blocks broken (42),
+  stamps read in the text (28), entries joined (19) and joins across columns (7: `ax_cslg_240306367`
+  p3, `ax_csro_240306533` p4, `ax_eesssp_240306460` p1, 2 and 7, `sm_index_b` p1 and 2). The seven
+  are the same with the tree off; the one looked at (csro p4, two clean columns under a figure,
+  gutter found) is not a gutter fault. The line-number pages (`sm_lineno_a`, `_b`) are as they were
+  off. Nothing was built: the switch stays off until the re-recording (O-421), the one page the
+  tree makes worse is a figure page and not a column page, and the other causes were not
+  diagnosed page by page here (left open for the owner's ranking).
 - No recording or request changes; no version raise owed; no migration.
 
 ## Unreleased: the equation request carries the file's characters (SW55 a, b; `EQUATION_FILE_FACTS`, off)
