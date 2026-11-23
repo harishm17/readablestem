@@ -366,7 +366,7 @@ def _read_page(
     turn = page_type.turn_page(page)
     fields = take_form_fields(page)  # before any read: what a field draws is not the page's
     raw = _raw_blocks(page)
-    drawn = page.get_cdrawings()
+    drawn = page_type.page_drawings(page)
     strokes = glyph_strokes.strokes(page, raw)
     # What a reviewer's annotations paint (an icon, a caret, a highlight) is not the page's art:
     # figures and handwriting are read without it. The hidden-text check is given the whole list

@@ -417,6 +417,28 @@ def test_a_labelled_tab_over_a_sentence_is_not_swallowed_by_the_figure_below_it(
     assert "reciprocal of the sine function" in _text_of(out)
 
 
+def test_art_that_a_clip_leaves_unpainted_is_no_figure_over_the_text_it_lies_on():
+    # An export that carries a figure's art on every page clips each page to its own part
+    # (arXiv 2407.20815): the rest of the art is in the page's drawings, painted nowhere. Its
+    # box lay over the paragraphs and the figure rules took their text into a picture.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _scatter(page, 72)
+    end = _running_text(page, 300, n=2)
+    ops = ["q 110 62 370 220 re W n", "0.1 0.3 0.8 rg"]  # the clip holds the plot, not the text
+    for i in range(24):
+        x, y = 140 + 13 * i, 340 + 9 * i + 12 * math.sin(i * 1.7)
+        ops.append(f"{x:.1f} {792 - y:.1f} 3 3 re f")
+    ops += ["120 530 m 470 530 l S", "120 530 m 120 330 l S", "Q"]
+    contents = page.get_contents()
+    doc.update_stream(contents[0], doc.xref_stream(contents[0]) + "\n".join(["", *ops]).encode())
+    out = layout.analyze(doc.tobytes())
+    (figure,) = _figures(out)
+    assert figure.bbox[3] < 300 < end
+    assert "Displacement is the change in position" in _text_of(out)
+    assert "Average velocity is displacement divided" in _text_of(out)
+
+
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():
     # A numbered title a few points over a drawing stays text, a heading of the page, not a
     # label that the figure's picture takes in (a blind student loses the heading). A slide

@@ -54,7 +54,7 @@ def _page_paths(
     frame = page.cropbox  # the drawings' own (unrotated) frame
     paths: list[_Path] = []
     lines: list[list[_Straight]] = []  # each path's horizontal and vertical lines
-    drawings = drawings if drawings is not None else page.get_cdrawings()
+    drawings = drawings if drawings is not None else page_type.page_drawings(page)
     if page_type.too_complex(drawings):
         return []  # not read: the page keeps its image (`page_type.PAGE_MAX_PATHS`)
     if seen is None:
