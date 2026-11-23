@@ -1102,6 +1102,7 @@ def _absorb_contained_regions(regions: list[_Region]) -> list[_Region]:
                 host.rows.extend(piece.rows)
                 host.rules.extend(p for p in piece.rules if p not in host.rules)
                 host.labels.extend(piece.labels)
+                host.box = _union([host.box, piece.box])
                 merged.add(id(piece))
                 break
     return [r for r in regions if id(r) not in merged]
