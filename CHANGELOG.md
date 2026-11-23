@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased: code fonts the list did not name (O-440)
+
+- `glyphs._MONO_FONT` names NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor and Lucida Console as
+  monospaced. A numbered listing, an algorithm or an inline identifier set in them was read as
+  prose (the pattern had "mono" but not "Mon" + "L"). The names are those counted on the public
+  files and the corpus (docs/layout.md, "Code fonts"); the font list matches no other name there.
+- Tests: one case in `tests/test_structure.py`.
+- `PIPELINE_VERSION` (0.5.18) is owed a raise for the files that carry those fonts (layouts cached
+  under the old version read their listings as prose); not made here. `RENDER_VERSION` is not owed.
+
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,

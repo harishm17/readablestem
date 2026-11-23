@@ -2313,6 +2313,17 @@ equations are). A box drawn round one line of code is its frame, not a figure
 (`_backdrop`). The notice `code_block` (review "none") is still given, now saying the
 code keeps its line breaks and indentation but not its highlighting.
 
+**Code fonts (O-440).** A font is monospaced when MuPDF flags it or its name matches
+`glyphs._MONO_FONT`: "mono" (not "Monotype"), Courier, Consolas, Menlo, Inconsolata, CMTT and
+SFTT, and, added after counting every font name on the 332 files of the corpus hash set and the
+25 private corpus uploads (the glyphs of a candidate must all advance alike), NimbusMonL (the
+Courier clone of the Times-Nimbus LaTeX stack: 10 files with the regular face, 5 oblique, 1
+bold; 2 corpus uploads), CMITT (3 files), t1xtt and txtt (txfonts typewriter: 1 file each),
+TeXGyreCursor (1 file) and Lucida Console (1 file). Their text in those files is code: a
+listing, an inline identifier or a URL (a URL stays inline, see below). No other font on those
+files has all glyphs of one advance and a name the list misses. A new name enters the list only
+when a real document sets code in it.
+
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
 its mark in the text above it also links to it (the output writes the mark as `doc-noteref`, the note as `doc-footnote`, with a `doc-backlink`, docs/output.md "Navigation"): the mark is found again in the element's
 text by the ten characters printed before it, and a mark that cannot be found exactly once
@@ -2675,10 +2686,10 @@ absorbs, a `for ...:` line over an equation, an opener that wraps flush, a one-l
 number), 2405.15050 p4 steps 10 to 12 (a stacked math region listed before the numbers), the
 boxed "TABLE III" algorithm of ax_eesssp_240306423 p6 (two columns interleaved), and the garbled
 math of step 8 in ax_csro_240306420 p9 (a math-region fault, not the algorithm's). Found beside
-them and outside the algorithm functions: `glyphs._MONO_FONT` does not name "NimbusMonL"
+them and outside the algorithm functions: `glyphs._MONO_FONT` did not name "NimbusMonL"
 (`Mon` + `L`), "CMITT", "TeXGyreCursor" or "t1xtt", so a listing set in those fonts (the numbered
-listing of 2505.13042 p3; 42 pages of 8 files carry NimbusMonL) is not taken for code and is read
-as prose. One regex line, a reader change over those files that needs its own corpus run.
+listing of 2505.13042 p3; 42 pages of 8 files carry NimbusMonL) was not taken for code and was
+read as prose; the names are now in the list (O-440, "Code fonts" under Code blocks).
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a

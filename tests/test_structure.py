@@ -73,6 +73,24 @@ def test_a_run_of_monospaced_lines_is_one_code_block_with_its_indentation():
     assert [e.kind for e in elements] == [Kind.PARAGRAPH] * 3  # prose, code, prose
 
 
+def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
+    """LaTeX papers set listings in NimbusMonL, CMITT and t1xtt, not in a font called Courier."""
+
+    def fill(page):
+        y = prose(page, 100)
+        y = code(page, y, LOOP)
+        prose(page, y, "Run it and check that it prints 55.")
+
+    for font in ("NimbusMonL-Regu", "CMITT10", "t1xtt"):
+        doc = pymupdf.open(stream=page_of(fill))
+        for xref in range(1, doc.xref_length()):
+            if doc.xref_get_key(xref, "BaseFont")[1] == "/Courier":
+                doc.xref_set_key(xref, "BaseFont", f"/{font}")
+        blocks = [e.text for e in analyze(doc.tobytes()).elements if e.preformatted]
+        assert len(blocks) == 1, font  # the renamed face has other widths: compare the lines only
+        assert [line.strip() for line in blocks[0].split("\n")] == [t for _, t in LOOP], font
+
+
 def test_code_is_written_as_pre_code_and_escaped():
     def fill(page):
         y = prose(page, 100)
