@@ -257,6 +257,40 @@ def test_a_number_set_far_from_a_line_with_words_numbers_it_when_display_groupin
     assert "(106)" not in (equation.text or "")
 
 
+def number_level_with_a_row_that_goes_on(page):
+    """The first row of a display set in two rows ends in "+", its number level with it, at the
+    right margin ("(D4)" in 2412.18448): the number is not the row's right-hand side."""
+    prose(page, 100, "The two terms of the drift are collected in the next display, which is")
+    page.insert_text((200, 140), "a = b + c + d +", fontsize=12, fontname="Times-Italic")
+    page.insert_text((520, 140), "(106)", fontsize=12)
+    page.insert_text((230, 162), "e + f + g", fontsize=12, fontname="Times-Italic")
+
+
+def number_above_the_display_at_its_left_edge(page):
+    """A number on a row of its own right above its display, at the display's left edge
+    ("(10.20)" in 2412.12319)."""
+    prose(page, 100, "The two terms of the drift are collected in the next display, which is")
+    page.insert_text((200, 126), "(106)", fontsize=12)
+    page.insert_text((200, 142), "a = b + c + d + e + f + g", fontsize=12, fontname="Times-Italic")
+
+
+@pytest.mark.parametrize(
+    "fill", [number_level_with_a_row_that_goes_on, number_above_the_display_at_its_left_edge]
+)
+def test_a_number_set_off_from_a_display_numbers_it_when_display_grouping_is_on(fill):
+    def page_with(page):
+        fill(page)
+        prose(page, 200, "and the second one in the same way, as the text goes on and on.")
+
+    pdf = one_page(page_with)
+    assert not any(e.equation_label for e in analyze(pdf).elements)  # the switch is off
+    elements = analyze(pdf, display_grouping=True).elements
+    [equation] = [e for e in equations(elements) if e.equation_label]
+    assert equation.display == "block"
+    assert equation.equation_label == "(106)"
+    assert not any("(106)" in (e.text or "") for e in elements)  # no element of its own
+
+
 # ---------------------------------------------------------------- rows of a table
 
 

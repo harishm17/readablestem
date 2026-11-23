@@ -118,6 +118,12 @@ NUMBERED_INDENT = 1.5  # x font size: how far a display stands in from its colum
 NUMBERED_FAR_GAP = 4.0  # x font size: the space between the line and a number set off from it
 NUMBERED_FAR_SHARE = 0.35
 NUMBERED_FAR_INDENT = 1.0
+# `LAYOUT_DISPLAY_GROUPING`: a bracketed number this far (x font size) right of a line that ends in
+# "+" or a relation is the display's number, not the line's right-hand side ("x = (2)" is never
+# set so far off): the first row of a display set in several rows, its number level with it.
+NUMBERED_TRAILING_GAP = 3.0
+# `LAYOUT_DISPLAY_GROUPING`: a number on a row of its own above the display, at its left edge.
+NUMBER_ABOVE_GAP = 1.0  # x font size: the most blank between the number's row and the display
 
 
 def _promote_numbered_lines(rows: list[_Row], *, document: _Document) -> None:
@@ -800,7 +806,10 @@ def _equation_regions(
             for line in lines
             if _number_beside(label, line.box, line.size, far=label.far_number)
             and not (label.far_number and _level_with_numbered(line, lines))
-            and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+            and (
+                line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+                or (document.grouping and _trailing_number(label, line))
+            )
         ]
         # Another column's maths only when the number's own column has no content beside it.
         own_column = [ln for ln in beside if ln.rows[0].column == label.column]
@@ -816,6 +825,8 @@ def _equation_regions(
             label.kind, label.far_number = "text", False
         elif under := _line_over_number(label, lines):
             under.labels.append(label)
+        elif document.grouping and (below := _line_below_number(label, lines)):
+            below.labels.append(label)
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
     return _stack_lines(lines, document=document)
@@ -832,6 +843,35 @@ def _line_over_number(label: _Row, lines: list[_Line]) -> _Line | None:
         and _number_under(label, line.box, max(label.size, line.size))
     ]
     return min(over, key=lambda ln: label.y0 - ln.box[3]) if over else None
+
+
+def _trailing_number(label: _Row, line: _Line) -> bool:
+    """Is `label`, level with a line that ends in a sign that goes on, a bracketed number set
+    `NUMBERED_TRAILING_GAP` font sizes or more to its right (`LAYOUT_DISPLAY_GROUPING`)?"""
+    return (
+        bool(EQUATION_NUMBER.match(label.clean))
+        and label.x0 - line.box[2] >= NUMBERED_TRAILING_GAP * max(label.size, line.size)
+    )
+
+
+def _line_below_number(label: _Row, lines: list[_Line]) -> _Line | None:
+    """The line whose number `label` is, when it is set on a row of its own right above the
+    display at the display's left edge ("(10.18)" over its equation; `LAYOUT_DISPLAY_GROUPING`):
+    the nearest line with no number yet that starts under it, within `NUMBER_ABOVE_GAP` font
+    sizes of blank, and that the number does not stand beyond."""
+    size = max(label.size, 1.0)
+    below = [
+        line
+        for line in lines
+        if line.rows[0].column == label.column
+        and 0 <= line.box[1] - label.y1 <= NUMBER_ABOVE_GAP * size
+        and label.x0 <= line.box[2]
+    ]
+    if not below or any(line.labels for line in below):
+        return None
+    if abs(label.x0 - min(line.box[0] for line in below)) > size:
+        return None
+    return min(below, key=lambda ln: (ln.box[1], ln.box[0]))
 
 
 def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:
