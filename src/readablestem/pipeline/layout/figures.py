@@ -1423,6 +1423,23 @@ def _cut_by(row: BBox, box: BBox) -> bool:
     return inter >= CUT_MIN * area and box[0] <= (row[0] + row[2]) / 2 <= box[2]
 
 
+CUT_COLUMN = 6  # other rows on a row's left edge: it is a line of a column of text
+
+
+def _text_of_page(row: _Row, rows: Sequence[_Row]) -> bool:
+    """A row a drawing's box cuts that is the page's own text, not a label: a list item (a
+    bullet of a slide whose picture starts on its line), or a line of a column of text (a
+    display equation whose column the box of a figure beside it runs into by a few points:
+    CUT_COLUMN other rows start where it does; the tick labels of an axis, which are the
+    rows the cut is for, are three at most)."""
+    if row.marker is not None:
+        return True
+    starts_here = sum(
+        1 for r in rows if r is not row and not r.absorbed and abs(r.bbox[0] - row.bbox[0]) <= 1.5
+    )
+    return starts_here >= CUT_COLUMN
+
+
 def _label_owners(
     figures: Sequence[_Figure], rows: Sequence[_Row], ctx: _Context, *, document: _Document
 ) -> dict[int, _Figure]:
@@ -1462,7 +1479,12 @@ def _label_owners(
                 ):
                     continue
                 gap = _stroke_gap(row.bbox, figure, held[id(figure)])
-                if not inside and _cut_by(row.bbox, figure.drawing):
+                if (
+                    document.figure_art
+                    and not inside
+                    and _cut_by(row.bbox, figure.drawing)
+                    and not _text_of_page(row, rows)
+                ):
                     # the drawing's edge cuts through it (an axis title under a plot): a label
                     # at the longest reach, so a figure whose stroke is nearer still takes it
                     gap = min(gap, reach)
