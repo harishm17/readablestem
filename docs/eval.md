@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-23 | 0.5.17 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-23 | 0.5.18 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -3479,9 +3479,13 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-23 at pipeline 0.5.17 by
-`eval burden --out`, production profile, 43 of the 73 uploads, 117 pages, 56 decisions,
-0.479 a page). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-23 at pipeline 0.5.18 by
+`eval burden --out`, production profile, all 73 uploads, 338 pages, 536 decisions, 1.586 a
+page). The corpus was re-recorded under the switch release, so no answer is missing and no
+upload is left out; the 43 uploads of the record before it ask 51 decisions where they asked
+56 ("The switch release of 2026-11-23"). The decisions a page are not comparable with the
+records below, which left out the equation-heavy uploads. Before it, the record held 43 of the
+73 uploads, 117 pages, 56 decisions, 0.479 a page (2026-11-23, pipeline 0.5.17). Fewer uploads than the first baseline below: the changes since 0.5.10 (the
 MathTime fonts, blanks, the legend and axis rules, then decks found by shape, small
 capitals, equation numbers and kept line ends) make the pipeline ask questions the
 recording does not hold, so 30 uploads are left out for 1,324 answers missing, among them the
@@ -4041,10 +4045,13 @@ limits is still owed.
 
 ## The switch release of 2026-11-23
 
-Pipeline 0.5.18 changes no code. It turns on four layout switches in the production profile
+Pipeline 0.5.18 turns on four layout switches in the production profile
 (`src/readablestem/ops/production.profile.toml`) that 0.5.17 shipped off: `REGION_TREE`,
 `LAYOUT_INLINE_JOINS`, `LAYOUT_DISPLAY_GROUPING` and `LAYOUT_JOIN_PANELS`. Each was measured
-at $0 against the same code with it off, and each can go back off alone.
+at $0 against the same code with it off, and each can go back off alone. Its two code changes
+are for slides, found when the region tree read a lecture deck's title slide (CHANGELOG
+0.5.18): small words set over a far larger one are no script of it, and each slide's largest
+heading is its title, one level whatever its size.
 
 **Reading order** (`eval order --set layout-dev-1`, 267 pages, the production profile edited
 in a separate worktree):
@@ -4075,7 +4082,18 @@ captioned figures are the same.
 **Recordings.** The workflow corpus was re-recorded under the four switches with
 `scripts/corpus_refresh.py --live`, at most $1.00 a call. A live refresh leaves out the
 hostile-file tests (`tests/workflows/test_wf49_hostile_input.py`): their cases state how many
-pictures stay unanswered, and paid answers would break that count.
+pictures stay unanswered, and paid answers would break that count. Three calls paid $1.01,
+$1.00 and $0.58 ($2.59); the last asked 101 answers and stopped under its cap, so nothing it
+asked for is left unrecorded. The recording holds 441 answers in the repository and 1,954
+kept out of it (`corpus.KEPT_OUT`).
+
+**Decisions** (`eval burden`, the replay of the corpus): with every answer recorded, all 73
+uploads are measured for the first time since 0.5.10, 338 pages and 536 decisions (1.59 a
+page); the 0.5.17 record held 43 of them. On those 43 uploads the decisions go from 56 to 51,
+and no decision of band 1 or 2 became optional: on `s10_slides_boxes` page 5 the two arrows
+between the boxes of a flow chart were two "equations", each a band 1 decision ("not an
+equation"), and are part of their boxes' figures now (`LAYOUT_JOIN_PANELS`);
+`w_lecture_560` asks 8 where it asked 11; `w_mixed_slides+image_pages` asks the same three.
 
 ## What the numbers do not show
 

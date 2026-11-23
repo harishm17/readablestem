@@ -31,9 +31,10 @@
     the same captions.
 - Found when the region tree was turned on, on a slide of MIT 6.0001 lecture 1 that sets the
   20-point words "PROBLEM SOLVING" over an 80-point "PRACTICE":
-  - A row of its own is no sub- or superscript of a row more than 2.5 times its size
+  - A row of its own is no sub- or superscript of a row more than 3.3 times its size
     (`layout/rows.py` `_attach_scripts`), so the small words no longer read inside the large one
-    letter by letter ("PRACTSOLVINGICE"). TeX's smallest script is half the text, well inside it.
+    letter by letter ("PRACTSOLVINGICE"). The smallest real script measured, an exponent inside
+    a fraction in an inline fraction (OpenStax), is 0.36 of its line: inside the limit.
   - In a slide deck each page's largest heading is its slide's title, and every slide title is
     one level whatever its size (`layout.heading_levels`): an 80-point slide title no longer puts
     the deck's 48-point titles a level under it.
@@ -41,6 +42,11 @@
   read as results of the new layout; 0.5.17 results still open.
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many
   pictures stay unanswered, and a paid answer recorded for one broke that count on every replay.
+- The workflow corpus was re-recorded under the four switches (three capped calls, $2.59), so no
+  recorded replay lacks an answer and the replay record `data/eval/burden-corpus.json` measures
+  all 73 uploads (338 pages, 536 decisions) where it measured 43. Those 43 ask 51 decisions where
+  they asked 56, none of band 1 or 2 made optional: the arrows between the boxes of a flow chart
+  are part of the boxes' figures, not two "equations" a person had to rule out.
 
 ## Pipeline 0.5.17, render 11 (2026-11-23)
 

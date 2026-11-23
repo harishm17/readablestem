@@ -62,14 +62,15 @@ def test_no_slide_footer_is_in_the_text(student: lxml.html.HtmlElement) -> None:
     assert not re.search(r"6\.0001 LECTURE \d", harness.words(student.xpath("//main")[0]))
 
 
-@harness.waits_for("w_slides_60001_lec1")
-@harness.finding("F-227")
-def test_no_bullet_is_an_unreadable_character(student: lxml.html.HtmlElement) -> None:
+def test_no_bullet_is_an_unreadable_character(
+    request: pytest.FixtureRequest, student: lxml.html.HtmlElement
+) -> None:
+    if request.node.callspec.params["deck"] == "lecture_10":
+        request.applymarker(harness.finding("F-227"))  # lecture 1's bullets read since 0.5.18
     text = harness.words(student.xpath("//main")[0])
     lost = re.findall(r"\[unreadable character\]|[\ufffd\ue000-\uf8ff]", text)
     assert lost == []
 
 
-@harness.waits_for("w_slides_60001_lec10")
 def test_every_table_has_header_cells(student: lxml.html.HtmlElement) -> None:
     assert [table.get("id") for table in student.xpath("//table") if not table.xpath(".//th")] == []
