@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import bisect
 import math
-import re
 from collections import Counter
 from collections.abc import Collection, Sequence
 from dataclasses import replace
@@ -501,10 +500,7 @@ def _page_blocks(
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
     lap("order")
-    pictures = placed + [f.bbox for f in small_pictures]
-    runs = _split_options(
-        _runs(ordered, ctx, document=document, obstacles=pictures), document=document
-    )
+    runs = _split_options(_runs(ordered, ctx, document=document), document=document)
     blocks = [_classify_run(run, ctx, document=document) for run in runs]
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
     _flag_text(blocks)
@@ -1429,33 +1425,11 @@ def _mark_groups(row: _Row, start: int, end: int) -> list[tuple[int, int]]:
     return groups
 
 
-MAX_RANGE_MARKS = 20  # notes a raised range (from "1" to "3") may span
-_RANGE = re.compile(r"(\d+)[-\u2010-\u2015\u2212](\d+)")
-_AFTER_NUMBER = re.compile(r"(?:^|\s)[-+\u2212]?\d[\d.,]*\s?[^\W\d_]{1,3}$")
-
-
-def _range_marks(row: _Row, start: int, end: int) -> tuple[list[tuple[int, int]], list[str]]:
-    """A raised range of notes (a raised "1" to "3" over notes 1 to 3): the char ranges of its
-    two ends, each a mark of its own, and the numbers between them, which have no place of their
-    own in the text. ([], []) for any other raised glyphs."""
-    found = _RANGE.fullmatch("".join(c.c for c in row.chars[start:end]))
-    if found is None or not 0 < int(found[2]) - int(found[1]) <= MAX_RANGE_MARKS:
-        return [], []
-    split = start + len(found[1])
-    middle = [str(n) for n in range(int(found[1]) + 1, int(found[2]))]
-    return [(start, split), (split + 1, end)], middle
-
-
-def _after_unit(row: _Row, at: int) -> bool:
-    """Does the raised glyph at `at` follow a unit ("25 cm" and "3 m": a few letters after a
-    number) or a letter set in a math font? It is an exponent then, not a note's mark: a note
-    whose mark follows such a word is lost, as a mark that is a unit's exponent was before."""
-    if at <= 0:
-        return False
-    before = row.chars[at - 1]
-    if before.math and before.c.isalpha():
-        return True
-    return _AFTER_NUMBER.search("".join(c.c for c in row.chars[:at])) is not None
+def _after_math_letter(row: _Row, at: int) -> bool:
+    """Does the raised glyph at `at` follow a letter set in a math font ("p1", "m0", "n2")? It is a
+    subscript or an exponent then, not a note's mark: such a glyph was taken for the mark of the
+    note that opens with the same digit, and the link of that note went to the wrong block."""
+    return at > 0 and row.chars[at - 1].math and row.chars[at - 1].c.isalpha()
 
 
 def _place_by_mark(
@@ -1530,7 +1504,7 @@ def _flag_text_marks(row: _Row, marks: set[str]) -> None:
         before = chars[i - 1] if i else None
         if (
             before is not None
-            and not _after_unit(row, i)
+            and not _after_math_letter(row, i)
             and (before.c in ".,;:?!" or (before.c.isalpha() and not before.math))
         ):
             for a, b in _mark_groups(row, i, j):

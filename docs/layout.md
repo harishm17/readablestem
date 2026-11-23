@@ -978,15 +978,12 @@ that stands in a run of its series either (`_mark_series_items`, `_Row.in_series
 marker of its column, past its own lines, is the next value ("A.", "B.", "C."; "I." between "H."
 and "J."), or the marker nearest above is the value before with nothing but its own lines
 between. A heading of the same shape has text, or a figure, under it: text of another face is
-no line of the item, and a figure or a table, which is no row of text, is told by its box
-(`_page_blocks` gives `_mark_series_items` the boxes of the page's pictures, drawings and tables,
-the small pictures of a line included): a run ends at white that holds one, over the width of the
-column ("1. Setup" over a picture of 6 to 120 pt and "2. Procedure" under it are two titles).
-White with nothing in it ends no run, however wide: numbered items set far apart, with room to
-answer between them (a worksheet's questions, in bold too), are items. Until wave 4 any white of
-more than twice the type size ended a run, and the bold questions of such a worksheet were
-headings (O-401). Two titles in a row, the first with no text of its own, are read as a list of
-two. A bold line that starts
+no line of the item, and a figure or a table, which is no row of text, shows as the white it
+leaves, where a run ends (more than `SERIES_GAP` times the type size between two rows of the
+column: "1. Setup" over a picture and "2. Procedure" under it are two titles). The white alone
+ends a run, whatever stands in it: numbered items set that far apart, with room to answer
+between them, end their runs too, and set in bold they are headings (O-401). Two titles in
+a row, the first with no text of its own, are read as a list of two. A bold line that starts
 with a bullet glyph in its text is a list item, not a heading (a bullet drawn beside the row
 changes nothing).
 

@@ -1140,34 +1140,7 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
         linked = {link.target_id for e in layout.elements for link in e.links}
         assert linked == notes, mark
 
-    # Row 5: a raised range over notes 1 to 3 finds all three; its two ends link, the one
-    # between has no place of its own in the text.
-    def span(page):
-        body_with_marks(page, mark="1-3", after="  at sea level.")
-        for n, text in enumerate(["See the first report.", "The tool was set.", "A third run."]):
-            page.insert_text((72, 709 + 12 * n), str(n + 1), fontsize=5.5, fontname="helv")
-            page.insert_text((77, 712 + 12 * n), text, fontsize=8, fontname="helv")
-
-    layout = analyze(page_of(span))
-    notes = [n.element_id for n in layout.notices if n.code == "footnote"]
-    assert len(notes) == 3
-    linked = [link.target_id for link in layout.elements[0].links]
-    assert linked == [notes[0], notes[2]]
-
-    # Row 6: the nearest thing, a unit's exponent ("25 cm" and a "2" raised after it) over a row of
-    # axis numbers in small type, is no note; nor is a line of small type that opens with a number.
-    for low in ("2 4 6 8 10 time in seconds", "2 500 mL beakers were set out."):
-
-        def exponent(page, low=low):
-            body_with_marks(page, mark="3", after="  at sea level.")
-            page.insert_text((72, 160), "The plate has an area of 25 cm", fontsize=BODY)
-            page.insert_text((72 + 134, 156), "2", fontsize=7, fontname="helv")
-            page.insert_text((72, 712), low, fontsize=8, fontname="helv")
-
-        layout = analyze(page_of(exponent))
-        assert not [n for n in layout.notices if n.code == "footnote"], low
-
-    # Row 7: the star of a script (a raised asterisk operator over a low one-word line, "Fro" under
+    # Row 5: the star of a script (a raised asterisk operator over a low one-word line, "Fro" under
     # a norm) is no note, while the same sign over a line of words is.
     sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
     for low, count in (("\u2217 Fro", 0), ("\u2217 Corresponding author.", 1)):
@@ -1181,6 +1154,21 @@ def test_a_note_is_what_opens_with_its_mark_and_goes_on_in_words():
         if sans.is_file():
             layout = analyze(page_of(star))
             assert len([n for n in layout.notices if n.code == "footnote"]) == count, low
+
+    # Row 6: an exponent set tight against a math letter ("p1", "n2") on the page is not the mark of
+    # note 1: the note keeps its link from the paragraph that holds its mark.
+    def exponent(page):
+        body_with_marks(page, after=".")
+        page.insert_text((72, 709), "1", fontsize=5.5, fontname="helv")
+        page.insert_text((77, 712), "Pressure matters.", fontsize=8)
+        x = 72 + pymupdf.get_text_length("The mass grows as ", fontname="helv", fontsize=BODY)
+        page.insert_text((72, 200), "The mass grows as ", fontsize=BODY, fontname="helv")
+        page.insert_text((x, 200), "n", fontsize=BODY, fontname="symb")
+        page.insert_text((x + 5.5, 195), "1", fontsize=7, fontname="helv")
+
+    layout = analyze(page_of(exponent))
+    (note,) = [n.element_id for n in layout.notices if n.code == "footnote"]
+    assert [k.target_id for k in layout.elements[0].links] == [note]
 
     # Nearest things the rows must not take: a raised "1" after a math letter is an exponent,
     # and a raised "14" before "C" in the text is a nuclide, with a note "1 ..." on the page.

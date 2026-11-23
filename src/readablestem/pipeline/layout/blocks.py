@@ -582,18 +582,12 @@ def _next_in_series(first: _Marker, second: _Marker) -> bool:
     )
 
 
-def _holds_figure(
-    top: float, bottom: float, span: tuple[float, float], obstacles: Sequence[BBox]
-) -> bool:
-    """Does a picture, a drawing or a table stand in the white between `top` and `bottom`, over
-    the width `span` of the column?"""
-    return any(
-        top <= (box[1] + box[3]) / 2 <= bottom and box[0] < span[1] and box[2] > span[0]
-        for box in obstacles
-    )
+SERIES_GAP = (
+    2.0  # line heights of white between two rows of one run: more, and something stood there
+)
 
 
-def _mark_series_items(rows: list[_Row], obstacles: Sequence[BBox] = ()) -> None:
+def _mark_series_items(rows: list[_Row]) -> None:
     """Set `_Row.in_series` on the rows with an ordered marker that stand in a run of their
     series: the next marker of the row's column, past the item's own lines, is the next value,
     or the nearest one above is the value before with nothing between but its own lines.
@@ -601,17 +595,11 @@ def _mark_series_items(rows: list[_Row], obstacles: Sequence[BBox] = ()) -> None
     A heading of the same shape has body text, or a figure, under it, so its neighbors are not
     markers: "B. Newton's second law" in bold among upright options, the bold lines of an agenda
     and "I." between "H." and "J." of an outline are items whatever they are set in. The options
-    of a grid are a list too. Only text rows are seen here, so a figure or a table is told by
-    its box in `obstacles` (the pictures, drawings and tables of the page): a run ends at white
-    that holds one, and "1. Setup" over a picture with "2. Procedure" under it are two titles.
-    White with nothing in it ends no run: the questions of a worksheet, set far apart to leave
-    room to answer, are items however far apart.
+    of a grid are a list too. Only text rows are seen here, so a figure or a table shows as the
+    white it leaves (`SERIES_GAP`): a run ends there, and "1. Setup" over a picture with
+    "2. Procedure" under it are two titles.
 
     Two titles in a row, the first with no text of its own, do read as a list of two."""
-    spans: dict[str, tuple[float, float]] = {}
-    for row in rows:
-        low, high = spans.get(row.column, (row.x0, row.x1))
-        spans[row.column] = (min(low, row.x0), max(high, row.x1))
     for i, row in enumerate(rows):
         marker = row.marker
         if marker is None or not marker.ordered:
@@ -620,12 +608,12 @@ def _mark_series_items(rows: list[_Row], obstacles: Sequence[BBox] = ()) -> None
             row.in_series = True
             continue
         face = _face(row)
-        span = spans[row.column]
+        reach = SERIES_GAP * row.size
         last = row
         for under in rows[i + 1 :]:
             if under.column != row.column:
                 continue
-            if obstacles and _holds_figure(last.y1, under.y0, span, obstacles):
+            if under.y0 - last.y1 > reach:
                 break
             last = under
             if under.marker is None and face and _face(under) == face:
@@ -640,7 +628,7 @@ def _mark_series_items(rows: list[_Row], obstacles: Sequence[BBox] = ()) -> None
         for above in reversed(rows[:i]):
             if above.column != row.column:
                 continue
-            if obstacles and _holds_figure(above.y1, last.y0, span, obstacles):
+            if last.y0 - above.y1 > reach:
                 break
             last = above
             if above.marker is None:
@@ -2402,16 +2390,14 @@ def _rtl_words(row: _Row) -> int:
     return words
 
 
-def _runs(
-    rows: list[_Row], ctx: _Context, *, document: _Document, obstacles: Sequence[BBox] = ()
-) -> list[_Run]:
+def _runs(rows: list[_Row], ctx: _Context, *, document: _Document) -> list[_Run]:
     runs: list[_Run] = []
     code = _code_groups(rows)
     steps, rows = _algorithm_groups(rows, _RightEdges(rows), code)
     code.update(steps)  # an algorithm's steps are kept like code (`_Run.algo`)
     rows = _option_grids(rows, ctx, code, document=document)
     _mark_lettered_titles(rows)
-    _mark_series_items(rows, obstacles)
+    _mark_series_items(rows)
     scored: dict[int, list[_Row]] = {}  # a points label, by the run of the line it scores
     edges = _RightEdges(rows)
     hanging = _hanging_entries(rows, edges)
