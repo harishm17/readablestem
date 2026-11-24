@@ -1115,10 +1115,11 @@ def _stack_position(
         prefix = before_symbol and not after_base
     elif _degree_over_label(script, first, at, last):
         return last  # E°cell: the degree sign does not cut "cell" in two
-    elif base is not None and first < at < last:
-        # A name of several small glyphs (the KRR of a filter's superscript) with a lowered
-        # script under it: the script is a script of the whole name, not a letter of it, and
-        # the lowered one is read first (the order of SO4 2-).
+    elif base is not None and first < at < last and all(c.mono for c in cluster):
+        # A typewriter name of several small glyphs (the KRR of a filter's superscript) with a
+        # lowered script under it: the script is a script of the whole name, not a letter of it,
+        # and the lowered one is read first (the order of SO4 2-). Names in other fonts (the ref
+        # of R_n^ref) keep the order of the text layer.
         return first if mine > level else last
     else:
         return at
