@@ -802,3 +802,29 @@ def test_a_mark_row_that_a_paragraph_keeps_is_not_also_taken_as_a_panel_label():
     (figure,) = _figures(out)
     assert "B" in figure.text.split() and "n" not in figure.text.split()
     assert "value of n" in _text_of(out)
+
+
+def test_header_words_over_pictures_on_one_filled_panel_are_the_figures_labels():
+    # A grid of pictures on a white card with the column names painted on the card above
+    # them (ax_physicsoptics pages 34 to 36, counted from 0): the names were paragraphs.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    top = y + 20
+    _rect(page, (117, top, 495, top + 215), colour=None, fill=(1, 1, 1))
+    names = ["Object", "Measurement", "Reconstruction"]
+    for col, name in enumerate(names):
+        x = 130 + 120 * col
+        _label(page, (x + 10, top + 12), name)
+        for row in range(2):
+            noise = bytes((17 * col + 29 * row + 7 * i * (i % 5)) % 256 for i in range(96 * 96 * 3))
+            picture = pymupdf.Pixmap(pymupdf.csRGB, 96, 96, noise, False)
+            at = pymupdf.Rect(x, top + 20 + 95 * row, x + 120, top + 115 + 95 * row)
+            page.insert_image(at, pixmap=picture)
+    _running_text(page, top + 235, 1, start=2)
+    out = layout.analyze(doc.tobytes(), join_panels=True)
+    (figure,) = _figures(out)
+    assert _holds(figure, (130, top + 5, 480, top + 205))
+    assert all(name in figure.text for name in names)
+    assert not any(name in _text_of(out) for name in names)
+    assert "Acceleration is" in _text_of(out)

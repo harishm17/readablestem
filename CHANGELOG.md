@@ -113,7 +113,7 @@
   figure again, with its whole extent and labels (`page._pen_figures`; behind the same switch
   since review 25, see the 0.5.19 entry).
 - Figures of pictures alone on a filled panel claim the panel's header labels
-  (`ax_physicsoptics` page 13), and a row cut by a drawing's edge belongs to it (2407.09859
+  (`ax_physicsoptics` pages 34 to 36, counted from 0), and a row cut by a drawing's edge belongs to it (2407.09859
   page 3), so no figure loses a label the page paints. The cut-row rule is behind
   `LAYOUT_FIGURE_ART` and takes no list item and no line of a column of text (a slide's bullet
   under a picture's top, a display equation beside a figure whose box runs into its column).
