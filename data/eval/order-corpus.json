@@ -16,10 +16,10 @@
   ]
  },
  "pipeline_version": "0.5.19",
- "commit": "e2a5a14468f56add9bcfd6b68159b959abb2fad9+changes",
+ "commit": "a680cc80ca9a1de08d09c77ea492849aa5e11826",
  "provenance": {
-  "commit": "e2a5a14468f56add9bcfd6b68159b959abb2fad9",
-  "clean": false,
+  "commit": "a680cc80ca9a1de08d09c77ea492849aa5e11826",
+  "clean": true,
   "pipeline_version": "0.5.19",
   "render_version": 11,
   "tools": {
