@@ -1503,6 +1503,20 @@ def _spills(row: _Row, steps: _Steps, following: _Row | None) -> bool:
     )
 
 
+def _in_column(row: _Row, steps: _Steps, number: tuple[int, str, int] | None) -> bool:
+    """Is `row` in the column of the algorithm? A full-width algorithm (long lines that run past
+    the gutter, comments right of the short ones) is cut by the region tree into leaves of
+    different columns: the first steps stand in "L", the long ones in "S". A step in "S" that has
+    the next line number, at the place of the numbers, is a step of it (its words are pieces on
+    its line, or its own row)."""
+    return row.column == steps.anchor.column or (
+        row.column == "S"
+        and number is not None
+        and number[0] == steps.expect
+        and abs(row.x0 - steps.number_x) <= 1.5 * steps.anchor.size
+    )
+
+
 def _step_kind(
     row: _Row, steps: _Steps, edges: _RightEdges, following: _Row | None, soon: bool
 ) -> str | None:
@@ -1521,9 +1535,9 @@ def _step_kind(
         and steps.on_line(row)
     ):
         return "piece"
-    if row.column != anchor.column and not _spills(row, steps, following):
-        return None
     number = steps.number(row)
+    if not _in_column(row, steps, number) and not _spills(row, steps, following):
+        return None
     # The item of a list is no step: a bullet anywhere, and a "1." or "2)" with no caption over
     # it (under one, `_is_algorithm` asks such numbers for a step set inside another).
     if (row.marker is not None or _listed(number)) and (number is None or caption is None):
@@ -1608,7 +1622,7 @@ def _resumes(row: _Row, steps: _Steps) -> bool:
     anchor = steps.anchor
     number = steps.number(row) if steps.expect is not None else None
     small = number is not None and ALGORITHM_SMALL <= row.size / anchor.size <= 1.05
-    if row.column != anchor.column or (abs(row.size - anchor.size) > 0.5 and not small):
+    if not _in_column(row, steps, number) or (abs(row.size - anchor.size) > 0.5 and not small):
         return False
     if steps.expect is not None:
         return (

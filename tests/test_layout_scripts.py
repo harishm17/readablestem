@@ -166,6 +166,15 @@ def test_small_capitals_are_text_and_real_capital_scripts_are_not():
     ]
 
 
+def test_a_lowered_script_under_a_name_is_read_before_the_whole_name():
+    # 2503.00504 p8: the filter of a method is a letter with a typewriter name raised over a
+    # lowered letter that starts under the name's first glyph and ends inside the second.
+    # Sorted by x the letter landed inside the name ("KRwR"); it is read before the name.
+    pdf = build([[("The filter ", None), ("x", "italic"), ("w|KRR", "stack-up-first")]])
+    (equation,) = [e for e in layout.analyze(pdf).elements if e.kind is Kind.EQUATION]
+    assert equation.text == "xwKRR"
+
+
 def test_small_words_set_over_a_far_larger_word_are_no_script_of_it():
     # A slide (MIT 6.0001 lecture 1) sets "PROBLEM SOLVING" in 20 points over an 80-point
     # "PRACTICE": the small line is its own text, not read inside the large word letter by letter.

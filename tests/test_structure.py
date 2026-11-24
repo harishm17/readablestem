@@ -966,6 +966,47 @@ def test_a_numbered_algorithm_whose_numbers_the_text_layer_lists_after_its_steps
     assert all(len(line.split()) > 1 for line in lines)  # each formula stays with its number
 
 
+def test_a_full_width_algorithm_with_comments_and_long_steps_is_one_block():
+    # 2504.06207 p13: the short steps have comments at their right (two columns), the long
+    # ones run past the gutter and the line numbers stand in the leaf of the long ones
+    # ("S"), not in the one of the first steps ("L").
+    sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    steps = [
+        (0, "Input: Names[..]", "\u25b7 the names to rate"),
+        (0, "Output: base[..]", "\u25b7 the base"),
+        (0, "function Build(items)", "\u25b7 the items"),
+        (1, "base[ ] = 0", "\u25b7 starts empty"),
+        (1, "for each item x in Items do", "\u25b7 every item once"),
+        (2, "for each part p in Parts do", None),
+        (3, "v = Score(x, p);", None),
+        (3, "for each unit u in Units do", None),
+        (4, "for each rate r in Rates of the part that the reader marked for the scan do", None),
+        (5, "w = Rate(v, u, x) plus the weight of the part of the line;", None),
+        (5, "base[ ] <- v union w;", None),
+        (1, "return base", None),
+    ]
+
+    def wide(page):
+        y = 90.0
+        for row in ["System   Cost   Coding need", "Linux   Mac   Windows   Free", "Python   Java   R"]:
+            page.insert_text((140, y), row, fontsize=BODY, fontname="helv")
+            y += 14
+        y = prose(page, y + 12, "Algorithm 1 Establish the base.") - 8
+        for n, (level, text, comment) in enumerate(steps, 1):
+            line = f"{n}:" + " " * (1 + 4 * level) + text
+            page.insert_text((72, y), line, fontsize=BODY, fontname="helv")
+            if comment:
+                page.insert_text((400, y), comment, fontsize=BODY, fontname="dj", fontfile=str(sans))
+            y += 20 if n == 8 else 14
+        for left in (72, 316):
+            rect = pymupdf.Rect(left, y + 20, left + 224, y + 170)
+            page.insert_textbox(rect, LONG, fontsize=BODY, fontname="helv", align=3)
+
+    layout = analyze(page_of(wide), region_tree=True)
+    (block,) = [e for e in layout.elements if e.preformatted]
+    assert [line.split()[0] for line in block.text.split("\n")] == [f"{n}:" for n in range(1, 13)]
+
+
 def test_numbered_exercises_and_a_numbered_table_are_not_algorithms():
     def exercises(page):
         y = prose(

@@ -1101,7 +1101,8 @@ def _stack_position(
         return at
     # After a base of upright text (SO4 2-) lowered first; before the capital letter of a
     # symbol (a nuclide) raised first. Any other stack (a variable's v_0^2 in a maths font, a
-    # small fraction) keeps the order of the text layer, as before.
+    # small fraction) keeps the order of the text layer, as before, unless that order would put
+    # the script inside a name after a base.
     base = host[first - 1] if first else None
     after_base = base is not None and (_text_char(base) or base.c in ")]}")
     following = next((c for c in [*host[last:], *after] if not c.blank), None)
@@ -1114,6 +1115,11 @@ def _stack_position(
         prefix = before_symbol and not after_base
     elif _degree_over_label(script, first, at, last):
         return last  # E°cell: the degree sign does not cut "cell" in two
+    elif base is not None and first < at < last:
+        # A name of several small glyphs (the KRR of a filter's superscript) with a lowered
+        # script under it: the script is a script of the whole name, not a letter of it, and
+        # the lowered one is read first (the order of SO4 2-).
+        return first if mine > level else last
     else:
         return at
     script_lower = mine > level
