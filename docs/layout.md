@@ -220,7 +220,9 @@ reader, neither to find them nor as a second opinion
    in lower case (the rest of a sentence from the page before). A head with no page
    number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
    under it a line away, so it never stands clear. What goes is counted as `furniture` left
-   out, as on a longer file. The
+   out, as on a longer file. Counted on real documents, 2026-11-24 (404 files, 76 of one page, 20
+   of them private): the shape rule took no line of words on any one-page file, so no small-print
+   line that ends in a separate number is lost, and the rule is not changed. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
@@ -520,9 +522,24 @@ changed nothing in production.
   and the upper limit are one fragment) is in the sign's band: the cut between the lines of
   the display left the limit out of its text ("∫b f′(x) dx = f(b) −f(a) a" on a slide). Only a
   big operator counts: a general "short item inside a tall one" moved an equation in a recorded upload
-  (`w_solutions_1802`). A limit that hangs under a binomial's bracket, or stands
-  over the sign without touching it, is not covered (page 20 of `latex-slides`, the
-  two-column fixture).
+  (`w_solutions_1802`). A short item (at most 8 characters) that is the limit of such a sign by
+  its place (`regions._limit_of`: centered on the sign, no wider than twice it, no further above
+  or below it than its own height) is in the sign's band too, whether the sign is taller than it
+  or not: the lower limit of a sum that stood level with the lower entry of a binomial's bracket
+  beside it was a band of its own, and read after the whole line ("(x + y)n =∑n (n k)xn−kyk
+  k=0"; page 20 of `latex-slides`, `∑nk=0 (n k)` now). Counted on real documents, 2026-11-24:
+  of 404 files (the public PDFs, the development papers and the 73 recorded corpus uploads),
+  72 hold 3,119 limit-like items (a short item over or under a big operator) that the bands
+  left apart from their sign's, on 264 pages. In the 71 public files, 1,892 of them sit inside
+  an equation's box; the display's text has the limit beside its sign 657 times with the rule
+  off and 703 times with it on. 43 limits moved to their sign. Three more were counted as
+  moved away and are not (the test is a distance, and an upper limit that moves inline
+  lengthens it). Four limits on three displays (`econem` page 48, `quantph` page 14) are
+  traded: the upper limit now follows its sign and the lower is read after the line, where
+  before the lower followed its sign and the upper stood in front of the display. The rule
+  moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
+  score of the 21 development papers as it was (9,198 of 11,258 whole; displays 903 of
+  1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
   lines each side (two on a slide) that have a line of the other side at their height (the pieces
   a formula cuts a line into are one line), and a line of three words or more, cuts it in two.
@@ -1273,7 +1290,7 @@ math font, stay math.
   bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
   "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
   "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
-  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it (the regular rule runs with display grouping off as well, so the dots change is not behind that switch). Known limit (review 26, made pages only; 0.5.18 was not right on them either): fill-in lines stacked one under the other, each with a mark at its right ("3x + 2 = (4)" over "5x − 1 = (2)"), still give the marks away as equation numbers, because a line under the line is what "goes on" means here; telling them apart needs the row under to continue the line (to start with a relation or an operator, or to be indented under the right-hand side). A bracketed number on a row of its
+  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it (the regular rule runs with display grouping off as well, so the dots change is not behind that switch). Known limit (review 26, made pages only; 0.5.18 was not right on them either): fill-in lines stacked one under the other, each with a mark at its right ("3x + 2 = (4)" over "5x − 1 = (2)"), still give the marks away as equation numbers, because a line under the line is what "goes on" means here; telling them apart needs the row under to continue the line (to start with a relation or an operator, or to be indented under the right-hand side). Counted on real documents, 2026-11-24 (404 files: the public PDFs, the development papers and the 73 recorded corpus uploads): no page shows it. Four public pages (`ax_condmatmtrlsci_240306389` page 2, `ax_qbionc_240306496` page 17, 2307.16839 page 5, `display_groups` page 0) have two stacked rows with a bracketed mark at the right, and in each the marks are consecutive equation numbers ((6) and (7), (18) and (19), (44) and (45), (2) and (3)); no private page has two. The rule is not built. A bracketed number on a row of its
   own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
   "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
   display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label
@@ -2010,7 +2027,12 @@ math by the document's evidence; the equation step's own tiers then decide it.
   paragraphs and are the figure's labels now; every other page of that copy, page 13 by either count
   included, reads the same with and without the rule). A panel that is itself the figure's own drawn shape is the
   figure's box already, and one whose area is more than 1.5 times the pictures' (a card that
-  holds a title and a sentence beside them) is left alone.
+  holds a title and a sentence beside them) is left alone. Counted on real documents,
+  2026-11-24 (404 files): 73 panels on 43 files are more than 1.5 times their pictures. 60 are
+  as large as half a page or more (a page backdrop behind one picture, which no label rule
+  should take). The other 13 are boxes of 5 to 16 rows of running text beside one picture
+  (an example box, a slide's side panel); their rows are paragraphs and not labels, so
+  leaving them alone is what the limit is for. The limit stays.
 - **A row cut by a drawing's edge** (behind `LAYOUT_FIGURE_ART`) belongs to that drawing when at
   least a quarter of it lies inside and its center is between the drawing's sides
   (`figures._cut_by`; 2407.09859 page 3: an axis title straddling the figure's bottom edge once

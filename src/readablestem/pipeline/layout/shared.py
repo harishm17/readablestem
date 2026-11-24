@@ -34,6 +34,9 @@ SCRIPT_MIN_RATIO = 0.62  # the smallest a script is, beside the text it belongs 
 # A row of its own is no script of a row more than this many times its size: a slide sets
 # 20-point words over an 80-point one (0.25), while the smallest real script measured is an
 # exponent in a fraction inside an inline fraction, 0.36 of the line's period (OpenStax).
+# Counted 2026-11-24 on 332 public PDFs (3,652 script rows) and the 1,432 script rows of the
+# equation development papers: none is under 0.36 (the smallest is 0.364, then 0.367, 0.408,
+# 0.453, 0.493), so the floor stays.
 SCRIPT_ROW_FLOOR = 0.3
 SCRIPT_MAX_LIFT = 0.7  # the furthest off the baseline a script is (x the text size)
 _DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
