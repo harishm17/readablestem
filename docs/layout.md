@@ -2526,6 +2526,52 @@ review 28, on made pages only: near a code row a set named by a Greek capital ("
 in a font the list takes for code is a paragraph with inline formulas, since the letter test
 asks for a Latin letter (a λ in a listing line must not make it a formula); and a listing
 whose variables are in math italic is reread, so three of its lines become a display.
+
+Counted on real documents, 2026-11-24 (O-454, O-456, O-457, O-458; nothing built, no reader
+change): of 120 public files, the 73 development papers of the real-world set, the 60 files of
+`layout-dev-1` and the 25 private corpus uploads, 88 carry a code-face font (7, 54, 21 and 6); on
+their 567 pages with a code-face character, 188 pages in 40 files have a math-face letter on
+the same line or within three lines (11 pages, 119, 23 and 35; the private ones are one
+upload). Each shape was searched from the page's characters (fonts, gaps, classes, as
+`_code_beside_maths` reads them) and the probe finds them on the reviewers' made pages (27
+files: 394 rows with a code-face word, 90 name-after-letter gaps, 61 names with a script, 20
+cut runs, 11 assignment lines, 14 rows with a lone denominator beside them). On the real files:
+
+- A display with a `\mathtt` name and a denominator under a line of code (O-454): 0. 94 rows of
+  a code-face word of two letters or more near a code row on the papers, 39 on `layout-dev-1`, 17
+  in the corpus and 21 on public files; none has a short row (a lone denominator) stacked on
+  it. They are addresses and DOIs in reference lists, R and algorithm lines, file and function
+  names in a sentence.
+- Code-face text beside math signs (O-456). Inline formula cut on one side ("y[j + 1"): 1, on
+  `ax_cslg_240306367` p8 (the attribute set "{A, C, E, F}", an inline formula as at 0.5.18, no
+  text lost); the corpus has 8 candidates in 2 uploads, all a code-face digit or expression
+  beside a hyphen or a math letter a word space away, none with a formula to cut. A line of
+  assignments near code rows read as one-sign formulas: 1 line on 2504.06207 p13 (step 12 of
+  Algorithm 5, "meta ds[measure] ← metadata[ ];"), 2 lines in one upload. On that page the
+  cause is not the code face: the step lines are set in math italic (CMMI) and only "DS",
+  "Alg" and "Hp" are code face, so steps 7 and 11 are display equations and steps 5, 6, 8, 9,
+  10 and 12 paragraphs with inline fragments, and the algorithm block does not form (an
+  algorithm-rule fault, not built here). A code-face name with a math subscript ("cost_i"):
+  none; the 33 names beside a script letter on the papers are typewriter abbreviations used as
+  scripts ("BC", "KRR", "SM") in three statistics and biology papers, joined to their letters,
+  in displays that are whole and in inline formulas. A code-face word flush against a math
+  letter in prose ("ith", "n-bit"): none. The 84 words within 0.3 of the size of a math letter
+  are subscripts (script size, lowered: 71 on the papers, 6 in the corpus, joined) and 7 not
+  scripts: 2 typewriter names in two displays of 2408.05847 and 5 calls with math arguments
+  in 2505.08251 ("Rescale(BC ∪ BG, λb, boost)"), joined as one inline formula each.
+- A code-face name as superscript of, or set after, a slanted letter at a gap of 0.1 to 0.25 of
+  the size (O-457): 7 cases in 2 papers (2408.05847 pp22, 44, 45 and 2503.00504 pp5, 7, 10),
+  all inside display equations that are whole; none in a sentence.
+- A displayed set with string members or a Greek-capital name near a code row (O-458): 0 (the one
+  set found, an alphabet in a sentence of 2405.09610 p27, is an inline formula, as it should
+  be). A listing with variables in math italic: 12 rows in 3 files (2405.15050 p9,
+  2506.01997 p10, the SQL page ax_cslg_240306367 p4); none becomes a display, each stays code
+  or a paragraph.
+
+Four lines closed by the count: the shapes stay as limits of the two rules. One thing the
+count turned up outside them: on 2503.00504 the name "KRR" over a "λ" subscript is read as
+"KRλR" (the λ stands under the name, so the characters sorted by x put it inside).
+
 Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
 (base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
 is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
