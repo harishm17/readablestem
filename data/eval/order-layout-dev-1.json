@@ -18,9 +18,9 @@
   ]
  },
  "pipeline_version": "0.5.19",
- "commit": "84dbf08327a01789f660dd61928573aeb91adb4d",
+ "commit": "193fbba37d90c95fc4158f6d92d7e1f9ee7a5f7c",
  "provenance": {
-  "commit": "84dbf08327a01789f660dd61928573aeb91adb4d",
+  "commit": "193fbba37d90c95fc4158f6d92d7e1f9ee7a5f7c",
   "clean": true,
   "pipeline_version": "0.5.19",
   "render_version": 11,
