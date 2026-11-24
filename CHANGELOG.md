@@ -24,7 +24,13 @@
 - Stored documents: a document laid out under 0.5.19 with a code-face operand in a formula keeps the
   torn read until it is converted again, so a pipeline raise is owed with the next release; this
   entry does not make it. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no
-  prompt changes, and no recorded request moves (the replayed documents of the 73 uploads are identical to the base run).
+  prompt changes, and no recorded request moves (the replayed documents of the 73 uploads are
+  identical to the base run).
+- Measured with the 0.5.19 switches on, no model: `full` of 73 uploads, 0 differences; `analyze`
+  of the 332 files (996 results), 3 differences, all of `ax_cslg_240306367` (p8: the attribute
+  set "{A, C, E, F}" is an inline formula again, as in 0.5.18); the development box score 9,198
+  whole of 11,258 formulas (base 9,197), no paper worse; `eval order --set layout-dev-1` 161 of
+  267 pages right, 81 faultless, as the base.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
