@@ -3123,7 +3123,7 @@ set's folder) each file is converted as a job converts it, under production's be
 settings, with no model: an equation, a picture and a table keep what the file gives, which
 is what the reading order is made of. The folder must be the registered one
 (`gold layout verify`), and the groups are the registry's kinds of document. A held-out set
-(every set whose registry does not say `development`) is scored only with `--for-release`: once, for a release, and never while the reader is
+(`side` in the registry; a registry with a side that is neither `development` nor `held-out` is refused) is scored only with `--for-release`: once, for a release, and never while the reader is
 being changed. Its record keeps totals and names no page, `--records`, `--from` and
 `--against` are refused for it, and a failing page is not looked at.
 
@@ -3929,7 +3929,8 @@ uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendere
   folder is the one that registry registers (the same files and gold, by their hashes): a
   folder with no registry, with one the command cannot find under the folder's name, or with
   another set's registry is treated as held out (`cli/layout_gold.held_out`, which
-  `eval order --set` asks too).
+  `eval order --set` asks too). When a development registry's folder does not verify, a line
+  on stderr says that is why no name is printed.
 - **`--rendered`** also sends the picture of the page's output (needs the browser group).
 - **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
   nothing is sent and a page whose answer is not in the file is not audited. `--batch`

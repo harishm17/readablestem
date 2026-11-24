@@ -293,9 +293,11 @@ def test_a_layout_gold_set_is_scored_with_no_model_and_a_held_out_one_only_for_a
     (root / "files" / "torn.pdf").write_bytes(b"%PDF-1.4 torn")
     (root / "gold" / "torn.json").write_text(json.dumps(gold | {"id": "torn"}))
 
-    def eval_order(side: str, *args: str) -> tuple[int, dict]:
-        registry, out = tmp_path / f"{side}.json", tmp_path / f"{side}-record.json"
-        registry.write_text(json.dumps(layout_gold.registry_of(root, "tiny", "a test", side)))
+    def eval_order(side: str, *args: str, written: str = "") -> tuple[int, dict]:
+        written = written or side
+        registry, out = tmp_path / f"{written}.json", tmp_path / f"{written}-record.json"
+        listed = layout_gold.registry_of(root, "tiny", "a test", side)
+        registry.write_text(json.dumps(listed | {"side": written}))
         named = ["--set", "tiny", "--root", str(root), "--registry", str(registry)]
         code = main(["eval", "order", *named, "--out", str(out), *args])
         return code, json.loads(out.read_text()) if out.is_file() else {}
@@ -313,3 +315,5 @@ def test_a_layout_gold_set_is_scored_with_no_model_and_a_held_out_one_only_for_a
     assert code == 0 and record["split"]["name"] == "held-out"
     assert record["metrics"]["sources"]["html"]["all"]["pages"] == 1
     assert record["metrics"]["pages"] == []
+    # A registry with any other word for its side is refused, for a release too.
+    assert eval_order("held-out", "--for-release", written="heldout") == (2, {})

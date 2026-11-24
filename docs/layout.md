@@ -2482,16 +2482,24 @@ or operators of another face, or comes right after one (or right before one) tha
 operand on its other side ("x = {1, 2}" with the set in the code face). A run beside nothing of
 the kind stays code, so "x = 5" in a code face inside prose is still an identifier and the
 "x + x" in front of an arrow is not drawn into the arrow's formula. A run that holds a word of two
-letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it touches a math
-letter: read as a word it would make the row prose and take a display out of the equations, and
-read in part the "1" of `op1` would join the formula next to it (2504.20938 p7). When such a
-name does touch a math letter (`\mathtt{out}` with a subscript, "n cost"), its letters are read
-as math letters and not as letters of a word: as a word the name made its display prose again
-and left the denominator a paragraph of its own (review 26; made pages only). A row that is
-mostly code face is not reread at all when it has code words in it or stands among code rows
-(`_Row.code_run`): the SQL page of ax_cslg_240306367 p4 stays code, and so does the line
-"a[i] ← a[j] ⊕ t" of a listing whose arrows are of a math font, which has no word in it and
-was cut out of its code block as a display (review 26; made pages only).
+letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it is set against
+a math letter: read as a word it would make the row prose and take a display out of the
+equations, and read in part the "1" of `op1` would join the formula next to it (2504.20938 p7).
+When such a name is set against a math letter (`\mathtt{out}` with a subscript, "n cost" with a
+thin space), its letters are read as math letters and not as letters of a word: as a word the
+name made its display prose again and left the denominator a paragraph of its own (review 26;
+made pages only). "Set against" is a gap under a quarter of the font size (`TIGHT_GAP`), which a
+subscript and a thin space are and a word space is not: with any gap under one font size
+allowed, a code-face word a word space from a math letter in a sentence ("for each `measure`
+in M", "ends with `return` x") became an inline formula of letters (review 27; 2504.06207 p13
+and made pages). A row that is mostly code face is not reread at all when it has code words in
+it, or when it is near a code row (`_Row.code_run`: within three lines of a row that is mostly
+code face) and has no Latin math letter of another face: the SQL page of ax_cslg_240306367 p4
+stays code, and so does the line "a[i] ← a[j] ⊕ t" of a listing whose arrows are of a math
+font, which has no word in it and was cut out of its code block as a display (review 26; made
+pages only). The letter test keeps a displayed set with a math-face name and code-face members
+("L2 = {00, 01, 10, 11}") a display when a line with code words stands near it; without it the
+set went into that line's code block (review 27; made pages only).
 
 Known limits of the two code-face rules (review 26, each seen on made pages only): a display
 that stands right under a line of code and has a `\mathtt` name is still classified with the
@@ -2499,7 +2507,12 @@ name as a word, so its denominator is a paragraph of its own (the "within three 
 `_mark_code_runs` cannot tell a display after code from a step of an algorithm); and in prose
 that mixes code-face text with math signs some inline formulas come out cut on one side
 ("y[j + 1" with its "]" left in the sentence, "i = 0; i < n; i" out of a `for` header). No
-text is lost: what is left out of a formula stays in the sentence. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
+text is lost: what is left out of a formula stays in the sentence. Three more from review 27,
+on made pages only: near code rows, lines of assignments with math signs ("s ← x ⊕ y ⊕ c") are
+a paragraph with one-sign formulas, as at 0.5.18, and not one display; a code-face name with a
+math-face subscript ("cost_i") is an inline formula in a sentence and plain text in a row that
+is mostly code face; and a displayed set whose members are strings of letters in the code
+face ("L1 = {ab, ba, abab}") has code words in it and is a line of code. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
 (base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
 is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
 {...}") and changed 16 pages of 2 files against the 0.5.18 read, 11 of them for the worse. With

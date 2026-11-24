@@ -1087,7 +1087,7 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     be the registered one, and a held-out set is scored only when the caller says the
     score is for a release."""
     from readablestem.cli import layout_gold as sets
-    from readablestem.eval import measure, order_report
+    from readablestem.eval import measure, order_report, split
     from readablestem.gold import layout_gold
 
     listed = sets.registry_path(args.set, args.registry)
@@ -1095,6 +1095,8 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     if not listed.is_file():
         return _error(f"no registry at {listed}")
     registry = json.loads(listed.read_text(encoding="utf-8"))
+    if registry.get("side") not in split.SIDES:
+        return _error(f"{listed}: the side of a set is one of {', '.join(split.SIDES)}")
     if sets.held_out(registry):
         if not args.for_release:
             return _error(
@@ -1329,9 +1331,16 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
         listed = sets.registry_path(name, args.registry)
         if listed.is_file():
             try:
-                held_out = sets.held_out(json.loads(listed.read_text(encoding="utf-8")), root)
+                registry = json.loads(listed.read_text(encoding="utf-8"))
+                held_out = sets.held_out(registry, root)
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 return _error(f"cannot read {listed}: {exc}")
+            if held_out and not sets.held_out(registry):
+                print(
+                    f"{root} is not the folder {listed.name} registers: taken as held out, "
+                    "no document or page is named",
+                    file=sys.stderr,
+                )
     earlier = None
     if args.against is not None:
         try:
