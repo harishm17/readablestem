@@ -38,6 +38,10 @@
     job's call count. A refused, timed-out or unreadable first answer is not shared.
 - No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
   stays as made at 0.5.18; the result's schema is the same.
+- Both reading-order records are re-made at 0.5.19 on a clean tree. The corpus record has
+  every count of the 0.5.18 one (83 of 91 pages right, 42 faultless). `layout-dev-1` has the
+  same right and faultless pages (161 and 81 of 267); its strays go from 875 to 877 on three
+  pages, two of them the pages whose SQL snippets are code blocks now (docs/eval.md).
 - Reviewed twice before its release. Review 26 (`8fe3b940`): no blocker; its two regressions
   on made pages and its smaller findings are in the first entry below.
 - Review 25 (a680cc80): one blocker and seven smaller findings.

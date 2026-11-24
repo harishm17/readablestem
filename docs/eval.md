@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.18 as of 2026-11-23; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.19 as of 2026-11-23; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -3061,8 +3061,8 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-23 at pipeline 0.5.18,
-production profile `11fc9f366bea`, 47 files and 91 gold pages, no answer missing, no step
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-23 at pipeline 0.5.19,
+production profile `2047f403770c`, every count as in the 0.5.18 record it replaces, 47 files and 91 gold pages, no answer missing, no step
 stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
@@ -3127,19 +3127,22 @@ is what the reading order is made of. The folder must be the registered one
 being changed. Its record keeps totals and names no page, `--records`, `--from` and
 `--against` are refused for it, and a failing page is not looked at.
 
-`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.18
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.19
 under the production profile with the four layout switches on), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 69 | 32 | 32 (32) | 93 (458) | 36 (46) | 44 (55) | 10 (13) | 0 of 0 | 18 | 7 |
+| paper | 119 | 69 | 32 | 32 (32) | 94 (460) | 36 (46) | 44 (55) | 10 (13) | 0 of 0 | 18 | 7 |
 | selfmade | 40 | 26 | 13 | 4 (8) | 16 (62) | 10 (67) | 13 (30) | 2 (4) | 0 of 5 | 4 | 2 |
 | textbook | 108 | 66 | 36 | 15 (15) | 77 (355) | 43 (269) | 5 (6) | 1 (1) | 0 of 0 | 28 | 0 |
-| all | 267 | 161 | 81 | 51 (55) | 186 (875) | 89 (382) | 62 (91) | 13 (18) | 0 of 5 | 50 | 9 |
+| all | 267 | 161 | 81 | 51 (55) | 187 (877) | 89 (382) | 62 (91) | 13 (18) | 0 of 5 | 50 | 9 |
 
-The element list reads 160 of 267 right and 82 faultless. Against the 0.5.16 record below: 20
+The element list reads 160 of 267 right and 82 faultless. Against the 0.5.18 record the one
+count that moved is the strays, 875 to 877 on three pages: the two pages of
+`ax_cslg_240306367` whose SQL snippets are code blocks of their own since 0.5.19 (one and
+two more) and `ax_econem_240306657` page 1 (one fewer). Against the 0.5.16 record below: 20
 pages made right and none made wrong, broken blocks 99 to 50, cross-joins 27 to 9, strays 985
-to 875, merged places 121 to 91. Cut places rise from 296 to 382 on fewer pages (92 to 89): 83
+to 877, merged places 121 to 91. Cut places rise from 296 to 382 on fewer pages (92 to 89): 83
 of the 86 more are on four pages (`os_introduction_computer_science` pages 7 and 8,
 `os_algebra_and_trigonometry_2e` page 11, `sm_glossary_a` page 1), three of which became
 right; the element list's cut places fall (132 to 125).
@@ -3572,7 +3575,7 @@ stops matching. A paid recording of the
 answers was owed then (about 1,300 requests) to bring those uploads back into
 the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
 records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
-compare them; the order record was re-made at 0.5.18.
+compare them; the order records were re-made at 0.5.18 and again at 0.5.19.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -4140,7 +4143,8 @@ in a separate worktree):
 | all four on (0.5.18) | 161 | 81 | 20 | 0 |
 
 One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
-`data/eval/order-layout-dev-1.json` is the 0.5.18 one (its table is under `eval order`).
+`data/eval/order-layout-dev-1.json` was the 0.5.18 one at this release; it is re-made at 0.5.19
+since, with the same right and faultless pages (its table is under `eval order`).
 
 **Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
 of 47 uploads, the student page):
@@ -4149,7 +4153,8 @@ of 47 uploads, the student page):
 |---|---|---|
 | the 0.5.10 record kept until now (3 pages apart, answers missing) | 64 | 37 |
 | 0.5.18 with all four off | 71 | 37 |
-| 0.5.18, all four on (`data/eval/order-corpus.json` now) | 83 | 42 |
+| 0.5.18, all four on | 83 | 42 |
+| 0.5.19 (`data/eval/order-corpus.json` now; every count as at 0.5.18) | 83 | 42 |
 
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
