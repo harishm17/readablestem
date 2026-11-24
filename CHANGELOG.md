@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: the lab manual page (O-444)
+
+- Nothing changes for a reader. The corpus upload `r05_labmanual_5310_lab1`, page 2, that the
+  reading-order record counts as not right in the student page since 0.5.12, is no read order
+  fault: the commit that did it is the figure label rule ("One label rule by distance",
+  0.5.12), which moved the diagram's labels from paragraphs into the figure, where the student
+  page does not hear them and the scorer cannot place the figure's block. Measured with the
+  rule's commit and its parent on the corpus replay (87 pages: none made right, two made wrong)
+  and on `layout-dev-1` (267 pages: net one page worse in the student page). No code or record
+  is changed; docs/layout.md "One label rule by distance" and docs/eval.md have the counts.
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

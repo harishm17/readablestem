@@ -4170,8 +4170,13 @@ of 47 uploads, the student page):
   lost). Five pages stopped being faultless (`a8_handout_3up` page 2, `r02_syllabus_21l704`
   page 1, that lab manual page,
   `r12_exam_900sc` page 1, `s11_layout_change` page 1) and five became so. None of it is this
-  release's: all of these pages score the same with the four switches off. The causes are not
-  found yet.
+  release's: all of these pages score the same with the four switches off. The cause of the
+  lab manual page is found (2026-11-24, O-444): pipeline 0.5.12, the commit "One label rule by
+  distance for a figure's labels" (`0fa8351d`; its parent reads the page right). Its
+  diagram's labels moved from paragraphs into the figure, the student page hears no word of
+  a figure, and the scorer then places the figure's gold block by chance matches (3 of its 25 four-word runs) in the list
+  below (docs/layout.md, "One label rule by distance"). `r18_arxiv_opt` page 3 went wrong in
+  the element list at the same commit. The causes of the other four are not found yet.
 
 **Formulas kept whole** (box score of the 21 development papers, 11,258 formulas):
 

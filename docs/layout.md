@@ -2275,6 +2275,23 @@ math by the document's evidence; the equation step's own tiers then decide it.
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).
+  What the rule cost on reading order (O-444, 2026-11-24; `eval order` on this rule's commit
+  and on its parent, each in its own tree, the replay of the corpus and `layout-dev-1`):
+  corpus, 87 gold pages in both, right in the student page 68 before and 67 after, none made
+  right, two made wrong (`r05_labmanual_5310_lab1` page 2 in the student page,
+  `r18_arxiv_opt` page 3 in the element list); `layout-dev-1`, 267 pages, student page 140
+  and 139 (`os_introductory_statistics_2e` page 2 lost, `os_contemporary_mathematics` page 4
+  made faultless), element list 139 and 139 (`ax_quantph_240306377` page 11 made right,
+  `os_algebra_and_trigonometry_2e` page 5 made wrong). The lab manual page is no read order
+  fault: its diagram's five pieces and their labels read in the same order before and after;
+  the labels used to be paragraphs, so the student page said the words of the diagram before
+  the heading, and the scorer found the figure block's words there. Now the labels are in the
+  figure (31, 11, 5 and 2 characters in its text, in its crop) and the student page hears
+  no word of a figure, so the figure block's words are found only by chance in two list
+  items under the heading (3 of its 25 four-word runs), which puts the block after the
+  heading. The rule is as designed here and the scorer's student-page source cannot place
+  a block whose words are in a picture; neither was changed, as the scorer version fixes
+  every record's numbers. Left open: the three other pages above are not looked into.
 - **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code, on in
   production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump). A figure printed as panels
   (a), (b), (c) under one caption was found as one figure for each panel, and only the one
