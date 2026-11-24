@@ -247,7 +247,7 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "d412692b3674e002362e3f04e93554714b1f68c8",
+    "commit": "39324dd354f4578d29eaec82c000e1c7ce5eaf8b",
     "clean": true,
     "pipeline_version": "0.5.19",
     "render_version": 11,
