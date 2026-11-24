@@ -401,16 +401,33 @@ def display_with_one_typewriter_name(page):
     prose(page, 190, "and the text goes on after the display with more words than one.")
 
 
+def display_with_a_subscripted_typewriter_name(page):
+    """ "Pr[out_A = 1] >= 2/3": the name in a code face, as \\mathtt prints it, with a subscript
+    in the maths italic that touches it (Times italic here, given TeX's name in the test)."""
+    prose(page, 100, "The probability of the event is bounded by")
+    page.insert_text((200, 140), "Pr[", fontsize=11)
+    page.insert_text((218, 140), "out", fontsize=11, fontname="cour")
+    page.insert_text((238.2, 143), "A", fontsize=7, fontname="tiit")
+    page.insert_text((246, 140), "= 1] \N{GREATER-THAN OR EQUAL TO}", fontsize=11)
+    fraction(page, 296, 135, "2", "3", 12)
+    prose(page, 190, "and the text goes on after the display with more words than one.")
+
+
 @pytest.mark.skipif(not Path(DEJAVU).exists(), reason="needs DejaVu Sans for the maths signs")
 @pytest.mark.parametrize(
     ("fill", "kind", "whole"),
     [
         (formula_with_a_set_in_a_code_face, "inline", "{101}"),  # not left to the sentence
         (display_with_one_typewriter_name, "block", "out"),  # not a paragraph and a stray "3"
+        (display_with_a_subscripted_typewriter_name, "block", "out"),  # the name is no prose word
     ],
 )
 def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, kind, whole):
-    elements = analyze(one_page(fill)).elements
+    doc = pymupdf.open(stream=one_page(fill))
+    for xref in range(1, doc.xref_length()):  # the subscript's face under TeX's name for it
+        if doc.xref_get_key(xref, "BaseFont")[1] == "/Times-Italic":
+            doc.xref_set_key(xref, "BaseFont", "/CMMI10")
+    elements = analyze(doc.tobytes()).elements
     (found,) = [e for e in equations(elements) if e.display == kind]
     assert whole in nospace(found.text)
     assert not [e for e in elements if e.kind == Kind.PARAGRAPH and whole in (e.text or "")]

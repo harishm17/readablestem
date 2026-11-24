@@ -1095,7 +1095,7 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     if not listed.is_file():
         return _error(f"no registry at {listed}")
     registry = json.loads(listed.read_text(encoding="utf-8"))
-    if registry["side"] == "held-out":
+    if sets.held_out(registry):
         if not args.for_release:
             return _error(
                 f"{args.set} is a held-out set: it is scored for a release, once, and a score "
@@ -1193,7 +1193,9 @@ def _cmd_order(args: argparse.Namespace) -> int:
             return scored
         run, registry = scored
         settings = order_report.set_settings()
-        held_out = registry["side"] == "held-out"
+        from readablestem.cli import layout_gold as sets
+
+        held_out = sets.held_out(registry)
         metrics = order_report.report(run, order_report.set_groups(registry), listed=not held_out)
         of_set = order_report.set_stamp(registry, [done.upload for done in run])
         record = measure.record(run, settings, metrics, of_set=of_set | {"client": "none"})
@@ -1318,8 +1320,8 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
         return _error("--gold-pages is for a layout gold set: it needs --gold-dir")
     name = "corpus" if root is None else root.name
     # A held-out set's printed report names no document and no page. A gold set is held out
-    # unless its registry says development: a held-out folder under another name, or one whose
-    # registry is missing, must not be the one that gets named.
+    # unless its registry says development and the folder is the one it registers: a held-out
+    # folder under another name, with another set's registry or with none must not be named.
     held_out = root is not None
     if root is not None:
         from readablestem.cli import layout_gold as sets
@@ -1327,7 +1329,7 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
         listed = sets.registry_path(name, args.registry)
         if listed.is_file():
             try:
-                held_out = json.loads(listed.read_text(encoding="utf-8"))["side"] != "development"
+                held_out = sets.held_out(json.loads(listed.read_text(encoding="utf-8")), root)
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 return _error(f"cannot read {listed}: {exc}")
     earlier = None

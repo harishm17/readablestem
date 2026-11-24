@@ -38,12 +38,39 @@
     job's call count. A refused, timed-out or unreadable first answer is not shared.
 - No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
   stays as made at 0.5.18; the result's schema is the same.
-- Reviewed before its release (review 25, a680cc80): one blocker and seven smaller findings.
+- Reviewed twice before its release. Review 26 (`8fe3b940`): no blocker; its two regressions
+  on made pages and its smaller findings are in the first entry below.
+- Review 25 (a680cc80): one blocker and seven smaller findings.
   The blocker (the hand-drawn figure rule, above) and four more are fixed in the entries
   below and in this one; the page audit prints a set's document names only when its registry
   says development; two are limits stated in docs/steps.md (a shared answer needs identical
   crops; a resumed job shows the cost on the twin that asked first); the panel-label rule has
   its test.
+
+## Unreleased: a code-face name beside a math letter, a listing line without a word (review 26)
+
+- Review 26 read the release again after review 25's fixes (`8fe3b940`): no blocker, all eight
+  findings of review 25 closed, two things made worse than 0.5.18 on pages made for the review
+  (none on a corpus or development page), fixed here:
+  - A `\mathtt` name that touches a math letter ("out" with a subscript, "n cost") was read
+    letter by letter as a word of prose, so its display became a line of text and the
+    denominator under it a paragraph of its own ("Pr[out_A = 1] ≥ 2" and a stray "3"). The
+    letters of such a name are math letters now (`shared._code_beside_maths`). The names in
+    prose ("out_A") are inline formulas.
+  - A line of a listing with no word of two letters and an arrow from a math font
+    ("a[i] ← a[j] ⊕ t") was reread as maths and cut out of its code block as a display. A row
+    that is mostly code face and stands among code rows (`_Row.code_run`) is not reread.
+- `eval page-audit` and `eval order --set` ask one function whether a set is held out
+  (`cli/layout_gold.held_out`): it is, unless its registry says development, and for the audit
+  unless the folder is also the one that registry registers.
+- Stated as limits, each seen on made pages only (docs/layout.md): a display right under a
+  line of code with a `\mathtt` name still loses its denominator; stacked fill-in lines with a
+  mark each still give marks away as equation numbers (0.5.18 was not right there either);
+  inline formulas cut on one side where code-face text and math signs mix in prose (no text
+  lost).
+- Measured, no model: the 25 private corpus files (1,202 pages) read the same before and
+  after this change, page for page. Each of the two regression cases and the audit case fails
+  on `8fe3b940`. Part of 0.5.19, which was not released before it.
 
 ## Unreleased: one number for a display (review 25, finding 5)
 
@@ -56,8 +83,11 @@
   attached (a cases display, two equations numbered one under the other).
 - A row of three centered dots that ends a display ("x + x^2 + x^3 + ...") is not an operator
   that goes on, so the number beside it is the display's under the regular rule.
-- Layout only: no crop, picture or request changes (a number is a label, not part of the
-  crop). Part of 0.5.19, which was not released before it.
+- Layout only, and no recorded request moves. Against the 0.5.19 branch before this change a
+  number that is no longer a label is an element of its own again and is asked about, as at
+  0.5.18 (review 26, on one made page of numbers: 14 requests at 0.5.18, 10 before this
+  change, 12 now, all 12 among the 14). The dots rule is in the regular number rule, which
+  runs with display grouping off as well. Part of 0.5.19, which was not released before it.
 
 ## Unreleased: a code-face word inside a formula (review 25, findings 2 and 3)
 
@@ -70,7 +100,8 @@
   letters or more that touches no math letter stay code, so what the 0.5.19 entry for code fonts
   (O-440) fixed is unchanged. Measured on the 25 private corpus uploads: 10 pages of one upload,
   fonts NimbusMonL and CourierNew, had their formulas torn since 0.5.19; 30 of the 31 broken
-  formulas are whole now and the 247 formulas of those pages read as in 0.5.18 but one.
+  formulas are whole now and the 247 formulas of those pages read as in 0.5.18 but one (the
+  builder's count; review 26 counted all 247 as in 0.5.18, and 215 before the change).
 - Finding 2: a word of the code face counts as a prose word only in a row within three lines of a
   row that is mostly code face (`inline_runs._mark_code_runs`), as in an algorithm. A display with
   one `\mathtt` name and no code rows near it ("Pr[out = 1] ≥ 2/3") is no longer made text, so its
@@ -78,8 +109,12 @@
   read as before.
 - The 0.5.19 entry says "none worse" of the corpus differences. Of the 16 pages that 0.5.19 changed
   on 2 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
-  inline read). After this change 6 pages of 2 uploads differ from the 0.5.18 read, all the
-  intended changes of 0.5.19, so "none worse" holds: 11 worse before, 0 after.
+  inline read). After this change 7 pages of 3 of the 25 files differ from the 0.5.18 read
+  (counted again on the release head with the four switches on; the entry first said 6 of 2,
+  review 26 counted 7 of 3): six are the intended changes of 0.5.19, the listings and tails,
+  and on one a two-letter paragraph in a code face at the foot of a page is a line of code
+  now. None is a formula made worse, so "none worse" holds for the formulas: 11 pages worse
+  before, 0 after.
 - Part of 0.5.19, which was not released before it, so no document was stored with the torn
   read. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no prompt changes, and
   no recorded request moves (the replayed documents of the 73 uploads are identical to the base
@@ -98,7 +133,11 @@
   (counts only). `--against REPORT` sets a run beside an earlier one of the same set.
 - A held-out set's printed report names no document and no page, and a set is held out
   unless its registry says development (review 25: a folder with no registry was printed
-  with its names). An eval tool only: no reader change, no version raise.
+  with its names) and the folder is the one that registry registers (review 26: a held-out
+  folder given a development set's registry, or its name, was named). `eval order --set`
+  asks the same function (`cli/layout_gold.held_out`), so a registry with any other word for
+  its side is scored for a release only. An eval tool only: no reader change, no version
+  raise.
 - Why: as built, the audit of the held-out layout set asked about every page of every
   document (1,015 pages) where the gold marks 247, so the paid shadow run the plan caps at
   $3.00 could not be afforded, and its verdicts could not be set against any truth.
