@@ -556,6 +556,18 @@ changed nothing in production.
    Name line; of the 332 PDFs counted (public files, the layout development set, the real-world
    development parts, the workflow corpus), only that page has a column with two kinds, and the
    two matching exercises (`e1_mc_columns`, `s04_worksheet`) are cut as before.
+   What stands under a matching exercise (`LAYOUT_MATCHING_UNDER`, off in code and in the
+   production profile, with `REGION_TREE` on): the line under it that goes on in a column ("8."
+   under terms 1. 2. 3.) was a fourth term and was read between the terms and the definitions.
+   With the switch on, each column's labels end where their count stops (`_run`: the first
+   label, then the next number or letter of the same kind; at least two in each column, the two
+   columns of different kinds), and the exercise is a `cols` node over a stack with what stands
+   under it (`_Build._matching`), read after it. It covers both shapes: a full-width line with
+   its points at the right edge (`e1_mc_columns` page 1) and a numbered question with sub-parts
+   (a), (b). Limit: a line under the exercise that goes on counting ("4." under terms 1. 2. 3.)
+   is not told from a fourth term. Moving what is read before a figure or an equation under the
+   exercise moves the text of its request, so the recorded answer of such an item stops
+   matching: that is why the switch is off until a re-recording.
 9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
