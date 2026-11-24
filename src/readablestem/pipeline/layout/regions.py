@@ -36,6 +36,7 @@ from readablestem.core.types import BBox
 from readablestem.pipeline.layout import entries
 from readablestem.pipeline.layout import figures as _figures
 from readablestem.pipeline.layout.context import _Document
+from readablestem.pipeline.layout.display import LIMIT_OPERATORS
 from readablestem.pipeline.layout.furniture import _box_zone, _margin_zone
 from readablestem.pipeline.layout.order import (
     FULL_LINE,
@@ -54,6 +55,7 @@ WIDE_GAP = 2.5  # rule 6: line pitches of white that close a segment of side-by-
 BOX_MIN_WIDTH, BOX_MIN_HEIGHT, BOX_MAX_SHARE = 40.0, 18.0, 0.8  # rule 2
 PICTURE_MIN_PT, PICTURE_MAX_SHARE = 24.0, 0.85
 MAX_DEPTH = 10
+LIMIT_CHARS = 8  # a limit is at most this many characters ("k=0", "x→0")
 MAX_BOX_CANDIDATES = 300  # a page of shaded shapes is a chart, not a page of boxes
 FOOT_SIZE = 0.92  # rule 5: footnote type, as a share of the body size
 FOOT_SHARE = 0.4  # ... at most this share of a column's lines
@@ -159,6 +161,32 @@ def _under_taller(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
     )
 
 
+def _limit_of(limit: Item, sign: Item) -> bool:
+    """Is the short item `limit` the limit of the sum, product or integral sign `sign` opens
+    with: centered on it, no wider than twice it, and no further above or below it than its own
+    height? (`display._limits_of` takes them once the rows are cut; here the cut must not
+    separate them, the way a binomial's bracket beside the lower limit of a sum did.)"""
+    (x0, y0, x1, y1), text = limit
+    (sx0, sy0, sx1, sy1), held = sign
+    height = y1 - y0
+    if held[:1] not in LIMIT_OPERATORS or not 0 < len(text.strip()) <= LIMIT_CHARS:
+        return False
+    if height <= 0 or height > sy1 - sy0:
+        return False
+    gap = y0 - sy1 if y0 >= sy1 - 0.3 * height else sy0 - y1
+    return (
+        -0.3 * height <= gap <= height
+        and sx0 - 0.5 * height <= (x0 + x1) / 2 <= sx1 + 0.5 * height
+        and x1 - x0 <= 2 * (sx1 - sx0) + (sy1 - sy0)
+    )
+
+
+def _at_sign(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
+    """Is the text item `i` the limit of a big operator in `band`, or has `band` a limit of
+    the operator `i` opens with?"""
+    return any(_limit_of(items[i], items[j]) or _limit_of(items[j], items[i]) for j in band)
+
+
 def _bands(items: Sequence[Item]) -> list[list[int]]:
     """Indexes of `items` grouped in bands: items that overlap vertically (all but a fifth of
     their height) are one band. An item that stands over a shorter one's whole height, but
@@ -174,6 +202,7 @@ def _bands(items: Sequence[Item]) -> list[list[int]]:
             y0 + shrink < bottom
             or _over_shorter(items, bands[-1], y0, y1)
             or _under_taller(items, bands[-1], i)
+            or _at_sign(items, bands[-1], i)
         ):
             bands[-1].append(i)
             bottom = max(bottom, y1 - shrink)
