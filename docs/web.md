@@ -911,7 +911,12 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `paper`, ...), else the person names it.
 - **Lint** (defence in depth, `source/lint.py`): `\write18` and its spellings, `\openout`, a
   pipe in `\input`, `\directlua`, shell-escape packages, and a file argument that is absolute,
-  goes up, names a home folder or is a URL.
+  goes up, names a home folder or is a URL. Two things are not looked at, because nothing
+  reads them: a class or package file of the upload (`.cls .clo .sty .bst`: a journal's own
+  `elsarticle.cls` or `revtex4-1.cls` holds `\openout`) unless a file that is read names it with
+  its suffix in `\input`, `\include` or `\InputIfFileExists` (`source.lint.project_problem`), and
+  an absolute path in `\bibliography` or `\addbibresource` (the author's own machine; LaTeXML
+  reads the compiled `.bbl`, never the database). `..`, `~`, `|` and URLs stay refused there too.
 - **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
   per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
   `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their
@@ -947,7 +952,10 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `pipeline.run.convert_pdf` passes it to `source.convert`, in the same conversion child
   (`web/isolated_convert.py`). The child checks everything again, unpacks into a private temporary
   folder, runs LaTeXML in the sandbox (`core/sandbox.py`, `source/latexml.py`; docs/security.md,
-  "Running uploaded TeX"), and `source/ltx_reader.py` turns its XHTML into elements: headings,
+  "Running uploaded TeX"; `source/compat.tex` is read before every document: an empty
+  `\lstlanguagefiles`, which LaTeXML's `listings` binding digests and cannot find with the TeX
+  tree hidden, so a document that loads `listings` is read instead of stopping, and an
+  `\orcidlink` that sets nothing), and `source/ltx_reader.py` turns its XHTML into elements: headings,
   paragraphs, lists (a list nested in an item, a contents entry's sub-entries included, is read
   as items of its own one level down; the item keeps only its own words), tables, exact
   equations (LaTeXML's MathML through the sanitiser, accepted), and figures with the project's own picture through the ordinary figure step. A formula

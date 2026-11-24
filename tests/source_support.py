@@ -112,6 +112,24 @@ LOSSES: dict[str, Loss] = {
         "{tikzpicture}",
         ("missing", "missing_file", "tikz", ""),
     ),
+    # Sources that stopped on a command only LaTeXML's missing TeX tree made undefined
+    # (`source/compat.tex`): `listings` (`\lstlanguagefiles`) and `orcidlink`.
+    "listings_package": Loss(
+        _article(
+            "\\begin{lstlisting}[language=Python]\nZQlisting = 1\nprint(ZQlisting)\n"
+            "\\end{lstlisting}",
+            "\\usepackage{listings}",
+        ),
+        None,
+        "ZQlisting = 1",
+    ),
+    "orcid_link": Loss(
+        _article(
+            "Words by Ada\\orcidlink{0000-0002-1825-0097} and ZQorcid.", "\\usepackage{orcidlink}"
+        ),
+        None,
+        "ZQorcid",
+    ),
     # What the reader used to leave out with nothing said (SW42.4): a picture outside a float
     # follows its block as a figure, and one in a cell makes its table a decision...
     "centered_picture": Loss(

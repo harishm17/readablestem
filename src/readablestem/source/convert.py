@@ -158,9 +158,8 @@ def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, boo
         texts = intake.read_texts(kind, data, arc.DEFAULT_LIMITS)
         from readablestem.source import lint
 
-        for text in texts.values():
-            if lint.problem(text) is not None:
-                raise SourceFailed("source_refused")
+        if lint.project_problem(texts) is not None:
+            raise SourceFailed("source_refused")
         main = intake.find_main(texts, hint)
         try:
             intake.check_support(texts, main)

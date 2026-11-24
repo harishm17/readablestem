@@ -1,0 +1,17 @@
+% Definitions every source conversion reads before the document (latexml --preload,
+% `source/latexml.py`). Written for this project.
+%
+% LaTeXML 0.8.8's `listings` binding reads the package's configuration file for the list of
+% language-definition files and digests `\lstlanguagefiles`. With the TeX tree hidden from
+% LaTeXML (`source.latexml.HIDDEN_FILES`) the file is not found, the macro is undefined, and
+% every document that loads `listings` stopped on that error although its listings were read.
+% An empty list says "no language files": the code of a listing is kept as written; only the
+% highlighting of a language that is not defined is left out.
+%
+% The `orcidlink` package has no binding: `\orcidlink{id}` is an icon that links to an ORCID
+% page, set beside an author's name, and the commands stopped every document that used it
+% although no word of the document hangs on it.
+\makeatletter
+\providecommand{\lstlanguagefiles}{}
+\providecommand{\orcidlink}[1]{}
+\makeatother
