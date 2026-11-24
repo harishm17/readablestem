@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-11-23",
+  "date": "2026-11-24",
   "pipeline_version": "0.5.19",
   "profile": {
     "name": "development settings",
@@ -247,7 +247,7 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "d4d497b011d2de11e8642da1f52325798164cbee",
+    "commit": "d412692b3674e002362e3f04e93554714b1f68c8",
     "clean": true,
     "pipeline_version": "0.5.19",
     "render_version": 11,
