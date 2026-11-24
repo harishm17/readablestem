@@ -10,12 +10,17 @@
     typed labels that do not start like an item ("(a)", "1.", "[4 marks]"). A worksheet's typed
     "Answer:" beside what a student wrote is no longer a figure label (review 25): the writing
     stays handwriting with its notice and the typed word stays in the text. arXiv 2407.20815
-    pages 2 and 4 keep their figures and labels. PEN_COUNTS
+    pages 2 and 4 keep their figures and labels. Pages with a pen figure with the switch on:
+    4 in 2 public files before and after, 0 in the corpus before and after.
   - Figures side by side (`order._top_down(earlier=True)`): a short row between them no longer
     splits the line, so w_lecture_5111 page 4 reads left, middle, right.
   - The strike and highlight marks of the text pass read the drawings as layout does
     (`rows.page_paint(figure_art=True)`). The upload probe is measured and not changed.
-- Turning it on still needs a re-recording of the requests that move (REQUESTS_MOVED) and a
+- Measured by replay of the 73 corpus uploads with the switch on: the recorded requests that no
+  longer match are 2, all on w_lecture_5111 (a figure's and an equation's, page 4); the same 2
+  on the base. Two uploads differ in their result (w_lecture_5111 and r21_infographic_orcid,
+  whose figure reason reads 866 paths for 867), 71 do not. With it off all 73 uploads and all
+  996 analyze entries are those of b8fb9ab7. Turning it on still needs that re-recording and a
   `PIPELINE_VERSION` bump; neither is in this change. No stored document changes.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
