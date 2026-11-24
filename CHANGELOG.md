@@ -69,6 +69,19 @@
   (`_label`), but on the 38 public files in `data/`, the 93 in `tests/`, the 60 of the development
   set and the 25 private files, 29 pairs of label columns were found and none holds a roman
   label, so no real page reads wrong and the label kinds stay.
+## Unreleased: five limits counted on real documents (wave 6, O-445 built; O-446, O-455, O-459, O-437 counted and left)
+
+- O-445: a short item (at most 8 characters) that is the limit of a sum, product or integral sign
+  by its place is in the sign's band, whether or not the sign is taller than it, so a limit level
+  with a binomial's lower entry is no longer a band of its own (`regions._limit_of`).
+  On 71 public files 43 limits moved beside their sign; none of the 73 recorded corpus uploads
+  moved, the box score of the development papers is as it was, and neither `eval order` record
+  has a page made wrong. Behind the region tree switch, which is on. No version bump is in
+  this entry.
+- O-446: `SCRIPT_ROW_FLOOR` stays 0.3; the smallest real script row measured is 0.364.
+- O-455, O-459, O-437: no real page shows the fault (four public pages with two bracketed marks
+  are consecutive equation numbers; 13 small panels are boxes of text; the one-page rule took no
+  line of words on 76 one-page files). Nothing is built; the counts are in docs/layout.md.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
