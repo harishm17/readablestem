@@ -512,6 +512,11 @@ def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[boo
     return longest
 
 
+# A code-face name is set against a maths letter (its subscript, a factor after a thin space)
+# when the gap is under this share of the font size; a word space is wider.
+TIGHT_GAP = 0.25
+
+
 def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bool) -> None:
     """A run of code-face characters ("C") inside a formula is read as it would be in any face:
     the set of "x \u2208 {101} \u2217 y", or the right side of "x = {1, 2}", with the set in CMTT.
@@ -520,13 +525,20 @@ def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bo
     own on its other side. A code-face run beside nothing of the kind stays code: "x = 5" in
     prose, in a code face, is an identifier, and so is the "x + x" in front of an arrow. A row that
     is mostly code face is a line of code, and is left as it is, when it has words of the code
-    face in it or stands among code rows (`among_code`: "a[i] \u2190 a[j] \u2295 t" in a listing has
-    no word, and its arrow is of another face)."""
+    face in it, or is near a code row (`among_code`) and has no maths letter of another face:
+    "a[i] \u2190 a[j] \u2295 t" in a listing has no word, and its arrow is of another face, while
+    "L = {0, 1}" under a line of code, its L in maths italic, is a formula."""
     n = len(chars)
     code = {k for k, kind in enumerate(classes) if kind == "C"}
     if 2 * len(code) > sum(not c.blank for c in chars) and (
-        among_code
-        or any(chars[a].c.isalpha() and chars[a + 1].c.isalpha() for a in code if a + 1 in code)
+        any(chars[a].c.isalpha() and chars[a + 1].c.isalpha() for a in code if a + 1 in code)
+        or (
+            among_code
+            and not any(
+                kind == "M" and c.c.isalpha() and c.c.isascii() and not c.mono
+                for c, kind in zip(chars, classes, strict=True)
+            )
+        )
     ):
         return
 
@@ -569,6 +581,19 @@ def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bo
             touching = (left and chars[before].c.isalpha() and classes[before] == "M") or (
                 right and chars[after].c.isalpha() and classes[after] == "M"
             )
+            # Set against the maths letter, as a subscript or a factor is, not a word space
+            # away from it ("for each measure in M" in an algorithm, "return x" in prose).
+            tight = (
+                left
+                and chars[before].c.isalpha()
+                and classes[before] == "M"
+                and chars[i].x0 - chars[before].x1 < TIGHT_GAP * chars[i].size
+            ) or (
+                right
+                and chars[after].c.isalpha()
+                and classes[after] == "M"
+                and chars[after].x0 - chars[stop - 1].x1 < TIGHT_GAP * chars[stop - 1].size
+            )
             inside = (
                 touching
                 or (left and right)
@@ -586,11 +611,11 @@ def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bo
             if inside and (touching or not word):
                 for k in range(i, stop):
                     if classes[k] == "C":
-                        # The letters of a name that touches a maths letter ("out" with a
+                        # The letters of a name set against a maths letter ("out" with a
                         # subscript) are maths, not a word of the sentence: counted as a
                         # prose word the name made its display a line of text.
                         kind = _char_class(chars[k], code=False)
-                        classes[k] = "M" if word and kind == "L" else kind
+                        classes[k] = "M" if word and tight and kind == "L" else kind
                         changed = True
             i = end
 

@@ -42,8 +42,11 @@
   every count of the 0.5.18 one (83 of 91 pages right, 42 faultless). `layout-dev-1` has the
   same right and faultless pages (161 and 81 of 267); its strays go from 875 to 877 on three
   pages, two of them the pages whose SQL snippets are code blocks now (docs/eval.md).
-- Reviewed twice before its release. Review 26 (`8fe3b940`): no blocker; its two regressions
-  on made pages and its smaller findings are in the first entry below.
+- Reviewed three times before its release. Review 27 (`d4d497b0`): one blocker, in the fix
+  made for review 26 (a code-face word a word space from a math letter became a formula, on
+  one development page), and one smaller regression; both are in the first entry below.
+  Review 26 (`8fe3b940`): no blocker; its two regressions on made pages and its smaller
+  findings are in the second.
 - Review 25 (a680cc80): one blocker and seven smaller findings.
   The blocker (the hand-drawn figure rule, above) and four more are fixed in the entries
   below and in this one; the page audit prints a set's document names only when its registry
@@ -51,19 +54,56 @@
   crops; a resumed job shows the cost on the twin that asked first); the panel-label rule has
   its test.
 
+## Unreleased: a code-face word a word space from a math letter is no formula (review 27)
+
+- Review 27 read the fixes made for review 26 (`8fe3b940..d4d497b0`) and found two things they
+  made worse, fixed here with a regression test each:
+  - Blocker. The rule for a `\mathtt` name beside a math letter took "beside" as anything
+    within one font size, which is also a word space. A code-face word followed or preceded by
+    a math letter in a sentence ("ends with `return` x", "for each `measure` in M") became an
+    inline formula of letters; one page of a development paper showed it (2504.06207 p13, a
+    step of an algorithm), and so did made pages of ordinary prose. The letters of a name are
+    math letters now only when the name is set against the math letter: a gap under a quarter
+    of the font size (`shared.TIGHT_GAP`), which a subscript and a thin space are and a word
+    space is not. The names review 26 found ("out" with a subscript, "n cost") still read as
+    formulas.
+  - Should fix. "Among code rows" was `_Row.code_run`, which is within three lines of one row
+    that is mostly code face. Displayed sets with members in a code face ("L2 = {00, 01, 10,
+    11}") under a line with code words were not reread and went into a code block with that
+    line (made pages only). Such a row is left unread now only when it also has no Latin math
+    letter of another face, as a line of a listing has none.
+- What this takes back: near code rows two reads that were better at `8fe3b940` than at 0.5.18
+  are the 0.5.18 read again (on a made page: two lines of assignments with math signs,
+  "s ← x ⊕ y ⊕ c", are a paragraph with one-sign formulas and not one display). Not worse than
+  0.5.18.
+- A known unevenness, on a made page only: a code-face name with a subscript in a math face
+  ("cost_i") is an inline formula in a sentence and plain text in a row that is mostly code
+  face. No text is lost either way.
+- `eval order --set` refuses a registry whose side is neither `development` nor `held-out`
+  before it converts anything; with `--for-release` it used to convert and score the set and
+  then stop with a traceback, nothing written. `eval page-audit` says on stderr why names are
+  missing when a development set's folder is not the one its registry registers.
+- Measured, no model, against `8fe3b940` with the four switches on: the 25 private corpus
+  files (1,202 pages), the 120 public PDFs of the repository (476 pages), `layout-dev-1` (60
+  documents, 954 pages) and the 6 development papers with algorithms (251 pages) read the same,
+  page for page. Each new case fails on `d4d497b0`. Part of 0.5.19, which was not released
+  before it.
+
 ## Unreleased: a code-face name beside a math letter, a listing line without a word (review 26)
 
 - Review 26 read the release again after review 25's fixes (`8fe3b940`): no blocker, all eight
   findings of review 25 closed, two things made worse than 0.5.18 on pages made for the review
-  (none on a corpus or development page), fixed here:
-  - A `\mathtt` name that touches a math letter ("out" with a subscript, "n cost") was read
-    letter by letter as a word of prose, so its display became a line of text and the
-    denominator under it a paragraph of its own ("Pr[out_A = 1] ≥ 2" and a stray "3"). The
-    letters of such a name are math letters now (`shared._code_beside_maths`). The names in
-    prose ("out_A") are inline formulas.
+  (none on a corpus or development page), fixed here. Review 27 then found the first fix too
+  wide and the second too wide (the entry above narrows both):
+  - A `\mathtt` name set against a math letter ("out" with a subscript, "n cost" with a thin
+    space) was read letter by letter as a word of prose, so its display became a line of text
+    and the denominator under it a paragraph of its own ("Pr[out_A = 1] ≥ 2" and a stray "3").
+    The letters of such a name are math letters now (`shared._code_beside_maths`). The names
+    in prose ("out_A") are inline formulas.
   - A line of a listing with no word of two letters and an arrow from a math font
     ("a[i] ← a[j] ⊕ t") was reread as maths and cut out of its code block as a display. A row
-    that is mostly code face and stands among code rows (`_Row.code_run`) is not reread.
+    that is mostly code face, near a code row (`_Row.code_run`: within three lines of one) and
+    without a Latin math letter of another face is not reread.
 - `eval page-audit` and `eval order --set` ask one function whether a set is held out
   (`cli/layout_gold.held_out`): it is, unless its registry says development, and for the audit
   unless the folder is also the one that registry registers.
@@ -101,7 +141,7 @@
   it touches a math letter of another face, stands between two math characters or operators of
   another face, or comes next to one that has an operand on its other side. A run beside nothing
   of the kind, a row that is mostly code face with code words (a listing), and a word of two
-  letters or more that touches no math letter stay code, so what the 0.5.19 entry for code fonts
+  letters or more that is not set against a math letter stay code, so what the 0.5.19 entry for code fonts
   (O-440) fixed is unchanged. Measured on the 25 private corpus uploads: 10 pages of one upload,
   fonts NimbusMonL and CourierNew, had their formulas torn since 0.5.19; 30 of the 31 broken
   formulas are whole now and the 247 formulas of those pages read as in 0.5.18 but one (the
@@ -139,9 +179,8 @@
   unless its registry says development (review 25: a folder with no registry was printed
   with its names) and the folder is the one that registry registers (review 26: a held-out
   folder given a development set's registry, or its name, was named). `eval order --set`
-  asks the same function (`cli/layout_gold.held_out`), so a registry with any other word for
-  its side is scored for a release only. An eval tool only: no reader change, no version
-  raise.
+  asks the same function (`cli/layout_gold.held_out`) and refuses a registry with any other
+  word for its side (review 27). An eval tool only: no reader change, no version raise.
 - Why: as built, the audit of the held-out layout set asked about every page of every
   document (1,015 pages) where the gold marks 247, so the paid shadow run the plan caps at
   $3.00 could not be afforded, and its verdicts could not be set against any truth.

@@ -413,6 +413,17 @@ def display_with_a_subscripted_typewriter_name(page):
     prose(page, 190, "and the text goes on after the display with more words than one.")
 
 
+def in_tex_faces(pdf: bytes) -> bytes:
+    """The page with Times italic under TeX's name for its maths italic, and Times under the
+    name of a code face that only the font's name tells (no fixed-pitch flag)."""
+    doc = pymupdf.open(stream=pdf)
+    names = {"/Times-Italic": "/CMMI10", "/Times-Roman": "/NimbusMonL-Regu"}
+    for xref in range(1, doc.xref_length()):
+        if (name := doc.xref_get_key(xref, "BaseFont")[1]) in names:
+            doc.xref_set_key(xref, "BaseFont", names[name])
+    return doc.tobytes()
+
+
 @pytest.mark.skipif(not Path(DEJAVU).exists(), reason="needs DejaVu Sans for the maths signs")
 @pytest.mark.parametrize(
     ("fill", "kind", "whole"),
@@ -423,12 +434,57 @@ def display_with_a_subscripted_typewriter_name(page):
     ],
 )
 def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, kind, whole):
-    doc = pymupdf.open(stream=one_page(fill))
-    for xref in range(1, doc.xref_length()):  # the subscript's face under TeX's name for it
-        if doc.xref_get_key(xref, "BaseFont")[1] == "/Times-Italic":
-            doc.xref_set_key(xref, "BaseFont", "/CMMI10")
-    elements = analyze(doc.tobytes()).elements
+    elements = analyze(in_tex_faces(one_page(fill))).elements
     (found,) = [e for e in equations(elements) if e.display == kind]
     assert whole in nospace(found.text)
     assert not [e for e in elements if e.kind == Kind.PARAGRAPH and whole in (e.text or "")]
     assert not [e for e in elements if e.kind == Kind.PARAGRAPH and (e.text or "").strip() == "3"]
+
+
+def test_a_code_word_a_word_space_from_a_math_letter_is_no_formula():
+    """ "ends with return x" and "for each measure in M": the word in the code face stands a
+    word space from the maths letter, it is not set against it as a name with a subscript is."""
+
+    def fill(page):
+        page.insert_text((72, 100), "The function ends with", fontsize=11)
+        page.insert_text((184, 100), "return", fontsize=11, fontname="cour")
+        page.insert_text((227, 100), "x", fontsize=11, fontname="tiit")
+        page.insert_text((236, 100), "when the list is empty, and it goes on", fontsize=11)
+        page.insert_text((72, 114), "for each", fontsize=11)
+        page.insert_text((114, 114), "measure", fontsize=11, fontname="cour")
+        page.insert_text((164, 114), "in", fontsize=11)
+        page.insert_text((177, 114), "M", fontsize=11, fontname="tiit")
+        page.insert_text((190, 114), "of the list until every one of them is done.", fontsize=11)
+
+    found = equations(analyze(in_tex_faces(one_page(fill))).elements)
+    assert not [e for e in found if "return" in e.text or "measure" in e.text]
+
+
+def test_displayed_sets_under_a_line_with_code_words_are_a_display_not_code():
+    """Three displayed sets, their members in a code face: the first holds words of letters
+    and is a line of code to the reader, the two under it hold digits only and begin with a
+    letter in maths italic. Standing near a code row does not make them code."""
+
+    def fill(page):
+        prose(page, 100, "The three languages over the alphabet, each written out in full, are")
+        rows = [
+            ("1", "{ab, ba, abab, baba}"),
+            ("2", "{00, 01, 10, 11}"),
+            ("3", "{000, 010, 100, 110}"),
+        ]
+        for n, (index, members) in enumerate(rows):
+            y = 140 + 16 * n
+            page.insert_text((200, y), "L", fontsize=11, fontname="tiit")
+            page.insert_text((207, y + 2), index, fontsize=7, fontname="helv")
+            page.insert_text((216, y), "=", fontsize=11, fontname="helv")
+            page.insert_text((230, y), members, fontsize=11, fontname="tiro")
+        prose(
+            page,
+            202,
+            "and every word of the second language has length two, as the next part shows.",
+        )
+        prose(page, 218, "The third language is used in the exercise at the end of the section.")
+
+    elements = analyze(in_tex_faces(one_page(fill))).elements
+    assert any("L2={00,01,10,11}" in nospace(e.text) for e in equations(elements))
+    assert not [e for e in elements if e.preformatted and "00, 01" in (e.text or "")]
