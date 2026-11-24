@@ -512,9 +512,10 @@ def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[boo
     return longest
 
 
-# A code-face name is set against a maths letter (its subscript, a factor after a thin space)
-# when the gap is under this share of the font size; a word space is wider.
-TIGHT_GAP = 0.25
+# A code-face name is set against a maths letter (the letter is its subscript, or the two are
+# kerned together) when the gap is under this share of the font size. A word space is a
+# quarter to a third of the size and shrinks to a fifth in a tight line; a thin space is a sixth.
+TIGHT_GAP = 0.1
 
 
 def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bool) -> None:
@@ -581,8 +582,8 @@ def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bo
             touching = (left and chars[before].c.isalpha() and classes[before] == "M") or (
                 right and chars[after].c.isalpha() and classes[after] == "M"
             )
-            # Set against the maths letter, as a subscript or a factor is, not a word space
-            # away from it ("for each measure in M" in an algorithm, "return x" in prose).
+            # Set against the maths letter, as a name with a subscript is, not a space away
+            # from it ("for each measure in M" in an algorithm, "return x" in prose).
             tight = (
                 left
                 and chars[before].c.isalpha()
@@ -601,21 +602,22 @@ def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bo
                 or (right and operand(nearest(after + 1, 1)))
             )
             # A word of the code face ("out" in "Pr[out = 1]", "op1" in prose) is a name, not an
-            # operand: unless it touches a maths letter the run stays code as a whole. Read as
-            # a word it would turn a display into a line of prose, and read in part the "1" of
-            # "op1" would join the formula next to it.
+            # operand: unless it is set against a maths letter the run stays code as a whole,
+            # at any size of the code face. Read as a word it would turn a display into a line
+            # of prose (or, smaller than the text, pass for a script of the letter), and read in
+            # part the "1" of "op1" would join the formula next to it.
             word = any(
                 chars[k].c.isalpha() and k + 1 < stop and chars[k + 1].c.isalpha()
                 for k in range(i, stop)
             )
-            if inside and (touching or not word):
+            if inside and (tight or not word):
                 for k in range(i, stop):
                     if classes[k] == "C":
                         # The letters of a name set against a maths letter ("out" with a
                         # subscript) are maths, not a word of the sentence: counted as a
                         # prose word the name made its display a line of text.
                         kind = _char_class(chars[k], code=False)
-                        classes[k] = "M" if word and tight and kind == "L" else kind
+                        classes[k] = "M" if word and kind == "L" else kind
                         changed = True
             i = end
 

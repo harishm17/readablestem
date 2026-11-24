@@ -2485,14 +2485,20 @@ the kind stays code, so "x = 5" in a code face inside prose is still an identifi
 letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it is set against
 a math letter: read as a word it would make the row prose and take a display out of the
 equations, and read in part the "1" of `op1` would join the formula next to it (2504.20938 p7).
-When such a name is set against a math letter (`\mathtt{out}` with a subscript, "n cost" with a
-thin space), its letters are read as math letters and not as letters of a word: as a word the
-name made its display prose again and left the denominator a paragraph of its own (review 26;
-made pages only). "Set against" is a gap under a quarter of the font size (`TIGHT_GAP`), which a
-subscript and a thin space are and a word space is not: with any gap under one font size
-allowed, a code-face word a word space from a math letter in a sentence ("for each `measure`
-in M", "ends with `return` x") became an inline formula of letters (review 27; 2504.06207 p13
-and made pages). A row that is mostly code face is not reread at all when it has code words in
+When such a name is set against a math letter (`\mathtt{out}` with a subscript), its letters
+are read as math letters and not as letters of a word: as a word the name made its display
+prose again and left the denominator a paragraph of its own (review 26; made pages only). "Set
+against" is a gap under a tenth of the font size (`TIGHT_GAP`), which a subscript and a kerned
+pair are; a thin space is a sixth, and a word space a quarter to a third, a fifth in a tight
+line. At any wider gap the name stays code as a whole, as at 0.5.18: its display is whole all
+the same (a code word is a prose word only near a code row), and in a sentence the word stays
+in the sentence. With any gap under one font size allowed, a code-face word a word space from
+a math letter ("for each `measure` in M", "ends with `return` x") became an inline formula of
+letters (review 27; 2504.06207 p13 and made pages); with a quarter allowed, so did a word at
+a shrunk or quarter-em word space, a display with a name a thick space from a letter ("n cost"
+at `\;`) was cut, and a code face smaller than the text, reread as letters, passed for a
+script of the letter and joined its formula (review 28; made pages only, the last two since
+`8fe3b940`). A row that is mostly code face is not reread at all when it has code words in
 it, or when it is near a code row (`_Row.code_run`: within three lines of a row that is mostly
 code face) and has no Latin math letter of another face: the SQL page of ax_cslg_240306367 p4
 stays code, and so does the line "a[i] ← a[j] ⊕ t" of a listing whose arrows are of a math
@@ -2512,7 +2518,12 @@ on made pages only: near code rows, lines of assignments with math signs ("s ←
 a paragraph with one-sign formulas, as at 0.5.18, and not one display; a code-face name with a
 math-face subscript ("cost_i") is an inline formula in a sentence and plain text in a row that
 is mostly code face; and a displayed set whose members are strings of letters in the code
-face ("L1 = {ab, ba, abab}") has code words in it and is a line of code. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
+face ("L1 = {ab, ba, abab}") has code words in it and is a line of code. Two more from
+review 28, on made pages only: near a code row a set named by a Greek capital ("Σ = {0, 1}")
+in a font the list takes for code is a paragraph with inline formulas, since the letter test
+asks for a Latin letter (a λ in a listing line must not make it a formula); and a listing
+whose variables are in math italic is reread, so three of its lines become a display.
+Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
 (base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
 is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
 {...}") and changed 16 pages of 2 files against the 0.5.18 read, 11 of them for the worse. With

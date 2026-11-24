@@ -42,17 +42,54 @@
   every count of the 0.5.18 one (83 of 91 pages right, 42 faultless). `layout-dev-1` has the
   same right and faultless pages (161 and 81 of 267); its strays go from 875 to 877 on three
   pages, two of them the pages whose SQL snippets are code blocks now (docs/eval.md).
-- Reviewed three times before its release. Review 27 (`d4d497b0`): one blocker, in the fix
-  made for review 26 (a code-face word a word space from a math letter became a formula, on
-  one development page), and one smaller regression; both are in the first entry below.
-  Review 26 (`8fe3b940`): no blocker; its two regressions on made pages and its smaller
-  findings are in the second.
+- Reviewed four times before its release. Review 28 (`84dbf083`): release OK, no blocker;
+  three cases of a code-face word beside a math letter that read worse than 0.5.18 on made
+  pages, closed by one condition in the first entry below. Review 27 (`d4d497b0`): one
+  blocker, in the fix made for review 26 (a code-face word a word space from a math letter
+  became a formula, on one development page), and one smaller regression; both are in the
+  second entry. Review 26 (`8fe3b940`): no blocker; its two regressions on made pages and its
+  smaller findings are in the third.
 - Review 25 (a680cc80): one blocker and seven smaller findings.
   The blocker (the hand-drawn figure rule, above) and four more are fixed in the entries
   below and in this one; the page audit prints a set's document names only when its registry
   says development; two are limits stated in docs/steps.md (a shared answer needs identical
   crops; a resumed job shows the cost on the twin that asked first); the panel-label rule has
   its test.
+
+## Unreleased: a code-face word is reread only when set against a math letter (review 28)
+
+- Review 28 read the fix made for review 27 (`c348d72b`): release OK, no blocker, no page of
+  a real set moved. On pages made for the review a code-face word of two letters or more
+  within one font size of a math letter still read worse than 0.5.18 in three ways, all one
+  shape (rare in the corpus and the development sets; ordinary in computer science notes and
+  Typst documents):
+  - A code face set smaller than the text (Typst's `raw` at 0.8 of the size,
+    `\footnotesize\texttt`) a word space from a math letter was joined to the letter's
+    formula: reread as letters, the small word passed for a script. Since `8fe3b940`.
+  - A display with a code-face name a thick space or a word space from a math letter
+    ("n cost" at `\;`, "a xor b") was a line of prose with its denominator a paragraph of its
+    own. As at `8fe3b940`; `d4d497b0` read these whole, by the rule that made prose into
+    formulas.
+  - A word space under a quarter of the font size (a tight line of a two-column page, a
+    quarter-em space) made one formula of the word and the letter. From review 27's fix.
+- One condition closes the three: a code-face word is reread only when it is set against a
+  math letter, a gap under a tenth of the font size (`shared.TIGHT_GAP`, a quarter before), as
+  a name with a subscript is; at any wider gap the run stays code as a whole, which is what
+  0.5.18 does. A display with such a name is whole (a code word is a prose word only near a
+  code row), the word in a sentence stays in the sentence, and a math letter beside it is a
+  formula of its own ("n bits": the "n" alone).
+- The word-space test of review 27 had a row that held nothing (its code word stood next to
+  "in", not next to a math letter). The test is one sentence at three settings now (a word
+  space, a shrunk word space, a small code face) and the display has a case; the last two
+  settings and the display fail on `84dbf083`.
+- Stated as limits, each on made pages only (docs/layout.md): near a code row a set named by
+  a Greek capital ("Σ = {0, 1}") in a font the list takes for code is a paragraph with inline
+  formulas and not a display; a listing whose variables are in math italic is reread, three
+  of its lines become a display (since `8fe3b940`).
+- Measured, no model, against `8fe3b940` with the four switches on: the 25 private corpus
+  files (1,202 pages), the public PDFs of the repository (120 listed, 119 open; 476 pages),
+  `layout-dev-1` (60 documents, 954 pages) and the 6 development papers with algorithms (251
+  pages) read the same, page for page. Part of 0.5.19, which was not released before it.
 
 ## Unreleased: a code-face word a word space from a math letter is no formula (review 27)
 
@@ -64,9 +101,9 @@
     inline formula of letters; one page of a development paper showed it (2504.06207 p13, a
     step of an algorithm), and so did made pages of ordinary prose. The letters of a name are
     math letters now only when the name is set against the math letter: a gap under a quarter
-    of the font size (`shared.TIGHT_GAP`), which a subscript and a thin space are and a word
-    space is not. The names review 26 found ("out" with a subscript, "n cost") still read as
-    formulas.
+    of the font size (`shared.TIGHT_GAP`; a tenth since review 28, above, because a word space
+    can be under a quarter). The displays review 26 found ("out" with a subscript, "n cost")
+    still read whole.
   - Should fix. "Among code rows" was `_Row.code_run`, which is within three lines of one row
     that is mostly code face. Displayed sets with members in a code face ("L2 = {00, 01, 10,
     11}") under a line with code words were not reread and went into a code block with that
@@ -86,8 +123,8 @@
 - Measured, no model, against `8fe3b940` with the four switches on: the 25 private corpus
   files (1,202 pages), the 120 public PDFs of the repository (476 pages), `layout-dev-1` (60
   documents, 954 pages) and the 6 development papers with algorithms (251 pages) read the same,
-  page for page. Each new case fails on `d4d497b0`. Part of 0.5.19, which was not released
-  before it.
+  page for page (one of the 120 public PDFs does not open, under any version). Each new case
+  fails on `d4d497b0`. Part of 0.5.19, which was not released before it.
 
 ## Unreleased: a code-face name beside a math letter, a listing line without a word (review 26)
 
@@ -95,7 +132,7 @@
   findings of review 25 closed, two things made worse than 0.5.18 on pages made for the review
   (none on a corpus or development page), fixed here. Review 27 then found the first fix too
   wide and the second too wide (the entry above narrows both):
-  - A `\mathtt` name set against a math letter ("out" with a subscript, "n cost" with a thin
+  - A `\mathtt` name beside a math letter ("out" with a subscript, "n cost" with a thin
     space) was read letter by letter as a word of prose, so its display became a line of text
     and the denominator under it a paragraph of its own ("Pr[out_A = 1] ≥ 2" and a stray "3").
     The letters of such a name are math letters now (`shared._code_beside_maths`). The names
