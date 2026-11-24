@@ -114,6 +114,8 @@ def _env(extra: dict[str, str]) -> dict[str, str]:
     return {"HOME": "/tmp", "LANG": "C.UTF-8", "TZ": "UTC", "SOURCE_DATE_EPOCH": "1", **extra}
 
 
+COMPAT = Path(__file__).with_name("compat.tex")
+_COMPAT_MOUNT = "/opt/compat.tex"
 BEAMER_COMPAT = Path(__file__).with_name("beamer_compat.tex")
 _BEAMER_MOUNT = "/opt/beamer_compat.tex"
 
@@ -146,10 +148,12 @@ def convert(
     xml_out = sandbox.where(xml_dir, "/out")
 
     prefix, extra, tools = _program("latexml")
-    preload: list[str] = []
+    compat_file = sandbox.where(COMPAT, _COMPAT_MOUNT)
+    preload = [f"--preload={compat_file}"]  # what every source lacks (the file's header)
+    ro += ((COMPAT, _COMPAT_MOUNT),)
     beamer_file = sandbox.where(BEAMER_COMPAT, _BEAMER_MOUNT)
     if beamer:  # definitions for the Beamer parts LaTeXML's binding lacks (the file's header)
-        preload = [f"--preload={beamer_file}"]
+        preload.append(f"--preload={beamer_file}")
         ro += ((BEAMER_COMPAT, _BEAMER_MOUNT),)
     first = sandbox.run(
         [

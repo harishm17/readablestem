@@ -1054,8 +1054,12 @@ class _Reader:
                 term = ""
 
     def _listing(self, node: Node) -> None:
+        # A line of a `listings` listing ends in its own newline; joining them again would
+        # leave a blank line between every two lines of the code.
         lines = [
-            "".join(line.itertext()) for line in node.iter() if "ltx_listingline" in _classes(line)
+            "".join(line.itertext()).rstrip("\n")
+            for line in node.iter()
+            if "ltx_listingline" in _classes(line)
         ]
         whole = self._take(node)
         text = "\n".join(lines) if lines else whole

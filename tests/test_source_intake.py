@@ -149,9 +149,16 @@ def test_the_lint_refuses_the_plain_forms(snippet, code):
     assert refusal("p.zip", make_zip({"main.tex": source})) == code
 
 
-def test_the_lint_reads_every_text_file_of_a_zip():
-    data = make_zip({"main.tex": ARTICLE, "evil.sty": "\\immediate\\write18{id}"})
+def test_the_lint_reads_every_text_file_of_a_zip_that_is_read():
+    data = make_zip({"main.tex": ARTICLE, "chapter.tex": "\\immediate\\write18{id}"})
     assert refusal("p.zip", data) == "source_unsafe"
+    # A class or package of the upload is read only when a file names it in an input command;
+    # `\usepackage` takes LaTeXML's own binding. A journal's class holds `\openout` as it comes.
+    own = {"elsarticle.cls": "\\newwrite\\w\\immediate\\openout\\w=\\jobname.spl"}
+    use = ARTICLE.replace("{article}", "{elsarticle}")
+    assert intake.inspect("p.zip", make_zip({"main.tex": use, **own})).main == "main.tex"
+    named = use.replace("\\begin{document}", "\\input{elsarticle.cls}\n\\begin{document}")
+    assert refusal("p.zip", make_zip({"main.tex": named, **own})) == "source_unsafe"
 
 
 @pytest.mark.parametrize(
@@ -165,6 +172,7 @@ def test_the_lint_reads_every_text_file_of_a_zip():
         "\\newcommand{\\writer}{x}\\writer",
         "\\inputencoding is not an input",
         "\\write\\mystream{text}",
+        "\\bibliography{/Users/me/papers/refs}",  # the author's own machine: the .bbl is read
     ],
 )
 def test_ordinary_documents_pass_the_lint(snippet):
