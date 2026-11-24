@@ -971,6 +971,9 @@ def test_a_full_width_algorithm_with_comments_and_long_steps_is_one_block():
     # ones run past the gutter and the line numbers stand in the leaf of the long ones
     # ("S"), not in the one of the first steps ("L").
     sans = Path("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf")
+    wide_step = (
+        "for each rate r in Rates of the part that the reader marked for the scan of the verse do"
+    )
     steps = [
         (0, "Input: Names[..]", "\u25b7 the names to rate"),
         (0, "Output: base[..]", "\u25b7 the base"),
@@ -980,7 +983,7 @@ def test_a_full_width_algorithm_with_comments_and_long_steps_is_one_block():
         (2, "for each part p in Parts do", None),
         (3, "v = Score(x, p);", None),
         (3, "for each unit u in Units do", None),
-        (4, "for each rate r in Rates of the part that the reader marked for the scan of the verse do", None),
+        (4, wide_step, None),
         (5, "w = Rate(v, u, x) plus the weight of the part of the line;", None),
         (5, "base[ ] <- v union w;", None),
         (1, "return base", None),
@@ -988,7 +991,11 @@ def test_a_full_width_algorithm_with_comments_and_long_steps_is_one_block():
 
     def wide(page):
         y = 90.0
-        for row in ["System   Cost   Coding need", "Linux   Mac   Windows   Free", "Python   Java   R"]:
+        for row in [
+            "System   Cost   Coding need",
+            "Linux   Mac   Windows   Free",
+            "Python   Java   R",
+        ]:
             page.insert_text((140, y), row, fontsize=BODY, fontname="helv")
             y += 14
         y = prose(page, y + 12, "Algorithm 1 Establish the base.") - 8
@@ -996,7 +1003,9 @@ def test_a_full_width_algorithm_with_comments_and_long_steps_is_one_block():
             line = f"{n}:" + " " * (1 + 4 * level) + text
             page.insert_text((72, y), line, fontsize=BODY, fontname="helv")
             if comment:
-                page.insert_text((400, y), comment, fontsize=BODY, fontname="dj", fontfile=str(sans))
+                page.insert_text(
+                    (400, y), comment, fontsize=BODY, fontname="dj", fontfile=str(sans)
+                )
             y += 20 if n == 8 else 14
         for left in (72, 316):
             rect = pymupdf.Rect(left, y + 20, left + 224, y + 170)
