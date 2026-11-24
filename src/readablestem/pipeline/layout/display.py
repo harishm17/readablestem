@@ -44,6 +44,7 @@ from readablestem.pipeline.parse import EQUATION_THRESHOLD
 
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
+ELLIPSIS_DOTS = 3  # centered dots in a row that make an ellipsis, not a multiplication sign
 TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table
 MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
 
@@ -122,6 +123,7 @@ NUMBERED_FAR_INDENT = 1.0
 # "+" or a relation is the display's number, not the line's right-hand side ("x = (2)" is never
 # set so far off): the first row of a display set in several rows, its number level with it.
 NUMBERED_TRAILING_GAP = 3.0
+TRAILING_ROW_GAP = 1.5  # x font size: the most blank between that row and the display's next one
 # `LAYOUT_DISPLAY_GROUPING`: a number on a row of its own above the display, at its left edge.
 NUMBER_ABOVE_GAP = 1.0  # x font size: the most blank between the number's row and the display
 
@@ -661,6 +663,20 @@ class _Line:
         return self.ink[0].c in _CONTINUATION_SIGNS
 
     @cached_property
+    def goes_on_after_ink(self) -> bool:
+        """Ends in a relation or operator that the next row takes up. Not the row of dots that
+        ends a series ("x + x^2 + x^3 + ..."): they are set as multiplication signs."""
+        ink = self.ink
+        if ink[-1].c not in _CONTINUATION_SIGNS:
+            return False
+        dots = 0
+        for c in reversed(ink):
+            if c.c != "\u22c5":
+                break
+            dots += 1
+        return dots < ELLIPSIS_DOTS
+
+    @cached_property
     def relation_x(self) -> float | None:
         return min((c.x0 for c in self.relations), default=None)
 
@@ -806,15 +822,18 @@ def _equation_regions(
             for line in lines
             if _number_beside(label, line.box, line.size, far=label.far_number)
             and not (label.far_number and _level_with_numbered(line, lines))
-            and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+            and not line.goes_on_after_ink  # "x =   2.4": its right-hand side
         ]
         if not beside and document.grouping:
-            # only a row that goes on stands beside it: the first row of a display in several
+            # only a row that goes on stands beside it: the first row of a display in several,
+            # level with its number, with no number yet, and with something after it
             beside = [
                 line
                 for line in lines
-                if _number_beside(label, line.box, line.size, far=label.far_number)
+                if not line.labels
+                and _number_beside(label, line.box, line.size)
                 and _trailing_number(label, line)
+                and _goes_on(label, line, lines, rows)
             ]
         # Another column's maths only when the number's own column has no content beside it.
         own_column = [ln for ln in beside if ln.rows[0].column == label.column]
@@ -856,6 +875,35 @@ def _trailing_number(label: _Row, line: _Line) -> bool:
     return bool(EQUATION_NUMBER.match(label.clean)) and label.x0 - line.box[
         2
     ] >= NUMBERED_TRAILING_GAP * max(label.size, line.size)
+
+
+def _goes_on(label: _Row, line: _Line, lines: list[_Line], rows: list[_Row]) -> bool:
+    """Does the display go on after `line`, so that the number level with it is the display's:
+    a line right under it (at most `TRAILING_ROW_GAP` font sizes down, over part of its width),
+    or rows between the line and the number (the cases of a brace)? A bracketed number after
+    "3x + 2 =" with nothing under it or beside it is an answer or a mark of a worksheet."""
+    size = max(label.size, line.size)
+    if any(
+        other is not line
+        and other.rows[0].column == line.rows[0].column
+        and 0 < other.box[1] - line.box[3] <= TRAILING_ROW_GAP * size
+        and other.box[0] <= line.box[2]
+        and other.box[2] >= line.box[0]
+        for other in lines
+    ):
+        return True
+    own = {id(r) for r in line.rows}
+    for row in rows:
+        if id(row) in own or row is label or row.column != line.rows[0].column:
+            continue
+        shared = min(row.y1, line.box[3]) - max(row.y0, line.box[1])
+        if (
+            line.box[2] - 1 <= row.x0
+            and row.x1 <= label.x0 + 1
+            and shared > 0.25 * min(row.y1 - row.y0, line.box[3] - line.box[1])
+        ):
+            return True
+    return False
 
 
 def _line_below_number(label: _Row, lines: list[_Line]) -> _Line | None:

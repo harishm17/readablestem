@@ -291,6 +291,20 @@ def test_a_number_set_off_from_a_display_numbers_it_when_display_grouping_is_on(
     assert not any("(106)" in (e.text or "") for e in elements)  # no element of its own
 
 
+def test_a_bracketed_answer_after_a_line_that_does_not_go_on_is_not_an_equation_number():
+    """A worksheet line "3x + 2 =      (4)" ends in a relation and has nothing under it: the
+    "(4)" is the answer or a mark, so it stays out of the equation's label."""
+
+    def fill(page):
+        prose(page, 100, "Fill in the missing value and give the number of the rule you used.")
+        page.insert_text((200, 140), "3x + 2 =", fontsize=12, fontname="Times-Italic")
+        page.insert_text((400, 140), "(4)", fontsize=12)
+        prose(page, 200, "and the next line goes on as the text of the sheet goes on and on.")
+
+    elements = analyze(one_page(fill), display_grouping=True).elements
+    assert not any(e.equation_label for e in elements)
+
+
 # ---------------------------------------------------------------- rows of a table
 
 
