@@ -174,6 +174,8 @@ def _project(blob: bytes, tmp: Path, *, beamer_ok: bool) -> tuple[Path, str, boo
             (project / "main.tex").write_bytes(data)
         else:
             arc.extract(data, project)
+            for path in lint.left_out(texts):  # a class or package file that fails the lint
+                (project / path).unlink(missing_ok=True)
     except intake.SourceRefused:
         raise SourceFailed("source_refused") from None
     except arc.ArchiveRefused:

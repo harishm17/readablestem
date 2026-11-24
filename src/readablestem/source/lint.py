@@ -35,11 +35,16 @@ _ARG = re.compile(
 # never opens the database, so an absolute path there (a path on the author's machine, the usual
 # case) reads nothing and is no reason to refuse the upload. `..`, `~`, `|` and URLs still are.
 _BIBLIOGRAPHY = frozenset({"bibliography", "addbibresource"})
-# Files that are read only when a document names one with its suffix in an input command: a
-# class or package of the upload is not read by `\documentclass` or `\usepackage` (LaTeXML uses
-# its own bindings; docs/web.md, "Classes and packages"). A journal's own `.cls` that came with
-# the paper holds `\immediate\openout` and `\input{\csname...}` as TeX Live's copy does.
-_UNREAD = (".cls", ".clo", ".sty", ".bst")
+# A class or package file of the upload. A journal's own `.cls` that came with the paper holds
+# `\immediate\openout` and `\input{\csname...}` as TeX Live's copy does, and the document is
+# read with LaTeXML's binding of that class, not with the file. One that fails the scan is
+# therefore left out of the project (`left_out`) instead of refusing the upload, unless a file
+# names it with its suffix in an input command. It cannot stay in the project unscanned:
+# LaTeXML does read such a file when a binding loads the raw file of its own name (88 of the
+# bindings of 0.8.8 do, `algorithm` and `revtex4-1` among them: with the TeX tree hidden they
+# find nothing, with a file of that name in the project they find it), and when the document
+# loads the `latexml` package with `rawstyles` or `rawclasses`.
+_STYLE_FILES = (".cls", ".clo", ".sty", ".bst")
 _INPUT = re.compile(r"\\(?:input|include|InputIfFileExists)(?![A-Za-z])\s*\{?\s*([^\s{}]+)")
 _FORBIDDEN = re.compile(
     r"\\write\s*\{?\s*-?18(?![A-Za-z])"  # \write18, \write 18, \write{18}
@@ -87,19 +92,30 @@ def problem(text: str) -> str | None:
     return None
 
 
-def project_problem(texts: dict[str, str]) -> str | None:
-    """`problem` for every text file of an upload (by path). A class or package file of the
-    upload is looked at only when a file that is read names it with its suffix in `\\input`,
-    `\\include` or `\\InputIfFileExists`: nothing else makes LaTeXML read it."""
+def left_out(texts: dict[str, str]) -> set[str]:
+    """The paths of the upload's class and package files that fail `problem` and that no file of
+    the upload names with its suffix in `\\input`, `\\include` or `\\InputIfFileExists`. The
+    conversion does not put them in the project it gives LaTeXML (`convert._project`), so no
+    file LaTeXML can read has failed the scan."""
     named = {
         PurePosixPath(match.group(1)).name
-        for path, text in texts.items()
-        if not path.lower().endswith(_UNREAD)
+        for text in texts.values()
         for match in _INPUT.finditer(strip_comments(text))
     }
+    return {
+        path
+        for path, text in texts.items()
+        if path.lower().endswith(_STYLE_FILES)
+        and PurePosixPath(path).name not in named
+        and problem(text) is not None
+    }
+
+
+def project_problem(texts: dict[str, str]) -> str | None:
+    """`problem` for every text file of an upload (by path) that the conversion gives LaTeXML:
+    all but the ones `left_out`."""
+    skipped = left_out(texts)
     for path, text in texts.items():
-        if path.lower().endswith(_UNREAD) and PurePosixPath(path).name not in named:
-            continue
-        if (found := problem(text)) is not None:
+        if path not in skipped and (found := problem(text)) is not None:
             return found
     return None

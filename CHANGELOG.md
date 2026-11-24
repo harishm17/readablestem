@@ -114,12 +114,18 @@
     `language=` option, so the source stopped with `source_undefined`. A new preload,
     `source/compat.tex`, defines it as empty, and `\orcidlink{...}` as nothing (the link has no
     text for a reader). It is read before every document, next to the beamer preload.
-  - Lint: a class or package file bundled with the upload (a journal's `.cls` or `.sty`) is
-    never read by LaTeXML, which uses its own binding, so the lint no longer reads it either
-    unless a file that is read inputs it by name. Three sources had been refused as
-    `source_refused` for a `\openout` in such a file. An absolute `\bibliography{/path}` is no
-    longer refused as a path (bibliography files are read from the project only); `..`, `~`,
-    pipes and URLs still are.
+  - Lint: a class or package file bundled with the upload (a journal's `.cls` or `.sty`) that
+    fails the lint no longer refuses the upload: the file is left out of the project LaTeXML
+    gets, and the document is read with LaTeXML's own binding, unless a file inputs it by name
+    (then the upload is refused as before). Three sources had been refused as `source_refused`
+    for a `\openout` in such a file. The first form of this fix only stopped looking at such
+    files and left them in the project, on the ground that LaTeXML never reads them. It does:
+    a binding that loads the raw file of its own name reads a bundled `algorithm.sty` (88
+    bindings do this), and so does a document that loads `latexml` with `rawstyles`. Found on
+    reading the branch, before any release; with the file left out, the three sources end as
+    they did in the census (2404.15495 converts to the same LaTeXML output). An absolute
+    `\bibliography{/path}` is no longer refused as a path (bibliography files are read from the
+    project only); `..`, `~`, pipes and URLs still are.
   - A `listings` block no longer shows a blank line between its lines.
 - Of the 13 sources that converted before, all 13 keep the same LaTeXML output (hash of the
   XHTML). Six more now convert (four by these fixes; two moved with the load of the machine).

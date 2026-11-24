@@ -912,12 +912,17 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `paper`, ...), else the person names it.
 - **Lint** (defence in depth, `source/lint.py`): `\write18` and its spellings, `\openout`, a
   pipe in `\input`, `\directlua`, shell-escape packages, and a file argument that is absolute,
-  goes up, names a home folder or is a URL. Two things are not looked at, because nothing
-  reads them: a class or package file of the upload (`.cls .clo .sty .bst`: a journal's own
-  `elsarticle.cls` or `revtex4-1.cls` holds `\openout`) unless a file that is read names it with
-  its suffix in `\input`, `\include` or `\InputIfFileExists` (`source.lint.project_problem`), and
-  an absolute path in `\bibliography` or `\addbibresource` (the author's own machine; LaTeXML
-  reads the compiled `.bbl`, never the database). `..`, `~`, `|` and URLs stay refused there too.
+  goes up, names a home folder or is a URL. Two things are no refusal. A class or package file
+  of the upload (`.cls .clo .sty .bst`) that fails the lint, as a journal's own `elsarticle.cls`
+  or `revtex4-1.cls` does with its `\openout`, is left out of the project LaTeXML gets
+  (`source.lint.left_out`, `convert._project`), and the document is read with LaTeXML's binding
+  as if the file had not come with it; the upload is still refused when a file names that file
+  with its suffix in `\input`, `\include` or `\InputIfFileExists`. Such a file cannot stay in
+  the project unscanned: 88 of LaTeXML 0.8.8's bindings load the raw file of their own name
+  (`algorithm`, `revtex4-1`), which they find once the project holds one, and the `latexml`
+  package's `rawstyles` and `rawclasses` options read any. And an absolute path in
+  `\bibliography` or `\addbibresource` (the author's own machine; LaTeXML reads the compiled
+  `.bbl`, never the database) is no refusal; `..`, `~`, `|` and URLs stay refused there too.
 - **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
   per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
   `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their

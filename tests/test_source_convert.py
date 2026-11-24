@@ -198,6 +198,21 @@ def test_conversions_one_after_another_each_get_the_gate():
         assert convert("bib").stats.required_decisions == 0
 
 
+def test_a_package_file_of_the_upload_that_fails_the_lint_is_not_given_to_latexml():
+    # LaTeXML's `algorithm` binding loads the raw file of that name when the project holds one
+    # (a paper that comes with its own copy). A file that fails the lint, as a journal's class
+    # with its `\openout` does, is left out of the project: the upload converts, without it.
+    own = "\\newwrite\\w\\immediate\\openout\\w=\\jobname.spl\n\\AtBeginDocument{Smuggled words.}\n"
+    main = (
+        "\\documentclass{article}\n\\usepackage{algorithm}\n"
+        "\\begin{document}\nHello $x$.\n\\end{document}\n"
+    )
+    files = {"main.tex": main, "algorithm.sty": own}
+    blob = envelope.wrap("zip", "p.zip", "main.tex", make_zip(files))
+    result = convert_source(blob, settings=get_settings(), client=FakeVisionClient()).result
+    assert "Hello" in result.html and "Smuggled" not in result.html
+
+
 # ------------------------------------------------------------------ what LaTeXML reported
 
 

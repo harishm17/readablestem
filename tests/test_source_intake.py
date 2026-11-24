@@ -152,8 +152,9 @@ def test_the_lint_refuses_the_plain_forms(snippet, code):
 def test_the_lint_reads_every_text_file_of_a_zip_that_is_read():
     data = make_zip({"main.tex": ARTICLE, "chapter.tex": "\\immediate\\write18{id}"})
     assert refusal("p.zip", data) == "source_unsafe"
-    # A class or package of the upload is read only when a file names it in an input command;
-    # `\usepackage` takes LaTeXML's own binding. A journal's class holds `\openout` as it comes.
+    # A journal's class holds `\openout` as it comes: the upload is not refused for it (the
+    # conversion leaves the file out and reads the document with LaTeXML's binding), unless a
+    # file names it in an input command.
     own = {"elsarticle.cls": "\\newwrite\\w\\immediate\\openout\\w=\\jobname.spl"}
     use = ARTICLE.replace("{article}", "{elsarticle}")
     assert intake.inspect("p.zip", make_zip({"main.tex": use, **own})).main == "main.tex"
