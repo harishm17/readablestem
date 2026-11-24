@@ -3883,6 +3883,24 @@ uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendere
   converted with no model, so what is audited is the layout and the reading order. The
   report goes in that folder (`DIR/page-audit.json`), so a held-out set's rows stay with
   the set and outside the repository.
+- **`--gold-pages`** (with `--gold-dir`): audit only the pages the set's gold marks
+  (`DIR/gold/<id>.json`), so that the verdict can be set against a truth, and a run costs
+  the gold pages and not every page. A file with no gold file is left out and named under
+  `skipped` (`no_gold`). Each file is converted as `eval order --set` converts it, and that
+  one conversion is also scored by the reading-order scorer. The report then holds
+  `against_scorer`: for the page a student is given (`html`) and for what the pipeline holds
+  (`elements`), the gold pages the scorer calls right (its "pages right") and not right, each
+  split by the audit's verdict (pass, flagged, not audited), as counts. Without the flag
+  nothing changes.
+- **`--against REPORT`**: an earlier report of the same set. The command prints, and keeps
+  in the report as `against`, how many pages are in both (matched by document and page),
+  how many have another verdict now (a 3 by 3 table of the earlier verdict by the verdict
+  now), and the earlier run's model, effort and prompt version beside this one's. Reports
+  of different sets, or one made with `--gold-pages` and one without, end with exit code 2.
+- A held-out set (`side` in its registry, `data/gold/layout/<set>.json`; `--registry` names
+  another file) is printed with no document and no page: the Markdown, `against_scorer` and
+  `against` hold counts only, and only the report's `rows`, kept in the set's folder, name
+  pages. A folder with no registry is a development set.
 - **`--rendered`** also sends the picture of the page's output (needs the browser group).
 - **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
   nothing is sent and a page whose answer is not in the file is not audited. `--batch`
