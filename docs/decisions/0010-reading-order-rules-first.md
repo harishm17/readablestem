@@ -42,8 +42,8 @@ Since then the region tree (`pipeline/layout/regions.py`, behind `REGION_TREE`) 
 on the same rules. Measured on layout-dev-1's 267 pages, with no model: 141 pages right with the
 tree off and 163 with it on (22 made right, none made wrong), and on the 91 corpus gold pages
 70 right off and 82 on (none made wrong). Those figures are from 2026-11-18 and 2026-11-19 and
-are the builders' counts; the tree stays off in production until a paid re-recording
-(`docs/layout.md`, "Measured").
+are the builders' counts; the tree stayed off in production until the paid re-recording of
+pipeline 0.5.18 (2026-11-23), which turned it on (`docs/layout.md`, "Measured").
 
 **Cost.** A learned reader takes about 3.5 CPU-seconds and up to 1.4 GB of memory a page. The
 rules take 0.607 s a page today and 0.799 s with the second round's rules (542 development

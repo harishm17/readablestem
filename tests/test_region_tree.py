@@ -248,3 +248,27 @@ def test_a_paragraph_after_a_line_that_runs_to_the_edge_is_no_glossary_entry():
     for on in (False, True):
         found = layout.analyze(doc.tobytes(), region_tree=on).elements
         assert len([e for e in found if e.kind == "paragraph"]) == 1
+
+
+DATA = Path(__file__).parent.parent / "data"
+
+
+def test_options_at_tab_stops_are_no_columns():
+    # A Word quiz: "2. Which quantity is a vector?  a) mass  b) speed  c) displacement" on one
+    # line, "d) energy" under it, and a Name / Date line on the tab stops of the options. The
+    # tree read d) before a), and b) inside the Name line.
+    pdf = (DATA / "authored/tables/handout-word/handout.pdf").read_bytes()
+    texts = [e.text for e in layout.analyze(pdf, pages=[0], region_tree=True).elements]
+    assert "Which quantity is a vector? a) mass b) speed c) displacement d) energy" in texts
+    assert any(t and t.startswith("Name:") and t.endswith("Date: __________") for t in texts)
+
+
+def test_the_limits_of_a_display_stay_in_its_text_with_the_tree_on():
+    # An integral sign taller than its lower limit: the horizontal cut between the lines of the
+    # display left the limit out of the operator's line (text "∫b f′(x) dx = f(b) −f(a) a").
+    pdf = (DATA / "dev-v2/dev/authored/latex-slides/latex-slides.pdf").read_bytes()
+    texts = [
+        [e.text for e in layout.analyze(pdf, pages=[2, 3], region_tree=on).elements]
+        for on in (False, True)
+    ]
+    assert texts[0] == texts[1]

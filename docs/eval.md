@@ -3061,10 +3061,26 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The baseline** (`data/eval/order-corpus.json`, 44 files measured
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-23 at pipeline 0.5.18,
+production profile `11fc9f366bea`, 47 files and 91 gold pages, no answer missing, no step
+stopped early), the student page. A count is given as its pages and, in brackets, its places.
+
+| | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| edge | 13 | 11 | 5 | 4 (5) | 4 (5) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 2 | 0 |
+| real | 41 | 36 | 12 | 7 (9) | 12 (16) | 12 (17) | 10 (15) | 1 (1) | 1 of 2 | 4 | 1 |
+| self-made | 37 | 36 | 25 | 4 (4) | 8 (10) | 2 (20) | 2 (19) | 0 (0) | 0 of 2 | 0 | 0 |
+| real and self-made | 78 | 72 | 37 | 11 (13) | 20 (26) | 14 (37) | 12 (34) | 1 (1) | 1 of 4 | 4 | 1 |
+| all | 91 | 83 | 42 | 15 (18) | 24 (31) | 15 (38) | 15 (39) | 1 (1) | 1 of 4 | 6 | 1 |
+
+The element list reads 83 of 91 right and 48 faultless. What changed against the first
+baseline, and how much of it the four switches of 0.5.18 did, is in "The switch release of
+2026-11-23".
+
+**The first baseline** (2026-11-11, 44 files measured
 whole, 88 gold pages, pipeline 0.5.10,
 production profile `62b4f1678d36`,
-no step stopped early). A count is given as its pages and, in brackets, its places.
+no step stopped early; the figures below are that record's, no longer the file's).
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
@@ -3111,8 +3127,24 @@ is scored only with `--for-release`: once, for a release, and never while the re
 being changed. Its record keeps totals and names no page, `--records`, `--from` and
 `--against` are refused for it, and a failing page is not looked at.
 
-`layout-dev-1` (60 documents, 267 pages;
-`data/eval/order-layout-dev-1.json`, made at 0.5.16), the student page:
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.18
+under the production profile with the four layout switches on), the student page:
+
+| | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| paper | 119 | 69 | 32 | 32 (32) | 93 (458) | 36 (46) | 44 (55) | 10 (13) | 0 of 0 | 18 | 7 |
+| selfmade | 40 | 26 | 13 | 4 (8) | 16 (62) | 10 (67) | 13 (30) | 2 (4) | 0 of 5 | 4 | 2 |
+| textbook | 108 | 66 | 36 | 15 (15) | 77 (355) | 43 (269) | 5 (6) | 1 (1) | 0 of 0 | 28 | 0 |
+| all | 267 | 161 | 81 | 51 (55) | 186 (875) | 89 (382) | 62 (91) | 13 (18) | 0 of 5 | 50 | 9 |
+
+The element list reads 160 of 267 right and 82 faultless. Against the 0.5.16 record below: 20
+pages made right and none made wrong, broken blocks 99 to 50, cross-joins 27 to 9, strays 985
+to 875, merged places 121 to 91. Cut places rise from 296 to 382 on fewer pages (92 to 89): 83
+of the 86 more are on four pages (`os_introduction_computer_science` pages 7 and 8,
+`os_algebra_and_trigonometry_2e` page 11, `sm_glossary_a` page 1), three of which became
+right; the element list's cut places fall (132 to 125).
+
+The record before it (0.5.16, the four switches off), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Cut | Merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|
@@ -3514,10 +3546,11 @@ record's 3 tables are 2 and its 57 decisions 56): the body column beside a sideb
 table and sent for a decision, and is two columns of text now
 (CHANGELOG "two text columns whose lines mostly hold one cell are not a table", O-150). The same 30
 uploads are left out, for the same 1,324 answers missing, upload by upload: no recorded request
-stops matching. **A paid recording of the
-answers is owed** (about 1,300 requests on the current code) to bring those uploads back into
-the gate. The cost, order and outputs records are still the 0.5.10 ones, and CI does not
-compare them.
+stops matching. A paid recording of the
+answers was owed then (about 1,300 requests) to bring those uploads back into
+the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
+records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
+compare them; the order record was re-made at 0.5.18.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -4062,7 +4095,33 @@ in a separate worktree):
 | `REGION_TREE` on | 159 | 80 | 18 | 0 |
 | all four on (0.5.18) | 161 | 81 | 20 | 0 |
 
-One page stops being faultless and stays right (`ax_qbionc_240307089` page 8).
+One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
+`data/eval/order-layout-dev-1.json` is the 0.5.18 one (its table is under `eval order`).
+
+**Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
+of 47 uploads, the student page):
+
+| Record | Right pages | Faultless pages |
+|---|---|---|
+| the 0.5.10 record kept until now (3 pages apart, answers missing) | 64 | 37 |
+| 0.5.18 with all four off | 71 | 37 |
+| 0.5.18, all four on (`data/eval/order-corpus.json` now) | 83 | 42 |
+
+- The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
+  where a full-width line under a matching exercise is split between the columns. The tree's
+  first measurement found it, and the one fix tried made four development pages wrong
+  (docs/layout.md, "Measured"). The fault is wider than that page: a numbered line straight
+  under a matching exercise may be read inside it (a page built by the second review of the
+  release: a question with sub-parts (a) and (b) is read between the terms and the
+  definitions; 0.5.17 reads it right). No page stops being faultless.
+- From 0.5.10 to 0.5.17, with the switches off: 8 pages made right and one made wrong in the
+  student page (`r05_labmanual_5310_lab1` page 2: two blocks next to each other out of order;
+  the element list is right there, and `r18_arxiv_opt` page 3 is the one page the element list
+  lost). Five pages stopped being faultless (`a8_handout_3up` page 2, `r02_syllabus_21l704`
+  page 1, that lab manual page,
+  `r12_exam_900sc` page 1, `s11_layout_change` page 1) and five became so. None of it is this
+  release's: all of these pages score the same with the four switches off. The causes are not
+  found yet.
 
 **Formulas kept whole** (box score of the 21 development papers, 11,258 formulas):
 
@@ -4072,15 +4131,22 @@ One page stops being faultless and stays right (`ax_qbionc_240307089` page 8).
 | `LAYOUT_DISPLAY_GROUPING` | | 103 | 1 | none |
 | `LAYOUT_INLINE_JOINS` | | 96 | 1 | none |
 | both | 9,186 | 198 | 1 | none |
+| all four (what 0.5.18 runs) | 9,195 | 217 | 11 | none |
 
-Displays kept whole go from 803 to 904 of 1,004, and units from 15 to 33 of 47.
+Displays kept whole go from 803 to 903 of 1,004 under all four (904 under the two formula
+switches), and units from 15 to 33 of 47. Of the 11 formulas made not whole under all four, 8
+are in one paper (2305.10416: 3 cut, 3 merged, 2 split). Against the two formula switches
+alone, all four is better in 7 papers and one formula worse in 3 (2309.01468, 2406.11041,
+2503.13676). The scoring tool and its 21 papers are kept outside the repository, so this table
+cannot be made again from a clone.
 
 **Figures** (`LAYOUT_JOIN_PANELS`, O-422, measured 2026-11-20 and 2026-11-22): the public
 files' figures go from 1,611 to 1,320 as the panels of one figure are joined, and the
 captioned figures are the same.
 
 **Recordings.** The workflow corpus was re-recorded under the four switches with
-`scripts/corpus_refresh.py --live`, at most $1.00 a call. A live refresh leaves out the
+`scripts/corpus_refresh.py --live`, each call capped at $1.00 (the cap refuses new requests; the
+first call ended one cent over it). A live refresh leaves out the
 hostile-file tests (`tests/workflows/test_wf49_hostile_input.py`): their cases state how many
 pictures stay unanswered, and paid answers would break that count. Three calls paid $1.01,
 $1.00 and $0.58 ($2.59); the last asked 101 answers and stopped under its cap, so nothing it
@@ -4094,6 +4160,20 @@ and no decision of band 1 or 2 became optional: on `s10_slides_boxes` page 5 the
 between the boxes of a flow chart were two "equations", each a band 1 decision ("not an
 equation"), and are part of their boxes' figures now (`LAYOUT_JOIN_PANELS`);
 `w_lecture_560` asks 8 where it asked 11; `w_mixed_slides+image_pages` asks the same three.
+
+**What these numbers do not show.** `layout-dev-1`, the corpus and the 21 papers are
+development sets: the rules were written while reading them, so the figures say the release
+does not go backward there, not how often a new document is read right. No held-out set was
+scored for this release. The sizes are small: 161 of 267 is 60%, about 54 to 66 at 95% if
+pages were independent, which pages of one document are not; 83 of 91 is about 84 to 96. What
+a model reads from the larger equation boxes was not measured: the replay passing under the
+new recording shows that every answer exists, not that the answers are as good. An
+independent review of the release found a page outside these sets that the tree read wrong
+(`data/authored/tables/handout-word` page 1, a quiz whose options stand at tab stops: option d
+before a). It is fixed in this release (CHANGELOG 0.5.18), and it is the kind of page these
+sets do not hold. The headings and tables-local reports of 0.5.18 (`latest-headings.json`,
+`latest-tables-local.json`) are made under development settings with the four switches off,
+so their unchanged metrics say nothing about the switches.
 
 ## What the numbers do not show
 

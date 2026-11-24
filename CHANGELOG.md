@@ -127,9 +127,14 @@
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,
   `LAYOUT_DISPLAY_GROUPING` and `LAYOUT_JOIN_PANELS`, each measured at $0 against 0.5.17 with it
   off (docs/eval.md, "The switch release of 2026-11-23"):
-  - Reading order: 161 of 267 pages right (was 141) and 81 faultless (was 72); no page made wrong.
-  - Formulas kept whole: 9,186 of 11,258 (was 8,989); 198 made whole, 1 made not whole, no paper
-    worse. Displays kept whole: 904 of 1,004 (was 803).
+  - Reading order, the layout development set: 161 of 267 pages right (was 141) and 81
+    faultless (was 72); no page made wrong. The corpus gold pages: 83 of 91 right (71 with the
+    switches off), 13 made right and one made wrong, the self-made `e1_mc_columns` page 1 (a
+    line under a matching exercise is read inside it; known since the tree was first
+    measured, docs/layout.md "Measured").
+  - Formulas kept whole, all four switches: 9,195 of 11,258 (was 8,989); 217 made whole and 11
+    made not whole (8 of them in one paper), no paper worse. Displays kept whole: 903 of 1,004
+    (was 803). The two formula switches alone give 9,186, with 198 made whole and 1 not.
   - Figures: the panels of one figure are one figure (1,611 to 1,320 on the public files), with
     the same captions.
 - Found when the region tree was turned on, on a slide of MIT 6.0001 lecture 1 that sets the
@@ -140,9 +145,41 @@
     a fraction in an inline fraction (OpenStax), is 0.36 of its line: inside the limit.
   - In a slide deck each page's largest heading is its slide's title, and every slide title is
     one level whatever its size (`layout.heading_levels`): an 80-point slide title no longer puts
-    the deck's 48-point titles a level under it.
+    the deck's 48-point titles a level under it. With it, in every deck and with the switches
+    off too: two headings of a slide's largest size are both its titles (peers stay one level);
+    a slide whose only heading is set in a sub-heading's size has it as its title, so every
+    slide with a heading can be reached at the slide titles' level; and a title slide's subtitle
+    is at that level, where a deck of many sizes had it up to three levels deeper. Sizes alike
+    within the 5% that makes one level of two sizes count as the same size.
+- Found by two independent reviews of the release, with the region tree on
+  (`layout/regions.py`):
+  - A question number and its options at tab stops, with a Name / Date line on the same stops,
+    are no two columns: a matching exercise is cut in two only when each column holds one kind
+    of label (terms 1. 2. 3. beside definitions A. B. C.). `data/authored/tables/handout-word`
+    page 1 read option d) before a), and b) inside the Name line; it reads as 0.5.17 read it.
+  - The lower limit of a big operator (an integral, sum, product or root sign) is read with the
+    sign, not cut off below it: "∫ab f′(x) dx = f(b) −f(a)" on two slides of `latex-slides` no
+    longer reads as "∫b f′(x) dx = f(b) −f(a) a", and on 7 pages of a development paper
+    (`ax_mathap_240306464`) the domain letter under an integral is back in its equation. A limit
+    that hangs under a binomial or stands over the sign without touching it (a sum's `i=1` on
+    page 20 of that deck and the two-column fixture) still reads out of place.
+  - Known and not fixed: a line straight under a matching exercise can be read inside it. On
+    the self-made `e1_mc_columns` page 1 a full-width line is split between the columns, and on
+    a page built by the second review a numbered question with sub-parts (a) and (b) is read
+    between the terms and the definitions. 0.5.17 reads both right. No real document is known
+    to show it; it is the first tree fix owed after this release.
 - Each switch can go back off alone. The pipeline is raised so results made under 0.5.17 are not
-  read as results of the new layout; 0.5.17 results still open.
+  read as results of the new layout; 0.5.17 results still open. The switches reach production
+  through four Railway variables (the code defaults stay off), so the version says which layout
+  made a result only while the variables match the profile: the release steps end with
+  `readablestem ops profile-check` (docs/deploy-railway.md).
+- These are counts on development sets, which the rules were written against; no held-out
+  set was scored, and what a model reads from the larger equation boxes was not measured
+  (docs/eval.md, "The switch release of 2026-11-23", the last paragraph). The two reading-order
+  records, `data/eval/order-layout-dev-1.json` and `data/eval/order-corpus.json`, are re-made at
+  0.5.18; the corpus one measures all 91 gold pages (3 were apart) and shows what 0.5.11 to
+  0.5.17 changed with the switches off: 8 pages made right and one made wrong
+  (`r05_labmanual_5310_lab1` page 2, in the student page only).
 - `scripts/corpus_refresh.py --live` leaves out the hostile-file tests: their cases state how many
   pictures stay unanswered, and a paid answer recorded for one broke that count on every replay.
 - The workflow corpus was re-recorded under the four switches (three capped calls, $2.59), so no
