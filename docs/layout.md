@@ -2005,8 +2005,12 @@ math by the document's evidence; the equation step's own tiers then decide it.
 - **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
   panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
   no other figure) claims the rows on the panel, its header labels included, short or long
-  (`ax_physicsoptics` page 13: the header labels were paragraphs and a spurious italic "C"
-  equation).
+  (`ax_physicsoptics`, the layout development copy, pages 34 to 36 counted from 0, 35 to 37 as
+  the PDF numbers them: the header words over the panels and the numbers of a color bar were
+  paragraphs and are the figure's labels now; every other page of that copy, page 13 by either count
+  included, reads the same with and without the rule). A panel that is itself the figure's own drawn shape is the
+  figure's box already, and one whose area is more than 1.5 times the pictures' (a card that
+  holds a title and a sentence beside them) is left alone.
 - **A row cut by a drawing's edge** (behind `LAYOUT_FIGURE_ART`) belongs to that drawing when at
   least a quarter of it lies inside and its center is between the drawing's sides
   (`figures._cut_by`; 2407.09859 page 3: an axis title straddling the figure's bottom edge once
