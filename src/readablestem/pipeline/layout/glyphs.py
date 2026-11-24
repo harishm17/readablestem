@@ -385,9 +385,9 @@ def _regular_letters(chars: Iterable[_Char]) -> str | None:
     return "".join(letters) or None
 
 
-def _char_class(ch: _Char) -> str:
+def _char_class(ch: _Char, *, code: bool = True) -> str:
     """W space, C code (monospaced), M maths, D digit, O operator, B bracket, L letter,
-    P other."""
+    P other. `code=False` reads a monospaced character as it would be in any other face."""
     c = ch.c
     if ch.blank:
         return "W"
@@ -395,7 +395,7 @@ def _char_class(ch: _Char) -> str:
         return "P"
     if ch.math:
         return "M"
-    if ch.mono:
+    if ch.mono and code:
         return "C"  # code listings are full of "x = 5"; never maths
     if c.isdigit() or c in _SCRIPT_DIGITS:
         return "D"

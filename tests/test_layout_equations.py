@@ -14,6 +14,8 @@ Equation numbers now go to `Element.equation_label` and stay out of bbox and tex
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pymupdf
 import pytest
 
@@ -291,6 +293,20 @@ def test_a_number_set_off_from_a_display_numbers_it_when_display_grouping_is_on(
     assert not any("(106)" in (e.text or "") for e in elements)  # no element of its own
 
 
+def test_a_bracketed_answer_after_a_line_that_does_not_go_on_is_not_an_equation_number():
+    """A worksheet line "3x + 2 =      (4)" ends in a relation and has nothing under it: the
+    "(4)" is the answer or a mark, so it stays out of the equation's label."""
+
+    def fill(page):
+        prose(page, 100, "Fill in the missing value and give the number of the rule you used.")
+        page.insert_text((200, 140), "3x + 2 =", fontsize=12, fontname="Times-Italic")
+        page.insert_text((400, 140), "(4)", fontsize=12)
+        prose(page, 200, "and the next line goes on as the text of the sheet goes on and on.")
+
+    elements = analyze(one_page(fill), display_grouping=True).elements
+    assert not any(e.equation_label for e in elements)
+
+
 # ---------------------------------------------------------------- rows of a table
 
 
@@ -356,3 +372,46 @@ def test_a_display_fraction_over_a_close_equation_is_not_a_table_row():
 
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements].count(Kind.EQUATION) == 2
+
+
+DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+def formula_with_a_set_in_a_code_face(page):
+    """ "x in {101} union y" in a line of words: the set is the one part of the formula in a
+    typewriter face, as TeX's \\mathtt prints it."""
+    maths = {"fontfile": DEJAVU, "fontname": "dj", "fontsize": 11}
+    page.insert_text((72, 100), "The strings", fontsize=11, fontname="helv")
+    page.insert_text((140, 100), "x", fontsize=11, fontname="heit")
+    page.insert_text((148, 100), "\N{ELEMENT OF}", **maths)
+    page.insert_text((168, 100), "{101}", fontsize=11, fontname="cour")
+    page.insert_text((200, 100), "\N{UNION}", **maths)
+    page.insert_text((212, 100), "y", fontsize=11, fontname="heit")
+    page.insert_text(
+        (228, 100), "are accepted by the machine and the rest are rejected.", fontsize=11
+    )
+
+
+def display_with_one_typewriter_name(page):
+    prose(page, 100, "The probability of the event is bounded by")
+    page.insert_text((200, 140), "Pr[", fontsize=11)
+    page.insert_text((218, 140), "out", fontsize=11, fontname="cour")
+    page.insert_text((240, 140), "= 1] \N{GREATER-THAN OR EQUAL TO}", fontsize=11)
+    fraction(page, 290, 135, "2", "3", 12)
+    prose(page, 190, "and the text goes on after the display with more words than one.")
+
+
+@pytest.mark.skipif(not Path(DEJAVU).exists(), reason="needs DejaVu Sans for the maths signs")
+@pytest.mark.parametrize(
+    ("fill", "kind", "whole"),
+    [
+        (formula_with_a_set_in_a_code_face, "inline", "{101}"),  # not left to the sentence
+        (display_with_one_typewriter_name, "block", "out"),  # not a paragraph and a stray "3"
+    ],
+)
+def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, kind, whole):
+    elements = analyze(one_page(fill)).elements
+    (found,) = [e for e in equations(elements) if e.display == kind]
+    assert whole in nospace(found.text)
+    assert not [e for e in elements if e.kind == Kind.PARAGRAPH and whole in (e.text or "")]
+    assert not [e for e in elements if e.kind == Kind.PARAGRAPH and (e.text or "").strip() == "3"]

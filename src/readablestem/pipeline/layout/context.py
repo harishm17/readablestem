@@ -51,7 +51,8 @@ class _Document:
     (`figures._join_panels`).
     `figure_art`: `analyze(figure_art=...)`: a page's drawings are read without the paint no clip
     lets through (`page_type.page_drawings`), and a row the edge of a figure's box cuts through
-    is the figure's label (`figures._cut_by`).
+    is the figure's label (`figures._cut_by`), and a pen drawing typed labels name is a figure
+    (`page._pen_figures`).
     `trace`: the page trace (`step_facts.PageTrace`): the time of each step on each page.
     `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector
     (`tables.DetectorBudget`) may still spend on this document. Only `_read_page` and

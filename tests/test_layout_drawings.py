@@ -440,23 +440,33 @@ def test_art_that_a_clip_leaves_unpainted_is_no_figure_over_the_text_it_lies_on(
     assert "Average velocity is displacement divided" in _text_of(out)
 
 
-def test_a_pen_drawing_that_typed_labels_name_is_a_figure_not_handwriting():
+def test_a_pen_drawing_that_typed_labels_name_is_a_figure_only_with_figure_art():
     # A figure drawn with a pen on a typed page (arXiv 2407.20815: a ball with its radius and
     # charge) was cut out as "handwriting, not converted" from the strokes alone, and its typed
     # labels stood off as stray equations. The labels name it: it is a figure with them. The
     # same strokes with no typed label by them are still handwriting.
     path = Path(__file__).parent / "fixtures" / "handwriting" / "typed_with_ink.pdf"
-    plain = layout.analyze(path.read_bytes())
+    plain = layout.analyze(path.read_bytes(), figure_art=True)
     (note,) = _regions(plain)
     assert _figures(plain) == []
     doc = pymupdf.open(path)
     _label(doc[0], (note.bbox[0] + 40, note.bbox[1] + 12), "R", 11)
     _label(doc[0], (note.bbox[0] + 140, note.bbox[3] - 14), "O(0)", 11)
-    out = layout.analyze(doc.tobytes())
+    out = layout.analyze(doc.tobytes(), figure_art=True)
     (figure,) = _figures(out)
     assert _regions(out) == []
     assert _holds(figure, note.bbox, slack=8)
     assert "R" in (figure.text or "") and "O(0)" in (figure.text or "")
+    # Without the switch (production) what a student wrote beside a typed "Answer:" is
+    # handwriting to decide on, and the typed word stays in the page's text: the rule took
+    # the word into a picture and dropped the notice (review 25).
+    sheet = pymupdf.open(path)
+    width = pymupdf.get_text_length("Answer:", fontname="helv", fontsize=11)
+    _label(sheet[0], (note.bbox[0] - 4 - width, note.bbox[1] + 12), "Answer:", 11)
+    off = layout.analyze(sheet.tobytes())
+    assert _figures(off) == []
+    assert len(_regions(off)) == 1
+    assert "Answer:" in _text_of(off)
 
 
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():
@@ -792,3 +802,29 @@ def test_a_mark_row_that_a_paragraph_keeps_is_not_also_taken_as_a_panel_label():
     (figure,) = _figures(out)
     assert "B" in figure.text.split() and "n" not in figure.text.split()
     assert "value of n" in _text_of(out)
+
+
+def test_header_words_over_pictures_on_one_filled_panel_are_the_figures_labels():
+    # A grid of pictures on a white card with the column names painted on the card above
+    # them (ax_physicsoptics pages 34 to 36, counted from 0): the names were paragraphs.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    top = y + 20
+    _rect(page, (117, top, 495, top + 215), colour=None, fill=(1, 1, 1))
+    names = ["Object", "Measurement", "Reconstruction"]
+    for col, name in enumerate(names):
+        x = 130 + 120 * col
+        _label(page, (x + 10, top + 12), name)
+        for row in range(2):
+            noise = bytes((17 * col + 29 * row + 7 * i * (i % 5)) % 256 for i in range(96 * 96 * 3))
+            picture = pymupdf.Pixmap(pymupdf.csRGB, 96, 96, noise, False)
+            at = pymupdf.Rect(x, top + 20 + 95 * row, x + 120, top + 115 + 95 * row)
+            page.insert_image(at, pixmap=picture)
+    _running_text(page, top + 235, 1, start=2)
+    out = layout.analyze(doc.tobytes(), join_panels=True)
+    (figure,) = _figures(out)
+    assert _holds(figure, (130, top + 5, 480, top + 205))
+    assert all(name in figure.text for name in names)
+    assert not any(name in _text_of(out) for name in names)
+    assert "Acceleration is" in _text_of(out)

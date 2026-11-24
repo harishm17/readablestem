@@ -1273,7 +1273,7 @@ math font, stay math.
   bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
   "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
   "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
-  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). A bracketed number on a row of its
+  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it. A bracketed number on a row of its
   own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
   "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
   display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label
@@ -1945,18 +1945,20 @@ math by the document's evidence; the equation step's own tiers then decide it.
   above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
 - **`LAYOUT_FIGURE_ART`** (`layout.analyze(figure_art=True)`, off in code and in the production
-  profile) holds the two rules below that moved a recorded figure request on the corpus: "Art a
-  clip hides" and "A row cut by a drawing's edge". Off, the output is what it was before them.
+  profile) holds the two rules below that moved a recorded figure request on the corpus, "Art a
+  clip hides" and "A row cut by a drawing's edge", and "Pen figures", which is for the pages the
+  first of them turns into ink pages. Off, the output is what it was before them.
   Measured by replay on the 73 uploads of the corpus against release 5d081fcc (0.5.18): with it
   off, 0 uploads differ (the whole result's hash is the same on all 73); with it on, one upload
   differs in a request (w_lecture_5111 page 4, counted from 0 as the corpus pages in this
   section are: one figure's crop is 12 pt shorter, the same five
   words, and its request has no recorded answer until it is re-recorded), and one in a note
-  (r21_infographic_orcid: a figure's reason reads 866 paths for 867). The other parts of
-  this section (pen figures, panel labels) move no request and are not behind it. Turning it on
+  (r21_infographic_orcid: a figure's reason reads 866 paths for 867). Panel labels, the other
+  part of this section, move no request and are not behind it. Turning it on
   needs a re-recording and a `PIPELINE_VERSION` bump, and, first, an order for figures that stand
   side by side: on w_lecture_5111 the figure that is 12 pt shorter now starts below its neighbor
-  and `order._top_down` puts the neighbor first (the middle figure of three before the left one).
+  and `order._top_down` puts the neighbor first (the middle figure of three before the left one),
+  and a narrower label test for pen figures (below).
 - **Art a clip hides** is no figure and no ink (`page_type.page_drawings`; behind
   `LAYOUT_FIGURE_ART`). A
   PDF that carries a figure's art on every page (an editor's export) clips each page to its
@@ -1978,7 +1980,7 @@ math by the document's evidence; the equation step's own tiers then decide it.
   page (2407.20815 page 4: 138 pen-like strokes of which 19 are painted) is read from the
   painted strokes: that page is now mixed ink; its pen-drawn sphere and page 2's world lines
   are figures again ("Pen figures").
-- **Pen figures** (`page._pen_figures`). On a `mixed_ink` page the pen drawings are cut out of
+- **Pen figures** (`page._pen_figures`; behind `LAYOUT_FIGURE_ART`). On a `mixed_ink` page the pen drawings are cut out of
   the figure rules (`document.py` holds them back in `pen`), and a handwriting region comes
   from the pen strokes alone, so the typed labels of a hand-drawn figure cut its region short
   (2407.20815 page 4: the sphere lost its top, y518-605 for y461-617) and the drawing was
@@ -1986,13 +1988,29 @@ math by the document's evidence; the equation step's own tiers then decide it.
   paths and the loose paths inside it; if a typed label belongs to the result
   (`_label_owners`), the result is a figure with its whole extent, claims its labels, and the
   region is dropped. A drawing that no typed label names stays handwriting, and so does
-  handwriting with no typed label in it; handwriting with a short typed label in it (a letter
-  beside a hand-drawn ball) is now a figure for the figure step.
+  handwriting with no typed label in it.
+  Why it is behind the switch (review 25, 2026-11-23): with the switch off the two pages it was
+  written for read the same with or without it (page 29 of that paper is no ink page until the
+  hidden art is left out), and the label rule takes more than a figure's labels. A typed row
+  that lies mostly inside the region's box, or a short one within a font size of a stroke, is
+  taken: on the same paper's page 41 the box runs up the page over hidden art and two numbered
+  displays left the text for a figure; on a worksheet a typed "Answer:", "(a)", a question
+  number, "[4 marks]" or a whole typed line through what a student wrote left the text, the
+  writing went to the figure step as a picture, and the `handwriting_on_page` notice with its
+  required decision was not raised. With the switch on, page 41 reads right (its box is the
+  drawn sketch alone), and the worksheet cases are still taken: before the switch goes on, a
+  label here must be told from a worksheet's own words (short, no display, no line of running
+  text, no row that reaches outside the box, and a region that is a drawing and not rows of
+  writing).
 - **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
   panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
   no other figure) claims the rows on the panel, its header labels included, short or long
-  (`ax_physicsoptics` page 13: the header labels were paragraphs and a spurious italic "C"
-  equation).
+  (`ax_physicsoptics`, the layout development copy, pages 34 to 36 counted from 0, 35 to 37 as
+  the PDF numbers them: the header words over the panels and the numbers of a color bar were
+  paragraphs and are the figure's labels now; every other page of that copy, page 13 by either count
+  included, reads the same with and without the rule). A panel that is itself the figure's own drawn shape is the
+  figure's box already, and one whose area is more than 1.5 times the pictures' (a card that
+  holds a title and a sentence beside them) is left alone.
 - **A row cut by a drawing's edge** (behind `LAYOUT_FIGURE_ART`) belongs to that drawing when at
   least a quarter of it lies inside and its center is between the drawing's sides
   (`figures._cut_by`; 2407.09859 page 3: an axis title straddling the figure's bottom edge once
@@ -2442,12 +2460,42 @@ file before, 553 now). Two line numbers in them read wrong (p16 "2930", p18 "34 
 number of a blank line and the next one are 9 pt apart and 6 pt high, and the row builder makes
 one row of them.
 
-A word of the code face counts as a prose word when a row is classified (`_classify_row`,
-`_prose_words(typewriter=True)`): "for each Alg do" in an algorithm set in NimbusMonL
-(2504.06207 p4) made its rows "math" and its step numbers fragments attached to them, and the
-algorithm rule then lost the page. The figure and display rules do not count them: the labels
-of a diagram set in Courier New would be prose. 2504.06207 p4 and 2405.15050 p4 read as builder
-04 left them (the same elements with the old font list and with the new).
+A word of the code face counts as a prose word when a row is classified (`_classify_row`),
+but only in a row beside a row that is mostly code face (`_mark_code_runs`: within three lines,
+over the same columns, with more than half of its characters in the code face and three
+letters of it at least): "for each Alg do" in an algorithm set in NimbusMonL (2504.06207 p4)
+made its rows "math" and its step numbers fragments attached to them, and the algorithm rule
+then lost the page. A display with one `\mathtt` name and no code rows near it ("Pr[out = 1]
+≥ 2/3") is classified as before: counted as a word, the name made the row text and left the
+denominator "3" a paragraph of its own (review 25, finding 2). The figure and display rules do
+not count them: the labels of a diagram set in Courier New would be prose. 2504.06207 p4 and
+2405.15050 p4 read as builder 04 left them.
+
+**A code-face run inside a formula (review 25, finding 3).** A formula can carry an operand
+in a typewriter face (`\mathtt`: a set of strings, "{101}", a name): the code-face rule
+(`_char_class`: "C", never math) cut the formula at it, so "x ∈ {101} ∗ y" was two
+formulas with the set left in the sentence, in CMTT already and in six more fonts since the
+list grew. `shared._code_beside_maths` reads a run of code-face characters as it would be in any
+face (digit, bracket, operator, letter) when it is inside a formula, and the formula finder
+then keeps it: it touches a math letter of another face, stands between two math characters
+or operators of another face, or comes right after one (or right before one) that has an
+operand on its other side ("x = {1, 2}" with the set in the code face). A run beside nothing of
+the kind stays code, so "x = 5" in a code face inside prose is still an identifier and the
+"x + x" in front of an arrow is not drawn into the arrow's formula. A run that holds a word of two
+letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it touches a math
+letter: read as a word it would make the row prose and take a display out of the equations, and
+read in part the "1" of `op1` would join the formula next to it (2504.20938 p7). A row that is mostly code face
+with code words in it (a listing) is not reread at all: the SQL page of ax_cslg_240306367 p4
+stays code. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
+(base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
+is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
+{...}") and changed 16 pages of 2 files against the 0.5.18 read, 11 of them for the worse. With
+this rule 6 pages of 2 files differ from the 0.5.18 read, all of them the intended changes of
+0.5.19 (the listings and tails); of the 247 formulas on the pages of that upload, 246 are as in
+the 0.5.18 read (base: 216), so 30 of the 31 broken ones are whole. Base against this change
+differs on 11 pages of that one upload, none of them worse. Of the 30 public files that carry a
+code-face font, one page differs from base (ax_cslg_240306367 p8: the attribute set "{A, C, E,
+F}" is an inline formula again, as in 0.5.18).
 
 Measured on the 332 files of the corpus hash set (996 results, 3 modes of each file): 33
 differ, 11 files. 6 results are builder 04's algorithm changes (2504.06207, 2405.15050); 27 are

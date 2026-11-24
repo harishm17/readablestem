@@ -42,7 +42,12 @@ the second request is sent as it would be without this. The second fix's call is
 `shared`, costs nothing and is not in the job's call count (`DocumentStats.model_calls`, the
 step facts, the trace and the review counts). Which of two pictures asked first depends on
 thread timing, so when the job ends the paid call moves to the one first in reading order, and
-the same file gives the same fixes. A repeat of the same request is told apart from a different
+the same file gives the same fixes. Two limits (review 25). The request holds the crop, so the
+two pictures must be cut to the same pixels: one image placed twice side by side with other
+things beside each copy is two requests. And a fix is kept for a resumed job
+(`web/step_cache.py`) when its step ends, before the move: a job that is resumed after both
+answers were kept shows the cost on the twin that asked first in the first run; the total and
+the descriptions are the same. A repeat of the same request is told apart from a different
 one by what the model is given (`models.question`), so the escalation, which asks another model,
 is never shared with the first call.
 

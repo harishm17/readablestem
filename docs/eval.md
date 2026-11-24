@@ -3922,7 +3922,9 @@ uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendere
 - A held-out set (`side` in its registry, `data/gold/layout/<set>.json`; `--registry` names
   another file) is printed with no document and no page: the Markdown, `against_scorer` and
   `against` hold counts only, and only the report's `rows`, kept in the set's folder, name
-  pages. A folder with no registry is a development set.
+  pages. A set is printed with its names only when its registry says `development`: a folder
+  with no registry, or with one the command cannot find under the folder's name, is treated
+  as held out.
 - **`--rendered`** also sends the picture of the page's output (needs the browser group).
 - **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
   nothing is sent and a page whose answer is not in the file is not audited. `--batch`
