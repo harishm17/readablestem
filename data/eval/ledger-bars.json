@@ -1,0 +1,25 @@
+{
+ "bars": {
+  "pages.not_right": {
+   "value": 29.149797570850204,
+   "set": "layout-heldout-1",
+   "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
+   "release": "0.5.19+2047f403770c",
+   "date": "2026-11-24"
+  },
+  "pages.documents_right": {
+   "value": 22.448979591836736,
+   "set": "layout-heldout-1",
+   "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
+   "release": "0.5.19+2047f403770c",
+   "date": "2026-11-24"
+  },
+  "pages.furniture": {
+   "value": 14.574898785425102,
+   "set": "layout-heldout-1",
+   "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
+   "release": "0.5.19+2047f403770c",
+   "date": "2026-11-24"
+  }
+ }
+}
