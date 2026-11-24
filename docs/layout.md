@@ -1754,7 +1754,15 @@ this section describes.
   a raised script one over the other (the 4 and the 2- of SO4 2-, the 6 and the 14 of a
   nuclide) arrive as two fragments, and the lowered one used to start a paragraph of its own
   (MuPDF starts a line with it). It is now folded into the row it is under, read lowered
-  first after a base (`SO42-`) and raised first before one (`14 6 C`).
+  first after a base (`SO42-`) and raised first before one (`14 6 C`). A typewriter name (a run of
+  monospaced small glyphs) with a lowered script under it, after a base, is read the same way
+  (the lambda of a filter's `KRR` superscript, 2503.00504 p8, read "KRλR" before): the x-order
+  put the lowered script inside a name whose glyphs it overlapped by one, and it is now read
+  before the whole name (`φλKRR`). The rule is for that font only. A first version took every
+  run of small glyphs and moved three formulas of two development papers (the `ref` of
+  R_n^ref, the X of L with X_h^(S): their boxes came out cut or split, 9,196 of 11,258 whole
+  against 9,198); a name in any other font keeps the order of the text layer. On the 332 public files the
+  rule changes nothing; it changes the page it was made for.
 - **Rows of mostly scripts** (`_Row.size`): a row's size is the size of most of its glyphs,
   and a nuclide's "92 U -> 234" has five script glyphs and three full-size ones, so its
   scripts were taken for its text, never recognized as scripts, and the equation was cut
@@ -2967,6 +2975,16 @@ markup. In the Word file a code block that holds an equation is written as lines
 (pandoc would flatten the equation to its characters), the indentation and the gap after a line
 number as no-break spaces (`export_docx._lines_of`). A monospaced listing is code, read before
 this, and its line numbers are not taken apart.
+
+**Algorithms, wave 6 (2504.06207 p13, Algorithm 5).** A full-width algorithm (long steps that run
+past the gutter, comments at the right of the short ones) is cut by the region tree into leaves of
+different columns: the first steps and their comments are in "L" and "R", the long steps in "S".
+The scan asked every step for the column of the first one, so it ended at step 8 and the page
+stayed a heading paragraph with display equations (steps 7 and 11) and paragraphs with inline
+formulas. A step in "S" that carries the next line number at the place of the numbers is now a
+step of the algorithm (`_in_column`, in `_step_kind` and `_resumes`); its words are pieces on its
+line as before. The steps being set in math italic was not the cause: their math is inline
+equations in the block as in any other.
 
 **Monospaced quotations (WS2.6 c).** A block of monospaced lines that has none of the
 punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier followed by
