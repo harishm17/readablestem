@@ -3208,7 +3208,29 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
   `analyze` runs of the two commits (about 70 minutes through the slot), and no change that
   depends on the count is waiting.
 
-`layout-heldout-1` has not been scored.
+**The held-out score.** `layout-heldout-1` was scored for the first time for the 0.5.18
+release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
+four layout switches on, no model):
+
+```bash
+uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
+```
+
+| Kind | Gold pages | Right in the student page | Faultless |
+|---|---|---|---|
+| course handouts | 29 | 26 | 16 |
+| papers | 128 | 85 | 50 |
+| textbooks | 90 | 64 | 34 |
+| all | 247 | 175 | 100 |
+
+175 of 247 is 71%, about 65 to 76 at 95% if pages were independent, which pages of one
+document are not; 11 of 49 documents have every gold page right. Two of the 51 documents are
+longer than a job may be (`too_many_pages`) and are not measured, so 9 gold pages are missing
+from the count. 36 pages read furniture aloud, 57 cut a block and 68 run blocks together. The
+development set of the same kinds reads 161 of 267 right under the same code; the held-out
+figure is not lower, which is what a set of rules fitted too closely to its development pages
+would show. The run had the switches on only: what they gained on these documents is not
+known. No page of the set is named in the record, and none was looked at.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -4164,7 +4186,10 @@ equation"), and are part of their boxes' figures now (`LAYOUT_JOIN_PANELS`);
 **What these numbers do not show.** `layout-dev-1`, the corpus and the 21 papers are
 development sets: the rules were written while reading them, so the figures say the release
 does not go backward there, not how often a new document is read right. No held-out set was
-scored for this release. The sizes are small: 161 of 267 is 60%, about 54 to 66 at 95% if
+scored before the release. After it, `layout-heldout-1` was scored once for 0.5.18 (`eval
+order`, "The held-out score"): 175 of 247 gold pages right in the student page. That run had
+the switches on only, so it says how the release reads documents nobody built a rule on, not
+what the switches gained there. The sizes are small: 161 of 267 is 60%, about 54 to 66 at 95% if
 pages were independent, which pages of one document are not; 83 of 91 is about 84 to 96. What
 a model reads from the larger equation boxes was not measured: the replay passing under the
 new recording shows that every answer exists, not that the answers are as good. An
