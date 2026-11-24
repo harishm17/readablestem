@@ -102,6 +102,9 @@ class _Row:
     # The item of a run of one series ("B." set in bold between "A." and "C."; the lines of an
     # agenda), whatever it is set in: never a heading by its type (`blocks._mark_series_items`).
     in_series: bool = False
+    # A row next to a row that is mostly code face (`_mark_code_runs`): a line of an
+    # algorithm, where a word of the code face is a prose word.
+    code_run: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
@@ -509,6 +512,73 @@ def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[boo
     return longest
 
 
+def _code_beside_maths(chars: list[_Char], classes: list[str]) -> None:
+    """A run of code-face characters ("C") inside a formula is read as it would be in any face:
+    the set of "x \u2208 {101} \u2217 y", or the right side of "x = {1, 2}", with the set in CMTT.
+    It is inside when it touches a maths letter of another face, stands between two maths
+    characters or operators of another face, or comes right after one that has an operand of its
+    own on its other side. A code-face run beside nothing of the kind stays code: "x = 5" in
+    prose, in a code face, is an identifier, and so is the "x + x" in front of an arrow."""
+    n = len(chars)
+
+    def nearest(k: int, step: int) -> int | None:
+        while 0 <= k < n and chars[k].blank:
+            k += step
+        return k if 0 <= k < n else None
+
+    def symbol(k: int | None) -> bool:  # a maths glyph or an operator, not in a code face
+        return k is not None and classes[k] in "MO" and not chars[k].mono
+
+    def operand(k: int | None) -> bool:  # what a side of a formula is made of
+        return k is not None and (classes[k] in "MDB" or (classes[k] == "L" and chars[k].italic))
+
+    changed = True
+    while changed:  # a run that joins a formula lets the run beyond it join too
+        changed = False
+        i = 0
+        while i < n:
+            if classes[i] != "C":
+                i += 1
+                continue
+            end = i
+            while end < n and classes[end] in "CW":
+                end += 1
+            stop = end
+            while chars[stop - 1].blank:
+                stop -= 1
+            before, after = nearest(i - 1, -1), nearest(stop, 1)
+            left = (
+                before is not None
+                and symbol(before)
+                and chars[i].x0 - chars[before].x1 < chars[before].size
+            )
+            right = (
+                after is not None
+                and symbol(after)
+                and chars[after].x0 - chars[stop - 1].x1 < chars[after].size
+            )
+            touching = (left and chars[before].c.isalpha() and classes[before] == "M") or (
+                right and chars[after].c.isalpha() and classes[after] == "M"
+            )
+            inside = (
+                touching
+                or (left and right)
+                or (left and operand(nearest(before - 1, -1)))
+                or (right and operand(nearest(after + 1, 1)))
+            )
+            for k in range(i, stop) if inside else ():
+                # A word of the code face ("out" in "Pr[out = 1]") is a name, not an operand
+                # letter, unless it touches a maths letter: read as a word it would turn a
+                # display into a line of prose.
+                word = chars[k].c.isalpha() and (
+                    (k > 0 and chars[k - 1].c.isalpha()) or (k + 1 < n and chars[k + 1].c.isalpha())
+                )
+                if classes[k] == "C" and (touching or not word):
+                    classes[k] = _char_class(chars[k], code=False)
+                    changed = True
+            i = end
+
+
 @dataclass
 class _CharInfo:
     """Per-character maths evidence for one row."""
@@ -521,6 +591,7 @@ class _CharInfo:
     @classmethod
     def of(cls, row: _Row, *, document: _Document = _PLAIN) -> _CharInfo:
         classes = ["M" if c.stacked else _char_class(c) for c in row.chars]
+        _code_beside_maths(row.chars, classes)
         first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
         if (
             first is not None

@@ -87,7 +87,11 @@ from readablestem.pipeline.layout.furniture import (
     _rotated_key,
 )
 from readablestem.pipeline.layout.glyphs import _MATH_SYMBOL_FONT, NOTE_MARK_FLAG, _Char, _union
-from readablestem.pipeline.layout.inline_runs import _classify_row, _equation_pictures
+from readablestem.pipeline.layout.inline_runs import (
+    _classify_row,
+    _equation_pictures,
+    _mark_code_runs,
+)
 from readablestem.pipeline.layout.order import (
     Gutter,
     _find_gutter,
@@ -431,6 +435,7 @@ def _page_blocks(
         document=document,
     )
     _mark_notes(rows, number, page_rect.height, ctx)
+    _mark_code_runs(rows)
     for row in rows:
         _classify_row(row, document=document)
     contents = _contents_rows(rows, number)

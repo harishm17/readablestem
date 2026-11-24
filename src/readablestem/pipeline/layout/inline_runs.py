@@ -35,6 +35,7 @@ from readablestem.pipeline.layout.shared import (
     _Context,
     _Figure,
     _Row,
+    _RowIndex,
 )
 from readablestem.pipeline.parse import (
     EQUATION_THRESHOLD,
@@ -412,6 +413,33 @@ def _is_equation_number(text: str) -> bool:
     return bool(EQUATION_NUMBER.match(text) or BARE_EQUATION_NUMBER.match(text))
 
 
+def _code_row(row: _Row) -> bool:
+    """Is the row mostly code face (with three letters of it at least)?"""
+    ink = [c for c in row.chars if not c.blank]
+    code = [c for c in ink if c.mono]
+    return 2 * len(code) > len(ink) and sum(c.c.isalpha() for c in code) >= 3
+
+
+def _mark_code_runs(rows: list[_Row]) -> None:
+    """Set `row.code_run` on the rows within two lines of a row that is mostly code face.
+
+    A word of the code face counts as a prose word in a row of an algorithm ("for each Alg
+    do", or a step with an identifier in the code face and the rest of it plain): the row is
+    text, and not a display equation. A display with one `\\mathtt` name, away from such rows,
+    is not (`_classify_row`).
+    """
+    code = [r for r in rows if _code_row(r)]
+    if not code:
+        return
+    index = _RowIndex(code)
+    for row in rows:
+        reach = 2.0 * row.size
+        row.code_run = any(
+            other is not row and other.x0 < row.x1 and row.x0 < other.x1
+            for other in index.near(row.y0 - reach, row.y1 + reach)
+        )
+
+
 def _classify_row(row: _Row, *, document: _Document = _PLAIN) -> None:
     """Set row.kind: "math" (a display-equation line), "frag" (short maths-only piece such
     as a lone denominator, decided later) or "text"."""
@@ -424,7 +452,7 @@ def _classify_row(row: _Row, *, document: _Document = _PLAIN) -> None:
     # Punctuation after maths ("v ." at the end of a displayed fraction) counts neither way.
     counted = [i for i in ink if row.chars[i].c not in ",.;:"]
     ratio = sum(info.mathy(i) for i in counted) / max(1, len(counted))
-    prose = _prose_words(row, info, typewriter=True)
+    prose = _prose_words(row, info, typewriter=row.code_run)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
     elif row.exercise_number:
