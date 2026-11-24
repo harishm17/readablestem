@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: LaTeX sources that stopped before the reader (O-425)
+
+- A census of 73 public arXiv sources with no model (LaTeXML 0.8.8 in the sandbox) found 13
+  converting and 60 not. Four causes were ours and are fixed; the rest stop by design or on a
+  limit and are listed in docs/web.md.
+  - `listings`: LaTeXML read `\lstlanguagefiles` as undefined once the package was loaded with a
+    `language=` option, so the source stopped with `source_undefined`. A new preload,
+    `source/compat.tex`, defines it as empty, and `\orcidlink{...}` as nothing (the link has no
+    text for a reader). It is read before every document, next to the beamer preload.
+  - Lint: a class or package file bundled with the upload (a journal's `.cls` or `.sty`) is
+    never read by LaTeXML, which uses its own binding, so the lint no longer reads it either
+    unless a file that is read inputs it by name. Three sources had been refused as
+    `source_refused` for a `\openout` in such a file. An absolute `\bibliography{/path}` is no
+    longer refused as a path (bibliography files are read from the project only); `..`, `~`,
+    pipes and URLs still are.
+  - A `listings` block no longer shows a blank line between its lines.
+- Of the 13 sources that converted before, all 13 keep the same LaTeXML output (hash of the
+  XHTML). Six more now convert (four by these fixes; two moved with the load of the machine).
+- Stored documents: only an upload that failed before can now succeed; nothing already stored
+  changes, so no version raise and no migration is owed. The sandbox, the time limit and the
+  memory cap are as before.
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
