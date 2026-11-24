@@ -5,7 +5,7 @@
   "pipeline_version": "0.5.19",
   "profile": {
     "name": "development settings",
-    "sha256": "11fc9f366beafec6190c26aa0c3fcd7c560fd365838a8d08e29494f187ce0a4a",
+    "sha256": "2047f403770c918faf6ca0de4b9a2b11c48ef3c773012e8dedf7502cd3bbcef2",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -82,6 +82,7 @@
     "IMAGE_PAGES_VECTOR_CHECKS": true,
     "IMAGE_PAGES_VECTOR_CROPS": false,
     "LAYOUT_DISPLAY_GROUPING": false,
+    "LAYOUT_FIGURE_ART": false,
     "LAYOUT_INLINE_JOINS": false,
     "LAYOUT_JOIN_PANELS": false,
     "MATH_READER_CLAUDE_EFFORT": "medium",
@@ -246,7 +247,7 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "80947edd9f236c2418abf3226441423e1acdb85b",
+    "commit": "d4d497b011d2de11e8642da1f52325798164cbee",
     "clean": true,
     "pipeline_version": "0.5.19",
     "render_version": 11,
