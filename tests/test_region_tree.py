@@ -272,3 +272,42 @@ def test_the_limits_of_a_display_stay_in_its_text_with_the_tree_on():
         for on in (False, True)
     ]
     assert texts[0] == texts[1]
+
+
+def _matching_then(page: pymupdf.Page, *lines: tuple[float, float, str]) -> None:
+    """Question 7, a matching exercise (terms 1. 2. 3. beside definitions A. B. C.), and the
+    lines under it as (x, top, text)."""
+    page.insert_text((40, 100), "7. Match each term with its definition.", fontsize=10)
+    for k, (term, meaning) in enumerate(
+        [
+            ("Osmosis", "Movement against a gradient using energy"),
+            ("Diffusion", "Movement of water across a membrane"),
+            ("Transport", "Movement of particles from high to low concentration"),
+        ]
+    ):
+        page.insert_text((60, 120 + 14 * k), f"___ {k + 1}. {term}", fontsize=10)
+        page.insert_text((200, 120 + 14 * k), f"{'ABC'[k]}. {meaning}", fontsize=10)
+    for x, top, text in lines:
+        page.insert_text((x, top), text, fontsize=10)
+
+
+@pytest.mark.parametrize(
+    "under",
+    [
+        # a question with its points at the right edge, and one with sub-parts
+        [(40, 175, "8. Explain why cells are small."), (440, 175, "(4 points)")],
+        [
+            (40, 175, "8. Explain why cells are small."),
+            (60, 189, "(a) one reason"),
+            (60, 203, "(b) another"),
+        ],
+    ],
+    ids=["full-width line", "question with sub-parts"],
+)
+def test_what_stands_under_a_matching_exercise_is_read_after_it(under):
+    doc, page = _page()
+    _matching_then(page, *under)
+    elements = layout.analyze(doc.tobytes(), region_tree=True).elements
+    markers = [e.list_marker for e in elements if e.list_marker]
+    assert markers[:7] == ["7.", "1.", "2.", "3.", "A.", "B.", "C."]
+    assert markers[7] == "8."

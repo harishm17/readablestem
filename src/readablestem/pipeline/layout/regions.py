@@ -323,6 +323,8 @@ class _Build:
             grid = self._grid(idx, left, right, box, column)
             if isinstance(grid, _Node):
                 return grid
+            if isinstance(grid, float):  # a matching exercise, and what stands under it
+                return self._matching(idx, left, right, (a, b), grid, column, depth)
             if grid == "cols":  # each column a run of labels of its own
                 return _Node(
                     "cols",
@@ -355,6 +357,38 @@ class _Build:
                 node.notes = k
         return node
 
+    def _matching(
+        self,
+        idx: list[int],
+        left: list[int],
+        right: list[int],
+        channel: tuple[float, float],
+        top: float,
+        column: str,
+        depth: int,
+    ) -> _Node:
+        """Rule 8, a matching exercise with a line under it. The lines from `top` down are no
+        cell of either column: the exercise is a `cols` node over what stands under it."""
+        items = self.items
+        above = {i for i in idx if (items[i][0][1] + items[i][0][3]) / 2 < top}
+        under = [i for i in idx if i not in above]
+        lcol, rcol = [i for i in left if i in above], [i for i in right if i in above]
+        box = _union([items[i][0] for i in above])
+        cols = _Node(
+            "cols",
+            box,
+            [
+                self.build(lcol, _side(column, "L"), depth + 1),
+                self.build(rcol, _side(column, "R"), depth + 1),
+            ],
+            channel=channel,
+        )
+        cut = (box[3] + min(items[i][0][1] for i in under)) / 2
+        whole = _union([items[i][0] for i in idx])
+        return _Node(
+            "stack", whole, [cols, self.build(under, column, depth + 1)], [cut], column=column
+        )
+
     def _rows(self, side: Sequence[int]) -> list[tuple[float, float, int]]:
         """A column's lines: (top, bottom, how many lines it holds) of each band of its
         items, so that the pieces a formula cuts one line into are one line."""
@@ -382,15 +416,27 @@ class _Build:
 
     def _grid(
         self, idx: list[int], left: list[int], right: list[int], box: BBox, column: str
-    ) -> _Node | str | None:
+    ) -> _Node | str | float | None:
         """Rule 8. A label grid ("grid", read in label order), or "cols" when each column
-        holds a run of labels of its own (terms 1. 2. 3. beside definitions A. B. C.)."""
+        holds a run of labels of its own (terms 1. 2. 3. beside definitions A. B. C.). A
+        matching exercise with a line under it that goes on in a column ("8." after 1. 2. 3.)
+        gives the top of that line (a float): the exercise ends there."""
         items = self.items
         lc, rc = _cells(items, left), _cells(items, right)
         if len(lc) > 12 or len(rc) > 12:
             return None
         if any(lab is None for lab, _ in lc + rc):
             return None
+        runs = _run(lc), _run(rc)
+        if (
+            lc[0][0][0] != rc[0][0][0]
+            and min(runs) >= 2
+            and (runs[0] < len(lc) or runs[1] < len(rc))
+        ):
+            # terms 1. 2. 3. beside definitions A. B. C., then a labeled line that does not
+            # count on (question 8): each column's labels end where its count ends
+            ends = [cells[n] for cells, n in ((lc, runs[0]), (rc, runs[1])) if n < len(cells)]
+            return min(items[i][0][1] for _, m in ends for i in m)
         labels = [lab for lab, _ in lc + rc if lab is not None]
         if len({lab[0] for lab in labels}) != 1:
             above = self._grid_above(idx, left, right, box, column, lc + rc)
@@ -457,6 +503,19 @@ def _label(text: str) -> tuple[str, int] | None:
     if re.fullmatch(r"[ivx]{2,4}", s):
         return ("r", _ROMAN.get(s, 0))
     return ("U" if s.isupper() else "l", ord(s.lower()) - 97)
+
+
+def _run(cells: Sequence[tuple[tuple[str, int] | None, list[int]]]) -> int:
+    """How many of a column's first cells count on in one kind of label (1. 2. 3.)."""
+    first = cells[0][0]
+    if first is None:
+        return 0
+    n = 0
+    for k, (lab, _) in enumerate(cells):
+        if lab is None or lab[0] != first[0] or lab[1] != first[1] + k:
+            break
+        n += 1
+    return n
 
 
 def _cells(
