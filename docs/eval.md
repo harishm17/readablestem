@@ -3213,27 +3213,32 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
 
 **The held-out score.** `layout-heldout-1` was scored for the first time for the 0.5.18
 release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
-four layout switches on, no model):
+four layout switches on, no model), and once more for 0.5.19 after its release (2026-11-24,
+main `b8fb9ab7`, the same profile, no model):
 
 ```bash
 uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
 ```
 
-| Kind | Gold pages | Right in the student page | Faultless |
-|---|---|---|---|
-| course handouts | 29 | 26 | 16 |
-| papers | 128 | 85 | 50 |
-| textbooks | 90 | 64 | 34 |
-| all | 247 | 175 | 100 |
+| Kind | Gold pages | Right in the student page, 0.5.18 | Faultless, 0.5.18 | Right, 0.5.19 | Faultless, 0.5.19 |
+|---|---|---|---|---|---|
+| course handouts | 29 | 26 | 16 | 26 | 17 |
+| papers | 128 | 85 | 50 | 85 | 50 |
+| textbooks | 90 | 64 | 34 | 64 | 34 |
+| all | 247 | 175 | 100 | 175 | 101 |
 
 175 of 247 is 71%, about 65 to 76 at 95% if pages were independent, which pages of one
-document are not; 11 of 49 documents have every gold page right. Two of the 51 documents are
-longer than a job may be (`too_many_pages`) and are not measured, so 9 gold pages are missing
-from the count. 36 pages read furniture aloud, 57 cut a block and 68 run blocks together. The
-development set of the same kinds reads 161 of 267 right under the same code; the held-out
-figure is not lower, which is what a set of rules fitted too closely to its development pages
-would show. The run had the switches on only: what they gained on these documents is not
-known. No page of the set is named in the record, and none was looked at.
+document are not; 11 of 49 documents have every gold page right, in both runs. Two of the 51
+documents are longer than a job may be (`too_many_pages`) and are not measured, so 9 gold
+pages are missing from the count. At 0.5.19, 36 pages read furniture aloud, 56 cut a block
+(57 at 0.5.18) and 68 run blocks together. The development set of the same kinds reads 161 of
+267 right under the same code; the held-out figure is not lower, which is what a set of rules
+fitted too closely to its development pages would show. Both runs had the switches on only:
+what they gained on these documents is not known. Between the two releases the count of right
+pages is the same and one more page is faultless (the totals say no more: which pages moved
+is not looked at). The record kept in the
+repository is the 0.5.19 one, and three of its figures are the ledger's first release bars
+(below). No page of the set is named in the record, and none was looked at.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -4018,41 +4023,55 @@ theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_ou
 event's, so the admin page can set production's numbers of the same release (false flags
 per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
 
-**Today** (`data/eval/ledger.json`, release `0.5.10+62b4f1678d36`). No row has a held-out
-figure and no release bar is registered: every line below is a development score.
+**Today** (`data/eval/ledger.json`, release `0.5.19+2047f403770c`, made 2026-11-24 on a
+clean tree). The three page rows have a held-out line, from the one run of
+`layout-heldout-1` for 0.5.19, and that run's figures are their release bars
+(`data/eval/ledger-bars.json`, registered 2026-11-24 with `--register-bars`): a later release
+may not read fewer of these pages right, give fewer documents with every gold page right, or
+read furniture aloud on more pages. The 0.5.18 run had the same three figures. Every other
+line is a development score, or a record of an earlier release.
 
-| Row | Set | Figure | Counts | 95% bound | Label | Goal bar |
-|---|---|---|---|---|---|---|
-| Required decisions a page, the median document | corpus | 0.29 | 63 documents | 0.60 | development score | at most 1.00 |
-| Pages not read right in the student page, by the scorer | corpus | 27.3 per 100 | 24 of 88 pages | 36.2 per 100 | development score | - |
-| Pages not read right in the student page, by the scorer | layout-dev-1 | 44.2 per 100 | 118 of 267 pages | 49.4 per 100 | development score | - |
-| Documents with every gold page right | corpus | 56.8% | 25 of 44 documents | 43.3% | development score | - |
-| Documents with every gold page right | layout-dev-1 | 13.3% | 8 of 60 documents | 6.8% | development score | - |
-| Pages that read a running head, a page number or a stamp aloud | corpus | 17.0 per 100 | 15 of 88 pages | 25.0 per 100 | development score | at most 2.0 per 100 |
-| Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 54.3 per 100 | 145 of 267 pages | 59.5 per 100 | development score | at most 2.0 per 100 |
-| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | development score | - |
-| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | development score | - |
-| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
-| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
-| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
-| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
-| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | development score | - |
-| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | development score | none |
+| Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
+|---|---|---|---|---|---|---|---|
+| Required decisions a page, the median document | corpus | 0.25 | 73 documents | 0.50 | earlier release (0.5.18+11fc9f366bea) | - | at most 1.00 |
+| Pages not read right in the student page, by the scorer | layout-heldout-1 | 29.1 per 100 | 72 of 247 pages | 34.3 per 100 | held-out | at most 29.1 per 100: met | - |
+| Pages not read right in the student page, by the scorer | corpus | 8.8 per 100 | 8 of 91 pages | 15.3 per 100 | development score | at most 29.1 per 100 | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 39.7 per 100 | 106 of 267 pages | 44.9 per 100 | development score, 2 steps stopped early | at most 29.1 per 100 | - |
+| Documents with every gold page right | layout-heldout-1 | 22.4% | 11 of 49 documents | 13.1% | held-out | at least 22.4%: met | - |
+| Documents with every gold page right | corpus | 83.0% | 39 of 47 documents | 71.4% | development score | at least 22.4% | - |
+| Documents with every gold page right | layout-dev-1 | 20.0% | 12 of 60 documents | 12.0% | development score, 2 steps stopped early | at least 22.4% | - |
+| Pages that read a running head, a page number or a stamp aloud | layout-heldout-1 | 14.6 per 100 | 36 of 247 pages | 18.8 per 100 | held-out | at most 14.6 per 100: met | at most 2.0 per 100: not met |
+| Pages that read a running head, a page number or a stamp aloud | corpus | 16.5 per 100 | 15 of 91 pages | 24.2 per 100 | development score | at most 14.6 per 100 | at most 2.0 per 100 |
+| Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 19.1 per 100 | 51 of 267 pages | 23.5 per 100 | development score, 2 steps stopped early | at most 14.6 per 100 | at most 2.0 per 100 |
+| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
+| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | earlier release (0.5.10+62b4f1678d36) | - | none |
 
 Read with care:
 
 - "Required decisions a page" is the median over documents of a document's decisions a
-  page, as production counts it. Its bound is an order statistic of
-  63 documents of a set chosen to cover kinds of
-  document, not sampled from what people upload.
-- The corpus line of the page rows counts every gold page measured whole
-  (88, the edge pages with the others); `eval order`'s
-  "of 78" leaves the edge pages out.
-- Every gold page is right in 25 of 44 corpus documents and in
-  8 of 60 documents of `layout-dev-1`. A document's gold pages are
-  the ones labeled, which in a layout set is a sample of its pages.
-- The output rows count places, and one fault can be many places: most of the HTML file's
-  are proposals still open that the page does not mark (`eval outputs`, above).
+  page, as production counts it. Its record was made at 0.5.18 (the re-recording of the
+  corpus) and is labeled so; 0.5.19 moved no recorded request, and `eval burden --same`
+  against it passed for the release. Its bound is an order statistic of 73 documents of a
+  set chosen to cover kinds of document, not sampled from what people upload.
+- The held-out lines count 247 gold pages of 49 documents; two more documents are too long
+  for a job and are not measured. A release bar is held as measured, with no bound: 72 of
+  247 pages not right allows up to 34.3 in 100 at 95%.
+- The furniture row meets its release bar and not its goal: 36 of 247 held-out pages read a
+  running head, a page number or a stamp aloud, and the goal is 2 in 100.
+- `layout-dev-1` has two documents in which a step stopped early (a limit on work, the same
+  on every machine); its lines say so.
+- Every gold page is right in 39 of 47 corpus documents, 12 of 60 documents of
+  `layout-dev-1` and 11 of 49 held-out documents. A document's gold pages are the ones
+  labeled, which in a layout set is a sample of its pages.
+- The output rows are the 0.5.10 record (`eval outputs` has not been run again since). They
+  count places, and one fault can be many places: most of the HTML file's are proposals
+  still open that the page does not mark (`eval outputs`, above).
 
 Not measured, with the proof each is owed printed by the command: silent errors, documents with no silent error, false flags per true flag, doubt flags only, pages that passed every check and had a fault, read by hand, flags of the page check, and verdicts that change between two runs of one input, formulas whose meaning is wrong, with no flag, boxes that hold the whole formula, formulas inside tables read wrong, private-use or U+FFFD characters on a page with no flag, pages with a text error and no flag, words changed on a print page, wrong tables shown with no decision, wrong stated values on vector charts, drawn structures wrong with no question; and the rule-required decisions by rule.
 
@@ -4288,7 +4307,7 @@ so their unchanged metrics say nothing about the switches.
 | `src/readablestem/eval/order.py`, `eval/order_report.py` | the reading-order scorer, and `eval order`: its figures on the measured replay or on a layout gold set, and the bar that no right page is made wrong |
 | `data/eval/order-corpus.json`, `data/eval/order-layout-dev-1.json` | the last reading-order records of the corpus and of the layout development set |
 | `src/readablestem/eval/ledger.py` | the quality ledger and `eval ledger`: every row from the kept records, with counts, a bound, a label and the two bars |
-| `data/eval/ledger.json`, `data/eval/ledger-bars.json` | the last ledger, and the release bars once a held-out run has been registered (none yet) |
+| `data/eval/ledger.json`, `data/eval/ledger-bars.json` | the last ledger, and the release bars (three page rows, from the 0.5.19 held-out run) |
 | `src/readablestem/pipeline/page_audit.py`, `models/prompts/page_audit.md`, `eval/page_audit_eval.py` | the page audit, its prompt, and `eval page-audit`: the audit in shadow over the corpus or a layout gold set |
 | `data/eval/cost-corpus.json` | the last cost record of the corpus (development set). The speed record, `data/eval/speed-corpus.json`, names its machine and is not kept yet (see "What a page costs and how long it takes") |
 | `src/readablestem/eval/equations_chem.py` | the chemistry scorer and the chemistry report fields (`chem_right_excl_times`, `silent_harm`) |

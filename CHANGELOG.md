@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased: the held-out reading order of 0.5.19, and the ledger's first release bars
+
+- `layout-heldout-1` was scored once for 0.5.19 after its release (main `b8fb9ab7`, the
+  production profile, no model): 175 of 247 gold pages right in the student page, 101
+  faultless (0.5.18: 175 and 100); 11 of 49 documents have every gold page right; two
+  documents are too long to measure. No page is named in the record and none was looked at.
+  `data/eval/order-layout-heldout-1.json` is that run's record.
+- The quality ledger has its first release bars (`data/eval/ledger-bars.json`, from that
+  run): pages not read right (72 of 247), documents with every gold page right (11 of 49),
+  pages that read a running head, a page number or a stamp aloud (36 of 247). `eval ledger
+  --for-release` passes. `data/eval/ledger.json` is re-made at 0.5.19; its burden line is the
+  0.5.18 record and its output lines the 0.5.10 record, each labeled as an earlier release.
+- Records and docs only (docs/eval.md, "The held-out score" and "The quality ledger"). No
+  code changes and no version is owed.
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
