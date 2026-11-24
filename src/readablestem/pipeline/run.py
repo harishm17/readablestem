@@ -390,8 +390,9 @@ log = logging.getLogger(__name__)
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
 # 0.5.19 (2026-11-23): one raise for wave 5 (CHANGELOG.md has each change). What a PDF's result
 # holds moves: six more code font names, numbered listings one block, addresses and name lists
-# not code; algorithm steps listed before their numbers stay in the block; panel header labels
-# belong to their figure; two more equation-number shapes label their display. Behind a new
+# not code, a code-face run inside a formula stays in it; algorithm steps listed before their
+# numbers stay in the block; panel header labels belong to their figure; two more
+# equation-number shapes label their display, one number to a display. Behind a new
 # switch that stays off (no change): LAYOUT_FIGURE_ART (art a clip hides, rows a figure's edge
 # cuts, a hand-drawn figure named by typed labels).
 # The result's schema is the same: results from 0.5.10 to 0.5.18 load unchanged and their page

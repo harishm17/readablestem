@@ -1,6 +1,51 @@
 # Changelog
 
-## Unreleased: one number for a display (review 25)
+## Pipeline 0.5.19, render 11 (2026-11-23)
+
+- `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  "Unreleased" entries below down to the 0.5.18 entry (wave 5: faults real documents show; the
+  first of them, the page audit on gold pages only, is an eval tool and changes nothing for a
+  reader).
+  What changes for a reader, one line for each:
+  - Code fonts (O-440): listings set in NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor or Lucida
+    Console are code; a numbered listing is one block; an address, a list of names or the last
+    line of a wrapped paragraph in the code face is not code. A run of a code face inside a
+    formula (a set of strings, a name beside a math letter) stays in the formula: the longer
+    font list had torn 31 formulas on 11 pages of one private upload (review 25), and the same
+    rule mends the formulas 0.5.18 cut at a CMTT operand.
+  - Algorithms (O-442): a step whose words the text layer lists before its number, and formula
+    stacks listed before their numbers, stay in the algorithm's block.
+  - Figures (O-441): a figure of pictures keeps the header labels of the panel it sits on.
+  - Behind a new switch that stays off, no change: `LAYOUT_FIGURE_ART` (art a clip leaves
+    unpainted is no figure over the text; a row a figure's edge cuts through is its label; a
+    hand-drawn figure that typed labels name is a figure, not "handwriting, not converted"). It
+    moved one recorded figure request on each of three corpus uploads; turning it on is owed a
+    re-recording, a pipeline raise, the reading order of two figures on one lecture page,
+    the clip read in the upload probe and the strike and highlight read, and a narrower test
+    for a hand-drawn figure's label. The hand-drawn figure rule was on by itself until the
+    review of this release (review 25): with the switch off it helped no page and took typed
+    words and two numbered displays into a picture on pages with handwriting, dropping the
+    handwriting notice (docs/layout.md "Pen figures").
+  - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
+    bracketed number label their display instead of standing as an element of their own. A
+    display takes one number, and a bracketed answer after a line that does not go on
+    ("3x + 2 =      (4)") is no equation number (review 25). A display that ends in a row of
+    dots keeps the number beside it.
+  - One request, one answer (a job's identical requests): two pictures that are the same pixels
+    with the same text around them (the options of an exam question) are asked once and both get
+    that description; before, each was sent and they could differ. The second call is marked
+    `shared` on its `ModelCall` (left out of the JSON otherwise), costs nothing and is not in the
+    job's call count. A refused, timed-out or unreadable first answer is not shared.
+- No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
+  stays as made at 0.5.18; the result's schema is the same.
+- Reviewed before its release (review 25, a680cc80): one blocker and seven smaller findings.
+  The blocker (the hand-drawn figure rule, above) and four more are fixed in the entries
+  below and in this one; the page audit prints a set's document names only when its registry
+  says development; two are limits stated in docs/steps.md (a shared answer needs identical
+  crops; a resumed job shows the cost on the twin that asked first); the panel-label rule has
+  its test.
+
+## Unreleased: one number for a display (review 25, finding 5)
 
 - A bracketed number after a line that ends in "+" or a relation (display grouping, on) is
   that display's number only when it is level with the line, the line has no number yet, and
@@ -12,8 +57,9 @@
 - A row of three centered dots that ends a display ("x + x^2 + x^3 + ...") is not an operator
   that goes on, so the number beside it is the display's under the regular rule.
 - Layout only: no crop, picture or request changes (a number is a label, not part of the
-  crop). `PIPELINE_VERSION` stays; fold this entry into 0.5.19.
-## Unreleased: a code-face word inside a formula (review 25)
+  crop). Part of 0.5.19, which was not released before it.
+
+## Unreleased: a code-face word inside a formula (review 25, findings 2 and 3)
 
 - Finding 3: a formula with an operand in a typewriter face (a set of strings, "{101}", a name)
   was cut at it, because a character of a code face is never math. In `shared._code_beside_maths`
@@ -34,49 +80,15 @@
   on 2 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
   inline read). After this change 6 pages of 2 uploads differ from the 0.5.18 read, all the
   intended changes of 0.5.19, so "none worse" holds: 11 worse before, 0 after.
-- Stored documents: a document laid out under 0.5.19 with a code-face operand in a formula keeps the
-  torn read until it is converted again, so a pipeline raise is owed with the next release; this
-  entry does not make it. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no
-  prompt changes, and no recorded request moves (the replayed documents of the 73 uploads are
-  identical to the base run).
+- Part of 0.5.19, which was not released before it, so no document was stored with the torn
+  read. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no prompt changes, and
+  no recorded request moves (the replayed documents of the 73 uploads are identical to the base
+  run).
 - Measured with the 0.5.19 switches on, no model: `full` of 73 uploads, 0 differences; `analyze`
   of the 332 files (996 results), 3 differences, all of `ax_cslg_240306367` (p8: the attribute
   set "{A, C, E, F}" is an inline formula again, as in 0.5.18); the development box score 9,198
   whole of 11,258 formulas (base 9,197), no paper worse; `eval order --set layout-dev-1` 161 of
   267 pages right, 81 faultless, as the base.
-
-## Pipeline 0.5.19, render 11 (2026-11-23)
-
-- `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
-  "Unreleased" entries below down to the 0.5.18 entry (wave 5: faults real documents show; the
-  first of them, the page audit on gold pages only, is an eval tool and changes nothing for a
-  reader).
-  What changes for a reader, one line for each:
-  - Code fonts (O-440): listings set in NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor or Lucida
-    Console are code; a numbered listing is one block; an address, a list of names or the last
-    line of a wrapped paragraph in the code face is not code.
-  - Algorithms (O-442): a step whose words the text layer lists before its number, and formula
-    stacks listed before their numbers, stay in the algorithm's block.
-  - Figures (O-441): a figure of pictures keeps the header labels of the panel it sits on.
-  - Behind a new switch that stays off, no change: `LAYOUT_FIGURE_ART` (art a clip leaves
-    unpainted is no figure over the text; a row a figure's edge cuts through is its label; a
-    hand-drawn figure that typed labels name is a figure, not "handwriting, not converted"). It
-    moved one recorded figure request on each of three corpus uploads; turning it on is owed a
-    re-recording, a pipeline raise, the reading order of two figures on one lecture page,
-    the clip read in the upload probe and the strike and highlight read, and a narrower test
-    for a hand-drawn figure's label. The hand-drawn figure rule was on by itself until the
-    review of this release (review 25): with the switch off it helped no page and took typed
-    words and two numbered displays into a picture on pages with handwriting, dropping the
-    handwriting notice (docs/layout.md "Pen figures").
-  - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
-    bracketed number label their display instead of standing as an element of their own.
-  - One request, one answer (a job's identical requests): two pictures that are the same pixels
-    with the same text around them (the options of an exam question) are asked once and both get
-    that description; before, each was sent and they could differ. The second call is marked
-    `shared` on its `ModelCall` (left out of the JSON otherwise), costs nothing and is not in the
-    job's call count. A refused, timed-out or unreadable first answer is not shared.
-- No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
-  stays as made at 0.5.18; the result's schema is the same.
 
 ## Unreleased: the page audit on gold pages only
 
@@ -84,8 +96,9 @@
   marks, converts each file as `eval order --set` does, and reports `against_scorer`: the
   gold pages the reading-order scorer calls right and not right, each by the audit's verdict
   (counts only). `--against REPORT` sets a run beside an earlier one of the same set.
-- A held-out set's printed report names no document and no page. An eval tool only: no
-  reader change, no version raise.
+- A held-out set's printed report names no document and no page, and a set is held out
+  unless its registry says development (review 25: a folder with no registry was printed
+  with its names). An eval tool only: no reader change, no version raise.
 - Why: as built, the audit of the held-out layout set asked about every page of every
   document (1,015 pages) where the gold marks 247, so the paid shadow run the plan caps at
   $3.00 could not be afforded, and its verdicts could not be set against any truth.
@@ -104,7 +117,8 @@
   prose word in `_classify_row` only, so an algorithm in NimbusMonL stays one algorithm block
   (2504.06207 p4 and 2405.15050 p4 read as builder 04 left them).
 - Corpus (against 55917ea2): `analyze` 996 results, 33 differ (11 files): 6 are builder 04's
-  (2504.06207, 2405.15050), 27 this change (9 files), each read, better or cosmetic, none worse.
+  (2504.06207, 2405.15050), 27 this change (9 files), each read, better or cosmetic, none worse (the private corpus was
+  not in that read: see "a code-face word inside a formula" above).
   `full`: 73 uploads, 2 differ from a run of 55917ea2 made for the purpose (`r18_arxiv_opt`,
   cosmetic; `w_slides_60001_lec1`, better); equation, figure and table parts equal: no recorded
   request moves. The shared baseline `full.json` is older than the rewrite of the kept-out
