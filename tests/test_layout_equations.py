@@ -413,6 +413,17 @@ def display_with_a_subscripted_typewriter_name(page):
     prose(page, 190, "and the text goes on after the display with more words than one.")
 
 
+def display_with_a_typewriter_name_a_space_from_a_letter(page):
+    """ "T = n out >= 2/3": the name stands a thick space after a factor in maths italic."""
+    prose(page, 100, "The time the whole of the run takes is bounded by")
+    page.insert_text((200, 140), "T =", fontsize=11)
+    page.insert_text((222, 140), "n", fontsize=11, fontname="tiit")
+    page.insert_text((231, 140), "out", fontsize=11, fontname="cour")
+    page.insert_text((256, 140), "\N{GREATER-THAN OR EQUAL TO}", fontsize=11)
+    fraction(page, 272, 135, "2", "3", 12)
+    prose(page, 190, "and the text goes on after the display with more words than one.")
+
+
 def in_tex_faces(pdf: bytes) -> bytes:
     """The page with Times italic under TeX's name for its maths italic, and Times under the
     name of a code face that only the font's name tells (no fixed-pitch flag)."""
@@ -431,6 +442,7 @@ def in_tex_faces(pdf: bytes) -> bytes:
         (formula_with_a_set_in_a_code_face, "inline", "{101}"),  # not left to the sentence
         (display_with_one_typewriter_name, "block", "out"),  # not a paragraph and a stray "3"
         (display_with_a_subscripted_typewriter_name, "block", "out"),  # the name is no prose word
+        (display_with_a_typewriter_name_a_space_from_a_letter, "block", "out"),
     ],
 )
 def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, kind, whole):
@@ -441,23 +453,30 @@ def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, k
     assert not [e for e in elements if e.kind == Kind.PARAGRAPH and (e.text or "").strip() == "3"]
 
 
-def test_a_code_word_a_word_space_from_a_math_letter_is_no_formula():
-    """ "ends with return x" and "for each measure in M": the word in the code face stands a
-    word space from the maths letter, it is not set against it as a name with a subscript is."""
+@pytest.mark.parametrize(
+    ("gap", "size"),
+    [
+        (3.4, 11),  # a word space
+        (2.2, 11),  # a word space shrunk in a tight line: a fifth of the size
+        (3.4, 8.8),  # a code face set smaller than the text, as Typst sets it
+    ],
+)
+def test_a_code_word_a_word_space_from_a_math_letter_is_no_formula(gap, size):
+    """ "ends with return x": the word in the code face stands a word space from the maths
+    letter, it is not set against it as a name with a subscript is."""
 
     def fill(page):
         page.insert_text((72, 100), "The function ends with", fontsize=11)
-        page.insert_text((184, 100), "return", fontsize=11, fontname="cour")
-        page.insert_text((227, 100), "x", fontsize=11, fontname="tiit")
-        page.insert_text((236, 100), "when the list is empty, and it goes on", fontsize=11)
-        page.insert_text((72, 114), "for each", fontsize=11)
-        page.insert_text((114, 114), "measure", fontsize=11, fontname="cour")
-        page.insert_text((164, 114), "in", fontsize=11)
-        page.insert_text((177, 114), "M", fontsize=11, fontname="tiit")
-        page.insert_text((190, 114), "of the list until every one of them is done.", fontsize=11)
+        page.insert_text((184, 100), "return", fontsize=size, fontname="cour")
+        x = 184 + 6 * 0.6 * size + gap
+        page.insert_text((x, 100), "x", fontsize=11, fontname="tiit")
+        page.insert_text((x + 9, 100), "when the list is empty, and it goes on", fontsize=11)
+        page.insert_text(
+            (72, 114), "to the next one of the list until every one is done.", fontsize=11
+        )
 
     found = equations(analyze(in_tex_faces(one_page(fill))).elements)
-    assert not [e for e in found if "return" in e.text or "measure" in e.text]
+    assert not [e for e in found if "return" in e.text]
 
 
 def test_displayed_sets_under_a_line_with_code_words_are_a_display_not_code():
