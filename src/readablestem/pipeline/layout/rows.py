@@ -51,6 +51,7 @@ from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
     SCRIPT_MIN_RATIO,
     SCRIPT_RATIO,
+    SCRIPT_ROW_FLOOR,
     _arrow_spans,
     _Display,
     _over_arrow,
@@ -972,6 +973,8 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
             host = rows[j]
             if j == i or j in dropped or host.vertical or glyph > SCRIPT_RATIO * host.size:
                 continue
+            if glyph < SCRIPT_ROW_FLOOR * host.size:
+                continue  # words set small over a far larger one (a slide's word art)
             host = merged.get(j, host)
             near_y = host.y0 - 0.5 * host.size <= centre <= host.y1 + 0.5 * host.size
             near_x = host.x0 - host.size <= small.x0 and small.x1 <= host.x1 + 2 * host.size

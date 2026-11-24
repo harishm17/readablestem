@@ -479,7 +479,7 @@ so a heading is not, and a line that starts a block is not).
    `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
    unchanged.
 
-### The region tree (`REGION_TREE`, off in code and in production)
+### The region tree (`REGION_TREE`, off in code, on in production since 0.5.18)
 
 `pipeline/layout/regions.py` (and `entries.py`). The reader above finds one gutter for the page,
 merges the page's fragments into lines and then orders the lines. A page with three columns, a
@@ -505,8 +505,8 @@ worse (the rows of the two columns alternated, as they do with the tree on for a
 picture there), so the code was not kept. A figure between narrow columns has to be cut like a
 column first. Wave 4 (2026-11-22, O-013) did not build it again: that count stands (0 pages
 changed, 1 page better, a worse read where a drawing stands between two columns of short
-lines), no page asking for it is known, and the tree is off, so the item would change
-nothing in production.
+lines), no page asking for it is known, and the tree was off then, so the item would have
+changed nothing in production.
 
 **The cuts.**
 
@@ -515,7 +515,14 @@ nothing in production.
   picture that starts a little below the first line beside it is in that line's band). A run of bands that
   keep one set of white channels is a segment. A band that does not (a line that spans the
   region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
-  only when the band below is side by side (rule 6).
+  only when the band below is side by side (rule 6). A fragment that hangs inside an
+  integral, sum, product or root sign at least twice its height (the lower limit of `∫ab`, where the sign
+  and the upper limit are one fragment) is in the sign's band: the cut between the lines of
+  the display left the limit out of its text ("∫b f′(x) dx = f(b) −f(a) a" on a slide). Only a
+  big operator counts: a general "short item inside a tall one" moved an equation in a recorded upload
+  (`w_solutions_1802`). A limit that hangs under a binomial's bracket, or stands
+  over the sign without touching it, is not covered (page 20 of `latex-slides`, the
+  two-column fixture).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
   lines each side (two on a slide) that have a line of the other side at their height (the pieces
   a formula cuts a line into are one line), and a line of three words or more, cuts it in two.
@@ -540,7 +547,15 @@ nothing in production.
    it, are read at the end of the page.
 6. Wide gap (above).
 8. Options in label order: `(A) (B)` over `(C) (D)` and `(A) (C)` over `(B) (D)` read A, B, C, D;
-   a grid of labeled cells is a `grid` node.
+   a grid of labeled cells is a `grid` node. Two columns of labels of different kinds are cut
+   only when each column holds one kind (terms `1.` `2.` `3.` beside definitions `A.` `B.` `C.`,
+   a matching exercise). A question number with its options at tab stops, over the next
+   options (`2.` `a)` `d)` against `b)` `c)`, and a Name / Date line on the same stops), has two
+   kinds on one side: it is one line of labels, not two columns, and stays in one leaf. The
+   cases: `data/authored/tables/handout-word` page 1 read option d) before a), and b) inside the
+   Name line; of the 332 PDFs counted (public files, the layout development set, the real-world
+   development parts, the workflow corpus), only that page has a column with two kinds, and the
+   two matching exercises (`e1_mc_columns`, `s04_worksheet`) are cut as before.
 9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
@@ -649,8 +664,9 @@ table is an item yet) and `regions.table_refusal` judges each proposal against i
 Still not an item: a vector figure (its drawings are read after the rows are made), so a figure
 drawn as vectors at the top of a column beside text is placed by its labels only.
 
-**Why it is off.** Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION`
-bump and a recorded re-measurement first.
+**Why it is off in code.** Changing it changes the output of pages, so it needs a
+`PIPELINE_VERSION` bump and a recorded re-measurement; production turned it on with pipeline
+0.5.18 (docs/eval.md, "The switch release of 2026-11-23").
 
 ### Headings
 
@@ -1163,7 +1179,7 @@ math font, stay math.
   other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
   equation step adds the warning `equation.region: half_fraction`, holds the confidence
   under the accept bar and never accepts without a decision.
-- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Seven patterns cut one printed
+- **One printed display, one element (`LAYOUT_DISPLAY_GROUPING`, off in code, on in production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump).** Seven patterns cut one printed
   formula into several elements, and each is joined on evidence from the page; anything less
   clear keeps the old behavior.
   1. *Two formulas and a word.* "P_A = ... and P_B = ...", "0 < p < 1 for all i": a connective
@@ -1264,7 +1280,7 @@ math font, stay math.
   row); a display set with function names in a text font (`PMI`, `Unif` in Times) is still
   cut at the word, and an equation number set above the first row of a tall display is still
   an element of its own.
-- **Inline formulas kept whole (`LAYOUT_INLINE_JOINS`, off in code and in production; bump `PIPELINE_VERSION` when it is turned on).** Four rules for the places where an inline run ended inside one printed formula, all behind `analyze(inline_joins=True)`; with the switch off the output is byte for byte what it was (the layout of 996 files, hashed before and after). Measured on the position truth of 21 development papers (a development box score kept outside the repository; 11,258 formulas, 8,990 whole before), each rule alone, and none made a paper worse:
+- **Inline formulas kept whole (`LAYOUT_INLINE_JOINS`, off in code, on in production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump).** Four rules for the places where an inline run ended inside one printed formula, all behind `analyze(inline_joins=True)`; with the switch off the output is byte for byte what it was (the layout of 996 files, hashed before and after). Measured on the position truth of 21 development papers (a development box score kept outside the repository; 11,258 formulas, 8,990 whole before), each rule alone, and none made a paper worse:
   1. *Operator names* (`_MORE_MATH_WORDS` in `shared.py`): `erfi`, `erfc`, `supp`, `diam`, `codim`, `coker` and `arccot` count as math words, like `sin` or `max`. +2 whole, none lost.
   2. *A colon or semicolon inside a bracket* (`_separator_in_bracket`): "I(A : B)", "W(P; G)". A TeX-made page's separator inside a bracket the run opened, with math in between and the bracket closing on the same row, does not end the run. +76 whole, none lost.
   3. *A math word between formulas* (`_math_word_joins`): "a = b mod n". A word space next to a math word, with math on the other side, does not end the run: the spaces around `\bmod` and `\pmod` are the author's. The run before it must be math on its own evidence. +3 whole, none lost.
@@ -1399,9 +1415,13 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   lines are one title when they follow each other in one size. When the file has more than one
   deck, or a deck has a title, every heading on a deck's pages gets the reason `slide_deck N`
   (`slides.DECK_REASON`) and a deck title also `slide_deck_title`. `layout.heading_levels` then
-  judges heading sizes deck by deck: a deck's title is level 1, the other headings of the deck
-  are clustered by size from level 2, and a heading with no deck (the pages of a portrait part
-  between two decks) is judged on its own. So two lectures in one file have titles at one level
+  judges heading sizes deck by deck: a deck's title is level 1, each page's largest heading is
+  its slide's title, one level under the deck's title whatever its size (one slide sets its
+  title in 80 points, the next in 48; two headings of that largest size or within 5% of it, "Pros" and "Cons",
+  are both titles; a slide whose only heading is small has it as its title, and so does a title
+  slide's subtitle), the page's other headings are clustered by size under the
+  slide titles, and a heading with no deck (the pages of a portrait part between two decks) is
+  judged on its own. So two lectures in one file have titles at one level
   and slide titles one level below, whatever sizes each uses; `assemble.title_plan` (the one H1,
   SW6c) then writes the document's title above the deck titles, or makes the only deck title the
   H1. A file with one deck and no title slide gets no reasons and the levels it had.
@@ -2162,8 +2182,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).
-- **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code and in
-  production; bump `PIPELINE_VERSION` when it is turned on). A figure printed as panels
+- **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code, on in
+  production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump). A figure printed as panels
   (a), (b), (c) under one caption was found as one figure for each panel, and only the one
   nearest the caption took the caption (`_attach_captions`), so the others were figures
   with a picture and no words: a reader got one description for each panel and the caption

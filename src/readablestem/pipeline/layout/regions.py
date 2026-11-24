@@ -43,7 +43,7 @@ from readablestem.pipeline.layout.order import (
     _section_break,
     _top_down,
 )
-from readablestem.pipeline.layout.rows import _merge_baselines
+from readablestem.pipeline.layout.rows import _BIG_OPERATORS, _merge_baselines
 from readablestem.pipeline.layout.shared import _Display, _Path, _Row
 
 CHANNEL_PT = 7.0  # narrowest white channel that cuts a segment into columns
@@ -143,6 +143,22 @@ def _over_shorter(items: Sequence[Item], band: Sequence[int], y0: float, y1: flo
     return False
 
 
+def _under_taller(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
+    """Does the text item `i` hang inside a big operator of `band` (a fragment that opens with
+    an integral, sum, product or root sign, `rows._BIG_OPERATORS`, at least twice its height)?
+    The lower limit of a display's operator is read with it, not cut off below it."""
+    (_, y0, _, y1), text = items[i]
+    height = y1 - y0
+    if not text.strip() or height <= 0:
+        return False
+    return any(
+        held[:1] in _BIG_OPERATORS
+        and bottom - top >= 2 * height
+        and min(bottom, y1) - max(top, y0) >= 0.2 * height
+        for (_, top, _, bottom), held in (items[j] for j in band)
+    )
+
+
 def _bands(items: Sequence[Item]) -> list[list[int]]:
     """Indexes of `items` grouped in bands: items that overlap vertically (all but a fifth of
     their height) are one band. An item that stands over a shorter one's whole height, but
@@ -154,7 +170,11 @@ def _bands(items: Sequence[Item]) -> list[list[int]]:
     for i in order:
         y0, y1 = items[i][0][1], items[i][0][3]
         shrink = 0.2 * (y1 - y0)
-        if bands and (y0 + shrink < bottom or _over_shorter(items, bands[-1], y0, y1)):
+        if bands and (
+            y0 + shrink < bottom
+            or _over_shorter(items, bands[-1], y0, y1)
+            or _under_taller(items, bands[-1], i)
+        ):
             bands[-1].append(i)
             bottom = max(bottom, y1 - shrink)
         else:
@@ -373,7 +393,14 @@ class _Build:
             return None
         labels = [lab for lab, _ in lc + rc if lab is not None]
         if len({lab[0] for lab in labels}) != 1:
-            return self._grid_above(idx, left, right, box, column, lc + rc) or "cols"
+            above = self._grid_above(idx, left, right, box, column, lc + rc)
+            if above is not None:
+                return above
+            # a matching exercise: one kind of label in each column (terms 1. 2. 3. beside
+            # definitions A. B. C.). A question number and its options "a) b)" at tab stops,
+            # beside the options of the line below, are labels of one line, not two columns.
+            kinds = [{lab[0] for lab, _ in cells if lab is not None} for cells in (lc, rc)]
+            return "cols" if all(len(k) == 1 for k in kinds) else None
         vals = sorted(v for _, v in labels)
         if vals != list(range(vals[0], vals[0] + len(vals))):
             return None

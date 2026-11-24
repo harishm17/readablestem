@@ -205,11 +205,11 @@ def test_require_current_refuses_a_report_made_with_other_switches(tmp_path, cap
     )
     assert "flags not recorded" in capsys.readouterr().err
     # Without the flag a difference is listed, with what production runs for each setting.
-    settings = {**fresh["flags"], "REGION_TREE": "on"}
+    settings = {**fresh["flags"], "EQUATION_FILE_FACTS": True}
     plain = ["eval", "gate", "--baseline", str(baseline), "--current"]
     assert main([*plain, str(write(tmp_path, "dev.json", {**fresh, "flags": settings}))]) == 0
     out = capsys.readouterr().out
-    assert "flag REGION_TREE changed" in out and "production 'off'" in out
+    assert "flag EQUATION_FILE_FACTS changed" in out and "production False" in out
 
 
 # A numeric constant of a module that holds a bar, or what a request holds, is guarded

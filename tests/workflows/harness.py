@@ -63,7 +63,6 @@ __all__ = [
     "document",
     "fetch",
     "finding",
-    "waits_for",
     "words",
 ]
 
@@ -129,16 +128,6 @@ def finding(ident: str) -> pytest.MarkDecorator:
     if not (re.fullmatch(r"F-\d{3}", ident) and 1 <= int(ident[2:]) <= LAST_FINDING):
         raise ValueError(f"{ident!r} is not a finding (F-001 to F-{LAST_FINDING})")
     return pytest.mark.xfail(strict=True, reason=ident)
-
-
-def waits_for(entry_id: str) -> pytest.MarkDecorator:
-    """Marks a test that reads what a model's answers give, on a file whose recording lacks
-    them (`OWED`): the parts it reads are left for the reviewer, as when a model is
-    unavailable, so the test says nothing about the product until the refresh. The mark is
-    refused once the file is off the list, so it is removed with the refresh."""
-    if entry_id not in OWED:
-        raise ValueError(f"{entry_id} owes no answers (harness.OWED): take the mark off")
-    return pytest.mark.skip(reason=f"{entry_id}: {OWED[entry_id]} answers owed (harness.OWED)")
 
 
 def words(node: lxml.html.HtmlElement) -> str:

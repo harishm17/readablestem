@@ -238,20 +238,35 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
     level_of: dict[tuple[int | None, float], int] = {}
     below: dict[int | None, int] = {}
     titled_decks: set[int | None] = set()
+    # In a deck each page's largest heading is its slide's title, and every slide title is one
+    # level whatever its size: a slide may set its title in 80 points and the next in 48.
+    slide_title: dict[str, int] = {}
     for group in set(group_of.values()):
         in_group = [e for e in headings if group_of[e.id] == group]
         titled = any(slides.DECK_TITLE_REASON in e.reasons for e in in_group)
         if titled:
             titled_decks.add(group)
-        sized = sorted(
-            {
-                round(e.font_size or 0.0, 1)
-                for e in in_group
-                if REASON_LARGER_FONT in e.reasons and slides.DECK_TITLE_REASON not in e.reasons
-            },
-            reverse=True,
-        )
-        level, top = int(titled), None  # the deck's title is level 1: the rest start at 2
+        sized_in = [
+            e
+            for e in in_group
+            if REASON_LARGER_FONT in e.reasons and slides.DECK_TITLE_REASON not in e.reasons
+        ]
+        if group is not None:
+            # Two headings of the page's largest size ("Pros" and "Cons", alike within the
+            # tolerance that makes one level of two sizes) are both titles: peers stay one level.
+            largest: dict[int, float] = {}
+            for e in sized_in:
+                largest[e.page] = max(largest.get(e.page, 0.0), round(e.font_size or 0.0, 1))
+            slide_title.update(
+                (e.id, int(titled) + 1)
+                for e in sized_in
+                if round(e.font_size or 0.0, 1)
+                >= largest[e.page] * (1 - HEADING_LEVEL_TOLERANCE) - 0.05
+            )
+            sized_in = [e for e in sized_in if e.id not in slide_title]
+        sized = sorted({round(e.font_size or 0.0, 1) for e in sized_in}, reverse=True)
+        # the deck's title is level 1: the rest start at 2, under the slide titles when there are
+        level, top = int(titled) + int(any(group_of[k] == group for k in slide_title)), None
         for size in sized:
             if top is None or size < top * (1 - HEADING_LEVEL_TOLERANCE) - 0.05:
                 level, top = level + 1, size
@@ -264,6 +279,8 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
         group = group_of[e.id]
         if slides.DECK_TITLE_REASON in e.reasons:
             raw = 1
+        elif e.id in slide_title:
+            raw = slide_title[e.id]
         elif REASON_LARGER_FONT in e.reasons:
             raw = level_of[group, round(e.font_size or 0.0, 1)]
         elif REASON_ABSTRACT in e.reasons:

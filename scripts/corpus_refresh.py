@@ -9,11 +9,13 @@ The workflow tests (`pytest -m workflow`) convert every corpus file through the 
 This script runs them against one working copy of the recording and then writes what they
 read back as the recording: `tests/workflows/corpus/answers.jsonl.gz` for answers read from
 files that may be committed, and the cache's `answers.jsonl.gz` for the rest
-(`eval/corpus.py`). An answer no test read is dropped.
+(`eval/corpus.py`). An answer no test read is dropped (not by a `--live` run: it leaves the
+hostile-file tests out, so what they alone read would look unread).
 
 Nothing is sent to a model unless `--live` is given, and `--live` needs `--max-usd`: the
-most this run may pay for answers the recording lacks, never above $1.00. Past it the
-missing answers are refused and stay missing. Answers already recorded cost nothing and are
+most this run may pay for answers the recording lacks, never set above $1.00. Past it new
+requests are refused and their answers stay missing; a request already sent is paid for, so a
+run can end a cent over. Answers already recorded cost nothing and are
 never asked again. `--live` reads `ANTHROPIC_API_KEY` from the environment.
 
 It prints what was read, what was missing and why (so a prompt that changed is named), and
@@ -39,6 +41,7 @@ from readablestem.eval import corpus  # noqa: E402
 from readablestem.proof.bundle import dump_line  # noqa: E402
 
 MOST_USD = 1.00
+HOSTILE = "tests/workflows/test_wf49_hostile_input.py"
 
 
 def parse(argv: list[str] | None) -> argparse.Namespace:
@@ -123,6 +126,10 @@ def main(argv: list[str] | None = None) -> int:
         }
         # One process: the tests append to one file, and the limit on paying is per process.
         tests = [sys.executable, "-m", "pytest", "tests/workflows", "-m", "workflow"]
+        if args.live:
+            # A hostile case states how many of its parts stay unanswered; paid answers would
+            # be recorded for it and break that count on every later replay.
+            tests += ["--ignore", HOSTILE]
         quiet = ["-q", "-p", "no:cacheprovider", "-p", "no:xdist", "--show-capture=no"]
         code = subprocess.run([*tests, *quiet], cwd=REPO, env=env, check=False).returncode
         conversions = [
@@ -139,10 +146,12 @@ def main(argv: list[str] | None = None) -> int:
         kept_out: set[str] = set()
         for one in conversions:
             (may_commit if one["commit"] else kept_out).update(one["keys"])
-        if code != 0:
+        if code != 0 or args.live:
             # A test that did not run read nothing, so "unread" proves nothing today: no
             # answer is dropped, and one whose file is not known stays out of the repository.
-            print("the tests did not pass: no answer is dropped")
+            # A live refresh leaves the hostile-file tests out, so it never drops either.
+            why = "the tests did not pass" if code != 0 else "a live refresh leaves tests out"
+            print(f"{why}: no answer is dropped")
             may_commit |= {row["k"] for row in committed}
             kept_out |= have - may_commit
         commit = [row for row in after if row["k"] in may_commit - kept_out]
