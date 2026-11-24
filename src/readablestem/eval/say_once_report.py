@@ -56,6 +56,8 @@ def _convert(entry: str, image_pages: bool, exam: bool) -> dict[str, Any]:
             grouping["join_panels"] = True
         if settings.layout_figure_art:
             grouping["figure_art"] = True
+        if settings.layout_matching_under:
+            grouping["matching_under"] = True
         grouping["table_search_limited"] = False
         doc = layout.analyze(pdf, max_pages=settings.max_pages_per_job, **grouping)
     except Exception as exc:

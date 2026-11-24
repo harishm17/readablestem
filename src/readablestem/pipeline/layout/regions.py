@@ -203,8 +203,16 @@ def _interior(
 class _Build:
     """The state of building one page's tree."""
 
-    def __init__(self, items: list[Item], slide: bool, pitch: float, rects: Sequence[BBox]) -> None:
+    def __init__(
+        self,
+        items: list[Item],
+        slide: bool,
+        pitch: float,
+        rects: Sequence[BBox],
+        matching_under: bool = False,
+    ) -> None:
         self.items = items
+        self.matching_under = matching_under
         self.slide = slide
         self.pitch = pitch
         self.rects = list(rects)
@@ -428,8 +436,10 @@ class _Build:
         if any(lab is None for lab, _ in lc + rc):
             return None
         runs = _run(lc), _run(rc)
+        first = [cells[0][0][0] if cells[0][0] else "" for cells in (lc, rc)]
         if (
-            lc[0][0][0] != rc[0][0][0]
+            self.matching_under
+            and first[0] != first[1]
             and min(runs) >= 2
             and (runs[0] < len(lc) or runs[1] < len(rc))
         ):
@@ -1050,7 +1060,7 @@ def _tree_of(
     items += _pictures(page, height)
     items += [(t, "") for t in tables if _takes_room(t, page.rect.width, height)]
     rects = _boxes_of(paths, (page.rect.width, height), items)
-    build = _Build(items, document.slide_deck, pitch, rects)
+    build = _Build(items, document.slide_deck, pitch, rects, document.matching_under)
     root = build.build(list(range(len(items))), "S")
     lines = [(f.bbox, f.clean) for f in kept if not f.vertical]
     foot = _footnote_zones(root, body, body_size)

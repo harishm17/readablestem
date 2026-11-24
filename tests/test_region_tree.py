@@ -307,7 +307,7 @@ def _matching_then(page: pymupdf.Page, *lines: tuple[float, float, str]) -> None
 def test_what_stands_under_a_matching_exercise_is_read_after_it(under):
     doc, page = _page()
     _matching_then(page, *under)
-    elements = layout.analyze(doc.tobytes(), region_tree=True).elements
+    elements = layout.analyze(doc.tobytes(), region_tree=True, matching_under=True).elements
     markers = [e.list_marker for e in elements if e.list_marker]
     assert markers[:7] == ["7.", "1.", "2.", "3.", "A.", "B.", "C."]
     assert markers[7] == "8."

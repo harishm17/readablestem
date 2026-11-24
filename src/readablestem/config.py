@@ -167,6 +167,14 @@ class Settings(BaseSettings):
     # take, so the recorded figure answers of the pages it moves stop matching and
     # `PIPELINE_VERSION` must be bumped in the change that enables it.
     layout_figure_art: bool = False
+    # What stands under a matching exercise is read after it (`layout.analyze(matching_under=True)`,
+    # docs/layout.md "The region tree", rule 8), with `REGION_TREE` on: the exercise's two columns
+    # end where the numbers of their labels stop counting, so the line under them ("8. ...") is no
+    # cell of the terms. Off: output is byte-identical to before. Turning it on changes the text
+    # that goes with the figure or the equation under such an exercise, so the recorded answers of
+    # the pages it moves stop matching and `PIPELINE_VERSION` must be bumped in the change that
+    # enables it.
+    layout_matching_under: bool = False
     # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
     # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
     # tree of regions from the unmerged line fragments first and orders the pages by it. Off:
