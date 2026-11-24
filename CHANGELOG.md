@@ -1,5 +1,37 @@
 # Changelog
 
+## Pipeline 0.5.20, render 11 (2026-11-24)
+
+- `PIPELINE_VERSION` is 0.5.20 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  "Unreleased" entries below down to the 0.5.19 entry (wave 6: seven lines of work, each
+  counted on real documents first; four of them built something, three measured and built
+  nothing).
+  What changes for a reader, one line for each:
+  - Limits (O-445): with the region tree on, a limit under or over a sum, product or integral
+    sign stays in the sign's line where a bracket beside it had cut it off (on the public
+    files, limits read beside their sign go from 657 to 703 of 1,892; four limits on three
+    displays read worse, named in the entry below).
+  - Algorithms: a full-width algorithm whose short steps have comments at the right and whose
+    long steps run past the gutter is one block (arXiv 2504.06207 page 13).
+  - Scripts: a lowered script under a typewriter name is read before the name, not inside it
+    ("KRR" with a subscript, arXiv 2503.00504 page 8).
+  - LaTeX sources (O-425): a document that loads `listings` or uses `\orcidlink` is read; a
+    journal's own class or package file that fails the lint is left out of the project in
+    place of refusing the upload; an absolute bibliography path is no refusal; a listing has
+    no blank line between its lines.
+  - Behind switches that stay off, no change: the new `LAYOUT_MATCHING_UNDER` (what stands
+    under a matching exercise is read after it, O-443) and `LAYOUT_FIGURE_ART` (now with the
+    three things it was owed before it can go on, O-452). Each needs a re-recording of the
+    requests it moves (two each) before it goes on.
+  - Measured and not built: the lab manual page (O-444: the scorer cannot place a figure block
+    whose words are in the picture), the code-face limits (O-454, O-456, O-457, O-458), roman
+    label columns (O-449), the script row floor, stacked fill-in lines, larger panel cards and
+    the one-page small-print line (O-446, O-455, O-459, O-437).
+- Stored results: the schema is the same. Results from 0.5.10 to 0.5.19 load unchanged, their
+  page is not made again, and 0.5.19 opens a 0.5.20 result. The roll-back limit stays at 0.5.12.
+- The corpus recording made at 0.5.18 stands: no recorded request moves (the hash run of the
+  73 uploads is in docs/eval.md with the other release measurements).
+
 ## Unreleased: the held-out reading order of 0.5.19, and the ledger's first release bars
 
 - `layout-heldout-1` was scored once for 0.5.19 after its release (main `b8fb9ab7`, the

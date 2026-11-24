@@ -399,11 +399,12 @@ def _top_down(boxes: Sequence[BBox], members: Iterable[int], *, earlier: bool = 
     With `earlier` (`LAYOUT_FIGURE_ART`) an item that misses the last line because its height is
     more than three times that of the line's first item (or the other way round), and that
     starts above the bottom of that first item (it stands beside it, not under it), goes to
-    the latest earlier line it fits, if there is one. Three figures side by side whose tops differ
-    by a few points with a short row between two of them (the label of one) were three lines,
-    because the short row, sorted between them, could not share a line with a figure: the
-    figure on the right of the row was read after the one on its left, and the third before
-    them both. Items that miss the last line for any other reason start a line, as before.
+    the line before that one if it fits there (one line back, no further). Three figures side
+    by side whose tops differ by a few points with a short row between two of them (the label
+    of one) were three lines, because the short row, sorted between them, could not share a
+    line with a figure: the figure on the right of the row was read after the one on its left,
+    and the third before them both. Items that miss the last line for any other reason start
+    a line, as before.
     """
     ordered = sorted(members, key=lambda i: (boxes[i][1], boxes[i][0]))
     lines: list[list[int]] = []
