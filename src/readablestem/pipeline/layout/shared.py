@@ -566,16 +566,18 @@ def _code_beside_maths(chars: list[_Char], classes: list[str]) -> None:
                 or (left and operand(nearest(before - 1, -1)))
                 or (right and operand(nearest(after + 1, 1)))
             )
-            for k in range(i, stop) if inside else ():
-                # A word of the code face ("out" in "Pr[out = 1]") is a name, not an operand
-                # letter, unless it touches a maths letter: read as a word it would turn a
-                # display into a line of prose.
-                word = chars[k].c.isalpha() and (
-                    (k > 0 and chars[k - 1].c.isalpha()) or (k + 1 < n and chars[k + 1].c.isalpha())
-                )
-                if classes[k] == "C" and (touching or not word):
-                    classes[k] = _char_class(chars[k], code=False)
-                    changed = True
+            if inside:
+                for k in range(i, stop):
+                    # A word of the code face ("out" in "Pr[out = 1]") is a name, not an
+                    # operand letter, unless it touches a maths letter: read as a word it would
+                    # turn a display into a line of prose.
+                    word = chars[k].c.isalpha() and (
+                        (k > 0 and chars[k - 1].c.isalpha())
+                        or (k + 1 < n and chars[k + 1].c.isalpha())
+                    )
+                    if classes[k] == "C" and (touching or not word):
+                        classes[k] = _char_class(chars[k], code=False)
+                        changed = True
             i = end
 
 
