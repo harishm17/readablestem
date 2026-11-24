@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased: the figure-art switch is ready to go on (O-452)
+
+- `LAYOUT_FIGURE_ART` stays off in code and in the production profile. What was owed before it
+  can go on is built behind it, so with it off the output is that of b8fb9ab7
+  (docs/layout.md, "Figures"):
+  - A narrower test for a hand-drawn figure (`page._pen_figures`). Writing curves: a region
+    whose pen strokes mostly curve (`PEN_CURVED_MAX`) is writing, and a figure takes only short
+    typed labels that do not start like an item ("(a)", "1.", "[4 marks]"). A worksheet's typed
+    "Answer:" beside what a student wrote is no longer a figure label (review 25): the writing
+    stays handwriting with its notice and the typed word stays in the text. arXiv 2407.20815
+    pages 2 and 4 keep their figures and labels. PEN_COUNTS
+  - Figures side by side (`order._top_down(earlier=True)`): a short row between them no longer
+    splits the line, so w_lecture_5111 page 4 reads left, middle, right.
+  - The strike and highlight marks of the text pass read the drawings as layout does
+    (`rows.page_paint(figure_art=True)`). The upload probe is measured and not changed.
+- Turning it on still needs a re-recording of the requests that move (REQUESTS_MOVED) and a
+  `PIPELINE_VERSION` bump; neither is in this change. No stored document changes.
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

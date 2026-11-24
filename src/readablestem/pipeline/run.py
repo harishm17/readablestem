@@ -1085,6 +1085,7 @@ def _text_pass(
     layout_lang: str,
     options: ConversionOptions,
     tracer: Tracer,
+    figure_art: bool = False,
 ) -> text_pass.TextPassResult:
     """Links, cross-references, language, (with FEATURE_COLOUR) colour runs and (with
     CONTENT_RUNS; counted either way) struck runs on the elements, before any step
@@ -1100,6 +1101,7 @@ def _text_pass(
             colour=options.colour,
             runs=options.content_runs,
             chosen_lang=options.language,
+            figure_art=figure_art,
         )
         _annotate(span, lang_source=text.lang_source, **text.counts())
     return text
@@ -2374,7 +2376,17 @@ def _convert(
             made: list[text_pass.TextPassResult] = []
 
             def text_and_headings() -> None:
-                made.append(_text_pass(pdf_bytes, elements, readable, doc.lang, options, tracer))
+                made.append(
+                    _text_pass(
+                        pdf_bytes,
+                        elements,
+                        readable,
+                        doc.lang,
+                        options,
+                        tracer,
+                        settings.layout_figure_art,
+                    )
+                )
                 for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 
