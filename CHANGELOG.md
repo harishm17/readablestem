@@ -43,6 +43,32 @@
   rule's commit and its parent on the corpus replay (87 pages: none made right, two made wrong)
   and on `layout-dev-1` (267 pages: net one page worse in the student page). No code or record
   is changed; docs/layout.md "One label rule by distance" and docs/eval.md have the counts.
+## Unreleased: what stands under a matching exercise is read after it (O-443, O-449)
+
+- `LAYOUT_MATCHING_UNDER` (`layout.analyze(matching_under=True)`, off in code and in the
+  production profile; needs `REGION_TREE` on). With the region tree on, a matching exercise
+  (terms 1. 2. 3. beside definitions A. B. C.) took the line that follows it ("8. Explain ...") as
+  a fourth term, and read it between the terms and the definitions. With the switch on, each
+  column's labels end where their count stops (`regions._run`; at least two labels in each
+  column, the two columns of different kinds), and the exercise is a `cols` node over a stack
+  with what stands under it (`regions._Build._matching`). Both shapes read right: a full-width
+  line with its points at the right edge (corpus upload `e1_mc_columns` page 1, the one corpus
+  gold page the switches made wrong) and a numbered question with sub-parts (a) and (b).
+  - Measured with the switch on (`eval order`, no model): the corpus gold pages 84 of 91 right
+    (83 before; `e1_mc_columns` page 1 made right, none made wrong); layout-dev-1 161 of 267
+    right and 81 faultless, as before, no page changed. Count on real documents: of 38 public
+    files in `data/`, 93 in `tests/`, 60 of the development set and 25 private files, the rule
+    cut only `e1_mc_columns` (two calls); no real document shows the fault. With the switch off
+    `hashrun.py full` compares 73 uploads with 0 differences; with it on, 1 differs
+    (`e1_mc_columns`: the text read before its figure moves, so the 2 recorded answers of that
+    upload stop matching). That is why the switch is off: turning it on needs a re-recording and
+    a `PIPELINE_VERSION` bump.
+  - Known limit: a line under the exercise that goes on counting ("4." under terms 1. 2. 3.) is
+    not told from a fourth term.
+- O-449 measured and not built: a column of labels numbered i., ii., iii. counts as two kinds
+  (`_label`), but on the 38 public files in `data/`, the 93 in `tests/`, the 60 of the development
+  set and the 25 private files, 29 pairs of label columns were found and none holds a roman
+  label, so no real page reads wrong and the label kinds stay.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 

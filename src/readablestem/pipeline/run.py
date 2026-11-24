@@ -1926,6 +1926,8 @@ def _page_math_pass(
                 grouping["join_panels"] = True
             if settings.layout_figure_art:
                 grouping["figure_art"] = True
+            if settings.layout_matching_under:
+                grouping["matching_under"] = True
             if settings.table_search_unlimited:
                 grouping["table_search_limited"] = False
             try:
@@ -2222,6 +2224,8 @@ def _convert(
                 extra["join_panels"] = True
             if settings.layout_figure_art:
                 extra["figure_art"] = True
+            if settings.layout_matching_under:
+                extra["matching_under"] = True
             if settings.table_search_unlimited:
                 extra["table_search_limited"] = False
             if stage_progress is not None:

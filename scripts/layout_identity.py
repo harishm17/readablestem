@@ -81,6 +81,7 @@ def describe(path: str) -> dict[str, Any]:
             inline_joins=os.environ.get("LAYOUT_INLINE_JOINS", "").lower() == "true",
             join_panels=os.environ.get("LAYOUT_JOIN_PANELS", "").lower() == "true",
             figure_art=os.environ.get("LAYOUT_FIGURE_ART", "").lower() == "true",
+            matching_under=os.environ.get("LAYOUT_MATCHING_UNDER", "").lower() == "true",
         )
     except layout.LayoutError as exc:
         return {"error": exc.code, "seconds": round(time.perf_counter() - started, 2)}
