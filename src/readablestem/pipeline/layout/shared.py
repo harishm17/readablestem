@@ -518,8 +518,14 @@ def _code_beside_maths(chars: list[_Char], classes: list[str]) -> None:
     It is inside when it touches a maths letter of another face, stands between two maths
     characters or operators of another face, or comes right after one that has an operand of its
     own on its other side. A code-face run beside nothing of the kind stays code: "x = 5" in
-    prose, in a code face, is an identifier, and so is the "x + x" in front of an arrow."""
+    prose, in a code face, is an identifier, and so is the "x + x" in front of an arrow. A row that
+    is mostly code face with words of it in it is a line of code, and is left as it is."""
     n = len(chars)
+    code = {k for k, kind in enumerate(classes) if kind == "C"}
+    if 2 * len(code) > sum(not c.blank for c in chars) and any(
+        chars[a].c.isalpha() and chars[a + 1].c.isalpha() for a in code if a + 1 in code
+    ):
+        return
 
     def nearest(k: int, step: int) -> int | None:
         while 0 <= k < n and chars[k].blank:

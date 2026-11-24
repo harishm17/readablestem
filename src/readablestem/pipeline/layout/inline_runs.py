@@ -421,7 +421,7 @@ def _code_row(row: _Row) -> bool:
 
 
 def _mark_code_runs(rows: list[_Row]) -> None:
-    """Set `row.code_run` on the rows within two lines of a row that is mostly code face.
+    """Set `row.code_run` on the rows within three lines of a row that is mostly code face.
 
     A word of the code face counts as a prose word in a row of an algorithm ("for each Alg
     do", or a step with an identifier in the code face and the rest of it plain): the row is
@@ -433,7 +433,7 @@ def _mark_code_runs(rows: list[_Row]) -> None:
         return
     index = _RowIndex(code)
     for row in rows:
-        reach = 2.0 * row.size
+        reach = 3.0 * row.size
         row.code_run = any(
             other is not row and other.x0 < row.x1 and row.x0 < other.x1
             for other in index.near(row.y0 - reach, row.y1 + reach)

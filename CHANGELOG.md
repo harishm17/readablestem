@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: a code-face word inside a formula (review 25)
+
+- Finding 3: a formula with an operand in a typewriter face (a set of strings, "{101}", a name)
+  was cut at it, because a character of a code face is never math. In `shared._code_beside_maths`
+  a run of code-face characters is read as it would be in any face when it is inside a formula:
+  it touches a math letter of another face, stands between two math characters or operators of
+  another face, or comes next to one that has an operand on its other side. A run beside nothing
+  of the kind, a row that is mostly code face with code words (a listing), and a word of two
+  letters or more that touches no math letter stay code, so what the 0.5.19 entry for code fonts
+  (O-440) fixed is unchanged. Measured on the 25 private corpus uploads: 10 pages of one upload,
+  fonts NimbusMonL and CourierNew, had their formulas torn since 0.5.19; 30 of the 31 broken
+  formulas are whole now and the 247 formulas of those pages read as in 0.5.18 but one.
+- Finding 2: a word of the code face counts as a prose word only in a row within three lines of a
+  row that is mostly code face (`inline_runs._mark_code_runs`), as in an algorithm. A display with
+  one `\mathtt` name and no code rows near it ("Pr[out = 1] ≥ 2/3") is no longer made text, so its
+  denominator is no longer a paragraph of its own. Algorithm pages (2504.06207 p13, 2405.15050)
+  read as before.
+- The 0.5.19 entry says "none worse" of the corpus differences. Of the 18 pages that 0.5.19 changed
+  on 3 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
+  inline read). After this change 8 pages of 3 uploads differ from the 0.5.18 read, all the
+  intended changes of 0.5.19, so "none worse" holds: 11 worse before, 0 after.
+- Stored documents: a document laid out under 0.5.19 with a code-face operand in a formula keeps the
+  torn read until it is converted again, so a pipeline raise is owed with the next release; this
+  entry does not make it. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no
+  prompt changes, and no recorded request moves (hash run in the pull request).
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

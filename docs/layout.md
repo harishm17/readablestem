@@ -2456,12 +2456,41 @@ file before, 553 now). Two line numbers in them read wrong (p16 "2930", p18 "34 
 number of a blank line and the next one are 9 pt apart and 6 pt high, and the row builder makes
 one row of them.
 
-A word of the code face counts as a prose word when a row is classified (`_classify_row`,
-`_prose_words(typewriter=True)`): "for each Alg do" in an algorithm set in NimbusMonL
-(2504.06207 p4) made its rows "math" and its step numbers fragments attached to them, and the
-algorithm rule then lost the page. The figure and display rules do not count them: the labels
-of a diagram set in Courier New would be prose. 2504.06207 p4 and 2405.15050 p4 read as builder
-04 left them (the same elements with the old font list and with the new).
+A word of the code face counts as a prose word when a row is classified (`_classify_row`),
+but only in a row beside a row that is mostly code face (`_mark_code_runs`: within three lines,
+over the same columns, with more than half of its characters in the code face and three
+letters of it at least): "for each Alg do" in an algorithm set in NimbusMonL (2504.06207 p4)
+made its rows "math" and its step numbers fragments attached to them, and the algorithm rule
+then lost the page. A display with one `\mathtt` name and no code rows near it ("Pr[out = 1]
+≥ 2/3") is classified as before: counted as a word, the name made the row text and left the
+denominator "3" a paragraph of its own (review 25, finding 2). The figure and display rules do
+not count them: the labels of a diagram set in Courier New would be prose. 2504.06207 p4 and
+2405.15050 p4 read as builder 04 left them.
+
+**A code-face run inside a formula (review 25, finding 3).** A formula can carry an operand
+in a typewriter face (`\mathtt`: a set of strings, "{101}", a name): the code-face rule
+(`_char_class`: "C", never math) cut the formula at it, so "x ∈ {101} ∗ y" was two
+formulas with the set left in the sentence, in CMTT already and in six more fonts since the
+list grew. `shared._code_beside_maths` reads a run of code-face characters as it would be in any
+face (digit, bracket, operator, letter) when it is inside a formula, and the formula finder
+then keeps it: it touches a math letter of another face, stands between two math characters
+or operators of another face, or comes right after one (or right before one) that has an
+operand on its other side ("x = {1, 2}" with the set in the code face). A run beside nothing of
+the kind stays code, so "x = 5" in a code face inside prose is still an identifier and the
+"x + x" in front of an arrow is not drawn into the arrow's formula. A word of two letters or
+more (`\mathtt{out}`) stays code unless it touches a math letter: read as a word it would
+make the row prose and take a display out of the equations. A row that is mostly code face
+with code words in it (a listing) is not reread at all: the SQL page of ax_cslg_240306367 p4
+stays code. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
+(base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
+is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
+{...}") and changed 18 pages of 3 files against the 0.5.18 read, 11 of them for the worse. With
+this rule 8 pages of 3 files differ from the 0.5.18 read, all of them the intended changes of
+0.5.19 (the listings and tails); of the 247 formulas on the pages of that upload, 246 are as in
+the 0.5.18 read (base: 216), so 30 of the 31 broken ones are whole. Base against this change
+differs on 11 pages of that one upload, none of them worse. Of the 30 public files that carry a
+code-face font, one page differs from base (ax_cslg_240306367 p8: the attribute set "{A, C, E,
+F}" is an inline formula again, as in 0.5.18).
 
 Measured on the 332 files of the corpus hash set (996 results, 3 modes of each file): 33
 differ, 11 files. 6 results are builder 04's algorithm changes (2504.06207, 2405.15050); 27 are
