@@ -82,6 +82,29 @@
 - O-455, O-459, O-437: no real page shows the fault (four public pages with two bracketed marks
   are consecutive equation numbers; 13 small panels are boxes of text; the one-page rule took no
   line of words on 76 one-page files). Nothing is built; the counts are in docs/layout.md.
+## Unreleased: a full-width algorithm stays one block; a typewriter name's lowered script is read before it (wave 6, brief 07)
+
+- Two faults real documents show, both in `layout`; no recorded request moved (`hashrun.py full`
+  on the 73 corpus uploads: 0 differences; `analyze` on 996 PDFs: 0 differences), so no switch.
+  - Algorithm 5 of 2504.06207 (p13): a full-width algorithm (steps that run past the gutter,
+    comments at the right of the short ones) is cut by the region tree into leaves of
+    different columns, and the algorithm scan asked every step for the column of the first.
+    The block ended at step 8: a heading paragraph, display equations for steps 7 and 11. A
+    step in the spanning leaf that has the next line number at the place of the numbers now
+    belongs to the block (`blocks._in_column`). The math italic of the steps was not the cause.
+    Of the 32 captioned algorithms on 17 public documents, 20 were formed before and after
+    and one file changed (this one).
+  - 2503.00504 p8: a typewriter name raised over a lowered letter (the `KRR` of a filter's
+    superscript, with a lambda under it) was read "KRλR", the letter inside the name. It is
+    read before the whole name ("φλKRR", `rows._stack_position`). The rule is for monospaced
+    names only; the first version took every run of small glyphs and cost two formulas of
+    the box score (9,196 against 9,198 of 11,258 whole), so it was narrowed (box score now
+    9,198 and displays 903 of 1,004, as at the base, no formula changed class). It changes the
+    reading order on none of the 332 public files hashrun lists, only on the 2503.00504 page.
+- Two shapes seen and not built: a wrapped step followed by `return` in 2504.06207 (Algorithm 3,
+  p5), and the first algorithm of 2503.08264 (p0), whose scan yields no row.
+- `PIPELINE_VERSION` is owed a raise (the reading of these two shapes changes the layout of
+  documents that have them); no migration.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
