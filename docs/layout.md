@@ -2477,15 +2477,16 @@ then keeps it: it touches a math letter of another face, stands between two math
 or operators of another face, or comes right after one (or right before one) that has an
 operand on its other side ("x = {1, 2}" with the set in the code face). A run beside nothing of
 the kind stays code, so "x = 5" in a code face inside prose is still an identifier and the
-"x + x" in front of an arrow is not drawn into the arrow's formula. A word of two letters or
-more (`\mathtt{out}`) stays code unless it touches a math letter: read as a word it would
-make the row prose and take a display out of the equations. A row that is mostly code face
+"x + x" in front of an arrow is not drawn into the arrow's formula. A run that holds a word of two
+letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it touches a math
+letter: read as a word it would make the row prose and take a display out of the equations, and
+read in part the "1" of `op1` would join the formula next to it (2504.20938 p7). A row that is mostly code face
 with code words in it (a listing) is not reread at all: the SQL page of ax_cslg_240306367 p4
 stays code. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
 (base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
 is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
-{...}") and changed 18 pages of 3 files against the 0.5.18 read, 11 of them for the worse. With
-this rule 8 pages of 3 files differ from the 0.5.18 read, all of them the intended changes of
+{...}") and changed 16 pages of 2 files against the 0.5.18 read, 11 of them for the worse. With
+this rule 6 pages of 2 files differ from the 0.5.18 read, all of them the intended changes of
 0.5.19 (the listings and tails); of the 247 formulas on the pages of that upload, 246 are as in
 the 0.5.18 read (base: 216), so 30 of the 31 broken ones are whole. Base against this change
 differs on 11 pages of that one upload, none of them worse. Of the 30 public files that carry a

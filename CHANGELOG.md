@@ -17,14 +17,14 @@
   one `\mathtt` name and no code rows near it ("Pr[out = 1] ≥ 2/3") is no longer made text, so its
   denominator is no longer a paragraph of its own. Algorithm pages (2504.06207 p13, 2405.15050)
   read as before.
-- The 0.5.19 entry says "none worse" of the corpus differences. Of the 18 pages that 0.5.19 changed
-  on 3 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
-  inline read). After this change 8 pages of 3 uploads differ from the 0.5.18 read, all the
+- The 0.5.19 entry says "none worse" of the corpus differences. Of the 16 pages that 0.5.19 changed
+  on 2 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
+  inline read). After this change 6 pages of 2 uploads differ from the 0.5.18 read, all the
   intended changes of 0.5.19, so "none worse" holds: 11 worse before, 0 after.
 - Stored documents: a document laid out under 0.5.19 with a code-face operand in a formula keeps the
   torn read until it is converted again, so a pipeline raise is owed with the next release; this
   entry does not make it. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no
-  prompt changes, and no recorded request moves (hash run in the pull request).
+  prompt changes, and no recorded request moves (the replayed documents of the 73 uploads are identical to the base run).
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
