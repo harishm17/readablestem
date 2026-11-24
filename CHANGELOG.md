@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: one number for a display (review 25)
+
+- A bracketed number after a line that ends in "+" or a relation (display grouping, on) is
+  that display's number only when it is level with the line, the line has no number yet, and
+  something follows the line: a row right under it, or rows between it and the number (the
+  cases of a brace). A worksheet line "3x + 2 =      (4)" with nothing after it keeps its "(4)"
+  as an element of its own, as it did before 0.5.19; on one private page a lone "=" had taken
+  two numbers, one from the line above, and takes none. The real numbers of 0.5.19 stay
+  attached (a cases display, two equations numbered one under the other).
+- A row of three centered dots that ends a display ("x + x^2 + x^3 + ...") is not an operator
+  that goes on, so the number beside it is the display's under the regular rule.
+- Layout only: no crop, picture or request changes (a number is a label, not part of the
+  crop). `PIPELINE_VERSION` stays; fold this entry into 0.5.19.
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
