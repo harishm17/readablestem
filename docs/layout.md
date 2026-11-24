@@ -1991,11 +1991,39 @@ math by the document's evidence; the equation step's own tiers then decide it.
   section are: one figure's crop is 12 pt shorter, the same five
   words, and its request has no recorded answer until it is re-recorded), and one in a note
   (r21_infographic_orcid: a figure's reason reads 866 paths for 867). Panel labels, the other
-  part of this section, move no request and are not behind it. Turning it on
-  needs a re-recording and a `PIPELINE_VERSION` bump, and, first, an order for figures that stand
-  side by side: on w_lecture_5111 the figure that is 12 pt shorter now starts below its neighbor
-  and `order._top_down` puts the neighbor first (the middle figure of three before the left one),
-  and a narrower label test for pen figures (below).
+  part of this section, move no request and are not behind it. Re-measured at b8fb9ab7 for wave
+  6, with the figure order of this wave in: with it on, 2 recorded requests do not match, both
+  on w_lecture_5111 (one figure and one equation of page 4), the same 2 as without the order
+  change, and 2 uploads differ (that one and r21_infographic_orcid); with it off, 0 of 73
+  uploads and 0 of 996 analyze entries differ. Turning it on
+  needs a re-recording of those 2 requests and a `PIPELINE_VERSION` bump. The three things that were owed before it
+  could go on are in (wave 6): the order of figures that stand side by side, the narrower label
+  test for pen figures ("Pen figures") and the clip read in the readers of strike and highlight.
+  - *Order*: with the switch on, `order._top_down` puts an item that goes to a new line only
+    because its height is more than three times that of the last line's first item, and that
+    starts above the bottom of that item (it stands beside it, not under it), on the latest
+    earlier line it fits (`earlier=True`, passed from the blocks call in `page._analyze`
+    through `RegionTree.order`, the gutter orders and the grid, leaf and proxy walks of the
+    region tree). A short row between two figures of a row (their tops differ by a few points)
+    is a line of its own, and the figure after it started yet another: the row was read between
+    the left figure and the other two (w_lecture_5111 page 4: the middle figure before the left
+    one). Off, nothing is passed and the old rule stands (0 differences in 20,000 random
+    layouts, and in the 73 uploads). A first version that looked back whenever the last line
+    did not fit moved 12 pages of 8 uploads, among them a heading read after the paragraph under
+    it (r13_exam_3044 page 3); the rule above moves one page, w_lecture_5111 page 4.
+  - *Readers of paint* (`get_drawings`, `get_cdrawings`, `page_drawings`): layout
+    (`document._read_page`) reads the clipped list; `rows.page_paint`, the strike and highlight
+    marks of the text pass, reads it too with the switch on (`text_pass.read_pdf`,
+    `run._text_pass`); the furniture pass and the page-type eval read the plain list, as does the
+    upload probe (`page_type.probe_pages`, below). On the public sets 19 of 332 file entries
+    (14 different files, the rest copies) hold art that a clip hides on 42 pages; on 13 entries
+    and 30 of those pages the raw strike or highlight candidates differ with the clip read, and
+    in the result of the text pass (its counts and every element) 0 of the 14 files differ, and 0
+    of the 4 corpus files with such art.
+  - *The upload probe* is measured and not built: across the 332 public file entries and the 25
+    corpus files no page changes its kind with the clip read (1 public page has a probe
+    candidate with hidden art, and it stays the same kind). It would need the switch carried
+    through `web/uploads.py`'s child process and `web/pdf_probe.py` to `_probe_ink`.
 - **Art a clip hides** is no figure and no ink (`page_type.page_drawings`; behind
   `LAYOUT_FIGURE_ART`). A
   PDF that carries a figure's art on every page (an editor's export) clips each page to its
@@ -2007,8 +2035,9 @@ math by the document's evidence; the equation step's own tiers then decide it.
   with its depth (`level`); a drawing whose box, with half its line width, lies wholly
   outside the box of a clip it is inside of is painted at opacity 0, the way the page already
   leaves out paint nobody sees (`paint_visibility`, the ink analysis). Only layout's own read of
-  a page uses it (`document._read_page`); the text pass's strike and highlight marks, the upload
-  probe, the furniture pass and the page-type eval read the plain list. The list keeps its
+  a page uses it (`document._read_page`) and, with the switch on, the text pass's strike and
+  highlight marks (`rows.page_paint`); the upload probe, the furniture pass and the page-type
+  eval read the plain list. The list keeps its
   length and order. Counted on the public sets
   (302 files, 2,628 pages): 15 files and 34 pages hold such art on the page; on the private
   corpus 4 of 25 files and 5 of 1,202 pages. Only a drawing wholly outside its clip is
@@ -2035,10 +2064,21 @@ math by the document's evidence; the equation step's own tiers then decide it.
   number, "[4 marks]" or a whole typed line through what a student wrote left the text, the
   writing went to the figure step as a picture, and the `handwriting_on_page` notice with its
   required decision was not raised. With the switch on, page 41 reads right (its box is the
-  drawn sketch alone), and the worksheet cases are still taken: before the switch goes on, a
-  label here must be told from a worksheet's own words (short, no display, no line of running
-  text, no row that reaches outside the box, and a region that is a drawing and not rows of
-  writing).
+  drawn sketch alone).
+  Wave 6 closes the worksheet cases with two tests, so a region is a figure only if both hold.
+  The region is a drawing and not rows of writing: more than half (`PEN_CURVED_MAX`, 0.5) of its
+  pen strokes curve (a path with Bézier items, `_Path.curved`) is writing, which curves, and a
+  sketch of straight segments, a plot or a diagram with their few arcs is not. And what the
+  figure takes of the typed rows is only labels: every row it takes is at most `LABEL_SHORT` (25)
+  characters and none starts like an item (`_Row.marker`: "(a)", "1.", "[4 marks]"). A row is
+  taken as a label by `_label_owners`, the one rule for what a figure's labels are, as before.
+  Measured on made worksheet pages (9 of 9 cases of writing in ribbon, polyline and segment
+  styles with a typed "Answer:", "R", "(a)" or a question number beside it; the 10 sweep PDFs and
+  the probe pages P0 to P6): all stay handwriting, with the notice and the typed words in the
+  text; on arXiv 2407.20815 pages 2 and 4 the sphere and the world lines are still figures with
+  their labels. Pages with a pen figure, before and after (switch on, the 332 public file entries and the 25
+  corpus files): 4 pages in 2 files and 0 before, 4 pages in the same 2 files and 0 after, on 10
+  public and 1 corpus pages that hold an ink region; no page gains or loses a pen figure there.
 - **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
   panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
   no other figure) claims the rows on the panel, its header labels included, short or long

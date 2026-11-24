@@ -53,6 +53,7 @@ from readablestem.pipeline.layout.figures import (
     DRAWING_CLUSTER_GAP,
     FIGURE_PART_REACH,
     HAND_MEET,
+    LABEL_SHORT,
     LEFTOVER_REACH,
     _backdrop,
     _bond_ends,
@@ -595,7 +596,14 @@ def _page_blocks(
     lap("figures")
     # A caption held by its figure still fills its column: without it the column looks empty
     # beside the next line of the other column, which then reads as a heading across both.
-    order = _reading_order([b.bbox for b in blocks], gutter, ctx.body, captions, blocks=True)
+    order = _reading_order(
+        [b.bbox for b in blocks],
+        gutter,
+        ctx.body,
+        captions,
+        blocks=True,
+        earlier=document.figure_art,
+    )
     lap("order")
     final = _option_order(_merge_column_continuations([blocks[i] for i in order]))
     edges = _RightEdges(text_rows)
@@ -1074,6 +1082,9 @@ def _at_edge(box: BBox, frame: BBox, reach: float) -> bool:
     )
 
 
+PEN_CURVED_MAX = 0.5  # share of a region's pen strokes with curves above which it is writing
+
+
 def _pen_figures(
     figures: list[_Figure],
     regions: Sequence[BBox],
@@ -1102,18 +1113,21 @@ def _pen_figures(
     drawing that meets a figure the page has already is part of that figure's page, not a
     second one.
 
-    Known limit, and why the rule is not on by itself: the label rule takes any typed row
-    that lies mostly inside the region's box or a short one within a font size of a stroke,
-    so on a worksheet a typed "Answer:" beside what a student wrote, or a display the box
-    lies over, leaves the text and the handwriting notice is not raised (review 25). The
-    switch stays off until a label here is told from a worksheet's own words."""
+    What keeps a worksheet's own words out of it (review 25: a typed "Answer:", "(a)" or
+    "[4 marks]" beside what a student wrote went into a picture and the handwriting notice
+    was not raised): a region is a drawing only when at most `PEN_CURVED_MAX` of its strokes
+    carry curves (a hand writes in curves; the drawings the rule is for are lines), and
+    every row the figure would take is a label, short (`LABEL_SHORT`) and no list marker."""
     if not pen_paths or not regions:
         return figures, regions
     chosen: list[_Figure] = []
     for region in sorted(regions, key=lambda r: -(r[2] - r[0]) * (r[3] - r[1])):
         if any(_centre_inside(region, f.bbox) for f in chosen):
             continue
-        pool = [p for p in (*pen_paths, *others) if _within(p.bbox, region, 0.0)]
+        strokes = [p for p in pen_paths if _within(p.bbox, region, 0.0)]
+        if sum(p.curved for p in strokes) > PEN_CURVED_MAX * len(strokes):
+            continue  # rows of writing: they curve
+        pool = [*strokes, *(p for p in others if _within(p.bbox, region, 0.0))]
         found = _vector_figures(pool, rows, page_rect, ctx, page_sized=False, document=document)
         if not found:
             continue
@@ -1125,9 +1139,9 @@ def _pen_figures(
             paths=sum(f.paths for f in found),
             members=[p for f in found for p in f.members],
         )
-        if any(
-            owner is one for owner in _label_owners([one], rows, ctx, document=document).values()
-        ):
+        owners = _label_owners([one], rows, ctx, document=document)
+        taken = [r for r in rows if owners.get(id(r)) is one]
+        if taken and all(len(r.clean) <= LABEL_SHORT and r.marker is None for r in taken):
             chosen.append(one)
     if not chosen:
         return figures, regions

@@ -644,9 +644,10 @@ class RegionTree:
         context: Sequence[BBox] = (),
         *,
         blocks: bool = False,
+        earlier: bool = False,
     ) -> list[int]:
         """Indices of `boxes` in reading order: footnote zones last, the rest by the tree, and
-        option grids in label order (rule 8)."""
+        option grids in label order (rule 8). `earlier` is `_top_down`'s."""
         boxes = list(boxes)
         members = list(range(len(boxes)))
         zone_of: dict[int, int] = {}
@@ -661,7 +662,7 @@ class RegionTree:
             for k in range(len(self.foot))
             for i in _top_down(boxes, [j for j in zone_of if zone_of[j] == k])
         ]
-        walker = _Walk(self, boxes, body, list(context), blocks)
+        walker = _Walk(self, boxes, body, list(context), blocks, earlier)
         seq = walker.order(self.root, members) + tail
         return _numbered_runs(_options(seq, boxes, self), boxes, self)
 
@@ -671,7 +672,13 @@ class _Walk:
     columns without being ordered (figure captions)."""
 
     def __init__(
-        self, tree: RegionTree, boxes: list[BBox], body: float, context: list[BBox], blocks: bool
+        self,
+        tree: RegionTree,
+        boxes: list[BBox],
+        body: float,
+        context: list[BBox],
+        blocks: bool,
+        earlier: bool = False,
     ) -> None:
         self.tree, self.boxes, self.body, self.context, self.blocks = (
             tree,
@@ -680,6 +687,7 @@ class _Walk:
             context,
             blocks,
         )
+        self.earlier = earlier
 
     def order(self, node: _Node, members: list[int]) -> list[int]:
         if not members:
@@ -697,13 +705,13 @@ class _Walk:
             per: list[list[int]] = [[] for _ in node.cells]
             for i in members:
                 per[_nearest_cell(node.cells, boxes[i])].append(i)
-            return [j for p in per for j in _top_down(boxes, p)]
+            return [j for p in per for j in _top_down(boxes, p, earlier=self.earlier)]
         return self._columns(node, members)
 
     def _leaf(self, node: _Node, members: list[int]) -> list[int]:
         boxes = self.boxes
         if not node.boxes:
-            return _top_down(boxes, members)
+            return _top_down(boxes, members, earlier=self.earlier)
         # a text box is read where it stands, as one item, with its inside in its own order
         groups: dict[int, list[int]] = {}
         loose: list[int] = []
@@ -717,7 +725,7 @@ class _Walk:
         proxies = list(boxes) + [self._place(node, k, groups, loose) for k in groups]
         pmap = {len(boxes) + n: k for n, k in enumerate(groups)}
         out: list[int] = []
-        for i in _top_down(proxies, loose + list(pmap)):
+        for i in _top_down(proxies, loose + list(pmap), earlier=self.earlier):
             if i in pmap:
                 k = pmap[i]
                 out.extend(self.order(node.boxes[k][1], groups[k]))

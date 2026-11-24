@@ -132,6 +132,28 @@
 - Stored documents: only an upload that failed before can now succeed; nothing already stored
   changes, so no version raise and no migration is owed. The sandbox, the time limit and the
   memory cap are as before.
+## Unreleased: the figure-art switch is ready to go on (O-452)
+
+- `LAYOUT_FIGURE_ART` stays off in code and in the production profile. What was owed before it
+  can go on is built behind it, so with it off the output is that of b8fb9ab7
+  (docs/layout.md, "Figures"):
+  - A narrower test for a hand-drawn figure (`page._pen_figures`). Writing curves: a region
+    whose pen strokes mostly curve (`PEN_CURVED_MAX`) is writing, and a figure takes only short
+    typed labels that do not start like an item ("(a)", "1.", "[4 marks]"). A worksheet's typed
+    "Answer:" beside what a student wrote is no longer a figure label (review 25): the writing
+    stays handwriting with its notice and the typed word stays in the text. arXiv 2407.20815
+    pages 2 and 4 keep their figures and labels. Pages with a pen figure with the switch on:
+    4 in 2 public files before and after, 0 in the corpus before and after.
+  - Figures side by side (`order._top_down(earlier=True)`): a short row between them no longer
+    splits the line, so w_lecture_5111 page 4 reads left, middle, right.
+  - The strike and highlight marks of the text pass read the drawings as layout does
+    (`rows.page_paint(figure_art=True)`). The upload probe is measured and not changed.
+- Measured by replay of the 73 corpus uploads with the switch on: the recorded requests that no
+  longer match are 2, all on w_lecture_5111 (a figure's and an equation's, page 4); the same 2
+  on the base. Two uploads differ in their result (w_lecture_5111 and r21_infographic_orcid,
+  whose figure reason reads 866 paths for 867), 71 do not. With it off all 73 uploads and all
+  996 analyze entries are those of b8fb9ab7. Turning it on still needs that re-recording and a
+  `PIPELINE_VERSION` bump; neither is in this change. No stored document changes.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 

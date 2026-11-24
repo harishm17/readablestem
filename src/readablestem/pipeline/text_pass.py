@@ -373,7 +373,7 @@ def embedded_files(doc: pymupdf.Document) -> tuple[list[str], int]:
         return [], 0
 
 
-def read_pdf(pdf_bytes: bytes, pages: Iterable[int]) -> PdfText:
+def read_pdf(pdf_bytes: bytes, pages: Iterable[int], *, figure_art: bool = False) -> PdfText:
     """/Lang, links and glyphs of the analysed pages (0-based).
 
     Glyphs are read on every page: they carry the colour, weight, slant and pitch of each
@@ -411,7 +411,7 @@ def read_pdf(pdf_bytes: bytes, pages: Iterable[int]) -> PdfText:
                     links = _pdf_links(doc, number, annotations, in_doc)
                     if links:
                         found.links[number] = links
-                    strikes, lit = layout.page_paint(doc[number])
+                    strikes, lit = layout.page_paint(doc[number], figure_art=figure_art)
                     found.glyphs[number] = layout.page_glyphs(doc[number])
                     if lit:
                         found.highlights[number] = lit
@@ -1885,19 +1885,22 @@ def apply(
     colour: bool = False,
     runs: bool = False,
     chosen_lang: str | None = None,
+    figure_art: bool = False,
 ) -> TextPassResult:
     """The text pass for one conversion (the module docstring says what it adds).
 
     `pages` are the analysed pages (0-based), `layout_lang` the language layout reported
     (`Layout.lang`: the PDF's /Lang, else "en"), `colour` the FEATURE_COLOUR flag in
     force, `runs` the CONTENT_RUNS flag (off: struck runs are counted, not written),
-    `chosen_lang` the language the person chose at upload (`ConversionOptions.language`).
-    Never raises: a PDF that cannot be read again gives no links or colours (the
-    cross-references and the language still come from the text), and a failure of the
-    pass itself leaves the elements as they were, with the language layout reported.
+    `chosen_lang` the language the person chose at upload (`ConversionOptions.language`),
+    `figure_art` `LAYOUT_FIGURE_ART` (strikes and highlights are read from the drawings a clip
+    lets through, as layout reads them). Never raises: a PDF that cannot be read again gives no
+    links or colours (the cross-references and the language still come from the text), and a
+    failure of the pass itself leaves the elements as they were, with the language layout
+    reported.
     """
     try:
-        pdf = read_pdf(pdf_bytes, pages)
+        pdf = read_pdf(pdf_bytes, pages, figure_art=figure_art)
     except Exception as exc:  # a reading problem never fails the conversion
         log.warning("text pass could not read the PDF: %s", type(exc).__name__)
         pdf = PdfText()

@@ -1286,7 +1286,9 @@ def _quads(annot: pymupdf.Annot, display: _Display) -> list[BBox]:
     return boxes
 
 
-def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
+def page_paint(
+    page: pymupdf.Page, *, figure_art: bool = False
+) -> tuple[list[Strike], list[Highlight]]:
     """The marks on `page` that may strike text through and the ones that may highlight it,
     for the text pass, from one read of the page's drawings and annotations.
 
@@ -1294,7 +1296,9 @@ def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
     bar no thicker than `STRIKE_MAX_PT`, and the quads of every StrikeOut annotation.
     Highlights: the quads of every Highlight annotation, and every visible filled rectangle
     within `HIGHLIGHT_MAX_PT`, with its colour. A page too complex to read its drawings
-    (`page_type.too_complex`) gives its annotations only. The caller holds `_LOCK`."""
+    (`page_type.too_complex`) gives its annotations only. With `figure_art` (`LAYOUT_FIGURE_ART`)
+    the drawings are read as layout reads them (`page_type.page_drawings`): a line or a fill that
+    a clip lets nowhere through is no strike and no highlight. The caller holds `_LOCK`."""
     display = _Display.of(page)
     marks: list[Strike] = []
     lit: list[Highlight] = []
@@ -1302,7 +1306,7 @@ def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
         marks.extend(Strike(box, True) for box in _quads(annot, display))
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_HIGHLIGHT]) or ():
         lit.extend(Highlight(box) for box in _quads(annot, display))
-    drawings = page.get_cdrawings()
+    drawings = page_type.page_drawings(page) if figure_art else page.get_cdrawings()
     if page_type.too_complex(drawings):
         return marks, lit
     seen = page_type.paint_visibility(drawings)
