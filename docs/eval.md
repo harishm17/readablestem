@@ -4110,7 +4110,10 @@ of 47 uploads, the student page):
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
   first measurement found it, and the one fix tried made four development pages wrong
-  (docs/layout.md, "Measured"). No page stops being faultless.
+  (docs/layout.md, "Measured"). The fault is wider than that page: a numbered line straight
+  under a matching exercise may be read inside it (a page built by the second review of the
+  release: a question with sub-parts (a) and (b) is read between the terms and the
+  definitions; 0.5.17 reads it right). No page stops being faultless.
 - From 0.5.10 to 0.5.17, with the switches off: 8 pages made right and one made wrong in the
   student page (`r05_labmanual_5310_lab1` page 2: two blocks next to each other out of order;
   the element list is right there, and `r18_arxiv_opt` page 3 is the one page the element list

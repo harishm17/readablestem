@@ -176,7 +176,7 @@ def test_a_second_title_slide_or_a_new_page_size_starts_a_second_deck_at_the_sam
             # a slide may set its title in 80 points: it is a slide title like the others ...
             slide("Loud", *(f"Point {n} of the loud slide" for n in range(5)), ordinary=80.0),
             # ... and two headings of a slide's largest size are peers
-            (SLIDE, [("Pros", 80, 30), ("It is fast", 130, 20), ("Cons", 300, 30)]),
+            (SLIDE, [("Pros", 80, 30), ("It is fast", 130, 20), ("Cons", 300, 30.5)]),
             title_slide("Second Lecture", 50.0, second),
             slide("Gamma", "Third point", size_of_page=second),
             slide("Delta", "Fourth point", size_of_page=second),

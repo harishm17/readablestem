@@ -8,7 +8,7 @@
   - Reading order, the layout development set: 161 of 267 pages right (was 141) and 81
     faultless (was 72); no page made wrong. The corpus gold pages: 83 of 91 right (71 with the
     switches off), 13 made right and one made wrong, the self-made `e1_mc_columns` page 1 (a
-    full-width line under a matching exercise is split; known since the tree was first
+    line under a matching exercise is read inside it; known since the tree was first
     measured, docs/layout.md "Measured").
   - Formulas kept whole, all four switches: 9,195 of 11,258 (was 8,989); 217 made whole and 11
     made not whole (8 of them in one paper), no paper worse. Displays kept whole: 903 of 1,004
@@ -27,17 +27,25 @@
     off too: two headings of a slide's largest size are both its titles (peers stay one level);
     a slide whose only heading is set in a sub-heading's size has it as its title, so every
     slide with a heading can be reached at the slide titles' level; and a title slide's subtitle
-    is at that level, where a deck of many sizes had it up to three levels deeper.
-    the deck's 48-point titles a level under it.
-  - Found by an independent review of the release (`layout/regions.py`). A question number and
-    its options at tab stops, with a Name / Date line on the same stops, are no two columns: a
-    matching exercise is cut in two only when each column holds one kind of label (terms 1. 2.
-    3. beside definitions A. B. C.). `data/authored/tables/handout-word` page 1 read option d)
-    before a), and b) inside the Name line, with the tree on; it reads as 0.5.17 read it.
-  - The lower limit of an integral or sum sign is read with the sign, not cut off below it:
-    "∫ab f′(x) dx = f(b) −f(a)" on two slides of `latex-slides` no longer read as "∫b f′(x) dx =
-    f(b) −f(a) a". A limit that hangs under a binomial or stands over the sign without touching it
-    (a sum's `i=1` on page 20 of that deck and the two-column fixture) still reads out of place.
+    is at that level, where a deck of many sizes had it up to three levels deeper. Sizes alike
+    within the 5% that makes one level of two sizes count as the same size.
+- Found by two independent reviews of the release, with the region tree on
+  (`layout/regions.py`):
+  - A question number and its options at tab stops, with a Name / Date line on the same stops,
+    are no two columns: a matching exercise is cut in two only when each column holds one kind
+    of label (terms 1. 2. 3. beside definitions A. B. C.). `data/authored/tables/handout-word`
+    page 1 read option d) before a), and b) inside the Name line; it reads as 0.5.17 read it.
+  - The lower limit of a big operator (an integral, sum, product or root sign) is read with the
+    sign, not cut off below it: "∫ab f′(x) dx = f(b) −f(a)" on two slides of `latex-slides` no
+    longer reads as "∫b f′(x) dx = f(b) −f(a) a", and on 7 pages of a development paper
+    (`ax_mathap_240306464`) the domain letter under an integral is back in its equation. A limit
+    that hangs under a binomial or stands over the sign without touching it (a sum's `i=1` on
+    page 20 of that deck and the two-column fixture) still reads out of place.
+  - Known and not fixed: a line straight under a matching exercise can be read inside it. On
+    the self-made `e1_mc_columns` page 1 a full-width line is split between the columns, and on
+    a page built by the second review a numbered question with sub-parts (a) and (b) is read
+    between the terms and the definitions. 0.5.17 reads both right. No real document is known
+    to show it; it is the first tree fix owed after this release.
 - Each switch can go back off alone. The pipeline is raised so results made under 0.5.17 are not
   read as results of the new layout; 0.5.17 results still open. The switches reach production
   through four Railway variables (the code defaults stay off), so the version says which layout

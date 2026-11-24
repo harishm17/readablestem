@@ -505,8 +505,8 @@ worse (the rows of the two columns alternated, as they do with the tree on for a
 picture there), so the code was not kept. A figure between narrow columns has to be cut like a
 column first. Wave 4 (2026-11-22, O-013) did not build it again: that count stands (0 pages
 changed, 1 page better, a worse read where a drawing stands between two columns of short
-lines), no page asking for it is known, and the tree is off, so the item would change
-nothing in production.
+lines), no page asking for it is known, and the tree was off then, so the item would have
+changed nothing in production.
 
 **The cuts.**
 
@@ -516,7 +516,7 @@ nothing in production.
   keep one set of white channels is a segment. A band that does not (a line that spans the
   region, a blank band) starts the next one (rule 1). A gap of 2.5 line pitches closes a segment
   only when the band below is side by side (rule 6). A fragment that hangs inside an
-  integral or sum sign at least twice its height (the lower limit of `∫ab`, where the sign
+  integral, sum, product or root sign at least twice its height (the lower limit of `∫ab`, where the sign
   and the upper limit are one fragment) is in the sign's band: the cut between the lines of
   the display left the limit out of its text ("∫b f′(x) dx = f(b) −f(a) a" on a slide). Only a
   big operator counts: a general "short item inside a tall one" moved an equation in a recorded upload
@@ -664,8 +664,9 @@ table is an item yet) and `regions.table_refusal` judges each proposal against i
 Still not an item: a vector figure (its drawings are read after the rows are made), so a figure
 drawn as vectors at the top of a column beside text is placed by its labels only.
 
-**Why it is off.** Turning it on changes the output of pages, so it needs a `PIPELINE_VERSION`
-bump and a recorded re-measurement first.
+**Why it is off in code.** Changing it changes the output of pages, so it needs a
+`PIPELINE_VERSION` bump and a recorded re-measurement; production turned it on with pipeline
+0.5.18 (docs/eval.md, "The switch release of 2026-11-23").
 
 ### Headings
 
@@ -1416,7 +1417,7 @@ page (size, PDF page label, text rows, big pictures) and the file's `/Creator`.
   (`slides.DECK_REASON`) and a deck title also `slide_deck_title`. `layout.heading_levels` then
   judges heading sizes deck by deck: a deck's title is level 1, each page's largest heading is
   its slide's title, one level under the deck's title whatever its size (one slide sets its
-  title in 80 points, the next in 48; two headings of that largest size, "Pros" beside "Cons",
+  title in 80 points, the next in 48; two headings of that largest size or within 5% of it, "Pros" and "Cons",
   are both titles; a slide whose only heading is small has it as its title, and so does a title
   slide's subtitle), the page's other headings are clustered by size under the
   slide titles, and a heading with no deck (the pages of a portrait part between two decks) is

@@ -13,8 +13,9 @@ files that may be committed, and the cache's `answers.jsonl.gz` for the rest
 hostile-file tests out, so what they alone read would look unread).
 
 Nothing is sent to a model unless `--live` is given, and `--live` needs `--max-usd`: the
-most this run may pay for answers the recording lacks, never above $1.00. Past it the
-missing answers are refused and stay missing. Answers already recorded cost nothing and are
+most this run may pay for answers the recording lacks, never set above $1.00. Past it new
+requests are refused and their answers stay missing; a request already sent is paid for, so a
+run can end a cent over. Answers already recorded cost nothing and are
 never asked again. `--live` reads `ANTHROPIC_API_KEY` from the environment.
 
 It prints what was read, what was missing and why (so a prompt that changed is named), and
