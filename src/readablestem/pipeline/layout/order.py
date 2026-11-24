@@ -396,24 +396,32 @@ def _top_down(boxes: Sequence[BBox], members: Iterable[int], *, earlier: bool = 
     inside or beside it) would otherwise pull everything it spans into one "line" and
     order it by x instead of top to bottom.
 
-    With `earlier` (`LAYOUT_FIGURE_ART`) an item that does not fit the last line goes to the
-    latest earlier line it fits. Three figures side by side whose tops differ by a few points
-    with a short row between two of them (the label of one) were three lines, because the
-    short row, sorted between them, could not share a line with a figure: the figure on the
-    right of the row was read after the one on its left, and the third before them both.
+    With `earlier` (`LAYOUT_FIGURE_ART`) an item that misses the last line because its height is
+    more than three times that of the line's first item (or the other way round), and that
+    starts above the bottom of that first item (it stands beside it, not under it), goes to
+    the latest earlier line it fits, if there is one. Three figures side by side whose tops differ
+    by a few points with a short row between two of them (the label of one) were three lines,
+    because the short row, sorted between them, could not share a line with a figure: the
+    figure on the right of the row was read after the one on its left, and the third before
+    them both. Items that miss the last line for any other reason start a line, as before.
     """
     ordered = sorted(members, key=lambda i: (boxes[i][1], boxes[i][0]))
     lines: list[list[int]] = []
     for i in ordered:
         box = boxes[i]
-        for line in reversed(lines) if earlier else lines[-1:]:
+        target: list[int] | None = None
+        for k, line in enumerate(reversed(lines)):
             anchor = boxes[line[0]]
             overlap = min(anchor[3], box[3]) - max(anchor[1], box[1])
             smaller = min(anchor[3] - anchor[1], box[3] - box[1])
             larger = max(anchor[3] - anchor[1], box[3] - box[1])
             if smaller > 0 and overlap >= 0.5 * smaller and larger <= 3 * smaller:
-                line.append(i)
+                target = line
                 break
-        else:
+            if not (earlier and k == 0 and larger > 3 * smaller and box[1] < anchor[3]):
+                break  # no reason to look further back
+        if target is None:
             lines.append([i])
+        else:
+            target.append(i)
     return [i for line in lines for i in sorted(line, key=lambda i: boxes[i][0])]
