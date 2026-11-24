@@ -512,9 +512,9 @@ def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[boo
     return longest
 
 
-# A code-face name is set against a maths letter (the letter is its subscript, or the two are
-# kerned together) when the gap is under this share of the font size. A word space is a
-# quarter to a third of the size and shrinks to a fifth in a tight line; a thin space is a sixth.
+# A code-face name is set against a maths letter (the letter is its subscript) when the gap is
+# under this share of the font size. A word space is a quarter to a third of the size and
+# shrinks to a sixth in a tight line; a thin space is a sixth.
 TIGHT_GAP = 0.1
 
 

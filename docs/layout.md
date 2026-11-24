@@ -2488,9 +2488,12 @@ equations, and read in part the "1" of `op1` would join the formula next to it (
 When such a name is set against a math letter (`\mathtt{out}` with a subscript), its letters
 are read as math letters and not as letters of a word: as a word the name made its display
 prose again and left the denominator a paragraph of its own (review 26; made pages only). "Set
-against" is a gap under a tenth of the font size (`TIGHT_GAP`), which a subscript and a kerned
-pair are; a thin space is a sixth, and a word space a quarter to a third, a fifth in a tight
-line. At any wider gap the name stays code as a whole, as at 0.5.18: its display is whole all
+against" is a gap under a tenth of the font size (`TIGHT_GAP`), which a subscript is; a thin
+space is a sixth, and a word space a quarter to a third and down to a sixth in a tight line. A
+name as a superscript of a slanted letter, or set straight after one, stands 0.11 to 0.20 of
+its size away by the letter's italic correction, which is among the shrunk word spaces, so it
+is not joined to the letter (of 52 letters 38 keep a superscript name and 42 a name set
+straight after; review 29, made pages; 0.5.18 joined none). At any wider gap the name stays code as a whole, as at 0.5.18: its display is whole all
 the same (a code word is a prose word only near a code row), and in a sentence the word stays
 in the sentence. With any gap under one font size allowed, a code-face word a word space from
 a math letter ("for each `measure` in M", "ends with `return` x") became an inline formula of

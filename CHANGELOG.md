@@ -42,7 +42,9 @@
   every count of the 0.5.18 one (83 of 91 pages right, 42 faultless). `layout-dev-1` has the
   same right and faultless pages (161 and 81 of 267); its strays go from 875 to 877 on three
   pages, two of them the pages whose SQL snippets are code blocks now (docs/eval.md).
-- Reviewed four times before its release. Review 28 (`84dbf083`): release OK, no blocker;
+- Reviewed five times before its release. Review 29 (`dbf8faa6`): release OK, no blocker;
+  what its fix takes back and the test row it asked for are in the first entry below.
+  Review 28 (`84dbf083`): release OK, no blocker;
   three cases of a code-face word beside a math letter that read worse than 0.5.18 on made
   pages, closed by one condition in the first entry below. Review 27 (`d4d497b0`): one
   blocker, in the fix made for review 26 (a code-face word a word space from a math letter
@@ -78,6 +80,17 @@
   0.5.18 does. A display with such a name is whole (a code word is a prose word only near a
   code row), the word in a sentence stays in the sentence, and a math letter beside it is a
   formula of its own ("n bits": the "n" alone).
+- What this takes back (review 29, made pages; never worse than 0.5.18, which joined none):
+  a code-face name as a superscript of a math letter, or set straight after one, is one
+  formula with the letter only when the letter leaves a gap under a tenth of the size. A
+  slanted letter's italic correction puts the gap over that: of 52 letters, 38 keep a
+  superscript name and 42 a name set straight after (not F, M, N, P, T, U, V, W, Y, f among
+  others); a subscript name is kept by all 52. The line cannot be wider: these gaps overlap
+  the shrunk word spaces above. Near a code row, a display with a name a thin space from a
+  letter is cut again, as at `8fe3b940` (inside a limit docs/layout.md states).
+- A row of the existing test holds the kept case (a name with a subscript that touches it, in
+  a sentence, is one formula): without it no test failed with the case switched off, and two
+  pages of one corpus file depend on it.
 - The word-space test of review 27 had a row that held nothing (its code word stood next to
   "in", not next to a math letter). The test is one sentence at three settings now (a word
   space, a shrunk word space, a small code face) and the display has a case; the last two
