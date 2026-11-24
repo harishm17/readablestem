@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased: the page audit on gold pages only
+
+- `eval page-audit --gold-dir DIR --gold-pages` audits only the pages a layout gold set's gold
+  marks, converts each file as `eval order --set` does, and reports `against_scorer`: the
+  gold pages the reading-order scorer calls right and not right, each by the audit's verdict
+  (counts only). `--against REPORT` sets a run beside an earlier one of the same set.
+- A held-out set's printed report names no document and no page. An eval tool only: no
+  reader change, no version raise.
+
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
