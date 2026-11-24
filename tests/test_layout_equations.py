@@ -424,6 +424,15 @@ def display_with_a_typewriter_name_a_space_from_a_letter(page):
     prose(page, 190, "and the text goes on after the display with more words than one.")
 
 
+def sentence_with_a_subscripted_typewriter_name(page):
+    """ "is out_A when": the name and the subscript that touches it are one formula."""
+    page.insert_text((72, 100), "The output of the party is", fontsize=11)
+    page.insert_text((200, 100), "out", fontsize=11, fontname="cour")
+    page.insert_text((220.2, 103), "A", fontsize=7, fontname="tiit")
+    page.insert_text((230, 100), "when the list is empty, and it goes on", fontsize=11)
+    page.insert_text((72, 114), "to the next one of the list until every one is done.", fontsize=11)
+
+
 def in_tex_faces(pdf: bytes) -> bytes:
     """The page with Times italic under TeX's name for its maths italic, and Times under the
     name of a code face that only the font's name tells (no fixed-pitch flag)."""
@@ -443,6 +452,7 @@ def in_tex_faces(pdf: bytes) -> bytes:
         (display_with_one_typewriter_name, "block", "out"),  # not a paragraph and a stray "3"
         (display_with_a_subscripted_typewriter_name, "block", "out"),  # the name is no prose word
         (display_with_a_typewriter_name_a_space_from_a_letter, "block", "out"),
+        (sentence_with_a_subscripted_typewriter_name, "inline", "outA"),  # not the "A" alone
     ],
 )
 def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, kind, whole):
