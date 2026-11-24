@@ -12,13 +12,17 @@
     line of a wrapped paragraph in the code face is not code.
   - Algorithms (O-442): a step whose words the text layer lists before its number, and formula
     stacks listed before their numbers, stay in the algorithm's block.
-  - Figures (O-441): a hand-drawn figure that typed labels name is a figure, not "handwriting,
-    not converted"; a figure of pictures keeps the header labels of the panel it sits on.
+  - Figures (O-441): a figure of pictures keeps the header labels of the panel it sits on.
   - Behind a new switch that stays off, no change: `LAYOUT_FIGURE_ART` (art a clip leaves
-    unpainted is no figure over the text; a row a figure's edge cuts through is its label). It
+    unpainted is no figure over the text; a row a figure's edge cuts through is its label; a
+    hand-drawn figure that typed labels name is a figure, not "handwriting, not converted"). It
     moved one recorded figure request on each of three corpus uploads; turning it on is owed a
-    re-recording, a pipeline raise, the reading order of two figures on one lecture page, and
-    the clip read in the upload probe and the strike and highlight read.
+    re-recording, a pipeline raise, the reading order of two figures on one lecture page,
+    the clip read in the upload probe and the strike and highlight read, and a narrower test
+    for a hand-drawn figure's label. The hand-drawn figure rule was on by itself until the
+    review of this release (review 25): with the switch off it helped no page and took typed
+    words and two numbered displays into a picture on pages with handwriting, dropping the
+    handwriting notice (docs/layout.md "Pen figures").
   - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
     bracketed number label their display instead of standing as an element of their own.
   - One request, one answer (a job's identical requests): two pictures that are the same pixels
@@ -106,7 +110,8 @@
 - Two pages that the clip fix turned into mixed ink would have lost their figures: 2407.20815
   pages 2 and 4 (a hand-drawn sphere and world lines, then "handwriting, not converted", the
   sphere with its top cut off). A handwriting region that a typed label of the page names is a
-  figure again, with its whole extent and labels (`page._pen_figures`).
+  figure again, with its whole extent and labels (`page._pen_figures`; behind the same switch
+  since review 25, see the 0.5.19 entry).
 - Figures of pictures alone on a filled panel claim the panel's header labels
   (`ax_physicsoptics` page 13), and a row cut by a drawing's edge belongs to it (2407.09859
   page 3), so no figure loses a label the page paints. The cut-row rule is behind

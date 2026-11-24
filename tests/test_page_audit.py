@@ -278,11 +278,16 @@ def test_the_audit_of_a_gold_sets_gold_pages_is_set_against_the_scorer_and_an_ea
     # (the pages of the two reports are not the same pages)
     assert run("--against", str(tmp_path / "first.json"))[0] == 2
 
-    # A held-out set's printed report names no document and no page; its rows are kept.
+    # A held-out set's printed report names no document and no page; its rows are kept. A
+    # set with no registry is taken as held out; only one its registry calls development is
+    # printed with its names.
     registry = tmp_path / "set.json"
-    registry.write_text(json.dumps(layout_gold.registry_of(root, "set", "a test", "held-out")))
-    capsys.readouterr()
-    code, kept = run("--gold-pages", "--registry", str(registry), name="held")
-    shown = capsys.readouterr().out
-    assert code == 0 and "news" not in shown and "loose" not in shown
-    assert [row["document"] for row in kept["rows"]] == ["news"]
+    for side, named in ((None, False), ("held-out", False), ("development", True)):
+        if side is not None:
+            registry.write_text(json.dumps(layout_gold.registry_of(root, "set", "a test", side)))
+        capsys.readouterr()
+        code, kept = run("--gold-pages", "--registry", str(registry), name="held")
+        shown = capsys.readouterr().out
+        assert code == 0 and ("news" in shown) is named
+        assert named or "loose" not in shown
+        assert [row["document"] for row in kept["rows"]] == ["news"]

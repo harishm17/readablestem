@@ -171,7 +171,8 @@ def analyze(
     `figure_art` (`LAYOUT_FIGURE_ART`, off): the page's drawings are read without the paint that
     no clip lets through ("Art a clip hides" in docs/layout.md), and a row the edge of a figure's
     box cuts through is the figure's label, unless it is a list item or a line of a column of
-    text ("A row cut by a drawing's edge"). Off, the output is what it was before the rules
+    text ("A row cut by a drawing's edge"), and a hand-drawn figure that typed labels name is a
+    figure, not handwriting ("Pen figures"). Off, the output is what it was before the rules
     existed.
 
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table

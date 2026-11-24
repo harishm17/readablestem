@@ -1317,14 +1317,17 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
     if args.gold_pages and root is None:
         return _error("--gold-pages is for a layout gold set: it needs --gold-dir")
     name = "corpus" if root is None else root.name
-    held_out = False  # a held-out set's printed report names no document and no page
+    # A held-out set's printed report names no document and no page. A gold set is held out
+    # unless its registry says development: a held-out folder under another name, or one whose
+    # registry is missing, must not be the one that gets named.
+    held_out = root is not None
     if root is not None:
         from readablestem.cli import layout_gold as sets
 
         listed = sets.registry_path(name, args.registry)
-        if listed.is_file():  # (a folder with no registry is development)
+        if listed.is_file():
             try:
-                held_out = json.loads(listed.read_text(encoding="utf-8"))["side"] == "held-out"
+                held_out = json.loads(listed.read_text(encoding="utf-8"))["side"] != "development"
             except (OSError, ValueError, KeyError, TypeError) as exc:
                 return _error(f"cannot read {listed}: {exc}")
     earlier = None

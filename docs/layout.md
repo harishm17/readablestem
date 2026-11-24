@@ -1945,18 +1945,20 @@ math by the document's evidence; the equation step's own tiers then decide it.
   above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
 - **`LAYOUT_FIGURE_ART`** (`layout.analyze(figure_art=True)`, off in code and in the production
-  profile) holds the two rules below that moved a recorded figure request on the corpus: "Art a
-  clip hides" and "A row cut by a drawing's edge". Off, the output is what it was before them.
+  profile) holds the two rules below that moved a recorded figure request on the corpus, "Art a
+  clip hides" and "A row cut by a drawing's edge", and "Pen figures", which is for the pages the
+  first of them turns into ink pages. Off, the output is what it was before them.
   Measured by replay on the 73 uploads of the corpus against release 5d081fcc (0.5.18): with it
   off, 0 uploads differ (the whole result's hash is the same on all 73); with it on, one upload
   differs in a request (w_lecture_5111 page 4, counted from 0 as the corpus pages in this
   section are: one figure's crop is 12 pt shorter, the same five
   words, and its request has no recorded answer until it is re-recorded), and one in a note
-  (r21_infographic_orcid: a figure's reason reads 866 paths for 867). The other parts of
-  this section (pen figures, panel labels) move no request and are not behind it. Turning it on
+  (r21_infographic_orcid: a figure's reason reads 866 paths for 867). Panel labels, the other
+  part of this section, move no request and are not behind it. Turning it on
   needs a re-recording and a `PIPELINE_VERSION` bump, and, first, an order for figures that stand
   side by side: on w_lecture_5111 the figure that is 12 pt shorter now starts below its neighbor
-  and `order._top_down` puts the neighbor first (the middle figure of three before the left one).
+  and `order._top_down` puts the neighbor first (the middle figure of three before the left one),
+  and a narrower label test for pen figures (below).
 - **Art a clip hides** is no figure and no ink (`page_type.page_drawings`; behind
   `LAYOUT_FIGURE_ART`). A
   PDF that carries a figure's art on every page (an editor's export) clips each page to its
@@ -1978,7 +1980,7 @@ math by the document's evidence; the equation step's own tiers then decide it.
   page (2407.20815 page 4: 138 pen-like strokes of which 19 are painted) is read from the
   painted strokes: that page is now mixed ink; its pen-drawn sphere and page 2's world lines
   are figures again ("Pen figures").
-- **Pen figures** (`page._pen_figures`). On a `mixed_ink` page the pen drawings are cut out of
+- **Pen figures** (`page._pen_figures`; behind `LAYOUT_FIGURE_ART`). On a `mixed_ink` page the pen drawings are cut out of
   the figure rules (`document.py` holds them back in `pen`), and a handwriting region comes
   from the pen strokes alone, so the typed labels of a hand-drawn figure cut its region short
   (2407.20815 page 4: the sphere lost its top, y518-605 for y461-617) and the drawing was
@@ -1986,8 +1988,20 @@ math by the document's evidence; the equation step's own tiers then decide it.
   paths and the loose paths inside it; if a typed label belongs to the result
   (`_label_owners`), the result is a figure with its whole extent, claims its labels, and the
   region is dropped. A drawing that no typed label names stays handwriting, and so does
-  handwriting with no typed label in it; handwriting with a short typed label in it (a letter
-  beside a hand-drawn ball) is now a figure for the figure step.
+  handwriting with no typed label in it.
+  Why it is behind the switch (review 25, 2026-11-23): with the switch off the two pages it was
+  written for read the same with or without it (page 29 of that paper is no ink page until the
+  hidden art is left out), and the label rule takes more than a figure's labels. A typed row
+  that lies mostly inside the region's box, or a short one within a font size of a stroke, is
+  taken: on the same paper's page 41 the box runs up the page over hidden art and two numbered
+  displays left the text for a figure; on a worksheet a typed "Answer:", "(a)", a question
+  number, "[4 marks]" or a whole typed line through what a student wrote left the text, the
+  writing went to the figure step as a picture, and the `handwriting_on_page` notice with its
+  required decision was not raised. With the switch on, page 41 reads right (its box is the
+  drawn sketch alone), and the worksheet cases are still taken: before the switch goes on, a
+  label here must be told from a worksheet's own words (short, no display, no line of running
+  text, no row that reaches outside the box, and a region that is a drawing and not rows of
+  writing).
 - **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
   panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
   no other figure) claims the rows on the panel, its header labels included, short or long

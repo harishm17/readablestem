@@ -477,9 +477,10 @@ def _page_blocks(
     figures = [f for f in figures if not _backdrop(f, rows, ctx, page.parent, document=document)]
     _panels(figures, paths)
     _claim_labels(figures, rows, ctx, document=document)
-    figures, ink = _pen_figures(
-        figures, ink, pen_paths, loose, rows, page_rect, ctx, document=document
-    )
+    if document.figure_art:
+        figures, ink = _pen_figures(
+            figures, ink, pen_paths, loose, rows, page_rect, ctx, document=document
+        )
     figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures, document=document)
     figures += _fragment_figures(
         rows,
@@ -1080,19 +1081,27 @@ def _pen_figures(
     document: _Document,
 ) -> tuple[list[_Figure], Sequence[BBox]]:
     """A hand-drawn figure on a typed page is a figure, not handwriting ("Pen figures" in
-    docs/layout.md). A page with handwriting (mixed_ink) holds its pen drawings back from
-    the figure rules (`pen_paths`) and cuts each region of strokes out as "handwriting, not
-    converted". But a drawing a pen made that the page's own typed labels name (a sphere
-    with its radius and charge, the world-lines of a particle beside the plane they cross)
-    is a figure like any other. Each region, the largest first, is read again with every
+    docs/layout.md; behind `LAYOUT_FIGURE_ART`, as the pages that need it are ink pages only
+    once the art a clip hides is left out). A page with handwriting (mixed_ink) holds its
+    pen drawings back from the figure rules (`pen_paths`) and cuts each region of strokes
+    out as "handwriting, not converted". But a drawing a pen made that the page's own typed
+    labels name (a sphere with its radius and charge, the world-lines of a particle beside
+    the plane they cross) is a figure like any other.
+    Each region, the largest first, is read again with every
     path that touches it (`others`: the drawing's strokes that failed the pen tests too) as
     the figure rules read a page: its drawings become one figure, and when a typed label
     belongs to it by the one rule for labels (`_label_owners`), that is the figure, with
     its labels and the whole of its extent (the region held only the strokes that passed
     the pen tests, so the typed labels stood off from it as stray equations). The regions
-    inside it are no handwriting. A drawing no typed label names stays handwriting: writing
-    on a typed page has no typed labels. A drawing that meets a figure the page has
-    already is part of that figure's page, not a second one."""
+    inside it are no handwriting. A drawing no typed label names stays handwriting. A
+    drawing that meets a figure the page has already is part of that figure's page, not a
+    second one.
+
+    Known limit, and why the rule is not on by itself: the label rule takes any typed row
+    that lies mostly inside the region's box or a short one within a font size of a stroke,
+    so on a worksheet a typed "Answer:" beside what a student wrote, or a display the box
+    lies over, leaves the text and the handwriting notice is not raised (review 25). The
+    switch stays off until a label here is told from a worksheet's own words."""
     if not pen_paths or not regions:
         return figures, regions
     chosen: list[_Figure] = []
