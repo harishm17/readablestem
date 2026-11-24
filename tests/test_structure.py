@@ -980,7 +980,7 @@ def test_a_full_width_algorithm_with_comments_and_long_steps_is_one_block():
         (2, "for each part p in Parts do", None),
         (3, "v = Score(x, p);", None),
         (3, "for each unit u in Units do", None),
-        (4, "for each rate r in Rates of the part that the reader marked for the scan do", None),
+        (4, "for each rate r in Rates of the part that the reader marked for the scan of the verse do", None),
         (5, "w = Rate(v, u, x) plus the weight of the part of the line;", None),
         (5, "base[ ] <- v union w;", None),
         (1, "return base", None),
