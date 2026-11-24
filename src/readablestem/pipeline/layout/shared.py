@@ -512,18 +512,21 @@ def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[boo
     return longest
 
 
-def _code_beside_maths(chars: list[_Char], classes: list[str]) -> None:
+def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bool) -> None:
     """A run of code-face characters ("C") inside a formula is read as it would be in any face:
     the set of "x \u2208 {101} \u2217 y", or the right side of "x = {1, 2}", with the set in CMTT.
     It is inside when it touches a maths letter of another face, stands between two maths
     characters or operators of another face, or comes right after one that has an operand of its
     own on its other side. A code-face run beside nothing of the kind stays code: "x = 5" in
     prose, in a code face, is an identifier, and so is the "x + x" in front of an arrow. A row that
-    is mostly code face with words of it in it is a line of code, and is left as it is."""
+    is mostly code face is a line of code, and is left as it is, when it has words of the code
+    face in it or stands among code rows (`among_code`: "a[i] \u2190 a[j] \u2295 t" in a listing has
+    no word, and its arrow is of another face)."""
     n = len(chars)
     code = {k for k, kind in enumerate(classes) if kind == "C"}
-    if 2 * len(code) > sum(not c.blank for c in chars) and any(
-        chars[a].c.isalpha() and chars[a + 1].c.isalpha() for a in code if a + 1 in code
+    if 2 * len(code) > sum(not c.blank for c in chars) and (
+        among_code
+        or any(chars[a].c.isalpha() and chars[a + 1].c.isalpha() for a in code if a + 1 in code)
     ):
         return
 
@@ -583,7 +586,11 @@ def _code_beside_maths(chars: list[_Char], classes: list[str]) -> None:
             if inside and (touching or not word):
                 for k in range(i, stop):
                     if classes[k] == "C":
-                        classes[k] = _char_class(chars[k], code=False)
+                        # The letters of a name that touches a maths letter ("out" with a
+                        # subscript) are maths, not a word of the sentence: counted as a
+                        # prose word the name made its display a line of text.
+                        kind = _char_class(chars[k], code=False)
+                        classes[k] = "M" if word and kind == "L" else kind
                         changed = True
             i = end
 
@@ -600,7 +607,7 @@ class _CharInfo:
     @classmethod
     def of(cls, row: _Row, *, document: _Document = _PLAIN) -> _CharInfo:
         classes = ["M" if c.stacked else _char_class(c) for c in row.chars]
-        _code_beside_maths(row.chars, classes)
+        _code_beside_maths(row.chars, classes, among_code=row.code_run)
         first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
         if (
             first is not None

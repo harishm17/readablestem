@@ -12,6 +12,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from readablestem.core.paths import cache_dir
 from readablestem.gold import layout_gold
@@ -33,6 +34,16 @@ def registry_path(name: str, path: Path | None = None) -> Path:
     from readablestem.cli.main import project_root
 
     return path or project_root() / REGISTRIES / f"{name}.json"
+
+
+def held_out(registry: dict[str, Any], root: Path | None = None) -> bool:
+    """Whether a set's documents and pages are not to be named, and its score is for a release
+    only. A set is held out unless its registry says development (any other word, or none,
+    fails closed). With `root`, a development registry speaks only for the folder it registers:
+    a held-out folder under a development set's name, or given its registry, stays held out."""
+    if registry.get("side") != "development":
+        return True
+    return root is not None and bool(layout_gold.verify_set(root, registry))
 
 
 def _outside_project(path: Path) -> bool:

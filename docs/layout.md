@@ -1273,7 +1273,7 @@ math font, stay math.
   bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
   "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
   "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
-  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it. A bracketed number on a row of its
+  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it (the regular rule runs with display grouping off as well, so the dots change is not behind that switch). Known limit (review 26, made pages only; 0.5.18 was not right on them either): fill-in lines stacked one under the other, each with a mark at its right ("3x + 2 = (4)" over "5x − 1 = (2)"), still give the marks away as equation numbers, because a line under the line is what "goes on" means here; telling them apart needs the row under to continue the line (to start with a relation or an operator, or to be indented under the right-hand side). A bracketed number on a row of its
   own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
   "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
   display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label
@@ -2484,15 +2484,31 @@ the kind stays code, so "x = 5" in a code face inside prose is still an identifi
 "x + x" in front of an arrow is not drawn into the arrow's formula. A run that holds a word of two
 letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it touches a math
 letter: read as a word it would make the row prose and take a display out of the equations, and
-read in part the "1" of `op1` would join the formula next to it (2504.20938 p7). A row that is mostly code face
-with code words in it (a listing) is not reread at all: the SQL page of ax_cslg_240306367 p4
-stays code. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
+read in part the "1" of `op1` would join the formula next to it (2504.20938 p7). When such a
+name does touch a math letter (`\mathtt{out}` with a subscript, "n cost"), its letters are read
+as math letters and not as letters of a word: as a word the name made its display prose again
+and left the denominator a paragraph of its own (review 26; made pages only). A row that is
+mostly code face is not reread at all when it has code words in it or stands among code rows
+(`_Row.code_run`): the SQL page of ax_cslg_240306367 p4 stays code, and so does the line
+"a[i] ← a[j] ⊕ t" of a listing whose arrows are of a math font, which has no word in it and
+was cut out of its code block as a display (review 26; made pages only).
+
+Known limits of the two code-face rules (review 26, each seen on made pages only): a display
+that stands right under a line of code and has a `\mathtt` name is still classified with the
+name as a word, so its denominator is a paragraph of its own (the "within three lines" of
+`_mark_code_runs` cannot tell a display after code from a step of an algorithm); and in prose
+that mixes code-face text with math signs some inline formulas come out cut on one side
+("y[j + 1" with its "]" left in the sentence, "i = 0; i < n; i" out of a `for` header). No
+text is lost: what is left out of a formula stays in the sentence. Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
 (base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
 is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
 {...}") and changed 16 pages of 2 files against the 0.5.18 read, 11 of them for the worse. With
-this rule 6 pages of 2 files differ from the 0.5.18 read, all of them the intended changes of
-0.5.19 (the listings and tails); of the 247 formulas on the pages of that upload, 246 are as in
-the 0.5.18 read (base: 216), so 30 of the 31 broken ones are whole. Base against this change
+this rule 7 pages of 3 files differ from the 0.5.18 read (counted again on the release head;
+first written as 6 of 2, review 26 counted 7 of 3): six are the intended changes of 0.5.19
+(the listings and tails), and on one a two-letter paragraph in a code face at the foot of a
+page is a line of code. Of the 247 formulas on the pages of that upload, 246 are as in the
+0.5.18 read (base: 216; review 26 counted 247 and 215), so 30 of the 31 broken ones are whole.
+Base against this change
 differs on 11 pages of that one upload, none of them worse. Of the 30 public files that carry a
 code-face font, one page differs from base (ax_cslg_240306367 p8: the attribute set "{A, C, E,
 F}" is an inline formula again, as in 0.5.18).

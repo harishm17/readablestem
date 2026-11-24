@@ -28,6 +28,16 @@ def page_of(fill) -> bytes:
     return doc.tobytes()
 
 
+def with_font_named(pdf: bytes, old: str, new: str) -> bytes:
+    """The PDF with the font whose name holds `old` called `new`, as another program names it."""
+    doc = pymupdf.open(stream=pdf)
+    for xref in range(1, doc.xref_length()):
+        for key in ("BaseFont", "FontName"):
+            if old in doc.xref_get_key(xref, key)[1]:
+                doc.xref_set_key(xref, key, f"/{new}")
+    return doc.tobytes()
+
+
 def html_of(pdf: bytes) -> str:
     layout = analyze(pdf)
     return render_html(
@@ -73,6 +83,42 @@ def test_a_run_of_monospaced_lines_is_one_code_block_with_its_indentation():
     assert [e.kind for e in elements] == [Kind.PARAGRAPH] * 3  # prose, code, prose
 
 
+DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+@pytest.mark.skipif(not Path(DEJAVU).exists(), reason="needs DejaVu Sans for the maths signs")
+def test_a_listing_line_of_letters_and_maths_signs_stays_in_its_code_block():
+    """Pseudo-code in the code face with its arrows from TeX's maths font: "a[i] <- a[j] (+) t"
+    has no word in it, and is a line of the listing all the same, not a display equation."""
+    lines = [
+        (0, "procedure swap(a, i, j)"),
+        (4, "t \N{LEFTWARDS ARROW} a[i]"),
+        (4, "a[i] \N{LEFTWARDS ARROW} a[j] \N{CIRCLED PLUS} t"),
+        (4, "a[j] \N{LEFTWARDS ARROW} t"),
+        (0, "end procedure"),
+    ]
+
+    def fill(page):
+        y = prose(page, 100, "The procedure below swaps two entries of the array in place.")
+        for indent, text in lines:
+            for column, ch in enumerate(text, indent):
+                at = (72 + column * ADVANCE, y)
+                if not ch.isascii():
+                    page.insert_text(at, ch, fontsize=CODE, fontfile=DEJAVU, fontname="dj")
+                elif ch != " ":
+                    page.insert_text(at, ch, fontsize=CODE, fontname="cour")
+            y += 13
+        prose(page, y + 10, "Run it on a short array and check that the two entries change places.")
+
+    elements = analyze(with_font_named(page_of(fill), "DejaVu", "CMSY10")).elements
+    blocks = [e.text or "" for e in elements if e.preformatted]
+    assert len(blocks) == 1
+    assert ["".join(line.split()) for line in blocks[0].split("\n")] == [
+        "".join(text.split()) for _, text in lines
+    ]
+    assert not [e for e in elements if e.kind == Kind.EQUATION]
+
+
 def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
     """LaTeX papers set listings in NimbusMonL, CMITT and t1xtt, not in a font called Courier;
     the author's email on the title page, set in the same face, is not a listing."""
@@ -84,11 +130,7 @@ def test_a_listing_in_a_code_font_the_text_layer_names_without_mono_is_code():
         code(page, y, [(0, "vdh|ffn|nhma|esme@sdu.dk")])  # an address in the same face is no code
 
     for font in ("NimbusMonL-Regu", "CMITT10", "t1xtt"):
-        doc = pymupdf.open(stream=page_of(fill))
-        for xref in range(1, doc.xref_length()):
-            if doc.xref_get_key(xref, "BaseFont")[1] == "/Courier":
-                doc.xref_set_key(xref, "BaseFont", f"/{font}")
-        found = analyze(doc.tobytes())
+        found = analyze(with_font_named(page_of(fill), "Courier", font))
         blocks = [e.text for e in found.elements if e.preformatted]
         assert len(blocks) == 1, font  # the renamed face has other widths: compare the lines only
         assert [n.code for n in found.notices].count("code_block") == 1, font  # not the address
