@@ -221,7 +221,10 @@ start. `readablestem ops profile-check` prints the same comparison for the envir
 the profile and the variable in Railway in the same change. A release that changes a profile row
 sets the variable first (`railway variable set -s web --skip-deploys NAME=value`, so the code
 that is running is not deployed again under the new value), then deploys, then runs that check: the release is live when the
-setting's name is not among the names that differ. The code defaults are not the profile's
+setting's name is not among the names that differ. `railway ssh` needs an SSH key registered
+with the Railway account; where there is none, the start log of the new deployment says the
+same (`railway logs -s web -d -n 200`: no `profile_mismatch` line before `app_started`; the
+0.5.18 release was checked this way). The code defaults are not the profile's
 values, so a deploy with a variable missing starts normally, stamps its results with the new
 `PIPELINE_VERSION` and reads them the old way; only this check (and the names on /admin) shows
 it. `/admin/health` and `/admin` show the profile's hash to an admin (the public `/healthz/ops`
