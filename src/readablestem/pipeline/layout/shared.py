@@ -102,6 +102,9 @@ class _Row:
     # The item of a run of one series ("B." set in bold between "A." and "C."; the lines of an
     # agenda), whatever it is set in: never a heading by its type (`blocks._mark_series_items`).
     in_series: bool = False
+    # A row next to a row that is mostly code face (`_mark_code_runs`): a line of an
+    # algorithm, where a word of the code face is a prose word.
+    code_run: bool = False
     # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
     # twice as far apart as those of an aligned row.
     case_row: bool = False
@@ -509,6 +512,116 @@ def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[boo
     return longest
 
 
+# A code-face name is set against a maths letter (the letter is its subscript) when the gap is
+# under this share of the font size. A word space is a quarter to a third of the size and
+# shrinks to a sixth in a tight line; a thin space is a sixth.
+TIGHT_GAP = 0.1
+
+
+def _code_beside_maths(chars: list[_Char], classes: list[str], *, among_code: bool) -> None:
+    """A run of code-face characters ("C") inside a formula is read as it would be in any face:
+    the set of "x \u2208 {101} \u2217 y", or the right side of "x = {1, 2}", with the set in CMTT.
+    It is inside when it touches a maths letter of another face, stands between two maths
+    characters or operators of another face, or comes right after one that has an operand of its
+    own on its other side. A code-face run beside nothing of the kind stays code: "x = 5" in
+    prose, in a code face, is an identifier, and so is the "x + x" in front of an arrow. A row that
+    is mostly code face is a line of code, and is left as it is, when it has words of the code
+    face in it, or is near a code row (`among_code`) and has no maths letter of another face:
+    "a[i] \u2190 a[j] \u2295 t" in a listing has no word, and its arrow is of another face, while
+    "L = {0, 1}" under a line of code, its L in maths italic, is a formula."""
+    n = len(chars)
+    code = {k for k, kind in enumerate(classes) if kind == "C"}
+    if 2 * len(code) > sum(not c.blank for c in chars) and (
+        any(chars[a].c.isalpha() and chars[a + 1].c.isalpha() for a in code if a + 1 in code)
+        or (
+            among_code
+            and not any(
+                kind == "M" and c.c.isalpha() and c.c.isascii() and not c.mono
+                for c, kind in zip(chars, classes, strict=True)
+            )
+        )
+    ):
+        return
+
+    def nearest(k: int, step: int) -> int | None:
+        while 0 <= k < n and chars[k].blank:
+            k += step
+        return k if 0 <= k < n else None
+
+    def symbol(k: int | None) -> bool:  # a maths glyph or an operator, not in a code face
+        return k is not None and classes[k] in "MO" and not chars[k].mono
+
+    def operand(k: int | None) -> bool:  # what a side of a formula is made of
+        return k is not None and (classes[k] in "MDB" or (classes[k] == "L" and chars[k].italic))
+
+    changed = True
+    while changed:  # a run that joins a formula lets the run beyond it join too
+        changed = False
+        i = 0
+        while i < n:
+            if classes[i] != "C":
+                i += 1
+                continue
+            end = i
+            while end < n and classes[end] in "CW":
+                end += 1
+            stop = end
+            while chars[stop - 1].blank:
+                stop -= 1
+            before, after = nearest(i - 1, -1), nearest(stop, 1)
+            left = (
+                before is not None
+                and symbol(before)
+                and chars[i].x0 - chars[before].x1 < chars[before].size
+            )
+            right = (
+                after is not None
+                and symbol(after)
+                and chars[after].x0 - chars[stop - 1].x1 < chars[after].size
+            )
+            touching = (left and chars[before].c.isalpha() and classes[before] == "M") or (
+                right and chars[after].c.isalpha() and classes[after] == "M"
+            )
+            # Set against the maths letter, as a name with a subscript is, not a space away
+            # from it ("for each measure in M" in an algorithm, "return x" in prose).
+            tight = (
+                left
+                and chars[before].c.isalpha()
+                and classes[before] == "M"
+                and chars[i].x0 - chars[before].x1 < TIGHT_GAP * chars[i].size
+            ) or (
+                right
+                and chars[after].c.isalpha()
+                and classes[after] == "M"
+                and chars[after].x0 - chars[stop - 1].x1 < TIGHT_GAP * chars[stop - 1].size
+            )
+            inside = (
+                touching
+                or (left and right)
+                or (left and operand(nearest(before - 1, -1)))
+                or (right and operand(nearest(after + 1, 1)))
+            )
+            # A word of the code face ("out" in "Pr[out = 1]", "op1" in prose) is a name, not an
+            # operand: unless it is set against a maths letter the run stays code as a whole,
+            # at any size of the code face. Read as a word it would turn a display into a line
+            # of prose (or, smaller than the text, pass for a script of the letter), and read in
+            # part the "1" of "op1" would join the formula next to it.
+            word = any(
+                chars[k].c.isalpha() and k + 1 < stop and chars[k + 1].c.isalpha()
+                for k in range(i, stop)
+            )
+            if inside and (tight or not word):
+                for k in range(i, stop):
+                    if classes[k] == "C":
+                        # The letters of a name set against a maths letter ("out" with a
+                        # subscript) are maths, not a word of the sentence: counted as a
+                        # prose word the name made its display a line of text.
+                        kind = _char_class(chars[k], code=False)
+                        classes[k] = "M" if word and kind == "L" else kind
+                        changed = True
+            i = end
+
+
 @dataclass
 class _CharInfo:
     """Per-character maths evidence for one row."""
@@ -521,6 +634,7 @@ class _CharInfo:
     @classmethod
     def of(cls, row: _Row, *, document: _Document = _PLAIN) -> _CharInfo:
         classes = ["M" if c.stacked else _char_class(c) for c in row.chars]
+        _code_beside_maths(row.chars, classes, among_code=row.code_run)
         first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
         if (
             first is not None
@@ -721,6 +835,8 @@ class _Figure:
     number: str | None = None  # ... and the equation number printed beside it
     fragments: bool = False  # a region of text fragments and short strokes (`_fragment_figures`)
     members: list[_Path] = field(default_factory=list)  # the vector paths it is drawn with
+    # The filled panel a figure of pictures alone sits on, with its header labels (`_panels`).
+    panel: BBox | None = None
     # The box of what is drawn (the box before any label is added to it).
     drawing: BBox = field(init=False)
 

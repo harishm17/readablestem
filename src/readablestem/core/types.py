@@ -180,6 +180,10 @@ class ModelCall(BaseModel):
     # timed out after it was sent). 0: every dollar is a measured one. Left out of the JSON
     # when 0, so a record of a call with none is unchanged.
     billed_unseen_usd: float = Field(default=0.0, exclude_if=lambda v: v == 0)
+    # True when the job asked this exact request earlier and this is that answer given again:
+    # nothing was sent, so its cost, tokens and latency are 0 and it is not in the job's call
+    # count. Left out of the JSON when false, so a record of a request that was sent is unchanged.
+    shared: bool = Field(default=False, exclude_if=lambda v: not v)
 
 
 class Verification(BaseModel):

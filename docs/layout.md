@@ -1268,6 +1268,19 @@ math font, stay math.
   other 14 are no cluster, and none was built. The label that moved from the brace to the
   rows on 2210.13562 page 2 is a display cut into a brace, a paragraph and rows: the display
   rules cut it, not the number rules.
+  Two more shapes taken (wave 5, `LAYOUT_DISPLAY_GROUPING`; the count of 94 papers run again with
+  the four switches on, a number that is an equation of its own or a paragraph of its own): a
+  bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
+  "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
+  "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
+  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it (the regular rule runs with display grouping off as well, so the dots change is not behind that switch). Known limit (review 26, made pages only; 0.5.18 was not right on them either): fill-in lines stacked one under the other, each with a mark at its right ("3x + 2 = (4)" over "5x − 1 = (2)"), still give the marks away as equation numbers, because a line under the line is what "goes on" means here; telling them apart needs the row under to continue the line (to start with a relation or an operator, or to be indented under the right-hand side). A bracketed number on a row of its
+  own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
+  "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
+  display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label
+  is not in the equation's crop or text, so no crop and no request moves; the number's own
+  element, a request for a picture of "(D4)", is gone. Still loose, one case each: "(A5)"
+  (under the display), "(63)", "(5)", "(3.7)", three glued tails, boxed digits, and the two
+  numbers on figure pages.
   Labeled parts inside one display ("(a) ... (b)", O-048), counted again on the 94 papers:
   none of the 2,186 displays holds them (12 have "(a)" and "(b)" in the text, all arguments
   of a function or proof-step marks). With the 7 of 65,817 of wave 3 the shape stays too rare
@@ -1291,6 +1304,8 @@ math font, stay math.
   6. *A colon inside a Computer Modern index* (`_TEX_FACE`): the colon of "dx_{1:T}" ended the formula after the "1" when the file's producer field does not say TeX (a paper re-written by a viewer or a converter, `data/real-tables/2407.13734.pdf`), because `glyph_math.script_punctuation` only ran for a file typeset by TeX. A glyph of a Computer Modern or Latin Modern face is TeX's whatever the producer says. No box of the 21 development papers changes (their producer says TeX); the public file's "dx1:T" is whole.
 
   Measured and not built (wave 4, 21 development papers, the four rules and the display rules on): the inline "extra" group is 394 boxes. Of 219 read (the five papers with most of them), 83 are a formula that wrapped from one line to the next (`_wrapped_inline`): its box is the union of the two pieces, a rectangle that holds the prose between them, and no change of a rule shrinks it (two boxes would be "split", and one element needs one crop); 31 are a multi-line display or a row of a display whose box holds a neighboring formula; 87 are a piece the gold leaves out of the formula (an unpainted bold letter, the isotope of "27Al", the "rank" of "rank r": the box is right); 18 hold prose, and the ones read are the same kind of piece ("CaWO4" for its "4"). The cuts at a spaced relation (285) and merged inline (144) were not taken.
+
+  Measured again and not built (wave 5, the base 55917ea2 with the four switches on, 21 development papers: whole 9,195 of 11,258, inline extra 375, inline cut 289): 75 of the 289 cuts leave one relation outside the box (69 "=", 4 "≥", 1 "≤", 1 ">"). Of 14 of them read, 2 end a row with "=" and the formula goes on in the next row, and 2 are a ":=" whose "=" the run leaves out; the other 10 were not sorted further. Joining a wrapped formula across rows makes one box that is the union of both rows and holds the words between them, which scores "extra" and moves a crop, so a cut becomes an extra and nothing is gained. Of the 375 extras, 200 swallow 25 or more characters; 74 of those are a one-row formula whose box also holds a neighboring piece (two boxes), the rest are the wrapped formulas and the gold's left-out pieces that wave 4 read.
 
   Not built: a part label "(a)", "(b)", "(iii)" that splits a run and stays text. A TeX word-space rule already splits "(a) x = 1" on TeX pages; on the other pages the narrowed rule changed no box on the development papers (a first version lost 29 whole boxes by taking a raised "(j)" and "V(f)" for labels), so it is not in the code.
 
@@ -1929,6 +1944,84 @@ math by the document's evidence; the equation step's own tiers then decide it.
   pairs of neighboring pixels differ by more than 16 levels, and what is seen, alpha
   above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
+- **`LAYOUT_FIGURE_ART`** (`layout.analyze(figure_art=True)`, off in code and in the production
+  profile) holds the two rules below that moved a recorded figure request on the corpus, "Art a
+  clip hides" and "A row cut by a drawing's edge", and "Pen figures", which is for the pages the
+  first of them turns into ink pages. Off, the output is what it was before them.
+  Measured by replay on the 73 uploads of the corpus against release 5d081fcc (0.5.18): with it
+  off, 0 uploads differ (the whole result's hash is the same on all 73); with it on, one upload
+  differs in a request (w_lecture_5111 page 4, counted from 0 as the corpus pages in this
+  section are: one figure's crop is 12 pt shorter, the same five
+  words, and its request has no recorded answer until it is re-recorded), and one in a note
+  (r21_infographic_orcid: a figure's reason reads 866 paths for 867). Panel labels, the other
+  part of this section, move no request and are not behind it. Turning it on
+  needs a re-recording and a `PIPELINE_VERSION` bump, and, first, an order for figures that stand
+  side by side: on w_lecture_5111 the figure that is 12 pt shorter now starts below its neighbor
+  and `order._top_down` puts the neighbor first (the middle figure of three before the left one),
+  and a narrower label test for pen figures (below).
+- **Art a clip hides** is no figure and no ink (`page_type.page_drawings`; behind
+  `LAYOUT_FIGURE_ART`). A
+  PDF that carries a figure's art on every page (an editor's export) clips each page to its
+  own part; the rest is in the page's drawings, painted nowhere. `get_cdrawings()` does not
+  say so, so a drawing was read as painted and the figure rules boxed it with the body text
+  over it (arXiv 2407.20815 pages 2 and 4: a figure took "(II.10)" with its display, and
+  a paragraph of page 4 became an "equation image"; 2401.11209 page 2: one figure box over
+  both columns of the page). The extended list holds the clips between the drawings, each
+  with its depth (`level`); a drawing whose box, with half its line width, lies wholly
+  outside the box of a clip it is inside of is painted at opacity 0, the way the page already
+  leaves out paint nobody sees (`paint_visibility`, the ink analysis). Only layout's own read of
+  a page uses it (`document._read_page`); the text pass's strike and highlight marks, the upload
+  probe, the furniture pass and the page-type eval read the plain list. The list keeps its
+  length and order. Counted on the public sets
+  (302 files, 2,628 pages): 15 files and 34 pages hold such art on the page; on the private
+  corpus 4 of 25 files and 5 of 1,202 pages. Only a drawing wholly outside its clip is
+  dropped: art that is cut by the clip but reaches into it stays, as does anything under a
+  clip that is not a box (its box is what is tested). A page that the hidden art made an ink
+  page (2407.20815 page 4: 138 pen-like strokes of which 19 are painted) is read from the
+  painted strokes: that page is now mixed ink; its pen-drawn sphere and page 2's world lines
+  are figures again ("Pen figures").
+- **Pen figures** (`page._pen_figures`; behind `LAYOUT_FIGURE_ART`). On a `mixed_ink` page the pen drawings are cut out of
+  the figure rules (`document.py` holds them back in `pen`), and a handwriting region comes
+  from the pen strokes alone, so the typed labels of a hand-drawn figure cut its region short
+  (2407.20815 page 4: the sphere lost its top, y518-605 for y461-617) and the drawing was
+  "handwriting, not converted". Each region is read again with the figure rules over the pen
+  paths and the loose paths inside it; if a typed label belongs to the result
+  (`_label_owners`), the result is a figure with its whole extent, claims its labels, and the
+  region is dropped. A drawing that no typed label names stays handwriting, and so does
+  handwriting with no typed label in it.
+  Why it is behind the switch (review 25, 2026-11-23): with the switch off the two pages it was
+  written for read the same with or without it (page 29 of that paper is no ink page until the
+  hidden art is left out), and the label rule takes more than a figure's labels. A typed row
+  that lies mostly inside the region's box, or a short one within a font size of a stroke, is
+  taken: on the same paper's page 41 the box runs up the page over hidden art and two numbered
+  displays left the text for a figure; on a worksheet a typed "Answer:", "(a)", a question
+  number, "[4 marks]" or a whole typed line through what a student wrote left the text, the
+  writing went to the figure step as a picture, and the `handwriting_on_page` notice with its
+  required decision was not raised. With the switch on, page 41 reads right (its box is the
+  drawn sketch alone), and the worksheet cases are still taken: before the switch goes on, a
+  label here must be told from a worksheet's own words (short, no display, no line of running
+  text, no row that reaches outside the box, and a region that is a drawing and not rows of
+  writing).
+- **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
+  panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
+  no other figure) claims the rows on the panel, its header labels included, short or long
+  (`ax_physicsoptics`, the layout development copy, pages 34 to 36 counted from 0, 35 to 37 as
+  the PDF numbers them: the header words over the panels and the numbers of a color bar were
+  paragraphs and are the figure's labels now; every other page of that copy, page 13 by either count
+  included, reads the same with and without the rule). A panel that is itself the figure's own drawn shape is the
+  figure's box already, and one whose area is more than 1.5 times the pictures' (a card that
+  holds a title and a sentence beside them) is left alone.
+- **A row cut by a drawing's edge** (behind `LAYOUT_FIGURE_ART`) belongs to that drawing when at
+  least a quarter of it lies inside and its center is between the drawing's sides
+  (`figures._cut_by`; 2407.09859 page 3: an axis title straddling the figure's bottom edge once
+  the hidden art no longer extended it). It counts at the longest reach only, so a figure with a
+  stroke nearer to the row takes it (2309.01229 page 4: the "−0.1" tick of one panel, cut by the
+  edge of its neighbor's box). The page's own text is not taken (`figures._text_of_page`): a
+  list item (a slide's bullet whose picture starts on its line: w_slides_60001_lec10 page 27) and
+  a line of a column of text, with `CUT_COLUMN` (6) other rows starting where it does (a display
+  equation of a column that the box of a figure beside it runs into by 15 pt: w_exam_5111 page
+  7, 21 rows on its edge). The rows this rule is for are short labels with three rows on their
+  edge at most (the public files and the corpus hold no other row it takes).
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
   along all four edges of its own box and nowhere else: a rectangle, rounded corners, a
@@ -2331,6 +2424,134 @@ equations are). A box drawn round one line of code is its frame, not a figure
 (`_backdrop`). The notice `code_block` (review "none") is still given, now saying the
 code keeps its line breaks and indentation but not its highlighting.
 
+**Code fonts (O-440).** A font is monospaced when MuPDF flags it or its name matches
+`glyphs._MONO_FONT`: "mono" (not "Monotype"), Courier, Consolas, Menlo, Inconsolata, CMTT and
+SFTT, and, added after counting every font name on the 332 files of the corpus hash set and the
+25 private corpus uploads (the glyphs of a candidate must all advance alike), NimbusMonL (the
+Courier clone of the Times-Nimbus LaTeX stack: 10 files with the regular face, 5 oblique, 1
+bold; 2 corpus uploads), CMITT (3 files), t1xtt and txtt (txfonts typewriter: 1 file each),
+TeXGyreCursor (1 file) and Lucida Console (1 file). Their text in those files is code: a
+listing, an inline identifier or a URL (a URL stays inline, see below). No other font on those
+files has all glyphs of one advance and a name the list misses. A new name enters the list only
+when a real document sets code in it.
+
+With the names in, the code rules had to stop reading four things as code, which the known
+fonts had always let through (each seen on a file of the hash set):
+
+- A block of monospaced lines that are only email or web addresses (`_is_contact`: an author's
+  contact line on a title page).
+- A list of names (`_is_name_list`): no code punctuation but the underscores of the names, and
+  a comma after about every second word (the task names in the cells of a table, "PandaPush,
+  PandaSlide, and PandaPickAndPlace.").
+- The last line of a wrapped paragraph that is one line of the code face (a URL, names) under a
+  full line of the same column at the line pitch (`_code_groups`, a group of one row). The
+  `code_block` notice leaves out addresses and name lists too (`_is_addresses_or_names`), so a
+  page does not report code that is not.
+- A numbered line without a code line in its block: "173 [quant-ph/9809078]." in a reference
+  list is not a listing.
+
+A numbered listing (a number in front of every line, the blank lines numbered too) is one
+block: a row of a number and code of the code face goes on a block (`_numbered_code`), and the
+number alone of a blank line (`_blank_line_number`) stays in it when code goes on. Measured on
+`ax_csro_240306420`: its five Python listings (pp11, 12, 14-15, 15-16, 18) are one block each,
+two blocks where a listing crosses a page (66 + 37 lines, 32 + 64): 7 blocks of 32 to 69 lines
+in all, where each line or wrapped argument was a paragraph of its own (826 elements on the
+file before, 553 now). Two line numbers in them read wrong (p16 "2930", p18 "34 def"): the
+number of a blank line and the next one are 9 pt apart and 6 pt high, and the row builder makes
+one row of them.
+
+A word of the code face counts as a prose word when a row is classified (`_classify_row`),
+but only in a row beside a row that is mostly code face (`_mark_code_runs`: within three lines,
+over the same columns, with more than half of its characters in the code face and three
+letters of it at least): "for each Alg do" in an algorithm set in NimbusMonL (2504.06207 p4)
+made its rows "math" and its step numbers fragments attached to them, and the algorithm rule
+then lost the page. A display with one `\mathtt` name and no code rows near it ("Pr[out = 1]
+≥ 2/3") is classified as before: counted as a word, the name made the row text and left the
+denominator "3" a paragraph of its own (review 25, finding 2). The figure and display rules do
+not count them: the labels of a diagram set in Courier New would be prose. 2504.06207 p4 and
+2405.15050 p4 read as builder 04 left them.
+
+**A code-face run inside a formula (review 25, finding 3).** A formula can carry an operand
+in a typewriter face (`\mathtt`: a set of strings, "{101}", a name): the code-face rule
+(`_char_class`: "C", never math) cut the formula at it, so "x ∈ {101} ∗ y" was two
+formulas with the set left in the sentence, in CMTT already and in six more fonts since the
+list grew. `shared._code_beside_maths` reads a run of code-face characters as it would be in any
+face (digit, bracket, operator, letter) when it is inside a formula, and the formula finder
+then keeps it: it touches a math letter of another face, stands between two math characters
+or operators of another face, or comes right after one (or right before one) that has an
+operand on its other side ("x = {1, 2}" with the set in the code face). A run beside nothing of
+the kind stays code, so "x = 5" in a code face inside prose is still an identifier and the
+"x + x" in front of an arrow is not drawn into the arrow's formula. A run that holds a word of two
+letters or more (`\mathtt{out}`, `\mathtt{op1}`) stays code as a whole unless it is set against
+a math letter: read as a word it would make the row prose and take a display out of the
+equations, and read in part the "1" of `op1` would join the formula next to it (2504.20938 p7).
+When such a name is set against a math letter (`\mathtt{out}` with a subscript), its letters
+are read as math letters and not as letters of a word: as a word the name made its display
+prose again and left the denominator a paragraph of its own (review 26; made pages only). "Set
+against" is a gap under a tenth of the font size (`TIGHT_GAP`), which a subscript is; a thin
+space is a sixth, and a word space a quarter to a third and down to a sixth in a tight line. A
+name as a superscript of a slanted letter, or set straight after one, stands 0.11 to 0.20 of
+its size away by the letter's italic correction, which is among the shrunk word spaces, so it
+is not joined to the letter (of 52 letters 38 keep a superscript name and 42 a name set
+straight after; review 29, made pages; 0.5.18 joined none). At any wider gap the name stays code as a whole, as at 0.5.18: its display is whole all
+the same (a code word is a prose word only near a code row), and in a sentence the word stays
+in the sentence. With any gap under one font size allowed, a code-face word a word space from
+a math letter ("for each `measure` in M", "ends with `return` x") became an inline formula of
+letters (review 27; 2504.06207 p13 and made pages); with a quarter allowed, so did a word at
+a shrunk or quarter-em word space, a display with a name a thick space from a letter ("n cost"
+at `\;`) was cut, and a code face smaller than the text, reread as letters, passed for a
+script of the letter and joined its formula (review 28; made pages only, the last two since
+`8fe3b940`). A row that is mostly code face is not reread at all when it has code words in
+it, or when it is near a code row (`_Row.code_run`: within three lines of a row that is mostly
+code face) and has no Latin math letter of another face: the SQL page of ax_cslg_240306367 p4
+stays code, and so does the line "a[i] ← a[j] ⊕ t" of a listing whose arrows are of a math
+font, which has no word in it and was cut out of its code block as a display (review 26; made
+pages only). The letter test keeps a displayed set with a math-face name and code-face members
+("L2 = {00, 01, 10, 11}") a display when a line with code words stands near it; without it the
+set went into that line's code block (review 27; made pages only).
+
+Known limits of the two code-face rules (review 26, each seen on made pages only): a display
+that stands right under a line of code and has a `\mathtt` name is still classified with the
+name as a word, so its denominator is a paragraph of its own (the "within three lines" of
+`_mark_code_runs` cannot tell a display after code from a step of an algorithm); and in prose
+that mixes code-face text with math signs some inline formulas come out cut on one side
+("y[j + 1" with its "]" left in the sentence, "i = 0; i < n; i" out of a `for` header). No
+text is lost: what is left out of a formula stays in the sentence. Three more from review 27,
+on made pages only: near code rows, lines of assignments with math signs ("s ← x ⊕ y ⊕ c") are
+a paragraph with one-sign formulas, as at 0.5.18, and not one display; a code-face name with a
+math-face subscript ("cost_i") is an inline formula in a sentence and plain text in a row that
+is mostly code face; and a displayed set whose members are strings of letters in the code
+face ("L1 = {ab, ba, abab}") has code words in it and is a line of code. Two more from
+review 28, on made pages only: near a code row a set named by a Greek capital ("Σ = {0, 1}")
+in a font the list takes for code is a paragraph with inline formulas, since the letter test
+asks for a Latin letter (a λ in a listing line must not make it a formula); and a listing
+whose variables are in math italic is reread, so three of its lines become a display.
+Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
+(base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
+is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
+{...}") and changed 16 pages of 2 files against the 0.5.18 read, 11 of them for the worse. With
+this rule 7 pages of 3 files differ from the 0.5.18 read (counted again on the release head;
+first written as 6 of 2, review 26 counted 7 of 3): six are the intended changes of 0.5.19
+(the listings and tails), and on one a two-letter paragraph in a code face at the foot of a
+page is a line of code. Of the 247 formulas on the pages of that upload, 246 are as in the
+0.5.18 read (base: 216; review 26 counted 247 and 215), so 30 of the 31 broken ones are whole.
+Base against this change
+differs on 11 pages of that one upload, none of them worse. Of the 30 public files that carry a
+code-face font, one page differs from base (ax_cslg_240306367 p8: the attribute set "{A, C, E,
+F}" is an inline formula again, as in 0.5.18).
+
+Measured on the 332 files of the corpus hash set (996 results, 3 modes of each file): 33
+differ, 11 files. 6 results are builder 04's algorithm changes (2504.06207, 2405.15050); 27 are
+this change, in 9 files, each read: the Python listings of ax_csro_240306420; the SQL snippets
+of ax_cslg_240306367 (paragraphs, equations and fragments before; code now, the prose after
+them a paragraph of its own); the numbered listings of 2505.13042 pp2-3; and URL, email and
+wrapped-line tails that were one-line code blocks and are part of their reference or list item
+now (ax_cscl_240306350, ax_cscv_240306361, ax_statme_240307158, ax_econem_240306657,
+2502.08443, 2405.20573). In the 73 uploads, 2 differ from a run of 55917ea2 made for the
+purpose: `r18_arxiv_opt` (a URL in a footnote is set as code: cosmetic) and
+`w_slides_60001_lec1` (a wrapped line of a list item is no more a code block); no recorded
+request moves (the equation, figure and table parts are equal).
+
 **Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
 its mark in the text above it also links to it (the output writes the mark as `doc-noteref`, the note as `doc-footnote`, with a `doc-backlink`, docs/output.md "Navigation"): the mark is found again in the element's
 text by the ten characters printed before it, and a mark that cannot be found exactly once
@@ -2689,14 +2910,40 @@ Output lines join the numbered steps (before this they were headings). Measured 
 page and not built: a numbered tail at the top of the next page (2504.06207 p5 step 9; the page
 has no caption and starts at a number), a heading under an algorithm that its last line
 absorbs, a `for ...:` line over an equation, an opener that wraps flush, a one-line block,
-2504.06207 p4 steps 9 to 13 (the content of a numbered step listed by the text layer before its
-number), 2405.15050 p4 steps 10 to 12 (a stacked math region listed before the numbers), the
+2504.06207 p4 steps 9 to 13 and 2405.15050 p4 steps 10 to 12 (both built in wave 5, below), the
 boxed "TABLE III" algorithm of ax_eesssp_240306423 p6 (two columns interleaved), and the garbled
 math of step 8 in ax_csro_240306420 p9 (a math-region fault, not the algorithm's). Found beside
-them and outside the algorithm functions: `glyphs._MONO_FONT` does not name "NimbusMonL"
+them and outside the algorithm functions: `glyphs._MONO_FONT` did not name "NimbusMonL"
 (`Mon` + `L`), "CMITT", "TeXGyreCursor" or "t1xtt", so a listing set in those fonts (the numbered
-listing of 2505.13042 p3; 42 pages of 8 files carry NimbusMonL) is not taken for code and is read
-as prose. One regex line, a reader change over those files that needs its own corpus run.
+listing of 2505.13042 p3; 42 pages of 8 files carry NimbusMonL) was not taken for code and was
+read as prose; the names are now in the list (O-440, "Code fonts" under Code blocks).
+
+**Algorithms, wave 5 (O-442).** The shapes wave 4 measured and left are counted again on the
+public pages that hold an algorithm (75 pages of 47 documents; the dev copies of one paper count
+each time) and on the private corpus (25 documents, counts only: no numbered algorithm block in
+any). Two have real pages and are read, each on those pages and on no other page looked at:
+
+- *A step's words listed before its line number, across the gutter of a two-column page*
+  (2504.06207 p4, steps 9 to 13). The long steps of a full-width algorithm are wider than a column,
+  so the reader calls them spanning rows ("S") and the scan, which took only the anchor's column,
+  stopped at the first. `_spills` lets such a row in when the row after it is the expected number
+  alone, in the anchor's column, left of it on the same baseline: only a step's words are listed
+  that way, and a wide line of the page's own text has no number beside it.
+- *A stack of formula steps listed before their numbers* (2405.15050 p4, steps 10 to 12). The math
+  region is listed first and the small numbers after it, so the scan met formulas with no number and
+  numbers with no step. `_numbers_first` puts a lone number ahead of the formula rows of one region
+  on its baseline, right of it, for the scan only; `_place` still gives each row its own slot, so
+  the page's order is unchanged.
+
+Before, those steps stood outside their algorithm; the block now holds them. Counted and not
+built, because no second page shows them: a numbered tail at the top of the next page (the
+line-number pattern finds 13 public pages and 1 private one; of the public ones 2504.06207 p5
+step 9 is the tail, the rest are lists and proofs; the private one was not read further), a
+heading taken into the last line, a `for ...:` line over an equation, an opener that wraps flush,
+a one-line block (ax_statme_240307124 p12 step 3, after an equation), the boxed "TABLE III" and
+the garbled math of ax_csro_240306420 p9 step 8 (one public page each, the pages wave 4 named).
+The mono-font names are O-440 (brief 02).
+
 Known wrong reads, all prose
 taken for steps (independent reviews 8, findings 5 and 7, 9, finding 5, and 10): text set in
 under a last step that reaches the right edge is taken into the block (lines hung under a
@@ -2909,7 +3156,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.5"):
 |---|---|---|
 | `born_digital` | visible text that covers the page's content, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count, or `hidden_text_check` (required) from `page_type.HIDDEN_BLOCK` (400) characters on |
-| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text") |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), any pen stroke, clean or not (two pen widths in one note fail the clean test), that no figure holds is cut out the same way, from one stroke up (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and checked by hand over the typed text, which stays read); an equation or a table does not hold it (a transcription or a rebuilt table would leave the note out). Marks too simple or too long for the stroke test (a tick of three points, a cross of two lines, a one-stroke signature) are handwriting when the stroke itself is a pen's (since 2026-11-11: "Small drawings on a typed page"), or when drawn over typed text ("Pen marks over typed text"); straight lines that meet at their ends or run parallel (a skeletal structure's bonds) and a printed seal's even arcs are figures for the figure step; a pen stroke that is a glyph outline in a typed line is a figure too ("Glyphs drawn as outlines in a line of text"); a region that a typed label of the page names is a figure, not a handwriting region ("Pen figures") |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo, a watermark or page number over a photographed page) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`). If the text does not cover the picture (reason `text_not_covering_content`, below) the image page pass reads it as a scan (`page_type.reads_image`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analyzed in time; its visible text is read, its drawings are not sent to the figure model |

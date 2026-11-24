@@ -103,9 +103,9 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import cache, partial
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any, Protocol, cast
 
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from readablestem.config import ConfigError, Settings
 from readablestem.core import triage
@@ -388,7 +388,17 @@ log = logging.getLogger(__name__)
 # not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.17 opens a 0.5.18 result. Each
 # switch goes back off alone with its profile row and the Railway variable of the same name.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.18"
+# 0.5.19 (2026-11-23): one raise for wave 5 (CHANGELOG.md has each change). What a PDF's result
+# holds moves: six more code font names, numbered listings one block, addresses and name lists
+# not code, a code-face run inside a formula stays in it; algorithm steps listed before their
+# numbers stay in the block; panel header labels belong to their figure; two more
+# equation-number shapes label their display, one number to a display. Behind a new
+# switch that stays off (no change): LAYOUT_FIGURE_ART (art a clip hides, rows a figure's edge
+# cuts, a hand-drawn figure named by typed labels).
+# The result's schema is the same: results from 0.5.10 to 0.5.18 load unchanged and their page
+# is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.18 opens a 0.5.19 result.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.19"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -474,7 +484,7 @@ class _RecordingClient:
         ) as span:
             parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
             self.calls.append(call)
-            if self._observer is not None:
+            if self._observer is not None and not call.shared:  # a shared answer was not sent
                 self._observer(call)
             _annotate(
                 span,
@@ -487,11 +497,112 @@ class _RecordingClient:
                 reasoning_tokens=call.reasoning_tokens,
                 cost_usd=call.cost_usd,
                 latency_ms=call.latency_ms,
+                shared=call.shared,
             )
         return parsed, call
 
     def __getattr__(self, name: str) -> Any:  # anything else a step may read
         return getattr(self._inner, name)
+
+
+class _Asked:
+    """One request of the job, while it is in flight and after: the first caller's answer,
+    given to every caller of the same request once it has one."""
+
+    def __init__(self) -> None:
+        self.done = threading.Event()
+        self.answer: tuple[BaseModel, ModelCall] | None = None
+
+
+class _SharedAnswers:
+    """The job's model client: a request this job already asked is not sent again.
+
+    Equal `question.question_key`s (and the same fallback flag) are the same question. The
+    first caller sends it; a caller that arrives while it is out waits for it, and one that
+    arrives later does not wait. Each gets the first answer, as a copy, with a `ModelCall`
+    that costs nothing and says `shared`, so the job's money and call count are the first
+    call's. Only an answer that was read and whose call ended "ok" is given again: after
+    any other end (a refusal, a timeout, an unreadable reply, or the first caller raising)
+    the waiting caller sends its own request, as it would without this, so a retry or a
+    fallback never meets a stored failure. Two identical pictures therefore get one
+    description. Shared by every thread of the job; it sits above the recording client.
+    """
+
+    def __init__(self, inner: VisionClient, settings: Settings) -> None:
+        self._inner = inner
+        self._settings = settings
+        self._lock = threading.Lock()
+        self._asked: dict[str, _Asked] = {}
+        self._handed: dict[str, list[ModelCall]] = {}  # every call given out, by question
+
+    def run(
+        self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
+    ) -> tuple[T | None, ModelCall]:
+        key = f"{question.question_key(self._settings, request, schema)}:{is_fallback}"
+        with self._lock:
+            entry = self._asked.get(key)
+            first = entry is None
+            if entry is None:
+                entry = self._asked[key] = _Asked()
+        if not first:
+            entry.done.wait()
+            if entry.answer is not None:
+                parsed, call = entry.answer
+                handed = _shared(call)
+                with self._lock:
+                    self._handed[key].append(handed)
+                return cast(T, parsed.model_copy(deep=True)), handed
+            return self._inner.run(request, schema, is_fallback=is_fallback)
+        try:
+            parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+            if parsed is not None and call.outcome == "ok":
+                entry.answer = (parsed.model_copy(deep=True), call)
+                with self._lock:
+                    self._handed[key] = [call]
+            return parsed, call
+        finally:
+            entry.done.set()  # also when the call raised: a waiter sends its own
+
+    def settle(self, fixes: Sequence[Fix]) -> None:
+        """Put what an answer cost on the first fix of the document that has it. Which of two
+        identical pictures asked first is a matter of thread timing, and the one that did is
+        the one that paid; here the money moves to the one that comes first in reading order,
+        so the same file gives the same fixes whatever the timing (`fixes` are in reading
+        order). The total is what it was."""
+        of = {id(call): n for n, fix in enumerate(fixes) for call in fix.calls}
+        for calls in self._handed.values():
+            kept = [call for call in calls if id(call) in of]
+            paid = next((call for call in kept if not call.shared), None)
+            first = min(kept, key=lambda call: of[id(call)], default=None)
+            if paid is None or first is None or first is paid:
+                continue
+            for name in _PAID_FIELDS:
+                one, other = getattr(paid, name), getattr(first, name)
+                setattr(paid, name, other)
+                setattr(first, name, one)
+
+    def __getattr__(self, name: str) -> Any:  # anything else a step may read
+        return getattr(self._inner, name)
+
+
+# What a request cost and whether it was sent: the fields a shared call has none of.
+_PAID_FIELDS = (
+    "input_tokens",
+    "cached_input_tokens",
+    "cache_creation_input_tokens",
+    "output_tokens",
+    "reasoning_tokens",
+    "cost_usd",
+    "latency_ms",
+    "billed_unseen_usd",
+    "shared",
+)
+
+
+def _shared(call: ModelCall) -> ModelCall:
+    """The call a caller is given for an answer that was already paid for."""
+    none = {"cost_usd": 0.0, "billed_unseen_usd": 0.0, "shared": True}
+    return call.model_copy(update={**dict.fromkeys(_PAID_FIELDS, 0), **none})
 
 
 class _Stop:
@@ -960,7 +1071,7 @@ def _run_step(
             status=fix.status.value,
             reason=fix.reason,
             model=_single_model(fix.calls),
-            calls=len(fix.calls),
+            calls=sum(1 for c in fix.calls if not c.shared),
             cost_usd=fix.cost_usd,
             latency_ms=elapsed_ms,
         )
@@ -1451,7 +1562,7 @@ def _stats(
         pages=len(pages),
         cost_usd=round(sum(f.cost_usd for f in fixes), 8),
         latency_ms=wall_ms,
-        model_calls=sum(len(f.calls) for f in fixes),
+        model_calls=sum(1 for f in fixes for c in f.calls if not c.shared),
         by_kind=dict(Counter(f.kind.value for f in fixes)),
         by_status=dict(Counter(f.status.value for f in fixes)),
         by_review=dict(Counter(f.review for f in fixes)),
@@ -1813,6 +1924,8 @@ def _page_math_pass(
                 grouping["region_tree"] = True
             if settings.layout_join_panels:
                 grouping["join_panels"] = True
+            if settings.layout_figure_art:
+                grouping["figure_art"] = True
             if settings.table_search_unlimited:
                 grouping["table_search_limited"] = False
             try:
@@ -2107,6 +2220,8 @@ def _convert(
                 extra["region_tree"] = True
             if settings.layout_join_panels:
                 extra["join_panels"] = True
+            if settings.layout_figure_art:
+                extra["figure_art"] = True
             if settings.table_search_unlimited:
                 extra["table_search_limited"] = False
             if stage_progress is not None:
@@ -2231,12 +2346,13 @@ def _convert(
             fixes = {f.element_id: f for f in scan_fixes}
             for page_built in image_built.values():
                 fixes.update(page_built.fixes)
+            shared_answers = _SharedAnswers(client, settings)
             run = _Run(
                 pdf_bytes=pdf_bytes,
                 settings=settings,
                 options=options,
                 stage_progress=stage_progress,
-                client=client,
+                client=shared_answers,
                 tracer=tracer,
                 pages=_Pages(page_list, progress),
                 contexts=context_texts(elements),
@@ -2319,6 +2435,7 @@ def _convert(
             run.fixes[fix.element_id] = fix
         triage.stamp(run.fixes.values())  # the risk band each decision was asked at
         ordered = _ordered_fixes(elements, run.fixes)
+        shared_answers.settle(ordered)
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
             measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))

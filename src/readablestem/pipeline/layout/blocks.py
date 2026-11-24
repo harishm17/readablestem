@@ -55,6 +55,7 @@ from readablestem.pipeline.layout.shared import (
     _MATH_WORDS,
     _ROW_RELATIONS,
     _SUPERSCRIPT_FLAG,
+    CODE_MONO_SHARE,
     SCRIPT_RATIO,
     _Block,
     _CharInfo,
@@ -1098,12 +1099,25 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
     in the code is a gap of up to two) and of one size, with at least `CODE_MIN_GLYPHS`
     glyphs, or `CODE_MIN_SHORT` in two lines or more. Whatever their indentation: a
     Python loop's body is a line that starts further right, not a new paragraph. A single
-    short monospaced line ("print") is not a block.
+    short monospaced line ("print") is not a block. A listing's line numbers, set in a
+    small face of their own, are part of its lines (`_numbered_code`), and the number of a
+    blank line, alone in its row, between two lines of code does not end the block.
     """
     groups: list[list[_Row]] = []
+    gap: list[_Row] = []  # numbers of blank lines, in the block only when code goes on
     for row in rows:
-        if row.kind != "text" or not row.code:
+        if row.kind != "text" or not (row.code or _numbered_code(row)):
+            last = groups[-1] if groups else []
+            if (
+                last
+                and row.kind == "text"
+                and row.column == last[-1].column
+                and _blank_line_number(row)
+            ):
+                gap.append(row)
+                continue
             groups.append([])  # ends the block
+            gap = []
             continue
         last = groups[-1] if groups else []
         if last:
@@ -1114,18 +1128,58 @@ def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
                 and abs(row.size - prev.size) <= 0.5
                 and 0.5 * prev.size <= pitch <= CODE_MAX_PITCH * prev.size
             ):
+                last.extend(gap)
                 last.append(row)
+                gap = []
                 continue
         groups.append([row])
+        gap = []
     found: dict[int, int] = {}
+    place = {id(r): i for i, r in enumerate(rows)}
+    right: dict[str, float] = {}
+    for r in rows:
+        right[r.column] = max(right.get(r.column, 0.0), r.x1)
     for group in groups:
         glyphs = sum(len(r.ink) for r in group)
+        if len(group) == 1 and place.get(id(group[0]), 0) > 0:
+            row, above = group[0], rows[place[id(group[0])] - 1]
+            if (  # the last line of a wrapped paragraph that has names in a typewriter face
+                above.kind == "text"
+                and not above.code
+                and above.column == row.column
+                and abs(above.size - row.size) <= 0.5
+                and 0.5 * row.size <= row.baseline - above.baseline <= 1.5 * row.size
+                and above.x1 >= right[row.column] - 1.5 * row.size
+            ):
+                continue
+        # a numbered line only goes on a listing: a reference "173 [quant-ph/9809078]." is not one
         if (
-            glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT)
-        ) and not _is_quotation(group):
+            any(r.code for r in group)
+            and (glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT))
+            and not (_is_quotation(group) or _is_addresses_or_names(group))
+        ):
             for row in group:
                 found[id(row)] = id(group[0])
     return found
+
+
+def _numbered_code(row: _Row) -> bool:
+    """Is the row a line of a listing that numbers its lines: a number in a face of its own
+    ("21") and then monospaced code? The number is not counted in the share of monospaced
+    glyphs, so `_Row.code` (which counts it) has said no."""
+    if row.vertical or row.diagonal or (number := _line_number(row)) is None:
+        return False
+    body = [c for c in row.chars[number[2] :] if not c.blank]
+    return bool(body) and sum(c.mono for c in body) >= CODE_MONO_SHARE * len(body)
+
+
+def _blank_line_number(row: _Row) -> bool:
+    """Is the row only the number of a blank line of a listing ("22")?"""
+    return (
+        not row.vertical
+        and not any(c.mono for c in row.ink)
+        and re.fullmatch(r"\d{1,4}", row.clean.strip()) is not None
+    )
 
 
 # What only code has: brackets, operators, an assignment, a call ("print("), an option
@@ -1147,6 +1201,32 @@ def _is_quotation(group: Sequence[_Row]) -> bool:
     if spread > 0.5 * group[0].size and any(line.endswith(":") for line in lines):
         return False  # a block: "else:" and its body
     return len(text.split()) >= QUOTATION_MIN_WORDS and any(c in text for c in ".,?!")
+
+
+def _is_name_list(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines a list of names (the task names in a table cell, "A, B
+    and C" in the text) and not code? Only when, leaving the underscores of the names aside, it
+    has none of the punctuation code has, and about every second word is followed by a comma."""
+    text = " ".join(r.clean for r in group).replace("_", "")
+    words = text.split()
+    commas = text.count(",")
+    return commas >= 2 and 2 * commas >= len(words) and not _CODE_PUNCTUATION.search(text)
+
+
+# An address set in a typewriter face on a title page: one word, an email or a web address.
+_CONTACT = re.compile(r"^(?:[\w.+|{},-]+@[\w-]+(?:\.[\w-]+)+|(?:https?://|www\.)\S+)[.,;]?$")
+
+
+def _is_contact(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines only email or web addresses (an author's contact line,
+    not code)?"""
+    return all(_CONTACT.match(r.clean) for r in group)
+
+
+def _is_addresses_or_names(group: Sequence[_Row]) -> bool:
+    """Is a block of monospaced lines only addresses or a list of names? It is no code, and the
+    notice that a page has code (`notices.py`) leaves it out too."""
+    return _is_contact(group) or _is_name_list(group)
 
 
 def _pitch(row: _Row) -> list[float]:
@@ -1404,6 +1484,25 @@ class _Steps:
         )
 
 
+def _spills(row: _Row, steps: _Steps, following: _Row | None) -> bool:
+    """Is `row` the words of the next numbered step that cross the gutter of a two-column page
+    (a full-width algorithm: the reader calls a row wider than a column "S")? Only the words the
+    text layer lists before the step's number, which stands alone in the row after them on the
+    same baseline (`_lone_number`), count: a wide line of the page's text has no such number."""
+    size = steps.anchor.size
+    return (
+        row.column == "S"
+        and row.kind == "text"
+        and steps.expect is not None
+        and row.x0 > steps.number_x + 0.5 * size
+        and following is not None
+        and following.column == steps.anchor.column
+        and following.x0 < row.x0
+        and abs(following.baseline - row.baseline) <= ALGORITHM_SAME_LINE * size
+        and _lone_number(following, steps.expect) is not None
+    )
+
+
 def _step_kind(
     row: _Row, steps: _Steps, edges: _RightEdges, following: _Row | None, soon: bool
 ) -> str | None:
@@ -1422,7 +1521,7 @@ def _step_kind(
         and steps.on_line(row)
     ):
         return "piece"
-    if row.column != anchor.column:
+    if row.column != anchor.column and not _spills(row, steps, following):
         return None
     number = steps.number(row)
     # The item of a list is no step: a bullet anywhere, and a "1." or "2)" with no caption over
@@ -1761,6 +1860,33 @@ def _lines(steps: _Steps) -> list[list[_Row]]:
     return [sorted(line, key=lambda r: r.x0) for line in lines]
 
 
+def _numbers_first(rows: Sequence[_Row]) -> list[_Row]:
+    """`rows` with each line number that stands alone in its row put ahead of the formula rows
+    the text layer listed before it on its baseline, right of it: a stack of formula steps is
+    listed in one run (one math region) and then the numbers of its lines, so a step's number
+    came after its words and a number is no longer where the scan expects it. Only the scan
+    reads this order; the page's own order is the one given."""
+    out = list(rows)
+    for at, row in enumerate(out):
+        if row.kind != "text" or _LONE_NUMBER.fullmatch(row.clean) is None:
+            continue
+        stack = at
+        region = out[at - 1].region if at else None
+        while stack and region is not None and out[stack - 1].kind == "math":
+            if out[stack - 1].region is not region:
+                break
+            stack -= 1
+        for first in range(stack, at):
+            above = out[first]
+            if (
+                abs(above.baseline - row.baseline) <= ALGORITHM_SAME_LINE * above.size
+                and above.x0 > row.x1
+            ):
+                out.insert(first, out.pop(at))
+                break
+    return out
+
+
 def _algorithm_groups(
     rows: Sequence[_Row], edges: _RightEdges, code: dict[int, int]
 ) -> tuple[dict[int, int], list[_Row]]:
@@ -1796,6 +1922,7 @@ def _algorithm_groups(
     (an inline equation)."""
     found: dict[int, int] = {}
     order = list(rows)
+    rows = _numbers_first(rows)
     index = 0
     while index < len(rows):
         start = index

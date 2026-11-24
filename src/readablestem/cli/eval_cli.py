@@ -1087,7 +1087,7 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     be the registered one, and a held-out set is scored only when the caller says the
     score is for a release."""
     from readablestem.cli import layout_gold as sets
-    from readablestem.eval import measure, order_report
+    from readablestem.eval import measure, order_report, split
     from readablestem.gold import layout_gold
 
     listed = sets.registry_path(args.set, args.registry)
@@ -1095,7 +1095,9 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     if not listed.is_file():
         return _error(f"no registry at {listed}")
     registry = json.loads(listed.read_text(encoding="utf-8"))
-    if registry["side"] == "held-out":
+    if registry.get("side") not in split.SIDES:
+        return _error(f"{listed}: the side of a set is one of {', '.join(split.SIDES)}")
+    if sets.held_out(registry):
         if not args.for_release:
             return _error(
                 f"{args.set} is a held-out set: it is scored for a release, once, and a score "
@@ -1193,7 +1195,9 @@ def _cmd_order(args: argparse.Namespace) -> int:
             return scored
         run, registry = scored
         settings = order_report.set_settings()
-        held_out = registry["side"] == "held-out"
+        from readablestem.cli import layout_gold as sets
+
+        held_out = sets.held_out(registry)
         metrics = order_report.report(run, order_report.set_groups(registry), listed=not held_out)
         of_set = order_report.set_stamp(registry, [done.upload for done in run])
         record = measure.record(run, settings, metrics, of_set=of_set | {"client": "none"})
@@ -1314,7 +1318,44 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
     root: Path | None = args.gold_dir
     if root is not None and not (root / "files").is_dir():
         return _error(f"{root} is not a layout gold set's folder (no files/ in it)")
+    if args.gold_pages and root is None:
+        return _error("--gold-pages is for a layout gold set: it needs --gold-dir")
     name = "corpus" if root is None else root.name
+    # A held-out set's printed report names no document and no page. A gold set is held out
+    # unless its registry says development and the folder is the one it registers: a held-out
+    # folder under another name, with another set's registry or with none must not be named.
+    held_out = root is not None
+    if root is not None:
+        from readablestem.cli import layout_gold as sets
+
+        listed = sets.registry_path(name, args.registry)
+        if listed.is_file():
+            try:
+                registry = json.loads(listed.read_text(encoding="utf-8"))
+                held_out = sets.held_out(registry, root)
+            except (OSError, ValueError, KeyError, TypeError) as exc:
+                return _error(f"cannot read {listed}: {exc}")
+            if held_out and not sets.held_out(registry):
+                print(
+                    f"{root} is not the folder {listed.name} registers: taken as held out, "
+                    "no document or page is named",
+                    file=sys.stderr,
+                )
+    earlier = None
+    if args.against is not None:
+        try:
+            earlier = json.loads(args.against.read_text(encoding="utf-8"))
+            if earlier["task"] != "page_audit" or not isinstance(earlier["rows"], list):
+                raise ValueError("not a page-audit report")
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            return _error(f"cannot read {args.against} as a page-audit report: {exc}")
+        if earlier["set"] != name:
+            return _error(f"{args.against} is a report of {earlier['set']}, not of {name}")
+        if bool(earlier.get("gold_pages")) != args.gold_pages:
+            return _error(
+                f"{args.against} and this run differ in --gold-pages: the pages are not "
+                "the same, so they cannot be set side by side"
+            )
     keep = (run_record.set_root("corpus"), "corpus") if root is None else (root, name)
     default_out = (
         _default(Path("data/eval/latest-page-audit.json"))
@@ -1337,7 +1378,9 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
             documents = list(
                 audit_eval.corpus_documents(Path(scratch), args.only)
                 if root is None
-                else audit_eval.gold_documents(root, settings, args.only)
+                else audit_eval.gold_documents(
+                    root, settings, args.only, gold_pages=args.gold_pages
+                )
             )[: args.limit]
         if not documents:
             return _error("no document to audit: the set is empty, or --only names none of it")
@@ -1346,7 +1389,7 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
         def one_pass() -> Any:
             if hasattr(client, "reset"):
                 client.reset()
-            quiet = (lambda _line: None) if args.batch else print
+            quiet = (lambda _line: None) if args.batch or held_out else print
             return audit_eval.audit_documents(
                 documents, client, settings, renderer=renderer, say=quiet
             )
@@ -1370,12 +1413,15 @@ def _cmd_page_audit(args: argparse.Namespace) -> int:
             date=args.date,
             client_label=label,
             with_output_picture=args.rendered,
+            gold_pages=args.gold_pages,
         )
+        if earlier is not None:
+            found["against"] = audit_eval.against(found, earlier)
         if hasattr(client, "summary"):
             found["answers_file"] = dict(client.summary())
         _finish_recording(rec, args, found)
         pe.write_report(found, out)
-        print(audit_eval.format_markdown(found), end="")
+        print(audit_eval.format_markdown(found, listed=not held_out), end="")
         print(f"wrote {_shown(out)}")
         _copy_report(rec, found)
     return 1 if run.stopped else 0
@@ -2297,6 +2343,28 @@ def register(
         type=Path,
         metavar="DIR",
         help="a layout gold set's folder (files/<id>.pdf), each file converted with no model",
+    )
+    page_audit.add_argument(
+        "--gold-pages",
+        action="store_true",
+        help="with --gold-dir: audit only the pages the set's gold marks (a file with no "
+        "gold is left out), convert each file as `eval order --set` does, and add to the "
+        "report, as `against_scorer`, the gold pages the reading-order scorer calls right "
+        "and not right, each by the audit's verdict (counts only)",
+    )
+    page_audit.add_argument(
+        "--against",
+        type=Path,
+        metavar="REPORT",
+        help="an earlier page-audit report of the same set (made with or without "
+        "--gold-pages, as this run is): print how many pages are in both and how many have "
+        "another verdict now; exit 2 for another set or the other way of choosing pages",
+    )
+    page_audit.add_argument(
+        "--registry",
+        type=Path,
+        help="the set's registry (default: data/gold/layout/<set>.json); a held-out set's "
+        "printed report names no document and no page",
     )
     page_audit.add_argument(
         "--only", action="append", default=[], metavar="ID", help="only this document (repeat)"

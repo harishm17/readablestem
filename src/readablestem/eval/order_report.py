@@ -108,17 +108,17 @@ def set_settings() -> Any:
     return profile.load().apply(base)
 
 
-def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
-    """One document of a set, converted with no model and scored (a process of `set_run`)."""
-    from readablestem.core.types import ConversionOptions, StepFacts
+def convert_document(pdf: bytes) -> Any:
+    """One document of a set converted with no model, as a job converts it under
+    `set_settings()`: its output, or the code of the error it ended with (a file the reader
+    refuses or cannot finish ends as a job's does)."""
+    from readablestem.core.types import ConversionOptions
     from readablestem.models.fake import FakeVisionClient
     from readablestem.web.isolated_convert import convert_isolated
 
-    gold = json.loads(Path(gold_path).read_text(encoding="utf-8"))
-    pdf = Path(pdf_path).read_bytes()
     settings = set_settings()
     try:
-        output = convert_isolated(
+        return convert_isolated(
             pdf,
             settings=settings,
             client=FakeVisionClient(),
@@ -128,8 +128,18 @@ def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
     except Exception as exc:
         from readablestem.web.worker import error_code_for
 
-        # A file the reader refuses or cannot finish ends as a job's does: with its code.
-        return Converted(gold["id"], error=error_code_for(exc)).as_dict()
+        return error_code_for(exc)
+
+
+def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
+    """One document of a set, converted with no model and scored (a process of `set_run`)."""
+    from readablestem.core.types import StepFacts
+
+    gold = json.loads(Path(gold_path).read_text(encoding="utf-8"))
+    pdf = Path(pdf_path).read_bytes()
+    output = convert_document(pdf)
+    if isinstance(output, str):
+        return Converted(gold["id"], error=output).as_dict()
     done = Converted(
         gold["id"],
         pages=output.result.stats.pages,

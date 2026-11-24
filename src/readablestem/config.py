@@ -158,6 +158,15 @@ class Settings(BaseSettings):
     # figure answers of the pages it moves stop matching and `PIPELINE_VERSION` must be bumped
     # in the change that enables it.
     layout_join_panels: bool = False
+    # Which art is a figure and which rows are its labels (`layout.analyze(figure_art=True)`,
+    # docs/layout.md "Art a clip hides" and "A row cut by a drawing's edge"): the drawings of a
+    # page are read without the paint no clip lets through, and a short row the edge of a figure's
+    # box cuts through is its label unless it is a list item or a line of a column of text; a
+    # hand-drawn figure that typed labels name is a figure, not handwriting ("Pen figures"). Off:
+    # output is byte-identical to before. Turning it on moves figure boxes and the text they
+    # take, so the recorded figure answers of the pages it moves stop matching and
+    # `PIPELINE_VERSION` must be bumped in the change that enables it.
+    layout_figure_art: bool = False
     # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
     # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
     # tree of regions from the unmerged line fragments first and orders the pages by it. Off:

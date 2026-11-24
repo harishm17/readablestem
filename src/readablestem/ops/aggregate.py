@@ -183,7 +183,7 @@ def fix_counts(
             counts[_key(step, "tier", code(tier), code(reason))] += 1
     if fix.reason:
         counts[_key(step, "reason", code(fix.reason))] += 1
-    for call in fix.calls:
+    for call in (c for c in fix.calls if not c.shared):  # a shared answer was not sent
         counts[_key(step, "call", code(call.model), "outcome", code(call.outcome))] += 1
         if call.is_fallback:
             counts[_key(step, "call", "fallback")] += 1

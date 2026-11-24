@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.18 as of 2026-11-23; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.19 as of 2026-11-23; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-23 | 0.5.18 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-24 | 0.5.19 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -3061,8 +3061,8 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-23 at pipeline 0.5.18,
-production profile `11fc9f366bea`, 47 files and 91 gold pages, no answer missing, no step
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-24 at pipeline 0.5.19,
+production profile `2047f403770c`, every count as in the 0.5.18 record it replaces, 47 files and 91 gold pages, no answer missing, no step
 stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
@@ -3123,23 +3123,26 @@ set's folder) each file is converted as a job converts it, under production's be
 settings, with no model: an equation, a picture and a table keep what the file gives, which
 is what the reading order is made of. The folder must be the registered one
 (`gold layout verify`), and the groups are the registry's kinds of document. A held-out set
-is scored only with `--for-release`: once, for a release, and never while the reader is
+(`side` in the registry; a registry with a side that is neither `development` nor `held-out` is refused) is scored only with `--for-release`: once, for a release, and never while the reader is
 being changed. Its record keeps totals and names no page, `--records`, `--from` and
 `--against` are refused for it, and a failing page is not looked at.
 
-`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.18
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.19
 under the production profile with the four layout switches on), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 69 | 32 | 32 (32) | 93 (458) | 36 (46) | 44 (55) | 10 (13) | 0 of 0 | 18 | 7 |
+| paper | 119 | 69 | 32 | 32 (32) | 94 (460) | 36 (46) | 44 (55) | 10 (13) | 0 of 0 | 18 | 7 |
 | selfmade | 40 | 26 | 13 | 4 (8) | 16 (62) | 10 (67) | 13 (30) | 2 (4) | 0 of 5 | 4 | 2 |
 | textbook | 108 | 66 | 36 | 15 (15) | 77 (355) | 43 (269) | 5 (6) | 1 (1) | 0 of 0 | 28 | 0 |
-| all | 267 | 161 | 81 | 51 (55) | 186 (875) | 89 (382) | 62 (91) | 13 (18) | 0 of 5 | 50 | 9 |
+| all | 267 | 161 | 81 | 51 (55) | 187 (877) | 89 (382) | 62 (91) | 13 (18) | 0 of 5 | 50 | 9 |
 
-The element list reads 160 of 267 right and 82 faultless. Against the 0.5.16 record below: 20
+The element list reads 160 of 267 right and 82 faultless. Against the 0.5.18 record the one
+count that moved is the strays, 875 to 877 on three pages: the two pages of
+`ax_cslg_240306367` whose SQL snippets are code blocks of their own since 0.5.19 (one and
+two more) and `ax_econem_240306657` page 1 (one fewer). Against the 0.5.16 record below: 20
 pages made right and none made wrong, broken blocks 99 to 50, cross-joins 27 to 9, strays 985
-to 875, merged places 121 to 91. Cut places rise from 296 to 382 on fewer pages (92 to 89): 83
+to 877, merged places 121 to 91. Cut places rise from 296 to 382 on fewer pages (92 to 89): 83
 of the 86 more are on four pages (`os_introduction_computer_science` pages 7 and 8,
 `os_algebra_and_trigonometry_2e` page 11, `sm_glossary_a` page 1), three of which became
 right; the element list's cut places fall (132 to 125).
@@ -3208,7 +3211,29 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
   `analyze` runs of the two commits (about 70 minutes through the slot), and no change that
   depends on the count is waiting.
 
-`layout-heldout-1` has not been scored.
+**The held-out score.** `layout-heldout-1` was scored for the first time for the 0.5.18
+release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
+four layout switches on, no model):
+
+```bash
+uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
+```
+
+| Kind | Gold pages | Right in the student page | Faultless |
+|---|---|---|---|
+| course handouts | 29 | 26 | 16 |
+| papers | 128 | 85 | 50 |
+| textbooks | 90 | 64 | 34 |
+| all | 247 | 175 | 100 |
+
+175 of 247 is 71%, about 65 to 76 at 95% if pages were independent, which pages of one
+document are not; 11 of 49 documents have every gold page right. Two of the 51 documents are
+longer than a job may be (`too_many_pages`) and are not measured, so 9 gold pages are missing
+from the count. 36 pages read furniture aloud, 57 cut a block and 68 run blocks together. The
+development set of the same kinds reads 161 of 267 right under the same code; the held-out
+figure is not lower, which is what a set of rules fitted too closely to its development pages
+would show. The run had the switches on only: what they gained on these documents is not
+known. No page of the set is named in the record, and none was looked at.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -3550,7 +3575,7 @@ stops matching. A paid recording of the
 answers was owed then (about 1,300 requests) to bring those uploads back into
 the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
 records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
-compare them; the order record was re-made at 0.5.18.
+compare them; the order records were re-made at 0.5.18 and again at 0.5.19.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -3883,6 +3908,29 @@ uv run readablestem eval page-audit --corpus --only s15_charts_figures --rendere
   converted with no model, so what is audited is the layout and the reading order. The
   report goes in that folder (`DIR/page-audit.json`), so a held-out set's rows stay with
   the set and outside the repository.
+- **`--gold-pages`** (with `--gold-dir`): audit only the pages the set's gold marks
+  (`DIR/gold/<id>.json`), so that the verdict can be set against a truth, and a run costs
+  the gold pages and not every page. A file with no gold file is left out and named under
+  `skipped` (`no_gold`). Each file is converted as `eval order --set` converts it, and that
+  one conversion is also scored by the reading-order scorer. The report then holds
+  `against_scorer`: for the page a student is given (`html`) and for what the pipeline holds
+  (`elements`), the gold pages the scorer calls right (its "pages right") and not right, each
+  split by the audit's verdict (pass, flagged, not audited), as counts. Without the flag
+  nothing changes.
+- **`--against REPORT`**: an earlier report of the same set. The command prints, and keeps
+  in the report as `against`, how many pages are in both (matched by document and page),
+  how many have another verdict now (a 3 by 3 table of the earlier verdict by the verdict
+  now), and the earlier run's model, effort and prompt version beside this one's. Reports
+  of different sets, or one made with `--gold-pages` and one without, end with exit code 2.
+- A held-out set (`side` in its registry, `data/gold/layout/<set>.json`; `--registry` names
+  another file) is printed with no document and no page: the Markdown, `against_scorer` and
+  `against` hold counts only, and only the report's `rows`, kept in the set's folder, name
+  pages. A set is printed with its names only when its registry says `development` and the
+  folder is the one that registry registers (the same files and gold, by their hashes): a
+  folder with no registry, with one the command cannot find under the folder's name, or with
+  another set's registry is treated as held out (`cli/layout_gold.held_out`, which
+  `eval order --set` asks too). When a development registry's folder does not verify, a line
+  on stderr says that is why no name is printed.
 - **`--rendered`** also sends the picture of the page's output (needs the browser group).
 - **`--answers FILE`** keeps the answers (`eval/answers.py`); with `--answers-offline`
   nothing is sent and a page whose answer is not in the file is not audited. `--batch`
@@ -4096,7 +4144,8 @@ in a separate worktree):
 | all four on (0.5.18) | 161 | 81 | 20 | 0 |
 
 One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
-`data/eval/order-layout-dev-1.json` is the 0.5.18 one (its table is under `eval order`).
+`data/eval/order-layout-dev-1.json` was the 0.5.18 one at this release; it is re-made at 0.5.19
+since, with the same right and faultless pages (its table is under `eval order`).
 
 **Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
 of 47 uploads, the student page):
@@ -4105,7 +4154,8 @@ of 47 uploads, the student page):
 |---|---|---|
 | the 0.5.10 record kept until now (3 pages apart, answers missing) | 64 | 37 |
 | 0.5.18 with all four off | 71 | 37 |
-| 0.5.18, all four on (`data/eval/order-corpus.json` now) | 83 | 42 |
+| 0.5.18, all four on | 83 | 42 |
+| 0.5.19 (`data/eval/order-corpus.json` now; every count as at 0.5.18) | 83 | 42 |
 
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
@@ -4164,7 +4214,10 @@ equation"), and are part of their boxes' figures now (`LAYOUT_JOIN_PANELS`);
 **What these numbers do not show.** `layout-dev-1`, the corpus and the 21 papers are
 development sets: the rules were written while reading them, so the figures say the release
 does not go backward there, not how often a new document is read right. No held-out set was
-scored for this release. The sizes are small: 161 of 267 is 60%, about 54 to 66 at 95% if
+scored before the release. After it, `layout-heldout-1` was scored once for 0.5.18 (`eval
+order`, "The held-out score"): 175 of 247 gold pages right in the student page. That run had
+the switches on only, so it says how the release reads documents nobody built a rule on, not
+what the switches gained there. The sizes are small: 161 of 267 is 60%, about 54 to 66 at 95% if
 pages were independent, which pages of one document are not; 83 of 91 is about 84 to 96. What
 a model reads from the larger equation boxes was not measured: the replay passing under the
 new recording shows that every answer exists, not that the answers are as good. An

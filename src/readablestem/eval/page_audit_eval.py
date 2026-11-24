@@ -12,7 +12,9 @@ Two kinds of set:
 - the corpus (`eval.corpus`), each upload converted under the production profile with its
   recorded answers, as `eval cost` converts it;
 - a layout gold set's folder (`gold.layout_gold`: `files/<id>.pdf`), each file converted
-  with no model, so what is audited is the layout and the reading order.
+  with no model, so what is audited is the layout and the reading order. With `gold_pages`
+  only the pages the set's gold marks are audited, and the one conversion is also scored
+  by the reading-order scorer, so the verdicts can be set against the pages it calls right.
 
 The report holds codes, ids, boxes, counts and dollars, and no text of any document.
 """
@@ -44,6 +46,9 @@ class Document:
     pdf: bytes = b""
     result: DocumentResult | None = None
     error: str = ""
+    # (a set's gold pages only: the pages to audit, 0-based, and the scorer's rows of them)
+    pages: tuple[int, ...] | None = None
+    order: dict[str, list[dict[str, Any]]] | None = None
 
 
 @dataclass
@@ -53,6 +58,7 @@ class Audited:
     name: str
     verdicts: list[PageVerdict] = field(default_factory=list)
     error: str = ""
+    order: dict[str, list[dict[str, Any]]] | None = None
 
 
 @dataclass
@@ -80,9 +86,16 @@ def corpus_documents(folder: Path, only: Sequence[str] = ()) -> Iterator[Documen
             yield Document(upload.name, *converted)
 
 
-def gold_documents(root: Path, settings: Settings, only: Sequence[str] = ()) -> Iterator[Document]:
+def gold_documents(
+    root: Path, settings: Settings, only: Sequence[str] = (), *, gold_pages: bool = False
+) -> Iterator[Document]:
     """The files of a layout gold set's folder, converted with no model: every element
-    keeps the text the file gives, and no request is sent."""
+    keeps the text the file gives, and no request is sent.
+
+    `gold_pages`: only the pages the set's gold marks are to be audited, and each file is
+    converted as `eval order --set` converts it (`order_report.convert_document`, whatever
+    `settings` say), so that what is audited is what that scorer scored. A file with no gold
+    file is left out, with the code "no_gold"."""
     from readablestem.models.fake import FakeVisionClient
     from readablestem.pipeline import layout, run
 
@@ -90,12 +103,35 @@ def gold_documents(root: Path, settings: Settings, only: Sequence[str] = ()) -> 
         if only and pdf.stem not in only:
             continue
         data = pdf.read_bytes()
+        if gold_pages:
+            yield _scored_document(root, pdf.stem, data)
+            continue
         try:
             output = run.convert_pdf(data, settings=settings, client=FakeVisionClient())
         except layout.LayoutError as exc:
             yield Document(pdf.stem, error=exc.code)
             continue
         yield Document(pdf.stem, data, output.result)
+
+
+def _scored_document(root: Path, name: str, data: bytes) -> Document:
+    """One file of a gold set, converted the way `eval order --set` converts it, and scored
+    by the reading-order scorer: the same conversion is what the audit looks at."""
+    import json
+
+    from readablestem.eval import measure, order_report
+
+    gold_file = root / "gold" / f"{name}.json"
+    if not gold_file.is_file():
+        return Document(name, error="no_gold")
+    gold = json.loads(gold_file.read_text(encoding="utf-8"))
+    output = order_report.convert_document(data)
+    if isinstance(output, str):
+        return Document(name, error=output)
+    pages = tuple(page["page"] - 1 for page in gold["pages"])  # (gold counts pages from 1)
+    return Document(
+        name, data, output.result, pages=pages, order=measure.order_of(gold, data, output.result)
+    )
 
 
 # -------------------------------------------------------------------------------- the run
@@ -138,12 +174,14 @@ def audit_documents(
             run.documents.append(Audited(document.name, error=document.error or "not_a_pdf"))
             continue
         pages = page_audit.pages_of(result)
+        if document.pages is not None:
+            pages = [page for page in pages if page in document.pages]
         if run.stopped is not None:
             late = [
                 PageVerdict(page=page, verdict="not_audited", by="code", reason="cap_reached")
                 for page in pages
             ]
-            run.documents.append(Audited(document.name, late))
+            run.documents.append(Audited(document.name, late, order=document.order))
             continue
         with pymupdf.open(stream=document.pdf, filetype="pdf") as opened:
             done = page_audit.audit(
@@ -155,7 +193,7 @@ def audit_documents(
                 _output_pictures(renderer, result) if renderer is not None else None,
                 pages,
             )
-        run.documents.append(Audited(document.name, done.verdicts))
+        run.documents.append(Audited(document.name, done.verdicts, order=document.order))
         run.stopped = done.stopped
         say(
             f"{document.name}: {len(pages)} pages, {done.count('flagged')} flagged, "
@@ -166,6 +204,51 @@ def audit_documents(
 
 # ----------------------------------------------------------------------------- the report
 
+VERDICTS = ("pass", "flagged", "not_audited")
+
+
+def against_scorer(run: Run) -> dict[str, dict[str, dict[str, int]]]:
+    """For the page a student is given (`html`) and for what the pipeline holds
+    (`elements`): the gold pages the reading-order scorer calls right and not right, each
+    split by the audit's verdict. A gold page with no verdict (a page the output left out)
+    is not audited. Counts only. A document that was not converted has no scorer rows."""
+    table: dict[str, dict[str, Counter[str]]] = {}
+    for document in run.documents:
+        if document.error or document.order is None:
+            continue
+        verdict_of = {v.page: v.verdict for v in document.verdicts}
+        for source, rows in document.order.items():
+            counts = table.setdefault(source, {"right": Counter(), "not_right": Counter()})
+            for row in rows:  # (the scorer counts pages from 1)
+                counts["right" if row["right"] else "not_right"][
+                    verdict_of.get(row["page"] - 1, "not_audited")
+                ] += 1
+    return {
+        source: {kind: {verdict: n[verdict] for verdict in VERDICTS} for kind, n in counts.items()}
+        for source, counts in table.items()
+    }
+
+
+def against(found: dict[str, Any], earlier: dict[str, Any]) -> dict[str, Any]:
+    """This report's verdicts beside an earlier report's of the same set: how many pages are
+    in both, a table of counts of the earlier verdict by the verdict now, and the earlier
+    run's model, effort and prompt. Pages are matched by document and page. Counts only."""
+    before = {(row["document"], row["page"]): row["verdict"] for row in earlier["rows"]}
+    table = {was: dict.fromkeys(VERDICTS, 0) for was in VERDICTS}
+    both = 0
+    for row in found["rows"]:
+        was = before.get((row["document"], row["page"]))
+        if was in table and row["verdict"] in VERDICTS:
+            table[was][row["verdict"]] += 1
+            both += 1
+    return {
+        "pages_in_both": both,
+        "changed": both - sum(table[verdict][verdict] for verdict in VERDICTS),
+        "earlier_verdict_by_verdict_now": table,
+        "earlier": {k: earlier.get(k) for k in ("date", "model", "effort", "prompt_version")},
+        "now": {k: found[k] for k in ("date", "model", "effort", "prompt_version")},
+    }
+
 
 def report(
     run: Run,
@@ -175,14 +258,16 @@ def report(
     date: str,
     client_label: str,
     with_output_picture: bool,
+    gold_pages: bool = False,
 ) -> dict[str, Any]:
-    """What the run found. Content-free."""
+    """What the run found. Content-free. `gold_pages`: the run audited a set's gold pages
+    only, and the report sets the verdicts against the reading-order scorer's."""
     from readablestem.models.prompts import load_prompt
 
     verdicts = [(doc.name, v) for doc in run.documents for v in doc.verdicts]
     asked = [v for _, v in verdicts if v.by == "model"]
     cost = round(sum(v.cost_usd for v in asked), 6)
-    return {
+    found = {
         "task": "page_audit",
         "provenance": run_record.provenance(),
         "date": date,
@@ -221,9 +306,14 @@ def report(
         ],
         "rows": [{"document": name} | v.model_dump(mode="json") for name, v in verdicts],
     }
+    if gold_pages:
+        found["gold_pages"] = True
+        found["against_scorer"] = against_scorer(run)
+    return found
 
 
-def format_markdown(found: dict[str, Any]) -> str:
+def format_markdown(found: dict[str, Any], *, listed: bool = True) -> str:
+    """The report as Markdown. `listed` False (a held-out set) names no document and no page."""
     counts = found["verdicts"]
     lines = [
         f"# Page audit in shadow: {found['set']} ({found['date']})",
@@ -253,13 +343,47 @@ def format_markdown(found: dict[str, Any]) -> str:
     if found["findings"]:
         what = ", ".join(f"{k} {n}" for k, n in found["findings"].items())
         lines.append(f"- findings, by code and severity: {what}")
-    for skipped in found["skipped"]:
-        lines.append(f"- left out: {skipped['document']} ({skipped['reason']})")
+    if listed:
+        for skipped in found["skipped"]:
+            lines.append(f"- left out: {skipped['document']} ({skipped['reason']})")
+    elif found["skipped"]:
+        why = Counter(skipped["reason"] for skipped in found["skipped"])
+        lines.append("- left out: " + ", ".join(f"{k} {n}" for k, n in sorted(why.items())))
     if found["stopped"]:
         lines.append(
             f"- STOPPED: the spend cap ({found['stopped']}) was reached; the pages after it "
             "are not audited"
         )
+    for source, kinds in found.get("against_scorer", {}).items():
+        lines += [
+            "",
+            f"Gold pages by the reading-order scorer and the audit ({source}):",
+            "",
+            "| Scorer | pass | flagged | not audited |",
+            "|---|---|---|---|",
+        ]
+        for kind, n in kinds.items():
+            lines.append(
+                f"| {kind.replace('_', ' ')} | {n['pass']} | {n['flagged']} | {n['not_audited']} |"
+            )
+    if "against" in found:
+        was, now = found["against"]["earlier"], found["against"]["now"]
+        lines += [
+            "",
+            f"Against the earlier report ({was['date']}): {found['against']['pages_in_both']} "
+            f"pages in both, {found['against']['changed']} with another verdict now.",
+            f"Earlier: model {was['model']}, effort {was['effort']}, prompt "
+            f"{was['prompt_version']}. Now: model {now['model']}, effort {now['effort']}, "
+            f"prompt {now['prompt_version']}.",
+            "",
+            "| Earlier verdict, by verdict now | pass | flagged | not audited |",
+            "|---|---|---|---|",
+        ]
+        for verdict, n in found["against"]["earlier_verdict_by_verdict_now"].items():
+            lines.append(
+                f"| {verdict.replace('_', ' ')} | {n['pass']} | {n['flagged']} | "
+                f"{n['not_audited']} |"
+            )
     lines += [
         "",
         "One run's verdicts. They change no output and raise no decision; the bars are "

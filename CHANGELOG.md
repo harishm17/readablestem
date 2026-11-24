@@ -1,5 +1,337 @@
 # Changelog
 
+## Pipeline 0.5.19, render 11 (2026-11-23)
+
+- `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  "Unreleased" entries below down to the 0.5.18 entry (wave 5: faults real documents show; the
+  first of them, the page audit on gold pages only, is an eval tool and changes nothing for a
+  reader).
+  What changes for a reader, one line for each:
+  - Code fonts (O-440): listings set in NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor or Lucida
+    Console are code; a numbered listing is one block; an address, a list of names or the last
+    line of a wrapped paragraph in the code face is not code. A run of a code face inside a
+    formula (a set of strings, a name beside a math letter) stays in the formula: the longer
+    font list had torn 31 formulas on 11 pages of one private upload (review 25), and the same
+    rule mends the formulas 0.5.18 cut at a CMTT operand.
+  - Algorithms (O-442): a step whose words the text layer lists before its number, and formula
+    stacks listed before their numbers, stay in the algorithm's block.
+  - Figures (O-441): a figure of pictures keeps the header labels of the panel it sits on.
+  - Behind a new switch that stays off, no change: `LAYOUT_FIGURE_ART` (art a clip leaves
+    unpainted is no figure over the text; a row a figure's edge cuts through is its label; a
+    hand-drawn figure that typed labels name is a figure, not "handwriting, not converted"). It
+    moved one recorded figure request on each of three corpus uploads; turning it on is owed a
+    re-recording, a pipeline raise, the reading order of two figures on one lecture page,
+    the clip read in the upload probe and the strike and highlight read, and a narrower test
+    for a hand-drawn figure's label. The hand-drawn figure rule was on by itself until the
+    review of this release (review 25): with the switch off it helped no page and took typed
+    words and two numbered displays into a picture on pages with handwriting, dropping the
+    handwriting notice (docs/layout.md "Pen figures").
+  - Equation numbers (O-037, O-391; display grouping, on since 0.5.18): two more shapes of a
+    bracketed number label their display instead of standing as an element of their own. A
+    display takes one number, and a bracketed answer after a line that does not go on
+    ("3x + 2 =      (4)") is no equation number (review 25). A display that ends in a row of
+    dots keeps the number beside it.
+  - One request, one answer (a job's identical requests): two pictures that are the same pixels
+    with the same text around them (the options of an exam question) are asked once and both get
+    that description; before, each was sent and they could differ. The second call is marked
+    `shared` on its `ModelCall` (left out of the JSON otherwise), costs nothing and is not in the
+    job's call count. A refused, timed-out or unreadable first answer is not shared.
+- No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
+  stays as made at 0.5.18; the result's schema is the same.
+- Both reading-order records are re-made at 0.5.19 on a clean tree. The corpus record has
+  every count of the 0.5.18 one (83 of 91 pages right, 42 faultless). `layout-dev-1` has the
+  same right and faultless pages (161 and 81 of 267); its strays go from 875 to 877 on three
+  pages, two of them the pages whose SQL snippets are code blocks now (docs/eval.md).
+- Reviewed five times before its release. Review 29 (`dbf8faa6`): release OK, no blocker;
+  what its fix takes back and the test row it asked for are in the first entry below.
+  Review 28 (`84dbf083`): release OK, no blocker;
+  three cases of a code-face word beside a math letter that read worse than 0.5.18 on made
+  pages, closed by one condition in the first entry below. Review 27 (`d4d497b0`): one
+  blocker, in the fix made for review 26 (a code-face word a word space from a math letter
+  became a formula, on one development page), and one smaller regression; both are in the
+  second entry. Review 26 (`8fe3b940`): no blocker; its two regressions on made pages and its
+  smaller findings are in the third.
+- Review 25 (a680cc80): one blocker and seven smaller findings.
+  The blocker (the hand-drawn figure rule, above) and four more are fixed in the entries
+  below and in this one; the page audit prints a set's document names only when its registry
+  says development; two are limits stated in docs/steps.md (a shared answer needs identical
+  crops; a resumed job shows the cost on the twin that asked first); the panel-label rule has
+  its test.
+
+## Unreleased: a code-face word is reread only when set against a math letter (review 28)
+
+- Review 28 read the fix made for review 27 (`c348d72b`): release OK, no blocker, no page of
+  a real set moved. On pages made for the review a code-face word of two letters or more
+  within one font size of a math letter still read worse than 0.5.18 in three ways, all one
+  shape (rare in the corpus and the development sets; ordinary in computer science notes and
+  Typst documents):
+  - A code face set smaller than the text (Typst's `raw` at 0.8 of the size,
+    `\footnotesize\texttt`) a word space from a math letter was joined to the letter's
+    formula: reread as letters, the small word passed for a script. Since `8fe3b940`.
+  - A display with a code-face name a thick space or a word space from a math letter
+    ("n cost" at `\;`, "a xor b") was a line of prose with its denominator a paragraph of its
+    own. As at `8fe3b940`; `d4d497b0` read these whole, by the rule that made prose into
+    formulas.
+  - A word space under a quarter of the font size (a tight line of a two-column page, a
+    quarter-em space) made one formula of the word and the letter. From review 27's fix.
+- One condition closes the three: a code-face word is reread only when it is set against a
+  math letter, a gap under a tenth of the font size (`shared.TIGHT_GAP`, a quarter before), as
+  a name with a subscript is; at any wider gap the run stays code as a whole, which is what
+  0.5.18 does. A display with such a name is whole (a code word is a prose word only near a
+  code row), the word in a sentence stays in the sentence, and a math letter beside it is a
+  formula of its own ("n bits": the "n" alone).
+- What this takes back (review 29, made pages; never worse than 0.5.18, which joined none):
+  a code-face name as a superscript of a math letter, or set straight after one, is one
+  formula with the letter only when the letter leaves a gap under a tenth of the size. A
+  slanted letter's italic correction puts the gap over that: of 52 letters, 38 keep a
+  superscript name and 42 a name set straight after (not F, M, N, P, T, U, V, W, Y, f among
+  others); a subscript name is kept by all 52. The line cannot be wider: these gaps overlap
+  the shrunk word spaces above. Near a code row, a display with a name a thin space from a
+  letter is cut again, as at `8fe3b940` (inside a limit docs/layout.md states).
+- A row of the existing test holds the kept case (a name with a subscript that touches it, in
+  a sentence, is one formula): without it no test failed with the case switched off, and two
+  pages of one corpus file depend on it.
+- The word-space test of review 27 had a row that held nothing (its code word stood next to
+  "in", not next to a math letter). The test is one sentence at three settings now (a word
+  space, a shrunk word space, a small code face) and the display has a case; the last two
+  settings and the display fail on `84dbf083`.
+- Stated as limits, each on made pages only (docs/layout.md): near a code row a set named by
+  a Greek capital ("Σ = {0, 1}") in a font the list takes for code is a paragraph with inline
+  formulas and not a display; a listing whose variables are in math italic is reread, three
+  of its lines become a display (since `8fe3b940`).
+- Measured, no model, against `8fe3b940` with the four switches on: the 25 private corpus
+  files (1,202 pages), the public PDFs of the repository (120 listed, 119 open; 476 pages),
+  `layout-dev-1` (60 documents, 954 pages) and the 6 development papers with algorithms (251
+  pages) read the same, page for page. Part of 0.5.19, which was not released before it.
+
+## Unreleased: a code-face word a word space from a math letter is no formula (review 27)
+
+- Review 27 read the fixes made for review 26 (`8fe3b940..d4d497b0`) and found two things they
+  made worse, fixed here with a regression test each:
+  - Blocker. The rule for a `\mathtt` name beside a math letter took "beside" as anything
+    within one font size, which is also a word space. A code-face word followed or preceded by
+    a math letter in a sentence ("ends with `return` x", "for each `measure` in M") became an
+    inline formula of letters; one page of a development paper showed it (2504.06207 p13, a
+    step of an algorithm), and so did made pages of ordinary prose. The letters of a name are
+    math letters now only when the name is set against the math letter: a gap under a quarter
+    of the font size (`shared.TIGHT_GAP`; a tenth since review 28, above, because a word space
+    can be under a quarter). The displays review 26 found ("out" with a subscript, "n cost")
+    still read whole.
+  - Should fix. "Among code rows" was `_Row.code_run`, which is within three lines of one row
+    that is mostly code face. Displayed sets with members in a code face ("L2 = {00, 01, 10,
+    11}") under a line with code words were not reread and went into a code block with that
+    line (made pages only). Such a row is left unread now only when it also has no Latin math
+    letter of another face, as a line of a listing has none.
+- What this takes back: near code rows two reads that were better at `8fe3b940` than at 0.5.18
+  are the 0.5.18 read again (on a made page: two lines of assignments with math signs,
+  "s ← x ⊕ y ⊕ c", are a paragraph with one-sign formulas and not one display). Not worse than
+  0.5.18.
+- A known unevenness, on a made page only: a code-face name with a subscript in a math face
+  ("cost_i") is an inline formula in a sentence and plain text in a row that is mostly code
+  face. No text is lost either way.
+- `eval order --set` refuses a registry whose side is neither `development` nor `held-out`
+  before it converts anything; with `--for-release` it used to convert and score the set and
+  then stop with a traceback, nothing written. `eval page-audit` says on stderr why names are
+  missing when a development set's folder is not the one its registry registers.
+- Measured, no model, against `8fe3b940` with the four switches on: the 25 private corpus
+  files (1,202 pages), the 120 public PDFs of the repository (476 pages), `layout-dev-1` (60
+  documents, 954 pages) and the 6 development papers with algorithms (251 pages) read the same,
+  page for page (one of the 120 public PDFs does not open, under any version). Each new case
+  fails on `d4d497b0`. Part of 0.5.19, which was not released before it.
+
+## Unreleased: a code-face name beside a math letter, a listing line without a word (review 26)
+
+- Review 26 read the release again after review 25's fixes (`8fe3b940`): no blocker, all eight
+  findings of review 25 closed, two things made worse than 0.5.18 on pages made for the review
+  (none on a corpus or development page), fixed here. Review 27 then found the first fix too
+  wide and the second too wide (the entry above narrows both):
+  - A `\mathtt` name beside a math letter ("out" with a subscript, "n cost" with a thin
+    space) was read letter by letter as a word of prose, so its display became a line of text
+    and the denominator under it a paragraph of its own ("Pr[out_A = 1] ≥ 2" and a stray "3").
+    The letters of such a name are math letters now (`shared._code_beside_maths`). The names
+    in prose ("out_A") are inline formulas.
+  - A line of a listing with no word of two letters and an arrow from a math font
+    ("a[i] ← a[j] ⊕ t") was reread as maths and cut out of its code block as a display. A row
+    that is mostly code face, near a code row (`_Row.code_run`: within three lines of one) and
+    without a Latin math letter of another face is not reread.
+- `eval page-audit` and `eval order --set` ask one function whether a set is held out
+  (`cli/layout_gold.held_out`): it is, unless its registry says development, and for the audit
+  unless the folder is also the one that registry registers.
+- Stated as limits, each seen on made pages only (docs/layout.md): a display right under a
+  line of code with a `\mathtt` name still loses its denominator; stacked fill-in lines with a
+  mark each still give marks away as equation numbers (0.5.18 was not right there either);
+  inline formulas cut on one side where code-face text and math signs mix in prose (no text
+  lost).
+- Measured, no model: the 25 private corpus files (1,202 pages) read the same before and
+  after this change, page for page. Each of the two regression cases and the audit case fails
+  on `8fe3b940`. Part of 0.5.19, which was not released before it.
+
+## Unreleased: one number for a display (review 25, finding 5)
+
+- A bracketed number after a line that ends in "+" or a relation (display grouping, on) is
+  that display's number only when it is level with the line, the line has no number yet, and
+  something follows the line: a row right under it, or rows between it and the number (the
+  cases of a brace). A worksheet line "3x + 2 =      (4)" with nothing after it keeps its "(4)"
+  as an element of its own, as it did before 0.5.19; on one private page a lone "=" had taken
+  two numbers, one from the line above, and takes none. The real numbers of 0.5.19 stay
+  attached (a cases display, two equations numbered one under the other).
+- A row of three centered dots that ends a display ("x + x^2 + x^3 + ...") is not an operator
+  that goes on, so the number beside it is the display's under the regular rule.
+- Layout only, and no recorded request moves. Against the 0.5.19 branch before this change a
+  number that is no longer a label is an element of its own again and is asked about, as at
+  0.5.18 (review 26, on one made page of numbers: 14 requests at 0.5.18, 10 before this
+  change, 12 now, all 12 among the 14). The dots rule is in the regular number rule, which
+  runs with display grouping off as well. Part of 0.5.19, which was not released before it.
+
+## Unreleased: a code-face word inside a formula (review 25, findings 2 and 3)
+
+- Finding 3: a formula with an operand in a typewriter face (a set of strings, "{101}", a name)
+  was cut at it, because a character of a code face is never math. In `shared._code_beside_maths`
+  a run of code-face characters is read as it would be in any face when it is inside a formula:
+  it touches a math letter of another face, stands between two math characters or operators of
+  another face, or comes next to one that has an operand on its other side. A run beside nothing
+  of the kind, a row that is mostly code face with code words (a listing), and a word of two
+  letters or more that is not set against a math letter stay code, so what the 0.5.19 entry for code fonts
+  (O-440) fixed is unchanged. Measured on the 25 private corpus uploads: 10 pages of one upload,
+  fonts NimbusMonL and CourierNew, had their formulas torn since 0.5.19; 30 of the 31 broken
+  formulas are whole now and the 247 formulas of those pages read as in 0.5.18 but one (the
+  builder's count; review 26 counted all 247 as in 0.5.18, and 215 before the change).
+- Finding 2: a word of the code face counts as a prose word only in a row within three lines of a
+  row that is mostly code face (`inline_runs._mark_code_runs`), as in an algorithm. A display with
+  one `\mathtt` name and no code rows near it ("Pr[out = 1] ≥ 2/3") is no longer made text, so its
+  denominator is no longer a paragraph of its own. Algorithm pages (2504.06207 p13, 2405.15050)
+  read as before.
+- The 0.5.19 entry says "none worse" of the corpus differences. Of the 16 pages that 0.5.19 changed
+  on 2 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
+  inline read). After this change 7 pages of 3 of the 25 files differ from the 0.5.18 read
+  (counted again on the release head with the four switches on; the entry first said 6 of 2,
+  review 26 counted 7 of 3): six are the intended changes of 0.5.19, the listings and tails,
+  and on one a two-letter paragraph in a code face at the foot of a page is a line of code
+  now. None is a formula made worse, so "none worse" holds for the formulas: 11 pages worse
+  before, 0 after.
+- Part of 0.5.19, which was not released before it, so no document was stored with the torn
+  read. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no prompt changes, and
+  no recorded request moves (the replayed documents of the 73 uploads are identical to the base
+  run).
+- Measured with the 0.5.19 switches on, no model: `full` of 73 uploads, 0 differences; `analyze`
+  of the 332 files (996 results), 3 differences, all of `ax_cslg_240306367` (p8: the attribute
+  set "{A, C, E, F}" is an inline formula again, as in 0.5.18); the development box score 9,198
+  whole of 11,258 formulas (base 9,197), no paper worse; `eval order --set layout-dev-1` 161 of
+  267 pages right, 81 faultless, as the base.
+
+## Unreleased: the page audit on gold pages only
+
+- `eval page-audit --gold-dir DIR --gold-pages` audits only the pages a layout gold set's gold
+  marks, converts each file as `eval order --set` does, and reports `against_scorer`: the
+  gold pages the reading-order scorer calls right and not right, each by the audit's verdict
+  (counts only). `--against REPORT` sets a run beside an earlier one of the same set.
+- A held-out set's printed report names no document and no page, and a set is held out
+  unless its registry says development (review 25: a folder with no registry was printed
+  with its names) and the folder is the one that registry registers (review 26: a held-out
+  folder given a development set's registry, or its name, was named). `eval order --set`
+  asks the same function (`cli/layout_gold.held_out`) and refuses a registry with any other
+  word for its side (review 27). An eval tool only: no reader change, no version raise.
+- Why: as built, the audit of the held-out layout set asked about every page of every
+  document (1,015 pages) where the gold marks 247, so the paid shadow run the plan caps at
+  $3.00 could not be afforded, and its verdicts could not be set against any truth.
+
+## Unreleased: code fonts the list did not name (O-440)
+
+- `glyphs._MONO_FONT` names NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor and Lucida Console as
+  monospaced. A numbered listing, an algorithm or an inline identifier set in them was read as
+  prose. The names are those counted on the public files and the corpus (docs/layout.md, "Code
+  fonts"); the font list matches no other name there.
+- Code rules (`layout/blocks.py`): a block of monospaced lines that are only addresses or a list
+  of names is not code, nor is a wrapped paragraph's last line in the code face, nor a numbered
+  line without a code line in its block. A numbered listing is one block, its blank lines
+  numbered too (`ax_csro_240306420`: 5 listings, 7 blocks, where each line was a paragraph). The
+  `code_block` notice leaves out addresses and name lists. A word of the code face counts as a
+  prose word in `_classify_row` only, so an algorithm in NimbusMonL stays one algorithm block
+  (2504.06207 p4 and 2405.15050 p4 read as builder 04 left them).
+- Corpus (against 55917ea2): `analyze` 996 results, 33 differ (11 files): 6 are builder 04's
+  (2504.06207, 2405.15050), 27 this change (9 files), each read, better or cosmetic, none worse (the private corpus was
+  not in that read: see "a code-face word inside a formula" above).
+  `full`: 73 uploads, 2 differ from a run of 55917ea2 made for the purpose (`r18_arxiv_opt`,
+  cosmetic; `w_slides_60001_lec1`, better); equation, figure and table parts equal: no recorded
+  request moves. The shared baseline `full.json` is older than the rewrite of the kept-out
+  answers and differs from a fresh run of 55917ea2 on 9 uploads (Word files) this change does not touch.
+- Tests: two cases in `tests/test_structure.py`.
+- `PIPELINE_VERSION` (0.5.18) is owed a raise for the files that carry those fonts or listings
+  (layouts cached under the old version read their listings as prose); not made here.
+  `RENDER_VERSION` is not owed.
+
+## Unreleased: algorithms whose steps and numbers the text layer lists apart (O-442); the 'ti' ligature of one lecture measured (O-047)
+
+- Algorithms (O-442): two more shapes of a numbered algorithm are one block (`layout/blocks.py`),
+  each read on the pages that show it and on no other page looked at:
+  - A step whose words cross the gutter of a two-column page, listed before its number
+    (2504.06207 p4): the long steps of a full-width algorithm are spanning rows and the scan
+    stopped at the first; they now join when the number alone follows them on their baseline.
+  - A stack of formula steps listed before their numbers (2405.15050 p4): the numbers go ahead of
+    the formulas on their baseline for the scan only; the page's order is unchanged.
+  - Counted and not built, no second page shows them: a numbered tail at the top of the next
+    page, a heading taken into the last line, a `for ...:` line over an equation, an opener that
+    wraps flush, a one-line block, the boxed "TABLE III" and the garbled math of step 8 of
+    ax_csro_240306420 p9 (docs/layout.md, "Algorithms, wave 5").
+  - The corpus hash (`hashrun.py analyze`, 996 runs) differs on those two files only (3 modes
+    each): the steps join their block, and the formulas of the joined steps are read as the
+    formulas of any step, more and smaller equation items there (2405.15050 p4: six in place of
+    one). `hashrun.py full`: 73 compared, 0 differences, so no recorded request stops matching.
+- 'ti' read as 'A' (O-047, `w_slides_60001_lec10`): measured, not built. The file's Calibri
+  subsets are a simple TrueType font with no /Encoding, a ToUnicode with gaps and glyphs with no
+  names (no `post` or `GSUB` table). The codes are per subset ('A' is "ti", 'G' "tti", 'L' "tt" in
+  this file only), so no table keyed on the font name is exact. 1 public file of about 332 and 0
+  of 25 private files; a width rule would read 'L' as "ft".
+## Unreleased: art that a clip hides is no figure (O-441)
+
+- A PDF that carries a figure's art on every page clips each page to its own part and leaves the
+  rest in the page's drawings, painted nowhere. Layout read that art as painted: a figure box
+  over the text beside it (arXiv 2407.20815 pages 2 and 4, 2401.11209 page 2, 2504.03499 page 3,
+  ax_astrophga_240306409 page 11, where three lines of a paragraph were in no element), and ink from it that made a
+  typed page look like handwriting. `page_type.page_drawings` reads the page's clips and gives a
+  drawing wholly outside its clip opacity 0, which every reader of paint already leaves out
+  (`pipeline/layout/document.py`, the read of a page). 15 public files and 34 pages are
+  affected, 4 of 25 corpus files; see docs/layout.md, "Figures". This part and the rule for a
+  row cut by a drawing's edge (below) are behind the new switch `LAYOUT_FIGURE_ART`
+  (`layout.analyze(figure_art=True)`), off in code and in the production profile: in the replay
+  of the 0.5.18 recording they moved one figure's request on each of w_exam_5111,
+  w_slides_60001_lec10 and w_lecture_5111, and a request that moves is behind a switch that is
+  off. With it off the output of all 73 corpus uploads is that of 5d081fcc; turning it on comes
+  with a re-recording and a pipeline raise (docs/layout.md, "Figures").
+- Two pages that the clip fix turned into mixed ink would have lost their figures: 2407.20815
+  pages 2 and 4 (a hand-drawn sphere and world lines, then "handwriting, not converted", the
+  sphere with its top cut off). A handwriting region that a typed label of the page names is a
+  figure again, with its whole extent and labels (`page._pen_figures`; behind the same switch
+  since review 25, see the 0.5.19 entry).
+- Figures of pictures alone on a filled panel claim the panel's header labels
+  (`ax_physicsoptics` pages 34 to 36, counted from 0), and a row cut by a drawing's edge belongs to it (2407.09859
+  page 3), so no figure loses a label the page paints. The cut-row rule is behind
+  `LAYOUT_FIGURE_ART` and takes no list item and no line of a column of text (a slide's bullet
+  under a picture's top, a display equation beside a figure whose box runs into its column).
+
+## Unreleased: equation numbers left after wave 4 (`LAYOUT_DISPLAY_GROUPING`; O-037, O-391, O-412, O-416)
+
+- With the display grouping switch on, two more equation numbers label their display and are no
+  element of their own: a bracketed number set three font sizes or more right of a row that ends
+  in "+" or a relation ("(D4)", "(D9)" in 2412.18448; `display._trailing_number`), and a bracketed
+  number on a row of its own right above its display at the display's left edge ("(10.20)" in
+  2412.12319; `display._line_below_number`). A label is outside the equation's crop and text, so no
+  crop moves. Off, the output is what it was.
+- Measured: box score of the 21 development papers with the four switches on, whole 9,195 of 11,258
+  before and after (12,012 predicted boxes, 12,008 after: four number boxes gone). Corpus hashes
+  against 55917ea2: `analyze` of 996 results, 4 differ in 3 files, each read ("(21)" in
+  ax_eesssp_240306423, a number beside a cases piece, now a label; "(10.20)" in 2412.12319;
+  "(10)" in ax_eesssp_240306460, no longer glued into a paragraph that spans the column, the
+  display now holds "(10) (11)", its two equations' numbers); `full` of 73 uploads, 0 differences
+  from an unchanged tree run the same day, so no recorded request moves. No raise of
+  `PIPELINE_VERSION` is owed while the switch is off; it is on in production, so a raise is
+  owed with the next release (results of these files change).
+- Counted and not built: the other loose numbers are one case each (docs/layout.md, "Loose
+  equation numbers"). Inline boxes (O-412): of 289 inline cuts 75 leave one relation outside the
+  box, and the ones read are formulas that wrap with the "=" ending the row; no rule makes them
+  better than "extra". Raised digits (O-416): already answered, see the wave 4 entry (every
+  flat raised group has its notice, none silent).
+
 ## Pipeline 0.5.18, render 11 (2026-11-23): four layout switches on
 
 - The production profile turns on `REGION_TREE`, `LAYOUT_INLINE_JOINS`,

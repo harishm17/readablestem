@@ -236,3 +236,63 @@ def test_the_shadow_run_writes_a_verdict_for_every_page_and_no_text_of_the_docum
     ]
     assert "velocity" not in out.read_text(encoding="utf-8")
     assert "velocity" not in capsys.readouterr().out
+
+
+def test_the_audit_of_a_gold_sets_gold_pages_is_set_against_the_scorer_and_an_earlier_report(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+):
+    from readablestem.eval import corpus
+    from readablestem.gold import layout_gold
+
+    entry = corpus.load_manifest()["s01_newsletter_3col"]
+    root = tmp_path / "set"
+    (root / "files").mkdir(parents=True)
+    (root / "gold").mkdir()
+    with pymupdf.open(stream=corpus.document(entry), filetype="pdf") as made:
+        made.new_page().insert_text((72, 100), PRINTED[1], fontsize=12)  # a page no gold marks
+        made.save(root / "files" / "news.pdf")
+    (root / "files" / "loose.pdf").write_bytes((root / "files" / "news.pdf").read_bytes())
+    gold = corpus.load_gold(entry) | {"id": "news", "kind": "made here", "source": "a test"}
+    (root / "gold" / "news.json").write_text(json.dumps(gold))  # (page 1 only)
+
+    def run(*args: str, name: str = "report") -> tuple[int, dict]:
+        out = tmp_path / f"{name}.json"
+        code = main(
+            ["eval", "page-audit", "--gold-dir", str(root), "--fake", *args, "--out", str(out)]
+        )
+        return code, json.loads(out.read_text(encoding="utf-8")) if out.is_file() else {}
+
+    assert run(name="all")[1]["pages"] == 4  # without the flag: every page of both files
+
+    code, first = run("--gold-pages", name="first")
+    assert code == 0
+    assert [(row["document"], row["page"]) for row in first["rows"]] == [("news", 0)]
+    assert first["skipped"] == [{"document": "loose", "reason": "no_gold"}]
+    for counts in first["against_scorer"].values():  # (the one gold page, in one of the rows)
+        assert sum(sum(by_verdict.values()) for by_verdict in counts.values()) == 1
+        assert counts["right"]["not_audited"] + counts["not_right"]["not_audited"] == 1
+
+    code, again = run("--gold-pages", "--against", str(tmp_path / "first.json"), name="again")
+    assert code == 0 and again["against"]["pages_in_both"] == 1 and again["against"]["changed"] == 0
+    assert again["against"]["earlier"]["model"] == again["against"]["now"]["model"]
+    # (the pages of the two reports are not the same pages)
+    assert run("--against", str(tmp_path / "first.json"))[0] == 2
+
+    # A held-out set's printed report names no document and no page; its rows are kept. A
+    # set with no registry is taken as held out; only one its registry calls development is
+    # printed with its names, and only when the registry is this folder's.
+    registry = tmp_path / "set.json"
+    cases = ((None, True, False), ("held-out", True, False), ("development", True, True),
+             ("development", False, False))  # fmt: skip
+    for side, of_this_folder, named in cases:
+        if side is not None:
+            listed = layout_gold.registry_of(root, "set", "a test", side)
+            if not of_this_folder:
+                listed["documents"][0]["pdf_sha256"] = "0" * 64
+            registry.write_text(json.dumps(listed))
+        capsys.readouterr()
+        code, kept = run("--gold-pages", "--registry", str(registry), name="held")
+        shown = capsys.readouterr().out
+        assert code == 0 and ("news" in shown) is named
+        assert named or "loose" not in shown
+        assert [row["document"] for row in kept["rows"]] == ["news"]

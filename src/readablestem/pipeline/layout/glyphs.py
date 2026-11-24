@@ -94,8 +94,15 @@ _REGULAR_FACE = re.compile(
 )
 
 
-# "MonotypeCorsiva" and "MonotypeSorts" are named for their foundry: neither is fixed-pitch
-_MONO_FONT = re.compile(r"mono(?!type)|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
+# "MonotypeCorsiva" and "MonotypeSorts" are named for their foundry: neither is fixed-pitch.
+# Names a real document sets code in without "mono" in them: NimbusMonL (the Courier clone of
+# the Times-Nimbus LaTeX stack), CMITT (the italic typewriter), t1xtt and txtt (txfonts),
+# TeXGyreCursor and Lucida Console.
+_MONO_FONT = re.compile(
+    r"mono(?!type)|nimbusmon|courier|consolas|menlo|inconsolata|lucidaconsole|texgyrecursor|"
+    r"cmi?tt|sftt|t1?xtt",
+    re.IGNORECASE,
+)
 
 # TeX fonts whose letters are a style the text layer drops: MSBM's R is \mathbb{R}, the
 # reals, but its text layer says "R". (pattern, style, capitals only): MSBM, bbm and
@@ -378,9 +385,9 @@ def _regular_letters(chars: Iterable[_Char]) -> str | None:
     return "".join(letters) or None
 
 
-def _char_class(ch: _Char) -> str:
+def _char_class(ch: _Char, *, code: bool = True) -> str:
     """W space, C code (monospaced), M maths, D digit, O operator, B bracket, L letter,
-    P other."""
+    P other. `code=False` reads a monospaced character as it would be in any other face."""
     c = ch.c
     if ch.blank:
         return "W"
@@ -388,7 +395,7 @@ def _char_class(ch: _Char) -> str:
         return "P"
     if ch.math:
         return "M"
-    if ch.mono:
+    if ch.mono and code:
         return "C"  # code listings are full of "x = 5"; never maths
     if c.isdigit() or c in _SCRIPT_DIGITS:
         return "D"

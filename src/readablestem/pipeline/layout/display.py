@@ -44,6 +44,7 @@ from readablestem.pipeline.parse import EQUATION_THRESHOLD
 
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
+ELLIPSIS_DOTS = 3  # centered dots in a row that make an ellipsis, not a multiplication sign
 TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table
 MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
 
@@ -118,6 +119,13 @@ NUMBERED_INDENT = 1.5  # x font size: how far a display stands in from its colum
 NUMBERED_FAR_GAP = 4.0  # x font size: the space between the line and a number set off from it
 NUMBERED_FAR_SHARE = 0.35
 NUMBERED_FAR_INDENT = 1.0
+# `LAYOUT_DISPLAY_GROUPING`: a bracketed number this far (x font size) right of a line that ends in
+# "+" or a relation is the display's number, not the line's right-hand side ("x = (2)" is never
+# set so far off): the first row of a display set in several rows, its number level with it.
+NUMBERED_TRAILING_GAP = 3.0
+TRAILING_ROW_GAP = 1.5  # x font size: the most blank between that row and the display's next one
+# `LAYOUT_DISPLAY_GROUPING`: a number on a row of its own above the display, at its left edge.
+NUMBER_ABOVE_GAP = 1.0  # x font size: the most blank between the number's row and the display
 
 
 def _promote_numbered_lines(rows: list[_Row], *, document: _Document) -> None:
@@ -655,6 +663,20 @@ class _Line:
         return self.ink[0].c in _CONTINUATION_SIGNS
 
     @cached_property
+    def goes_on_after_ink(self) -> bool:
+        """Ends in a relation or operator that the next row takes up. Not the row of dots that
+        ends a series ("x + x^2 + x^3 + ..."): they are set as multiplication signs."""
+        ink = self.ink
+        if ink[-1].c not in _CONTINUATION_SIGNS:
+            return False
+        dots = 0
+        for c in reversed(ink):
+            if c.c != "\u22c5":
+                break
+            dots += 1
+        return dots < ELLIPSIS_DOTS
+
+    @cached_property
     def relation_x(self) -> float | None:
         return min((c.x0 for c in self.relations), default=None)
 
@@ -800,8 +822,19 @@ def _equation_regions(
             for line in lines
             if _number_beside(label, line.box, line.size, far=label.far_number)
             and not (label.far_number and _level_with_numbered(line, lines))
-            and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+            and not line.goes_on_after_ink  # "x =   2.4": its right-hand side
         ]
+        if not beside and document.grouping:
+            # only a row that goes on stands beside it: the first row of a display in several,
+            # level with its number, with no number yet, and with something after it
+            beside = [
+                line
+                for line in lines
+                if not line.labels
+                and _number_beside(label, line.box, line.size)
+                and _trailing_number(label, line)
+                and _goes_on(label, line, lines, rows)
+            ]
         # Another column's maths only when the number's own column has no content beside it.
         own_column = [ln for ln in beside if ln.rows[0].column == label.column]
         if not own_column and not _column_content_near(label, rows):
@@ -816,6 +849,8 @@ def _equation_regions(
             label.kind, label.far_number = "text", False
         elif under := _line_over_number(label, lines):
             under.labels.append(label)
+        elif document.grouping and (below := _line_below_number(label, lines)):
+            below.labels.append(label)
         else:
             lines.append(_Line([label], []))  # a number inside the maths, not beside it
     return _stack_lines(lines, document=document)
@@ -832,6 +867,63 @@ def _line_over_number(label: _Row, lines: list[_Line]) -> _Line | None:
         and _number_under(label, line.box, max(label.size, line.size))
     ]
     return min(over, key=lambda ln: label.y0 - ln.box[3]) if over else None
+
+
+def _trailing_number(label: _Row, line: _Line) -> bool:
+    """Is `label`, level with a line that ends in a sign that goes on, a bracketed number set
+    `NUMBERED_TRAILING_GAP` font sizes or more to its right (`LAYOUT_DISPLAY_GROUPING`)?"""
+    return bool(EQUATION_NUMBER.match(label.clean)) and label.x0 - line.box[
+        2
+    ] >= NUMBERED_TRAILING_GAP * max(label.size, line.size)
+
+
+def _goes_on(label: _Row, line: _Line, lines: list[_Line], rows: list[_Row]) -> bool:
+    """Does the display go on after `line`, so that the number level with it is the display's:
+    a line right under it (at most `TRAILING_ROW_GAP` font sizes down, over part of its width),
+    or rows between the line and the number (the cases of a brace)? A bracketed number after
+    "3x + 2 =" with nothing under it or beside it is an answer or a mark of a worksheet."""
+    size = max(label.size, line.size)
+    if any(
+        other is not line
+        and other.rows[0].column == line.rows[0].column
+        and 0 < other.box[1] - line.box[3] <= TRAILING_ROW_GAP * size
+        and other.box[0] <= line.box[2]
+        and other.box[2] >= line.box[0]
+        for other in lines
+    ):
+        return True
+    own = {id(r) for r in line.rows}
+    for row in rows:
+        if id(row) in own or row is label or row.column != line.rows[0].column:
+            continue
+        shared = min(row.y1, line.box[3]) - max(row.y0, line.box[1])
+        if (
+            line.box[2] - 1 <= row.x0
+            and row.x1 <= label.x0 + 1
+            and shared > 0.25 * min(row.y1 - row.y0, line.box[3] - line.box[1])
+        ):
+            return True
+    return False
+
+
+def _line_below_number(label: _Row, lines: list[_Line]) -> _Line | None:
+    """The line whose number `label` is, when it is set on a row of its own right above the
+    display at the display's left edge ("(10.18)" over its equation; `LAYOUT_DISPLAY_GROUPING`):
+    the nearest line with no number yet that starts under it, within `NUMBER_ABOVE_GAP` font
+    sizes of blank, and that the number does not stand beyond."""
+    size = max(label.size, 1.0)
+    below = [
+        line
+        for line in lines
+        if line.rows[0].column == label.column
+        and 0 <= line.box[1] - label.y1 <= NUMBER_ABOVE_GAP * size
+        and label.x0 <= line.box[2]
+    ]
+    if not below or any(line.labels for line in below):
+        return None
+    if abs(label.x0 - min(line.box[0] for line in below)) > size:
+        return None
+    return min(below, key=lambda ln: (ln.box[1], ln.box[0]))
 
 
 def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:

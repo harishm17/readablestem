@@ -329,7 +329,9 @@ def test_budget_exhaustion_stops_the_rest_and_still_assembles(fake):
 
 
 def test_calls_made_before_a_refusal_are_kept(monkeypatch):
-    FakePipeline(calls_per_step=2).install(monkeypatch)  # cheap call, then escalation
+    # the cheap model's call, then the escalation to the main model (a different request)
+    cheap, main = settings().cheap_model, settings().main_model
+    FakePipeline(calls_per_step=2, step_models=(cheap, main)).install(monkeypatch)
     output = convert_pdf(
         b"%PDF", settings=settings(), client=fake_client(budget(max_calls=3)), concurrency=1
     )
@@ -559,3 +561,64 @@ def test_list_items_are_context_for_a_display_equation_between_them():
     assert run.context_texts(elements)["p1-e2"] == (
         "Solution: the average velocity is\n[this equation]\nDiscussion: the answer is positive."
     )
+
+
+# ------------------------------------------------------------- identical requests
+
+
+def twin_figures(
+    monkeypatch, answers: list[dict | None], *, first_is_late: bool = False
+) -> tuple[FakeVisionClient, PipelineOutput]:
+    """Two figures that are the same picture with the same text around them, on a client that
+    answers a different thing each time it is asked. `first_is_late`: the first figure's step
+    is slower to ask, so the second asks first."""
+    elements = [
+        el("p1-e0", Kind.FIGURE, 0, 0, caption="Option A"),
+        el("p1-e1", Kind.FIGURE, 0, 1, caption="Option A"),
+    ]
+    pipeline = FakePipeline(layout=Layout(elements=elements, page_count=1, pages=[0], lang="en"))
+    pipeline.install(monkeypatch)
+    monkeypatch.setattr(layout, "crop", lambda pdf, element, **kw: PNG_SIGNATURE + b"same")
+    if first_is_late:
+        describe = pipeline.describe
+
+        def slow_first(element, png, **kw):
+            if element.id == "p1-e0":
+                time.sleep(0.3)
+            return describe(element, png, **kw)
+
+        monkeypatch.setattr(figure_step, "describe", slow_first)
+    asked = iter(answers)
+    client = FakeVisionClient(responders={"figure": lambda request: next(asked)})
+    output = convert_pdf(
+        b"%PDF", settings=settings(), client=client, concurrency=2 if first_is_late else 1
+    )
+    return client, output
+
+
+@pytest.mark.parametrize("first_is_late", [False, True])
+def test_one_job_asks_an_identical_request_once(monkeypatch, first_is_late):
+    client, output = twin_figures(
+        monkeypatch,
+        [{"alt": "A cart.", "confidence": 0.9}, {"alt": "A ball.", "confidence": 0.9}],
+        first_is_late=first_is_late,
+    )
+    fixes = fixes_by_id(output)
+    assert len(client.requests) == 1
+    assert fixes["p1-e0"].figure.alt == fixes["p1-e1"].figure.alt
+    # the first figure in reading order has the call, whichever asked first
+    asked, shared = fixes["p1-e0"].calls[0], fixes["p1-e1"].calls[0]
+    assert asked.cost_usd > 0 and not asked.shared
+    assert shared.cost_usd == 0 and shared.input_tokens == 0 and shared.shared
+    assert output.result.stats.cost_usd == asked.cost_usd
+    assert output.result.stats.model_calls == 1
+    assert [c.step for c in output.facts.calls] == ["figure"]
+
+
+def test_a_failed_first_request_is_not_given_to_the_one_that_waited(monkeypatch):
+    client, output = twin_figures(monkeypatch, [None, {"alt": "A ball.", "confidence": 0.9}])
+    fixes = fixes_by_id(output)
+    assert len(client.requests) == 2
+    assert fixes["p1-e0"].status is not Status.ACCEPTED
+    assert fixes["p1-e1"].figure.alt == "A ball."
+    assert output.result.stats.model_calls == 2

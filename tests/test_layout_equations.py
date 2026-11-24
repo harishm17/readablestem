@@ -14,6 +14,8 @@ Equation numbers now go to `Element.equation_label` and stay out of bbox and tex
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pymupdf
 import pytest
 
@@ -257,6 +259,54 @@ def test_a_number_set_far_from_a_line_with_words_numbers_it_when_display_groupin
     assert "(106)" not in (equation.text or "")
 
 
+def number_level_with_a_row_that_goes_on(page):
+    """The first row of a display set in two rows ends in "+", its number level with it, at the
+    right margin ("(D4)" in 2412.18448): the number is not the row's right-hand side."""
+    prose(page, 100, "The two terms of the drift are collected in the next display, which is")
+    page.insert_text((200, 140), "a = b + c + d +", fontsize=12, fontname="Times-Italic")
+    page.insert_text((520, 140), "(106)", fontsize=12)
+    page.insert_text((230, 162), "e + f + g", fontsize=12, fontname="Times-Italic")
+
+
+def number_above_the_display_at_its_left_edge(page):
+    """A number on a row of its own right above its display, at the display's left edge
+    ("(10.20)" in 2412.12319)."""
+    prose(page, 100, "The two terms of the drift are collected in the next display, which is")
+    page.insert_text((200, 126), "(106)", fontsize=12)
+    page.insert_text((200, 142), "a = b + c + d + e + f + g", fontsize=12, fontname="Times-Italic")
+
+
+@pytest.mark.parametrize(
+    "fill", [number_level_with_a_row_that_goes_on, number_above_the_display_at_its_left_edge]
+)
+def test_a_number_set_off_from_a_display_numbers_it_when_display_grouping_is_on(fill):
+    def page_with(page):
+        fill(page)
+        prose(page, 200, "and the second one in the same way, as the text goes on and on.")
+
+    pdf = one_page(page_with)
+    assert not any(e.equation_label for e in analyze(pdf).elements)  # the switch is off
+    elements = analyze(pdf, display_grouping=True).elements
+    [equation] = [e for e in equations(elements) if e.equation_label]
+    assert equation.display == "block"
+    assert equation.equation_label == "(106)"
+    assert not any("(106)" in (e.text or "") for e in elements)  # no element of its own
+
+
+def test_a_bracketed_answer_after_a_line_that_does_not_go_on_is_not_an_equation_number():
+    """A worksheet line "3x + 2 =      (4)" ends in a relation and has nothing under it: the
+    "(4)" is the answer or a mark, so it stays out of the equation's label."""
+
+    def fill(page):
+        prose(page, 100, "Fill in the missing value and give the number of the rule you used.")
+        page.insert_text((200, 140), "3x + 2 =", fontsize=12, fontname="Times-Italic")
+        page.insert_text((400, 140), "(4)", fontsize=12)
+        prose(page, 200, "and the next line goes on as the text of the sheet goes on and on.")
+
+    elements = analyze(one_page(fill), display_grouping=True).elements
+    assert not any(e.equation_label for e in elements)
+
+
 # ---------------------------------------------------------------- rows of a table
 
 
@@ -322,3 +372,148 @@ def test_a_display_fraction_over_a_close_equation_is_not_a_table_row():
 
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements].count(Kind.EQUATION) == 2
+
+
+DEJAVU = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+
+
+def formula_with_a_set_in_a_code_face(page):
+    """ "x in {101} union y" in a line of words: the set is the one part of the formula in a
+    typewriter face, as TeX's \\mathtt prints it."""
+    maths = {"fontfile": DEJAVU, "fontname": "dj", "fontsize": 11}
+    page.insert_text((72, 100), "The strings", fontsize=11, fontname="helv")
+    page.insert_text((140, 100), "x", fontsize=11, fontname="heit")
+    page.insert_text((148, 100), "\N{ELEMENT OF}", **maths)
+    page.insert_text((168, 100), "{101}", fontsize=11, fontname="cour")
+    page.insert_text((200, 100), "\N{UNION}", **maths)
+    page.insert_text((212, 100), "y", fontsize=11, fontname="heit")
+    page.insert_text(
+        (228, 100), "are accepted by the machine and the rest are rejected.", fontsize=11
+    )
+
+
+def display_with_one_typewriter_name(page):
+    prose(page, 100, "The probability of the event is bounded by")
+    page.insert_text((200, 140), "Pr[", fontsize=11)
+    page.insert_text((218, 140), "out", fontsize=11, fontname="cour")
+    page.insert_text((240, 140), "= 1] \N{GREATER-THAN OR EQUAL TO}", fontsize=11)
+    fraction(page, 290, 135, "2", "3", 12)
+    prose(page, 190, "and the text goes on after the display with more words than one.")
+
+
+def display_with_a_subscripted_typewriter_name(page):
+    """ "Pr[out_A = 1] >= 2/3": the name in a code face, as \\mathtt prints it, with a subscript
+    in the maths italic that touches it (Times italic here, given TeX's name in the test)."""
+    prose(page, 100, "The probability of the event is bounded by")
+    page.insert_text((200, 140), "Pr[", fontsize=11)
+    page.insert_text((218, 140), "out", fontsize=11, fontname="cour")
+    page.insert_text((238.2, 143), "A", fontsize=7, fontname="tiit")
+    page.insert_text((246, 140), "= 1] \N{GREATER-THAN OR EQUAL TO}", fontsize=11)
+    fraction(page, 296, 135, "2", "3", 12)
+    prose(page, 190, "and the text goes on after the display with more words than one.")
+
+
+def display_with_a_typewriter_name_a_space_from_a_letter(page):
+    """ "T = n out >= 2/3": the name stands a thick space after a factor in maths italic."""
+    prose(page, 100, "The time the whole of the run takes is bounded by")
+    page.insert_text((200, 140), "T =", fontsize=11)
+    page.insert_text((222, 140), "n", fontsize=11, fontname="tiit")
+    page.insert_text((231, 140), "out", fontsize=11, fontname="cour")
+    page.insert_text((256, 140), "\N{GREATER-THAN OR EQUAL TO}", fontsize=11)
+    fraction(page, 272, 135, "2", "3", 12)
+    prose(page, 190, "and the text goes on after the display with more words than one.")
+
+
+def sentence_with_a_subscripted_typewriter_name(page):
+    """ "is out_A when": the name and the subscript that touches it are one formula."""
+    page.insert_text((72, 100), "The output of the party is", fontsize=11)
+    page.insert_text((200, 100), "out", fontsize=11, fontname="cour")
+    page.insert_text((220.2, 103), "A", fontsize=7, fontname="tiit")
+    page.insert_text((230, 100), "when the list is empty, and it goes on", fontsize=11)
+    page.insert_text((72, 114), "to the next one of the list until every one is done.", fontsize=11)
+
+
+def in_tex_faces(pdf: bytes) -> bytes:
+    """The page with Times italic under TeX's name for its maths italic, and Times under the
+    name of a code face that only the font's name tells (no fixed-pitch flag)."""
+    doc = pymupdf.open(stream=pdf)
+    names = {"/Times-Italic": "/CMMI10", "/Times-Roman": "/NimbusMonL-Regu"}
+    for xref in range(1, doc.xref_length()):
+        if (name := doc.xref_get_key(xref, "BaseFont")[1]) in names:
+            doc.xref_set_key(xref, "BaseFont", names[name])
+    return doc.tobytes()
+
+
+@pytest.mark.skipif(not Path(DEJAVU).exists(), reason="needs DejaVu Sans for the maths signs")
+@pytest.mark.parametrize(
+    ("fill", "kind", "whole"),
+    [
+        (formula_with_a_set_in_a_code_face, "inline", "{101}"),  # not left to the sentence
+        (display_with_one_typewriter_name, "block", "out"),  # not a paragraph and a stray "3"
+        (display_with_a_subscripted_typewriter_name, "block", "out"),  # the name is no prose word
+        (display_with_a_typewriter_name_a_space_from_a_letter, "block", "out"),
+        (sentence_with_a_subscripted_typewriter_name, "inline", "outA"),  # not the "A" alone
+    ],
+)
+def test_a_word_set_in_a_code_face_inside_a_formula_stays_in_the_formula(fill, kind, whole):
+    elements = analyze(in_tex_faces(one_page(fill))).elements
+    (found,) = [e for e in equations(elements) if e.display == kind]
+    assert whole in nospace(found.text)
+    assert not [e for e in elements if e.kind == Kind.PARAGRAPH and whole in (e.text or "")]
+    assert not [e for e in elements if e.kind == Kind.PARAGRAPH and (e.text or "").strip() == "3"]
+
+
+@pytest.mark.parametrize(
+    ("gap", "size"),
+    [
+        (3.4, 11),  # a word space
+        (2.2, 11),  # a word space shrunk in a tight line: a fifth of the size
+        (3.4, 8.8),  # a code face set smaller than the text, as Typst sets it
+    ],
+)
+def test_a_code_word_a_word_space_from_a_math_letter_is_no_formula(gap, size):
+    """ "ends with return x": the word in the code face stands a word space from the maths
+    letter, it is not set against it as a name with a subscript is."""
+
+    def fill(page):
+        page.insert_text((72, 100), "The function ends with", fontsize=11)
+        page.insert_text((184, 100), "return", fontsize=size, fontname="cour")
+        x = 184 + 6 * 0.6 * size + gap
+        page.insert_text((x, 100), "x", fontsize=11, fontname="tiit")
+        page.insert_text((x + 9, 100), "when the list is empty, and it goes on", fontsize=11)
+        page.insert_text(
+            (72, 114), "to the next one of the list until every one is done.", fontsize=11
+        )
+
+    found = equations(analyze(in_tex_faces(one_page(fill))).elements)
+    assert not [e for e in found if "return" in e.text]
+
+
+def test_displayed_sets_under_a_line_with_code_words_are_a_display_not_code():
+    """Three displayed sets, their members in a code face: the first holds words of letters
+    and is a line of code to the reader, the two under it hold digits only and begin with a
+    letter in maths italic. Standing near a code row does not make them code."""
+
+    def fill(page):
+        prose(page, 100, "The three languages over the alphabet, each written out in full, are")
+        rows = [
+            ("1", "{ab, ba, abab, baba}"),
+            ("2", "{00, 01, 10, 11}"),
+            ("3", "{000, 010, 100, 110}"),
+        ]
+        for n, (index, members) in enumerate(rows):
+            y = 140 + 16 * n
+            page.insert_text((200, y), "L", fontsize=11, fontname="tiit")
+            page.insert_text((207, y + 2), index, fontsize=7, fontname="helv")
+            page.insert_text((216, y), "=", fontsize=11, fontname="helv")
+            page.insert_text((230, y), members, fontsize=11, fontname="tiro")
+        prose(
+            page,
+            202,
+            "and every word of the second language has length two, as the next part shows.",
+        )
+        prose(page, 218, "The third language is used in the exercise at the end of the section.")
+
+    elements = analyze(in_tex_faces(one_page(fill))).elements
+    assert any("L2={00,01,10,11}" in nospace(e.text) for e in equations(elements))
+    assert not [e for e in elements if e.preformatted and "00, 01" in (e.text or "")]

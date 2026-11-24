@@ -49,6 +49,10 @@ class _Document:
     (`regions.py`) in place of one gutter.
     `panels`: `analyze(join_panels=...)`: the panels of one captioned figure are one figure
     (`figures._join_panels`).
+    `figure_art`: `analyze(figure_art=...)`: a page's drawings are read without the paint no clip
+    lets through (`page_type.page_drawings`), and a row the edge of a figure's box cuts through
+    is the figure's label (`figures._cut_by`), and a pen drawing typed labels name is a figure
+    (`page._pen_figures`).
     `trace`: the page trace (`step_facts.PageTrace`): the time of each step on each page.
     `ink`, `detector`: what the ink analysis (`page_type.InkBudget`) and the table detector
     (`tables.DetectorBudget`) may still spend on this document. Only `_read_page` and
@@ -64,6 +68,7 @@ class _Document:
     inline_joins: bool = False
     region_tree: bool = False
     panels: bool = False
+    figure_art: bool = False
     # Where each page's time goes. `analyze` makes one that times; the default times nothing.
     trace: PageTrace = field(default_factory=lambda: PageTrace(enabled=False))
     ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)

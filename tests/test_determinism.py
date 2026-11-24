@@ -254,13 +254,7 @@ def test_a_table_search_the_time_limit_stops_says_so_and_a_sleep_does_not_stop_i
 
 # Uploads a slower machine converts differently today, with the plan item that ends it. One
 # of these may differ and need not; any other upload must give the same document.
-KNOWN: dict[str, str] = {
-    # Two option pictures on page 2 are the same pixels with the same nearby text, so their
-    # figure requests are identical; the recording holds two answers for that request and
-    # the replay hands them out in the order the step threads ask. Ends when one job asks an
-    # identical request once and shares the answer (wave 5, pipeline 0.5.19).
-    "r14_exam_513": "identical figure requests race for the recorded answers",
-}
+KNOWN: dict[str, str] = {}
 # A quarter of the time: the share of a core the smallest hosting plan gives a job.
 SHARE = 0.25
 

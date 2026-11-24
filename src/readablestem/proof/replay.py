@@ -18,9 +18,10 @@ PNG that is not decodable is keyed by its bytes ("raw:...").
 A request the bundle has no answer for is a miss. The replay never invents an answer and
 never raises from inside the pipeline (a step could turn the exception into a failed fix
 and hide it): it counts the miss, answers "refused", and the runner stops the proof when
-the run ends with any miss. Repeated identical requests inside one run are answered from
-the recorded list in order, then cycle; the runner replays on one thread so the order is
-fixed.
+the run ends with any miss. A conversion asks an identical request once (`pipeline.run`), so
+a run reads each key once and a repeated key in a recording is read in order, then cycles,
+only for a caller that is not a conversion's step. That order is fixed only where one
+thread replays; the corpus replay (`eval.measure`) runs the pipeline's own step threads.
 
 The same module holds the media stand-ins (`RecordingMedia`, `ReplayMedia`) and the axe
 recorder, because an axe-core run needs a browser and its output is a function of the HTML.
