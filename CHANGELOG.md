@@ -13,6 +13,37 @@
   that goes on, so the number beside it is the display's under the regular rule.
 - Layout only: no crop, picture or request changes (a number is a label, not part of the
   crop). `PIPELINE_VERSION` stays; fold this entry into 0.5.19.
+## Unreleased: a code-face word inside a formula (review 25)
+
+- Finding 3: a formula with an operand in a typewriter face (a set of strings, "{101}", a name)
+  was cut at it, because a character of a code face is never math. In `shared._code_beside_maths`
+  a run of code-face characters is read as it would be in any face when it is inside a formula:
+  it touches a math letter of another face, stands between two math characters or operators of
+  another face, or comes next to one that has an operand on its other side. A run beside nothing
+  of the kind, a row that is mostly code face with code words (a listing), and a word of two
+  letters or more that touches no math letter stay code, so what the 0.5.19 entry for code fonts
+  (O-440) fixed is unchanged. Measured on the 25 private corpus uploads: 10 pages of one upload,
+  fonts NimbusMonL and CourierNew, had their formulas torn since 0.5.19; 30 of the 31 broken
+  formulas are whole now and the 247 formulas of those pages read as in 0.5.18 but one.
+- Finding 2: a word of the code face counts as a prose word only in a row within three lines of a
+  row that is mostly code face (`inline_runs._mark_code_runs`), as in an algorithm. A display with
+  one `\mathtt` name and no code rows near it ("Pr[out = 1] ≥ 2/3") is no longer made text, so its
+  denominator is no longer a paragraph of its own. Algorithm pages (2504.06207 p13, 2405.15050)
+  read as before.
+- The 0.5.19 entry says "none worse" of the corpus differences. Of the 16 pages that 0.5.19 changed
+  on 2 private corpus uploads, 11 pages of one upload were worse (the torn formulas and one
+  inline read). After this change 6 pages of 2 uploads differ from the 0.5.18 read, all the
+  intended changes of 0.5.19, so "none worse" holds: 11 worse before, 0 after.
+- Stored documents: a document laid out under 0.5.19 with a code-face operand in a formula keeps the
+  torn read until it is converted again, so a pipeline raise is owed with the next release; this
+  entry does not make it. `RENDER_VERSION` is not touched. Nothing sent to a model changes, no
+  prompt changes, and no recorded request moves (the replayed documents of the 73 uploads are
+  identical to the base run).
+- Measured with the 0.5.19 switches on, no model: `full` of 73 uploads, 0 differences; `analyze`
+  of the 332 files (996 results), 3 differences, all of `ax_cslg_240306367` (p8: the attribute
+  set "{A, C, E, F}" is an inline formula again, as in 0.5.18); the development box score 9,198
+  whole of 11,258 formulas (base 9,197), no paper worse; `eval order --set layout-dev-1` 161 of
+  267 pages right, 81 faultless, as the base.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
