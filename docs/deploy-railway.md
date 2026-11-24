@@ -219,7 +219,8 @@ values and their `source` lines, and set `confirmed = true`; from then on a diff
 start. `readablestem ops profile-check` prints the same comparison for the environment it runs in
 (`railway ssh -s web -- readablestem ops profile-check`). To change a setting in production, change
 the profile and the variable in Railway in the same change. A release that changes a profile row
-sets the variable first, then deploys, then runs that check: the release is live when the
+sets the variable first (`railway variable set -s web --skip-deploys NAME=value`, so the code
+that is running is not deployed again under the new value), then deploys, then runs that check: the release is live when the
 setting's name is not among the names that differ. The code defaults are not the profile's
 values, so a deploy with a variable missing starts normally, stamps its results with the new
 `PIPELINE_VERSION` and reads them the old way; only this check (and the names on /admin) shows
