@@ -14,6 +14,25 @@
   0.5.18 record and its output lines the 0.5.10 record, each labeled as an earlier release.
 - Records and docs only (docs/eval.md, "The held-out score" and "The quality ledger"). No
   code changes and no version is owed.
+## Unreleased: code face beside math, counted on real documents (O-454, O-456, O-457, O-458)
+
+- Nothing in the reader changes. The limits of the two code-face rules that review 26 to 29
+  found on made pages were counted on real documents (120 public files, the 73 development
+  papers of the real-world set, the 60 files of `layout-dev-1`, the 25 private corpus uploads):
+  88 files carry a code-face font, and 188 pages in 40 files have a math-face letter on the
+  line of a code-face character or within three lines of it. The count is in docs/layout.md
+  ("Counted on real documents, 2026-11-24"); each shape is closed by it:
+  - O-454 (a display with a `\mathtt` name and a denominator under a line of code): 0.
+  - O-456: an inline formula cut on one side, 1 (an attribute set, as at 0.5.18); a code-face
+    name with a math subscript or a code word flush against a math letter in prose, 0 (what
+    is there are subscripts and calls with math arguments, all joined); a line of assignments
+    read as one-sign formulas, 1 line on one public page (2504.06207 p13) whose cause is the
+    algorithm's math-italic steps and not the code face, and 2 lines in one private upload.
+  - O-457 (a name as superscript of, or after, a slanted letter): 7 cases in 2 papers, all in
+    displays that are whole.
+  - O-458 (a displayed set with string members or a Greek-capital name near code, a listing
+    with math-italic variables): 0 and 12 rows that stay code or a paragraph.
+- No version raise and no re-recording are owed.
 
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
