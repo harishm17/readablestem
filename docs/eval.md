@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-23 | 0.5.19 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-24 | 0.5.19 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -3061,7 +3061,7 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-23 at pipeline 0.5.19,
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-24 at pipeline 0.5.19,
 production profile `2047f403770c`, every count as in the 0.5.18 record it replaces, 47 files and 91 gold pages, no answer missing, no step
 stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
