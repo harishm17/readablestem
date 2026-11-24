@@ -93,7 +93,7 @@ def gold_documents(
     keeps the text the file gives, and no request is sent.
 
     `gold_pages`: only the pages the set's gold marks are to be audited, and each file is
-    converted as `eval order --set` converts it (`order_report.set_document`, whatever
+    converted as `eval order --set` converts it (`order_report.convert_document`, whatever
     `settings` say), so that what is audited is what that scorer scored. A file with no gold
     file is left out, with the code "no_gold"."""
     from readablestem.models.fake import FakeVisionClient

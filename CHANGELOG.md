@@ -1,18 +1,11 @@
 # Changelog
 
-## Unreleased: the page audit on gold pages only
-
-- `eval page-audit --gold-dir DIR --gold-pages` audits only the pages a layout gold set's gold
-  marks, converts each file as `eval order --set` does, and reports `against_scorer`: the
-  gold pages the reading-order scorer calls right and not right, each by the audit's verdict
-  (counts only). `--against REPORT` sets a run beside an earlier one of the same set.
-- A held-out set's printed report names no document and no page. An eval tool only: no
-  reader change, no version raise.
-
 ## Pipeline 0.5.19, render 11 (2026-11-23)
 
 - `PIPELINE_VERSION` is 0.5.19 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
-  four "Unreleased" entries below down to the 0.5.18 entry (wave 5: faults real documents show).
+  "Unreleased" entries below down to the 0.5.18 entry (wave 5: faults real documents show; the
+  first of them, the page audit on gold pages only, is an eval tool and changes nothing for a
+  reader).
   What changes for a reader, one line for each:
   - Code fonts (O-440): listings set in NimbusMonL, CMITT, t1xtt, txtt, TeXGyreCursor or Lucida
     Console are code; a numbered listing is one block; an address, a list of names or the last
@@ -35,6 +28,18 @@
     job's call count. A refused, timed-out or unreadable first answer is not shared.
 - No recorded request moves (each branch's `full` corpus hash run), so the workflow recording
   stays as made at 0.5.18; the result's schema is the same.
+
+## Unreleased: the page audit on gold pages only
+
+- `eval page-audit --gold-dir DIR --gold-pages` audits only the pages a layout gold set's gold
+  marks, converts each file as `eval order --set` does, and reports `against_scorer`: the
+  gold pages the reading-order scorer calls right and not right, each by the audit's verdict
+  (counts only). `--against REPORT` sets a run beside an earlier one of the same set.
+- A held-out set's printed report names no document and no page. An eval tool only: no
+  reader change, no version raise.
+- Why: as built, the audit of the held-out layout set asked about every page of every
+  document (1,015 pages) where the gold marks 247, so the paid shadow run the plan caps at
+  $3.00 could not be afforded, and its verdicts could not be set against any truth.
 
 ## Unreleased: code fonts the list did not name (O-440)
 
