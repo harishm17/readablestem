@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.20",
- "commit": "f7a19275f9e2d09ffecab5e157870389cd33b45c",
+ "pipeline_version": "0.5.21",
+ "commit": "a5c1104b37aee6e13c75cd2cf3c7261314b0e264",
  "provenance": {
-  "commit": "f7a19275f9e2d09ffecab5e157870389cd33b45c",
+  "commit": "a5c1104b37aee6e13c75cd2cf3c7261314b0e264",
   "clean": true,
-  "pipeline_version": "0.5.20",
+  "pipeline_version": "0.5.21",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
