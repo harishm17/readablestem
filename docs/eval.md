@@ -3182,10 +3182,14 @@ student page:
 | all | 267 | 182 | 94 | 30 (34) | 186 (856) | 81 (372) | 63 (92) | 13 (18) | 0 of 5 | 50 | 9 |
 
 The element list reads 181 of 267 right and 95 faultless, and 20 of the 60 documents have
-every gold page right (12 at 0.5.19). The one count that moved from the 0.5.20 record is the
-merged places of the papers, 55 to 56 on one page more (a page that is not right in either
-record; the count moves with the sign rule of 0.5.21); every count of pages right, faultless and of documents is the
-0.5.20 one. The rest of this paragraph is the 0.5.20 record against the 0.5.19 one. Against the 0.5.19 record (161 right and 81 faultless;
+every gold page right (12 at 0.5.19). Of the table's counts the one that moved from the
+0.5.20 record is the merged places of the papers, 55 to 56 on one page more (a page that is
+not right in either record; the count moves with the sign rule of 0.5.21); every count of
+pages right, faultless and of documents is the 0.5.20 one. Outside the table one gold block
+of the textbooks is no longer found (2,377 to 2,376 in the student page, 2,443 to 2,442 in
+the element list): page 8 of `os_principles_data_science` opened with the end of a
+paragraph that is now read whole on page 7 (the page join of 0.5.21), and the scorer counts
+page by page; the page stays right. The rest of this paragraph is the 0.5.20 record against the 0.5.19 one. Against the 0.5.19 record (161 right and 81 faultless;
 papers 69 and 32 with furniture read on 32 pages, 94 pages (460 places) of strays and 36
 (46) cut; in all furniture read on 51 pages (55 places), strays 187 (877), cut 89 (382)): 21
 pages are made right and none is made wrong, each the first page of a paper whose stamp was
@@ -4511,12 +4515,17 @@ release branch:
   of 11,258, 81.7% (0.5.20: 9,198); split 140, from 145; displays 903 of 1,004, as before.
 - **Reading order.** `layout-dev-1`: 182 of 267 pages right and 94 faultless in the student
   page, 181 and 95 in the element list, 20 of 60 documents with every gold page right: each
-  as at 0.5.20, and `--against` the 0.5.20 record finds no page made wrong. One count moves:
-  the papers' merged places, 55 to 56 (a page not right in either record). The corpus: 83 of
+  as at 0.5.20, and `--against` the 0.5.20 record finds no page made wrong. Two counts move:
+  the papers' merged places, 55 to 56 (a page not right in either record), and the
+  textbooks' blocks found, 2,377 to 2,376 (page 8 of `os_principles_data_science` opened
+  with the end of a paragraph that the page join now reads whole on page 7; the scorer
+  counts page by page and the page stays right). The corpus: 83 of
   91 and 43, 83 and 49 in the element list, every count as at 0.5.20. Both records are re-made
   at 0.5.21; the production profile's hash stays `ae2c92fb65cf`.
 - **The three changes on real documents** (`layout.analyze` with production's switches,
-  against 0.5.20; the pages are named in docs/layout.md and in the CHANGELOG entries).
+  against 0.5.20; the sign rule's pages are named in docs/layout.md and in the CHANGELOG
+  entries; of the joins the paper the change was built for is named, arXiv 2505.05280, and
+  the other six are in review 38's table).
   The page join: 8 joins gained on 7 of 365 public papers and 2 on 2 of the 60 development
   files, each right, none lost; review 38 found the same 8 among 2,006 joins of the papers
   read whole. The sign rule: of 11,011 pages of 366 public papers read whole 125 differ, 34

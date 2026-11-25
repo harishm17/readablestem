@@ -1962,9 +1962,10 @@ raised text (next section).
   denominator begins with a text-style sum and holds the upright subscript "old", which
   counts as a running word, and the denominator is read before the numerator (the
   numerator stands above the sign, not left of it, so nothing "stands before the sign").
-  Counting a word only when its letters are no script of the row was measured and not
-  built: it changes 17 of the 125 pages, mends 2406.15398 page 5 and cuts a paragraph
-  before its last formula on 2411.08218 page 37. The signs are those of `LIMIT_SIGNS`
+  Counting a word only when its letters are no script of the row (`_Row.is_script`) was
+  measured and not built: it changes 17 of the 125 pages, gives 2406.15398 page 5 its
+  0.5.20 reading back, and on 2411.08218 page 37 gives up a repair of the rule (the
+  paragraph is cut before its last formula again, as in 0.5.20). The signs are those of `LIMIT_SIGNS`
   (sum, product, coproduct, the integrals, big union, big intersection). `_starts_at`
   reads the page's rows once for each sign that passes its first test: a made page of
   2,000 sign-led lines takes 50 s against 19 s; no real page comes near it.

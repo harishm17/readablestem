@@ -24,8 +24,8 @@
     whole 125 differ: 34 only in spacing, about 75 read better (most are lines in the middle
     of a paragraph, after a break at an equals sign), about 10 are broken with the rule and
     without it, and 3 read worse (arXiv 2501.05251 page 9, 2412.19752 page 96, 2406.15398
-    page 5: a display that begins with the sign and holds an upright word is taken for
-    such a line). Of the 947 pages of the development files 6 differ, all better.
+    page 5: a display, or a line of one, that begins with the sign and holds an upright
+    word is taken for such a line). Of the 947 pages of the development files 6 differ, all better.
   - The stop rule for held-out runs (docs/eval.md, rule 5) is kept by the command: `eval order
     --set NAME --for-release` lists each release run of a held-out set in a tracked file
     before it reads a document and refuses a set already scored for the current pipeline
@@ -159,8 +159,10 @@
   Without the region tree an index page is one column, most of its lines start at the
   right-hand column of the index, and `_line_edges` reads that x as the page's edge. The
   production switches make neither join; the code's own defaults are the switches off.
-  `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) does not
-  move on either view. The corpus replay (73 uploads) is the same byte for byte, so no
+  `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) moves no page's
+  right or faultless count on either view; one gold block at the head of page 8 of
+  `os_principles_data_science` is counted lost, because its lines are now read with their
+  paragraph on page 7 (the scorer counts page by page). The corpus replay (73 uploads) is the same byte for byte, so no
   recorded request stops matching. A pipeline raise is owed with the next release.
 
 ## Unreleased: LaTeX sources that stop on the time limit and on a journal class (O-469)
@@ -217,10 +219,13 @@
   (2411.09088 page 5, 2401.00649 page 55, 2501.02602 page 1). Most of the better pages are
   lines in the middle of a paragraph that begin with a sign after a break at an equals sign.
 - Measured and not built: counting a running word only when its letters are no script of the
-  row. On the 76 papers it changes 17 of the 125 pages: 14 go back to the reading without the
-  rule (2406.15398 page 5 among them; most of the others differ only in spacing) and 3 read
-  another way, one of them worse (2411.08218 page 37, a paragraph cut before its last
-  formula). One page mended for one page worse, so the rule stays as it is.
+  row (the row's own test, `_Row.is_script`). On the 76 papers it changes 17 of the 125
+  pages: 14 go back to the reading without the rule (2406.15398 page 5 among them; most of
+  the others differ only in spacing) and 3 read another way, one of them worse than with the
+  rule as built (2411.08218 page 37: the paragraph is cut before its last formula again, as
+  in 0.5.20). One page spared for one repair lost, so the rule stays as it is. (Review 39
+  built the test with a size cut-off of its own and counted 14 pages, 11 and 3, and the same
+  two named pages.)
 - The 73 recorded requests of the
   corpus all still match; so a change to stored documents is limited to the pages above, and
   `PIPELINE_VERSION` is owed a raise with the next release (`RENDER_VERSION` is not).
