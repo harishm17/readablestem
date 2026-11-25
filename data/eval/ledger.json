@@ -11,9 +11,9 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "commit": "bb47bb3d24df5e6500eb578cd0279c2d535d20fa",
+ "commit": "3743f347ac825a5f1062979e1296e2598084fce3",
  "provenance": {
-  "commit": "bb47bb3d24df5e6500eb578cd0279c2d535d20fa",
+  "commit": "3743f347ac825a5f1062979e1296e2598084fce3",
   "clean": true,
   "pipeline_version": "0.5.20",
   "render_version": 11,
@@ -105,11 +105,11 @@
    "better": "lower",
    "goal": null,
    "release_bar": {
-    "value": 29.149797570850204,
+    "value": 22.672064777327936,
     "set": "layout-heldout-1",
     "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
-    "release": "0.5.19+2047f403770c",
-    "date": "2026-11-24"
+    "release": "0.5.20+ae2c92fb65cf",
+    "date": "2026-11-25"
    },
    "owed": "`eval order --for-release` on the held-out layout set, once, when the reader is ported",
    "measured": [
@@ -168,11 +168,11 @@
    "better": "higher",
    "goal": null,
    "release_bar": {
-    "value": 22.448979591836736,
+    "value": 40.816326530612244,
     "set": "layout-heldout-1",
     "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
-    "release": "0.5.19+2047f403770c",
-    "date": "2026-11-24"
+    "release": "0.5.20+ae2c92fb65cf",
+    "date": "2026-11-25"
    },
    "owed": "the same run as the row above",
    "measured": [
@@ -231,11 +231,11 @@
    "better": "lower",
    "goal": 2,
    "release_bar": {
-    "value": 14.574898785425102,
+    "value": 8.097165991902834,
     "set": "layout-heldout-1",
     "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
-    "release": "0.5.19+2047f403770c",
-    "date": "2026-11-24"
+    "release": "0.5.20+ae2c92fb65cf",
+    "date": "2026-11-25"
    },
    "owed": "the same run as the two rows above",
    "measured": [
