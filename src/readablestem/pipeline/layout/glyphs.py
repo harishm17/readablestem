@@ -207,6 +207,11 @@ class _Char:
     # (`mark_small_capitals`). Text, not a script; a lower-case letter of the source when a
     # full-size capital leads the word.
     small_cap: bool = False
+    # On a sum, product or integral sign that was folded into a line with its limits
+    # (`rows._attach_big_operators`): the size that line is set in; 0 on every other glyph. The
+    # row that holds the sign has this size (`_Row.size`), so it is kept when the row is cut
+    # (an equation number or a list marker taken off it) or joined.
+    line_size: float = 0.0
     # Whitespace. Read about 80 times for each char made (11.6 million reads for 146,000
     # chars on the slowest development file), so it is worked out once, here.
     blank: bool = field(init=False, repr=False, compare=False)

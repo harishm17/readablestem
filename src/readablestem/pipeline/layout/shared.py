@@ -126,9 +126,6 @@ class _Row:
     algo_number: str = ""
     algo_start: int = 0
     algo_join: bool = False
-    # The size the line had before a sum, product or integral sign and its limits were folded
-    # into it (`rows._attach_big_operators`); 0 when none were. It is the row's size.
-    line_size: float = 0.0
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -163,12 +160,13 @@ class _Row:
         letters. The numbers of a fraction (beside an operator, or in a sentence) are not
         scripts of anything.
 
-        A line that took a sign and its limits keeps the size it had (`line_size`): a limit
-        is script size and further off the baseline than a script is, so "Etot = sum ei +
-        Ereg" with an "n" over the sum counted as a line of script size, its roman
-        subscripts as words of a sentence, and the display as a paragraph."""
-        if self.line_size:
-            return self.line_size
+        A line that took a sign and its limits keeps the size it had (`_Char.line_size`, on
+        the sign): a limit is script size and further off the baseline than a script is, so
+        "Etot = sum ei + Ereg" with an "n" over the sum counted as a line of script size, its
+        roman subscripts as words of a sentence, and the display as a paragraph."""
+        kept = next((c.line_size for c in self.chars if c.line_size), 0.0)
+        if kept:
+            return kept
         counts = Counter(round(c.size * 2) / 2 for c in self.plain)
         if not counts:  # a row with no characters has no size; the body default, as elsewhere
             return 10.0
@@ -415,7 +413,10 @@ def _arrow_label_flags(chars: Sequence[_Char]) -> list[bool]:
     return flags
 
 
-LIMIT_SIGNS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u22c3\u22c2")  # sums
+# The signs that take limits over and under them: integrals, sum, product, coproduct, big
+# union and intersection. One set for the rows (`rows._sign_of_limits`), the bands
+# (`regions._limit_gap`) and the displays (`display._limits_of`).
+LIMIT_SIGNS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u22c3\u22c2")
 
 
 def _box_key(box: BBox) -> tuple[int, int, int, int]:

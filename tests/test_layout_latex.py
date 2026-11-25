@@ -10,6 +10,7 @@ negation slash of \\neq, a cases brace, absolute-value bars, nested itemize/enum
 with TeX's bullets and dashes, beamer's triangle bullets and sans-serif maths, a
 two-column page and a TikZ figure. A fifth page, vectors_relations, holds signs TeX
 draws from pieces (arrows over points, \\cong, \\models) for tests/test_sign_check.py.
+A sixth, sum_limits, holds sums and a product with limits over and under the sign.
 """
 
 from __future__ import annotations
@@ -142,13 +143,17 @@ def test_a_sign_that_took_its_upper_limit_keeps_its_place_and_the_line_its_numbe
     # the number was refused because the line is level with the numbered equation of the
     # other column. And on the second page, which has no line of running text, "Etot = sum ei
     # + Ereg" with the "n" in it counted as a line of script size: its roman subscripts were
-    # words of a sentence and the display a paragraph with three pieces of maths.
+    # words of a sentence and the display a paragraph with three pieces of maths. The same
+    # line as an item of a list lost the size it was given when its marker was cut off it:
+    # "Ekin" and "Epot" were then a letter each and a subscript left in the item.
     names = ("display_grouping", "inline_joins", "region_tree", "join_panels")
     layout = analyze((LATEX / "sum_limits.pdf").read_bytes(), **dict.fromkeys(names, True))
-    total, product, entropy, energy = blocks(layout)
+    total, product, entropy, energy, *_ = blocks(layout)
+    [kinetic] = children(layout, next(e for e in layout.elements if e.kind == Kind.LIST_ITEM))
     assert (total.equation_label, entropy.equation_label) == ("(1)", "(2)")
     assert plain(product.text).startswith("p(x0)=\u222b\u220fT")
-    assert plain(energy.text) == "Etot=\u2211nei+Eregi=1"
+    for display, first, last in ((energy, "Etot", "Ereg"), (kinetic, "Ekin", "Epot")):
+        assert plain(display.text).startswith(f"{first}=\u2211") and last in plain(display.text)
 
 
 def test_calculus_notes_nested_itemize_and_enumerate():

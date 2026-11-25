@@ -31,6 +31,7 @@ from readablestem.pipeline.layout.inline_runs import (
 )
 from readablestem.pipeline.layout.shared import (
     _ROW_RELATIONS,
+    LIMIT_SIGNS,
     SCRIPT_RATIO,
     _CharInfo,
     _Marker,
@@ -1049,7 +1050,6 @@ def _joins_line(
     return False
 
 
-LIMIT_OPERATORS = frozenset("\u222b\u222e\u2211\u220f\u2210\u22c3\u22c2")  # int oint sum prod ...
 LIMIT_REACH = 0.8  # x font size: how far above or below a big operator its limits sit
 
 
@@ -1058,17 +1058,21 @@ def _limits_of(operator: _Line, limits: _Line, size: float) -> bool:
 
     The limits of a sum hang right under its sign (or sit right over it), centred on it
     and no wider than twice the sign. A paper that sets them at the size of the row they
-    belong to gives `_joins_line` no size to tell them by.
+    belong to gives `_joins_line` no size to tell them by. The reach is counted in the size
+    of the sign when that is the larger: a line with three subscripted letters side by side,
+    "dij = aik bkl clj", counts as a line of script size (the word test of `_Row.size` reads
+    "abc"), and the limit under its sum was then too far off.
     """
     centre = (limits.box[0] + limits.box[2]) / 2
     for c in operator.ink:
-        if c.c not in LIMIT_OPERATORS:
+        if c.c not in LIMIT_SIGNS:
             continue
-        gap = limits.box[1] - c.y1 if limits.box[1] >= c.y1 - 0.3 * size else c.y0 - limits.box[3]
+        em = max(size, c.size)
+        gap = limits.box[1] - c.y1 if limits.box[1] >= c.y1 - 0.3 * em else c.y0 - limits.box[3]
         if (
-            -0.3 * size <= gap <= LIMIT_REACH * size
-            and c.x0 - 0.5 * size <= centre <= c.x1 + 0.5 * size
-            and limits.box[2] - limits.box[0] <= 2 * (c.x1 - c.x0) + size
+            -0.3 * em <= gap <= LIMIT_REACH * em
+            and c.x0 - 0.5 * em <= centre <= c.x1 + 0.5 * em
+            and limits.box[2] - limits.box[0] <= 2 * (c.x1 - c.x0) + em
         ):
             return True
     return False

@@ -324,8 +324,14 @@ reader, neither to find them nor as a second opinion
    which makes the fragment longer than four glyphs and moves its center off the line. So
    a row that is one such sign and its limits alone (`_sign_of_limits`: every other glyph
    script-size beside the sign, set over it or under it, at most eight on each side) is a
-   fragment whatever its length, it is placed where the sign stands, and a fragment that
-   finds no row at its own center looks at the center of its sign. One that finds no line
+   fragment whatever its length, it is placed where the sign stands, and a fragment with a
+   limit in it (a glyph smaller than its sign) that finds no row at its own center looks at
+   the center of its sign. Two kinds stay where they are. A fragment that reaches into a
+   row at its own center without lying within it: the sum of a fraction's numerator, whose
+   row of terms begins under its raised script, is no part of the line under it
+   (`ax_statme_240307158` pages 3 and 8). And a sign with nothing but a bracket before it,
+   "(∑": no limit moved its center, and in the line under it it was read before the "=" of
+   its own line (`ax_cslg_240306366` pages 10, 11 and 13). One that finds no line
    at all may stand in the row of another sign and its limits (the product and the sum
    before an integral whose row took their limits). Before this a sign that took a long
    limit, or one that stands after another sign, was read after its line ("p(x0) =
@@ -537,26 +543,35 @@ changed nothing in production.
   the display left the limit out of its text ("∫b f′(x) dx = f(b) −f(a) a" on a slide). Only a
   big operator counts: a general "short item inside a tall one" moved an equation in a recorded upload
   (`w_solutions_1802`). A short item (at most 8 characters) that is the limit of such a sign by
-  its place (`regions._limit_of`: centered on the sign, no wider than twice it, no further above
+  its place (`regions._limit_gap`: centered on the sign, no wider than twice it, no further above
   or below it than its own height) is in the sign's band too, whether the sign is taller than it
-  or not: the lower limit of a sum that stood level with the lower entry of a binomial's bracket
+  or not, and it is the limit of one sign, the nearer one (`regions._at_sign`; a sum behind
+  its opening bracket counts as a sign for this): the "|u|=k" that hangs under the sum of one
+  line of a display is no upper limit of the sum on the line under it, which cut display
+  (2.19) of arXiv 2503.05994 page 14 into two equations that overlapped. The first case: the lower limit of a sum that stood level with the lower entry of a binomial's bracket
   beside it was a band of its own, and read after the whole line ("(x + y)n =∑n (n k)xn−kyk
   k=0"; page 20 of `latex-slides`, `∑nk=0 (n k)` now). Measured on real documents, 2026-11-24,
   against 0.5.19 with production's switches (the rule together with the three repairs it
   needed: "Rows" above, "Equation numbers", and "Limits of a sign" under Glyph math). On 62
-  public arXiv papers (the first 25 pages of each, 1,224 pages) 75 pages differ, 1 has
+  public arXiv papers (the first 25 pages of each, 1,224 pages) 74 pages differ, 1 has
   one element more (the equations (2) and (3) of arXiv 2210.13562 page 5, one display with two
-  numbers before) and 8 have fewer; the display equations whose text ends with a sign and its
+  numbers before) and 7 have fewer; the display equations whose text ends with a sign and its
   limits (the sign read after its line) go from 189 to 186, and those that are a sign and its
-  limits alone from 31 to 30. On the 60 files of the `layout-dev-1` development set (917
-  pages) 57 pages differ, 1 has one element more and 4 have fewer; the same two counts go
-  from 77 to 75 and stay at 21. Traded, on `ax_econem_240306657` page 49 and
+  limits alone from 31 to 30. On the 60 files of the `layout-dev-1` development set (whole
+  files: 954 pages, 947 with elements) 51 pages differ, 1 has one element more and 4 have
+  fewer; the same two counts go from 79 to 77 and stay at 21. On 60 further public arXiv
+  papers (the second sample of review 31, the first 25 pages of each, 1,195 pages) 66 pages
+  differ, none has more elements and 10 have fewer; the two counts go from 126 to 115 and
+  from 20 to 19. Traded, on `ax_econem_240306657` page 49 and
   `ax_quantph_240306391` page 15: the upper limit now follows its sign and the lower is read
   after the line, where before the lower followed its sign and the upper stood in front of
   the display. Worse, on arXiv 2504.03499 page 25: the second line of a display has a note
   set over its "=", a little higher than its three sums, so the cut under the upper limits
   gives them to the line above and they are read in front of their line ("T m T (α) ∑ ∑ =
-  …"; 0.5.19 read two of the three at their signs). The one page with an element more is
+  …"; 0.5.19 read two of the three at their signs). Worse too, on `ax_quantph_240306391`
+  page 16: the upper limit "2N−1" of a sum was folded into the row of numerators beside
+  it before the sign came, and the sign with its lower limit lands inside it ("2N∑n=0−1
+  …"; 0.5.19 read "2N−1 … ∑n=0", the sign after its line). The one page with an element more is
   `ax_mathap_240306449` page 3: a sum set in a sentence with limits over and under it had
   them read into the words of the sentence ("morek=0 involved and need∞s"); the sentence is
   clean now, the upper limit is at its sign and the lower is a short equation of its own. The
@@ -1759,8 +1774,17 @@ raised text (next section).
 - **Limits of a sign** (built in part). A limit set over or under a sum, product or
   integral sign is a small glyph further off the baseline than a script may be, so with it
   in the line a row of few full-size letters took the size of its scripts (`_Row.size`).
-  A line that a sign and its limits are folded into together keeps the size it had
-  (`_Row.line_size`, set by `rows._attach_big_operators`). Four faults had that one cause.
+  A line that a sign and its limits are folded into together keeps the size it had: the
+  sign carries it (`_Char.line_size`, set by `rows._attach_big_operators`), so the row that
+  holds the sign has that size however it is cut or joined afterwards (an equation number
+  or a list marker taken off it). The size it had can itself be the script size: three
+  subscripted letters side by side, "d_ij = ∑ a_ik b_kl c_lj", are a word of script size
+  to `_Row.size`. The row keeps that size, and the limit under its sum is found by the
+  size of the sign (`display._limits_of` counts its reach in the larger of the two; arXiv
+  2505.04942 page 12). Giving such a row the sign's size was tried first and taken back: a
+  display line of `ax_econem_240306657` page 54 that holds the words "a.s. and" then had
+  its true size and became a paragraph and eight pieces, the older fault named below.
+  Four faults had that one cause.
   On a page with no line of running text, the word subscripts of "E_tot = ∑ e_i + E_reg"
   were words of prose once the "n" over the sum was in the row, and the display a paragraph
   and three pieces of math (`sum_limits.tex`, page 2). The limit under the sum of such a

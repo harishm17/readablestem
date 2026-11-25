@@ -63,7 +63,10 @@ from readablestem.pipeline.layout.shared import (
 )
 from readablestem.pipeline.parse import is_math_alphanumeric
 
-# Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$).
+# Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$): the
+# signs that lead a fragment `_attach_big_operators` folds into its line. The root is one, and
+# the big union and intersection of `shared.LIMIT_SIGNS` are not: no real page has shown one
+# as a fragment of its own.
 _BIG_OPERATORS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a")
 LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first
 LINE_GLYPH_ROW = 0.5  # x the span's height: how far off the span's row a neighbour may sit
@@ -1049,10 +1052,15 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     A limit set over or under the sign and folded onto it (`_attach_scripts`) makes the
     fragment longer and moves its centre off the line. So a sign with its limits alone
     (`_sign_of_limits`) is a fragment whatever its length, placed where the sign stands, and
-    a fragment that finds no row at its own centre looks at the centre of its sign. One that
-    finds no line at all may still stand in a row of a sign and its limits: the product and
-    the sum before an integral whose row took their limits. The line keeps the size it had
-    before the limits came into it (`_Row.line_size`).
+    a fragment with a limit in it (a glyph smaller than its sign) that finds no row at its own
+    centre looks at the centre of its sign. (One that reaches into a row at its own centre
+    without lying within it stays where it is: the sum of a fraction's numerator, whose row of
+    terms begins under its raised script, is no part of the line under it. And a sign with
+    nothing but a bracket before it, "(∑", has no limit that moved its centre: it stays too.)
+    One that finds no line at all may still stand in a row of a
+    sign and its limits: the product and the sum before an integral whose row took their
+    limits. The line keeps the size it had before the limits came into it: the sign carries
+    it (`_Char.line_size`).
     """
     signs = {i: _sign_of_limits(r) for i, r in enumerate(rows) if not r.vertical}
     pieces = [
@@ -1075,34 +1083,39 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     for i in pieces:
         piece = merged.get(i, rows[i])
         best, overlap = None, 0.0
+        sign = signs[i]
         centres = [(piece.y0 + piece.y1) / 2]
-        centres += [(c.y0 + c.y1) / 2 for c in piece.ink if c.c in _BIG_OPERATORS][:1]
+        big = next((c for c in piece.ink if c.c in _BIG_OPERATORS), None)
+        if big is not None and any(c.size < big.size - 0.5 for c in piece.ink):
+            centres.append((big.y0 + big.y1) / 2)
         for hosts in (lines, [(y, j) for y, j in sign_rows if j != i and j not in dropped]):
             tops = [y for y, _ in hosts]
             tallest = max((merged.get(j, rows[j]).height for _, j in hosts), default=0.0)
             for centre in centres:
                 lo = bisect.bisect_left(tops, centre - tallest)
+                beside = False
                 for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
                     host = merged.get(j, rows[j])
                     reach = 0.5 * host.size
                     inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
                     shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
                     on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
+                    beside = beside or (on_line and piece.x0 < host.x1 and host.x0 < piece.x1)
                     if on_line and inside and shared > overlap:
                         best, overlap = j, shared
-                if best is not None:
+                if best is not None or beside:
                     break
             if best is not None:
                 break
         if best is not None:
             host = merged.get(best, rows[best])
-            sign = signs[i]
             left = piece.x0 if sign is None or len(piece.ink) <= 4 or i in merged else sign.x0
             at = next((k for k, c in enumerate(host.chars) if c.x0 >= left), len(host.chars))
-            chars = [*host.chars[:at], *piece.chars, *host.chars[at:]]
-            keeps = sign is not None and best not in piece_ids
-            size = host.size if keeps else host.line_size
-            merged[best] = _Row(chars, column=host.column, line_size=size)
+            folded = piece.chars
+            if sign is not None and best not in piece_ids:
+                kept = replace(sign, line_size=host.size)
+                folded = [kept if c is sign else c for c in folded]
+            merged[best] = _Row([*host.chars[:at], *folded, *host.chars[at:]], column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 

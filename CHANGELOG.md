@@ -10,10 +10,12 @@
   - Limits (O-445): with the region tree on, a limit under or over a sum, product or integral
     sign stays in the sign's line where a bracket beside it had cut it off; a sign that took
     its limit keeps its place in the line, and the line keeps its equation number. Against
-    0.5.19 on 62 public arXiv papers (1,224 pages) 75 pages differ, 1 has one element more
-    (two numbered equations that were one display) and 8 have fewer; on the 60 development
-    files (917 pages) 57 differ, 1 has one element more and 4 have fewer. One display reads worse, the limits of displays on two pages
-    are traded and one sentence reads better at the cost of a stray equation, all named in
+    0.5.19 on 62 public arXiv papers (1,224 pages) 74 pages differ, 1 has one element more
+    (two numbered equations that were one display) and 7 have fewer; on the 60 development
+    files (whole, 947 pages) 51 differ, 1 has one element more and 4 have fewer; on 60
+    further public papers (1,195 pages) 66 differ, none has more and 10 have fewer. Two
+    displays read worse, the limits of displays on two pages are traded and one sentence
+    reads better at the cost of a stray equation, all named in
     the entry below.
   - Algorithms: a full-width algorithm whose short steps have comments at the right and whose
     long steps run past the gutter is one block (arXiv 2504.06207 page 13).
@@ -109,7 +111,10 @@
 
 - O-445: a short item (at most 8 characters) that is the limit of a sum, product or integral sign
   by its place is in the sign's band, whether or not the sign is taller than it, so a limit level
-  with a binomial's lower entry is no longer a band of its own (`regions._limit_of`).
+  with a binomial's lower entry is no longer a band of its own (`regions._limit_gap`). A limit is
+  the limit of one sign, the nearer one, so the limit under the sum of one line of a display is
+  no upper limit of the sum on the next line (`regions._at_sign`; display (2.19) of arXiv
+  2503.05994 page 14 stays one equation).
   Three faults the rule brought with it are repaired with it (review 30): a sign whose row
   took a long limit, or that stands after another sign, was read after its line ("p(x0) =
   pt(…) dx. ∫ ∏Tt=1"; `rows._sign_of_limits`); the line, taller with the limit in it, lost
@@ -118,14 +123,27 @@
   script-size letters than full-size ones counted as a line of script size once the limit
   was in it, so the limit under its sum became an equation of its own, a numbered line
   under it passed for its limits, and on a page with no running text a display whose
-  subscripts are words became a paragraph (the line keeps the size it had,
-  `_Row.line_size`).
+  subscripts are words became a paragraph (the line keeps the size it had; the sign
+  carries it, `_Char.line_size`, so a row cut for its equation number or its list marker
+  keeps it too).
+  And after review 31: the limit under a sum is found by the size of the sign when the line
+  counts as script size without any limit in it (three subscripted letters side by side;
+  `display._limits_of`, arXiv 2505.04942 page 12); a sign placed by its own center, when
+  the fragment's center finds no row, needs a limit in the fragment and no row that the
+  fragment reaches into without lying within it (`rows._attach_big_operators`: the sum of a
+  fraction's numerator on `ax_statme_240307158` pages 3 and 8 and the "(∑" of
+  `ax_cslg_240306366` pages 10, 11 and 13 read as at 0.5.19 again); and the signs that take
+  limits are one set (`shared.LIMIT_SIGNS`).
   Measured against 0.5.19 with production's switches, 2026-11-24: on 62 public arXiv papers
-  (the first 25 pages of each, 1,224 pages) 75 pages differ, 1 has one element more (the
+  (the first 25 pages of each, 1,224 pages) 74 pages differ, 1 has one element more (the
   equations (2) and (3) of arXiv 2210.13562 page 5, one display with two numbers before) and
-  8 have fewer, and the displays that end with a sign and its limits (the sign read after its
-  line) go from 189 to 186; on the 60 files of `layout-dev-1` (917 pages) 57 pages differ, 1
-  has one element more and 4 have fewer, and those displays go from 77 to 75. None of the 73
+  7 have fewer, and the displays that end with a sign and its limits (the sign read after its
+  line) go from 189 to 186; on the 60 files of `layout-dev-1` (whole files, 947 pages with
+  elements) 51 pages differ, 1 has one element more and 4 have fewer, and those displays go
+  from 79 to 77; on 60 further public papers (the first 25 pages of each, 1,195 pages) 66
+  pages differ, none has more elements and 10 have fewer, and those displays go from 126 to
+  115 (the lower limit of three displays of arXiv 2503.05994 that 0.5.19 read as equations
+  of their own is in its display). None of the 73
   recorded corpus uploads moved, the box score of the development papers is as it was, and
   neither `eval order` record has a page made wrong. Behind the region tree switch, which is
   on. No version bump is in this entry.
@@ -135,7 +153,13 @@
   - Read worse: the second line of one display, where a note set over the "=" stands a little
     higher than the sums, has the upper limits of its three sums read in front of the line
     ("T m T (α) ∑ ∑ = …"); 0.5.19 read two of the three at their signs (arXiv 2504.03499
-    page 25).
+    page 25). And one sum whose upper limit was folded into the row of numerators beside it
+    before the sign came: the sign lands inside that limit ("2N∑n=0−1 …"; 0.5.19 read the
+    sign after its line; `ax_quantph_240306391` page 16).
+  - Known limit, as at 0.5.19: the lower limit of a sum beside a binomial is in the sum's
+    line on the slide the rule was built for; on an ordinary article page the same shape
+    still reads "(x + y)n = xn−kyk ∑ (nn ) k k=0" (a made page; no real page of the three
+    sets shows it).
   - A trade: a sum set in a sentence with limits over and under it had its limits read into
     the words of the sentence ("morek=0 involved and need∞s"); the sentence is clean now, the
     upper limit is at its sign, and the lower one is a short equation of its own
@@ -181,6 +205,9 @@
     `language=` option, so the source stopped with `source_undefined`. A new preload,
     `source/compat.tex`, defines it as empty, and `\orcidlink{...}` as nothing (the link has no
     text for a reader). It is read before every document, next to the beamer preload.
+    Known limit: a source with a bibliography database gets one more warning from
+    `latexmlpost` ("missing_file:/opt/compat.tex … In Post::MakeBibliography"); warnings
+    are only counted, and the page is the same.
   - Lint: a class or package file bundled with the upload (a journal's `.cls` or `.sty`) that
     fails the lint no longer refuses the upload: the file is left out of the project LaTeXML
     gets, and the document is read with LaTeXML's own binding, unless a file inputs it by name

@@ -2,7 +2,7 @@
 % numbered sum whose line holds a word ("sinc"), level with a numbered equation of the other
 % column, a product whose limits stand between an integral sign and the rest of the line, and
 % on a second page a short sum with more script-size letters than full-size ones, its
-% subscripts roman words.
+% subscripts roman words, as a display and as an item of a numbered list.
 % Used by tests/test_layout_latex.py. Written for ReadableSTEM's tests; no third-party text.
 \documentclass[10pt,twocolumn]{article}
 \usepackage[OT1]{fontenc}
@@ -44,5 +44,10 @@ It is zero only when the two distributions are the same.
 % the line itself says that the sum is a display.
 \noindent The energy of a chain:
 \[ E_{\mathrm{tot}} = \sum_{i=1}^{n} e_i + E_{\mathrm{reg}} \]
+% The same shape as an item of a list: the marker is cut off the line after the sum has come
+% into it.
+\begin{enumerate}
+\item $\displaystyle E_{\mathrm{kin}} = \sum_{i=1}^{n} k_i + E_{\mathrm{pot}}$
+\end{enumerate}
 
 \end{document}
