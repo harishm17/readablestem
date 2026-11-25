@@ -233,13 +233,19 @@ reader, neither to find them nor as a second opinion
    repeats on half of the reference pages are logos and are dropped too. Watermarks go:
    diagonal text at least 2 x body size, and rotated text repeated at the same place on
    half of the reference pages. One line goes without repeating (`_is_side_stamp`, since
-   0.5.20): the stamp arXiv prints up the left margin of a paper's first page, a turned row
-   whose words are the stamp's (`arXiv:2403.06391v1 [quant-ph] 10 Mar 2024`; an identifier
-   of the old form has no subject in brackets). It stands on one page, and its place in
-   the height of the page had it read as a paragraph between two of the text's, or inside
-   one. It is known by its words and not by its place: a turned line at the edge of a page
-   may be the title of a chart's axis, and no place tells the two apart. The same words set
-   upright (a reference, a footer) are text. A figure takes back the dropped rows that label it
+   0.5.20): the stamp arXiv prints up the left margin of a paper, a turned row whose words
+   are the stamp's, whole (`arXiv:2403.06391v1 [quant-ph] 10 Mar 2024`; an identifier of
+   the old form may have no subject in brackets). It stands on one page (the first, or the
+   first of a supplement bound in after the paper: the rule takes it on any page), and its
+   place in the height of the page had it read as a paragraph between two of the text's, or
+   inside one. It is known by its words and not by its place: a turned line at the edge of
+   a page may be the title of a chart's axis, and no place tells the two apart. The same
+   words set upright (the last line of a reference, a footer) are text. Limits: no other
+   stamp is known (a turned "Downloaded from ..." line that stands on one page is still
+   read), and a stamp that runs off the page so that its date is cut is still read (arXiv
+   1711.06139 page 1, a small page). What changes on real pages when the stamp goes, and
+   the two pages that read worse without it, are under "The stamp on real documents"
+   below. A figure takes back the dropped rows that label it
    (`_figure_labels`, since 2026-10-12: the silent-loss sweep found a slide's x tick
    labels in the footer band dropped as page numbers, an axis title repeated under each
    chart of a deck dropped as a running footer, and a repeated rotated y-axis title
@@ -434,9 +440,11 @@ so a heading is not, and a line that starts a block is not).
    document (`eigen-vector`), the hyphen stays; when the joined word is written whole
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
-   counted, so a break never vouches for itself. The rows left out as furniture are part
-   of the document's spelling (since 0.5.20): the subject in the stamp up the side of a
-   paper (`physics.ed-ph`) is how its references write it.
+   counted, so a break never vouches for itself. The rows that the margin filter leaves
+   out (running heads and feet, page numbers, watermarks, the stamp) are part of the
+   document's spelling (since 0.5.20): the subject in the stamp up the side of a paper
+   (`physics.ed-ph`) is how its references write it. Rows taken out by their place and
+   put elsewhere are in neither list.
    Two lines that end and start in a script written without spaces (Han, Hiragana, Katakana,
    Thai, Lao, Khmer, and their full-width punctuation) join with no separator
    (`blocks._line_break`).
@@ -514,6 +522,54 @@ so a heading is not, and a line that starts a block is not).
    joined ones, are not carried and are shown as "decide again" or counted in
    `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
    unchanged.
+
+**The stamp on real documents (0.5.20).** Counted with `layout.analyze` under production's
+switches, the source with the rule (`800165e7`) against the same source without it
+(`8c509aef`); no model:
+
+| Set | Pages | Differ | Stamps read, before to after |
+|---|---|---|---|
+| 183 public arXiv papers, the first 25 pages of each | 3,533 | 177 | 177 to 0 |
+| the 60 files of `layout-dev-1`, whole | 947 | 29 | 29 to 0 |
+| 184 further public arXiv papers that no earlier round had read, the first 6 pages of each (drawn and read by review 34) | 1,093 | 159 | not counted apart |
+
+- In the first set the pages that differ are 175 first pages and the first pages of two
+  supplements bound in after their papers (arXiv 2405.04201 page 6, 2405.07383 page 13). The
+  stamp was an element of its own on 148 of them and stood inside a paragraph or a list item
+  on 29. On 112 pages the stamp is the whole difference; on 60 the same characters stand in
+  the same order in fewer elements; on 4 the inline formulas of a joined paragraph are listed
+  at another place; 1 reads worse (below). No figure and no table changes. (Review 34's
+  comparison, from archives of the two commits; the commits after `800165e7` change no code.)
+- In the development files all 29 are first pages: 12 by the stamp alone, 15 with the same
+  characters in fewer elements, one with a word whole that the stamp had cut at a line end
+  ("relation-" and "ship", `ax_cslg_240306367`), one with inline formulas listed elsewhere.
+- In the third set: 87 by the stamp alone, 60 with the same characters, 5 with formulas
+  listed elsewhere, 7 other; no figure and no table changes.
+- "Fewer elements" is two things. Where the stamp had cut one block (a paragraph, a title, an
+  affiliation line), the block is whole. Where the stamp had stood between two different
+  blocks, they now run together with no word lost and the order right: the last affiliation
+  with the correspondence line (arXiv 2312.17566, 2408.09889), the author line with the
+  affiliations (2406.19702, 2408.13659, 2504.09024), an affiliation with its e-mail
+  (2401.11352, 2505.05338, 2407.08468), a title in two languages as one heading
+  (2412.17089), two affiliations (2311.08229), and in the development files an affiliation,
+  "and" and the next author as one heading (`ax_statme_240307124`). "Abstract" is a heading
+  where it was a paragraph on four pages (2311.16176, 2405.01155, 2408.13045, 2503.13398).
+- Two places read worse, and both are older faults that the stamp had hidden (the 0.5.19
+  source reads them the same way once the stamp is taken off the page). arXiv 2411.02531
+  page 1: the last line of a paragraph begins with a sum sign; with the stamp beside it the
+  line was a display of its own, and without it the line is read at the head of the next
+  paragraph and the sign after that paragraph. arXiv 2505.05280 pages 1 to 2: the last
+  paragraph of page 1 no longer takes its end from the top of page 2, because the left edge
+  of page 1's text is now the abstract's and not the stamp's (`joins._text_edges`), so the
+  two edges are not the same. So a stamp's removal can change the page after it. Neither
+  is repaired here.
+- Of 334 stamped first pages of 367 open papers, 333 are taken (the one left is the cut
+  stamp of 1711.06139), and 12 of 12 identifiers of the old forms are taken; no other
+  turned row at a side edge and no upright row that is a stamp's words whole was found in
+  them (review 34).
+- The spellings of the rows left out change one page of the 4,480 of the first two sets:
+  arXiv 2305.00609 page 20, where a reference breaks "[physics.ed-" and "ph]" and keeps its
+  hyphen because the stamp spells the subject.
 
 ### The region tree (`REGION_TREE`, off in code, on in production since 0.5.18)
 

@@ -141,11 +141,13 @@ _ARXIV_STAMP = re.compile(r"^arXiv:\S+(?:\s+\[[\w.-]+\])?\s+\d{1,2}\s+[A-Z][a-z]
 
 
 def _is_side_stamp(row: _Row) -> bool:
-    """Is this turned row the stamp of the repository a paper was taken from? It stands on
-    one page, so nothing repeats to say that it is no content (`_MarginFilter.rotated`), and
-    its place in the height of the page put it between two paragraphs of the text. It is
-    known by its words alone, and only when turned: a turned line at the edge of a page may
-    also be the title of a chart's axis, and no place on the page tells the two apart."""
+    """Is this turned row arXiv's stamp? It stands on one page of a paper (the first; the
+    first of a supplement bound in after it), so nothing repeats to say that it is no content
+    (`_MarginFilter.rotated`), and its place in the height of the page put it between two
+    paragraphs of the text. It is known by its words alone, whole, and only when turned: a
+    turned line at the edge of a page may also be the title of a chart's axis, and no place
+    on the page tells the two apart. No other repository's stamp is known here, and a stamp
+    that runs off the page, so that its date is cut, is not either."""
     return row.vertical and not row.diagonal and bool(_ARXIV_STAMP.match(row.clean.strip()))
 
 
@@ -153,7 +155,7 @@ def _is_side_stamp(row: _Row) -> bool:
 class _MarginFilter:
     """What repeats on the pages and is not content: running headers and footers, page
     numbers, logos in the header/footer band, watermarks; and the one line that is no
-    content without repeating, a repository's stamp up the side of a page (`_is_side_stamp`).
+    content without repeating, arXiv's stamp up the side of a page (`_is_side_stamp`).
 
     Margin text is dropped when its digit-normalised text repeats in the same band, unless
     it stands out (larger than body text, or bold at body size or more) and its digits change
