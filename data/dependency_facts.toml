@@ -145,7 +145,7 @@ hostile = ["tests/test_audit_uploads.py", "tests/workflows/test_wf49_hostile_inp
 [python.pymupdf-layout]
 use = "table proposals only (pipeline/tables.py); ruled out for reading order and as a witness"
 reads = "pages of an uploaded PDF"
-runs_in = "the conversion child, behind the probe that guards the table step"
+runs_in = "the conversion child, behind the probe that guards the table step and a second child that makes the detector's own text reading first (`access.hunt_failures`)"
 hostile = ["tests/test_audit_uploads.py", "tests/test_tables_fuzz.py"]
 
 [python.python-multipart]
