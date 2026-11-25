@@ -76,8 +76,10 @@ HUNT_FLAGS = (
     | pymupdf.TEXT_FUZZY_VECTORS
 )
 # The children that try that extraction (`hunt_failures`) may take this long together for a
-# document's first page and `PROBE_PER_PAGE_S` more for each further one: the slowest page of
-# 4 measured papers took 0.11 s on a fast core.
+# document's first page and `PROBE_PER_PAGE_S` more for each further one. Measured on 367
+# public papers, the 60 development files and the 25 corpus files (13,236 pages): 35 ms a
+# page on average, the slowest page 9.7 s, and the document that used most of its time 12%
+# of it (docs/layout.md, "A page the table detector cannot read").
 HUNT_TIMEOUT_S = 30.0
 HUNT_DEATHS_MAX = 8  # pages of one document that may kill a child before the rest go unread
 CROP_PAD = 2.0  # crop's default padding around an element box (pt)
@@ -576,6 +578,9 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int], at_most_s: float | None = N
 # detector will, and write the page's number once the read is over. Python errors are
 # swallowed (the detector's caller handles them in this process); what matters is the page
 # at which the child dies. `copy`: read a copy of the page alone in a document of its own.
+# A page with more drawn items than the detector reads (`tables.MAX_DETECTOR_ITEMS`) is not
+# read here either: `tables.propose` leaves it out by the same count, and the reading of such
+# a page can take minutes (page 7 of arXiv 2410.12036, 2.1 million items, did not end in 600 s).
 _HUNT_SCRIPT = """
 import sys
 try:  # cap this process's address space first, as the probe does
@@ -595,11 +600,12 @@ doc = pymupdf.open(stream=sys.stdin.buffer.read(), filetype="pdf")
 for number in map(int, sys.argv[1].split(",")):
     try:
         page = doc[number]
-        if sys.argv[3] == "copy":
-            alone = pymupdf.open()
-            alone.insert_pdf(doc, from_page=number, to_page=number)
-            page = alone[0]
-        page.get_textpage(flags=int(sys.argv[2]))
+        if sum(len(d["items"]) for d in page.get_cdrawings()) <= int(sys.argv[5]):
+            if sys.argv[3] == "copy":
+                alone = pymupdf.open()
+                alone.insert_pdf(doc, from_page=number, to_page=number)
+                page = alone[0]
+            page.get_textpage(flags=int(sys.argv[2]))
     except Exception:
         pass
     sys.stdout.write(f"{number}\\n")
@@ -660,6 +666,7 @@ def _hunt_pages(
         str(HUNT_FLAGS),
         source,
         str(PROBE_MEMORY_BYTES + 2 * len(pdf_bytes)),
+        str(tables.MAX_DETECTOR_ITEMS),
     ]
     try:
         written = subprocess.run(

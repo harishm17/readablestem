@@ -28,9 +28,19 @@
   are `"none"`.
 - **Measured.** Pages 21 to 23 of the paper are read (page 22: 18 elements, the detector on
   a copy). On the paper's other 26 pages the detector proposes the same boxes on the page
-  and on its copy. The reading costs 10 to 50 ms a page (the slowest of four papers'
-  pages 0.11 s) and the child about 0.14 s to start, once for a document. A document with
-  no such page reads as before: the child's reading is thrown away.
+  and on its copy. No other page dies: none of 11,079 pages of the 367 other public papers
+  of the collection, of 954 pages of the 60 development files or of 1,202 pages of the 25
+  corpus files, each read where it is and as a one-page copy turned a quarter either way.
+  The child costs 35 ms a page on those files (444 s for 13,236 pages) and about 0.14 s to
+  start, once for a document; the slowest page takes 9.7 s (arXiv 2504.09024, page 15), and
+  no document uses more than 12% of the children's time. A document with no such page reads
+  as before: the child's reading is thrown away.
+- **A page the detector does not read is not read by the child.** The first count found
+  it: page 7 of arXiv 2410.12036 has 2.1 million drawn items, and the reading did not end
+  in 600 s. `tables.propose` leaves out a page with more than 30,000 items
+  (`MAX_DETECTOR_ITEMS`), so the child counts the items first and leaves the same pages
+  out (109 of the 13,236). Without that, such a page would have used up the children's
+  time and left the pages after it without the detector.
 - **Not covered.** A page set sideways is read by the detector through a turned one-page
   copy, which has no structure tree and is not tried. A page whose answer is `"none"` gets
   a warning in the log and no notice of its own; none has been seen. Other MuPDF calls of

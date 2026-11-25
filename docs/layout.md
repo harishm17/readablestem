@@ -4598,7 +4598,10 @@ tree: the PDF is tagged, and a copy of the page alone in a new document
 (`Document.insert_pdf`, which carries the page's content, boxes and Rotate and leaves the
 tree behind) is read without harm, turned or not. So after the probe, `analyze` has a second
 child make that reading on every selected page the probe passed, one page after another,
-and write each page's number once the page is behind it. A child that dies names the page
+and write each page's number once the page is behind it. A page with more drawn items than
+the detector reads (`tables.MAX_DETECTOR_ITEMS`, 30,000) is not read by the child either:
+`tables.propose` leaves such a page out by the same count, and its reading can take minutes
+(page 7 of arXiv 2410.12036, 2.1 million items, did not end in 600 s). A child that dies names the page
 it died on (the first one it did not write); that page is tried again in a child of its
 own as a copy, and the rest go to a new child. The answer for each such page is
 `tables.DetectorSource`: `"copy"` (the detector reads a one-page copy; its proposals are in
@@ -4615,10 +4618,21 @@ each of 8 dying pages, one for the copy of each, and the one that dies on the ni
 then reads without the detector. The log names the page and the answer, nothing of the
 page.
 
-What it costs: the reading takes 10 to 50 ms a page on the papers measured (the slowest
-0.11 s) and the child about 0.14 s to start, once for a document. What it changes: nothing
-for a document none of whose pages dies there (the child's reading is thrown away; the
-detector reads the page as before). On the paper's other 26 pages the detector proposes
+How often (2026-11-25, every page read where it is and as a one-page copy turned a quarter
+either way): on the 367 other public papers of the collection (11,079 pages read; one page
+left out for its 2.1 million items), the 60 development files (954 pages) and the 25 files
+of the corpus (1,202 pages) no page dies. The one page known is the one that was found by
+its crash.
+
+What it costs, on the same files with the child's own steps (the items counted, then the
+reading): 391 s for the 11,080 pages of the papers, 42 s for the 954 pages of the
+development files and 11 s for the 1,202 of the corpus, 35 ms a page over all of them, and
+about 0.14 s to start the child, once for a document. 109 pages are not read for their
+items (98, 5 and 6). The slowest page takes 9.7 s (arXiv 2504.09024, page 15), and that
+paper is the one that uses most of its time, 12% of it; no other document uses a tenth.
+The detector makes the same reading again in this process, so a page that is slow here
+was as slow before, once. What it changes: nothing for a document none of whose pages
+dies there (the child's reading is thrown away; the detector reads the page as before). On the paper's other 26 pages the detector proposes
 the same boxes on the page and on its copy. What it does not cover: a page turned on its
 side is read by the detector through a turned one-page copy (`tables._find_turned`), which
 has no structure tree and is not tried; a page whose answer is `"none"` gets a warning in
