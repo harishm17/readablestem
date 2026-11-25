@@ -1132,9 +1132,10 @@ def _starts_at(host: _Row, piece: _Row, rows: Sequence[_Row]) -> bool:
     on its line? A sign that leads a line of a paragraph comes as a piece of its own, and the
     row of what goes on starts with the lower limit TeX lowers to the baseline of the line, or
     with the integrand, so that row seems to start a sign's width after the sign (arXiv
-    2411.02531 page 1, 2212.05955 page 13). The rows of a display are left as they were: their
+    2411.02531 page 1, 2212.05955 page 13). Most rows of a display are left as they were: their
     signs stand where the display's own lines put them, behind a fraction or an equals sign,
-    and its "for |x| < 1" is no running text."""
+    and its "for |x| < 1" is no running text. A display that begins with the sign and holds
+    an upright word is taken for such a line too (docs/layout.md has the count)."""
     first = next((c for c in host.chars if not c.blank), None)
     if first is None or not any(
         c.c in LIMIT_SIGNS and c.x0 <= first.x0 <= c.x1 + 0.5 * host.size for c in piece.ink

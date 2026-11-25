@@ -1933,7 +1933,8 @@ raised text (next section).
   start when the sign is a sum, product or integral sign that ends no more than half an
   em before the row's first glyph, the row goes on in running words (a word of three
   letters or more of upright letters that is no function name: "for", "which"; so the
-  rows of a display, which hold none, are left as they were), and nothing stands before
+  rows of a display that hold none are left as they were, and a display that begins
+  with the sign and holds one is folded too: the count below), and nothing stands before
   the sign on its line (a display's sign stands behind a fraction or an equals sign, and
   its "for |x| < 1" is no running text: 2411.16302 page 17, 2504.10283 page 23 and
   2506.13221 page 11 read worse before the rule asked for this, and were put back).
@@ -1951,6 +1952,22 @@ raised text (next section).
   letters is "acos", which is no entry of the function names, is read as a paragraph that
   starts with its sum sign, with the limit "E∈ℰ𝒮" a block after it; it was the block
   "∑E∈ℰ𝒮" before the paragraph; both are broken.
+  That count stops at page 25 of each paper. On the public papers read whole (366 of
+  368 are read, 11,011 pages; review 38, the table detector left out) the rule says yes
+  173 times in 76 papers and 125 pages differ: 34 only in spacing, about 75 read better
+  (most are lines in the middle of a paragraph that begin with a sign after a break at an
+  equals sign), about 10 are broken either way, and 3 read worse: the page above;
+  2412.19752 page 96 (a wide display that begins with a sum and holds "partitions of":
+  broken before, in more pieces now); and 2406.15398 page 5, where a fraction's
+  denominator begins with a text-style sum and holds the upright subscript "old", which
+  counts as a running word, and the denominator is read before the numerator (the
+  numerator stands above the sign, not left of it, so nothing "stands before the sign").
+  Counting a word only when its letters are no script of the row was measured and not
+  built: it changes 17 of the 125 pages, mends 2406.15398 page 5 and cuts a paragraph
+  before its last formula on 2411.08218 page 37. The signs are those of `LIMIT_SIGNS`
+  (sum, product, coproduct, the integrals, big union, big intersection). `_starts_at`
+  reads the page's rows once for each sign that passes its first test: a made page of
+  2,000 sign-led lines takes 50 s against 19 s; no real page comes near it.
 - **`E°cell`** (`_degree_over_label`). A degree sign over the start of a lowered label
   (`E°cell`, `E°cathode`) is read after the label, not inside it (`E c°ell`, which cut the inline
   equation in two); several degree signs in one row are scripts of their own; and the degree sign

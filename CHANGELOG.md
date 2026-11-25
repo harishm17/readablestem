@@ -10,17 +10,22 @@
     process (arXiv 2501.02633 page 22; the job ended as `conversion_crashed`) is found by a
     child process before the table detector reads it. The detector reads a one-page copy of
     it, or, where the copy faults too or the children's time is used up, the page is not
-    searched for tables and the document says so. One dying page was found in 13,236 pages of
-    real documents; every other document reads as before.
+    searched for tables and the document says so. It is the only dying page found: none of
+    the 13,236 pages of the other real documents read for it dies, and a document with no
+    such page reads as before.
   - A paragraph cut by a page break is joined on a first page whose abstract is set in left
-    of the body's column (arXiv 2505.05280 pages 1 to 2). Against 0.5.20, 8 joins are gained
-    on 7 of 365 public papers and 2 on 2 of the 60 development files; none is wrong and none
-    is lost.
-  - The last line of a paragraph that begins with a sum, product or integral sign and goes on
-    in running words is read in its paragraph, sign first (O-471; arXiv 2411.02531 page 1).
-    Of 3,533 pages of 183 public papers 46 differ (31 read better, 14 only in spacing, 1
-    reads worse: arXiv 2501.05251 page 9); of the 947 pages of the development files 6
-    differ, all better.
+    of the body's column (arXiv 2505.05280 pages 1 to 2). Against 0.5.20, with production's
+    four switches, 8 joins are gained on 7 of 365 public papers and 2 on 2 of the 60
+    development files; none is wrong and none is lost. With the four switches off two wrong
+    joins come on the development files (index entries, one pair in each of two textbooks).
+  - A line of a paragraph that begins with a sum, product or integral sign (or another of
+    the big signs that take limits) and goes on in running words is read in its paragraph,
+    sign first (O-471; arXiv 2411.02531 page 1). Of 11,011 pages of 366 public papers read
+    whole 125 differ: 34 only in spacing, about 75 read better (most are lines in the middle
+    of a paragraph, after a break at an equals sign), about 10 are broken with the rule and
+    without it, and 3 read worse (arXiv 2501.05251 page 9, 2412.19752 page 96, 2406.15398
+    page 5: a display that begins with the sign and holds an upright word is taken for
+    such a line). Of the 947 pages of the development files 6 differ, all better.
   - The stop rule for held-out runs (docs/eval.md, rule 5) is kept by the command: `eval order
     --set NAME --for-release` lists each release run of a held-out set in a tracked file
     before it reads a document and refuses a set already scored for the current pipeline
@@ -34,7 +39,8 @@
   page is not made again, and 0.5.20 opens a 0.5.21 result. The roll-back limit stays at 0.5.12.
 - The corpus recording made at 0.5.18 stands: every one of the 73 uploads asks for the
   decisions the record has, and none misses an answer of the recording that it had (`eval
-  burden --same`; the other release measurements are in docs/eval.md, "Pipeline 0.5.21").
+  burden --same`), and the replay of each upload gives the document 0.5.20 gave, hash for
+  hash. The other release measurements are in docs/eval.md, "Pipeline 0.5.21".
 
 ## Unreleased: a page whose reading for the table detector ends the process (O-468)
 
@@ -145,11 +151,15 @@
   tail across columns). The edge is not the column's body edge on 763, 116 and 32 of the
   7,965, 1,109 and 280 columns of pages.
 - Against 0.5.20: on the papers 16 pages of 7 papers differ, on the development files 4 pages of
-  2 files, in the corpus none. Each page is one join gained and every one is right (8 and 2
-  joins: a sentence cut by the page, a reference entry cut by the page); none is wrong, none is
-  lost. With the four switches off (`hashrun.py analyze`, 334 files in three variants) the same
-  joins come and one more: two index entries of `os_concepts_biology` (pages 17 and 18, a
-  wrong join the production switches do not make). `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) does not
+  2 files, in the corpus none. Each pair of pages is one join gained and every one is right (8
+  and 2 joins: a sentence cut by the page, a reference entry cut by the page); none is wrong,
+  none is lost. That is with production's four switches. With the four switches off the same
+  joins come and two more on the development files, both wrong: two index entries of
+  `os_concepts_biology` (pages 17 to 18) and of `os_principles_data_science` (pages 18 to 19).
+  Without the region tree an index page is one column, most of its lines start at the
+  right-hand column of the index, and `_line_edges` reads that x as the page's edge. The
+  production switches make neither join; the code's own defaults are the switches off.
+  `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) does not
   move on either view. The corpus replay (73 uploads) is the same byte for byte, so no
   recorded request stops matching. A pipeline raise is owed with the next release.
 
@@ -161,7 +171,8 @@
   stops); each was run again alone. The 19 that converted keep the same XHTML (hash).
   - The "time limit" group is the memory cap: 11 of 12 end at the 512 MB address-space cap
     (the twelfth crashes in `latexmlpost` at any cap). With 768 MB three more sources convert,
-    with 1 GB and 320 s a fourth and fifth would; each is a real conversion. No raw package or
+    a fourth with the group's resident cap raised as well, and a fifth needs 1 GB and up to
+    320 s; each is a real conversion. No raw package or
     figure is the cause, so there is nothing to skip or stub. The limit is the owner's to
     change: 4 x 768 MB is 3 GB for the sandbox's bound.
   - Journal classes: no binding LaTeXML ships reads any of the eight classes seen. Reading the
@@ -182,14 +193,35 @@
   its paragraph, sign first and with its limits. The sign is a row of its own and the row of what
   goes on starts a sign's width after it, so the sign was not folded into it: it was read at the
   head of the next paragraph and the sign after that paragraph (`rows._attach_big_operators`,
-  `rows._starts_at`). The rule asks that the row go on in running words and that nothing stand
-  before the sign on its line, so displays are left as they were. Counted on the 367 public papers
+  `rows._starts_at`). The rule asks that the row go on in running words (an upright word of
+  three letters or more that is no function name) and that nothing stand before the sign on
+  its line. That leaves most displays as they were, not all: a display that begins with the
+  sign and holds such a word is folded too, and so is a line in the middle of a paragraph.
+  The signs are those of `LIMIT_SIGNS`: sum, product, coproduct, the integrals, big union and
+  big intersection. Counted on the 367 public papers
   of the list (first 25 pages) and the 60 development files before the change: of the lines that
   begin with a big sign and go on in running words, 14 were read in place, 45 were a display of
   their own and 27 out of place (0, 2 and 4 on the development files; none in the private corpus);
   after it 31, 43 and 12 (1, 2 and 3). Of 3,533 pages of the 183 papers of review 34 (first 25
   pages) 46 differ (31 read better, 14 only in spacing, 1 reads worse: 2501.05251 page 9) and of the
-  947 pages of the 60 development files 6 differ, all better. The 73 recorded requests of the
+  947 pages of the 60 development files 6 differ, all better.
+- The whole cost, counted by review 38 on the public papers read whole (366 of 368 are read:
+  11,011 pages; production's switches, the table detector left out): the rule says yes 173
+  times in 76 papers and 125 pages differ, 51 of them past page 25. 34 differ only in spacing;
+  of the 91 others about 75 read better, about 10 are broken with the rule and without it, and
+  3 read worse: 2501.05251 page 9 (above); 2412.19752 page 96, a wide display that begins with
+  a sum and holds the words "partitions of", broken before and in more pieces now; and
+  2406.15398 page 5, a display whose fraction has a text-style sum at the head of its
+  denominator and the upright subscript "old", where the denominator is now read before the
+  numerator (still one equation). Three more are whole at the sign now and cut one line later
+  (2411.09088 page 5, 2401.00649 page 55, 2501.02602 page 1). Most of the better pages are
+  lines in the middle of a paragraph that begin with a sign after a break at an equals sign.
+- Measured and not built: counting a running word only when its letters are no script of the
+  row. On the 76 papers it changes 17 of the 125 pages: 14 go back to the reading without the
+  rule (2406.15398 page 5 among them; most of the others differ only in spacing) and 3 read
+  another way, one of them worse (2411.08218 page 37, a paragraph cut before its last
+  formula). One page mended for one page worse, so the rule stays as it is.
+- The 73 recorded requests of the
   corpus all still match; so a change to stored documents is limited to the pages above, and
   `PIPELINE_VERSION` is owed a raise with the next release (`RENDER_VERSION` is not).
 
