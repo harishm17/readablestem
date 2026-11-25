@@ -49,6 +49,7 @@ from readablestem.pipeline.layout.glyphs import (
 )
 from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
+    LIMIT_SIGNS,
     SCRIPT_MIN_RATIO,
     SCRIPT_RATIO,
     SCRIPT_ROW_FLOOR,
@@ -1007,6 +1008,30 @@ def _tall_bracket(row: _Row) -> bool:
     return len(row.ink) == 1 and row.ink[0].c in _BRACKETS
 
 
+LIMIT_GLYPHS = 8  # the glyphs of one limit of a sign, at most ("Ns/2−1", "i,j=1")
+
+
+def _sign_of_limits(row: _Row) -> _Char | None:
+    """The sum, product or integral sign of a row that is that sign and its limits alone: one
+    sign, and every other glyph a script-size one set over it or under it (its centre is above
+    the sign's top or below its bottom), at most `LIMIT_GLYPHS` on each side. The tall
+    brackets round a sum, "(∑ )−1", are no limits: they are the sign's size."""
+    ink = row.ink
+    signs = [c for c in ink if c.c in LIMIT_SIGNS]
+    if len(signs) != 1 or len(ink) < 2:
+        return None
+    sign = signs[0]
+    rest = [c for c in ink if c is not sign]
+    if any(c.size > SCRIPT_RATIO * sign.size for c in rest):
+        return None
+    centres = [(c.y0 + c.y1) / 2 for c in rest]
+    over = sum(centre <= sign.y0 for centre in centres)
+    under = sum(centre >= sign.y1 for centre in centres)
+    if over + under < len(centres) or over > LIMIT_GLYPHS or under > LIMIT_GLYPHS:
+        return None
+    return sign
+
+
 def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     """Fold a short fragment led by a big operator, or a tall bracket, into the line it
     sits in.
@@ -1020,39 +1045,64 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     right. So does a lone bracket (`_tall_bracket`): the opening bracket of
     "d/dx (7x^3 - 15x^2)" stood in a row of its own, and the inline equation lost it and
     kept the closing one, which was then cut off as unmatched.
+
+    A limit set over or under the sign and folded onto it (`_attach_scripts`) makes the
+    fragment longer and moves its centre off the line. So a sign with its limits alone
+    (`_sign_of_limits`) is a fragment whatever its length, placed where the sign stands, and
+    a fragment that finds no row at its own centre looks at the centre of its sign. One that
+    finds no line at all may still stand in a row of a sign and its limits: the product and
+    the sum before an integral whose row took their limits. The line keeps the size it had
+    before the limits came into it (`_Row.line_size`).
     """
+    signs = {i: _sign_of_limits(r) for i, r in enumerate(rows) if not r.vertical}
     pieces = [
         i
         for i, r in enumerate(rows)
         if not r.vertical
-        and ((len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)) or _tall_bracket(r))
+        and (
+            (len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink))
+            or _tall_bracket(r)
+            or signs[i] is not None
+        )
     ]
     if not pieces:
         return rows
     piece_ids = set(pieces)
-    hosts = sorted((r.y0, i) for i, r in enumerate(rows) if i not in piece_ids and not r.vertical)
-    tops = [y for y, _ in hosts]
-    tallest = max((rows[i].height for _, i in hosts), default=0.0)
+    lines = sorted((r.y0, i) for i, r in enumerate(rows) if i not in piece_ids and not r.vertical)
+    sign_rows = sorted((rows[i].y0, i) for i in pieces if signs[i] is not None)
     merged: dict[int, _Row] = {}
     dropped: set[int] = set()
     for i in pieces:
-        piece = rows[i]
-        centre = (piece.y0 + piece.y1) / 2
-        lo = bisect.bisect_left(tops, centre - tallest)
+        piece = merged.get(i, rows[i])
         best, overlap = None, 0.0
-        for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
-            host = merged.get(j, rows[j])
-            reach = 0.5 * host.size
-            inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
-            shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
-            on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
-            if on_line and inside and shared > overlap:
-                best, overlap = j, shared
+        centres = [(piece.y0 + piece.y1) / 2]
+        centres += [(c.y0 + c.y1) / 2 for c in piece.ink if c.c in _BIG_OPERATORS][:1]
+        for hosts in (lines, [(y, j) for y, j in sign_rows if j != i and j not in dropped]):
+            tops = [y for y, _ in hosts]
+            tallest = max((merged.get(j, rows[j]).height for _, j in hosts), default=0.0)
+            for centre in centres:
+                lo = bisect.bisect_left(tops, centre - tallest)
+                for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
+                    host = merged.get(j, rows[j])
+                    reach = 0.5 * host.size
+                    inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
+                    shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
+                    on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
+                    if on_line and inside and shared > overlap:
+                        best, overlap = j, shared
+                if best is not None:
+                    break
+            if best is not None:
+                break
         if best is not None:
             host = merged.get(best, rows[best])
-            at = next((k for k, c in enumerate(host.chars) if c.x0 >= piece.x0), len(host.chars))
+            sign = signs[i]
+            left = piece.x0 if sign is None or len(piece.ink) <= 4 or i in merged else sign.x0
+            at = next((k for k, c in enumerate(host.chars) if c.x0 >= left), len(host.chars))
             chars = [*host.chars[:at], *piece.chars, *host.chars[at:]]
-            merged[best] = _Row(chars, column=host.column)
+            keeps = sign is not None and best not in piece_ids
+            size = host.size if keeps else host.line_size
+            merged[best] = _Row(chars, column=host.column, line_size=size)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 

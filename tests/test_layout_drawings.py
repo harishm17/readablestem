@@ -24,7 +24,6 @@ from readablestem.core.types import Kind
 from readablestem.models import OFFLINE_DEFAULTS
 from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline import layout, page_type
-from readablestem.pipeline.layout.rows import page_paint
 from readablestem.pipeline.run import convert_pdf
 
 LETTER = (612.0, 792.0)
@@ -488,8 +487,8 @@ def test_a_line_that_a_clip_leaves_unpainted_is_no_strike_with_figure_art():
     # the clip holds a box far from the line
     ops = ["q 300 60 200 100 re W n", "0 0 0 RG 1 w 70 592 m 200 592 l S", "Q"]
     doc.update_stream(contents[0], doc.xref_stream(contents[0]) + "\n".join(["", *ops]).encode())
-    assert page_paint(doc[0])[0]
-    assert page_paint(doc[0], figure_art=True)[0] == []
+    assert layout.page_paint(doc[0])[0]
+    assert layout.page_paint(doc[0], figure_art=True)[0] == []
 
 
 def test_a_pen_drawing_that_typed_labels_name_is_a_figure_only_with_figure_art():

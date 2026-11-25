@@ -34,7 +34,8 @@ Element conventions:
   right edge is never a paragraph of its own: it is the label of the equation piece on its
   baseline (in either column of a page with a two-column section below, the same column
   first), or, when it is centered between lines, of the nearest piece within 2.5 font sizes
-  that has no number yet and is not level with a numbered line; a number that fits none
+  that has no number yet and is not level with a numbered line of its own column (a
+  numbered line of the other column is another equation); a number that fits none
   stays text. A number of one column does not go to the math of the other when text of its
   own column stands within two lines of it. Equation pieces that
   `display_grouping` does not join keep a number each, or none. A bracketed number set less
@@ -318,7 +319,20 @@ reader, neither to find them nor as a second opinion
    it had interleaved it with the line above ("dis v ta avg nce"). A fragment of at most
    four glyphs with a big operator (∫ ∑ ∏ √) joins the line it sits in, before the
    first glyph to its right: TeX sets the sign of an inline `$\int_0^1 x^2\,dx$` on a
-   baseline of its own, and left alone it became a display equation of its own.
+   baseline of its own, and left alone it became a display equation of its own. A limit
+   set over or under a sum, product or integral sign is folded onto the sign's row first,
+   which makes the fragment longer than four glyphs and moves its center off the line. So
+   a row that is one such sign and its limits alone (`_sign_of_limits`: every other glyph
+   script-size beside the sign, set over it or under it, at most eight on each side) is a
+   fragment whatever its length, it is placed where the sign stands, and a fragment that
+   finds no row at its own center looks at the center of its sign. One that finds no line
+   at all may stand in the row of another sign and its limits (the product and the sum
+   before an integral whose row took their limits). Before this a sign that took a long
+   limit, or one that stands after another sign, was read after its line ("p(x0) =
+   pt(xt−1 | xt) dx1:T . ∫ ∏Tt=1"; `tests/fixtures/layout/latex/sum_limits.tex`). The
+   tall brackets round a sum are no limits, and a row of a sign, its limits and a bracket
+   is still placed by its center. An integral sign whose box hangs above a line of plain
+   letters still finds no row (see "Limits of a sign" under Glyph math).
 5. **Reading order.** One column: top to bottom, left to right within a line. Two columns:
    left column, then right column, segment by segment. Items that cross the gutter are
    full-width and close a segment. A narrow item is full-width too when it sits at a
@@ -527,17 +541,26 @@ changed nothing in production.
   or below it than its own height) is in the sign's band too, whether the sign is taller than it
   or not: the lower limit of a sum that stood level with the lower entry of a binomial's bracket
   beside it was a band of its own, and read after the whole line ("(x + y)n =∑n (n k)xn−kyk
-  k=0"; page 20 of `latex-slides`, `∑nk=0 (n k)` now). Counted on real documents, 2026-11-24:
-  of 404 files (the public PDFs, the development papers and the 73 recorded corpus uploads),
-  72 hold 3,119 limit-like items (a short item over or under a big operator) that the bands
-  left apart from their sign's, on 264 pages. In the 71 public files, 1,892 of them sit inside
-  an equation's box; the display's text has the limit beside its sign 657 times with the rule
-  off and 703 times with it on. 43 limits moved to their sign. Three more were counted as
-  moved away and are not (the test is a distance, and an upper limit that moves inline
-  lengthens it). Four limits on three displays (`econem` page 48, `quantph` page 14) are
-  traded: the upper limit now follows its sign and the lower is read after the line, where
-  before the lower followed its sign and the upper stood in front of the display. The rule
-  moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
+  k=0"; page 20 of `latex-slides`, `∑nk=0 (n k)` now). Measured on real documents, 2026-11-24,
+  against 0.5.19 with production's switches (the rule together with the three repairs it
+  needed: "Rows" above, "Equation numbers", and "Limits of a sign" under Glyph math). On 62
+  public arXiv papers (the first 25 pages of each, 1,224 pages) 75 pages differ, 1 has
+  one element more (the equations (2) and (3) of arXiv 2210.13562 page 5, one display with two
+  numbers before) and 8 have fewer; the display equations whose text ends with a sign and its
+  limits (the sign read after its line) go from 189 to 186, and those that are a sign and its
+  limits alone from 31 to 30. On the 60 files of the `layout-dev-1` development set (917
+  pages) 57 pages differ, 1 has one element more and 4 have fewer; the same two counts go
+  from 77 to 75 and stay at 21. Traded, on `ax_econem_240306657` page 49 and
+  `ax_quantph_240306391` page 15: the upper limit now follows its sign and the lower is read
+  after the line, where before the lower followed its sign and the upper stood in front of
+  the display. Worse, on arXiv 2504.03499 page 25: the second line of a display has a note
+  set over its "=", a little higher than its three sums, so the cut under the upper limits
+  gives them to the line above and they are read in front of their line ("T m T (α) ∑ ∑ =
+  …"; 0.5.19 read two of the three at their signs). The one page with an element more is
+  `ax_mathap_240306449` page 3: a sum set in a sentence with limits over and under it had
+  them read into the words of the sentence ("morek=0 involved and need∞s"); the sentence is
+  clean now, the upper limit is at its sign and the lower is a short equation of its own. The
+  rule moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
   score of the 21 development papers as it was (9,198 of 11,258 whole; displays 903 of
   1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
@@ -1733,6 +1756,39 @@ raised text (next section).
   (`chem.MAX_SHAFT`). The labels do not count in the row's size (`_Row.plain`), which a long label
   used to pull down to the label's size and with it every subscript of the formulas. A script
   at the height of the arrow (a charge before it) is not a label.
+- **Limits of a sign** (built in part). A limit set over or under a sum, product or
+  integral sign is a small glyph further off the baseline than a script may be, so with it
+  in the line a row of few full-size letters took the size of its scripts (`_Row.size`).
+  A line that a sign and its limits are folded into together keeps the size it had
+  (`_Row.line_size`, set by `rows._attach_big_operators`). Four faults had that one cause.
+  On a page with no line of running text, the word subscripts of "E_tot = ∑ e_i + E_reg"
+  were words of prose once the "n" over the sum was in the row, and the display a paragraph
+  and three pieces of math (`sum_limits.tex`, page 2). The limit under the sum of such a
+  row was too far off, counted in script sizes, to be its limit (`display._limits_of`) and
+  was an equation of its own: two displays on page 4 of `ax_eesssp_240306460` in the
+  development set, and the "t=T" of a product on arXiv 2407.13734 page 5, which 0.5.19
+  split the same way. And a numbered line with a sum in it passed for the limits of the
+  numbered line over it, so two equations of arXiv 2210.13562 page 5 were one display with
+  the numbers "(2) (3)". What is left: a limit that reaches the line alone, before its sign
+  does (`_attach_scripts`), still counts, so "ℒ_total = ∑ ℒ_task + λ‖θ‖" with an "N" over
+  the sum is a paragraph on a made page, as at 0.5.19; no real page of the two sets below
+  shows it. Leaving the limit glyphs out of every row's size was built and measured on 2026-11-24
+  and is not in this release: on the 62 public papers of review 30 it made three pages
+  better, and on the 60 files of the development set four (the page above among them), but
+  a display whose row then has its true size and holds one word ("a.s. and",
+  `ax_econem_240306657` page 54) became a paragraph and eight pieces, and a sum before a
+  tall bracket was cut off as an equation of its own (`ax_quantph_240306391` page 12). Both
+  are older faults that the wrong size hid; the change waits for them. So does the join of
+  a band of upper limits to the band under it (`regions._bands`), which read "N ℒtotal =
+  ∑…" as "ℒtotal = ∑N…" on a made page and made one page of the development set better,
+  and split displays on three others of the same file (`ax_statme_240307158` pages 12, 22
+  and 26): a fraction set before a sum loses its numerator when the upper limit is in the
+  display's own segment, which 0.5.19 already does on page 22. And TeX's big
+  signs have their origin at the top of the glyph, so the box the PDF gives for a display
+  integral lies above a line of plain letters and its center is outside the line: a rule
+  that looks at the bottom of the sign's box moves about half of the integrals that are read
+  alone or after their line into it, and every root sign that leads its radicand; it was
+  tried on nine papers and is not built.
 - **`E°cell`** (`_degree_over_label`). A degree sign over the start of a lowered label
   (`E°cell`, `E°cathode`) is read after the label, not inside it (`E c°ell`, which cut the inline
   equation in two); several degree signs in one row are scripts of their own; and the degree sign

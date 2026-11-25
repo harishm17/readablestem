@@ -921,8 +921,12 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   the project unscanned: 88 of LaTeXML 0.8.8's bindings load the raw file of their own name
   (`algorithm`, `revtex4-1`), which they find once the project holds one, and the `latexml`
   package's `rawstyles` and `rawclasses` options read any. And an absolute path in
-  `\bibliography` or `\addbibresource` (the author's own machine; LaTeXML reads the compiled
-  `.bbl`, never the database) is no refusal; `..`, `~`, `|` and URLs stay refused there too.
+  `\bibliography` or `\addbibresource` (the author's own machine) is no refusal; `..`, `~`, `|`
+  and URLs stay refused there too. The lint does not keep LaTeXML from the database: with no
+  compiled `.bbl` in the upload, `latexmlpost` looks the name up, and an absolute path that
+  exists in the sandbox is read into the page. Only the upload and the TeX system tree exist
+  there, so what can be reached is a `.bib` that ships with TeX; bibunits' `\putbib[...]`, which
+  the lint has never scanned, reaches the same files. The sandbox is the limit here.
 - **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
   per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
   `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their

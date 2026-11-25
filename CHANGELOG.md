@@ -8,9 +8,13 @@
   nothing).
   What changes for a reader, one line for each:
   - Limits (O-445): with the region tree on, a limit under or over a sum, product or integral
-    sign stays in the sign's line where a bracket beside it had cut it off (on the public
-    files, limits read beside their sign go from 657 to 703 of 1,892; four limits on three
-    displays read worse, named in the entry below).
+    sign stays in the sign's line where a bracket beside it had cut it off; a sign that took
+    its limit keeps its place in the line, and the line keeps its equation number. Against
+    0.5.19 on 62 public arXiv papers (1,224 pages) 75 pages differ, 1 has one element more
+    (two numbered equations that were one display) and 8 have fewer; on the 60 development
+    files (917 pages) 57 differ, 1 has one element more and 4 have fewer. One display reads worse, the limits of displays on two pages
+    are traded and one sentence reads better at the cost of a stray equation, all named in
+    the entry below.
   - Algorithms: a full-width algorithm whose short steps have comments at the right and whose
     long steps run past the gutter is one block (arXiv 2504.06207 page 13).
   - Scripts: a lowered script under a typewriter name is read before the name, not inside it
@@ -106,10 +110,39 @@
 - O-445: a short item (at most 8 characters) that is the limit of a sum, product or integral sign
   by its place is in the sign's band, whether or not the sign is taller than it, so a limit level
   with a binomial's lower entry is no longer a band of its own (`regions._limit_of`).
-  On 71 public files 43 limits moved beside their sign; none of the 73 recorded corpus uploads
-  moved, the box score of the development papers is as it was, and neither `eval order` record
-  has a page made wrong. Behind the region tree switch, which is on. No version bump is in
-  this entry.
+  Three faults the rule brought with it are repaired with it (review 30): a sign whose row
+  took a long limit, or that stands after another sign, was read after its line ("p(x0) =
+  pt(…) dx. ∫ ∏Tt=1"; `rows._sign_of_limits`); the line, taller with the limit in it, lost
+  its equation number to a paragraph when a numbered equation of the other column stood
+  level with it (`display._level_with_numbered`, same column only); and a line with more
+  script-size letters than full-size ones counted as a line of script size once the limit
+  was in it, so the limit under its sum became an equation of its own, a numbered line
+  under it passed for its limits, and on a page with no running text a display whose
+  subscripts are words became a paragraph (the line keeps the size it had,
+  `_Row.line_size`).
+  Measured against 0.5.19 with production's switches, 2026-11-24: on 62 public arXiv papers
+  (the first 25 pages of each, 1,224 pages) 75 pages differ, 1 has one element more (the
+  equations (2) and (3) of arXiv 2210.13562 page 5, one display with two numbers before) and
+  8 have fewer, and the displays that end with a sign and its limits (the sign read after its
+  line) go from 189 to 186; on the 60 files of `layout-dev-1` (917 pages) 57 pages differ, 1
+  has one element more and 4 have fewer, and those displays go from 77 to 75. None of the 73
+  recorded corpus uploads moved, the box score of the development papers is as it was, and
+  neither `eval order` record has a page made wrong. Behind the region tree switch, which is
+  on. No version bump is in this entry.
+  - Traded: on some displays the upper limit now follows its sign and the lower limit is read
+    after the line; before, the lower followed its sign and the upper stood in front of the
+    display (`ax_econem_240306657` page 49, `ax_quantph_240306391` page 15).
+  - Read worse: the second line of one display, where a note set over the "=" stands a little
+    higher than the sums, has the upper limits of its three sums read in front of the line
+    ("T m T (α) ∑ ∑ = …"); 0.5.19 read two of the three at their signs (arXiv 2504.03499
+    page 25).
+  - A trade: a sum set in a sentence with limits over and under it had its limits read into
+    the words of the sentence ("morek=0 involved and need∞s"); the sentence is clean now, the
+    upper limit is at its sign, and the lower one is a short equation of its own
+    (`ax_mathap_240306449` page 3).
+  - Built, measured and left out: leaving limit glyphs out of a row's size, and joining a band
+    of upper limits to the band under it. Each made some pages better and split displays on
+    others through older faults (docs/layout.md, "Limits of a sign").
 - O-446: `SCRIPT_ROW_FLOOR` stays 0.3; the smallest real script row measured is 0.364.
 - O-455, O-459, O-437: no real page shows the fault (four public pages with two bracketed marks
   are consecutive equation numbers; 13 small panels are boxes of text; the one-page rule took no
@@ -141,7 +174,9 @@
 
 - A census of 73 public arXiv sources with no model (LaTeXML 0.8.8 in the sandbox) found 13
   converting and 60 not. Four causes were ours and are fixed; the rest stop by design or on a
-  limit and are listed in docs/web.md.
+  limit. After the fixes 19 convert and 54 stop: 25 on a package that is not read by design,
+  13 on the time limit, 6 on a journal class with no binding, 5 refused by the lint, 2 on an
+  undefined command, 2 on a syntax error and 1 as `source_failed`.
   - `listings`: LaTeXML read `\lstlanguagefiles` as undefined once the package was loaded with a
     `language=` option, so the source stopped with `source_undefined`. A new preload,
     `source/compat.tex`, defines it as empty, and `\orcidlink{...}` as nothing (the link has no
@@ -156,8 +191,11 @@
     bindings do this), and so does a document that loads `latexml` with `rawstyles`. Found on
     reading the branch, before any release; with the file left out, the three sources end as
     they did in the census (2404.15495 converts to the same LaTeXML output). An absolute
-    `\bibliography{/path}` is no longer refused as a path (bibliography files are read from the
-    project only); `..`, `~`, pipes and URLs still are.
+    `\bibliography{/path}` is no longer refused as a path; `..`, `~`, pipes and URLs still are.
+    The first reason given for this was wrong (review 30): LaTeXML does open the database when
+    the upload has no compiled `.bbl`, so an absolute path that exists in the sandbox, a `.bib`
+    of the TeX system tree, is read into the page. The sandbox holds nothing else besides the
+    upload, and `\putbib[...]` reached the same files before; docs/web.md says so now.
   - A `listings` block no longer shows a blank line between its lines.
 - Of the 13 sources that converted before, all 13 keep the same LaTeXML output (hash of the
   XHTML). Six more now convert (four by these fixes; two moved with the load of the machine).

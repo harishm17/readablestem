@@ -927,9 +927,15 @@ def _line_below_number(label: _Row, lines: list[_Line]) -> _Line | None:
 
 
 def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:
-    """Is `line` at the height of a line that has an equation number (or has one itself)?"""
+    """Is `line` at the height of a line of its column that has an equation number (or has
+    one itself)? A numbered line in the other column of a two-column page is another
+    equation."""
+    column = line.rows[0].column
     return any(
-        other.labels and other.box[1] < line.box[3] and line.box[1] < other.box[3]
+        other.labels
+        and other.rows[0].column == column
+        and other.box[1] < line.box[3]
+        and line.box[1] < other.box[3]
         for other in lines
     )
 

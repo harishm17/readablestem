@@ -134,6 +134,23 @@ def test_calculus_notes_numbered_equations_keep_their_numbers_out_of_the_crop():
     assert "\u222b" in (riemann.text or "")
 
 
+def test_a_sign_that_took_its_upper_limit_keeps_its_place_and_the_line_its_number():
+    # sum_limits.tex, with the switches production runs. The product of "p(x0) = int prod_{t=1}^T
+    # p_t(...) dx" took its limits and was then longer than a fragment may be: it stayed a row
+    # of its own and was read after the line, and the integral with it. And the line of the
+    # numbered sum on the left, taller with the limit in it, lost its "(1)" to a paragraph:
+    # the number was refused because the line is level with the numbered equation of the
+    # other column. And on the second page, which has no line of running text, "Etot = sum ei
+    # + Ereg" with the "n" in it counted as a line of script size: its roman subscripts were
+    # words of a sentence and the display a paragraph with three pieces of maths.
+    names = ("display_grouping", "inline_joins", "region_tree", "join_panels")
+    layout = analyze((LATEX / "sum_limits.pdf").read_bytes(), **dict.fromkeys(names, True))
+    total, product, entropy, energy = blocks(layout)
+    assert (total.equation_label, entropy.equation_label) == ("(1)", "(2)")
+    assert plain(product.text).startswith("p(x0)=\u222b\u220fT")
+    assert plain(energy.text) == "Etot=\u2211nei+Eregi=1"
+
+
 def test_calculus_notes_nested_itemize_and_enumerate():
     layout = load("calculus_notes")
     assert items(layout) == [

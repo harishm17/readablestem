@@ -1,0 +1,48 @@
+% Layout fixture: limits set over and under a sum and a product, on a two-column page. A
+% numbered sum whose line holds a word ("sinc"), level with a numbered equation of the other
+% column, a product whose limits stand between an integral sign and the rest of the line, and
+% on a second page a short sum with more script-size letters than full-size ones, its
+% subscripts roman words.
+% Used by tests/test_layout_latex.py. Written for ReadableSTEM's tests; no third-party text.
+\documentclass[10pt,twocolumn]{article}
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=0.8in]{geometry}
+% The layout reads TeX conventions only from a PDF that says TeX made it (/Creator); Tectonic's
+% own creator string does not, so the fixture sets one as a pdfLaTeX file has it.
+\usepackage[pdfcreator={LaTeX with hyperref}]{hyperref}
+\pagestyle{empty}
+
+\begin{document}
+
+The weight of a mode is a sum over the samples of the chain, each sample with the width of
+its own step,
+\begin{equation}
+\lambda_m \simeq \sigma \sum_{k=0}^{W} [w_k \, \mathrm{sinc}(\pi k/W)] \, g(w_k) \, \Delta w .
+\end{equation}
+The likelihood of the first state is an integral over the later states of a product of the
+steps of the chain,
+\[ p(x_0) = \int \prod_{t=1}^{T} p_t(x_{t-1} \mid x_t) \, dx_{1:T} . \]
+Each step has a mean and a spread of its own.
+
+\newpage
+
+% A few points lower than the left column, so that the numbered line here is level with the
+% sum on the left and with the limit under it.
+\vspace*{5pt}
+The cross entropy of two distributions over the same outcomes is a sum over the outcomes
+of the chain,
+\begin{equation}
+C(p, q) = - \sum_{i=1}^{W} p_i \log q_i .
+\end{equation}
+It is zero only when the two distributions are the same.
+
+\clearpage
+
+% A page with no line of running text on it, as a slide or a formula sheet has: nothing but
+% the line itself says that the sum is a display.
+\noindent The energy of a chain:
+\[ E_{\mathrm{tot}} = \sum_{i=1}^{n} e_i + E_{\mathrm{reg}} \]
+
+\end{document}

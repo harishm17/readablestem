@@ -31,9 +31,13 @@ _ARG = re.compile(
     rf"\\(?P<cmd>{_COMMAND})(?![A-Za-z])\s*(?:\[[^\]]*\]\s*)*"
     rf"(?:\{{(?P<braced>[^{{}}]*)\}}|(?P<bare>[^\s{{}}\\]+))"
 )
-# Commands that name a bibliography database: LaTeXML reads the `.bbl` the author compiled and
-# never opens the database, so an absolute path there (a path on the author's machine, the usual
-# case) reads nothing and is no reason to refuse the upload. `..`, `~`, `|` and URLs still are.
+# Commands that name a bibliography database. An absolute path there is a path on the author's
+# machine (the usual case) and is no reason to refuse the upload: inside the sandbox it names
+# nothing. It is not true that LaTeXML never opens the database: when the upload has no
+# compiled `.bbl`, `latexmlpost` looks the name up, and an absolute path that exists in the
+# sandbox (a `.bib` of the TeX system tree, the only files there besides the upload) is read
+# into the page. The sandbox bounds that, not this scan; bibunits' `\putbib[...]` was never
+# scanned and reaches the same files. `..`, `~`, `|` and URLs are still refused.
 _BIBLIOGRAPHY = frozenset({"bibliography", "addbibresource"})
 # A class or package file of the upload. A journal's own `.cls` that came with the paper holds
 # `\immediate\openout` and `\input{\csname...}` as TeX Live's copy does, and the document is
