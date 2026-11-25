@@ -558,7 +558,8 @@ switches, the source with the rule (`800165e7`) against the same source without 
   source reads them the same way once the stamp is taken off the page). arXiv 2411.02531
   page 1: the last line of a paragraph begins with a sum sign; with the stamp beside it the
   line was a display of its own, and without it the line is read at the head of the next
-  paragraph and the sign after that paragraph. arXiv 2505.05280 pages 1 to 2: the last
+  paragraph and the sign after that paragraph (repaired since: "A sign that leads a line"
+  under Glyph math). arXiv 2505.05280 pages 1 to 2: the last
   paragraph of page 1 no longer takes its end from the top of page 2, because the left edge
   of page 1's text is now the abstract's and not the stamp's (`joins._text_edges`), so the
   two edges are not the same. So a stamp's removal can change the page after it. Neither
@@ -1912,6 +1913,37 @@ raised text (next section).
   that looks at the bottom of the sign's box moves about half of the integrals that are read
   alone or after their line into it, and every root sign that leads its radicand; it was
   tried on nine papers and is not built.
+- **A sign that leads a line** (`rows._starts_at`, O-471). The last line of a paragraph
+  that begins with a sum, product or integral sign ("∑_{i=1}^n f_ik = 0 for k = 1, …, d.",
+  arXiv 2411.02531 page 1) is two rows: the sign with its upper limit, and the row of
+  what goes on, which starts with the lower limit or the integrand because TeX lowers a
+  text-style limit to the baseline of the line. `_attach_big_operators` folds a sign into
+  the row that holds its center and that it lies within, and the row of what goes on
+  begins a sign's width after the sign, farther than the half em it may start beyond it
+  (`host.x0 - 0.5 * host.size <= piece.x0`). The sign stayed in a row of its own, and a row
+  alone is read where its top is: at the head of the next paragraph, the sign after that
+  paragraph, and the paragraph cut in two. Now the row's start counts from the sign's
+  start when the sign is a sum, product or integral sign that ends no more than half an
+  em before the row's first glyph, the row goes on in running words (a word of three
+  letters or more of upright letters that is no function name: "for", "which"; so the
+  rows of a display, which hold none, are left as they were), and nothing stands before
+  the sign on its line (a display's sign stands behind a fraction or an equals sign, and
+  its "for |x| < 1" is no running text: 2411.16302 page 17, 2504.10283 page 23 and
+  2506.13221 page 11 read worse before the rule asked for this, and were put back).
+  Counted on the 367 public papers of the list (first 25 pages; the brief says 368) and
+  the 60 development files, lines that begin with a big sign and go on in running words:
+  read in place 14, display of its own 45, out of place 27 (public); 0, 2 and 4
+  (development); the 25 private PDFs show none. With the rule 31, 43 and 12 (public) and
+  1, 2 and 3 (development). What is left of the out-of-place group is partly other shapes
+  (two signs in one fragment, a sign in the middle of a line, a fraction before the sum)
+  and partly lines the count takes for a sign-led line that are not (2210.01009 page 25,
+  2312.17566 p4, 2405.04201 p2, 2405.15050 p10, 2412.05104 p19, 2501.02602 p11, 2502.15955
+  p22, 2502.18553 p18, 2503.05994 p4, 2504.00755 p3, 2504.19306 p10, 2505.08251 p3;
+  development `ax_eesssp_240306423` p2, `ax_mathap_240306464` p17 and p18); they are not
+  repaired. One page reads worse: 2501.05251 page 9, a display whose only word of three
+  letters is "acos", which is no entry of the function names, is read as a paragraph that
+  starts with its sum sign, with the limit "E∈ℰ𝒮" a block after it; it was the block
+  "∑E∈ℰ𝒮" before the paragraph; both are broken.
 - **`E°cell`** (`_degree_over_label`). A degree sign over the start of a lowered label
   (`E°cell`, `E°cathode`) is read after the label, not inside it (`E c°ell`, which cut the inline
   equation in two); several degree signs in one row are scripts of their own; and the degree sign
