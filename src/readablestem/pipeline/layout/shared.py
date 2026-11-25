@@ -34,6 +34,9 @@ SCRIPT_MIN_RATIO = 0.62  # the smallest a script is, beside the text it belongs 
 # A row of its own is no script of a row more than this many times its size: a slide sets
 # 20-point words over an 80-point one (0.25), while the smallest real script measured is an
 # exponent in a fraction inside an inline fraction, 0.36 of the line's period (OpenStax).
+# Counted 2026-11-24 on 332 public PDFs (3,652 script rows) and the 1,432 script rows of the
+# equation development papers: none is under 0.36 (the smallest is 0.364, then 0.367, 0.408,
+# 0.453, 0.493), so the floor stays.
 SCRIPT_ROW_FLOOR = 0.3
 SCRIPT_MAX_LIFT = 0.7  # the furthest off the baseline a script is (x the text size)
 _DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
@@ -155,7 +158,15 @@ class _Row:
         its baseline by at least 4 % and at most `SCRIPT_MAX_LIFT` of it, and no more than
         60 % of it from a larger glyph; and the larger glyphs hold a letter and no word of three
         letters. The numbers of a fraction (beside an operator, or in a sentence) are not
-        scripts of anything."""
+        scripts of anything.
+
+        A line that took a sign and its limits keeps the size it had (`_Char.line_size`, on
+        the sign): a limit is script size and further off the baseline than a script is, so
+        "Etot = sum ei + Ereg" with an "n" over the sum counted as a line of script size, its
+        roman subscripts as words of a sentence, and the display as a paragraph."""
+        kept = next((c.line_size for c in self.chars if c.line_size), 0.0)
+        if kept:
+            return kept
         counts = Counter(round(c.size * 2) / 2 for c in self.plain)
         if not counts:  # a row with no characters has no size; the body default, as elsewhere
             return 10.0
@@ -400,6 +411,12 @@ def _arrow_label_flags(chars: Sequence[_Char]) -> list[bool]:
             if not flags[k] and _over_arrow(chars, span, c):
                 flags[k] = True
     return flags
+
+
+# The signs that take limits over and under them: integrals, sum, product, coproduct, big
+# union and intersection. One set for the rows (`rows._sign_of_limits`), the bands
+# (`regions._limit_gap`) and the displays (`display._limits_of`).
+LIMIT_SIGNS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u22c3\u22c2")
 
 
 def _box_key(box: BBox) -> tuple[int, int, int, int]:

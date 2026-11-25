@@ -136,6 +136,7 @@ def analyze(
     region_tree: bool = False,
     join_panels: bool = False,
     figure_art: bool = False,
+    matching_under: bool = False,
     table_search_limited: bool = True,
     on_page: Callable[[int, int], None] | None = None,
 ) -> Layout:
@@ -175,6 +176,11 @@ def analyze(
     figure, not handwriting ("Pen figures"). Off, the output is what it was before the rules
     existed.
 
+    `matching_under` (`LAYOUT_MATCHING_UNDER`, off, with `region_tree`): a matching exercise's two
+    columns end where the numbers of their labels stop counting, and what stands under them is
+    read after them ("The region tree", rule 8, in docs/layout.md). Off, the output is what it
+    was before the rule existed.
+
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
     search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
     machine.
@@ -205,6 +211,7 @@ def analyze(
                         region_tree=region_tree,
                         panels=join_panels,
                         figure_art=figure_art,
+                        matching_under=matching_under,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
                         trace=PageTrace(),
                     ),
@@ -588,8 +595,10 @@ def _analyze_document(
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     ctx.notes = named_links.read(doc, [n for n in selected if n not in unrendered]) or None
     ctx.region_tree = document.region_tree
+    # The rows left out as furniture spell the document's words too: the subject in the stamp
+    # up the side of a paper ("physics.ed-ph") is how a reference of the paper writes it.
     document.compounds, document.whole_words = hyphens.document_spellings(
-        row.text for rows, _, _ in prepared.values() for row in rows
+        row.text for rows, _, dropped in prepared.values() for row in (*rows, *dropped)
     )
     document.link_cuts = _link_cuts(
         doc, {n: [*rows, *dropped] for n, (rows, _, dropped) in prepared.items()}

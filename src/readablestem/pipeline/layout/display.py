@@ -31,6 +31,7 @@ from readablestem.pipeline.layout.inline_runs import (
 )
 from readablestem.pipeline.layout.shared import (
     _ROW_RELATIONS,
+    LIMIT_SIGNS,
     SCRIPT_RATIO,
     _CharInfo,
     _Marker,
@@ -927,9 +928,15 @@ def _line_below_number(label: _Row, lines: list[_Line]) -> _Line | None:
 
 
 def _level_with_numbered(line: _Line, lines: list[_Line]) -> bool:
-    """Is `line` at the height of a line that has an equation number (or has one itself)?"""
+    """Is `line` at the height of a line of its column that has an equation number (or has
+    one itself)? A numbered line in the other column of a two-column page is another
+    equation."""
+    column = line.rows[0].column
     return any(
-        other.labels and other.box[1] < line.box[3] and line.box[1] < other.box[3]
+        other.labels
+        and other.rows[0].column == column
+        and other.box[1] < line.box[3]
+        and line.box[1] < other.box[3]
         for other in lines
     )
 
@@ -1043,7 +1050,6 @@ def _joins_line(
     return False
 
 
-LIMIT_OPERATORS = frozenset("\u222b\u222e\u2211\u220f\u2210\u22c3\u22c2")  # int oint sum prod ...
 LIMIT_REACH = 0.8  # x font size: how far above or below a big operator its limits sit
 
 
@@ -1052,17 +1058,21 @@ def _limits_of(operator: _Line, limits: _Line, size: float) -> bool:
 
     The limits of a sum hang right under its sign (or sit right over it), centred on it
     and no wider than twice the sign. A paper that sets them at the size of the row they
-    belong to gives `_joins_line` no size to tell them by.
+    belong to gives `_joins_line` no size to tell them by. The reach is counted in the size
+    of the sign when that is the larger: a line with three subscripted letters side by side,
+    "dij = aik bkl clj", counts as a line of script size (the word test of `_Row.size` reads
+    "abc"), and the limit under its sum was then too far off.
     """
     centre = (limits.box[0] + limits.box[2]) / 2
     for c in operator.ink:
-        if c.c not in LIMIT_OPERATORS:
+        if c.c not in LIMIT_SIGNS:
             continue
-        gap = limits.box[1] - c.y1 if limits.box[1] >= c.y1 - 0.3 * size else c.y0 - limits.box[3]
+        em = max(size, c.size)
+        gap = limits.box[1] - c.y1 if limits.box[1] >= c.y1 - 0.3 * em else c.y0 - limits.box[3]
         if (
-            -0.3 * size <= gap <= LIMIT_REACH * size
-            and c.x0 - 0.5 * size <= centre <= c.x1 + 0.5 * size
-            and limits.box[2] - limits.box[0] <= 2 * (c.x1 - c.x0) + size
+            -0.3 * em <= gap <= LIMIT_REACH * em
+            and c.x0 - 0.5 * em <= centre <= c.x1 + 0.5 * em
+            and limits.box[2] - limits.box[0] <= 2 * (c.x1 - c.x0) + em
         ):
             return True
     return False
@@ -1116,14 +1126,63 @@ def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
     if document.grouping:
-        regions = _merge_continued_regions(
-            regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
-        )
+        members = [[f, *p] for f, p in zip(first, peers, strict=True)]
+        _return_stray_pieces(regions, members)
+        regions = _merge_continued_regions(regions, members)
         regions = _absorb_contained_regions(regions)
     for region in regions:
         for row in [*region.rows, *region.labels]:
             row.region = region
     return regions
+
+
+def _return_stray_pieces(regions: list[_Region], members: list[list[_Line]]) -> None:
+    """Give a piece that the stacking left under the wrong display to the display it stands in.
+
+    Lines are stacked top to bottom, and a piece that is no whole equation joins the display
+    right above it. The upper limit of a sum behind its opening bracket, "(n", is a row of
+    script size that starts a little above the line it belongs to: it is met before that
+    line, with only the display above to go to, and equation (12) of arXiv 2408.09889 page 5
+    then reached into (13) and held a piece of it. The lowest line of a display, when it is
+    of script size, lies under every other line of that display and is no limit of a sign in
+    them, goes to another display that has a line of full size around it: the piece's middle
+    between that line's top and bottom, its extent between that line's left and right.
+    """
+    for k, region in enumerate(regions):
+        lines = list({id(ln): ln for ln in members[k]}.values())
+        if region.forced or len(lines) < 2:
+            continue
+        piece = max(lines, key=lambda ln: ln.box[1])
+        rest = [ln for ln in lines if ln is not piece]
+        if (
+            piece.labels
+            or piece.box[1] < max(ln.box[3] for ln in rest)
+            or any(_limits_of(ln, piece, max(ln.size, piece.size)) for ln in rest)
+        ):
+            continue
+        middle = (piece.box[1] + piece.box[3]) / 2
+        for j, other in enumerate(regions):
+            if j == k or other.forced:
+                continue
+            if any(
+                piece.size <= SCRIPT_RATIO * ln.size
+                and ln.rows[0].column == piece.rows[0].column
+                and ln.box[1] <= middle <= ln.box[3]
+                and ln.box[0] <= piece.box[0]
+                and piece.box[2] <= ln.box[2]
+                for ln in members[j]
+            ):
+                moved = {id(r) for r in piece.rows}
+                kept = {id(p) for ln in rest for p in ln.rules}
+                region.rows = [r for r in region.rows if id(r) not in moved]
+                region.rules = [p for p in region.rules if id(p) in kept]
+                region.box = _union([ln.box for ln in rest])
+                other.rows.extend(piece.rows)
+                other.rules.extend(p for p in piece.rules if p not in other.rules)
+                other.box = _union([other.box, piece.box])
+                members[k] = rest
+                members[j].append(piece)
+                break
 
 
 def _merge_continued_regions(regions: list[_Region], members: list[list[_Line]]) -> list[_Region]:

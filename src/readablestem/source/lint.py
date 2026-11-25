@@ -17,6 +17,7 @@ returns a content-free code: the caller never shows or logs the matching text.
 from __future__ import annotations
 
 import re
+from pathlib import PurePosixPath
 
 # Commands whose argument is a file name. `\input file` and `\input{file}` are both read.
 _FILE_COMMANDS = (
@@ -27,8 +28,28 @@ _FILE_COMMANDS = (
 )  # fmt: skip
 _COMMAND = "|".join(_FILE_COMMANDS)
 _ARG = re.compile(
-    rf"\\(?:{_COMMAND})(?![A-Za-z])\s*(?:\[[^\]]*\]\s*)*(?:\{{([^{{}}]*)\}}|([^\s{{}}\\]+))"
+    rf"\\(?P<cmd>{_COMMAND})(?![A-Za-z])\s*(?:\[[^\]]*\]\s*)*"
+    rf"(?:\{{(?P<braced>[^{{}}]*)\}}|(?P<bare>[^\s{{}}\\]+))"
 )
+# Commands that name a bibliography database. An absolute path there is a path on the author's
+# machine (the usual case) and is no reason to refuse the upload: inside the sandbox it names
+# nothing. It is not true that LaTeXML never opens the database: when the upload has no
+# compiled `.bbl`, `latexmlpost` looks the name up, and an absolute path that exists in the
+# sandbox (a `.bib` of the TeX system tree, the only files there besides the upload) is read
+# into the page. The sandbox bounds that, not this scan; bibunits' `\putbib[...]` was never
+# scanned and reaches the same files. `..`, `~`, `|` and URLs are still refused.
+_BIBLIOGRAPHY = frozenset({"bibliography", "addbibresource"})
+# A class or package file of the upload. A journal's own `.cls` that came with the paper holds
+# `\immediate\openout` and `\input{\csname...}` as TeX Live's copy does, and the document is
+# read with LaTeXML's binding of that class, not with the file. One that fails the scan is
+# therefore left out of the project (`left_out`) instead of refusing the upload, unless a file
+# names it with its suffix in an input command. It cannot stay in the project unscanned:
+# LaTeXML does read such a file when a binding loads the raw file of its own name (88 of the
+# bindings of 0.8.8 do, `algorithm` and `revtex4-1` among them: with the TeX tree hidden they
+# find nothing, with a file of that name in the project they find it), and when the document
+# loads the `latexml` package with `rawstyles` or `rawclasses`.
+_STYLE_FILES = (".cls", ".clo", ".sty", ".bst")
+_INPUT = re.compile(r"\\(?:input|include|InputIfFileExists)(?![A-Za-z])\s*\{?\s*([^\s{}]+)")
 _FORBIDDEN = re.compile(
     r"\\write\s*\{?\s*-?18(?![A-Za-z])"  # \write18, \write 18, \write{18}
     r"|\\immediate\s*\\write\s*\{?\s*-?18(?![A-Za-z])"
@@ -46,16 +67,19 @@ def strip_comments(text: str) -> str:
     return "\n".join(_COMMENT.sub("", line) for line in text.splitlines())
 
 
-def _bad_path(value: str) -> bool:
+_DRIVE_PATH = re.compile(r"^[A-Za-z]:[\\/]")
+
+
+def _bad_path(value: str, *, absolute_ok: bool = False) -> bool:
     for name in value.split(","):
         name = name.strip()
         if not name:
             continue
+        if ".." in name.replace("\\", "/").split("/") or "\x00" in name:
+            return True
+        if absolute_ok and (name.startswith(("/", "\\")) or _DRIVE_PATH.match(name)):
+            continue
         if name.startswith(("/", "~", "\\", "|")) or _URL.match(name):
-            return True
-        if ".." in name.replace("\\", "/").split("/"):
-            return True
-        if "\x00" in name:
             return True
     return False
 
@@ -66,6 +90,36 @@ def problem(text: str) -> str | None:
     if _FORBIDDEN.search(clean):
         return "shell"
     for match in _ARG.finditer(clean):
-        if _bad_path(match.group(1) or match.group(2) or ""):
+        value = match.group("braced") or match.group("bare") or ""
+        if _bad_path(value, absolute_ok=match.group("cmd") in _BIBLIOGRAPHY):
             return "path"
+    return None
+
+
+def left_out(texts: dict[str, str]) -> set[str]:
+    """The paths of the upload's class and package files that fail `problem` and that no file of
+    the upload names with its suffix in `\\input`, `\\include` or `\\InputIfFileExists`. The
+    conversion does not put them in the project it gives LaTeXML (`convert._project`), so no
+    file LaTeXML can read has failed the scan."""
+    named = {
+        PurePosixPath(match.group(1)).name
+        for text in texts.values()
+        for match in _INPUT.finditer(strip_comments(text))
+    }
+    return {
+        path
+        for path, text in texts.items()
+        if path.lower().endswith(_STYLE_FILES)
+        and PurePosixPath(path).name not in named
+        and problem(text) is not None
+    }
+
+
+def project_problem(texts: dict[str, str]) -> str | None:
+    """`problem` for every text file of an upload (by path) that the conversion gives LaTeXML:
+    all but the ones `left_out`."""
+    skipped = left_out(texts)
+    for path, text in texts.items():
+        if path not in skipped and (found := problem(text)) is not None:
+            return found
     return None

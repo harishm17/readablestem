@@ -219,9 +219,8 @@ def inspect(
     if kind == "tex" and (not data or b"\x00" in data[:4096]):
         raise SourceRefused("source_no_main")
     texts = read_texts(kind, data, limits)
-    for text in texts.values():
-        if lint.problem(text) is not None:
-            raise SourceRefused("source_unsafe")
+    if lint.project_problem(texts) is not None:
+        raise SourceRefused("source_unsafe")
     chosen = find_main(texts, main)
     check_support(texts, chosen)
     beamer = _is_beamer(texts[chosen])

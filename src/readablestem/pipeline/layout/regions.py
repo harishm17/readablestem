@@ -44,7 +44,7 @@ from readablestem.pipeline.layout.order import (
     _top_down,
 )
 from readablestem.pipeline.layout.rows import _BIG_OPERATORS, _merge_baselines
-from readablestem.pipeline.layout.shared import _Display, _Path, _Row
+from readablestem.pipeline.layout.shared import LIMIT_SIGNS, _Display, _Path, _Row
 
 CHANNEL_PT = 7.0  # narrowest white channel that cuts a segment into columns
 MAX_COLUMNS = 3
@@ -54,6 +54,9 @@ WIDE_GAP = 2.5  # rule 6: line pitches of white that close a segment of side-by-
 BOX_MIN_WIDTH, BOX_MIN_HEIGHT, BOX_MAX_SHARE = 40.0, 18.0, 0.8  # rule 2
 PICTURE_MIN_PT, PICTURE_MAX_SHARE = 24.0, 0.85
 MAX_DEPTH = 10
+LIMIT_CHARS = 8  # a limit is at most this many characters ("k=0", "x→0")
+# What a sum may stand behind in its item: "(∑", the corner of a tall bracket and the sum.
+_OPENING = "([{\u239b\u239c\u239d\u23a1\u23a2\u23a3\u23a7\u23a8\u23a9\u23aa"
 MAX_BOX_CANDIDATES = 300  # a page of shaded shapes is a chart, not a page of boxes
 FOOT_SIZE = 0.92  # rule 5: footnote type, as a share of the body size
 FOOT_SHARE = 0.4  # ... at most this share of a column's lines
@@ -159,6 +162,48 @@ def _under_taller(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
     )
 
 
+def _limit_gap(limit: Item, sign: Item, *, behind: str = "") -> float | None:
+    """How far the short item `limit` stands under or over the sum, product or integral sign
+    `sign` opens with (after the characters of `behind`), when it is that sign's limit:
+    centered on it, no wider than twice it, and no further above or below it than its own
+    height. None when it is no limit of it. (`display._limits_of` takes them once the rows are
+    cut; here the cut must not separate them, the way a binomial's bracket beside the lower
+    limit of a sum did.)"""
+    (x0, y0, x1, y1), text = limit
+    (sx0, sy0, sx1, sy1), held = sign
+    height = y1 - y0
+    if held.lstrip(behind)[:1] not in LIMIT_SIGNS or not 0 < len(text.strip()) <= LIMIT_CHARS:
+        return None
+    if height <= 0 or height > sy1 - sy0:
+        return None
+    gap = y0 - sy1 if y0 >= sy1 - 0.3 * height else sy0 - y1
+    if (
+        -0.3 * height <= gap <= height
+        and sx0 - 0.5 * height <= (x0 + x1) / 2 <= sx1 + 0.5 * height
+        and x1 - x0 <= 2 * (sx1 - sx0) + (sy1 - sy0)
+    ):
+        return gap
+    return None
+
+
+def _at_sign(items: Sequence[Item], band: Sequence[int], i: int) -> bool:
+    """Is the text item `i` the limit of a big operator in `band`, or has `band` a limit of
+    the operator `i` opens with? A limit is the limit of one sign, the nearer one: the "|u|=k"
+    that hangs under the sum of one line, be it a sum behind its opening bracket, is no upper
+    limit of the sum on the line under it."""
+    for j in band:
+        if _limit_gap(items[i], items[j]) is not None:
+            return True
+        gap = _limit_gap(items[j], items[i])
+        if gap is not None and not any(
+            (nearer := _limit_gap(items[j], other, behind=_OPENING)) is not None and nearer < gap
+            for k, other in enumerate(items)
+            if k not in (i, j)
+        ):
+            return True
+    return False
+
+
 def _bands(items: Sequence[Item]) -> list[list[int]]:
     """Indexes of `items` grouped in bands: items that overlap vertically (all but a fifth of
     their height) are one band. An item that stands over a shorter one's whole height, but
@@ -174,6 +219,7 @@ def _bands(items: Sequence[Item]) -> list[list[int]]:
             y0 + shrink < bottom
             or _over_shorter(items, bands[-1], y0, y1)
             or _under_taller(items, bands[-1], i)
+            or _at_sign(items, bands[-1], i)
         ):
             bands[-1].append(i)
             bottom = max(bottom, y1 - shrink)
@@ -203,8 +249,16 @@ def _interior(
 class _Build:
     """The state of building one page's tree."""
 
-    def __init__(self, items: list[Item], slide: bool, pitch: float, rects: Sequence[BBox]) -> None:
+    def __init__(
+        self,
+        items: list[Item],
+        slide: bool,
+        pitch: float,
+        rects: Sequence[BBox],
+        matching_under: bool = False,
+    ) -> None:
         self.items = items
+        self.matching_under = matching_under
         self.slide = slide
         self.pitch = pitch
         self.rects = list(rects)
@@ -323,6 +377,8 @@ class _Build:
             grid = self._grid(idx, left, right, box, column)
             if isinstance(grid, _Node):
                 return grid
+            if isinstance(grid, float):  # a matching exercise, and what stands under it
+                return self._matching(idx, left, right, (a, b), grid, column, depth)
             if grid == "cols":  # each column a run of labels of its own
                 return _Node(
                     "cols",
@@ -355,6 +411,38 @@ class _Build:
                 node.notes = k
         return node
 
+    def _matching(
+        self,
+        idx: list[int],
+        left: list[int],
+        right: list[int],
+        channel: tuple[float, float],
+        top: float,
+        column: str,
+        depth: int,
+    ) -> _Node:
+        """Rule 8, a matching exercise with a line under it. The lines from `top` down are no
+        cell of either column: the exercise is a `cols` node over what stands under it."""
+        items = self.items
+        above = {i for i in idx if (items[i][0][1] + items[i][0][3]) / 2 < top}
+        under = [i for i in idx if i not in above]
+        lcol, rcol = [i for i in left if i in above], [i for i in right if i in above]
+        box = _union([items[i][0] for i in above])
+        cols = _Node(
+            "cols",
+            box,
+            [
+                self.build(lcol, _side(column, "L"), depth + 1),
+                self.build(rcol, _side(column, "R"), depth + 1),
+            ],
+            channel=channel,
+        )
+        cut = (box[3] + min(items[i][0][1] for i in under)) / 2
+        whole = _union([items[i][0] for i in idx])
+        return _Node(
+            "stack", whole, [cols, self.build(under, column, depth + 1)], [cut], column=column
+        )
+
     def _rows(self, side: Sequence[int]) -> list[tuple[float, float, int]]:
         """A column's lines: (top, bottom, how many lines it holds) of each band of its
         items, so that the pieces a formula cuts one line into are one line."""
@@ -382,15 +470,29 @@ class _Build:
 
     def _grid(
         self, idx: list[int], left: list[int], right: list[int], box: BBox, column: str
-    ) -> _Node | str | None:
+    ) -> _Node | str | float | None:
         """Rule 8. A label grid ("grid", read in label order), or "cols" when each column
-        holds a run of labels of its own (terms 1. 2. 3. beside definitions A. B. C.)."""
+        holds a run of labels of its own (terms 1. 2. 3. beside definitions A. B. C.). A
+        matching exercise with a line under it that goes on in a column ("8." after 1. 2. 3.)
+        gives the top of that line (a float): the exercise ends there."""
         items = self.items
         lc, rc = _cells(items, left), _cells(items, right)
         if len(lc) > 12 or len(rc) > 12:
             return None
         if any(lab is None for lab, _ in lc + rc):
             return None
+        runs = _run(lc), _run(rc)
+        first = [cells[0][0][0] if cells[0][0] else "" for cells in (lc, rc)]
+        if (
+            self.matching_under
+            and first[0] != first[1]
+            and min(runs) >= 2
+            and (runs[0] < len(lc) or runs[1] < len(rc))
+        ):
+            # terms 1. 2. 3. beside definitions A. B. C., then a labeled line that does not
+            # count on (question 8): each column's labels end where its count ends
+            ends = [cells[n] for cells, n in ((lc, runs[0]), (rc, runs[1])) if n < len(cells)]
+            return min(items[i][0][1] for _, m in ends for i in m)
         labels = [lab for lab, _ in lc + rc if lab is not None]
         if len({lab[0] for lab in labels}) != 1:
             above = self._grid_above(idx, left, right, box, column, lc + rc)
@@ -457,6 +559,19 @@ def _label(text: str) -> tuple[str, int] | None:
     if re.fullmatch(r"[ivx]{2,4}", s):
         return ("r", _ROMAN.get(s, 0))
     return ("U" if s.isupper() else "l", ord(s.lower()) - 97)
+
+
+def _run(cells: Sequence[tuple[tuple[str, int] | None, list[int]]]) -> int:
+    """How many of a column's first cells count on in one kind of label (1. 2. 3.)."""
+    first = cells[0][0]
+    if first is None:
+        return 0
+    n = 0
+    for k, (lab, _) in enumerate(cells):
+        if lab is None or lab[0] != first[0] or lab[1] != first[1] + k:
+            break
+        n += 1
+    return n
 
 
 def _cells(
@@ -546,9 +661,10 @@ class RegionTree:
         context: Sequence[BBox] = (),
         *,
         blocks: bool = False,
+        earlier: bool = False,
     ) -> list[int]:
         """Indices of `boxes` in reading order: footnote zones last, the rest by the tree, and
-        option grids in label order (rule 8)."""
+        option grids in label order (rule 8). `earlier` is `_top_down`'s."""
         boxes = list(boxes)
         members = list(range(len(boxes)))
         zone_of: dict[int, int] = {}
@@ -563,7 +679,7 @@ class RegionTree:
             for k in range(len(self.foot))
             for i in _top_down(boxes, [j for j in zone_of if zone_of[j] == k])
         ]
-        walker = _Walk(self, boxes, body, list(context), blocks)
+        walker = _Walk(self, boxes, body, list(context), blocks, earlier)
         seq = walker.order(self.root, members) + tail
         return _numbered_runs(_options(seq, boxes, self), boxes, self)
 
@@ -573,7 +689,13 @@ class _Walk:
     columns without being ordered (figure captions)."""
 
     def __init__(
-        self, tree: RegionTree, boxes: list[BBox], body: float, context: list[BBox], blocks: bool
+        self,
+        tree: RegionTree,
+        boxes: list[BBox],
+        body: float,
+        context: list[BBox],
+        blocks: bool,
+        earlier: bool = False,
     ) -> None:
         self.tree, self.boxes, self.body, self.context, self.blocks = (
             tree,
@@ -582,6 +704,7 @@ class _Walk:
             context,
             blocks,
         )
+        self.earlier = earlier
 
     def order(self, node: _Node, members: list[int]) -> list[int]:
         if not members:
@@ -599,13 +722,13 @@ class _Walk:
             per: list[list[int]] = [[] for _ in node.cells]
             for i in members:
                 per[_nearest_cell(node.cells, boxes[i])].append(i)
-            return [j for p in per for j in _top_down(boxes, p)]
+            return [j for p in per for j in _top_down(boxes, p, earlier=self.earlier)]
         return self._columns(node, members)
 
     def _leaf(self, node: _Node, members: list[int]) -> list[int]:
         boxes = self.boxes
         if not node.boxes:
-            return _top_down(boxes, members)
+            return _top_down(boxes, members, earlier=self.earlier)
         # a text box is read where it stands, as one item, with its inside in its own order
         groups: dict[int, list[int]] = {}
         loose: list[int] = []
@@ -619,7 +742,7 @@ class _Walk:
         proxies = list(boxes) + [self._place(node, k, groups, loose) for k in groups]
         pmap = {len(boxes) + n: k for n, k in enumerate(groups)}
         out: list[int] = []
-        for i in _top_down(proxies, loose + list(pmap)):
+        for i in _top_down(proxies, loose + list(pmap), earlier=self.earlier):
             if i in pmap:
                 k = pmap[i]
                 out.extend(self.order(node.boxes[k][1], groups[k]))
@@ -991,7 +1114,7 @@ def _tree_of(
     items += _pictures(page, height)
     items += [(t, "") for t in tables if _takes_room(t, page.rect.width, height)]
     rects = _boxes_of(paths, (page.rect.width, height), items)
-    build = _Build(items, document.slide_deck, pitch, rects)
+    build = _Build(items, document.slide_deck, pitch, rects, document.matching_under)
     root = build.build(list(range(len(items))), "S")
     lines = [(f.bbox, f.clean) for f in kept if not f.vertical]
     foot = _footnote_zones(root, body, body_size)

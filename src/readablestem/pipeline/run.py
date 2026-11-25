@@ -398,7 +398,18 @@ log = logging.getLogger(__name__)
 # The result's schema is the same: results from 0.5.10 to 0.5.18 load unchanged and their page
 # is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.18 opens a 0.5.19 result.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.19"
+# 0.5.20 (2026-11-24): one raise for wave 6 (CHANGELOG.md has each change). What a PDF's result
+# holds moves on the pages that show one of three shapes: a limit stays in the line of its sum,
+# product or integral sign when the region tree cuts the display's rows; a full-width
+# algorithm whose long steps the tree puts in another leaf is one block; a lowered script
+# under a typewriter name is read before the name. No recorded request of the corpus moves.
+# Behind switches that stay off (no change): the new LAYOUT_MATCHING_UNDER (what stands under a
+# matching exercise is read after it) and LAYOUT_FIGURE_ART (a narrower hand-drawn figure test,
+# the order of figures side by side, clipped paint in the strike and highlight read).
+# The result's schema is the same: results from 0.5.10 to 0.5.19 load unchanged and their page
+# is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.19 opens a 0.5.20 result.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.20"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -1085,6 +1096,7 @@ def _text_pass(
     layout_lang: str,
     options: ConversionOptions,
     tracer: Tracer,
+    figure_art: bool = False,
 ) -> text_pass.TextPassResult:
     """Links, cross-references, language, (with FEATURE_COLOUR) colour runs and (with
     CONTENT_RUNS; counted either way) struck runs on the elements, before any step
@@ -1100,6 +1112,7 @@ def _text_pass(
             colour=options.colour,
             runs=options.content_runs,
             chosen_lang=options.language,
+            figure_art=figure_art,
         )
         _annotate(span, lang_source=text.lang_source, **text.counts())
     return text
@@ -1926,6 +1939,8 @@ def _page_math_pass(
                 grouping["join_panels"] = True
             if settings.layout_figure_art:
                 grouping["figure_art"] = True
+            if settings.layout_matching_under:
+                grouping["matching_under"] = True
             if settings.table_search_unlimited:
                 grouping["table_search_limited"] = False
             try:
@@ -2222,6 +2237,8 @@ def _convert(
                 extra["join_panels"] = True
             if settings.layout_figure_art:
                 extra["figure_art"] = True
+            if settings.layout_matching_under:
+                extra["matching_under"] = True
             if settings.table_search_unlimited:
                 extra["table_search_limited"] = False
             if stage_progress is not None:
@@ -2374,7 +2391,17 @@ def _convert(
             made: list[text_pass.TextPassResult] = []
 
             def text_and_headings() -> None:
-                made.append(_text_pass(pdf_bytes, elements, readable, doc.lang, options, tracer))
+                made.append(
+                    _text_pass(
+                        pdf_bytes,
+                        elements,
+                        readable,
+                        doc.lang,
+                        options,
+                        tracer,
+                        settings.layout_figure_art,
+                    )
+                )
                 for fix in _heading_fixes(made[0].elements, tracer, settings):
                     run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
 

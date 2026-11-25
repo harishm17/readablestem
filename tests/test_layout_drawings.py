@@ -18,6 +18,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
+from fixtures.handwriting.make_fixtures import A4, INK_BLUE, Writer, typed
 from readablestem.config import Settings
 from readablestem.core.types import Kind
 from readablestem.models import OFFLINE_DEFAULTS
@@ -41,6 +42,12 @@ PARAS = [
     "Current is the rate at which charge flows past a point. In a series circuit the same "
     "current flows through every component, and the voltages across them add up.",
 ]
+PRODUCTION_LAYOUT = {
+    "display_grouping": True,
+    "inline_joins": True,
+    "region_tree": True,
+    "join_panels": True,
+}  # the four switches that are on in production
 NOTE = "The speed levels off at the terminal speed, when drag balances the weight of the ball."
 
 
@@ -440,33 +447,102 @@ def test_art_that_a_clip_leaves_unpainted_is_no_figure_over_the_text_it_lies_on(
     assert "Average velocity is displacement divided" in _text_of(out)
 
 
+def _straight_pen_page(*, label: str | None = None) -> bytes:
+    """A typed page with pen strokes of straight segments (a sketch: the ribbons are
+    polylines, no curve in them) and, when given, a typed `label` by them."""
+
+    class Straight(Writer):
+        def stroke(self, centre):
+            if len(centre) < 2:
+                return
+            outline = self._resample(self._ribbon(self._resample(centre, 2.0)), 2.0)
+            if len(outline) < 4:
+                return
+            self.shape.draw_polyline([*outline, outline[0]])
+            self.pending += 1
+            if self.pending >= self.rng.randint(8, 60):
+                self.flush()
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=A4[0], height=A4[1])
+    typed(page)
+    Straight(page, 401, "ribbon", INK_BLUE).lines(
+        pymupdf.Rect(80, 470, 540, 540), pitch=26, em=8, count=2
+    )
+    if label:
+        note = layout.analyze(doc.tobytes(), figure_art=True)
+        box = next(e.bbox for e in note.elements if page_type.HANDWRITING_REGION in e.reasons)
+        _label(page, (box[0] + 40, box[1] + 12), label, 11)
+    return doc.tobytes()
+
+
+def test_a_line_that_a_clip_leaves_unpainted_is_no_strike_with_figure_art():
+    # The strike and highlight reader read the page's drawings unclipped, so a figure's art
+    # clipped to another page (arXiv 2407.20815) put its rules through the words under them.
+    # With figure art it reads the drawings as layout does.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _label(page, (72, 200), "The deadline is Friday", 11)
+    contents = page.get_contents()
+    # the clip holds a box far from the line
+    ops = ["q 300 60 200 100 re W n", "0 0 0 RG 1 w 70 592 m 200 592 l S", "Q"]
+    doc.update_stream(contents[0], doc.xref_stream(contents[0]) + "\n".join(["", *ops]).encode())
+    assert layout.page_paint(doc[0])[0]
+    assert layout.page_paint(doc[0], figure_art=True)[0] == []
+
+
 def test_a_pen_drawing_that_typed_labels_name_is_a_figure_only_with_figure_art():
     # A figure drawn with a pen on a typed page (arXiv 2407.20815: a ball with its radius and
     # charge) was cut out as "handwriting, not converted" from the strokes alone, and its typed
     # labels stood off as stray equations. The labels name it: it is a figure with them. The
-    # same strokes with no typed label by them are still handwriting.
-    path = Path(__file__).parent / "fixtures" / "handwriting" / "typed_with_ink.pdf"
-    plain = layout.analyze(path.read_bytes(), figure_art=True)
+    # same strokes with no typed label by them are still handwriting. A student's writing
+    # curves and a drawing's strokes mostly do not: writing with a typed "Answer:" or "R" by
+    # it stays handwriting, with the notice, and the typed word stays in the page's text
+    # (review 25).
+    sketch = _straight_pen_page()
+    plain = layout.analyze(sketch, figure_art=True)
     (note,) = _regions(plain)
     assert _figures(plain) == []
-    doc = pymupdf.open(path)
-    _label(doc[0], (note.bbox[0] + 40, note.bbox[1] + 12), "R", 11)
-    _label(doc[0], (note.bbox[0] + 140, note.bbox[3] - 14), "O(0)", 11)
-    out = layout.analyze(doc.tobytes(), figure_art=True)
+    out = layout.analyze(_straight_pen_page(label="R"), figure_art=True)
     (figure,) = _figures(out)
     assert _regions(out) == []
     assert _holds(figure, note.bbox, slack=8)
-    assert "R" in (figure.text or "") and "O(0)" in (figure.text or "")
-    # Without the switch (production) what a student wrote beside a typed "Answer:" is
-    # handwriting to decide on, and the typed word stays in the page's text: the rule took
-    # the word into a picture and dropped the notice (review 25).
-    sheet = pymupdf.open(path)
-    width = pymupdf.get_text_length("Answer:", fontname="helv", fontsize=11)
-    _label(sheet[0], (note.bbox[0] - 4 - width, note.bbox[1] + 12), "Answer:", 11)
-    off = layout.analyze(sheet.tobytes())
-    assert _figures(off) == []
-    assert len(_regions(off)) == 1
-    assert "Answer:" in _text_of(off)
+    assert "R" in (figure.text or "")
+    # The base's rule took writing as well, and with it the typed word: figure_art alone
+    # must keep both.
+    path = Path(__file__).parent / "fixtures" / "handwriting" / "typed_with_ink.pdf"
+    writing = layout.analyze(path.read_bytes(), figure_art=True)
+    (hand,) = _regions(writing)
+    for word, at in (("R", (40, 12)), ("Answer:", (-60, 12))):
+        sheet = pymupdf.open(path)
+        _label(sheet[0], (hand.bbox[0] + at[0], hand.bbox[1] + at[1]), word, 11)
+        for switch in (False, True):
+            result = layout.analyze(sheet.tobytes(), figure_art=switch)
+            assert _figures(result) == []
+            assert len(_regions(result)) == 1
+            if word == "Answer:":
+                assert word in _text_of(result)
+
+
+def test_three_figures_side_by_side_are_read_left_to_right_with_a_short_row_beside_them():
+    # Figures whose tops differ by a few points, and a short row at the right (a one-line
+    # equation) whose top lies between theirs: the row cannot share a line with a figure, and
+    # the figures after it were not put back on the line they belong to, so the row was read
+    # between the left figure and the other two (w_lecture_5111 page 4). With figure art the
+    # three are read in a row, and the row after them.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _running_text(page, 72, 1)
+    for k, (x0, top) in enumerate(zip((72, 232, 392), (200, 206, 208), strict=True)):
+        _path(page, [[(x0, top), (x0, top + 120), (x0 + 130, top + 120)]])
+        curve = [(x0 + 4 + 5 * i, top + 110 - 90 * math.sin(i / 8 + k)) for i in range(24)]
+        _path(page, [curve], colour=BLUE)
+        _label(page, (x0 + 50, top + 134), f"fig{k}", 9)
+    _label(page, (528, 210), "x = 2", 11)
+    _running_text(page, 460, 1, start=1)
+    out = layout.analyze(doc.tobytes(), figure_art=True, **PRODUCTION_LAYOUT)
+    order = [(e.text or "")[:5] for e in out.elements if e.kind is not Kind.PARAGRAPH]
+    assert order == ["fig0", "fig1", "fig2", "x = 2"]
 
 
 def test_a_title_or_a_line_by_a_slides_footer_bar_is_not_a_label_of_a_figure():

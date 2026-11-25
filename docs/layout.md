@@ -34,7 +34,8 @@ Element conventions:
   right edge is never a paragraph of its own: it is the label of the equation piece on its
   baseline (in either column of a page with a two-column section below, the same column
   first), or, when it is centered between lines, of the nearest piece within 2.5 font sizes
-  that has no number yet and is not level with a numbered line; a number that fits none
+  that has no number yet and is not level with a numbered line of its own column (a
+  numbered line of the other column is another equation); a number that fits none
   stays text. A number of one column does not go to the math of the other when text of its
   own column stands within two lines of it. Equation pieces that
   `display_grouping` does not join keep a number each, or none. A bracketed number set less
@@ -220,7 +221,9 @@ reader, neither to find them nor as a second opinion
    in lower case (the rest of a sentence from the page before). A head with no page
    number beside it (a draft stamp, a title) stays; a table's last row or a note has a line
    under it a line away, so it never stands clear. What goes is counted as `furniture` left
-   out, as on a longer file. The
+   out, as on a longer file. Counted on real documents, 2026-11-24 (404 files, 76 of one page, 20
+   of them private): the shape rule took no line of words on any one-page file, so no small-print
+   line that ends in a separate number is lost, and the rule is not changed. The
    reference pages are the analyzed pages plus their neighbors, up to 24 pages, so
    analyzing one page of a long PDF still recognizes its header. Bare page numbers (`7`,
    `Page 3 of 9`, `iv`, `- 12 -`) in the band are always dropped from the text (the page markers of
@@ -229,7 +232,20 @@ reader, neither to find them nor as a second opinion
    (raster images, and drawings clustered within the band) whose box, rounded to a point,
    repeats on half of the reference pages are logos and are dropped too. Watermarks go:
    diagonal text at least 2 x body size, and rotated text repeated at the same place on
-   half of the reference pages. A figure takes back the dropped rows that label it
+   half of the reference pages. One line goes without repeating (`_is_side_stamp`, since
+   0.5.20): the stamp arXiv prints up the left margin of a paper, a turned row whose words
+   are the stamp's, whole (`arXiv:2403.06391v1 [quant-ph] 10 Mar 2024`; an identifier of
+   the old form may have no subject in brackets). It stands on one page (the first, or the
+   first of a supplement bound in after the paper: the rule takes it on any page), and its
+   place in the height of the page had it read as a paragraph between two of the text's, or
+   inside one. It is known by its words and not by its place: a turned line at the edge of
+   a page may be the title of a chart's axis, and no place tells the two apart. The same
+   words set upright (the last line of a reference, a footer) are text. Limits: no other
+   stamp is known (a turned "Downloaded from ..." line that stands on one page is still
+   read), and a stamp that runs off the page so that its date is cut is still read (arXiv
+   1711.06139 page 1, a small page). What changes on real pages when the stamp goes, and
+   the two pages that read worse without it, are under "The stamp on real documents"
+   below. A figure takes back the dropped rows that label it
    (`_figure_labels`, since 2026-10-12: the silent-loss sweep found a slide's x tick
    labels in the footer band dropped as page numbers, an axis title repeated under each
    chart of a deck dropped as a running footer, and a repeated rotated y-axis title
@@ -316,7 +332,31 @@ reader, neither to find them nor as a second opinion
    it had interleaved it with the line above ("dis v ta avg nce"). A fragment of at most
    four glyphs with a big operator (∫ ∑ ∏ √) joins the line it sits in, before the
    first glyph to its right: TeX sets the sign of an inline `$\int_0^1 x^2\,dx$` on a
-   baseline of its own, and left alone it became a display equation of its own.
+   baseline of its own, and left alone it became a display equation of its own. A limit
+   set over or under a sum, product or integral sign is folded onto the sign's row first,
+   which makes the fragment longer than four glyphs and moves its center off the line. So
+   a row that is one such sign and its limits alone (`_sign_of_limits`: every other glyph
+   script-size beside the sign, set over it or under it, at most eight on each side) is a
+   fragment whatever its length, it is placed where the sign stands, and a fragment that
+   holds a sign that takes limits (`shared.LIMIT_SIGNS`: an integral, a sum, a product, a
+   big union or intersection) and a glyph smaller than that sign, which is how a limit in
+   it shows, looks at the center of the sign when it finds no row at its own center. Three
+   kinds stay where they are. A root: it has a smaller glyph under it ("√tn") and takes no
+   limits, and placed by its own center the denominator of a fraction was read between the
+   two terms of its numerator ("(V1(u) √tn −κ′1(θ)tn)"; arXiv 2503.05994 page 19 and
+   2312.17566 page 7, five displays, found by review 32). A fragment that reaches into a
+   row at its own center without lying within it: the sum of a fraction's numerator, whose
+   row of terms begins under its raised script, is no part of the line under it
+   (`ax_statme_240307158` pages 3 and 8). And a sign with nothing but a bracket before it,
+   "(∑": no limit moved its center, and in the line under it it was read before the "=" of
+   its own line (`ax_cslg_240306366` pages 10, 11 and 13). One that finds no line
+   at all may stand in the row of another sign and its limits (the product and the sum
+   before an integral whose row took their limits). Before this a sign that took a long
+   limit, or one that stands after another sign, was read after its line ("p(x0) =
+   pt(xt−1 | xt) dx1:T . ∫ ∏Tt=1"; `tests/fixtures/layout/latex/sum_limits.tex`). The
+   tall brackets round a sum are no limits, and a row of a sign, its limits and a bracket
+   is still placed by its center. An integral sign whose box hangs above a line of plain
+   letters still finds no row (see "Limits of a sign" under Glyph math).
 5. **Reading order.** One column: top to bottom, left to right within a line. Two columns:
    left column, then right column, segment by segment. Items that cross the gutter are
    full-width and close a segment. A narrow item is full-width too when it sits at a
@@ -400,7 +440,11 @@ so a heading is not, and a line that starts a block is not).
    document (`eigen-vector`), the hyphen stays; when the joined word is written whole
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
-   counted, so a break never vouches for itself.
+   counted, so a break never vouches for itself. The rows that the margin filter leaves
+   out (running heads and feet, page numbers, watermarks, the stamp) are part of the
+   document's spelling (since 0.5.20): the subject in the stamp up the side of a paper
+   (`physics.ed-ph`) is how its references write it. Rows taken out by their place and
+   put elsewhere are in neither list.
    Two lines that end and start in a script written without spaces (Han, Hiragana, Katakana,
    Thai, Lao, Khmer, and their full-width punctuation) join with no separator
    (`blocks._line_break`).
@@ -479,6 +523,54 @@ so a heading is not, and a line that starts a block is not).
    `EditsCarried.dropped`, which the instructor is told about. Results from 0.5.0 load
    unchanged.
 
+**The stamp on real documents (0.5.20).** Counted with `layout.analyze` under production's
+switches, the source with the rule (`800165e7`) against the same source without it
+(`8c509aef`); no model:
+
+| Set | Pages | Differ | Stamps read, before to after |
+|---|---|---|---|
+| 183 public arXiv papers, the first 25 pages of each | 3,533 | 177 | 177 to 0 |
+| the 60 files of `layout-dev-1`, whole | 947 | 29 | 29 to 0 |
+| 184 further public arXiv papers that no earlier round had read, the first 6 pages of each (drawn and read by review 34) | 1,093 | 159 | not counted apart |
+
+- In the first set the pages that differ are 175 first pages and the first pages of two
+  supplements bound in after their papers (arXiv 2405.04201 page 6, 2405.07383 page 13). The
+  stamp was an element of its own on 148 of them and stood inside a paragraph or a list item
+  on 29. On 112 pages the stamp is the whole difference; on 60 the same characters stand in
+  the same order in fewer elements; on 4 the inline formulas of a joined paragraph are listed
+  at another place; 1 reads worse (below). No figure and no table changes. (Review 34's
+  comparison, from archives of the two commits; the commits after `800165e7` change no code.)
+- In the development files all 29 are first pages: 12 by the stamp alone, 15 with the same
+  characters in fewer elements, one with a word whole that the stamp had cut at a line end
+  ("relation-" and "ship", `ax_cslg_240306367`), one with inline formulas listed elsewhere.
+- In the third set: 87 by the stamp alone, 60 with the same characters, 5 with formulas
+  listed elsewhere, 7 other; no figure and no table changes.
+- "Fewer elements" is two things. Where the stamp had cut one block (a paragraph, a title, an
+  affiliation line), the block is whole. Where the stamp had stood between two different
+  blocks, they now run together with no word lost and the order right: the last affiliation
+  with the correspondence line (arXiv 2312.17566, 2408.09889), the author line with the
+  affiliations (2406.19702, 2408.13659, 2504.09024), an affiliation with its e-mail
+  (2401.11352, 2505.05338, 2407.08468), a title in two languages as one heading
+  (2412.17089), two affiliations (2311.08229), and in the development files an affiliation,
+  "and" and the next author as one heading (`ax_statme_240307124`). "Abstract" is a heading
+  where it was a paragraph on four pages (2311.16176, 2405.01155, 2408.13045, 2503.13398).
+- Two places read worse, and both are older faults that the stamp had hidden (the 0.5.19
+  source reads them the same way once the stamp is taken off the page). arXiv 2411.02531
+  page 1: the last line of a paragraph begins with a sum sign; with the stamp beside it the
+  line was a display of its own, and without it the line is read at the head of the next
+  paragraph and the sign after that paragraph. arXiv 2505.05280 pages 1 to 2: the last
+  paragraph of page 1 no longer takes its end from the top of page 2, because the left edge
+  of page 1's text is now the abstract's and not the stamp's (`joins._text_edges`), so the
+  two edges are not the same. So a stamp's removal can change the page after it. Neither
+  is repaired here.
+- Of 334 stamped first pages of 367 open papers, 333 are taken (the one left is the cut
+  stamp of 1711.06139), and 12 of 12 identifiers of the old forms are taken; no other
+  turned row at a side edge and no upright row that is a stamp's words whole was found in
+  them (review 34).
+- The spellings of the rows left out change one page of the 4,480 of the first two sets:
+  arXiv 2305.00609 page 20, where a reference breaks "[physics.ed-" and "ph]" and keeps its
+  hyphen because the stamp spells the subject.
+
 ### The region tree (`REGION_TREE`, off in code, on in production since 0.5.18)
 
 `pipeline/layout/regions.py` (and `entries.py`). The reader above finds one gutter for the page,
@@ -520,9 +612,61 @@ changed nothing in production.
   and the upper limit are one fragment) is in the sign's band: the cut between the lines of
   the display left the limit out of its text ("∫b f′(x) dx = f(b) −f(a) a" on a slide). Only a
   big operator counts: a general "short item inside a tall one" moved an equation in a recorded upload
-  (`w_solutions_1802`). A limit that hangs under a binomial's bracket, or stands
-  over the sign without touching it, is not covered (page 20 of `latex-slides`, the
-  two-column fixture).
+  (`w_solutions_1802`). A short item (at most 8 characters) that is the limit of such a sign by
+  its place (`regions._limit_gap`: centered on the sign, no wider than twice it, no further above
+  or below it than its own height) is in the sign's band too, whether the sign is taller than it
+  or not, and it is the limit of one sign, the nearer one (`regions._at_sign`; a sum behind
+  its opening bracket counts as a sign for this): the "|u|=k" that hangs under the sum of one
+  line of a display is no upper limit of the sum on the line under it, which cut display
+  (2.19) of arXiv 2503.05994 page 14 into two equations that overlapped. The first case: the lower limit of a sum that stood level with the lower entry of a binomial's bracket
+  beside it was a band of its own, and read after the whole line ("(x + y)n =∑n (n k)xn−kyk
+  k=0"; page 20 of `latex-slides`, `∑nk=0 (n k)` now). Measured on real documents, 2026-11-24,
+  against 0.5.19 with production's switches (the rule together with the three repairs it
+  needed: "Rows" above, "Equation numbers", and "Limits of a sign" under Glyph math). On 62
+  public arXiv papers (the first 25 pages of each, 1,224 pages) 74 pages differ, 1 has
+  one element more (the equations (2) and (3) of arXiv 2210.13562 page 5, one display with two
+  numbers before) and 7 have fewer; the display equations whose text ends with a sign and its
+  limits (the sign read after its line) go from 189 to 186, and those that are a sign and its
+  limits alone from 31 to 30. On the 60 files of the `layout-dev-1` development set (whole
+  files: 954 pages, 947 with elements) 51 pages differ, 1 has one element more and 4 have
+  fewer; the same two counts go from 79 to 77 and stay at 21. On 60 further public arXiv
+  papers (the second sample of review 31, the first 25 pages of each, 1,195 pages) 64 pages
+  differ, none has more elements and 10 have fewer; the two counts go from 126 to 115 and
+  from 20 to 19. On 61 more public arXiv papers (the sample of review 33, papers no earlier
+  round had read, the first 25 pages of each, 1,114 pages) 87 pages differ, 2 have one
+  element more and 8 have fewer; the two counts go from 159 to 153 and from 50 to 51.
+  Traded, on `ax_econem_240306657` page 49 and
+  `ax_quantph_240306391` page 15: the upper limit now follows its sign and the lower is read
+  after the line, where before the lower followed its sign and the upper stood in front of
+  the display. Worse, on arXiv 2504.03499 page 25: the second line of a display has a note
+  set over its "=", a little higher than its three sums, so the cut under the upper limits
+  gives them to the line above and they are read in front of their line ("T m T (α) ∑ ∑ =
+  …"; 0.5.19 read two of the three at their signs). Worse too, on `ax_quantph_240306391`
+  page 16: the upper limit "2N−1" of a sum was folded into the row of numerators beside
+  it before the sign came, and the sign with its lower limit lands inside it ("2N∑n=0−1
+  …"; 0.5.19 read "2N−1 … ∑n=0", the sign after its line). And on arXiv 2309.13554 page
+  12: a sum with a wide lower limit, "q=1,q≠p", has the sign and the "M" after it inside
+  that limit ("≈q=∑P M1,q ≠p P"; 0.5.19 read "≈ ∑P MP" and the limit after the line). The one page with an element more is
+  `ax_mathap_240306449` page 3: a sum set in a sentence with limits over and under it had
+  them read into the words of the sentence ("morek=0 involved and need∞s"); the sentence is
+  clean now, the upper limit is at its sign and the lower is a short equation of its own.
+  Read differently, with neither reading the better one (the pieces of a display in another
+  order): arXiv 2203.14737 page 20, 2408.13045 page 22, 2409.12662 page 12, 2404.01333
+  page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22, 2411.16302 page 17,
+  2502.00994 page 9, 2504.00712 page 3, `ax_csro_240306420` page 3 and
+  `ax_mathap_240306449` page 15; and among the 61 papers of review 33 arXiv 2303.02529 pages 10, 18 and 21,
+  2308.00984 page 7, 2312.15494 page 18, 2405.04201 page 7, 2407.20419 page 9, 2501.02602
+  page 5 and 2505.03099 pages 6 and 7. Cut in two, among those 61 papers: two programs of
+  numbered lines of arXiv 2407.20419. On page 17 the objective of (17a) keeps the number and
+  its "s.t." line is an equation without a number under it; the lower limits of the
+  objective's two sums are read in that line, which is the fault `regions._at_sign` was
+  written against, one line further down (they were out of place at 0.5.19 too). On page 15,
+  (14a) stands alone and (14b) is with (14c), one display with three numbers before. This
+  is the shape to look at first if a later page shows a program of numbered lines cut
+  apart. The
+  rule moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
+  score of the 21 development papers as it was (9,198 of 11,258 whole; displays 903 of
+  1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree). The repairs it needed in the rows and in the display pass run with the tree off too: with all four switches off, 23 pages of 9 of the 60 development files read differently from 0.5.19 (none with more elements, 3 with fewer; the sign at its place where it was read before or after its line).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
   lines each side (two on a slide) that have a line of the other side at their height (the pieces
   a formula cuts a line into are one line), and a line of three words or more, cuts it in two.
@@ -556,6 +700,18 @@ changed nothing in production.
    Name line; of the 332 PDFs counted (public files, the layout development set, the real-world
    development parts, the workflow corpus), only that page has a column with two kinds, and the
    two matching exercises (`e1_mc_columns`, `s04_worksheet`) are cut as before.
+   What stands under a matching exercise (`LAYOUT_MATCHING_UNDER`, off in code and in the
+   production profile, with `REGION_TREE` on): the line under it that goes on in a column ("8."
+   under terms 1. 2. 3.) was a fourth term and was read between the terms and the definitions.
+   With the switch on, each column's labels end where their count stops (`_run`: the first
+   label, then the next number or letter of the same kind; at least two in each column, the two
+   columns of different kinds), and the exercise is a `cols` node over a stack with what stands
+   under it (`_Build._matching`), read after it. It covers both shapes: a full-width line with
+   its points at the right edge (`e1_mc_columns` page 1) and a numbered question with sub-parts
+   (a), (b). Limit: a line under the exercise that goes on counting ("4." under terms 1. 2. 3.)
+   is not told from a fourth term. Moving what is read before a figure or an equation under the
+   exercise moves the text of its request, so the recorded answer of such an item stops
+   matching: that is why the switch is off until a re-recording.
 9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
@@ -1219,7 +1375,17 @@ math font, stay math.
   5. *A piece inside a display.* The top of a tall bracket set in pieces, the double bars of a
      norm: a line of its own to the stacking, inside the box of the formula it belongs to.
      `_absorb_contained_regions` joins a region with at least `CONTAINED_SHARE` (0.9) of its
-     area inside a larger one; two numbered displays are never joined.
+     area inside a larger one; two numbered displays are never joined. And a piece that the
+     stacking gave to the display over its own: the upper limit of a sum behind its opening
+     bracket, "(n", starts a little above the line it belongs to, so it is met before that
+     line, with only the display above to join. Equation (12) of arXiv 2408.09889 page 5
+     then reached 12 pt into (13) and held a piece of it (review 32; the limits rule of
+     0.5.20 brought it out, by folding the limit over an integral into line (13), which
+     until then had chained the piece to its own line). `_return_stray_pieces` looks at the
+     lowest line of each display after the stacking: when it has no number, lies under every
+     other line of the display, is no limit of a sign in them and is of script size beside a
+     line of another display that stands around it (the piece's middle between that line's
+     top and bottom, its extent between the line's left and right), it goes to that display.
   6. *Limits at the size of the row.* `_joins_line` takes limits by their size (a script size
      under a big operator); a paper that sets them at the size of the row ("k=1" at 7 pt under
      a sum at 7 pt) gave it nothing to go by. `_limits_of` joins a line that hangs right under
@@ -1273,7 +1439,7 @@ math font, stay math.
   bracketed number set `NUMBERED_TRAILING_GAP` (3) font sizes or more right of a row that ends in
   "+" or a relation was its row's right-hand side, so it became an equation of its own ("(D4)",
   "(D9)" in 2412.18448: the first row of a display set in several rows, its number level with
-  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it (the regular rule runs with display grouping off as well, so the dots change is not behind that switch). Known limit (review 26, made pages only; 0.5.18 was not right on them either): fill-in lines stacked one under the other, each with a mark at its right ("3x + 2 = (4)" over "5x − 1 = (2)"), still give the marks away as equation numbers, because a line under the line is what "goes on" means here; telling them apart needs the row under to continue the line (to start with a relation or an operator, or to be indented under the right-hand side). A bracketed number on a row of its
+  it); it labels the row now when no other row stands beside the number (`display._trailing_number`; a number beside a cases piece and the "P(...) =" piece before it stays with the cases, 2210.13562). One number for a display (review 25): the trailing number goes only to a row level with it (never the far reach of a number centered on a group of lines), that has no number yet, and that something follows (`display._goes_on`: a row at most `TRAILING_ROW_GAP` (1.5) font sizes under it over part of its width, or rows between the row and the number, the cases of a brace). A bracketed answer or mark after "3x + 2 =" with nothing under or beside it is no equation number, and is its own element as before 0.5.19. Measured with the four switches on: the private corpus (25 files) had 2 displays with a number new at 0.5.19, the 60 papers of the layout development set 2, the 120 public PDFs of the repository 0. On the private corpus a lone "=" (9 x 3 pt, between two lines of words) took two numbers, one of them from a line 20 pt above, because the trailing rule took the far reach and had no limit of one number a row; it takes none now, and the page reads as at 0.5.18. The other three are real numbers and keep theirs: "(21)" of a cases display (`ax_eesssp_240306423`, page 4), "(10)" of two equations numbered (10) and (11) one under the other, which is one display of two rows with a number each (`ax_eesssp_240306460`, page 3), and one private "(15.21)" of a display that ends in a row of centered dots ("... + x^3 + ⋯"): `_Line.goes_on_after_ink` no longer takes those dots, set as three multiplication signs, for an operator that goes on, so the regular rule numbers it (the regular rule runs with display grouping off as well, so the dots change is not behind that switch). Known limit (review 26, made pages only; 0.5.18 was not right on them either): fill-in lines stacked one under the other, each with a mark at its right ("3x + 2 = (4)" over "5x − 1 = (2)"), still give the marks away as equation numbers, because a line under the line is what "goes on" means here; telling them apart needs the row under to continue the line (to start with a relation or an operator, or to be indented under the right-hand side). Counted on real documents, 2026-11-24 (404 files: the public PDFs, the development papers and the 73 recorded corpus uploads): no page shows it. Four public pages (`ax_condmatmtrlsci_240306389` page 2, `ax_qbionc_240306496` page 17, 2307.16839 page 5, `display_groups` page 0) have two stacked rows with a bracketed mark at the right, and in each the marks are consecutive equation numbers ((6) and (7), (18) and (19), (44) and (45), (2) and (3)); no private page has two. The rule is not built. A bracketed number on a row of its
   own right above a display, at the display's left edge ("(10.20)" in 2412.12319; the
   "(10.18)" of that paper is the end of a paragraph's line, not a row of its own), labels that
   display (`display._line_below_number`, within `NUMBER_ABOVE_GAP` font size of blank). A label
@@ -1704,6 +1870,48 @@ raised text (next section).
   (`chem.MAX_SHAFT`). The labels do not count in the row's size (`_Row.plain`), which a long label
   used to pull down to the label's size and with it every subscript of the formulas. A script
   at the height of the arrow (a charge before it) is not a label.
+- **Limits of a sign** (built in part). A limit set over or under a sum, product or
+  integral sign is a small glyph further off the baseline than a script may be, so with it
+  in the line a row of few full-size letters took the size of its scripts (`_Row.size`).
+  A line that a sign and its limits are folded into together keeps the size it had: the
+  sign carries it (`_Char.line_size`, set by `rows._attach_big_operators`), so the row that
+  holds the sign has that size however it is cut or joined afterwards (an equation number
+  or a list marker taken off it). The size it had can itself be the script size: three
+  subscripted letters side by side, "d_ij = ∑ a_ik b_kl c_lj", are a word of script size
+  to `_Row.size`. The row keeps that size, and the limit under its sum is found by the
+  size of the sign (`display._limits_of` counts its reach in the larger of the two; arXiv
+  2505.04942 page 12). Giving such a row the sign's size was tried first and taken back: a
+  display line of `ax_econem_240306657` page 54 that holds the words "a.s. and" then had
+  its true size and became a paragraph and eight pieces, the older fault named below.
+  Four faults had that one cause.
+  On a page with no line of running text, the word subscripts of "E_tot = ∑ e_i + E_reg"
+  were words of prose once the "n" over the sum was in the row, and the display a paragraph
+  and three pieces of math (`sum_limits.tex`, page 2). The limit under the sum of such a
+  row was too far off, counted in script sizes, to be its limit (`display._limits_of`) and
+  was an equation of its own: two displays on page 4 of `ax_eesssp_240306460` in the
+  development set, and the "t=T" of a product on arXiv 2407.13734 page 5, which 0.5.19
+  split the same way. And a numbered line with a sum in it passed for the limits of the
+  numbered line over it, so two equations of arXiv 2210.13562 page 5 were one display with
+  the numbers "(2) (3)". What is left: a limit that reaches the line alone, before its sign
+  does (`_attach_scripts`), still counts, so "ℒ_total = ∑ ℒ_task + λ‖θ‖" with an "N" over
+  the sum is a paragraph on a made page, as at 0.5.19; no real page of the two sets below
+  shows it. Leaving the limit glyphs out of every row's size was built and measured on 2026-11-24
+  and is not in this release: on the 62 public papers of review 30 it made three pages
+  better, and on the 60 files of the development set four (the page above among them), but
+  a display whose row then has its true size and holds one word ("a.s. and",
+  `ax_econem_240306657` page 54) became a paragraph and eight pieces, and a sum before a
+  tall bracket was cut off as an equation of its own (`ax_quantph_240306391` page 12). Both
+  are older faults that the wrong size hid; the change waits for them. So does the join of
+  a band of upper limits to the band under it (`regions._bands`), which read "N ℒtotal =
+  ∑…" as "ℒtotal = ∑N…" on a made page and made one page of the development set better,
+  and split displays on three others of the same file (`ax_statme_240307158` pages 12, 22
+  and 26): a fraction set before a sum loses its numerator when the upper limit is in the
+  display's own segment, which 0.5.19 already does on page 22. And TeX's big
+  signs have their origin at the top of the glyph, so the box the PDF gives for a display
+  integral lies above a line of plain letters and its center is outside the line: a rule
+  that looks at the bottom of the sign's box moves about half of the integrals that are read
+  alone or after their line into it, and every root sign that leads its radicand; it was
+  tried on nine papers and is not built.
 - **`E°cell`** (`_degree_over_label`). A degree sign over the start of a lowered label
   (`E°cell`, `E°cathode`) is read after the label, not inside it (`E c°ell`, which cut the inline
   equation in two); several degree signs in one row are scripts of their own; and the degree sign
@@ -1754,7 +1962,15 @@ this section describes.
   a raised script one over the other (the 4 and the 2- of SO4 2-, the 6 and the 14 of a
   nuclide) arrive as two fragments, and the lowered one used to start a paragraph of its own
   (MuPDF starts a line with it). It is now folded into the row it is under, read lowered
-  first after a base (`SO42-`) and raised first before one (`14 6 C`).
+  first after a base (`SO42-`) and raised first before one (`14 6 C`). A typewriter name (a run of
+  monospaced small glyphs) with a lowered script under it, after a base, is read the same way
+  (the lambda of a filter's `KRR` superscript, 2503.00504 p8, read "KRλR" before): the x-order
+  put the lowered script inside a name whose glyphs it overlapped by one, and it is now read
+  before the whole name (`φλKRR`). The rule is for that font only. A first version took every
+  run of small glyphs and moved three formulas of two development papers (the `ref` of
+  R_n^ref, the X of L with X_h^(S): their boxes came out cut or split, 9,196 of 11,258 whole
+  against 9,198); a name in any other font keeps the order of the text layer. On the 332 public files the
+  rule changes nothing; it changes the page it was made for.
 - **Rows of mostly scripts** (`_Row.size`): a row's size is the size of most of its glyphs,
   and a nuclide's "92 U -> 234" has five script glyphs and three full-size ones, so its
   scripts were taken for its text, never recognized as scripts, and the equation was cut
@@ -1954,11 +2170,39 @@ math by the document's evidence; the equation step's own tiers then decide it.
   section are: one figure's crop is 12 pt shorter, the same five
   words, and its request has no recorded answer until it is re-recorded), and one in a note
   (r21_infographic_orcid: a figure's reason reads 866 paths for 867). Panel labels, the other
-  part of this section, move no request and are not behind it. Turning it on
-  needs a re-recording and a `PIPELINE_VERSION` bump, and, first, an order for figures that stand
-  side by side: on w_lecture_5111 the figure that is 12 pt shorter now starts below its neighbor
-  and `order._top_down` puts the neighbor first (the middle figure of three before the left one),
-  and a narrower label test for pen figures (below).
+  part of this section, move no request and are not behind it. Re-measured at b8fb9ab7 for wave
+  6, with the figure order of this wave in: with it on, 2 recorded requests do not match, both
+  on w_lecture_5111 (one figure and one equation of page 4), the same 2 as without the order
+  change, and 2 uploads differ (that one and r21_infographic_orcid); with it off, 0 of 73
+  uploads and 0 of 996 analyze entries differ. Turning it on
+  needs a re-recording of those 2 requests and a `PIPELINE_VERSION` bump. The three things that were owed before it
+  could go on are in (wave 6): the order of figures that stand side by side, the narrower label
+  test for pen figures ("Pen figures") and the clip read in the readers of strike and highlight.
+  - *Order*: with the switch on, `order._top_down` puts an item that goes to a new line only
+    because its height is more than three times that of the last line's first item, and that
+    starts above the bottom of that item (it stands beside it, not under it), on the latest
+    earlier line it fits (`earlier=True`, passed from the blocks call in `page._analyze`
+    through `RegionTree.order`, the gutter orders and the grid, leaf and proxy walks of the
+    region tree). A short row between two figures of a row (their tops differ by a few points)
+    is a line of its own, and the figure after it started yet another: the row was read between
+    the left figure and the other two (w_lecture_5111 page 4: the middle figure before the left
+    one). Off, nothing is passed and the old rule stands (0 differences in 20,000 random
+    layouts, and in the 73 uploads). A first version that looked back whenever the last line
+    did not fit moved 12 pages of 8 uploads, among them a heading read after the paragraph under
+    it (r13_exam_3044 page 3); the rule above moves one page, w_lecture_5111 page 4.
+  - *Readers of paint* (`get_drawings`, `get_cdrawings`, `page_drawings`): layout
+    (`document._read_page`) reads the clipped list; `rows.page_paint`, the strike and highlight
+    marks of the text pass, reads it too with the switch on (`text_pass.read_pdf`,
+    `run._text_pass`); the furniture pass and the page-type eval read the plain list, as does the
+    upload probe (`page_type.probe_pages`, below). On the public sets 19 of 332 file entries
+    (14 different files, the rest copies) hold art that a clip hides on 42 pages; on 13 entries
+    and 30 of those pages the raw strike or highlight candidates differ with the clip read, and
+    in the result of the text pass (its counts and every element) 0 of the 14 files differ, and 0
+    of the 4 corpus files with such art.
+  - *The upload probe* is measured and not built: across the 332 public file entries and the 25
+    corpus files no page changes its kind with the clip read (1 public page has a probe
+    candidate with hidden art, and it stays the same kind). It would need the switch carried
+    through `web/uploads.py`'s child process and `web/pdf_probe.py` to `_probe_ink`.
 - **Art a clip hides** is no figure and no ink (`page_type.page_drawings`; behind
   `LAYOUT_FIGURE_ART`). A
   PDF that carries a figure's art on every page (an editor's export) clips each page to its
@@ -1970,8 +2214,9 @@ math by the document's evidence; the equation step's own tiers then decide it.
   with its depth (`level`); a drawing whose box, with half its line width, lies wholly
   outside the box of a clip it is inside of is painted at opacity 0, the way the page already
   leaves out paint nobody sees (`paint_visibility`, the ink analysis). Only layout's own read of
-  a page uses it (`document._read_page`); the text pass's strike and highlight marks, the upload
-  probe, the furniture pass and the page-type eval read the plain list. The list keeps its
+  a page uses it (`document._read_page`) and, with the switch on, the text pass's strike and
+  highlight marks (`rows.page_paint`); the upload probe, the furniture pass and the page-type
+  eval read the plain list. The list keeps its
   length and order. Counted on the public sets
   (302 files, 2,628 pages): 15 files and 34 pages hold such art on the page; on the private
   corpus 4 of 25 files and 5 of 1,202 pages. Only a drawing wholly outside its clip is
@@ -1998,10 +2243,21 @@ math by the document's evidence; the equation step's own tiers then decide it.
   number, "[4 marks]" or a whole typed line through what a student wrote left the text, the
   writing went to the figure step as a picture, and the `handwriting_on_page` notice with its
   required decision was not raised. With the switch on, page 41 reads right (its box is the
-  drawn sketch alone), and the worksheet cases are still taken: before the switch goes on, a
-  label here must be told from a worksheet's own words (short, no display, no line of running
-  text, no row that reaches outside the box, and a region that is a drawing and not rows of
-  writing).
+  drawn sketch alone).
+  Wave 6 closes the worksheet cases with two tests, so a region is a figure only if both hold.
+  The region is a drawing and not rows of writing: more than half (`PEN_CURVED_MAX`, 0.5) of its
+  pen strokes curve (a path with Bézier items, `_Path.curved`) is writing, which curves, and a
+  sketch of straight segments, a plot or a diagram with their few arcs is not. And what the
+  figure takes of the typed rows is only labels: every row it takes is at most `LABEL_SHORT` (25)
+  characters and none starts like an item (`_Row.marker`: "(a)", "1.", "[4 marks]"). A row is
+  taken as a label by `_label_owners`, the one rule for what a figure's labels are, as before.
+  Measured on made worksheet pages (9 of 9 cases of writing in ribbon, polyline and segment
+  styles with a typed "Answer:", "R", "(a)" or a question number beside it; the 10 sweep PDFs and
+  the probe pages P0 to P6): all stay handwriting, with the notice and the typed words in the
+  text; on arXiv 2407.20815 pages 2 and 4 the sphere and the world lines are still figures with
+  their labels. Pages with a pen figure, before and after (switch on, the 332 public file entries and the 25
+  corpus files): 4 pages in 2 files and 0 before, 4 pages in the same 2 files and 0 after, on 10
+  public and 1 corpus pages that hold an ink region; no page gains or loses a pen figure there.
 - **Panel labels** (`figures._panels`). A figure of pictures alone that sits on one filled
   panel (the smallest filled, non-curved shape that holds it, at most 1.5 times its area and
   no other figure) claims the rows on the panel, its header labels included, short or long
@@ -2010,7 +2266,12 @@ math by the document's evidence; the equation step's own tiers then decide it.
   paragraphs and are the figure's labels now; every other page of that copy, page 13 by either count
   included, reads the same with and without the rule). A panel that is itself the figure's own drawn shape is the
   figure's box already, and one whose area is more than 1.5 times the pictures' (a card that
-  holds a title and a sentence beside them) is left alone.
+  holds a title and a sentence beside them) is left alone. Counted on real documents,
+  2026-11-24 (404 files): 73 panels on 43 files are more than 1.5 times their pictures. 60 are
+  as large as half a page or more (a page backdrop behind one picture, which no label rule
+  should take). The other 13 are boxes of 5 to 16 rows of running text beside one picture
+  (an example box, a slide's side panel); their rows are paragraphs and not labels, so
+  leaving them alone is what the limit is for. The limit stays.
 - **A row cut by a drawing's edge** (behind `LAYOUT_FIGURE_ART`) belongs to that drawing when at
   least a quarter of it lies inside and its center is between the drawing's sides
   (`figures._cut_by`; 2407.09859 page 3: an axis title straddling the figure's bottom edge once
@@ -2275,6 +2536,23 @@ math by the document's evidence; the equation step's own tiers then decide it.
   four labels stayed equations. Before, a chart's category names stayed in the body as
   a stray paragraph and its crop had no axis values, so the model estimated them
   (2026-11-11, WS6.12, F-399).
+  What the rule cost on reading order (O-444, 2026-11-24; `eval order` on this rule's commit
+  and on its parent, each in its own tree, the replay of the corpus and `layout-dev-1`):
+  corpus, 87 gold pages in both, right in the student page 68 before and 67 after, none made
+  right, two made wrong (`r05_labmanual_5310_lab1` page 2 in the student page,
+  `r18_arxiv_opt` page 3 in the element list); `layout-dev-1`, 267 pages, student page 140
+  and 139 (`os_introductory_statistics_2e` page 2 lost, `os_contemporary_mathematics` page 4
+  made faultless), element list 139 and 139 (`ax_quantph_240306377` page 11 made right,
+  `os_algebra_and_trigonometry_2e` page 5 made wrong). The lab manual page is no read order
+  fault: its diagram's five pieces and their labels read in the same order before and after;
+  the labels used to be paragraphs, so the student page said the words of the diagram before
+  the heading, and the scorer found the figure block's words there. Now the labels are in the
+  figure (31, 11, 5 and 2 characters in its text, in its crop) and the student page hears
+  no word of a figure, so the figure block's words are found only by chance in two list
+  items under the heading (3 of its 25 four-word runs), which puts the block after the
+  heading. The rule is as designed here and the scorer's student-page source cannot place
+  a block whose words are in a picture; neither was changed, as the scorer version fixes
+  every record's numbers. Left open: the three other pages above are not looked into.
 - **Panels of one figure** (`_join_panels`, `LAYOUT_JOIN_PANELS`, off in code, on in
   production since 0.5.18; changing it needs a `PIPELINE_VERSION` bump). A figure printed as panels
   (a), (b), (c) under one caption was found as one figure for each panel, and only the one
@@ -2526,6 +2804,52 @@ review 28, on made pages only: near a code row a set named by a Greek capital ("
 in a font the list takes for code is a paragraph with inline formulas, since the letter test
 asks for a Latin letter (a λ in a listing line must not make it a formula); and a listing
 whose variables are in math italic is reread, so three of its lines become a display.
+
+Counted on real documents, 2026-11-24 (O-454, O-456, O-457, O-458; nothing built, no reader
+change): of 120 public files, the 73 development papers of the real-world set, the 60 files of
+`layout-dev-1` and the 25 private corpus uploads, 88 carry a code-face font (7, 54, 21 and 6); on
+their 567 pages with a code-face character, 188 pages in 40 files have a math-face letter on
+the same line or within three lines (11 pages, 119, 23 and 35; the private ones are one
+upload). Each shape was searched from the page's characters (fonts, gaps, classes, as
+`_code_beside_maths` reads them) and the probe finds them on the reviewers' made pages (27
+files: 394 rows with a code-face word, 90 name-after-letter gaps, 61 names with a script, 20
+cut runs, 11 assignment lines, 14 rows with a lone denominator beside them). On the real files:
+
+- A display with a `\mathtt` name and a denominator under a line of code (O-454): 0. 94 rows of
+  a code-face word of two letters or more near a code row on the papers, 39 on `layout-dev-1`, 17
+  in the corpus and 21 on public files; none has a short row (a lone denominator) stacked on
+  it. They are addresses and DOIs in reference lists, R and algorithm lines, file and function
+  names in a sentence.
+- Code-face text beside math signs (O-456). Inline formula cut on one side ("y[j + 1"): 1, on
+  `ax_cslg_240306367` p8 (the attribute set "{A, C, E, F}", an inline formula as at 0.5.18, no
+  text lost); the corpus has 8 candidates in 2 uploads, all a code-face digit or expression
+  beside a hyphen or a math letter a word space away, none with a formula to cut. A line of
+  assignments near code rows read as one-sign formulas: 1 line on 2504.06207 p13 (step 12 of
+  Algorithm 5, "meta ds[measure] ← metadata[ ];"), 2 lines in one upload. On that page the
+  cause is not the code face: the step lines are set in math italic (CMMI) and only "DS",
+  "Alg" and "Hp" are code face, so steps 7 and 11 are display equations and steps 5, 6, 8, 9,
+  10 and 12 paragraphs with inline fragments, and the algorithm block does not form (an
+  algorithm-rule fault, not built here). A code-face name with a math subscript ("cost_i"):
+  none; the 33 names beside a script letter on the papers are typewriter abbreviations used as
+  scripts ("BC", "KRR", "SM") in three statistics and biology papers, joined to their letters,
+  in displays that are whole and in inline formulas. A code-face word flush against a math
+  letter in prose ("ith", "n-bit"): none. The 84 words within 0.3 of the size of a math letter
+  are subscripts (script size, lowered: 71 on the papers, 6 in the corpus, joined) and 7 not
+  scripts: 2 typewriter names in two displays of 2408.05847 and 5 calls with math arguments
+  in 2505.08251 ("Rescale(BC ∪ BG, λb, boost)"), joined as one inline formula each.
+- A code-face name as superscript of, or set after, a slanted letter at a gap of 0.1 to 0.25 of
+  the size (O-457): 7 cases in 2 papers (2408.05847 pp22, 44, 45 and 2503.00504 pp5, 7, 10),
+  all inside display equations that are whole; none in a sentence.
+- A displayed set with string members or a Greek-capital name near a code row (O-458): 0 (the one
+  set found, an alphabet in a sentence of 2405.09610 p27, is an inline formula, as it should
+  be). A listing with variables in math italic: 12 rows in 3 files (2405.15050 p9,
+  2506.01997 p10, the SQL page ax_cslg_240306367 p4); none becomes a display, each stays code
+  or a paragraph.
+
+Four lines closed by the count: the shapes stay as limits of the two rules. One thing the
+count turned up outside them: on 2503.00504 the name "KRR" over a "λ" subscript is read as
+"KRλR" (the λ stands under the name, so the characters sorted by x put it inside).
+
 Measured on the 25 private corpus uploads (pages by count only): the 0.5.19 rules
 (base) tore the formulas of 10 pages of one upload (fonts NimbusMonL and CourierNew; the shape
 is digits, brackets and operators of a code face next to a math letter on one line, "x9 =
@@ -2967,6 +3291,16 @@ markup. In the Word file a code block that holds an equation is written as lines
 (pandoc would flatten the equation to its characters), the indentation and the gap after a line
 number as no-break spaces (`export_docx._lines_of`). A monospaced listing is code, read before
 this, and its line numbers are not taken apart.
+
+**Algorithms, wave 6 (2504.06207 p13, Algorithm 5).** A full-width algorithm (long steps that run
+past the gutter, comments at the right of the short ones) is cut by the region tree into leaves of
+different columns: the first steps and their comments are in "L" and "R", the long steps in "S".
+The scan asked every step for the column of the first one, so it ended at step 8 and the page
+stayed a heading paragraph with display equations (steps 7 and 11) and paragraphs with inline
+formulas. A step in "S" that carries the next line number at the place of the numbers is now a
+step of the algorithm (`_in_column`, in `_step_kind` and `_resumes`); its words are pieces on its
+line as before. The steps being set in math italic was not the cause: their math is inline
+equations in the block as in any other.
 
 **Monospaced quotations (WS2.6 c).** A block of monospaced lines that has none of the
 punctuation code has (brackets, `;`, `=`, `_`, `#`, `\`, `|`, `&`, an identifier followed by

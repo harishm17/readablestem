@@ -69,6 +69,7 @@ value and where that value came from. This page does not repeat those values.
 | `TABLE_FILE_FACTS`, `SCAN_LAYER_CHECK`, `PAGE_CHECK_SIGNALS`, `FIGURE_LABELS_ALWAYS` | What the file knows goes with the table, the scan, the page check and the figure (docs/steps.md, docs/tables.md, docs/layout.md), all off by default in code and in the production profile. Each one that is turned on needs a `PIPELINE_VERSION` bump: `TABLE_FILE_FACTS`, `PAGE_CHECK_SIGNALS` and `FIGURE_LABELS_ALWAYS` change the request of their step (and its prompt), `SCAN_LAYER_CHECK` adds the notice `image_page_layer_differs`. `TABLE_FILE_FACTS` on also sends the words printed in each table, so the tables row of `web/recipients.py` (the privacy page) must say so, with a new `stated` day, in the same release |
 | `LAYOUT_JOIN_PANELS` | The panels of one captioned figure are one figure, and one- or two-letter panel marks near a figure are its labels (docs/layout.md "Panels of one figure"), `false` by default in code, `true` in the production profile since 0.5.18. Changing it moves figure crops, so it needs a `PIPELINE_VERSION` bump and the recorded figure answers of the pages it moves are made again |
 | `LAYOUT_FIGURE_ART` | A page's drawings are read without the paint no clip lets through, and a short row the edge of a figure's box cuts through is that figure's label, unless it is a list item or a line of a column of text; a hand-drawn figure that typed labels name is a figure, not handwriting (docs/layout.md "Art a clip hides", "A row cut by a drawing's edge", "Pen figures"), `false` by default in code and in the production profile. Turning it on moves figure crops, so it needs a `PIPELINE_VERSION` bump and the recorded figure answers of the pages it moves are made again |
+| `LAYOUT_MATCHING_UNDER` | The two columns of a matching exercise end where the numbers of their labels stop counting (terms 1. 2. 3. beside definitions A. B. C.), so the line under them ("8. ...") is read after the exercise, not between its terms and its definitions (docs/layout.md "The region tree", rule 8; needs `REGION_TREE` `on`), `false` by default in code and in the production profile. Turning it on changes the text that goes with the figure or equation under such an exercise, so the recorded answers of the pages it moves stop matching: it needs a re-recording and a `PIPELINE_VERSION` bump |
 | `REGION_TREE` | Reading order from a tree of regions instead of one gutter (docs/layout.md "The region tree"), `off` or `on`, `off` by default in code, `on` in the production profile since 0.5.18. Changing it changes the order of some pages, so it needs a `PIPELINE_VERSION` bump |
 | `FONT_CODE_TABLES` | The codes of symbol and TeX fonts read as what the font draws, by font name (`pipeline/font_codes.py`, docs/layout.md "Font code tables"). **On by default in code**; set `false` on `web` to turn it off without a deploy. It changes element text on documents with these fonts, so stored step answers for them are asked again. Production's value is in the production profile |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
@@ -911,7 +912,21 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `paper`, ...), else the person names it.
 - **Lint** (defence in depth, `source/lint.py`): `\write18` and its spellings, `\openout`, a
   pipe in `\input`, `\directlua`, shell-escape packages, and a file argument that is absolute,
-  goes up, names a home folder or is a URL.
+  goes up, names a home folder or is a URL. Two things are no refusal. A class or package file
+  of the upload (`.cls .clo .sty .bst`) that fails the lint, as a journal's own `elsarticle.cls`
+  or `revtex4-1.cls` does with its `\openout`, is left out of the project LaTeXML gets
+  (`source.lint.left_out`, `convert._project`), and the document is read with LaTeXML's binding
+  as if the file had not come with it; the upload is still refused when a file names that file
+  with its suffix in `\input`, `\include` or `\InputIfFileExists`. Such a file cannot stay in
+  the project unscanned: 88 of LaTeXML 0.8.8's bindings load the raw file of their own name
+  (`algorithm`, `revtex4-1`), which they find once the project holds one, and the `latexml`
+  package's `rawstyles` and `rawclasses` options read any. And an absolute path in
+  `\bibliography` or `\addbibresource` (the author's own machine) is no refusal; `..`, `~`, `|`
+  and URLs stay refused there too. The lint does not keep LaTeXML from the database: with no
+  compiled `.bbl` in the upload, `latexmlpost` looks the name up, and an absolute path that
+  exists in the sandbox is read into the page. Only the upload and the TeX system tree exist
+  there, so what can be reached is a `.bib` that ships with TeX; bibunits' `\putbib[...]`, which
+  the lint has never scanned, reaches the same files. The sandbox is the limit here.
 - **Pages** (for the quota, counted at upload as an estimate): one per 3,000 characters of TeX or
   per figure (`\includegraphics`, a `tikzpicture`), whichever is larger, at least 1; more than
   `MAX_PAGES_PER_JOB` is refused. Beamer decks are refused ("Upload the compiled PDF") until their
@@ -947,7 +962,10 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   `pipeline.run.convert_pdf` passes it to `source.convert`, in the same conversion child
   (`web/isolated_convert.py`). The child checks everything again, unpacks into a private temporary
   folder, runs LaTeXML in the sandbox (`core/sandbox.py`, `source/latexml.py`; docs/security.md,
-  "Running uploaded TeX"), and `source/ltx_reader.py` turns its XHTML into elements: headings,
+  "Running uploaded TeX"; `source/compat.tex` is read before every document: an empty
+  `\lstlanguagefiles`, which LaTeXML's `listings` binding digests and cannot find with the TeX
+  tree hidden, so a document that loads `listings` is read instead of stopping, and an
+  `\orcidlink` that sets nothing), and `source/ltx_reader.py` turns its XHTML into elements: headings,
   paragraphs, lists (a list nested in an item, a contents entry's sub-entries included, is read
   as items of its own one level down; the item keeps only its own words), tables, exact
   equations (LaTeXML's MathML through the sanitiser, accepted), and figures with the project's own picture through the ordinary figure step. A formula

@@ -49,6 +49,7 @@ from readablestem.pipeline.layout.glyphs import (
 )
 from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
+    LIMIT_SIGNS,
     SCRIPT_MIN_RATIO,
     SCRIPT_RATIO,
     SCRIPT_ROW_FLOOR,
@@ -62,7 +63,10 @@ from readablestem.pipeline.layout.shared import (
 )
 from readablestem.pipeline.parse import is_math_alphanumeric
 
-# Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$).
+# Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$): the
+# signs that lead a short fragment `_attach_big_operators` folds into its line. The root is one.
+# The big union and intersection of `shared.LIMIT_SIGNS` are not: one of them is folded only as
+# a sign with its limits (`_sign_of_limits`; arXiv 2308.00984 page 22).
 _BIG_OPERATORS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a")
 LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first
 LINE_GLYPH_ROW = 0.5  # x the span's height: how far off the span's row a neighbour may sit
@@ -1007,6 +1011,30 @@ def _tall_bracket(row: _Row) -> bool:
     return len(row.ink) == 1 and row.ink[0].c in _BRACKETS
 
 
+LIMIT_GLYPHS = 8  # the glyphs of one limit of a sign, at most ("Ns/2−1", "i,j=1")
+
+
+def _sign_of_limits(row: _Row) -> _Char | None:
+    """The sum, product or integral sign of a row that is that sign and its limits alone: one
+    sign, and every other glyph a script-size one set over it or under it (its centre is above
+    the sign's top or below its bottom), at most `LIMIT_GLYPHS` on each side. The tall
+    brackets round a sum, "(∑ )−1", are no limits: they are the sign's size."""
+    ink = row.ink
+    signs = [c for c in ink if c.c in LIMIT_SIGNS]
+    if len(signs) != 1 or len(ink) < 2:
+        return None
+    sign = signs[0]
+    rest = [c for c in ink if c is not sign]
+    if any(c.size > SCRIPT_RATIO * sign.size for c in rest):
+        return None
+    centres = [(c.y0 + c.y1) / 2 for c in rest]
+    over = sum(centre <= sign.y0 for centre in centres)
+    under = sum(centre >= sign.y1 for centre in centres)
+    if over + under < len(centres) or over > LIMIT_GLYPHS or under > LIMIT_GLYPHS:
+        return None
+    return sign
+
+
 def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     """Fold a short fragment led by a big operator, or a tall bracket, into the line it
     sits in.
@@ -1020,39 +1048,77 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     right. So does a lone bracket (`_tall_bracket`): the opening bracket of
     "d/dx (7x^3 - 15x^2)" stood in a row of its own, and the inline equation lost it and
     kept the closing one, which was then cut off as unmatched.
+
+    A limit set over or under the sign and folded onto it (`_attach_scripts`) makes the
+    fragment longer and moves its centre off the line. So a sign with its limits alone
+    (`_sign_of_limits`) is a fragment whatever its length, placed where the sign stands, and
+    a fragment that holds a sign that takes limits (`LIMIT_SIGNS`) and a glyph smaller than
+    that sign, which is how a limit in it shows, looks at the centre of the sign when it finds
+    no row at its own centre. (A root takes no limits and has a smaller glyph under it: it is
+    not looked at twice, or the denominator "√tn" of a fraction was read between the terms of
+    its numerator. One that reaches into a row at its own centre without lying within it stays
+    where it is: the sum of a fraction's numerator, whose row of terms begins under its raised
+    script, is no part of the line under it. And a sign with nothing but a bracket before it,
+    "(∑", has no limit that moved its centre: it stays too.)
+    One that finds no line at all may still stand in a row of a
+    sign and its limits: the product and the sum before an integral whose row took their
+    limits. The line keeps the size it had before the limits came into it: the sign carries
+    it (`_Char.line_size`).
     """
+    signs = {i: _sign_of_limits(r) for i, r in enumerate(rows) if not r.vertical}
     pieces = [
         i
         for i, r in enumerate(rows)
         if not r.vertical
-        and ((len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)) or _tall_bracket(r))
+        and (
+            (len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink))
+            or _tall_bracket(r)
+            or signs[i] is not None
+        )
     ]
     if not pieces:
         return rows
     piece_ids = set(pieces)
-    hosts = sorted((r.y0, i) for i, r in enumerate(rows) if i not in piece_ids and not r.vertical)
-    tops = [y for y, _ in hosts]
-    tallest = max((rows[i].height for _, i in hosts), default=0.0)
+    lines = sorted((r.y0, i) for i, r in enumerate(rows) if i not in piece_ids and not r.vertical)
+    sign_rows = sorted((rows[i].y0, i) for i in pieces if signs[i] is not None)
     merged: dict[int, _Row] = {}
     dropped: set[int] = set()
     for i in pieces:
-        piece = rows[i]
-        centre = (piece.y0 + piece.y1) / 2
-        lo = bisect.bisect_left(tops, centre - tallest)
+        piece = merged.get(i, rows[i])
         best, overlap = None, 0.0
-        for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
-            host = merged.get(j, rows[j])
-            reach = 0.5 * host.size
-            inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
-            shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
-            on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
-            if on_line and inside and shared > overlap:
-                best, overlap = j, shared
+        sign = signs[i]
+        centres = [(piece.y0 + piece.y1) / 2]
+        big = next((c for c in piece.ink if c.c in LIMIT_SIGNS), None)
+        if big is not None and any(c.size < big.size - 0.5 for c in piece.ink):
+            centres.append((big.y0 + big.y1) / 2)
+        for hosts in (lines, [(y, j) for y, j in sign_rows if j != i and j not in dropped]):
+            tops = [y for y, _ in hosts]
+            tallest = max((merged.get(j, rows[j]).height for _, j in hosts), default=0.0)
+            for centre in centres:
+                lo = bisect.bisect_left(tops, centre - tallest)
+                beside = False
+                for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
+                    host = merged.get(j, rows[j])
+                    reach = 0.5 * host.size
+                    inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
+                    shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
+                    on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
+                    beside = beside or (on_line and piece.x0 < host.x1 and host.x0 < piece.x1)
+                    if on_line and inside and shared > overlap:
+                        best, overlap = j, shared
+                if best is not None or beside:
+                    break
+            if best is not None:
+                break
         if best is not None:
             host = merged.get(best, rows[best])
-            at = next((k for k, c in enumerate(host.chars) if c.x0 >= piece.x0), len(host.chars))
-            chars = [*host.chars[:at], *piece.chars, *host.chars[at:]]
-            merged[best] = _Row(chars, column=host.column)
+            left = piece.x0 if sign is None or len(piece.ink) <= 4 or i in merged else sign.x0
+            at = next((k for k, c in enumerate(host.chars) if c.x0 >= left), len(host.chars))
+            folded = piece.chars
+            if sign is not None and best not in piece_ids:
+                kept = replace(sign, line_size=host.size)
+                folded = [kept if c is sign else c for c in folded]
+            merged[best] = _Row([*host.chars[:at], *folded, *host.chars[at:]], column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 
@@ -1101,7 +1167,8 @@ def _stack_position(
         return at
     # After a base of upright text (SO4 2-) lowered first; before the capital letter of a
     # symbol (a nuclide) raised first. Any other stack (a variable's v_0^2 in a maths font, a
-    # small fraction) keeps the order of the text layer, as before.
+    # small fraction) keeps the order of the text layer, as before, unless that order would put
+    # the script inside a name after a base.
     base = host[first - 1] if first else None
     after_base = base is not None and (_text_char(base) or base.c in ")]}")
     following = next((c for c in [*host[last:], *after] if not c.blank), None)
@@ -1114,6 +1181,12 @@ def _stack_position(
         prefix = before_symbol and not after_base
     elif _degree_over_label(script, first, at, last):
         return last  # E°cell: the degree sign does not cut "cell" in two
+    elif base is not None and first < at < last and all(c.mono for c in cluster):
+        # A typewriter name of several small glyphs (the KRR of a filter's superscript) with a
+        # lowered script under it: the script is a script of the whole name, not a letter of it,
+        # and the lowered one is read first (the order of SO4 2-). Names in other fonts (the ref
+        # of R_n^ref) keep the order of the text layer.
+        return first if mine > level else last
     else:
         return at
     script_lower = mine > level
@@ -1279,7 +1352,9 @@ def _quads(annot: pymupdf.Annot, display: _Display) -> list[BBox]:
     return boxes
 
 
-def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
+def page_paint(
+    page: pymupdf.Page, *, figure_art: bool = False
+) -> tuple[list[Strike], list[Highlight]]:
     """The marks on `page` that may strike text through and the ones that may highlight it,
     for the text pass, from one read of the page's drawings and annotations.
 
@@ -1287,7 +1362,9 @@ def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
     bar no thicker than `STRIKE_MAX_PT`, and the quads of every StrikeOut annotation.
     Highlights: the quads of every Highlight annotation, and every visible filled rectangle
     within `HIGHLIGHT_MAX_PT`, with its colour. A page too complex to read its drawings
-    (`page_type.too_complex`) gives its annotations only. The caller holds `_LOCK`."""
+    (`page_type.too_complex`) gives its annotations only. With `figure_art` (`LAYOUT_FIGURE_ART`)
+    the drawings are read as layout reads them (`page_type.page_drawings`): a line or a fill that
+    a clip lets nowhere through is no strike and no highlight. The caller holds `_LOCK`."""
     display = _Display.of(page)
     marks: list[Strike] = []
     lit: list[Highlight] = []
@@ -1295,7 +1372,7 @@ def page_paint(page: pymupdf.Page) -> tuple[list[Strike], list[Highlight]]:
         marks.extend(Strike(box, True) for box in _quads(annot, display))
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_HIGHLIGHT]) or ():
         lit.extend(Highlight(box) for box in _quads(annot, display))
-    drawings = page.get_cdrawings()
+    drawings = page_type.page_drawings(page) if figure_art else page.get_cdrawings()
     if page_type.too_complex(drawings):
         return marks, lit
     seen = page_type.paint_visibility(drawings)

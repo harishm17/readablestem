@@ -475,6 +475,13 @@ def test_a_listing_keeps_its_lines(tmp_path):
     body = '<pre class="ltx_verbatim">\nfor i in x:\n    f(i)\n</pre>'
     [code] = read(body, tmp_path).elements
     assert code.preformatted and code.text == "for i in x:\n    f(i)"
+    # `listings` writes each line as a div that ends in its own newline.
+    body = (
+        '<div class="ltx_listing"><div class="ltx_listingline">for i in x:\n</div>'
+        '<div class="ltx_listingline">\n</div><div class="ltx_listingline">    f(i)\n</div></div>'
+    )
+    [code] = read(body, tmp_path).elements
+    assert code.text == "for i in x:\n\n    f(i)"
 
 
 def test_text_level_errors_stay_in_the_text_and_add_a_notice(tmp_path):

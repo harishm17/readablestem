@@ -27,6 +27,7 @@ class _Ordering(Protocol):
         context: Sequence[BBox] = (),
         *,
         blocks: bool = False,
+        earlier: bool = False,
     ) -> list[int]: ...
 
 
@@ -278,6 +279,7 @@ def _reading_order(
     context: Sequence[BBox] = (),
     *,
     blocks: bool = False,
+    earlier: bool = False,
 ) -> list[int]:
     """Indices of `boxes` in reading order.
 
@@ -285,12 +287,13 @@ def _reading_order(
     items close a segment: items crossing the gutter, and narrow items at a section break
     across both columns (see `_section_break`). `context` boxes (e.g. figures while
     ordering text) shape the column extents but are not returned. A region tree in place of
-    the gutter orders the boxes itself; `blocks` says they are blocks, not rows.
+    the gutter orders the boxes itself; `blocks` says they are blocks, not rows; `earlier` is
+    `_top_down`'s.
     """
     if gutter is not None and not isinstance(gutter, tuple):
-        return gutter.order(boxes, body, context, blocks=blocks)
+        return gutter.order(boxes, body, context, blocks=blocks, earlier=earlier)
     if gutter is None:
-        return _top_down(boxes, range(len(boxes)))
+        return _top_down(boxes, range(len(boxes)), earlier=earlier)
     everything = list(boxes) + list(context)
     columns = [_column_of(b, gutter) for b in everything]
     sides = {
@@ -317,7 +320,7 @@ def _reading_order(
     order: list[int] = []
     for segment in range(len(spanning) + 1):
         for side in ("L", "R"):
-            order.extend(_top_down(boxes, segments.get((segment, side), [])))
+            order.extend(_top_down(boxes, segments.get((segment, side), []), earlier=earlier))
         if segment < len(spanning):
             order.append(spanning[segment])
     return order
@@ -386,24 +389,40 @@ def _bands(boxes: list[BBox], bridge: float) -> list[tuple[float, float]]:
     return [(a, b) for a, b in bands]
 
 
-def _top_down(boxes: Sequence[BBox], members: Iterable[int]) -> list[int]:
+def _top_down(boxes: Sequence[BBox], members: Iterable[int], *, earlier: bool = False) -> list[int]:
     """Top to bottom; items overlapping vertically by half their height go left to right.
 
     Only items of comparable height share a line: a tall box (a panel or figure with text
     inside or beside it) would otherwise pull everything it spans into one "line" and
     order it by x instead of top to bottom.
+
+    With `earlier` (`LAYOUT_FIGURE_ART`) an item that misses the last line because its height is
+    more than three times that of the line's first item (or the other way round), and that
+    starts above the bottom of that first item (it stands beside it, not under it), goes to
+    the line before that one if it fits there (one line back, no further). Three figures side
+    by side whose tops differ by a few points with a short row between two of them (the label
+    of one) were three lines, because the short row, sorted between them, could not share a
+    line with a figure: the figure on the right of the row was read after the one on its left,
+    and the third before them both. Items that miss the last line for any other reason start
+    a line, as before.
     """
     ordered = sorted(members, key=lambda i: (boxes[i][1], boxes[i][0]))
     lines: list[list[int]] = []
     for i in ordered:
-        if lines:
-            anchor = boxes[lines[-1][0]]
-            box = boxes[i]
+        box = boxes[i]
+        target: list[int] | None = None
+        for k, line in enumerate(reversed(lines)):
+            anchor = boxes[line[0]]
             overlap = min(anchor[3], box[3]) - max(anchor[1], box[1])
             smaller = min(anchor[3] - anchor[1], box[3] - box[1])
             larger = max(anchor[3] - anchor[1], box[3] - box[1])
             if smaller > 0 and overlap >= 0.5 * smaller and larger <= 3 * smaller:
-                lines[-1].append(i)
-                continue
-        lines.append([i])
+                target = line
+                break
+            if not (earlier and k == 0 and larger > 3 * smaller and box[1] < anchor[3]):
+                break  # no reason to look further back
+        if target is None:
+            lines.append([i])
+        else:
+            target.append(i)
     return [i for line in lines for i in sorted(line, key=lambda i: boxes[i][0])]

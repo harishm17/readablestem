@@ -166,6 +166,27 @@ def test_small_capitals_are_text_and_real_capital_scripts_are_not():
     ]
 
 
+def test_a_lowered_script_under_a_typewriter_name_is_read_before_the_whole_name():
+    # 2503.00504 p8: the filter of a method is a letter with a typewriter name (KRR, CMTT8)
+    # raised over a lowered letter that starts under the name's first glyph and ends inside the
+    # second. Sorted by x the letter landed inside the name ("KRwR"); it is read before it.
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 100), "The filter", fontsize=BODY, fontname="helv")
+    page.insert_text((130, 100), "x", fontsize=BODY, fontname="heit")
+    right = 130 + pymupdf.get_text_length("x", fontname="heit", fontsize=BODY)
+    page.insert_text((right, 100 - UP), "KRR", fontsize=SMALL, fontname="cour")
+    page.insert_text((right, 100 - DOWN), "w", fontsize=SMALL, fontname="heit")
+    for xref in range(1, doc.xref_length()):  # TeX's names for the maths italic and the typewriter
+        name = doc.xref_get_key(xref, "BaseFont")[1]
+        if name in ("/Helvetica-Oblique", "/Courier"):
+            doc.xref_set_key(xref, "BaseFont", "/CMMI10" if "Oblique" in name else "/CMTT8")
+    pdf = doc.tobytes()
+    doc.close()
+    (equation,) = [e for e in layout.analyze(pdf).elements if e.kind is Kind.EQUATION]
+    assert equation.text == "xwKRR"
+
+
 def test_small_words_set_over_a_far_larger_word_are_no_script_of_it():
     # A slide (MIT 6.0001 lecture 1) sets "PROBLEM SOLVING" in 20 points over an 80-point
     # "PRACTICE": the small line is its own text, not read inside the large word letter by letter.

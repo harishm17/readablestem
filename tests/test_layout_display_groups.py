@@ -118,9 +118,10 @@ def char(c: str, x0: float, y0: float, x1: float, y1: float, size: float = 11.0)
     return layout._Char(c, x0, y0, x1, y1, y1 - 2, size, "CMMI10", 0)
 
 
-def one_row(text: str, x0: float, y0: float, step: float = 7.0) -> layout._Row:
+def one_row(text: str, x0: float, y0: float, step: float = 7.0, size: float = 11.0) -> layout._Row:
     chars = [
-        char(c, x0 + i * step, y0, x0 + (i + 1) * step - 1, y0 + 11) for i, c in enumerate(text)
+        char(c, x0 + i * step, y0, x0 + (i + 1) * step - 1, y0 + size, size)
+        for i, c in enumerate(text)
     ]
     return layout._Row(chars, kind="math")
 
@@ -201,6 +202,31 @@ def test_a_piece_that_lies_inside_the_box_of_a_display_is_a_part_of_it():
     kept = display._absorb_contained_regions([formula, piece, other])
     assert kept == [formula, other]
     assert len(formula.rows) == 3
+
+
+def test_a_limit_met_before_its_line_goes_to_the_display_it_stands_in():
+    """The upper limit of a sum behind its bracket, "(n", starts a little above the line it
+    belongs to, so it is met first and joins the numbered display over it: equation (12) of
+    arXiv 2408.09889 page 5 then reached into (13). The piece goes to the display whose line
+    it stands in, and the two numbered displays do not overlap."""
+    twelve = layout._Line(
+        [one_row("e=\u2211wd-\u222bL(X)dX", 181, 595, 9.0)], [], [one_row("(12)", 544, 595)]
+    )
+    opening = layout._Line([one_row("(n", 287, 608, 6.0, size=7.5)], [])
+    closing = layout._Line([one_row(")n", 420, 608, 6.0, size=7.5)], [])
+    thirteen = layout._Line(
+        [
+            one_row("=-L+\u2211wL-L+\u2211w(d-L).", 189, 617, 16.0),
+            one_row("1", 360, 610, size=7.5),  # the limit over an integral, folded into the line
+        ],
+        [],
+        [one_row("(13)", 544, 617)],
+    )
+    upper, lower = display._stack_lines(
+        [twelve, opening, closing, thirteen], document=layout._Document(grouping=True)
+    )
+    assert upper.box == twelve.box and upper.box[3] < lower.box[1]
+    assert opening.rows[0] in lower.rows
 
 
 # ------------------------------------------------------------ limits at the size of the row
