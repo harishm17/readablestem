@@ -7,7 +7,7 @@
  },
  "profile": {
   "name": "production",
-  "sha256": "2047f403770c918faf6ca0de4b9a2b11c48ef3c773012e8dedf7502cd3bbcef2",
+  "sha256": "ae2c92fb65cf74c77d9676b56a42409d6bcb786163579dd8ac3a99befa5250ab",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.19",
- "commit": "306ed2b0127fb01a5d2d2256980510093e5b5a0a",
+ "pipeline_version": "0.5.20",
+ "commit": "cb08434825072f2b28620e835f1aaef609662c39",
  "provenance": {
-  "commit": "306ed2b0127fb01a5d2d2256980510093e5b5a0a",
+  "commit": "cb08434825072f2b28620e835f1aaef609662c39",
   "clean": true,
-  "pipeline_version": "0.5.19",
+  "pipeline_version": "0.5.20",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
