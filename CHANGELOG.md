@@ -1,5 +1,41 @@
 # Changelog
 
+## Pipeline 0.5.21, render 11 (2026-11-25)
+
+- `PIPELINE_VERSION` is 0.5.21 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  four "Unreleased" entries below down to the 0.5.20 entry (wave 7: four lines of work, each
+  counted on real documents first; three built something, one measured and built nothing).
+  No switch is new and none goes on or off. What changes for a reader, one line for each:
+  - A PDF that could not be converted (O-468): a page on which MuPDF's table hunt ends the
+    process (arXiv 2501.02633 page 22; the job ended as `conversion_crashed`) is found by a
+    child process before the table detector reads it. The detector reads a one-page copy of
+    it, or, where the copy faults too or the children's time is used up, the page is not
+    searched for tables and the document says so. One dying page was found in 13,236 pages of
+    real documents; every other document reads as before.
+  - A paragraph cut by a page break is joined on a first page whose abstract is set in left
+    of the body's column (arXiv 2505.05280 pages 1 to 2). Against 0.5.20, 8 joins are gained
+    on 7 of 365 public papers and 2 on 2 of the 60 development files; none is wrong and none
+    is lost.
+  - The last line of a paragraph that begins with a sum, product or integral sign and goes on
+    in running words is read in its paragraph, sign first (O-471; arXiv 2411.02531 page 1).
+    Of 3,533 pages of 183 public papers 46 differ (31 read better, 14 only in spacing, 1
+    reads worse: arXiv 2501.05251 page 9); of the 947 pages of the development files 6
+    differ, all better.
+  - The stop rule for held-out runs (docs/eval.md, rule 5) is kept by the command: `eval order
+    --set NAME --for-release` lists each release run of a held-out set in a tracked file
+    before it reads a document and refuses a set already scored for the current pipeline
+    version, and `--only` is refused for a held-out set.
+  - Measured and not built: the LaTeX sources that stop on a limit or on a journal class
+    (O-469). The "time limit" stops are the 512 MB address-space limit of the sandbox. It
+    stays at 512 MB in this release: it is a security bound, 768 MB opens three of the 73
+    sources counted and makes the bound for four sandboxes 3 GB. A journal's own class is
+    not read: reading it loses the authors with no error. Both are open in the plan.
+- Stored results: the schema is the same. Results from 0.5.10 to 0.5.20 load unchanged, their
+  page is not made again, and 0.5.20 opens a 0.5.21 result. The roll-back limit stays at 0.5.12.
+- The corpus recording made at 0.5.18 stands: every one of the 73 uploads asks for the
+  decisions the record has, and none misses an answer of the recording that it had (`eval
+  burden --same`; the other release measurements are in docs/eval.md, "Pipeline 0.5.21").
+
 ## Unreleased: a page whose reading for the table detector ends the process (O-468)
 
 - **The fault.** arXiv 2501.02633 could not be converted: on its page 22 the conversion
@@ -91,6 +127,7 @@
   version; that half is still owed.
 - docs/layout.md ("A page the table detector cannot read"), docs/tables.md ("Where it
   runs, and what it costs"; "Upgrade check"), docs/dependencies.md.
+
 ## Unreleased: a paragraph that goes on over a page, on a first page whose abstract is set in
 
 - A paragraph cut by a page break is joined when the two parts stand at one edge, and the
@@ -115,6 +152,7 @@
   wrong join the production switches do not make). `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) does not
   move on either view. The corpus replay (73 uploads) is the same byte for byte, so no
   recorded request stops matching. A pipeline raise is owed with the next release.
+
 ## Unreleased: LaTeX sources that stop on the time limit and on a journal class (O-469)
 
 - Measured on the 73 public arXiv sources, no model, nothing built (docs/web.md, "What the
@@ -136,6 +174,7 @@
     name; one each `ifthen`, `xr`, `biblatex`, `svgcolor`, `apxproof`, `orcidlink`, one
     conference style, one algorithm pair), so reading one package opens at most one or two.
 - No version raise and no migration are owed; no stored document changes.
+
 ## Unreleased: the last line of a paragraph that begins with a big sign (O-471)
 
 - A line that begins with a sum, product or integral sign and goes on in running words ("∑_{i=1}^n

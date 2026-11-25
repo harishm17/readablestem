@@ -409,7 +409,18 @@ log = logging.getLogger(__name__)
 # The result's schema is the same: results from 0.5.10 to 0.5.19 load unchanged and their page
 # is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.19 opens a 0.5.20 result.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.20"
+# 0.5.21 (2026-11-25): one raise for wave 7 (CHANGELOG.md has each change). What a PDF's result
+# holds moves on the pages that show one of two shapes: a paragraph cut by a page break is
+# joined on a first page whose abstract is set in left of the body's column; a last line of a
+# paragraph that begins with a sum, product or integral sign and goes on in running words
+# stays in its paragraph. A PDF with a page on which MuPDF's table hunt ends the process is
+# converted (the page goes to the table detector as a one-page copy, or is not searched and
+# says so); every other document reads as before. No recorded request of the corpus moves.
+# No switch is new and none goes on or off.
+# The result's schema is the same: results from 0.5.10 to 0.5.20 load unchanged and their page
+# is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.20 opens a 0.5.21 result.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.21"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
