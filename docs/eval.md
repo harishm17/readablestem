@@ -733,8 +733,9 @@ added from November 2026 on:
    The 0.5.20 release is why the rule is written here and not per release:
    `layout-heldout-1` was scored for it twice, with a rule built between the runs in
    knowledge of the first one's totals ("The held-out runs for 0.5.20", below). The set has
-   now been scored four times (0.5.18, 0.5.19 and twice for 0.5.20; its list starts with
-   those four). No page of it was looked at, so it is not spent by rule 4, but its furniture
+   now been scored five times (0.5.18, 0.5.19, twice for 0.5.20, and once for 0.5.21, the
+   first release the command held to one run; its list starts with the first four). No
+   page of it was looked at, so it is not spent by rule 4, but its furniture
    row and its count of right pages are fitted to one fault, and each further run teaches the
    builders a little more of its totals. A second held-out half is owed (new documents and
    their sources, drawn by `gold layout new`; open in the plan, with no date yet). Until it
@@ -3277,8 +3278,9 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
 **The held-out score.** `layout-heldout-1` was scored for the first time for the 0.5.18
 release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
 four layout switches on, no model), once more for 0.5.19 after its release (2026-11-24,
-main `b8fb9ab7`, the same profile, no model), and twice for 0.5.20 before its release
-(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run):
+main `b8fb9ab7`, the same profile, no model), twice for 0.5.20 before its release
+(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run), and
+once for 0.5.21 before its release ("The held-out run for 0.5.21", below):
 
 ```bash
 uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
@@ -3304,8 +3306,9 @@ no more: which pages moved is not looked at). The 0.5.19 run's three figures wer
 ledger's first release bars (below). The 0.5.20 column (191 of 247, 77%; 20 of 49
 documents) is not a fresh measurement of the same worth: every page it gains is a paper's,
 and the gain is the stamp rule, which was built between two runs of this set (next
-paragraphs). The record kept in the repository is that second run's. No page of the set is
-named in any record, and none was looked at.
+paragraphs). The record kept in the repository was that second run's and is now the 0.5.21
+run's, whose rows of this table are the 0.5.20 column's. No page of the set is named in any
+record, and none was looked at.
 
 **The held-out runs for 0.5.20.** The set was scored for 0.5.20 before its release
 (2026-11-25, the release branch at `a986a42c`, the same profile, no model), and one release
@@ -3398,7 +3401,7 @@ figures say and do not say:
 - Blocks run together and headings merged did not rise, so the blocks that the stamp had
   kept apart on open first pages (docs/layout.md) do not show as merged places here. Blocks
   cut and broken fall a little, in papers.
-- The set has now been scored four times: for 0.5.18, for 0.5.19, and twice for 0.5.20.
+- The set had then been scored four times: for 0.5.18, for 0.5.19, and twice for 0.5.20.
   Each run after the first tells less about pages nobody has seen.
 
 The release bars are registered again from this run (`data/eval/ledger-bars.json`,
@@ -3407,6 +3410,22 @@ pages not right, at least 20 of 49 documents with every gold page right, at most
 pages that read furniture aloud. The furniture bar of 20 includes the page that failed the
 first run: a later release is not asked to win it back. The first run's record is not kept
 as a file; its totals are the middle column above.
+
+**The held-out run for 0.5.21.** The set was scored once for 0.5.21 before its release
+(2026-11-25, the release branch at `716dcd42`, clean, the same profile, no model), after
+the last change to the code and after the reviews of it were answered, and the command
+listed the run before it read a document (rule 5). Every count of pages and of faults in
+the student page is the 0.5.20 second run's, kind by kind: 191 of 247 pages right and
+113 faultless (course handouts 26 and 17, papers 101 and 62, textbooks 64 and 34), 20 of
+49 documents with every gold page right, furniture read on 20 pages (30 places), blocks
+cut on 52 pages (195 places), run together on 68 (135), strays on 180 (1,013). The element
+list reads 192 right and 115 faultless, as before. Two totals move, both in the course
+handouts and in both views: the page's elements, 4,929 to 4,927 (4,709 to 4,707 in the
+element list), and the places where a gold block is split, 503 to 502 (528 to 527). So on
+these documents the three changes of 0.5.21 move no page into or out of right or
+faultless. The totals say no more: which pages moved is not looked at, and whether the
+set holds a page of the kinds the changes mend is not known. The three release bars are
+met at exactly their figures (the ledger, below) and stay as registered.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -4193,17 +4212,18 @@ theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_ou
 event's, so the admin page can set production's numbers of the same release (false flags
 per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
 
-**Today** (`data/eval/ledger.json`, release `0.5.20+ae2c92fb65cf`, made 2026-11-25 on a
-clean tree). The three page rows have a held-out line, from the second run of
-`layout-heldout-1` for 0.5.20, and that run's figures are their release bars
-(`data/eval/ledger-bars.json`, registered again 2026-11-25 with `--replace-bar`): a later
-release may not read fewer of these pages right, give fewer documents with every gold page
-right, or read furniture aloud on more pages. The run first passed the bars of 0.5.19 (72 of
+**Today** (`data/eval/ledger.json`, release `0.5.21+ae2c92fb65cf`, made 2026-11-25 on a
+clean tree). The three page rows have a held-out line, from the one run of
+`layout-heldout-1` for 0.5.21, and each meets its release bar at the bar's own figure. The
+bars are the figures of the second run for 0.5.20 (`data/eval/ledger-bars.json`,
+registered again 2026-11-25 with `--replace-bar`): a later release may not read fewer of
+these pages right, give fewer documents with every gold page right, or read furniture
+aloud on more pages. That run of 0.5.20 first passed the bars of 0.5.19 (72 of
 247 pages not right, 11 of 49 documents, 36 of 247 pages with furniture; the ledger of that
 pass is commit `3743f347`). The bars were replaced because the stamp rule left 16
 pages of slack on each of the two page rows, enough to hide a later loss. The held-out lines
-of this release are not a first run's: `eval order`, "The held-out runs for 0.5.20", says
-what they are worth. Every other line is a development score, or a record of an earlier
+are not a first run's: the set has been scored five times, and `eval order`, "The held-out
+runs for 0.5.20" and "The held-out run for 0.5.21", says what they are worth. Every other line is a development score, or a record of an earlier
 release.
 
 | Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
@@ -4539,6 +4559,12 @@ release branch:
 - **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
   0.5.21 on a clean tree, with every headline number as at 0.5.20, and `eval gate
   --require-current` passes for both.
+- **Held-out pages and the ledger.** `layout-heldout-1` was scored once, at `716dcd42`
+  (`eval order`, "The held-out run for 0.5.21"): 191 of 247 pages right, 113 faultless, 20
+  of 49 documents, furniture on 20 pages, each as at the second run for 0.5.20. `eval
+  ledger --for-release` passes: no held-out figure is worse than its release bar (56 of 247
+  pages not right, 20 of 49 documents, 20 of 247 pages with furniture; each met at the
+  bar's own figure, so the release has no slack on these rows and none was used).
 
 ## What the numbers do not show
 

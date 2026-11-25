@@ -41,6 +41,13 @@
   decisions the record has, and none misses an answer of the recording that it had (`eval
   burden --same`), and the replay of each upload gives the document 0.5.20 gave, hash for
   hash. The other release measurements are in docs/eval.md, "Pipeline 0.5.21".
+- Held-out pages: `layout-heldout-1` was scored once for this release, at `716dcd42`, after
+  the last change to the code (rule 5; the run is listed in
+  `data/gold/layout/layout-heldout-1.runs.json`). 191 of 247 pages are right and 113
+  faultless, 20 of 49 documents have every gold page right and 20 pages read furniture
+  aloud: each as at the second run for 0.5.20, so on these documents the three changes move
+  no page into or out of right or faultless. `eval ledger --for-release` passes with each of the
+  three release bars met at its own figure. No held-out page was opened.
 
 ## Unreleased: a page whose reading for the table detector ends the process (O-468)
 
