@@ -125,18 +125,30 @@ def test_a_page_that_runs_out_of_the_childs_memory_is_too_complex(monkeypatch, u
     assert exc.value.code == "too_complex"
 
 
-@pytest.mark.parametrize("lives", ["copy", "none"])
-def test_a_page_whose_reading_kills_the_table_detector_is_read_another_way(monkeypatch, lives):
+_FAULT = "os.kill(os.getpid(), signal.SIGSEGV)"  # how MuPDF ended the child on the real page
+
+
+@pytest.mark.parametrize(
+    ("child", "detector_reads", "not_searched"),
+    [
+        (f"if sys.argv[3] != 'copy': {_FAULT}", "a copy of the page", []),
+        (_FAULT, "nothing", [0]),
+        ("time.sleep(60)", "nothing", [0]),
+        ("sys.exit(3)", "the page", []),
+    ],
+    ids=["the page faults", "its copy faults too", "no time left", "the child itself fails"],
+)
+def test_a_page_whose_reading_kills_the_table_detector_is_read_another_way(
+    monkeypatch, child, detector_reads, not_searched
+):
     # arXiv 2501.02633, page 22: MuPDF ended the process inside the text extraction the
-    # detector asks for, and the job with it; a copy of the page alone was read. The child
-    # here dies on every page where it stands, and on the copy too when `lives` is "none".
+    # detector asks for, and the job with it; a copy of the page alone was read. A page the
+    # detector may not read at all is listed as not searched, which the conversion says. A
+    # child that fails by itself has said nothing of the page: it is read as before.
     monkeypatch.setattr(access, "_HUNTED", OrderedDict())
+    monkeypatch.setattr(access, "HUNT_TIMEOUT_S", 1.0)
     monkeypatch.setattr(
-        access,
-        "_HUNT_SCRIPT",
-        "import os, signal, sys\n"
-        f"if sys.argv[3] != {lives!r}: os.kill(os.getpid(), signal.SIGKILL)\n"
-        "print(sys.argv[1])",
+        access, "_HUNT_SCRIPT", f"import os, signal, sys, time\n{child}\nprint(sys.argv[1])"
     )
     read_in = []  # the page count of each document the detector read a page of, in process
     find_tables = pymupdf.Page.find_tables
@@ -147,11 +159,14 @@ def test_a_page_whose_reading_kills_the_table_detector_is_read_another_way(monke
 
     monkeypatch.setattr(pymupdf.Page, "find_tables", watched)
     slides = TABLE_SLIDES.read_bytes()
-    assert pymupdf.open(stream=slides).page_count > 1
-    found = analyze(slides, pages=[0]).elements
-    assert found
-    if lives == "copy":
-        assert set(read_in) == {1}  # the copy, never the page where it stands
-        assert any(e.kind is Kind.TABLE for e in found)
-    else:
-        assert read_in == []
+    pages = pymupdf.open(stream=slides).page_count
+    assert pages > 1
+    result = analyze(slides, pages=[0])
+    assert result.elements
+    assert result.tables_not_searched == not_searched
+    assert (
+        set(read_in)
+        == {"a copy of the page": {1}, "the page": {pages}, "nothing": set()}[detector_reads]
+    )
+    if detector_reads != "nothing":
+        assert any(e.kind is Kind.TABLE for e in result.elements)

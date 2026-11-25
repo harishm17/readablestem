@@ -1128,6 +1128,10 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     unknown = sorted(set(args.only or ()) - known)
     if unknown:
         return _error(f"not in {args.set}: {', '.join(unknown)}")
+    if sets.held_out(registry):
+        refused = _note_release_run(listed, args.set)
+        if refused:
+            return _error(refused)
 
     def said(done: Any) -> None:
         print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
@@ -1138,6 +1142,41 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
         kept = {"runs": [[done.as_dict() for done in run]]}
         args.records.write_text(json.dumps(kept), encoding="utf-8")
     return run, registry
+
+
+def _note_release_run(listed: Path, name: str) -> str | None:
+    """The stop rule of docs/eval.md ("Development and held-out, and the two bars", rule 5),
+    kept by the command: a held-out set is scored once for a pipeline version. The set's runs
+    are listed beside its registry (`<set>.runs.json`: the version, the source and the day,
+    nothing of the set). This run is written there before a document is read, so a run that
+    was started counts; a run for a version already listed is refused, with the reason
+    returned."""
+    from readablestem.cli.main import project_root
+    from readablestem.eval import run_record
+    from readablestem.pipeline.run import PIPELINE_VERSION
+
+    path = listed.with_suffix(".runs.json")
+    try:
+        runs = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else []
+    except (OSError, ValueError) as exc:
+        return f"cannot read {path}: {exc}"
+    earlier = [run for run in runs if run.get("pipeline_version") == PIPELINE_VERSION]
+    if earlier:
+        return (
+            f"{name} was already scored for {PIPELINE_VERSION} ({earlier[0].get('date')}, "
+            f"source {earlier[0].get('source')}): a held-out set is scored once for a release, "
+            "and a release that failed a bar is not scored again (docs/eval.md, rule 5)"
+        )
+    source, _changed = run_record.source_state(project_root())
+    runs.append(
+        {
+            "pipeline_version": PIPELINE_VERSION,
+            "source": source[:8],
+            "date": dt.date.today().isoformat(),
+        }
+    )
+    path.write_text(json.dumps(runs, indent=2) + "\n", encoding="utf-8")
+    return None
 
 
 def _cmd_parsing_bench(args: argparse.Namespace) -> int:

@@ -21,7 +21,7 @@ import pytest
 from readablestem.core.types import Kind, TableCell, TableGrid, grid_problems
 from readablestem.pipeline import layout, table_model, tables
 from readablestem.pipeline.assemble import render_html
-from readablestem.pipeline.layout import LayoutError, analyze, release
+from readablestem.pipeline.layout import LayoutError, access, analyze, release
 from readablestem.pipeline.tables import Proposal, Slot
 
 BODY = 11.0
@@ -806,6 +806,23 @@ def test_detection_only_runs_on_pages_the_probe_passed(monkeypatch):
     with pytest.raises(LayoutError):
         analyze(data)
     assert calls == []
+
+
+def test_the_child_tries_the_reading_the_detector_makes(monkeypatch):
+    # The child that goes before the detector (`access.hunt_failures`) guards nothing if the
+    # add-on reads a page with other flags than the child does: this fails when a new pin of
+    # pymupdf-layout changes them (docs/tables.md, "Upgrade check").
+    flags: list[int] = []
+    real = pymupdf.Page.get_textpage
+
+    def watched(page, *args, **kwargs):
+        flags.append(kwargs.get("flags", 0))
+        return real(page, *args, **kwargs)
+
+    monkeypatch.setattr(pymupdf.Page, "get_textpage", watched)
+    doc = pymupdf.open(stream=pdf(lambda page: grid_table(page, PENDULUM, y0=150)))
+    assert tables.propose(doc[0])
+    assert access.HUNT_FLAGS in flags
 
 
 def test_table_detection_logs_no_document_text(caplog):

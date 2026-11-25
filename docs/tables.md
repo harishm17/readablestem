@@ -344,20 +344,22 @@ blank tables as figures) without rebuilding anything; meaning would be lost othe
 - **Only on probed pages.** `find_tables` renders the page for its layout model, where
   MuPDF's known aborts are. Layout only calls it on pages its probe child has rendered
   ([layout.md](layout.md), "Untrusted PDFs").
-- **Only where its reading has been tried.** Before it draws anything, `find_tables` reads
-  the page's text with MuPDF's table hunt on, and on one page of a public paper (arXiv
+- **Only where its reading has been tried.** Among the first things `find_tables` does is
+  read the page's text with MuPDF's table hunt on, and on one page of a public paper (arXiv
   2501.02633, page 22, a tagged PDF) that reading ends the process in MuPDF 1.28.2 although
   the probe passes the page. Layout has a second child make the same reading on every page
   first (`access.hunt_failures`) and tells `find` what it found (`detector`, a
   `DetectorSource`): `"page"`, the detector reads the page as always; `"copy"`, it reads a
   copy of the page alone in a new document, which has the page's content, boxes and Rotate
-  and not the document's structure tree, the thing the fault needs (the proposals are in the
-  page's frame; arbitration, grid and fill read the page itself); `"none"`, the copy dies
-  too and the detector is not run: the page gets the tables its own lines and rules show
-  ("Recall on real documents"). On the 26 other pages of that paper the detector proposes
-  the same boxes on the page and on its copy. Cost: one child for a document, 10 to 50 ms a
-  page. [layout.md](layout.md), "A page the table detector cannot read", has the measured
-  cause, the bounds and what is not covered.
+  and not the document's structure tree, the thing the fault needs (arbitration, grid and
+  fill read the page itself); `"none"`, MuPDF faults on the copy too or the time to try the
+  page ran out, and the detector is not run: the page gets the tables its own lines and
+  rules show ("Recall on real documents") and is said as a page whose search was not made
+  (`DetectorBudget.refused`, the notice `tables_not_searched`). A copy is read nearly as its
+  page: on 137 pages of 11 tagged papers some proposals differ by up to 3 pt and one is
+  missing on the copy, and no layout differs. Cost: one child for a document, 35 ms a page.
+  [layout.md](layout.md), "A page the table detector cannot read", has the measured cause,
+  the bounds and what is not covered.
 - **Threads.** pymupdf.layout builds its onnxruntime sessions with default options, which
   size the thread pools from the host's cores: on a 1-CPU container that ran 5-9 times
   slower. Before the add-on is imported (lazily, on first use), the session class is
@@ -511,10 +513,16 @@ fails the check. `TABLE_FUZZ_MUTANTS` (default 300) and `TABLE_FUZZ_JOBS` set th
 300 mutants took a minute on this box, with no escape.
 Run it, with the table numbers above, the extraction tests and the thread-pin test,
 before any bump of `pymupdf`, `pymupdf-layout` or `onnxruntime`. With a bump of
-`pymupdf-layout`, read the flags its `extract_base_elements` passes to `get_textpage`
-again and set `access.HUNT_FLAGS` to them (the child must make the detector's own
-reading), and run `layout.analyze` on page 22 of arXiv 2501.02633: if the page is read
-where it is, the fault is gone upstream and the second child can go. PyMuPDF 2.0 moves the
+`pymupdf` or `pymupdf-layout` (the fault below is MuPDF's, the flags are the add-on's): if
+`test_the_child_tries_the_reading_the_detector_makes` fails, read the flags the add-on's
+`extract_base_elements` passes to `get_textpage` again and set `access.HUNT_FLAGS` to them
+(the child must make the detector's own reading); and read page 22 of arXiv 2501.02633
+where it is, in a process of its own (`page.get_textpage(flags=access.HUNT_FLAGS)`; the
+file is not in the repository: `~/.cache/readablestem/realworld/papers/2501.02633/paper.pdf`
+on the build machine, sha256
+`5e1b995b3887e212f3442341b8510fcb30f3224addf1284100624ff239753332`, since arXiv may serve
+another version). If the page is read, the fault is gone upstream and the second child can
+go. PyMuPDF 2.0 moves the
 layout add-on into `pymupdf` itself; see the 2026-10-09 amendment of
 [ADR 0003](decisions/0003-pdf-library-agpl.md).
 

@@ -1,0 +1,22 @@
+[
+  {
+    "pipeline_version": "0.5.18",
+    "source": "c4d9e719",
+    "date": "2026-11-23"
+  },
+  {
+    "pipeline_version": "0.5.19",
+    "source": "b8fb9ab7",
+    "date": "2026-11-24"
+  },
+  {
+    "pipeline_version": "0.5.20",
+    "source": "a986a42c",
+    "date": "2026-11-25"
+  },
+  {
+    "pipeline_version": "0.5.20",
+    "source": "d2d284ef",
+    "date": "2026-11-25"
+  }
+]

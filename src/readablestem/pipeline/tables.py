@@ -218,7 +218,8 @@ DETECTOR_EXCESS_S = 360.0
 
 class DetectorBudget:
     """What is left of a document's slow-search CPU time (`DETECTOR_EXCESS_S`), and how many
-    searches it refused once that was used up (`refused`)."""
+    searches were not made (`refused`): the ones it refused once that was used up, and the
+    ones of pages the detector may not read (`_detected`, "none")."""
 
     def __init__(self, excess_s: float | None = None, free_s: float | None = None) -> None:
         self.left = DETECTOR_EXCESS_S if excess_s is None else excess_s
@@ -692,8 +693,9 @@ def _positions(values: Iterable[float]) -> int:
 # tries that reading in a child first (`layout.access.hunt_failures`) and says of each page:
 # "page", the page where it is; "copy", a copy of the page alone in a document of its own,
 # which takes no structure tree along, for a page that killed the child where it is; "none",
-# when the copy killed it too: only the page's own rules and aligned text propose a table
-# there, as on a page the time budget refused.
+# when the copy killed it too or the time to try the page ran out: only the page's own rules
+# and aligned text propose a table there, and the page is listed and said like a page the
+# time budget refused (`DetectorBudget.refused`, the notice `tables_not_searched`).
 DetectorSource = Literal["page", "copy", "none"]
 
 
@@ -703,7 +705,9 @@ def _detected(
     """`propose`, on what layout's probe left of the page for the detector to read."""
     if source == "page":
         return propose(page, budget)
-    if source == "none":
+    if source == "none":  # a search that is not made, said as the budget's own are
+        if budget is not None:
+            budget.refused += 1
         _warn_once("detector_unread", "table detection skipped on a page the detector cannot read")
         return []
     with _pdf_lock():

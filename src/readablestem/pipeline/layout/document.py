@@ -206,14 +206,11 @@ def analyze(
                 for number, error in unrendered.items():  # the page and the code, no content
                     log.warning("layout could not draw page %d: %s", number + 1, error.code)
                 unhunted = hunt_failures(
-                    pdf_bytes, _digest(pdf_bytes), [n for n in selected if n not in unrendered]
+                    pdf_bytes,
+                    _digest(pdf_bytes),
+                    [n for n in selected if n not in unrendered],
+                    limited=table_search_limited,
                 )
-                for number, source in unhunted.items():
-                    log.warning(
-                        "the table detector cannot read page %d where it is: %s",
-                        number + 1,
-                        source,
-                    )
                 return _analyze_document(
                     doc,
                     selected,
