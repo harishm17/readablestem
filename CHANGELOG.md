@@ -1,5 +1,27 @@
 # Changelog
 
+## Unreleased: LaTeX sources that stop on the time limit and on a journal class (O-469)
+
+- Measured on the 73 public arXiv sources, no model, nothing built (docs/web.md, "What the
+  limits stop"). 19 convert and 54 stop, as before. Three of the 19 and two of the stops moved
+  between runs with the load of the machine (a run under load gave 16 and 15 "time limit"
+  stops); each was run again alone. The 19 that converted keep the same XHTML (hash).
+  - The "time limit" group is the memory cap: 11 of 12 end at the 512 MB address-space cap
+    (the twelfth crashes in `latexmlpost` at any cap). With 768 MB three more sources convert,
+    with 1 GB and 320 s a fourth and fifth would; each is a real conversion. No raw package or
+    figure is the cause, so there is nothing to skip or stub. The limit is the owner's to
+    change: 4 x 768 MB is 3 GB for the sandbox's bound.
+  - Journal classes: no binding LaTeXML ships reads any of the eight classes seen. Reading the
+    upload's own class file would convert two of them with the authors and affiliations
+    dropped and no error, so it was not built; they keep stopping.
+  - The 25 sources that stop on a package not read by design: the algorithm packages
+    (`algorithmic`, `algpseudocode`, `algorithm2e`, `algorithm`: 9 sources) come first, then
+    `tikz` and its libraries (6), `tcolorbox` and `mdframed` (7). Each source usually loads
+    several: only 10 of the 25 name a single package family (two are `csquotes`, refused by
+    name; one each `ifthen`, `xr`, `biblatex`, `svgcolor`, `apxproof`, `orcidlink`, one
+    conference style, one algorithm pair), so reading one package opens at most one or two.
+- No version raise and no migration are owed; no stored document changes.
+
 ## Pipeline 0.5.20, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.20 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

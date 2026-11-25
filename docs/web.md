@@ -1034,6 +1034,33 @@ PDF checks apply; its own (`source/intake.py`, `web/archive_intake.py`):
   before LaTeXML starts and others wait for it, so the sandbox's limits (4 tasks, 512 MB of address
   space each) bound the whole server and not each conversion; the worker already runs one job at a
   time, and the lock also covers a job whose abandoned conversion is still ending.
+- **What the limits stop** (measured 2026-11-25 on the 73 public arXiv sources of the census,
+  LaTeXML 0.8.8, pandoc 3.7; nothing was changed for it). The "time limit" group is the memory
+  cap, not the clock: of the 12 sources that stop there, 11 end in Perl's own "Out of memory"
+  or a crash at the 512 MB address-space cap, between 25 and 130 s in (the twelfth,
+  2412.05104, crashes in `latexmlpost` at 2 GB too). With 768 MB, three of
+  them (2503.02921, 2412.12319, 2503.00504) convert in 28 to 110 s; 2303.02529 converts at
+  768 MB with the group's resident cap raised and crashes in `latexmlpost` without; 2504.19306
+  needs more than 768 MB resident (1 GB of address space, 220 to 320 s). They have no cause in
+  common that can be removed: no raw package was loaded, the XML is 0.8 to 12 MB, the memory is
+  the document (up to 1,600 formulas). The other 7 would
+  end in a package, a class or a missing file anyway. Each of the five that converts is a real
+  conversion (words within a few percent of the source, math is MathML, no error node;
+  `source_error` is raised for two of them). Raising the cap to 768 MB makes the sandbox's
+  bound 4 x 768 MB = 3 GB (`sandbox_total_bound_mb`) and means the group's resident cap goes
+  with it; that is a decision for the owner of the limits. Separately, the program has ended
+  but not exited in 6 of about 100 runs (all its output written, the sandbox waits for the wall
+  limit): not reproduced on demand, so not worked around.
+- **Journal classes are not read, and reading the upload's own class file is not the way.** A
+  class with no LaTeXML binding is read as LaTeXML's "OmniBus", and the class's own front-matter
+  commands (`\aff`, `\corresp`, `\affil`, `\jvol`, `\startlocaldefs`, 27 for `mdpi`) are
+  undefined: that is the stop. No binding of LaTeXML 0.8.8 under another name reads any of the
+  eight classes seen (`ametsocV6.1`, `mdpi`, `jfm`, `jpp`, `ar-1col-S2O`, `imsart`, `sn-jnl`,
+  `SciPost`), so there is no table of class to binding. Reading the class file bundled with the
+  upload (`\usepackage[localrawclasses]{latexml}`, LaTeXML's own switch for files of the
+  project only) turns two refusals (`ametsocV6.1`, `jfm`) into conversions with no error that
+  have lost the authors and their affiliations, because the class keeps them for its own
+  `\maketitle`; it was not built. A source that stops on its class keeps stopping.
 - **TeX Live is not read.** LaTeXML finds a package's own TeX with `kpsewhich`. With TeX Live's base
   installed (the image has `texlive-latex-base`, which `latexml` depends on) it then reads raw TeX for a
   package it has a binding for and runs expl3 under its own interpreter: `\usepackage{siunitx}` took 72 s
