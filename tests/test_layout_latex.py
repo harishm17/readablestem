@@ -10,7 +10,9 @@ negation slash of \\neq, a cases brace, absolute-value bars, nested itemize/enum
 with TeX's bullets and dashes, beamer's triangle bullets and sans-serif maths, a
 two-column page and a TikZ figure. A fifth page, vectors_relations, holds signs TeX
 draws from pieces (arrows over points, \\cong, \\models) for tests/test_sign_check.py.
-A sixth, sum_limits, holds sums and a product with limits over and under the sign.
+A sixth, sum_limits, holds sums and a product with limits over and under the sign, and
+pdftex/sum_limits_pdftex holds five more as pdfTeX sets them (built with pdfTeX: its header
+says why and how).
 """
 
 from __future__ import annotations
@@ -146,6 +148,8 @@ def test_a_sign_that_took_its_upper_limit_keeps_its_place_and_the_line_its_numbe
     # words of a sentence and the display a paragraph with three pieces of maths. The same
     # line as an item of a list lost the size it was given when its marker was cut off it:
     # "Ekin" and "Epot" were then a letter each and a subscript left in the item.
+    # Not repaired: the "i=1" under the sum of the list item is still an equation of its own
+    # after the item (it is among the blocks left unnamed below).
     names = ("display_grouping", "inline_joins", "region_tree", "join_panels")
     layout = analyze((LATEX / "sum_limits.pdf").read_bytes(), **dict.fromkeys(names, True))
     total, product, entropy, energy, *_ = blocks(layout)
@@ -154,6 +158,29 @@ def test_a_sign_that_took_its_upper_limit_keeps_its_place_and_the_line_its_numbe
     assert plain(product.text).startswith("p(x0)=\u222b\u220fT")
     for display, first, last in ((energy, "Etot", "Ereg"), (kinetic, "Ekin", "Epot")):
         assert plain(display.text).startswith(f"{first}=\u2211") and last in plain(display.text)
+
+
+def test_limits_as_pdftex_sets_them_leave_each_display_whole_and_in_order():
+    # pdftex/sum_limits_pdftex.tex, with the switches production runs: five displays, each a
+    # shape of a real paper, each wrong when one condition of the limits rule is taken out.
+    names = ("display_grouping", "inline_joins", "region_tree", "join_panels")
+    page = (LATEX / "pdftex" / "sum_limits_pdftex.pdf").read_bytes()
+    short, bracket, fraction, tall, root = (
+        plain(e.text) for e in blocks(analyze(page, **dict.fromkeys(names, True)))
+    )
+    # The limit under a short sum is in its display: the line counts as script size (three
+    # subscripted letters side by side), and the limit was an equation of its own.
+    assert short.startswith("dij=\u2211n") and short.endswith("k=1")
+    # A bracket and a sum in one row with no limit in it stay where the row is: placed by the
+    # sign, the right-hand side was read before the left.
+    assert bracket.startswith("hL\u03b2SE(v):=1")
+    # The sum of a numerator stays in the numerator, not beside the sum of the denominator.
+    assert "\u2211n\u2212hj=n" in fraction and "\u2211n\u2212h\u2211" not in fraction
+    # The limit under the sum of one line is no upper limit of the sum on the next: the
+    # display was cut in two after its first sum sign.
+    assert tall.startswith("E(") and "\u2211|u|=k" in tall and "|u|=|v|=k" in tall
+    # A root takes no limits: it stays under its bar, not between the terms over it.
+    assert "V1(u)\u2212\u03ba" in root and root.endswith("\u221atn")
 
 
 def test_calculus_notes_nested_itemize_and_enumerate():

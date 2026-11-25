@@ -1,0 +1,57 @@
+% Layout fixture: limits of sums as pdfTeX sets them. Five displays, each a shape that a real
+% paper showed while the limits rule of pipeline 0.5.20 was built: a short sum whose line has
+% three subscripted letters side by side, a sum behind a bracket that grows with it, a fraction
+% with a sum in its numerator and one in its denominator, a sum behind a tall bracket under the
+% line it continues, and a root under a fraction bar.
+% Used by tests/test_layout_latex.py. Written for ReadableSTEM's tests; no third-party text.
+%
+% Built with pdfTeX, not with Tectonic as the fixtures one folder up are (make_pdfs.py does not
+% look in this folder): Tectonic's glyph box of a sum sign reaches 4.6 pt further down than
+% pdfTeX's at 10 pt, so none of the five shapes shows on a Tectonic page, and the papers that
+% showed them are pdfTeX files. Rebuild, with the same bytes each time (pdfTeX 1.40.28, TeX
+% Live 2025), from this folder:
+%
+%   SOURCE_DATE_EPOCH=1791331200 FORCE_SOURCE_DATE=1 \
+%       pdflatex -interaction=nonstopmode -halt-on-error sum_limits_pdftex.tex
+%
+% and commit the PDF only after `uv run pytest tests/test_layout_latex.py` passes on it.
+\documentclass[11pt]{article}
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=0.8in]{geometry}
+\pagestyle{empty}
+\newcommand{\filler}{The value is counted once for each pair of rows and then added to the
+total of the table, which is kept for the next step of the count and for the check at the end
+of the run. }
+
+\begin{document}
+
+\filler
+% A short sum: the line has three subscripted letters side by side and counts as a line of
+% script size, and the limit under the sum was then too far from it.
+\[ d_{ij} = \sum_{k=1}^{n} a_{ik} b_{kl} c_{lj} \]
+\filler
+% A sum behind a bracket that grows with it, after a fraction and a word: the bracket and the
+% sign are one row with no limit in it.
+\begin{equation}
+h_{\beta}^{\mathrm{LSE}}(v) := \frac{1}{\beta} \ln \left( \sum_{a \in \mathcal{A}} \exp(v(a) \beta) \right) ,
+\end{equation}
+\filler
+% A fraction with a sum in the numerator and a sum in the denominator.
+\[ \hat{\rho}_{l_n}^{\hat{Z}}(h) = \frac{\sum_{j=n-l_n+1}^{n-h} \hat{Z}_j \hat{Z}_{j+h}}{\sum_{j=n-l_n+1}^{n} \hat{Z}_j^2} . \]
+\filler
+% A sum behind a tall bracket, under the line it continues: the limit under the sum of the
+% second line is no upper limit of the sum on the third.
+\begin{align*}
+& \mathbb{E}( \bar{W}_{n,A}(\theta) | \mathcal{F}_k )^2 \\
+&= \left( \sum_{|u|=k} e^{\theta V(u) - k \kappa(\theta)} 1_{\{u \in E_1(k,A) \cap E_2(k,A)\}} H_{n,k,A}(V(u)) \right)^2 \\
+&= \sum_{|u|=|v|=k, u \neq v} e^{\theta V(u) + \theta V(v) - 2k \kappa(\theta)} 1_{\{u,v \in E_1(k,A)\}} H_{n,k,A}(V(u)) \\
+& \quad + \sum_{|u|=k} e^{2 \theta V(u) - 2k \kappa(\theta)} 1_{\{u \in E_1(k,A)\}} H_{n,k,A}(V(u))^2 .
+\end{align*}
+\filler
+% A root under a fraction bar, the numerator of two terms: a root sign takes no limits.
+\[ Z_n = \Bigl( \frac{V_1(u) - \kappa'_1(\theta) t_n}{\sqrt{t_n}} \Bigr) \]
+\filler
+
+\end{document}

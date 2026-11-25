@@ -1052,11 +1052,14 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     A limit set over or under the sign and folded onto it (`_attach_scripts`) makes the
     fragment longer and moves its centre off the line. So a sign with its limits alone
     (`_sign_of_limits`) is a fragment whatever its length, placed where the sign stands, and
-    a fragment with a limit in it (a glyph smaller than its sign) that finds no row at its own
-    centre looks at the centre of its sign. (One that reaches into a row at its own centre
-    without lying within it stays where it is: the sum of a fraction's numerator, whose row of
-    terms begins under its raised script, is no part of the line under it. And a sign with
-    nothing but a bracket before it, "(∑", has no limit that moved its centre: it stays too.)
+    a fragment that holds a sign that takes limits (`LIMIT_SIGNS`) and a glyph smaller than
+    that sign, which is how a limit in it shows, looks at the centre of the sign when it finds
+    no row at its own centre. (A root takes no limits and has a smaller glyph under it: it is
+    not looked at twice, or the denominator "√tn" of a fraction was read between the terms of
+    its numerator. One that reaches into a row at its own centre without lying within it stays
+    where it is: the sum of a fraction's numerator, whose row of terms begins under its raised
+    script, is no part of the line under it. And a sign with nothing but a bracket before it,
+    "(∑", has no limit that moved its centre: it stays too.)
     One that finds no line at all may still stand in a row of a
     sign and its limits: the product and the sum before an integral whose row took their
     limits. The line keeps the size it had before the limits came into it: the sign carries
@@ -1085,7 +1088,7 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
         best, overlap = None, 0.0
         sign = signs[i]
         centres = [(piece.y0 + piece.y1) / 2]
-        big = next((c for c in piece.ink if c.c in _BIG_OPERATORS), None)
+        big = next((c for c in piece.ink if c.c in LIMIT_SIGNS), None)
         if big is not None and any(c.size < big.size - 0.5 for c in piece.ink):
             centres.append((big.y0 + big.y1) / 2)
         for hosts in (lines, [(y, j) for y, j in sign_rows if j != i and j not in dropped]):

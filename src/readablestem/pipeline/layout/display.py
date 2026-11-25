@@ -1126,14 +1126,63 @@ def _stack_lines(lines: list[_Line], *, document: _Document) -> list[_Region]:
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
     if document.grouping:
-        regions = _merge_continued_regions(
-            regions, [[f, *p] for f, p in zip(first, peers, strict=True)]
-        )
+        members = [[f, *p] for f, p in zip(first, peers, strict=True)]
+        _return_stray_pieces(regions, members)
+        regions = _merge_continued_regions(regions, members)
         regions = _absorb_contained_regions(regions)
     for region in regions:
         for row in [*region.rows, *region.labels]:
             row.region = region
     return regions
+
+
+def _return_stray_pieces(regions: list[_Region], members: list[list[_Line]]) -> None:
+    """Give a piece that the stacking left under the wrong display to the display it stands in.
+
+    Lines are stacked top to bottom, and a piece that is no whole equation joins the display
+    right above it. The upper limit of a sum behind its opening bracket, "(n", is a row of
+    script size that starts a little above the line it belongs to: it is met before that
+    line, with only the display above to go to, and equation (12) of arXiv 2408.09889 page 5
+    then reached into (13) and held a piece of it. The lowest line of a display, when it is
+    of script size, lies under every other line of that display and is no limit of a sign in
+    them, goes to another display that has a line of full size around it: the piece's middle
+    between that line's top and bottom, its extent between that line's left and right.
+    """
+    for k, region in enumerate(regions):
+        lines = list({id(ln): ln for ln in members[k]}.values())
+        if region.forced or len(lines) < 2:
+            continue
+        piece = max(lines, key=lambda ln: ln.box[1])
+        rest = [ln for ln in lines if ln is not piece]
+        if (
+            piece.labels
+            or piece.box[1] < max(ln.box[3] for ln in rest)
+            or any(_limits_of(ln, piece, max(ln.size, piece.size)) for ln in rest)
+        ):
+            continue
+        middle = (piece.box[1] + piece.box[3]) / 2
+        for j, other in enumerate(regions):
+            if j == k or other.forced:
+                continue
+            if any(
+                piece.size <= SCRIPT_RATIO * ln.size
+                and ln.rows[0].column == piece.rows[0].column
+                and ln.box[1] <= middle <= ln.box[3]
+                and ln.box[0] <= piece.box[0]
+                and piece.box[2] <= ln.box[2]
+                for ln in members[j]
+            ):
+                moved = {id(r) for r in piece.rows}
+                kept = {id(p) for ln in rest for p in ln.rules}
+                region.rows = [r for r in region.rows if id(r) not in moved]
+                region.rules = [p for p in region.rules if id(p) in kept]
+                region.box = _union([ln.box for ln in rest])
+                other.rows.extend(piece.rows)
+                other.rules.extend(p for p in piece.rules if p not in other.rules)
+                other.box = _union([other.box, piece.box])
+                members[k] = rest
+                members[j].append(piece)
+                break
 
 
 def _merge_continued_regions(regions: list[_Region], members: list[list[_Line]]) -> list[_Region]:

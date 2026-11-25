@@ -13,10 +13,10 @@
     0.5.19 on 62 public arXiv papers (1,224 pages) 74 pages differ, 1 has one element more
     (two numbered equations that were one display) and 7 have fewer; on the 60 development
     files (whole, 947 pages) 51 differ, 1 has one element more and 4 have fewer; on 60
-    further public papers (1,195 pages) 66 differ, none has more and 10 have fewer. Two
+    further public papers (1,195 pages) 64 differ, none has more and 10 have fewer. Three
     displays read worse, the limits of displays on two pages are traded and one sentence
-    reads better at the cost of a stray equation, all named in
-    the entry below.
+    reads better at the cost of a stray equation; the entry below names them, and with them
+    the pages that read differently without reading better or worse.
   - Algorithms: a full-width algorithm whose short steps have comments at the right and whose
     long steps run past the gutter is one block (arXiv 2504.06207 page 13).
   - Scripts: a lowered script under a typewriter name is read before the name, not inside it
@@ -125,7 +125,7 @@
   under it passed for its limits, and on a page with no running text a display whose
   subscripts are words became a paragraph (the line keeps the size it had; the sign
   carries it, `_Char.line_size`, so a row cut for its equation number or its list marker
-  keeps it too).
+  keeps it too; the item of a list is not whole for that, see the known limit below).
   And after review 31: the limit under a sum is found by the size of the sign when the line
   counts as script size without any limit in it (three subscripted letters side by side;
   `display._limits_of`, arXiv 2505.04942 page 12); a sign placed by its own center, when
@@ -134,13 +134,26 @@
   fraction's numerator on `ax_statme_240307158` pages 3 and 8 and the "(∑" of
   `ax_cslg_240306366` pages 10, 11 and 13 read as at 0.5.19 again); and the signs that take
   limits are one set (`shared.LIMIT_SIGNS`).
+  And after review 32: only a sign of that set is placed by its own center. A root has a
+  smaller glyph under it and no limits, and the denominator of a fraction was read between
+  the two terms of its numerator ("(V1(u) √tn −κ′1(θ)tn)"; three displays of arXiv
+  2503.05994 page 19 and two of 2312.17566 page 7 read as at 0.5.19 again). And a piece
+  that the stacking of a display's lines gave to the display over its own goes back
+  (`display._return_stray_pieces`): the upper limit of a sum behind its opening bracket,
+  "(n", starts a little above its line and is met first, and equation (12) of arXiv
+  2408.09889 page 5 reached 12 pt into (13) and held that piece of it; the two have the
+  boxes of 0.5.19 again. Each of the five conditions of the rule since review 30 has a
+  display that fails without it on a page built with pdfTeX
+  (`tests/fixtures/layout/latex/pdftex/sum_limits_pdftex.tex`: a Tectonic page shows none
+  of them, its sum sign's glyph box reaches further down), and the display pass has a test
+  on hand-built lines.
   Measured against 0.5.19 with production's switches, 2026-11-24: on 62 public arXiv papers
   (the first 25 pages of each, 1,224 pages) 74 pages differ, 1 has one element more (the
   equations (2) and (3) of arXiv 2210.13562 page 5, one display with two numbers before) and
   7 have fewer, and the displays that end with a sign and its limits (the sign read after its
   line) go from 189 to 186; on the 60 files of `layout-dev-1` (whole files, 947 pages with
   elements) 51 pages differ, 1 has one element more and 4 have fewer, and those displays go
-  from 79 to 77; on 60 further public papers (the first 25 pages of each, 1,195 pages) 66
+  from 79 to 77; on 60 further public papers (the first 25 pages of each, 1,195 pages) 64
   pages differ, none has more elements and 10 have fewer, and those displays go from 126 to
   115 (the lower limit of three displays of arXiv 2503.05994 that 0.5.19 read as equations
   of their own is in its display). None of the 73
@@ -155,7 +168,29 @@
     ("T m T (α) ∑ ∑ = …"); 0.5.19 read two of the three at their signs (arXiv 2504.03499
     page 25). And one sum whose upper limit was folded into the row of numerators beside it
     before the sign came: the sign lands inside that limit ("2N∑n=0−1 …"; 0.5.19 read the
-    sign after its line; `ax_quantph_240306391` page 16).
+    sign after its line; `ax_quantph_240306391` page 16). And one sum with a wide lower
+    limit, "q=1,q≠p": the sign and the "M" after it land inside the limit ("≈q=∑P M1,q ≠p
+    P"; 0.5.19 read "≈ ∑P MP" and the limit after the line; arXiv 2309.13554 page 12).
+  - Read differently, neither reading better: the pieces of a display come in another
+    order (a limit now at its sign and a numerator or a bracket out of its place, or the
+    other way round) on arXiv 2203.14737 page 20, 2408.13045 page 22, 2409.12662 page 12,
+    2404.01333 page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22 and
+    `ax_csro_240306420` page 3 ("1n∑=1N"). On `ax_mathap_240306449`
+    page 15 the first integral of the display's second line follows "= 2" now, where
+    0.5.19 read that line's integrals in front of it; the rest of the line is out of
+    order in both. `ax_cslg_240306366` page 2 reads as at 0.5.19 ("1 (∑ ) β lna∈𝒜
+    exp(v(a)β)": the bracket and its sum in front of the "ln" they follow).
+  - Known limit: the limit under a sum set in display style in the item of a list is an
+    equation of its own after the item ("Ekin = ∑n ki + Epot", then "i=1";
+    `sum_limits.tex`, page 2). At 0.5.19 the whole sign with both limits stood alone and
+    the item's formula was in pieces.
+  - Known limit, as at 0.5.19: two numbered lines of one aligned display are one equation
+    when a piece without a number stands between them ((A16) and (A17) of arXiv 2408.09889
+    page 18). Refusing a numbered line for a display that already has a number was built
+    and measured and is left out: of 175 pages of seven papers it moved 8, and four of
+    them for the worse (a pair of brackets left alone on arXiv 2405.01486 page 8, a row of
+    a cases display cut off on 2501.03732 page 13: what counts as a number there is not
+    always one).
   - Known limit, as at 0.5.19: the lower limit of a sum beside a binomial is in the sum's
     line on the slide the rule was built for; on an ordinary article page the same shape
     still reads "(x + y)n = xn−kyk ∑ (nn ) k k=0" (a made page; no real page of the three

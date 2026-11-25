@@ -324,9 +324,14 @@ reader, neither to find them nor as a second opinion
    which makes the fragment longer than four glyphs and moves its center off the line. So
    a row that is one such sign and its limits alone (`_sign_of_limits`: every other glyph
    script-size beside the sign, set over it or under it, at most eight on each side) is a
-   fragment whatever its length, it is placed where the sign stands, and a fragment with a
-   limit in it (a glyph smaller than its sign) that finds no row at its own center looks at
-   the center of its sign. Two kinds stay where they are. A fragment that reaches into a
+   fragment whatever its length, it is placed where the sign stands, and a fragment that
+   holds a sign that takes limits (`shared.LIMIT_SIGNS`: an integral, a sum, a product, a
+   big union or intersection) and a glyph smaller than that sign, which is how a limit in
+   it shows, looks at the center of the sign when it finds no row at its own center. Three
+   kinds stay where they are. A root: it has a smaller glyph under it ("√tn") and takes no
+   limits, and placed by its own center the denominator of a fraction was read between the
+   two terms of its numerator ("(V1(u) √tn −κ′1(θ)tn)"; arXiv 2503.05994 page 19 and
+   2312.17566 page 7, five displays, found by review 32). A fragment that reaches into a
    row at its own center without lying within it: the sum of a fraction's numerator, whose
    row of terms begins under its raised script, is no part of the line under it
    (`ax_statme_240307158` pages 3 and 8). And a sign with nothing but a bracket before it,
@@ -560,7 +565,7 @@ changed nothing in production.
   limits alone from 31 to 30. On the 60 files of the `layout-dev-1` development set (whole
   files: 954 pages, 947 with elements) 51 pages differ, 1 has one element more and 4 have
   fewer; the same two counts go from 79 to 77 and stay at 21. On 60 further public arXiv
-  papers (the second sample of review 31, the first 25 pages of each, 1,195 pages) 66 pages
+  papers (the second sample of review 31, the first 25 pages of each, 1,195 pages) 64 pages
   differ, none has more elements and 10 have fewer; the two counts go from 126 to 115 and
   from 20 to 19. Traded, on `ax_econem_240306657` page 49 and
   `ax_quantph_240306391` page 15: the upper limit now follows its sign and the lower is read
@@ -571,10 +576,16 @@ changed nothing in production.
   …"; 0.5.19 read two of the three at their signs). Worse too, on `ax_quantph_240306391`
   page 16: the upper limit "2N−1" of a sum was folded into the row of numerators beside
   it before the sign came, and the sign with its lower limit lands inside it ("2N∑n=0−1
-  …"; 0.5.19 read "2N−1 … ∑n=0", the sign after its line). The one page with an element more is
+  …"; 0.5.19 read "2N−1 … ∑n=0", the sign after its line). And on arXiv 2309.13554 page
+  12: a sum with a wide lower limit, "q=1,q≠p", has the sign and the "M" after it inside
+  that limit ("≈q=∑P M1,q ≠p P"; 0.5.19 read "≈ ∑P MP" and the limit after the line). The one page with an element more is
   `ax_mathap_240306449` page 3: a sum set in a sentence with limits over and under it had
   them read into the words of the sentence ("morek=0 involved and need∞s"); the sentence is
-  clean now, the upper limit is at its sign and the lower is a short equation of its own. The
+  clean now, the upper limit is at its sign and the lower is a short equation of its own.
+  Read differently, with neither reading the better one (the pieces of a display in another
+  order): arXiv 2203.14737 page 20, 2408.13045 page 22, 2409.12662 page 12, 2404.01333
+  page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22,
+  `ax_csro_240306420` page 3 and `ax_mathap_240306449` page 15. The
   rule moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
   score of the 21 development papers as it was (9,198 of 11,258 whole; displays 903 of
   1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree).
@@ -1286,7 +1297,17 @@ math font, stay math.
   5. *A piece inside a display.* The top of a tall bracket set in pieces, the double bars of a
      norm: a line of its own to the stacking, inside the box of the formula it belongs to.
      `_absorb_contained_regions` joins a region with at least `CONTAINED_SHARE` (0.9) of its
-     area inside a larger one; two numbered displays are never joined.
+     area inside a larger one; two numbered displays are never joined. And a piece that the
+     stacking gave to the display over its own: the upper limit of a sum behind its opening
+     bracket, "(n", starts a little above the line it belongs to, so it is met before that
+     line, with only the display above to join. Equation (12) of arXiv 2408.09889 page 5
+     then reached 12 pt into (13) and held a piece of it (review 32; the limits rule of
+     0.5.20 brought it out, by folding the limit over an integral into line (13), which
+     until then had chained the piece to its own line). `_return_stray_pieces` looks at the
+     lowest line of each display after the stacking: when it has no number, lies under every
+     other line of the display, is no limit of a sign in them and is of script size beside a
+     line of another display that stands around it (the piece's middle between that line's
+     top and bottom, its extent between the line's left and right), it goes to that display.
   6. *Limits at the size of the row.* `_joins_line` takes limits by their size (a script size
      under a big operator); a paper that sets them at the size of the row ("k=1" at 7 pt under
      a sum at 7 pt) gave it nothing to go by. `_limits_of` joins a line that hangs right under
