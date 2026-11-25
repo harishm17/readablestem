@@ -75,6 +75,7 @@ RUN_IN_LABELS = frozenset({"solution", "answer", "discussion", "procedure", "pro
 MIN_LABEL_COPIES = 2  # a label word that repeats this often is a label
 LABEL_SIZE_TOLERANCE = 0.05  # of the body size: "exactly body size"
 LABEL_INSET = 3.0  # pt a label sits in from its page's text edge: inside a box, not a section
+MIN_EDGE_LINES = 3  # lines that start at one x before it is a column's text edge (`_line_edges`)
 
 
 def _text_edges(page: _PageBlocks) -> dict[str, float]:
@@ -96,7 +97,8 @@ def _text_edges(page: _PageBlocks) -> dict[str, float]:
 
 def _line_edges(page: _PageBlocks) -> dict[str, float]:
     """Left edge of the body text of each column of a page, read from its lines: the x where
-    most of the column's paragraph lines start (within 2.5 pt; the leftmost on a tie).
+    most of the column's paragraph lines start (within 2.5 pt; the leftmost on a tie), if at
+    least `MIN_EDGE_LINES` start there (a page number, a caption or a lone line is no edge).
 
     `_text_edges` takes the leftmost x that three paragraphs start at, which is right for a
     page of boxes (the text at the margin is the body's) and wrong for a page whose first
@@ -110,9 +112,9 @@ def _line_edges(page: _PageBlocks) -> dict[str, float]:
     edges: dict[str, float] = {}
     for column, xs in lines.items():
         xs.sort()
-        edges[column] = max(
-            enumerate(xs), key=lambda ix: (bisect.bisect_right(xs, ix[1] + 2.5) - ix[0], -ix[1])
-        )[1]
+        count, x = max((bisect.bisect_right(xs, x + 2.5) - i, -x) for i, x in enumerate(xs))
+        if count >= MIN_EDGE_LINES:
+            edges[column] = -x
     return edges
 
 
