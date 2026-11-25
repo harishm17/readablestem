@@ -3319,23 +3319,35 @@ it. The student page, totals only:
 | Pages with a heading merged (places) | 19 (29) | 19 (29) | 19 (29) |
 | Broken blocks | 28 | 28 | 26 |
 
+In the element list one of the 25 stamped pages still reads its stamp (25 before); which,
+and why, is not looked at.
+
 `eval ledger --for-release` passes against the bars of 0.5.19 (at most 72 of 247 pages not
 right, at least 11 of 49 documents, at most 36 of 247 pages with furniture). What the
 figures say and do not say:
 
 - Every change is in papers. Course handouts and textbooks have each count of the first run
   (furniture read on 1 and 11 of their pages).
-- The furniture row falls by arXiv's stamp and by nothing else: no running head and no page
-  number is read less. It falls to 20 pages, not to the 13 to 18 written down before the
-  run: the 24 stamps took 17 pages off the row, where the development set's ratio gave 19 to
-  24. The expectation was wrong by two pages, and the figure is given as it is.
-- The page that failed the first run is still one worse by the scorer, beneath the stamps.
-  Its cause is not known and it was not looked for on held-out pages.
+- The furniture row falls to 20 pages, not to the 13 to 18 written down before the run, and
+  the figure is given as it is. 24 stamps are no longer read in the text; the stray
+  elements that read a margin line fall by 20 (50 to 30), all strays by the same 20 (1,033
+  to 1,013), and the pages with furniture by 17. The totals fit the stamp alone and do not
+  prove it: 4 of the 24 stamps would have stood inside a paragraph, where they are not
+  counted on this row (5 of 26 on the development set), and 3 stamped pages would still
+  read another margin line (before the rule the held-out papers had 32 such elements on
+  25 pages, the development papers 32 on 32, so the development ratio was the wrong one
+  to expect by). The same totals allow up to 4 margin lines newly read; no open page
+  shows one. Running heads and page numbers are not counted apart on this set, so nothing
+  says they are read less, or as often.
+- The page that failed the first run is counted as still one worse by the scorer, beneath
+  the stamps; the second run cannot show it either way. Its cause is not known and it was
+  not looked for on held-out pages.
 - The 16 more right pages (85 to 101 of the papers' 128), the 12 more faultless ones and the
-  9 more documents (1 to 10 of 28 papers) are what the stamp rule gains on pages whose stamp
-  was read in the text. They are fitted to that one fault, on a set whose totals for it were
-  known; they are not evidence that the reader of 0.5.20 reads unseen pages better in any
-  other way.
+  9 more documents (1 to 10 of 28 papers) are net figures: which pages moved is not looked
+  at, and a held-out set is not compared page by page. They fit what the stamp rule gains
+  on pages whose stamp was read in the text. They are fitted to that one fault, on a set
+  whose totals for it were known; they are not evidence that the reader of 0.5.20 reads
+  unseen pages better in any other way.
 - Blocks run together and headings merged did not rise, so the blocks that the stamp had
   kept apart on open first pages (docs/layout.md) do not show as merged places here. Blocks
   cut and broken fall a little, in papers.
@@ -3345,8 +3357,9 @@ figures say and do not say:
 The release bars are registered again from this run (`data/eval/ledger-bars.json`,
 `--replace-bar` for the three rows, after the pass against the old bars): at most 56 of 247
 pages not right, at least 20 of 49 documents with every gold page right, at most 20 of 247
-pages that read furniture aloud. The first run's record is not kept as a file; its totals are
-the middle column above.
+pages that read furniture aloud. The furniture bar of 20 includes the page that failed the
+first run: a later release is not asked to win it back. The first run's record is not kept
+as a file; its totals are the middle column above.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -4102,8 +4115,10 @@ is wider, and the rows that count documents are the ones to read for that.
 **The two bars.** The goal bar is the figure a lane is built toward, written with the row.
 It is met only when the bound is inside it, not when the figure is. A goal of none is met by
 a count of none, and the line still prints what that count allows. The release bar is the
-figure of the first held-out run, kept in `data/eval/ledger-bars.json` with the set it was
-measured on. `--register-bars` writes the bars that are missing; a bar is replaced only by
+figure of the held-out run it was registered from, kept in `data/eval/ledger-bars.json`
+with the set it was measured on: the first run of the set, unless the bar was replaced by
+name (the three page rows were, at 0.5.20, from the second run of that release; "Today",
+below). `--register-bars` writes the bars that are missing; a bar is replaced only by
 naming its row (`--replace-bar ROW`), and a figure from a run in which a step stopped early
 is no baseline and is not written. A release may not be worse than its release bar, held as
 measured, with no bound. Only a held-out line is held against either bar.
@@ -4177,7 +4192,8 @@ Read with care:
   247 pages not right allows up to 27.5 in 100 at 95%.
 - The furniture row meets its release bar and not its goal: 20 of 247 held-out pages read a
   running head, a page number or a stamp aloud, and the goal is 2 in 100. The fall from 36
-  is arXiv's stamp alone; running heads and page numbers are read as often as before.
+  fits arXiv's stamp alone (24 stamps no longer read in the text); running heads and page
+  numbers are not counted apart, and nothing says they are read less.
 - `layout-dev-1` has two documents in which a step stopped early (a limit on work, the same
   on every machine); its lines say so.
 - Every gold page is right in 39 of 47 corpus documents, 20 of 60 documents of

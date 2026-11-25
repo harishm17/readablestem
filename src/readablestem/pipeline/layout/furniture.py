@@ -134,8 +134,9 @@ def _rotated_key(row: _Row) -> tuple[str, int, int]:
     return _norm_margin(row.clean), round((row.x0 + row.x1) / 40), round((row.y0 + row.y1) / 40)
 
 
-# The line arXiv prints up the left margin of a paper's first page: "arXiv:2403.06391v1
-# [quant-ph] 10 Mar 2024", or with an identifier of the old form and no subject,
+# The line arXiv prints up the left margin of a paper (on its first page, or the first of a
+# supplement bound in after it): "arXiv:2403.06391v1 [quant-ph]
+# 10 Mar 2024", or with an identifier of the old form and no subject,
 # "arXiv:hep-th/9711200v3 22 Jan 1998".
 _ARXIV_STAMP = re.compile(r"^arXiv:\S+(?:\s+\[[\w.-]+\])?\s+\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}$")
 

@@ -24,12 +24,12 @@ that count documents are the ones to read for that.
 **Two bars** (`eval/split.py`). The goal bar is the figure a lane is built toward, written
 in `ROWS`. It is met only when the bound is inside it, not when the figure is; a goal of 0 is
 met by a count of 0, and the line still prints what that count allows. The release bar is
-the figure of the first held-out run, kept in `data/eval/ledger-bars.json` with the set it
-was measured on (`--register-bars` writes the bars that are missing, and no bar is ever
-replaced without being named): a release may not be worse than it, held as measured, with
-no bound. Only a held-out line is held against either. Exit code 0: no held-out line is
-worse than its release bar; 1: one is, or, with `--for-release`, a row that has a release
-bar has no held-out figure of this release on the bar's set; 2: refused.
+the figure of the held-out run it was registered from, kept in `data/eval/ledger-bars.json`
+with the set it was measured on (`--register-bars` writes the bars that are missing, and no
+bar is ever replaced without being named): a release may not be worse than it, held as
+measured, with no bound. Only a held-out line is held against either. Exit code 0: no held-out
+line is worse than its release bar; 1: one is, or, with `--for-release`, a row that has a
+release bar has no held-out figure of this release on the bar's set; 2: refused.
 
 **Refused.** A record that does not say its split, its set's hash, the profile's hash and the
 pipeline version is not read around: the run stops and names it.

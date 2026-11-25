@@ -111,16 +111,19 @@
   faultless (101), 20 of 49 documents with every gold page right (11), furniture read on
   20 pages (36 at 0.5.19, 37 in the first run), no stamped page of 25 reads the stamp in
   the text (24). Every change is in papers. 20 pages is two more than the 13 to 18 written
-  down before the run: the stamps took 17 pages off the row. `eval ledger --for-release`
-  passes against the bars of 0.5.19. The page that failed the first run is still one
-  worse, beneath the stamps, and its cause is not known. The gain is arXiv's stamp and
-  nothing else, on a set whose totals for that fault were known, so it is no evidence
-  that unseen pages are read better in any other way. The set has been scored four times
+  down before the run: 24 stamps are no longer read, 20 fewer stray elements read a margin
+  line (50 to 30) and 17 fewer pages have one. The totals fit the stamp alone (4 stamps
+  inside a paragraph, 3 stamped pages that still read another margin line) and cannot
+  rule out up to 4 margin lines newly read. `eval ledger --for-release` passes against
+  the bars of 0.5.19. The page that failed the first run is counted as still one worse,
+  beneath the stamps (the second run cannot show it), and its cause is not known. The
+  gain fits arXiv's stamp alone, on a set whose totals for that fault were known, so it
+  is no evidence that unseen pages are read better in any other way. The set has been scored four times
   in all.
 - The ledger's release bars are registered again from the second run
   (`data/eval/ledger-bars.json`): at most 56 of 247 pages not right, at least 20 of 49
   documents with every gold page right, at most 20 of 247 pages that read furniture
-  aloud. `data/eval/order-layout-heldout-1.json` is the second run's record and
+  aloud (the last includes the page that failed the first run). `data/eval/order-layout-heldout-1.json` is the second run's record and
   `data/eval/ledger.json` is re-made at 0.5.20.
 - One test (`tests/test_layout_analyze.py`): the stamp is not read, an upright line that is
   a stamp's words whole and a turned axis title are, and a line that breaks inside the
