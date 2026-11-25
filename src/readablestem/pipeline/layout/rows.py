@@ -1100,7 +1100,8 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
                 for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
                     host = merged.get(j, rows[j])
                     reach = 0.5 * host.size
-                    inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
+                    start = min(host.x0, piece.x0) if _starts_at(host, piece) else host.x0
+                    inside = start - reach <= piece.x0 and piece.x1 <= host.x1 + reach
                     shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
                     on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
                     beside = beside or (on_line and piece.x0 < host.x1 and host.x0 < piece.x1)
@@ -1121,6 +1122,18 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
             merged[best] = _Row([*host.chars[:at], *folded, *host.chars[at:]], column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
+
+
+def _starts_at(host: _Row, piece: _Row) -> bool:
+    """Does `host` begin where a sum, product or integral sign of `piece` ends, no further than
+    half an em beyond it? A sign that leads a line comes as a piece of its own, and the row of
+    what goes on starts with the lower limit TeX lowers to the baseline of the line, or with the
+    integrand, so that row seems to start a sign's width after the sign (arXiv 2411.02531 page 1,
+    2212.05955 page 13)."""
+    first = next((c for c in host.chars if not c.blank), None)
+    return first is not None and any(
+        c.c in LIMIT_SIGNS and c.x0 <= first.x0 <= c.x1 + 0.5 * host.size for c in piece.ink
+    )
 
 
 def _insert_script(
