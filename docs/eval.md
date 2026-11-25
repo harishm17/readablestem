@@ -718,8 +718,15 @@ added from November 2026 on:
    held-out set writes the run (pipeline version, source, day) to the list beside the
    registry, `data/gold/layout/NAME.runs.json`, before it reads a document, so a run that was
    started counts; and it refuses a set the list already names for the current version. The
-   list is committed with the release, and it is what a reviewer reads to see every run that
-   was made. Why a version was raised the command cannot know: that part is kept by whoever
+   list is committed with the release: a reviewer reads in it every run made in a tree whose
+   list was committed. A run made with another `--registry`, or in a tree whose list is then
+   put back, is in no list anyone reads; the command cannot see that. The list is a tracked
+   file, so writing it changes the tree: the run's record is stamped with the state of the
+   source read before the write, and an entry made on a tree that already had changes says
+   `changed` (that run was not made on the head that is to be released). A held-out set is
+   scored whole: `--only` is refused for it. A run that dies before it gives its totals has
+   taught nothing and still counts: the version is raised, the run is made again, and the
+   list shows both. Why a version was raised the command cannot know: that part is kept by whoever
    writes the release, and the release's entry in the CHANGELOG says what its changes were
    chosen from.
 

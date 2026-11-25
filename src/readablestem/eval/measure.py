@@ -677,11 +677,13 @@ def record(
     metrics: dict[str, Any],
     *,
     of_set: dict[str, Any] | None = None,
+    source: tuple[str, bool] | None = None,
 ) -> dict[str, Any]:
     """A report of a measured replay: what it says about itself, then its figures under
     `metrics`, the shape `readablestem eval bar` reads. `of_set`: the `set` and the `split`
-    of a run that is not of the corpus."""
-    return stamps(measured, settings, of_set=of_set) | {"metrics": metrics}
+    of a run that is not of the corpus. `source`: the state of the source when the run began
+    (`run_record.source_state`), for a run that itself writes a tracked file."""
+    return stamps(measured, settings, of_set=of_set, source=source) | {"metrics": metrics}
 
 
 def header(record: dict[str, Any]) -> list[str]:
@@ -720,7 +722,11 @@ def header(record: dict[str, Any]) -> list[str]:
 
 
 def stamps(
-    measured: Iterable[Converted], settings: Settings, *, of_set: dict[str, Any] | None = None
+    measured: Iterable[Converted],
+    settings: Settings,
+    *,
+    of_set: dict[str, Any] | None = None,
+    source: tuple[str, bool] | None = None,
 ) -> dict[str, Any]:
     """What a report of a measured replay says about itself (`eval.split`): the documents and
     their side, the settings, the code, and the steps that stopped before they were done
@@ -738,13 +744,13 @@ def stamps(
         # Every corpus file has been read while the readers were built.
         chosen = split.Split(seed="corpus", development=tuple(names), held_out=(), hashes=hashes)
         of_set = {"split": chosen.stamp(split.DEVELOPMENT)}
-    sha, dirty = run_record.source_state(corpus.REPO)
+    sha, dirty = source or run_record.source_state(corpus.REPO)
     return {
         **of_set,
         "profile": profile.stamp(settings),
         "pipeline_version": PIPELINE_VERSION,
         "commit": sha + ("+changes" if dirty else ""),
-        "provenance": run_record.provenance(corpus.REPO),
+        "provenance": run_record.provenance(corpus.REPO, source=(sha, dirty)),
         "machine": machine(),
         "not_finished": [
             {"upload": done.upload, "step": stop.step, "page": stop.page, "reason": stop.reason}

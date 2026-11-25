@@ -172,7 +172,8 @@ class Layout:
     # "scanned_page", "unread_page"): nothing on them is read, they have no elements, and
     # the pipeline keeps each one as an image marked "Not converted", with a decision.
     kept_pages: dict[int, str] = field(default_factory=dict)
-    # Pages whose table search the document's time for it refused (`tables.DetectorBudget`): only
+    # Pages whose table search was not made (the document's time for it refused it, or the
+    # detector may not read the page: `tables.DetectorBudget`, `detector_sources`): only
     # the page's own rules and aligned text propose a table there, so a table may be read as
     # text. The conversion writes a "not finished" fact for each, and `notices` has one
     # `tables_not_searched` for each.

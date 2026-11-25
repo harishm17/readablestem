@@ -352,8 +352,8 @@ blank tables as figures) without rebuilding anything; meaning would be lost othe
   `DetectorSource`): `"page"`, the detector reads the page as always; `"copy"`, it reads a
   copy of the page alone in a new document, which has the page's content, boxes and Rotate
   and not the document's structure tree, the thing the fault needs (arbitration, grid and
-  fill read the page itself); `"none"`, MuPDF faults on the copy too or the time to try the
-  page ran out, and the detector is not run: the page gets the tables its own lines and
+  fill read the page itself); `"none"`, MuPDF faults on the copy too, no copy can be made or the
+  time to try the page ran out, and the detector is not run: the page gets the tables its own lines and
   rules show ("Recall on real documents") and is said as a page whose search was not made
   (`DetectorBudget.refused`, the notice `tables_not_searched`). A copy is read nearly as its
   page: on 137 pages of 11 tagged papers some proposals differ by up to 3 pt and one is

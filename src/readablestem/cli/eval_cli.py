@@ -1081,7 +1081,9 @@ def _cmd_burden(args: argparse.Namespace) -> int:
     return 1 if verdict.judged else 2
 
 
-def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | int:
+def _scored_set(
+    args: argparse.Namespace,
+) -> tuple[list[Any], dict[str, Any], tuple[str, bool] | None] | int:
     """`eval order --set`: the documents of a layout gold set scored (or read from
     `--from`), and the set's registry; an exit code when it cannot be done. The folder must
     be the registered one, and a held-out set is scored only when the caller says the
@@ -1109,6 +1111,8 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
             return _error(
                 "a held-out set's pages are not kept: --records and --from are not for it"
             )
+        if args.only:
+            return _error("a held-out set is scored whole: --only is not for it")
     known = {row["id"] for row in registry["documents"]}
     if args.records_from is not None:
         try:
@@ -1119,7 +1123,7 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
         unknown = sorted({done.upload for done in run} - known)
         if unknown:
             return _error(f"{args.records_from}: not documents of {args.set}: {', '.join(unknown)}")
-        return run, registry
+        return run, registry, None
     if not (root / "gold").is_dir():
         return _error(f"no set at {root} (a folder with files/ and gold/)")
     problems = layout_gold.verify_set(root, registry)
@@ -1128,10 +1132,12 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
     unknown = sorted(set(args.only or ()) - known)
     if unknown:
         return _error(f"not in {args.set}: {', '.join(unknown)}")
+    source = None  # of a release run: the source as it was before the run was listed
     if sets.held_out(registry):
-        refused = _note_release_run(listed, args.set)
-        if refused:
-            return _error(refused)
+        noted = _note_release_run(listed, args.set)
+        if isinstance(noted, str):
+            return _error(noted)
+        source = noted
 
     def said(done: Any) -> None:
         print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
@@ -1141,23 +1147,31 @@ def _scored_set(args: argparse.Namespace) -> tuple[list[Any], dict[str, Any]] | 
         args.records.parent.mkdir(parents=True, exist_ok=True)
         kept = {"runs": [[done.as_dict() for done in run]]}
         args.records.write_text(json.dumps(kept), encoding="utf-8")
-    return run, registry
+    return run, registry, source
 
 
-def _note_release_run(listed: Path, name: str) -> str | None:
+def _note_release_run(listed: Path, name: str) -> tuple[str, bool] | str:
     """The stop rule of docs/eval.md ("Development and held-out, and the two bars", rule 5),
     kept by the command: a held-out set is scored once for a pipeline version. The set's runs
     are listed beside its registry (`<set>.runs.json`: the version, the source and the day,
     nothing of the set). This run is written there before a document is read, so a run that
     was started counts; a run for a version already listed is refused, with the reason
-    returned."""
-    from readablestem.cli.main import project_root
-    from readablestem.eval import run_record
+    returned.
+
+    The list is a tracked file, so writing it changes the tree the run's record is stamped
+    with. What is returned for a run that may go on is therefore the state of the source read
+    before the write (`run_record.source_state`), for the record; and an entry made on a
+    tree that already had changes says `changed`: that run was not made on the head that is
+    to be released. (Two runs started in the same moment both pass, and the later write
+    drops the earlier entry: there is no lock.)"""
+    from readablestem.eval import corpus, run_record
     from readablestem.pipeline.run import PIPELINE_VERSION
 
     path = listed.with_suffix(".runs.json")
     try:
         runs = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else []
+        if not (isinstance(runs, list) and all(isinstance(run, dict) for run in runs)):
+            raise ValueError("not a list of runs")
     except (OSError, ValueError) as exc:
         return f"cannot read {path}: {exc}"
     earlier = [run for run in runs if run.get("pipeline_version") == PIPELINE_VERSION]
@@ -1167,16 +1181,19 @@ def _note_release_run(listed: Path, name: str) -> str | None:
             f"source {earlier[0].get('source')}): a held-out set is scored once for a release, "
             "and a release that failed a bar is not scored again (docs/eval.md, rule 5)"
         )
-    source, _changed = run_record.source_state(project_root())
-    runs.append(
-        {
-            "pipeline_version": PIPELINE_VERSION,
-            "source": source[:8],
-            "date": dt.date.today().isoformat(),
-        }
-    )
-    path.write_text(json.dumps(runs, indent=2) + "\n", encoding="utf-8")
-    return None
+    source = run_record.source_state(corpus.REPO)
+    entry: dict[str, Any] = {
+        "pipeline_version": PIPELINE_VERSION,
+        "source": source[0][:8],
+        "date": dt.date.today().isoformat(),
+    }
+    if source[1]:
+        entry["changed"] = True
+    try:
+        path.write_text(json.dumps([*runs, entry], indent=2) + "\n", encoding="utf-8")
+    except OSError as exc:
+        return f"cannot write {path}: {exc}"
+    return source
 
 
 def _cmd_parsing_bench(args: argparse.Namespace) -> int:
@@ -1232,14 +1249,16 @@ def _cmd_order(args: argparse.Namespace) -> int:
         scored = _scored_set(args)
         if isinstance(scored, int):
             return scored
-        run, registry = scored
+        run, registry, source = scored
         settings = order_report.set_settings()
         from readablestem.cli import layout_gold as sets
 
         held_out = sets.held_out(registry)
         metrics = order_report.report(run, order_report.set_groups(registry), listed=not held_out)
         of_set = order_report.set_stamp(registry, [done.upload for done in run])
-        record = measure.record(run, settings, metrics, of_set=of_set | {"client": "none"})
+        record = measure.record(
+            run, settings, metrics, of_set=of_set | {"client": "none"}, source=source
+        )
     else:
         if not (args.only or args.records_from):
             with_gold = (entry.id for entry in corpus.load_manifest().values() if entry.gold)

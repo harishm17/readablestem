@@ -27,22 +27,25 @@
   always.
 - **Its limits say so.** The children of a call together have 30 s and 2 s for each page
   after the first; the pages not tried by then are `"none"` for that call, and the answer
-  is not kept. A `"none"` page is listed in `Layout.tables_not_searched`, gets the "not
+  is not kept. A `"none"` page the table step takes to the detector is listed in
+  `Layout.tables_not_searched`, gets the "not
   finished" fact `table_search` and the notice `tables_not_searched`, as a page the
   detector's time budget refused does (for a page whose copy faults too those name the time
   as the cause, which is not it; none has been seen). Evals and replays
   (`table_search_limited` False) have no time limit, so what they find does not depend on
   the machine. A child that ends in a way that is not MuPDF's doing (an exit code of its
-  own, a kill from outside) says nothing of a page: an error is logged and its pages are
-  read as before the guard.
+  own, a kill from outside, a fault before it has the document open) says nothing of a
+  page: an error is logged and its pages are read as before the guard, but for a page that
+  had already faulted where it is, which is not searched in that call. A page whose copy
+  cannot be made is not searched either, and says so.
 - **Measured.** Pages 21 to 23 of the paper are read (page 22: 18 elements, the detector on
   a copy). A file made of that page twelve times is read whole, every page as a copy (24
   children, 6.4 s in them). No other page dies: none of 11,079 pages of the 367 other
   public papers of the collection, of 954 pages of the 60 development files or of 1,202
   pages of the 25 corpus files, each read where it is and as a one-page copy turned a
-  quarter either way. The fault needs a tagged file, and 41 of those files are (18 papers,
-  no development file, 22 corpus files; 1,616 pages with the paper's own): one dying page
-  in 1,616 tagged pages. The child costs 35 ms a page on those files (444 s for 13,236
+  quarter either way. The fault needs a tagged file, and 40 of those files are (18 papers,
+  no development file, 22 corpus files), 41 with the paper itself: one dying page in the
+  1,616 pages of the 41. The child costs 35 ms a page on those files (444 s for 13,236
   pages) and about 0.14 s to start, once for a document; no document uses more than 12% of
   the children's time. A document with no such page reads as before, as long as the
   children end in time: the child's reading is thrown away.
@@ -69,9 +72,10 @@
   text, `find_tables` takes the CropBox off the open page and its boxes are not in the
   shown page's frame (a made page: the table's box holds 20 of the page's 33 words). In
   0.5.20 and before; open in the plan.
-- **Tests.** `tests/test_layout_crop.py`: one test, four ends of the child (MuPDF faults on
-  the page; on its copy too; no time left; the child fails by itself), each with what the
-  detector then reads and whether the page is listed as not searched.
+- **Tests.** `tests/test_layout_crop.py`: one test, six cases (MuPDF faults on the page; on
+  its copy too; no time left; an eval, which has no time limit; the child fails by itself;
+  the child faults before the file is open), each with what the detector then reads and
+  whether the page is listed as not searched.
   `tests/test_tables_detect.py`: the flags the child reads with are among the flags the
   add-on reads a page with, so a new pin that changes them fails a test.
 - **The standing stop rule for held-out runs** is written into docs/eval.md ("Development
@@ -79,7 +83,10 @@
   held-out layout set's runs are listed beside its registry
   (`data/gold/layout/layout-heldout-1.runs.json`, begun with the four runs made so far),
   `eval order --set ... --for-release` writes its run there before it reads a document and
-  refuses a set already scored for the current pipeline version. A rule built in knowledge
+  refuses a set already scored for the current pipeline version. The list is a tracked
+  file, so the run's record is stamped with the source as it was before the list was
+  written, and an entry made on a tree that had changes says `changed`. `--only` is refused
+  for a held-out set. A rule built in knowledge
   of a failed row is judged on a newly drawn half, never by the same set under a raised
   version; that half is still owed.
 - docs/layout.md ("A page the table detector cannot read"), docs/tables.md ("Where it

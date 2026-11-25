@@ -588,6 +588,7 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int], at_most_s: float | None = N
 # A page with more drawn items than the detector reads (`tables.MAX_DETECTOR_ITEMS`) is not
 # read here either: `tables.propose` leaves it out by the same count, and the reading of such
 # a page can take minutes (page 7 of arXiv 2410.12036, 2.1 million items, did not end in 600 s).
+# "open" is written once the document is open: a fault before that is the child's own.
 _HUNT_SCRIPT = """
 import sys
 try:  # cap this process's address space first, as the probe does
@@ -604,6 +605,8 @@ import pymupdf
 pymupdf.TOOLS.mupdf_display_errors(False)
 pymupdf.TOOLS.mupdf_display_warnings(False)
 doc = pymupdf.open(stream=sys.stdin.buffer.read(), filetype="pdf")
+sys.stdout.write("open\\n")
+sys.stdout.flush()
 for number in map(int, sys.argv[1].split(",")):
     try:
         page = doc[number]
@@ -638,9 +641,9 @@ def hunt_failures(
     the pages not tried by then are "none" for this call only: the table search of such a
     page is not made, which the detector's budget counts and the conversion says
     (`tables._detected`). A clock is the machine's, so evals and replays pass False and wait.
-    A child that ends in any other way (its own error, a kill from outside) has said nothing
-    of a page: that is logged, and the pages it did not get to are read as before there was a
-    child."""
+    A child that ends in any other way (its own error, a kill from outside, a fault before
+    the document was open) has said nothing of a page: that is logged, and the pages it did
+    not get to are read as before there was a child."""
     known = _HUNTED.setdefault(key, {})
     todo = [page for page in pages if page not in known]
     unsearched: list[int] = []  # "none" for this call only: nothing was found out about them
@@ -682,8 +685,8 @@ def _hunt_pages(
 ) -> tuple[list[int], str]:
     """Run `_HUNT_SCRIPT` on `pages` for at most `at_most_s`: the pages it got through, in
     order, and how it ended: "done", "fault" (MuPDF ended it at the next page), "late" (the
-    time ran out) or the code of an end of its own. Its output is the page numbers it wrote;
-    nothing else is kept."""
+    time ran out) or the code of an end of its own. Its output is "open" and the page numbers
+    it wrote; nothing else is kept."""
     if at_most_s <= 0:
         return [], "late"
     command = [
@@ -706,11 +709,14 @@ def _hunt_pages(
             check=False,
             env=child_env(),  # no keys or secrets for the process that reads the PDF
         )
-        written = child.stdout
-        end = "fault" if child.returncode in _HUNT_FAULTS else f"exit {child.returncode}"
+        written, end = child.stdout, f"exit {child.returncode}"
+        fault = child.returncode in _HUNT_FAULTS
     except subprocess.TimeoutExpired as slow:
-        written, end = slow.stdout or b"", "late"
+        written, end, fault = slow.stdout or b"", "late", False
     done = written.split()
+    if fault and done[:1] == [b"open"]:  # (a fault before the document was open is no page's)
+        end = "fault"
+    done = done[1:]
     count = 0
     while count < min(len(pages), len(done)) and done[count] == str(pages[count]).encode():
         count += 1

@@ -4619,19 +4619,31 @@ follows (`_hunt_pages`):
   `PROBE_PER_PAGE_S` (2 s) for each page after the first; the pages not tried by then are
   `"none"` for this call. Evals and replays (`table_search_limited` False) have no such
   limit, so what they find does not depend on the machine.
-- It ends in any other way (an exit code of its own, a kill from outside): that says
-  nothing of a page. An error is logged and the pages it did not get to are read as they
-  were before there was a child.
+- It ends in any other way (an exit code of its own, a kill from outside, a fault before
+  it has written that the document is open): that says nothing of a page. An error is
+  logged and the pages it did not get to are read as they were before there was a child.
+  One page is not: a page that faulted where it is, whose copy's child then failed by
+  itself or ran out of time, is `"none"` for this call, since it is known not to be
+  readable where it is.
 
 `"page"`, `"copy"` and a `"none"` that MuPDF's faults gave are remembered for the document
 (`_HUNTED`, by the hash of its bytes and then by page, the last `PROBED_MEMORY` documents),
-so a second `analyze` starts no child; an answer the clock gave is not remembered. `"page"`
+so a second `analyze` starts no child for those pages. An answer the clock gave is not
+remembered, and neither are the pages a failed child left: the next `analyze` of the
+document tries them again, so a page that hangs the child costs the whole limit in each
+analysis (a conversion makes two when the page-math pass is on). `"page"`
 is not stored in `_Document.detector_sources`. A page that is `"none"` is said the way a
 page the detector's time budget refused is said: `tables._detected` counts the search that
 was not made (`DetectorBudget.refused`), so the page is in `Layout.tables_not_searched`, the
 conversion writes the "not finished" fact `table_search` for it and the page carries the
 notice `tables_not_searched`; tables are still proposed from the page's own lines and
-rules. For a page whose copy faults too the fact's reason (`time_limit`) and the notice's
+rules. A page whose copy cannot be made in this process (`insert_pdf` raises) is said the
+same way. The count is made before the detector's own two ways out (a page over
+`MAX_DETECTOR_ITEMS`, the add-on not installed), so a page the clock left that the
+detector would not have read anyway is listed too: said once too often, never too seldom.
+A page the table step never takes to the detector (one kept as its image, one
+`may_hold_table` passes over) is not listed, whatever its answer.
+For a page whose copy faults too the fact's reason (`time_limit`) and the notice's
 words (the time ran out) name the wrong cause; no such page has been seen, and a teacher
 is told to compare the page either way. The children have the probe's memory cap and
 environment. There is no limit on their number but the time: a tagged file every page of

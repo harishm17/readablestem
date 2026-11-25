@@ -715,9 +715,9 @@ def _detected(
         try:  # (the page's boxes and /Rotate come along, so the proposals are in its frame)
             copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
             alone = copy[0]
-        except Exception:
+        except Exception:  # no copy can be made: the search is not made, and that is said
             copy.close()
-            raise
+            return _detected(page, budget, "none")
     try:
         return propose(alone, budget)
     finally:

@@ -186,8 +186,9 @@ def analyze(
     was before the rule existed.
 
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
-    search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
-    machine.
+    search has no time limit (`tables.DetectorBudget`), and neither have the children that
+    try the detector's reading (`access.hunt_failures`), so what it finds never depends on
+    the machine.
 
     `on_page(done, total)`: told how many of the pages have had their table search, the pass
     that takes most of the time (`done` is below `total` throughout: the caller marks the
@@ -528,7 +529,7 @@ def _analyze_document(
         text_kept.discard(number)
     guard.on_purpose = {n for n in kept if n not in text_kept}
     guard.settle()
-    not_searched: list[int] = []  # pages the table search's time limit refused
+    not_searched: list[int] = []  # pages whose detector search was not made
     searched = guard.live(selected)
     for done, number in enumerate(searched):
         if on_page is not None:

@@ -51,8 +51,9 @@ def _ink_notices(types: dict[int, page_type.PageTypeResult], kept: dict[int, str
 
 
 def _not_searched_notices(pages: list[int]) -> list[Notice]:
-    """A page whose table search the document's time for it refused
-    (`tables.DetectorBudget`) may have a table read as text: "Worth a look", and it holds
+    """A page whose table search was not made (the document's time for it refused it, or the
+    detector's reading could not be tried on the page: `tables.DetectorBudget`,
+    `tables.DetectorSource`) may have a table read as text: "Worth a look", and it holds
     the job back from "Ready" (`web.states`)."""
     return [make(TABLES_NOT_SEARCHED, page=number) for number in pages]
 

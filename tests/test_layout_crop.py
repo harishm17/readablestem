@@ -128,23 +128,36 @@ def test_a_page_that_runs_out_of_the_childs_memory_is_too_complex(monkeypatch, u
 _FAULT = "os.kill(os.getpid(), signal.SIGSEGV)"  # how MuPDF ended the child on the real page
 
 
+_OPEN = "print('open', flush=True)"  # what the child writes once it has the document open
+
+
 @pytest.mark.parametrize(
-    ("child", "detector_reads", "not_searched"),
+    ("child", "limited", "detector_reads", "not_searched"),
     [
-        (f"if sys.argv[3] != 'copy': {_FAULT}", "a copy of the page", []),
-        (_FAULT, "nothing", [0]),
-        ("time.sleep(60)", "nothing", [0]),
-        ("sys.exit(3)", "the page", []),
+        (f"{_OPEN}\nif sys.argv[3] != 'copy': {_FAULT}", True, "a copy of the page", []),
+        (f"{_OPEN}\n{_FAULT}", True, "nothing", [0]),
+        (f"{_OPEN}\ntime.sleep(60)", True, "nothing", [0]),
+        (f"{_OPEN}\ntime.sleep(2)", False, "the page", []),
+        (f"{_OPEN}\nsys.exit(3)", True, "the page", []),
+        (_FAULT, True, "the page", []),
     ],
-    ids=["the page faults", "its copy faults too", "no time left", "the child itself fails"],
+    ids=[
+        "the page faults",
+        "its copy faults too",
+        "no time left",
+        "an eval has no time limit",
+        "the child itself fails",
+        "the child faults before the file is open",
+    ],
 )
 def test_a_page_whose_reading_kills_the_table_detector_is_read_another_way(
-    monkeypatch, child, detector_reads, not_searched
+    monkeypatch, child, limited, detector_reads, not_searched
 ):
     # arXiv 2501.02633, page 22: MuPDF ended the process inside the text extraction the
     # detector asks for, and the job with it; a copy of the page alone was read. A page the
     # detector may not read at all is listed as not searched, which the conversion says. A
-    # child that fails by itself has said nothing of the page: it is read as before.
+    # child that fails by itself has said nothing of the page: it is read as before. The
+    # clock is the machine's, so an eval waits for the child.
     monkeypatch.setattr(access, "_HUNTED", OrderedDict())
     monkeypatch.setattr(access, "HUNT_TIMEOUT_S", 1.0)
     monkeypatch.setattr(
@@ -161,7 +174,7 @@ def test_a_page_whose_reading_kills_the_table_detector_is_read_another_way(
     slides = TABLE_SLIDES.read_bytes()
     pages = pymupdf.open(stream=slides).page_count
     assert pages > 1
-    result = analyze(slides, pages=[0])
+    result = analyze(slides, pages=[0], table_search_limited=limited)
     assert result.elements
     assert result.tables_not_searched == not_searched
     assert (

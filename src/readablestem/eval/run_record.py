@@ -113,7 +113,9 @@ def source_state(repo: Path) -> tuple[str, bool]:
     return sha, bool(status)
 
 
-def provenance(repo: Path | None = None) -> dict[str, Any]:
+def provenance(
+    repo: Path | None = None, *, source: tuple[str, bool] | None = None
+) -> dict[str, Any]:
     """What made a report or record: the commit and whether the tree had changes, the pipeline
     and render versions, and the versions of the programs a result depends on (pandoc,
     LaTeXML, PyMuPDF, the fonts a page is drawn with). A number nobody can trace to these
@@ -126,7 +128,7 @@ def provenance(repo: Path | None = None) -> dict[str, Any]:
     from readablestem.pipeline.assemble import RENDER_VERSION
     from readablestem.pipeline.run import PIPELINE_VERSION
 
-    sha, dirty = source_state(repo or corpus.REPO)
+    sha, dirty = source or source_state(repo or corpus.REPO)
     return {
         "commit": sha,
         "clean": not dirty,
