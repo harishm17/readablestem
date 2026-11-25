@@ -595,8 +595,10 @@ def _analyze_document(
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     ctx.notes = named_links.read(doc, [n for n in selected if n not in unrendered]) or None
     ctx.region_tree = document.region_tree
+    # The rows left out as furniture spell the document's words too: the subject in the stamp
+    # up the side of a paper ("physics.ed-ph") is how a reference of the paper writes it.
     document.compounds, document.whole_words = hyphens.document_spellings(
-        row.text for rows, _, _ in prepared.values() for row in rows
+        row.text for rows, _, dropped in prepared.values() for row in (*rows, *dropped)
     )
     document.link_cuts = _link_cuts(
         doc, {n: [*rows, *dropped] for n, (rows, _, dropped) in prepared.items()}

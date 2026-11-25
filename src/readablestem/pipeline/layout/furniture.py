@@ -134,10 +134,26 @@ def _rotated_key(row: _Row) -> tuple[str, int, int]:
     return _norm_margin(row.clean), round((row.x0 + row.x1) / 40), round((row.y0 + row.y1) / 40)
 
 
+# The line arXiv prints up the left margin of a paper's first page: "arXiv:2403.06391v1
+# [quant-ph] 10 Mar 2024", or with an identifier of the old form and no subject,
+# "arXiv:hep-th/9711200v3 22 Jan 1998".
+_ARXIV_STAMP = re.compile(r"^arXiv:\S+(?:\s+\[[\w.-]+\])?\s+\d{1,2}\s+[A-Z][a-z]{2}\s+\d{4}$")
+
+
+def _is_side_stamp(row: _Row) -> bool:
+    """Is this turned row the stamp of the repository a paper was taken from? It stands on
+    one page, so nothing repeats to say that it is no content (`_MarginFilter.rotated`), and
+    its place in the height of the page put it between two paragraphs of the text. It is
+    known by its words alone, and only when turned: a turned line at the edge of a page may
+    also be the title of a chart's axis, and no place on the page tells the two apart."""
+    return row.vertical and not row.diagonal and bool(_ARXIV_STAMP.match(row.clean.strip()))
+
+
 @dataclass
 class _MarginFilter:
     """What repeats on the pages and is not content: running headers and footers, page
-    numbers, logos in the header/footer band, watermarks.
+    numbers, logos in the header/footer band, watermarks; and the one line that is no
+    content without repeating, a repository's stamp up the side of a page (`_is_side_stamp`).
 
     Margin text is dropped when its digit-normalised text repeats in the same band, unless
     it stands out (larger than body text, or bold at body size or more) and its digits change
@@ -175,7 +191,7 @@ class _MarginFilter:
         if row.vertical:
             if row.diagonal and row.size >= WATERMARK_RATIO * self.body:
                 return True  # a large diagonal "DRAFT" across the page
-            if _rotated_key(row) in self.rotated:
+            if _rotated_key(row) in self.rotated or _is_side_stamp(row):
                 return True
         zone = _margin_zone(row, height)
         if zone is None:

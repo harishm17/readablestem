@@ -232,7 +232,14 @@ reader, neither to find them nor as a second opinion
    (raster images, and drawings clustered within the band) whose box, rounded to a point,
    repeats on half of the reference pages are logos and are dropped too. Watermarks go:
    diagonal text at least 2 x body size, and rotated text repeated at the same place on
-   half of the reference pages. A figure takes back the dropped rows that label it
+   half of the reference pages. One line goes without repeating (`_is_side_stamp`, since
+   0.5.20): the stamp arXiv prints up the left margin of a paper's first page, a turned row
+   whose words are the stamp's (`arXiv:2403.06391v1 [quant-ph] 10 Mar 2024`; an identifier
+   of the old form has no subject in brackets). It stands on one page, and its place in
+   the height of the page had it read as a paragraph between two of the text's, or inside
+   one. It is known by its words and not by its place: a turned line at the edge of a page
+   may be the title of a chart's axis, and no place tells the two apart. The same words set
+   upright (a reference, a footer) are text. A figure takes back the dropped rows that label it
    (`_figure_labels`, since 2026-10-12: the silent-loss sweep found a slide's x tick
    labels in the footer band dropped as page numbers, an axis title repeated under each
    chart of a deck dropped as a running footer, and a repeated rotated y-axis title
@@ -427,7 +434,9 @@ so a heading is not, and a line that starts a block is not).
    document (`eigen-vector`), the hyphen stays; when the joined word is written whole
    elsewhere (`antiderivative`), a break inside it is soft hyphenation and the hyphen
    goes, even for two words whose join the list lacks. A word cut at a line end is not
-   counted, so a break never vouches for itself.
+   counted, so a break never vouches for itself. The rows left out as furniture are part
+   of the document's spelling (since 0.5.20): the subject in the stamp up the side of a
+   paper (`physics.ed-ph`) is how its references write it.
    Two lines that end and start in a script written without spaces (Han, Hiragana, Katakana,
    Thai, Lao, Khmer, and their full-width punctuation) join with no separator
    (`blocks._line_break`).

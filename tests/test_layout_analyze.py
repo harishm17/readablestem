@@ -489,6 +489,36 @@ def test_a_single_page_keeps_unrepeated_margin_text_but_drops_the_page_number():
     ]
 
 
+def test_the_stamp_up_the_side_of_a_papers_first_page_is_not_read_between_its_paragraphs():
+    # The line arXiv prints up the left margin of a first page stands on that page only, so
+    # nothing repeats; it was read as a paragraph between two of the text's. Controls on the
+    # same page: a stamp's words set upright in the text, and another turned line at the
+    # edge (the title of an axis), are the page's own. The stamp still says how the paper
+    # spells its subject, for a line of the text that breaks inside it.
+    stamp = "arXiv:2403.06391v1 [physics.ed-ph] 10 Mar 2024"
+    earlier = "An earlier version of this paper is arXiv:2301.00017v1 [math.PR] 2 Jan 2023"
+    body = [
+        "The first paragraph of the paper says what the problem is and why it matters to us.",
+        earlier,
+        "The last paragraph, lower on the page, says what the paper shows about it.",
+    ]
+
+    def fill(page):
+        page.insert_text((72, 100), "A title for the paper", fontsize=18, fontname="hebo")
+        for y, line in zip((250, 365, 480), body, strict=True):
+            page.insert_text((72, y), line, fontsize=BODY)
+        write(page, 72, 600, ["The method is set out in full in arXiv:2007.14833 [physics.ed-",
+                              "ph], which this paper follows step by step."])  # fmt: skip
+        page.insert_text((36, 580), stamp, fontsize=20, rotate=90, color=(0.5, 0.5, 0.5))
+        page.insert_text((590, 700), "Speed in metres per second", fontsize=BODY, rotate=90)
+
+    said = texts(analyze(one_page(fill)).elements)
+    assert stamp not in said
+    assert [line for line in said if line in body] == body
+    assert "Speed in metres per second" in said
+    assert any("arXiv:2007.14833 [physics.ed-ph], which" in line for line in said)
+
+
 @pytest.mark.parametrize(("head_number", "foot_number"), [("Page 3 of 9", "11 of 14"), ("3", "11")])
 def test_a_single_page_cut_from_a_journal_loses_its_head_and_foot_found_by_their_shape(
     head_number, foot_number
