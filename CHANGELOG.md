@@ -1,5 +1,242 @@
 # Changelog
 
+## Pipeline 0.5.21, render 11 (2026-11-25)
+
+- `PIPELINE_VERSION` is 0.5.21 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  four "Unreleased" entries below down to the 0.5.20 entry (wave 7: four lines of work, each
+  counted on real documents first; three built something, one measured and built nothing).
+  No switch is new and none goes on or off. What changes for a reader, one line for each:
+  - A PDF that could not be converted (O-468): a page on which MuPDF's table hunt ends the
+    process (arXiv 2501.02633 page 22; the job ended as `conversion_crashed`) is found by a
+    child process before the table detector reads it. The detector reads a one-page copy of
+    it, or, where the copy faults too or the children's time is used up, the page is not
+    searched for tables and the document says so. It is the only dying page found: none of
+    the 13,236 pages of the other real documents read for it dies, and a document with no
+    such page reads as before.
+  - A paragraph cut by a page break is joined on a first page whose abstract is set in left
+    of the body's column (arXiv 2505.05280 pages 1 to 2). Against 0.5.20, with production's
+    four switches, 8 joins are gained on 7 of 365 public papers and 2 on 2 of the 60
+    development files; none is wrong and none is lost. With the four switches off two wrong
+    joins come on the development files (index entries, one pair in each of two textbooks).
+  - A line of a paragraph that begins with a sum, product or integral sign (or another of
+    the big signs that take limits) and goes on in running words is read in its paragraph,
+    sign first (O-471; arXiv 2411.02531 page 1). Of 11,011 pages of 366 public papers read
+    whole 125 differ: 34 only in spacing, about 75 read better (most are lines in the middle
+    of a paragraph, after a break at an equals sign), about 10 are broken with the rule and
+    without it, and 3 read worse (arXiv 2501.05251 page 9, 2412.19752 page 96, 2406.15398
+    page 5: a display, or a line of one, that begins with the sign and holds an upright
+    word is taken for such a line). Of the 947 pages of the development files 6 differ, all better.
+  - The stop rule for held-out runs (docs/eval.md, rule 5) is kept by the command: `eval order
+    --set NAME --for-release` lists each release run of a held-out set in a tracked file
+    before it reads a document and refuses a set already scored for the current pipeline
+    version, and `--only` is refused for a held-out set.
+  - Measured and not built: the LaTeX sources that stop on a limit or on a journal class
+    (O-469). The "time limit" stops are the 512 MB address-space limit of the sandbox. It
+    stays at 512 MB in this release: it is a security bound, 768 MB opens three of the 73
+    sources counted and makes the bound for four sandboxes 3 GB. A journal's own class is
+    not read: reading it loses the authors with no error. Both are open in the plan.
+- Stored results: the schema is the same. Results from 0.5.10 to 0.5.20 load unchanged, their
+  page is not made again, and 0.5.20 opens a 0.5.21 result. The roll-back limit stays at 0.5.12.
+- The corpus recording made at 0.5.18 stands: every one of the 73 uploads asks for the
+  decisions the record has, and none misses an answer of the recording that it had (`eval
+  burden --same`), and the replay of each upload gives the document 0.5.20 gave, hash for
+  hash. The other release measurements are in docs/eval.md, "Pipeline 0.5.21".
+- Held-out pages: `layout-heldout-1` was scored once for this release, at `716dcd42`, after
+  the last change to the code (rule 5; the run is listed in
+  `data/gold/layout/layout-heldout-1.runs.json`). 191 of 247 pages are right and 113
+  faultless, 20 of 49 documents have every gold page right and 20 pages read furniture
+  aloud: each as at the second run for 0.5.20, so on these documents the three changes move
+  no page into or out of right or faultless. `eval ledger --for-release` passes with each of the
+  three release bars met at its own figure. No held-out page was opened.
+
+## Unreleased: a page whose reading for the table detector ends the process (O-468)
+
+- **The fault.** arXiv 2501.02633 could not be converted: on its page 22 the conversion
+  child died with a segmentation fault, and the job ended as `conversion_crashed` (the
+  worker and the web process were not hurt: the conversion runs in a child of its own,
+  `web/isolated_convert.py`). `tables.find` promises that a job is never lost to table
+  detection; this one was.
+- **The cause, measured.** Not the layout model and not the drawing: among the first things
+  `page.find_tables` of `pymupdf-layout` 1.28.2 does (after it has drawn the page) is to
+  read the page's text with MuPDF's own table hunt on
+  (`page.get_textpage(flags=3209031)`), and MuPDF 1.28.2 dies there. The probe, which
+  draws the page and reads its plain text, passes the page. The fault needs four of the
+  flags together (`TEXT_COLLECT_VECTORS`, `TEXT_COLLECT_STRUCTURE`, `TEXT_TABLE_HUNT`,
+  `TEXT_LAZY_VECTORS`: those four alone die, and without any one of them the page is read)
+  and the document's structure tree: the PDF is tagged, the page is read once the tree or
+  the page's link into it is taken away, and a copy of the page alone in a new document
+  (`insert_pdf`) is read without harm, as it is and turned a quarter either way.
+- **The guard.** After the probe, `layout.analyze` has a second child make that reading on
+  every selected page the probe passed (`access.hunt_failures`, `access.HUNT_FLAGS`), and
+  `tables.find` is told where the detector may read each page (`detector`, a
+  `tables.DetectorSource`). A page on which MuPDF ends the child is tried again as a
+  one-page copy: `"copy"` (the detector reads the copy; arbitration, grid and fill read the
+  page itself), or `"none"` when MuPDF faults on the copy too (the detector is not run; the
+  page's own lines and rules still propose tables). Every other page is `"page"`, as
+  always.
+- **Its limits say so.** The children of a call together have 30 s and 2 s for each page
+  after the first; the pages not tried by then are `"none"` for that call, and the answer
+  is not kept. A `"none"` page the table step takes to the detector is listed in
+  `Layout.tables_not_searched`, gets the "not
+  finished" fact `table_search` and the notice `tables_not_searched`, as a page the
+  detector's time budget refused does (for a page whose copy faults too those name the time
+  as the cause, which is not it; none has been seen). Evals and replays
+  (`table_search_limited` False) have no time limit, so what they find does not depend on
+  the machine. A child that ends in a way that is not MuPDF's doing (an exit code of its
+  own, a kill from outside, a fault before it has the document open) says nothing of a
+  page: an error is logged and its pages are read as before the guard, but for a page that
+  had already faulted where it is, which is not searched in that call. A page whose copy
+  cannot be made is not searched either, and says so.
+- **Measured.** Pages 21 to 23 of the paper are read (page 22: 18 elements, the detector on
+  a copy). A file made of that page twelve times is read whole, every page as a copy (24
+  children, 6.4 s in them). No other page dies: none of 11,079 pages of the 367 other
+  public papers of the collection, of 954 pages of the 60 development files or of 1,202
+  pages of the 25 corpus files, each read where it is and as a one-page copy turned a
+  quarter either way. The fault needs a tagged file, and 40 of those files are (18 papers,
+  no development file, 22 corpus files), 41 with the paper itself: one dying page in the
+  1,616 pages of the 41. The child costs 35 ms a page on those files (444 s for 13,236
+  pages) and about 0.14 s to start, once for a document; no document uses more than 12% of
+  the children's time. A document with no such page reads as before, as long as the
+  children end in time: the child's reading is thrown away.
+- **A copy is read nearly as its page.** On the paper's other 26 pages one has proposals:
+  the same outer boxes to the point, cell boxes up to 0.02 pt apart. On the first 12 pages
+  of ten other tagged papers (111 pages) 8 pages have proposals and on 6 of them page and
+  copy differ, outer boxes by up to 3 pt and one proposal missing on the copy; the layout
+  was the same on all 137 pages.
+- **A page the detector does not read is not read by the child.** The first count found
+  it: page 7 of arXiv 2410.12036 has 2.1 million drawn items, and the reading did not end
+  in 600 s. `tables.propose` leaves out a page with more than 30,000 items
+  (`MAX_DETECTOR_ITEMS`), so the child counts the items first and leaves the same pages
+  out (109 of the 13,236; the slowest count, of 3.1 million items on page 15 of arXiv
+  2504.09024, takes 9.7 s). Without that, such a page would have used up the children's
+  time and left the pages after it without the detector.
+- **Not covered.** A page set sideways is read by the detector through a turned one-page
+  copy, which has no structure tree and is not tried. A page with Rotate is rewritten by
+  `find_tables` before it is read, and the child reads it as stored. A copy shows the
+  layers a document switches off. Other MuPDF calls of the analysis are guarded by the
+  probe or not at all. The fault is MuPDF's and has not been reported upstream yet;
+  docs/tables.md, "Upgrade check", says what to try again when either pin moves, with the
+  file's hash.
+- **Found on the way, not repaired here.** On a page with Rotate and a CropBox, upright
+  text, `find_tables` takes the CropBox off the open page and its boxes are not in the
+  shown page's frame (a made page: the table's box holds 20 of the page's 33 words). In
+  0.5.20 and before; open in the plan.
+- **Tests.** `tests/test_layout_crop.py`: one test, six cases (MuPDF faults on the page; on
+  its copy too; no time left; an eval, which has no time limit; the child fails by itself;
+  the child faults before the file is open), each with what the detector then reads and
+  whether the page is listed as not searched.
+  `tests/test_tables_detect.py`: the flags the child reads with are among the flags the
+  add-on reads a page with, so a new pin that changes them fails a test.
+- **The standing stop rule for held-out runs** is written into docs/eval.md ("Development
+  and held-out, and the two bars", rule 5), and the command keeps what it can of it: a
+  held-out layout set's runs are listed beside its registry
+  (`data/gold/layout/layout-heldout-1.runs.json`, begun with the four runs made so far),
+  `eval order --set ... --for-release` writes its run there before it reads a document and
+  refuses a set already scored for the current pipeline version. The list is a tracked
+  file, so the run's record is stamped with the source as it was before the list was
+  written, and an entry made on a tree that had changes says `changed`. `--only` is refused
+  for a held-out set. A rule built in knowledge
+  of a failed row is judged on a newly drawn half, never by the same set under a raised
+  version; that half is still owed.
+- docs/layout.md ("A page the table detector cannot read"), docs/tables.md ("Where it
+  runs, and what it costs"; "Upgrade check"), docs/dependencies.md.
+
+## Unreleased: a paragraph that goes on over a page, on a first page whose abstract is set in
+
+- A paragraph cut by a page break is joined when the two parts stand at one edge, and the
+  page's text edge (`joins._text_edges`: the leftmost x that three paragraphs of two lines
+  or more start at) was the abstract's on a first page whose abstract is set in left of the
+  body's column and whose column has two body paragraphs (arXiv 2505.05280 pages 1 to 2).
+  The page join now also reads the edge from the column's lines (`joins._line_edges`: the
+  x that most paragraph lines start at, three lines at least) and joins when either agrees.
+  The run-in labels read `_text_edges` as before.
+- Counted before the change on 365 public arXiv papers (25 pages each, 2 failed to open),
+  the 60 development files (whole) and the 72 corpus entries: 1,776, 193 and 24 breaks where a
+  page ends without sentence-final punctuation and the next starts in lower case; 1,564, 162
+  and 19 joined, 212, 31 and 5 refused, and 119, 25 and 4 of the refused by the place test.
+  Most of those are not the edge (list items whose lines wrap to the margin, a one-line
+  tail across columns). The edge is not the column's body edge on 763, 116 and 32 of the
+  7,965, 1,109 and 280 columns of pages.
+- Against 0.5.20: on the papers 16 pages of 7 papers differ, on the development files 4 pages of
+  2 files, in the corpus none. Each pair of pages is one join gained and every one is right (8
+  and 2 joins: a sentence cut by the page, a reference entry cut by the page); none is wrong,
+  none is lost. That is with production's four switches. With the four switches off the same
+  joins come and two more on the development files, both wrong: two index entries of
+  `os_concepts_biology` (pages 17 to 18) and of `os_principles_data_science` (pages 18 to 19).
+  Without the region tree an index page is one column, most of its lines start at the
+  right-hand column of the index, and `_line_edges` reads that x as the page's edge. The
+  production switches make neither join; the code's own defaults are the switches off.
+  `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) moves no page's
+  right or faultless count on either view; one gold block at the head of page 8 of
+  `os_principles_data_science` is counted lost, because its lines are now read with their
+  paragraph on page 7 (the scorer counts page by page). The corpus replay (73 uploads) is the same byte for byte, so no
+  recorded request stops matching. A pipeline raise is owed with the next release.
+
+## Unreleased: LaTeX sources that stop on the time limit and on a journal class (O-469)
+
+- Measured on the 73 public arXiv sources, no model, nothing built (docs/web.md, "What the
+  limits stop"). 19 convert and 54 stop, as before. Three of the 19 and two of the stops moved
+  between runs with the load of the machine (a run under load gave 16 and 15 "time limit"
+  stops); each was run again alone. The 19 that converted keep the same XHTML (hash).
+  - The "time limit" group is the memory cap: 11 of 12 end at the 512 MB address-space cap
+    (the twelfth crashes in `latexmlpost` at any cap). With 768 MB three more sources convert,
+    a fourth with the group's resident cap raised as well, and a fifth needs 1 GB and up to
+    320 s; each is a real conversion. No raw package or
+    figure is the cause, so there is nothing to skip or stub. The limit is the owner's to
+    change: 4 x 768 MB is 3 GB for the sandbox's bound.
+  - Journal classes: no binding LaTeXML ships reads any of the eight classes seen. Reading the
+    upload's own class file would convert two of them with the authors and affiliations
+    dropped and no error, so it was not built; they keep stopping.
+  - The 25 sources that stop on a package not read by design: the algorithm packages
+    (`algorithmic`, `algpseudocode`, `algorithm2e`, `algorithm`: 9 sources) come first, then
+    `tikz` and its libraries (6), `tcolorbox` and `mdframed` (7). Each source usually loads
+    several: only 10 of the 25 name a single package family (two are `csquotes`, refused by
+    name; one each `ifthen`, `xr`, `biblatex`, `svgcolor`, `apxproof`, `orcidlink`, one
+    conference style, one algorithm pair), so reading one package opens at most one or two.
+- No version raise and no migration are owed; no stored document changes.
+
+## Unreleased: the last line of a paragraph that begins with a big sign (O-471)
+
+- A line that begins with a sum, product or integral sign and goes on in running words ("∑_{i=1}^n
+  f_ik = 0 for k = 1, …, d.", the last line of a paragraph on arXiv 2411.02531 page 1) is read in
+  its paragraph, sign first and with its limits. The sign is a row of its own and the row of what
+  goes on starts a sign's width after it, so the sign was not folded into it: it was read at the
+  head of the next paragraph and the sign after that paragraph (`rows._attach_big_operators`,
+  `rows._starts_at`). The rule asks that the row go on in running words (an upright word of
+  three letters or more that is no function name) and that nothing stand before the sign on
+  its line. That leaves most displays as they were, not all: a display that begins with the
+  sign and holds such a word is folded too, and so is a line in the middle of a paragraph.
+  The signs are those of `LIMIT_SIGNS`: sum, product, coproduct, the integrals, big union and
+  big intersection. Counted on the 367 public papers
+  of the list (first 25 pages) and the 60 development files before the change: of the lines that
+  begin with a big sign and go on in running words, 14 were read in place, 45 were a display of
+  their own and 27 out of place (0, 2 and 4 on the development files; none in the private corpus);
+  after it 31, 43 and 12 (1, 2 and 3). Of 3,533 pages of the 183 papers of review 34 (first 25
+  pages) 46 differ (31 read better, 14 only in spacing, 1 reads worse: 2501.05251 page 9) and of the
+  947 pages of the 60 development files 6 differ, all better.
+- The whole cost, counted by review 38 on the public papers read whole (366 of 368 are read:
+  11,011 pages; production's switches, the table detector left out): the rule says yes 173
+  times in 76 papers and 125 pages differ, 51 of them past page 25. 34 differ only in spacing;
+  of the 91 others about 75 read better, about 10 are broken with the rule and without it, and
+  3 read worse: 2501.05251 page 9 (above); 2412.19752 page 96, a wide display that begins with
+  a sum and holds the words "partitions of", broken before and in more pieces now; and
+  2406.15398 page 5, a display whose fraction has a text-style sum at the head of its
+  denominator and the upright subscript "old", where the denominator is now read before the
+  numerator (still one equation). Three more are whole at the sign now and cut one line later
+  (2411.09088 page 5, 2401.00649 page 55, 2501.02602 page 1). Most of the better pages are
+  lines in the middle of a paragraph that begin with a sign after a break at an equals sign.
+- Measured and not built: counting a running word only when its letters are no script of the
+  row (the row's own test, `_Row.is_script`). On the 76 papers it changes 17 of the 125
+  pages: 14 go back to the reading without the rule (2406.15398 page 5 among them; most of
+  the others differ only in spacing) and 3 read another way, one of them worse than with the
+  rule as built (2411.08218 page 37: the paragraph is cut before its last formula again, as
+  in 0.5.20). One page spared for one repair lost, so the rule stays as it is. (Review 39
+  built the test with a size cut-off of its own and counted 14 pages, 11 and 3, and the same
+  two named pages.)
+- The 73 recorded requests of the
+  corpus all still match; so a change to stored documents is limited to the pages above, and
+  `PIPELINE_VERSION` is owed a raise with the next release (`RENDER_VERSION` is not).
+
 ## Pipeline 0.5.20, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.20 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

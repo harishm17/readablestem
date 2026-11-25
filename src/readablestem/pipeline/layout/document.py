@@ -37,6 +37,7 @@ from readablestem.pipeline.layout.access import (
     _open,
     _quiet_mupdf,
     _select_pages,
+    hunt_failures,
     probe_failures,
 )
 from readablestem.pipeline.layout.blocks import (
@@ -146,7 +147,10 @@ def analyze(
     the paragraph that contains it. `Element.order` is the position in the whole document.
     Pages are analysed in ascending order (duplicates ignored). Raises `LayoutError`.
 
-    The selected pages are first rendered once in a child process (see `_probe_pages`);
+    The selected pages are first rendered once in a child process (see `_probe_pages`),
+    and a second child reads each as the table detector will (`hunt_failures`): a page
+    that kills it is searched for tables on a copy of the page alone, or not by the
+    detector at all;
     the document is opened for this call only and closed again, so analysis leaves no
     user content in this module (only `crop` caches documents).
 
@@ -182,8 +186,9 @@ def analyze(
     was before the rule existed.
 
     `table_search_limited` False (`TABLE_SEARCH_UNLIMITED`, evals and replays): the table
-    search has no time limit (`tables.DetectorBudget`), so what it finds never depends on the
-    machine.
+    search has no time limit (`tables.DetectorBudget`), and neither have the children that
+    try the detector's reading (`access.hunt_failures`), so what it finds never depends on
+    the machine.
 
     `on_page(done, total)`: told how many of the pages have had their table search, the pass
     that takes most of the time (`done` is below `total` throughout: the caller marks the
@@ -201,6 +206,12 @@ def analyze(
                 unrendered = probe_failures(pdf_bytes, _digest(pdf_bytes), selected)
                 for number, error in unrendered.items():  # the page and the code, no content
                     log.warning("layout could not draw page %d: %s", number + 1, error.code)
+                unhunted = hunt_failures(
+                    pdf_bytes,
+                    _digest(pdf_bytes),
+                    [n for n in selected if n not in unrendered],
+                    limited=table_search_limited,
+                )
                 return _analyze_document(
                     doc,
                     selected,
@@ -213,6 +224,7 @@ def analyze(
                         figure_art=figure_art,
                         matching_under=matching_under,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
+                        detector_sources=unhunted,
                         trace=PageTrace(),
                     ),
                     on_page,
@@ -517,7 +529,7 @@ def _analyze_document(
         text_kept.discard(number)
     guard.on_purpose = {n for n in kept if n not in text_kept}
     guard.settle()
-    not_searched: list[int] = []  # pages the table search's time limit refused
+    not_searched: list[int] = []  # pages whose detector search was not made
     searched = guard.live(selected)
     for done, number in enumerate(searched):
         if on_page is not None:

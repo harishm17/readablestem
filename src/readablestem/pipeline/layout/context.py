@@ -7,7 +7,7 @@ the layout package: pipeline/layout/__init__.py describes how a page is read.
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Literal
@@ -76,6 +76,9 @@ class _Document:
     trace: PageTrace = field(default_factory=lambda: PageTrace(enabled=False))
     ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)
     detector: tables.DetectorBudget = field(default_factory=tables.DetectorBudget)
+    # Pages the table detector cannot read where they are (`access.hunt_failures`), each
+    # with what it may read instead (`tables.DetectorSource`: "copy" or "none").
+    detector_sources: Mapping[int, tables.DetectorSource] = field(default_factory=dict)
 
 
 _PLAIN = _Document()  # never changed: the document of a caller that has none
@@ -169,7 +172,8 @@ class Layout:
     # "scanned_page", "unread_page"): nothing on them is read, they have no elements, and
     # the pipeline keeps each one as an image marked "Not converted", with a decision.
     kept_pages: dict[int, str] = field(default_factory=dict)
-    # Pages whose table search the document's time for it refused (`tables.DetectorBudget`): only
+    # Pages whose table search was not made (the document's time for it refused it, or the
+    # detector may not read the page: `tables.DetectorBudget`, `detector_sources`): only
     # the page's own rules and aligned text propose a table there, so a table may be read as
     # text. The conversion writes a "not finished" fact for each, and `notices` has one
     # `tables_not_searched` for each.

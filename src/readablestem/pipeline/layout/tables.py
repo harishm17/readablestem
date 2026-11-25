@@ -64,7 +64,12 @@ def _claim_tables(
         found = []  # nothing the detector could find would be kept (`may_hold_table`)
     else:
         found = tables.find(
-            page, frags[number], paths[number], clean=_clean, budget=document.detector
+            page,
+            frags[number],
+            paths[number],
+            clean=_clean,
+            budget=document.detector,
+            detector=document.detector_sources.get(number, "page"),
         )
         if accept is not None:
             found = accept(found)

@@ -311,9 +311,12 @@ def test_a_layout_gold_set_is_scored_with_no_model_and_a_held_out_one_only_for_a
 
     # A held-out set is not scored while the reader is worked on, and its record names no page.
     assert eval_order("held-out") == (2, {})
+    assert eval_order("held-out", "--for-release", "--only", "news")[0] == 2  # scored whole
     code, record = eval_order("held-out", "--for-release")
     assert code == 0 and record["split"]["name"] == "held-out"
     assert record["metrics"]["sources"]["html"]["all"]["pages"] == 1
     assert record["metrics"]["pages"] == []
+    # It is scored once for a version: the second run for the same release is refused.
+    assert eval_order("held-out", "--for-release")[0] == 2
     # A registry with any other word for its side is refused, for a release too.
     assert eval_order("held-out", "--for-release", written="heldout") == (2, {})

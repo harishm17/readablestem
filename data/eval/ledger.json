@@ -1,6 +1,6 @@
 {
  "date": "2026-11-25",
- "pipeline_version": "0.5.20",
+ "pipeline_version": "0.5.21",
  "profile": {
   "name": "production",
   "sha256": "ae2c92fb65cf74c77d9676b56a42409d6bcb786163579dd8ac3a99befa5250ab",
@@ -11,11 +11,11 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "commit": "3743f347ac825a5f1062979e1296e2598084fce3",
+ "commit": "7a1c3f0b34d70167bc34e80d68890290fa3ba9c5",
  "provenance": {
-  "commit": "3743f347ac825a5f1062979e1296e2598084fce3",
+  "commit": "7a1c3f0b34d70167bc34e80d68890290fa3ba9c5",
   "clean": true,
-  "pipeline_version": "0.5.20",
+  "pipeline_version": "0.5.21",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -24,7 +24,7 @@
    "fonts": "fonts-liberation=1:2.1.5-3build1 fonts-noto-core=20201225-2build1"
   }
  },
- "release": "0.5.20+ae2c92fb65cf",
+ "release": "0.5.21+ae2c92fb65cf",
  "level": 0.95,
  "rows": [
   {
@@ -122,7 +122,7 @@
      "set": "layout-heldout-1",
      "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
      "label": "held-out",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
      "goal_bar": "",
@@ -137,7 +137,7 @@
      "set": "corpus",
      "set_sha256": "be00b35e6e4645a7bd115711ae909fc51dd0b7b14e8760cf3cf8566d31479bb0",
      "label": "development score",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-corpus.json",
      "stopped_early": 0,
      "goal_bar": "",
@@ -152,7 +152,7 @@
      "set": "layout-dev-1",
      "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
      "label": "development score",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
      "goal_bar": "",
@@ -185,7 +185,7 @@
      "set": "layout-heldout-1",
      "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
      "label": "held-out",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
      "goal_bar": "",
@@ -200,7 +200,7 @@
      "set": "corpus",
      "set_sha256": "be00b35e6e4645a7bd115711ae909fc51dd0b7b14e8760cf3cf8566d31479bb0",
      "label": "development score",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-corpus.json",
      "stopped_early": 0,
      "goal_bar": "",
@@ -215,7 +215,7 @@
      "set": "layout-dev-1",
      "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
      "label": "development score",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
      "goal_bar": "",
@@ -248,7 +248,7 @@
      "set": "layout-heldout-1",
      "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
      "label": "held-out",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
      "goal_bar": "not met",
@@ -263,7 +263,7 @@
      "set": "corpus",
      "set_sha256": "be00b35e6e4645a7bd115711ae909fc51dd0b7b14e8760cf3cf8566d31479bb0",
      "label": "development score",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-corpus.json",
      "stopped_early": 0,
      "goal_bar": "",
@@ -278,7 +278,7 @@
      "set": "layout-dev-1",
      "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
      "label": "development score",
-     "release": "0.5.20+ae2c92fb65cf",
+     "release": "0.5.21+ae2c92fb65cf",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
      "goal_bar": "",

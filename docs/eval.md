@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.20 as of 2026-11-24; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.21 as of 2026-11-25; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-25 | 0.5.20 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-25 | 0.5.21 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -704,6 +704,43 @@ added from November 2026 on:
    bar is the figure the fix is built toward.
 4. A held-out set that was used to choose between designs is spent. Its documents are passed
    as `spent` and are development from then on; new ones are drawn.
+5. The stop rule, standing since 2026-11-25. A release is a pipeline version
+   (`PIPELINE_VERSION`). A held-out set is scored once for a release, on the head that is to
+   be released. If a row is worse than its release bar, that release is not made: the bar is
+   not changed, no page is opened, and there is no second run for that version. A rule built
+   in knowledge of a failed row's totals is not judged on this set again, under any version
+   number: the same set with the version raised is the second run this rule forbids. Such a
+   rule is judged on a held-out half drawn after it was built. What may follow on the same
+   set is a later release whose changes were not chosen by the failed totals, judged by its
+   own single run.
+
+   The command keeps the part of this it can see. `eval order --set NAME --for-release` on a
+   held-out set writes the run (pipeline version, source, day) to the list beside the
+   registry, `data/gold/layout/NAME.runs.json`, before it reads a document, so a run that was
+   started counts; and it refuses a set the list already names for the current version. The
+   list is committed with the release: a reviewer reads in it every run made in a tree whose
+   list was committed. A run made with another `--registry`, or in a tree whose list is then
+   put back, is in no list anyone reads; the command cannot see that. The list is a tracked
+   file, so writing it changes the tree: the run's record is stamped with the state of the
+   source read before the write, and an entry made on a tree that already had changes says
+   `changed` (that run was not made on the head that is to be released). A held-out set is
+   scored whole: `--only` is refused for it. A run that dies before it gives its totals has
+   taught nothing and still counts: the version is raised, the run is made again, and the
+   list shows both. Why a version was raised the command cannot know: that part is kept by whoever
+   writes the release, and the release's entry in the CHANGELOG says what its changes were
+   chosen from.
+
+   The 0.5.20 release is why the rule is written here and not per release:
+   `layout-heldout-1` was scored for it twice, with a rule built between the runs in
+   knowledge of the first one's totals ("The held-out runs for 0.5.20", below). The set has
+   now been scored five times (0.5.18, 0.5.19, twice for 0.5.20, and once for 0.5.21, the
+   first release the command held to one run; its list starts with the first four). No
+   page of it was looked at, so it is not spent by rule 4, but its furniture
+   row and its count of right pages are fitted to one fault, and each further run teaches the
+   builders a little more of its totals. A second held-out half is owed (new documents and
+   their sources, drawn by `gold layout new`; open in the plan, with no date yet). Until it
+   is drawn and registered, a pass on `layout-heldout-1` says that a release is no worse than
+   the last one on these pages, and no more than that.
 
 A report says four things about its run: `split.name` and `split.set_sha256`
 (`Split.stamp`), `profile.sha256` and `pipeline_version`.
@@ -3061,19 +3098,21 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-25 at pipeline 0.5.20,
-production profile `ae2c92fb65cf`, every count as in the 0.5.19 and 0.5.18 records before it, 47 files and 91 gold pages, no answer missing, no step
-stopped early), the student page. A count is given as its pages and, in brackets, its places.
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-25 at pipeline 0.5.21,
+production profile `ae2c92fb65cf`, every count as in the 0.5.20 record before it, 47 files
+and 91 gold pages, no answer missing, no step stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| edge | 13 | 11 | 5 | 4 (5) | 4 (5) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 2 | 0 |
-| real | 41 | 36 | 12 | 7 (9) | 12 (16) | 12 (17) | 10 (15) | 1 (1) | 1 of 2 | 4 | 1 |
+| edge | 13 | 11 | 6 | 3 (4) | 3 (4) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 2 | 0 |
+| real | 41 | 36 | 12 | 6 (8) | 11 (15) | 12 (16) | 10 (15) | 1 (1) | 1 of 2 | 4 | 1 |
 | self-made | 37 | 36 | 25 | 4 (4) | 8 (10) | 2 (20) | 2 (19) | 0 (0) | 0 of 2 | 0 | 0 |
-| real and self-made | 78 | 72 | 37 | 11 (13) | 20 (26) | 14 (37) | 12 (34) | 1 (1) | 1 of 4 | 4 | 1 |
-| all | 91 | 83 | 42 | 15 (18) | 24 (31) | 15 (38) | 15 (39) | 1 (1) | 1 of 4 | 6 | 1 |
+| real and self-made | 78 | 72 | 37 | 10 (12) | 19 (25) | 14 (36) | 12 (34) | 1 (1) | 1 of 4 | 4 | 1 |
+| all | 91 | 83 | 43 | 13 (16) | 22 (29) | 15 (37) | 15 (39) | 1 (1) | 1 of 4 | 6 | 1 |
 
-The element list reads 83 of 91 right and 48 faultless. What changed against the first
+The element list reads 83 of 91 right and 49 faultless. (Until 0.5.21 this table still
+showed the 0.5.19 record: the stamp rule of 0.5.20 had made one edge page faultless and
+furniture is read on two pages fewer since, and the table was not made again then.) What changed against the first
 baseline, and how much of it the four switches of 0.5.18 did, is in "The switch release of
 2026-11-23".
 
@@ -3128,21 +3167,30 @@ being changed. Its record keeps totals and names no page, `--records`, `--from` 
 `--against` are refused for it, and a failing page is not looked at. The 0.5.20 release
 broke the "once" of this rule: `layout-heldout-1` was scored for it twice, with the reader
 changed between the two runs ("The held-out runs for 0.5.20", below, says why, and what
-the second run is worth).
+the second run is worth); rule 5 of "Development and held-out, and the two bars" above is
+the stop rule that stands since, and the command now refuses a second run for a pipeline
+version (the set's list of runs, `data/gold/layout/NAME.runs.json`).
 
-`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.20,
-source `800165e7`, under the production profile with the four layout switches on), the
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.21,
+under the production profile with the four layout switches on), the
 student page:
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 90 | 45 | 12 (12) | 93 (440) | 29 (37) | 44 (55) | 10 (13) | 0 of 0 | 18 | 7 |
+| paper | 119 | 90 | 45 | 12 (12) | 93 (440) | 29 (37) | 45 (56) | 10 (13) | 0 of 0 | 18 | 7 |
 | selfmade | 40 | 26 | 13 | 3 (7) | 16 (61) | 9 (66) | 13 (30) | 2 (4) | 0 of 5 | 4 | 2 |
 | textbook | 108 | 66 | 36 | 15 (15) | 77 (355) | 43 (269) | 5 (6) | 1 (1) | 0 of 0 | 28 | 0 |
-| all | 267 | 182 | 94 | 30 (34) | 186 (856) | 81 (372) | 62 (91) | 13 (18) | 0 of 5 | 50 | 9 |
+| all | 267 | 182 | 94 | 30 (34) | 186 (856) | 81 (372) | 63 (92) | 13 (18) | 0 of 5 | 50 | 9 |
 
 The element list reads 181 of 267 right and 95 faultless, and 20 of the 60 documents have
-every gold page right (12 at 0.5.19). Against the 0.5.19 record (161 right and 81 faultless;
+every gold page right (12 at 0.5.19). Of the table's counts the one that moved from the
+0.5.20 record is the merged places of the papers, 55 to 56 on one page more (a page that is
+not right in either record; the count moves with the sign rule of 0.5.21); every count of
+pages right, faultless and of documents is the 0.5.20 one. Outside the table one gold block
+of the textbooks is no longer found (2,377 to 2,376 in the student page, 2,443 to 2,442 in
+the element list): page 8 of `os_principles_data_science` opened with the end of a
+paragraph that is now read whole on page 7 (the page join of 0.5.21), and the scorer counts
+page by page; the page stays right. The rest of this paragraph is the 0.5.20 record against the 0.5.19 one. Against the 0.5.19 record (161 right and 81 faultless;
 papers 69 and 32 with furniture read on 32 pages, 94 pages (460 places) of strays and 36
 (46) cut; in all furniture read on 51 pages (55 places), strays 187 (877), cut 89 (382)): 21
 pages are made right and none is made wrong, each the first page of a paper whose stamp was
@@ -3230,8 +3278,9 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
 **The held-out score.** `layout-heldout-1` was scored for the first time for the 0.5.18
 release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
 four layout switches on, no model), once more for 0.5.19 after its release (2026-11-24,
-main `b8fb9ab7`, the same profile, no model), and twice for 0.5.20 before its release
-(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run):
+main `b8fb9ab7`, the same profile, no model), twice for 0.5.20 before its release
+(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run), and
+once for 0.5.21 before its release ("The held-out run for 0.5.21", below):
 
 ```bash
 uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
@@ -3257,8 +3306,9 @@ no more: which pages moved is not looked at). The 0.5.19 run's three figures wer
 ledger's first release bars (below). The 0.5.20 column (191 of 247, 77%; 20 of 49
 documents) is not a fresh measurement of the same worth: every page it gains is a paper's,
 and the gain is the stamp rule, which was built between two runs of this set (next
-paragraphs). The record kept in the repository is that second run's. No page of the set is
-named in any record, and none was looked at.
+paragraphs). The record kept in the repository was that second run's and is now the 0.5.21
+run's, whose rows of this table are the 0.5.20 column's. No page of the set is named in any
+record, and none was looked at.
 
 **The held-out runs for 0.5.20.** The set was scored for 0.5.20 before its release
 (2026-11-25, the release branch at `a986a42c`, the same profile, no model), and one release
@@ -3351,7 +3401,7 @@ figures say and do not say:
 - Blocks run together and headings merged did not rise, so the blocks that the stamp had
   kept apart on open first pages (docs/layout.md) do not show as merged places here. Blocks
   cut and broken fall a little, in papers.
-- The set has now been scored four times: for 0.5.18, for 0.5.19, and twice for 0.5.20.
+- The set had then been scored four times: for 0.5.18, for 0.5.19, and twice for 0.5.20.
   Each run after the first tells less about pages nobody has seen.
 
 The release bars are registered again from this run (`data/eval/ledger-bars.json`,
@@ -3360,6 +3410,22 @@ pages not right, at least 20 of 49 documents with every gold page right, at most
 pages that read furniture aloud. The furniture bar of 20 includes the page that failed the
 first run: a later release is not asked to win it back. The first run's record is not kept
 as a file; its totals are the middle column above.
+
+**The held-out run for 0.5.21.** The set was scored once for 0.5.21 before its release
+(2026-11-25, the release branch at `716dcd42`, clean, the same profile, no model), after
+the last change to the code and after the reviews of it were answered, and the command
+listed the run before it read a document (rule 5). Every count of pages and of faults in
+the student page is the 0.5.20 second run's, kind by kind: 191 of 247 pages right and
+113 faultless (course handouts 26 and 17, papers 101 and 62, textbooks 64 and 34), 20 of
+49 documents with every gold page right, furniture read on 20 pages (30 places), blocks
+cut on 52 pages (195 places), run together on 68 (135), strays on 180 (1,013). The element
+list reads 192 right and 115 faultless, as before. Two totals move, both in the course
+handouts and in both views: the page's elements, 4,929 to 4,927 (4,709 to 4,707 in the
+element list), and the places where a gold block is split, 503 to 502 (528 to 527). So on
+these documents the three changes of 0.5.21 move no page into or out of right or
+faultless. The totals say no more: which pages moved is not looked at, and whether the
+set holds a page of the kinds the changes mend is not known. The three release bars are
+met at exactly their figures (the ledger, below) and stay as registered.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -3701,7 +3767,7 @@ stops matching. A paid recording of the
 answers was owed then (about 1,300 requests) to bring those uploads back into
 the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
 records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
-compare them; the order records were re-made at 0.5.18 and again at 0.5.19 and 0.5.20.
+compare them; the order records were re-made at 0.5.18 and again at 0.5.19, 0.5.20 and 0.5.21.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -4146,17 +4212,18 @@ theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_ou
 event's, so the admin page can set production's numbers of the same release (false flags
 per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
 
-**Today** (`data/eval/ledger.json`, release `0.5.20+ae2c92fb65cf`, made 2026-11-25 on a
-clean tree). The three page rows have a held-out line, from the second run of
-`layout-heldout-1` for 0.5.20, and that run's figures are their release bars
-(`data/eval/ledger-bars.json`, registered again 2026-11-25 with `--replace-bar`): a later
-release may not read fewer of these pages right, give fewer documents with every gold page
-right, or read furniture aloud on more pages. The run first passed the bars of 0.5.19 (72 of
+**Today** (`data/eval/ledger.json`, release `0.5.21+ae2c92fb65cf`, made 2026-11-25 on a
+clean tree). The three page rows have a held-out line, from the one run of
+`layout-heldout-1` for 0.5.21, and each meets its release bar at the bar's own figure. The
+bars are the figures of the second run for 0.5.20 (`data/eval/ledger-bars.json`,
+registered again 2026-11-25 with `--replace-bar`): a later release may not read fewer of
+these pages right, give fewer documents with every gold page right, or read furniture
+aloud on more pages. That run of 0.5.20 first passed the bars of 0.5.19 (72 of
 247 pages not right, 11 of 49 documents, 36 of 247 pages with furniture; the ledger of that
 pass is commit `3743f347`). The bars were replaced because the stamp rule left 16
 pages of slack on each of the two page rows, enough to hide a later loss. The held-out lines
-of this release are not a first run's: `eval order`, "The held-out runs for 0.5.20", says
-what they are worth. Every other line is a development score, or a record of an earlier
+are not a first run's: the set has been scored five times, and `eval order`, "The held-out
+runs for 0.5.20" and "The held-out run for 0.5.21", says what they are worth. Every other line is a development score, or a record of an earlier
 release.
 
 | Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
@@ -4294,8 +4361,8 @@ in a separate worktree):
 
 One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
 `data/eval/order-layout-dev-1.json` was the 0.5.18 one at this release; it is re-made at 0.5.19
-with the same right and faultless pages, and at 0.5.20 with 182 and 94 (the stamp rule; its
-table is under `eval order`).
+with the same right and faultless pages, at 0.5.20 with 182 and 94 (the stamp rule), and at
+0.5.21 with 182 and 94 again (its table is under `eval order`).
 
 **Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
 of 47 uploads, the student page):
@@ -4306,7 +4373,8 @@ of 47 uploads, the student page):
 | 0.5.18 with all four off | 71 | 37 |
 | 0.5.18, all four on | 83 | 42 |
 | 0.5.19 (every count as at 0.5.18) | 83 | 42 |
-| 0.5.20 (`data/eval/order-corpus.json` now; page 1 of `b6_margin_identifier` is faultless, and furniture is read on 13 pages, from 15) | 83 | 43 |
+| 0.5.20 (page 1 of `b6_margin_identifier` is faultless, and furniture is read on 13 pages, from 15) | 83 | 43 |
+| 0.5.21 (`data/eval/order-corpus.json` now; every count as at 0.5.20) | 83 | 43 |
 
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
@@ -4447,6 +4515,56 @@ after it change no code). The figures are the second measurement's unless they s
   elements, 3 with fewer): the repairs in the rows and in the display pass have no switch.
 - **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
   0.5.20 on a clean tree, and `eval gate --require-current` passes for both.
+
+## Pipeline 0.5.21 (2026-11-25)
+
+Pipeline 0.5.21 turns no switch on or off and adds none: the four of 0.5.18 stay on, and
+`LAYOUT_MATCHING_UNDER` and `LAYOUT_FIGURE_ART` are in the code and off. What it changes
+(CHANGELOG 0.5.21: a page that ends the table detector's reading, a page join past a set-in
+abstract, a line that begins with a big sign) was measured at $0, with no model, on the
+release branch:
+
+- **The recorded corpus.** At the last commit before the raise (`e979e708`) the replay of the
+  73 uploads gave, upload by upload, the document that 0.5.20 (`0fab7fd2`) gives: 73 results
+  compared by the hash of the whole result (elements, heading fixes, page types, the HTML and
+  the rest), 0 differences. `eval burden --same` against `data/eval/burden-corpus.json`
+  passes at 0.5.21: every upload asks for the decisions the record has, and none misses an
+  answer of the recording that it had. So the recording made at 0.5.18 stands. (The hash run
+  is a scratch tool that is not in the repository.)
+- **Formulas whole** (the box score of the 21 development papers, the four switches on): 9,203
+  of 11,258, 81.7% (0.5.20: 9,198); split 140, from 145; displays 903 of 1,004, as before.
+- **Reading order.** `layout-dev-1`: 182 of 267 pages right and 94 faultless in the student
+  page, 181 and 95 in the element list, 20 of 60 documents with every gold page right: each
+  as at 0.5.20, and `--against` the 0.5.20 record finds no page made wrong. Two counts move:
+  the papers' merged places, 55 to 56 (a page not right in either record), and the
+  textbooks' blocks found, 2,377 to 2,376 (page 8 of `os_principles_data_science` opened
+  with the end of a paragraph that the page join now reads whole on page 7; the scorer
+  counts page by page and the page stays right). The corpus: 83 of
+  91 and 43, 83 and 49 in the element list, every count as at 0.5.20. Both records are re-made
+  at 0.5.21; the production profile's hash stays `ae2c92fb65cf`.
+- **The three changes on real documents** (`layout.analyze` with production's switches,
+  against 0.5.20; the sign rule's pages are named in docs/layout.md and in the CHANGELOG
+  entries; of the joins the paper the change was built for is named, arXiv 2505.05280, and
+  the other six are in review 38's table).
+  The page join: 8 joins gained on 7 of 365 public papers and 2 on 2 of the 60 development
+  files, each right, none lost; review 38 found the same 8 among 2,006 joins of the papers
+  read whole. The sign rule: of 11,011 pages of 366 public papers read whole 125 differ, 34
+  only in spacing, about 75 better, about 10 broken either way, 3 worse; of the 947
+  development pages 6 differ, all better. The table detector's guard: arXiv 2501.02633
+  converts (page 22 through a one-page copy), no other page of 13,236 dies, and a document
+  with no such page reads as before; the child costs about 35 ms a page.
+- **With the four switches off** (the code's defaults, which production does not run): the
+  join makes two wrong joins on the development files, index entries of two textbooks
+  (CHANGELOG, the join's entry).
+- **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
+  0.5.21 on a clean tree, with every headline number as at 0.5.20, and `eval gate
+  --require-current` passes for both.
+- **Held-out pages and the ledger.** `layout-heldout-1` was scored once, at `716dcd42`
+  (`eval order`, "The held-out run for 0.5.21"): 191 of 247 pages right, 113 faultless, 20
+  of 49 documents, furniture on 20 pages, each as at the second run for 0.5.20. `eval
+  ledger --for-release` passes: no held-out figure is worse than its release bar (56 of 247
+  pages not right, 20 of 49 documents, 20 of 247 pages with furniture; each met at the
+  bar's own figure, so the release has no slack on these rows and none was used).
 
 ## What the numbers do not show
 

@@ -9,7 +9,9 @@ from the text flow. Deterministic; no model calls. docs/tables.md explains the n
    imported on first use, after onnxruntime is told to use only the CPUs this process may
    use (`cpu_allowance`): left alone it sizes its thread pools from the host's cores and
    runs 5-9 times slower on a 1-CPU container. MuPDF messages `find_tables` prints (they
-   can quote the PDF) are captured and dropped.
+   can quote the PDF) are captured and dropped. Layout says where the detector may read a
+   page (`DetectorSource`): the page, a copy of it alone, or nowhere, after a child tried
+   the reading that can end the process (`layout.access.hunt_failures`).
 2. **Arbitrate** (`judge`): on real course manuals the detector's precision was 0.68: it
    also boxes vector figures, tables of contents, equations and bullet lists. A box stays
    a table only when it has a grid: drawn rules with text in at least two columns, or text
@@ -60,7 +62,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 from itertools import pairwise
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Protocol
+from typing import TYPE_CHECKING, Any, Literal, Protocol
 
 import pymupdf
 
@@ -216,7 +218,8 @@ DETECTOR_EXCESS_S = 360.0
 
 class DetectorBudget:
     """What is left of a document's slow-search CPU time (`DETECTOR_EXCESS_S`), and how many
-    searches it refused once that was used up (`refused`)."""
+    searches were not made (`refused`): the ones it refused once that was used up, and the
+    ones of pages the detector may not read (`_detected`, "none")."""
 
     def __init__(self, excess_s: float | None = None, free_s: float | None = None) -> None:
         self.left = DETECTOR_EXCESS_S if excess_s is None else excess_s
@@ -683,9 +686,50 @@ def _positions(values: Iterable[float]) -> int:
     return count
 
 
+# Where the detector may read a page. To read it, the layout add-on asks MuPDF for the page's
+# structured text with MuPDF's own table hunt on (`layout.access.HUNT_FLAGS`), and on some
+# pages MuPDF does not raise there: it ends the process (a segmentation fault on page 22 of
+# arXiv 2501.02633, PyMuPDF 1.28.2; the fault needs the document's structure tree). Layout
+# tries that reading in a child first (`layout.access.hunt_failures`) and says of each page:
+# "page", the page where it is; "copy", a copy of the page alone in a document of its own,
+# which takes no structure tree along, for a page that killed the child where it is; "none",
+# when the copy killed it too or the time to try the page ran out: only the page's own rules
+# and aligned text propose a table there, and the page is listed and said like a page the
+# time budget refused (`DetectorBudget.refused`, the notice `tables_not_searched`).
+DetectorSource = Literal["page", "copy", "none"]
+
+
+def _detected(
+    page: pymupdf.Page, budget: DetectorBudget | None, source: DetectorSource
+) -> list[Proposal]:
+    """`propose`, on what layout's probe left of the page for the detector to read."""
+    if source == "page":
+        return propose(page, budget)
+    if source == "none":  # a search that is not made, said as the budget's own are
+        if budget is not None:
+            budget.refused += 1
+        _warn_once("detector_unread", "table detection skipped on a page the detector cannot read")
+        return []
+    with _pdf_lock():
+        copy = pymupdf.open()
+        try:  # (the page's boxes and /Rotate come along, so the proposals are in its frame)
+            copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number)
+            alone = copy[0]
+        except Exception:  # no copy can be made: the search is not made, and that is said
+            copy.close()
+            return _detected(page, budget, "none")
+    try:
+        return propose(alone, budget)
+    finally:
+        with _pdf_lock():
+            copy.close()
+
+
 def propose(page: pymupdf.Page, budget: DetectorBudget | None = None) -> list[Proposal]:
     """Candidate tables on a page that passed layout's probe (never run it on one that did
-    not: the layout model renders the page, where the known MuPDF aborts are)."""
+    not: the layout model renders the page, where the known MuPDF aborts are) and whose
+    reading for the detector was tried in a child (`_detected` passes the page, or a copy
+    of it alone when the page where it is kills MuPDF)."""
     if budget is not None and not budget.open():
         _warn_once("detector_budget", "table detection stopped: this document took too long")
         return []
@@ -2851,16 +2895,21 @@ def find(
     *,
     clean: Callable[[str], str] = lambda s: " ".join(s.split()),
     budget: DetectorBudget | None = None,
+    detector: DetectorSource = "page",
 ) -> list[PageTable]:
     """The data tables of a page that passed layout's probe, in top-to-bottom order.
 
     `lines` and `paths` are what layout extracted from the page (display coordinates);
     `clean` is layout's text cleaning, applied to every cell and caption. Never raises:
     a page whose tables cannot be worked out is read as if it had none (one content-free
-    warning), so a job is never lost to table detection.
+    warning), so a job is never lost to table detection. `detector` is what layout's probe
+    of the detector's own reading said of this page (`DetectorSource`): MuPDF does not
+    raise where that reading fails, it ends the process.
     """
     try:
-        tables, _ = find_with_judgements(page, lines, paths, clean=clean, budget=budget)
+        tables, _ = find_with_judgements(
+            page, lines, paths, clean=clean, budget=budget, detector=detector
+        )
     except Exception as exc:
         log.warning("table detection failed on a page: %s", type(exc).__name__)
         return []
@@ -2874,12 +2923,22 @@ def find_with_judgements(
     *,
     clean: Callable[[str], str] = lambda s: " ".join(s.split()),
     budget: DetectorBudget | None = None,
+    detector: DetectorSource = "page",
 ) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     """`find`, plus every proposal with its judgement (for the evaluation)."""
     turn = _page_turn(lines)
     if turn:
-        return _find_turned(page, lines, paths, turn, clean=clean, budget=budget)
-    return _find_in(page, lines, paths, clean=clean, budget=budget)
+        # the detector reads a turned page on a copy of it anyway
+        return _find_turned(
+            page,
+            lines,
+            paths,
+            turn,
+            clean=clean,
+            budget=budget,
+            detector="none" if detector == "none" else "page",
+        )
+    return _find_in(page, lines, paths, clean=clean, budget=budget, detector=detector)
 
 
 def _find_in(
@@ -2889,9 +2948,10 @@ def _find_in(
     *,
     clean: Callable[[str], str],
     budget: DetectorBudget | None,
+    detector: DetectorSource = "page",
 ) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     view = _PageView.of(page, lines, paths)
-    proposals = [*propose(page, budget), *own_proposals(view)]
+    proposals = [*_detected(page, budget, detector), *own_proposals(view)]
     if not proposals:
         return [], []
     judged = [(p, judge(p, view)) for p in proposals]
@@ -3263,6 +3323,7 @@ def _find_turned(
     *,
     clean: Callable[[str], str],
     budget: DetectorBudget | None,
+    detector: DetectorSource = "page",
 ) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     """`_find_in` on the page turned upright: the lines and paths are turned to match (the
     indices stay, so the lines a table claims are the same ones), the detector and the
@@ -3303,7 +3364,9 @@ def _find_turned(
             copy.close()
             raise
     try:
-        found, judged = _find_in(sideways, turned_lines, turned_paths, clean=clean, budget=budget)
+        found, judged = _find_in(
+            sideways, turned_lines, turned_paths, clean=clean, budget=budget, detector=detector
+        )
     finally:
         with _pdf_lock():
             copy.close()

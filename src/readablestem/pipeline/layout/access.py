@@ -9,6 +9,7 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+import signal
 import subprocess
 import sys
 import threading
@@ -23,8 +24,8 @@ import pymupdf
 from readablestem.core import content_budget
 from readablestem.core.childenv import child_env
 from readablestem.core.types import BBox, Element
-from readablestem.pipeline import page_type
-from readablestem.pipeline.layout.context import LayoutError
+from readablestem.pipeline import page_type, tables
+from readablestem.pipeline.layout.context import LayoutError, log
 
 DOCUMENT_CACHE_SIZE = 4
 DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
@@ -56,6 +57,38 @@ PROBE_MAX_SIDE_PX = 2048
 # Address space the probe child may use (768 MB, like the upload probe in
 # web/pdf_probe.py), plus room for the PDF itself, which it holds twice.
 PROBE_MEMORY_BYTES = 768 * 1024 * 1024
+
+# The structured text the table detector reads a page by: the flags `pymupdf.layout` 1.28.2
+# gives MuPDF (`pymupdf_util_base.extract_base_elements`), which turn MuPDF's own table hunt
+# on. Read them there again when the pin of the add-on moves (docs/dependencies.md).
+HUNT_FLAGS = (
+    pymupdf.TEXT_PRESERVE_IMAGES
+    | pymupdf.TEXT_PRESERVE_WHITESPACE
+    | pymupdf.TEXT_PRESERVE_LIGATURES
+    | pymupdf.TEXT_ACCURATE_BBOXES
+    | pymupdf.TEXT_COLLECT_VECTORS
+    | pymupdf.TEXT_COLLECT_STYLES
+    | pymupdf.TEXT_SEGMENT
+    | pymupdf.TEXT_PARAGRAPH_BREAK
+    | pymupdf.TEXT_COLLECT_STRUCTURE
+    | pymupdf.TEXT_TABLE_HUNT
+    | pymupdf.TEXT_LAZY_VECTORS
+    | pymupdf.TEXT_CLIP
+    | pymupdf.TEXT_FUZZY_VECTORS
+)
+# The children that try that extraction (`hunt_failures`) may take this long together for a
+# document's first page and `PROBE_PER_PAGE_S` more for each further one. Measured on 367
+# public papers, the 60 development files and the 25 corpus files (13,236 pages): 35 ms a
+# page on average, the slowest page 9.7 s (the count of its 3.1 million drawn items, after
+# which it is left out), and the document that used most of its time 12% of it
+# (docs/layout.md, "A page the table detector cannot read").
+HUNT_TIMEOUT_S = 30.0
+# The ways a child ends that are the page's doing: MuPDF faulted or gave up while it read it.
+# Any other end that is not a clean one (an exit code, a kill from outside) is the child's own.
+_HUNT_FAULTS = frozenset(
+    -number
+    for number in (signal.SIGSEGV, signal.SIGABRT, signal.SIGBUS, signal.SIGILL, signal.SIGFPE)
+)
 CROP_PAD = 2.0  # crop's default padding around an element box (pt)
 TEXT_FLAGS = page_type.TEXT_FLAGS  # whitespace kept, clipped to the MediaBox, glyph boxes
 _LANG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$")
@@ -388,6 +421,8 @@ def _digest(pdf_bytes: bytes) -> str:
 # Pages that rendered in a child process, by document hash (hashes only, no content).
 _PROBED: OrderedDict[str, set[int]] = OrderedDict()
 PROBED_MEMORY = 64  # documents remembered
+# What `hunt_failures` found of each page it tried, by document hash: "page", "copy", "none".
+_HUNTED: OrderedDict[str, dict[int, tables.DetectorSource]] = OrderedDict()
 
 # Runs in a fresh interpreter: open the PDF from stdin, then extract and render each page
 # the way analyze and crop will. Python errors are fine (the parent handles them); only a
@@ -544,6 +579,148 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int], at_most_s: float | None = N
         raise LayoutError("too_complex", "the PDF needs more memory than a page may use")
     if result.returncode != 0 or result.stdout != b"ok":
         raise LayoutError("unreadable", "the PDF could not be rendered")
+
+
+# Runs in a fresh interpreter, on pages the probe above passed: read each page as the table
+# detector will, and write the page's number once the read is over. Python errors are
+# swallowed (the detector's caller handles them in this process); what matters is the page
+# at which the child dies. `copy`: read a copy of the page alone in a document of its own.
+# A page with more drawn items than the detector reads (`tables.MAX_DETECTOR_ITEMS`) is not
+# read here either: `tables.propose` leaves it out by the same count, and the reading of such
+# a page can take minutes (page 7 of arXiv 2410.12036, 2.1 million items, did not end in 600 s).
+# "open" is written once the document is open: a fault before that is the child's own.
+_HUNT_SCRIPT = """
+import sys
+try:  # cap this process's address space first, as the probe does
+    import resource
+    limit = int(sys.argv[4])
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    if hard != resource.RLIM_INFINITY:
+        limit = min(limit, hard)
+    if soft == resource.RLIM_INFINITY or soft > limit:
+        resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
+except (ImportError, ValueError, OSError):
+    pass
+import pymupdf
+pymupdf.TOOLS.mupdf_display_errors(False)
+pymupdf.TOOLS.mupdf_display_warnings(False)
+doc = pymupdf.open(stream=sys.stdin.buffer.read(), filetype="pdf")
+sys.stdout.write("open\\n")
+sys.stdout.flush()
+for number in map(int, sys.argv[1].split(",")):
+    try:
+        page = doc[number]
+        if sum(len(d["items"]) for d in page.get_cdrawings()) <= int(sys.argv[5]):
+            if sys.argv[3] == "copy":
+                alone = pymupdf.open()
+                alone.insert_pdf(doc, from_page=number, to_page=number)
+                page = alone[0]
+            page.get_textpage(flags=int(sys.argv[2]))
+    except Exception:
+        pass
+    sys.stdout.write(f"{number}\\n")
+    sys.stdout.flush()
+"""
+
+
+def hunt_failures(
+    pdf_bytes: bytes, key: str, pages: list[int], *, limited: bool = True
+) -> dict[int, tables.DetectorSource]:
+    """The pages of `pages` (pages the probe passed) on which the table detector may not read
+    the page where it is, each with what is left for it there (`tables.DetectorSource`):
+    "copy" or "none". Hold `_LOCK`.
+
+    Among the detector's first steps is a structured-text extraction with MuPDF's table hunt
+    on (`HUNT_FLAGS`), and on some pages MuPDF ends the process there. The extraction is tried
+    in a child, page after page. When MuPDF faults in the child (`_HUNT_FAULTS`), the page it
+    was at is the one: a second child reads a copy of that page alone ("copy" when it lives,
+    "none" when MuPDF faults there too), and the pages after it go to a new child. Those
+    answers are remembered for the document.
+
+    `limited`: all the children together have the time one child has for all the pages, and
+    the pages not tried by then are "none" for this call only: the table search of such a
+    page is not made, which the detector's budget counts and the conversion says
+    (`tables._detected`). A clock is the machine's, so evals and replays pass False and wait.
+    A child that ends in any other way (its own error, a kill from outside, a fault before
+    the document was open) has said nothing of a page: that is logged, and the pages it did
+    not get to are read as before there was a child."""
+    known = _HUNTED.setdefault(key, {})
+    todo = [page for page in pages if page not in known]
+    unsearched: list[int] = []  # "none" for this call only: nothing was found out about them
+    budget = HUNT_TIMEOUT_S + PROBE_PER_PAGE_S * max(0, len(todo) - 1)
+    until = time.monotonic() + budget if limited else math.inf
+    while todo:
+        survived, end = _hunt_pages(pdf_bytes, todo, "page", until - time.monotonic())
+        known.update(dict.fromkeys(survived, "page"))
+        todo = todo[len(survived) :]
+        if end == "fault" and todo:
+            alone, end = _hunt_pages(pdf_bytes, todo[:1], "copy", until - time.monotonic())
+            if alone or end == "fault":
+                died = todo.pop(0)
+                known[died] = "copy" if alone else "none"
+                log.warning(  # the page and what is read, nothing of the page
+                    "page %d ends the table detector's reading where it is: %s",
+                    died + 1,
+                    "a copy of the page is read" if alone else "so does a copy, no search",
+                )
+                continue
+            unsearched = todo[:1]  # it faulted where it is, whatever became of its copy
+        if end == "late":
+            unsearched = todo
+            log.warning("no time left to try the table detector's reading: %d pages", len(todo))
+        elif todo:
+            log.error("the child that tries the table detector's reading failed: %s", end)
+        break
+    _HUNTED.move_to_end(key)
+    while len(_HUNTED) > PROBED_MEMORY:
+        _HUNTED.popitem(last=False)
+    found = {page: known[page] for page in pages if known.get(page, "page") != "page"}
+    for page in unsearched:
+        found[page] = "none"
+    return found
+
+
+def _hunt_pages(
+    pdf_bytes: bytes, pages: list[int], source: tables.DetectorSource, at_most_s: float
+) -> tuple[list[int], str]:
+    """Run `_HUNT_SCRIPT` on `pages` for at most `at_most_s`: the pages it got through, in
+    order, and how it ended: "done", "fault" (MuPDF ended it at the next page), "late" (the
+    time ran out) or the code of an end of its own. Its output is "open" and the page numbers
+    it wrote; nothing else is kept."""
+    if at_most_s <= 0:
+        return [], "late"
+    command = [
+        sys.executable,
+        "-I",  # isolated, as the probe
+        "-c",
+        _HUNT_SCRIPT,
+        ",".join(map(str, pages)),
+        str(HUNT_FLAGS),
+        source,
+        str(PROBE_MEMORY_BYTES + 2 * len(pdf_bytes)),
+        str(tables.MAX_DETECTOR_ITEMS),
+    ]
+    try:
+        child = subprocess.run(
+            command,
+            input=pdf_bytes,
+            capture_output=True,
+            timeout=None if at_most_s == math.inf else at_most_s,
+            check=False,
+            env=child_env(),  # no keys or secrets for the process that reads the PDF
+        )
+        written, end = child.stdout, f"exit {child.returncode}"
+        fault = child.returncode in _HUNT_FAULTS
+    except subprocess.TimeoutExpired as slow:
+        written, end, fault = slow.stdout or b"", "late", False
+    done = written.split()
+    if fault and done[:1] == [b"open"]:  # (a fault before the document was open is no page's)
+        end = "fault"
+    done = done[1:]
+    count = 0
+    while count < min(len(pages), len(done)) and done[count] == str(pages[count]).encode():
+        count += 1
+    return pages[:count], "done" if count == len(pages) else end
 
 
 def _open(pdf_bytes: bytes) -> pymupdf.Document:

@@ -241,4 +241,42 @@ def test_the_limits_of_a_sum_set_at_the_size_of_its_row_are_a_part_of_the_displa
     assert not display._joins_line(main, main.box, far, grouping=True)
 
 
+def a_paragraph_whose_last_line_begins_with_a_sum() -> bytes:
+    """Text style: the sign hangs on a baseline of its own with the upper limit beside it, and
+    the row of the words that go on starts with the lower limit, a sign's width to its right
+    (arXiv 2411.02531 page 1). The next paragraph is indented."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=595, height=842)
+    words = "the weights are counted once for every pair of nodes and then added to the total "
+    for i, top in enumerate((100, 114, 128)):
+        page.insert_text((75, top), (words * 3)[i * 25 : i * 25 + 88], fontsize=12, fontname="tiro")
+    writer = pymupdf.TextWriter(page.rect)
+    writer.append((75, 138), "∑", font=pymupdf.Font("cjk"), fontsize=12)
+    writer.write_text(page)
+    page.insert_text((87.5, 135), "n", fontsize=8, fontname="tiit")
+    page.insert_text((87.5, 146), "i=1", fontsize=8, fontname="tiit")
+    page.insert_text((101, 142), "f", fontsize=12, fontname="tiit")
+    page.insert_text((108, 145), "ik", fontsize=8, fontname="tiit")
+    page.insert_text((120, 142), "= 0 for k = 1, . . . , d.", fontsize=12, fontname="tiro")
+    new = "The latent factors can be read via a set of node observables with the following model:"
+    page.insert_text((92, 156), new, fontsize=12, fontname="tiro")
+    page.insert_text((75, 170), "factors and the model are fixed before data is seen.", fontsize=12)
+    return doc.tobytes()
+
+
+def test_a_last_line_that_begins_with_a_sum_stays_in_its_paragraph():
+    found = analyze(
+        a_paragraph_whose_last_line_begins_with_a_sum(),
+        region_tree=True,
+        inline_joins=True,
+        display_grouping=True,
+        join_panels=True,
+    ).elements
+    paragraphs = [e for e in found if e.kind == Kind.PARAGRAPH]
+    assert len(paragraphs) == 2
+    assert (paragraphs[0].text or "").endswith("d.")
+    assert (paragraphs[1].text or "").startswith("The latent factors")
+    assert "∑" in "".join(e.text or "" for e in found if e.kind == Kind.EQUATION)
+
+
 # ------------------------------------------------------------ the setting (off by default)

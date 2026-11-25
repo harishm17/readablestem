@@ -59,6 +59,9 @@ CLOCKS = {
     ("pipeline/step_facts.py", "PageTrace"): TIMING,
     ("pipeline/layout/access.py", "_DocumentCache"): CACHE,
     ("pipeline/layout/access.py", "_halve"): ENDS_JOB,
+    # The children that try the table detector's reading: a page not tried in time is not
+    # searched and writes the table search's fact. Evals and replays run without the limit.
+    ("pipeline/layout/access.py", "hunt_failures"): SAYS_SO,
     ("pipeline/figure_images.py", "student_image"): CACHE,
     ("pipeline/image_page_reconcile.py", "reconcile"): SAYS_SO,
     ("pipeline/layout/figures.py", "_image_infos"): ENDS_JOB,

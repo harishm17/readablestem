@@ -2,7 +2,7 @@
   "schema_version": 1,
   "task": "headings",
   "date": "2026-11-25",
-  "pipeline_version": "0.5.20",
+  "pipeline_version": "0.5.21",
   "profile": {
     "name": "development settings",
     "sha256": "ae2c92fb65cf74c77d9676b56a42409d6bcb786163579dd8ac3a99befa5250ab",
@@ -248,9 +248,9 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "d4d265518a990fc6548fbc5cffd58630e8ca75ac",
+    "commit": "a202c34f991ef79890fc8c6851243d2a444703c0",
     "clean": true,
-    "pipeline_version": "0.5.20",
+    "pipeline_version": "0.5.21",
     "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",
