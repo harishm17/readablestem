@@ -588,7 +588,7 @@ changed nothing in production.
   `ax_csro_240306420` page 3 and `ax_mathap_240306449` page 15. The
   rule moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
   score of the 21 development papers as it was (9,198 of 11,258 whole; displays 903 of
-  1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree).
+  1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree). The repairs it needed in the rows and in the display pass run with the tree off too: with all four switches off, 23 pages of 9 of the 60 development files read differently from 0.5.19 (none with more elements, 3 with fewer; the sign at its place where it was read before or after its line).
 - *Vertical.* In a segment, a white channel of at least 7 pt (`CHANNEL_PT`) with at least three
   lines each side (two on a slide) that have a line of the other side at their height (the pieces
   a formula cuts a line into are one line), and a line of three words or more, cuts it in two.

@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-24 | 0.5.19 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-25 | 0.5.20 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -3061,8 +3061,8 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-24 at pipeline 0.5.19,
-production profile `2047f403770c`, every count as in the 0.5.18 record it replaces, 47 files and 91 gold pages, no answer missing, no step
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-25 at pipeline 0.5.20,
+production profile `ae2c92fb65cf`, every count as in the 0.5.19 and 0.5.18 records before it, 47 files and 91 gold pages, no answer missing, no step
 stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
@@ -3127,8 +3127,9 @@ is what the reading order is made of. The folder must be the registered one
 being changed. Its record keeps totals and names no page, `--records`, `--from` and
 `--against` are refused for it, and a failing page is not looked at.
 
-`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.19
-under the production profile with the four layout switches on), the student page:
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.20
+under the production profile with the four layout switches on; every count of both tables as
+in the 0.5.19 record), the student page:
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
@@ -3580,7 +3581,7 @@ stops matching. A paid recording of the
 answers was owed then (about 1,300 requests) to bring those uploads back into
 the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
 records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
-compare them; the order records were re-made at 0.5.18 and again at 0.5.19.
+compare them; the order records were re-made at 0.5.18 and again at 0.5.19 and 0.5.20.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -4164,7 +4165,7 @@ in a separate worktree):
 
 One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
 `data/eval/order-layout-dev-1.json` was the 0.5.18 one at this release; it is re-made at 0.5.19
-since, with the same right and faultless pages (its table is under `eval order`).
+and at 0.5.20 since, with the same right and faultless pages (its table is under `eval order`).
 
 **Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
 of 47 uploads, the student page):
@@ -4174,7 +4175,8 @@ of 47 uploads, the student page):
 | the 0.5.10 record kept until now (3 pages apart, answers missing) | 64 | 37 |
 | 0.5.18 with all four off | 71 | 37 |
 | 0.5.18, all four on | 83 | 42 |
-| 0.5.19 (`data/eval/order-corpus.json` now; every count as at 0.5.18) | 83 | 42 |
+| 0.5.19 (every count as at 0.5.18) | 83 | 42 |
+| 0.5.20 (`data/eval/order-corpus.json` now; every count as at 0.5.19) | 83 | 42 |
 
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
@@ -4251,6 +4253,42 @@ before a). It is fixed in this release (CHANGELOG 0.5.18), and it is the kind of
 sets do not hold. The headings and tables-local reports of 0.5.18 (`latest-headings.json`,
 `latest-tables-local.json`) are made under development settings with the four switches off,
 so their unchanged metrics say nothing about the switches.
+
+## Pipeline 0.5.20 (2026-11-25)
+
+Pipeline 0.5.20 turns no switch on or off: the four of 0.5.18 stay on, and
+`LAYOUT_MATCHING_UNDER` and `LAYOUT_FIGURE_ART` are in the code and off. What it changes
+(CHANGELOG 0.5.20) was measured at $0, with no model, on the release branch at source commit
+`f3158e1b`:
+
+- **The recorded corpus.** The replay of the 73 uploads gives, upload by upload, the document
+  that the 0.5.19 source gives when only its version string is raised: 73 results compared by
+  the hash of the whole result (elements, heading fixes, page types, the HTML and the rest), 0
+  differences. So no recorded request moves, the recording made at 0.5.18 stands, and `eval
+  burden --same` against `data/eval/burden-corpus.json` passes. (The hash run is a scratch
+  tool that is not in the repository.)
+- **Formulas whole** (the box score of the 21 development papers, the four switches on): 9,198
+  of 11,258, 81.7%; displays 903 of 1,004. Both as at 0.5.19.
+- **Reading order.** `layout-dev-1`: 161 of 267 pages right and 81 faultless in the student
+  page, 160 and 82 in the element list. The corpus: 83 of 91 and 42, 83 and 48 in the element
+  list. Every count of both records is the 0.5.19 one, and `--against` the 0.5.19 records
+  finds no page made wrong. Both records are re-made at 0.5.20; the production profile's hash
+  is `ae2c92fb65cf` now because the profile names the new switch (off).
+- **Limits of a sign on real documents** (`layout.analyze` with production's switches, against
+  0.5.19; the pages are named in docs/layout.md, "The cuts", and in the CHANGELOG entry):
+
+  | Set | Pages | Differ | More elements | Fewer | Displays that end with a sign and its limits | A sign and its limits alone |
+  |---|---|---|---|---|---|---|
+  | 62 public arXiv papers, the first 25 pages of each | 1,224 | 74 | 1 | 7 | 189 to 186 | 31 to 30 |
+  | the 60 files of `layout-dev-1`, whole | 947 | 51 | 1 | 4 | 79 to 77 | 21 to 21 |
+  | 60 further public arXiv papers, the first 25 pages of each | 1,195 | 64 | 0 | 10 | 126 to 115 | 20 to 19 |
+
+  Three displays read worse, the limits of the displays on two pages are traded, and nine
+  pages read differently with neither reading the better one. With all four switches off, 23
+  pages of 9 of the 60 development files read differently from 0.5.19 (none with more
+  elements, 3 with fewer): the repairs in the rows and in the display pass have no switch.
+- **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
+  0.5.20 on a clean tree, and `eval gate --require-current` passes for both.
 
 ## What the numbers do not show
 

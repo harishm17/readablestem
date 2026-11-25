@@ -1,6 +1,6 @@
 # Changelog
 
-## Pipeline 0.5.20, render 11 (2026-11-24)
+## Pipeline 0.5.20, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.20 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
   "Unreleased" entries below down to the 0.5.19 entry (wave 6: seven lines of work, each
@@ -158,8 +158,12 @@
   115 (the lower limit of three displays of arXiv 2503.05994 that 0.5.19 read as equations
   of their own is in its display). None of the 73
   recorded corpus uploads moved, the box score of the development papers is as it was, and
-  neither `eval order` record has a page made wrong. Behind the region tree switch, which is
-  on. No version bump is in this entry.
+  neither `eval order` record has a page made wrong. The band rule is part of the region
+  tree, which is on. The repairs in the rows and in the display pass have no switch: with
+  all four layout switches off, 23 pages of 9 of the 60 development files read differently
+  from 0.5.19 (none has more elements, 3 have fewer; a sign that was read before or after
+  its line is at its place, and `ax_quantph_240306391` page 16 reads worse as it does with
+  the switches on). No version bump is in this entry.
   - Traded: on some displays the upper limit now follows its sign and the lower limit is read
     after the line; before, the lower followed its sign and the upper stood in front of the
     display (`ax_econem_240306657` page 49, `ax_quantph_240306391` page 15).
