@@ -49,6 +49,8 @@ from readablestem.pipeline.layout.glyphs import (
 )
 from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
+    _MATH_WORDS,
+    _MORE_MATH_WORDS,
     LIMIT_SIGNS,
     SCRIPT_MIN_RATIO,
     SCRIPT_RATIO,
@@ -1100,7 +1102,8 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
                 for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
                     host = merged.get(j, rows[j])
                     reach = 0.5 * host.size
-                    inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
+                    start = min(host.x0, piece.x0) if _starts_at(host, piece, rows) else host.x0
+                    inside = start - reach <= piece.x0 and piece.x1 <= host.x1 + reach
                     shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
                     on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
                     beside = beside or (on_line and piece.x0 < host.x1 and host.x0 < piece.x1)
@@ -1121,6 +1124,45 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
             merged[best] = _Row([*host.chars[:at], *folded, *host.chars[at:]], column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
+
+
+def _starts_at(host: _Row, piece: _Row, rows: Sequence[_Row]) -> bool:
+    """Does `host`, a row that goes on in running words, begin where a sum, product or integral
+    sign of `piece` ends, no further than half an em beyond it, with nothing before the sign
+    on its line? A sign that leads a line of a paragraph comes as a piece of its own, and the
+    row of what goes on starts with the lower limit TeX lowers to the baseline of the line, or
+    with the integrand, so that row seems to start a sign's width after the sign (arXiv
+    2411.02531 page 1, 2212.05955 page 13). The rows of a display are left as they were: their
+    signs stand where the display's own lines put them, behind a fraction or an equals sign,
+    and its "for |x| < 1" is no running text."""
+    first = next((c for c in host.chars if not c.blank), None)
+    if first is None or not any(
+        c.c in LIMIT_SIGNS and c.x0 <= first.x0 <= c.x1 + 0.5 * host.size for c in piece.ink
+    ):
+        return False
+    return _runs_on_in_words(host) and not any(
+        r is not host
+        and r is not piece
+        and not r.vertical
+        and r.column == piece.column
+        and r.x1 <= piece.x0 + 0.5
+        and min(piece.y1, r.y1) - max(piece.y0, r.y0) > 0.4 * min(piece.height, r.height)
+        for r in rows
+    )
+
+
+def _runs_on_in_words(row: _Row) -> bool:
+    """Does the row hold a word of upright letters that is no function name ("for", "which")?"""
+    word: list[str] = []
+    for c in [*row.chars, None]:
+        if c is not None and _text_char(c) and c.c.isalpha():
+            word.append(c.c.lower())
+            continue
+        text = "".join(word)
+        word = []
+        if len(text) >= 3 and text not in _MATH_WORDS and text not in _MORE_MATH_WORDS:
+            return True
+    return False
 
 
 def _insert_script(

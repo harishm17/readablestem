@@ -136,6 +136,23 @@
     name; one each `ifthen`, `xr`, `biblatex`, `svgcolor`, `apxproof`, `orcidlink`, one
     conference style, one algorithm pair), so reading one package opens at most one or two.
 - No version raise and no migration are owed; no stored document changes.
+## Unreleased: the last line of a paragraph that begins with a big sign (O-471)
+
+- A line that begins with a sum, product or integral sign and goes on in running words ("∑_{i=1}^n
+  f_ik = 0 for k = 1, …, d.", the last line of a paragraph on arXiv 2411.02531 page 1) is read in
+  its paragraph, sign first and with its limits. The sign is a row of its own and the row of what
+  goes on starts a sign's width after it, so the sign was not folded into it: it was read at the
+  head of the next paragraph and the sign after that paragraph (`rows._attach_big_operators`,
+  `rows._starts_at`). The rule asks that the row go on in running words and that nothing stand
+  before the sign on its line, so displays are left as they were. Counted on the 367 public papers
+  of the list (first 25 pages) and the 60 development files before the change: of the lines that
+  begin with a big sign and go on in running words, 14 were read in place, 45 were a display of
+  their own and 27 out of place (0, 2 and 4 on the development files; none in the private corpus);
+  after it 31, 43 and 12 (1, 2 and 3). Of 3,533 pages of the 183 papers of review 34 (first 25
+  pages) 46 differ (31 read better, 14 only in spacing, 1 reads worse: 2501.05251 page 9) and of the
+  947 pages of the 60 development files 6 differ, all better. The 73 recorded requests of the
+  corpus all still match; so a change to stored documents is limited to the pages above, and
+  `PIPELINE_VERSION` is owed a raise with the next release (`RENDER_VERSION` is not).
 
 ## Pipeline 0.5.20, render 11 (2026-11-25)
 
