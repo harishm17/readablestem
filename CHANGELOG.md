@@ -13,10 +13,12 @@
     0.5.19 on 62 public arXiv papers (1,224 pages) 74 pages differ, 1 has one element more
     (two numbered equations that were one display) and 7 have fewer; on the 60 development
     files (whole, 947 pages) 51 differ, 1 has one element more and 4 have fewer; on 60
-    further public papers (1,195 pages) 64 differ, none has more and 10 have fewer. Three
-    displays read worse, the limits of displays on two pages are traded and one sentence
-    reads better at the cost of a stray equation; the entry below names them, and with them
-    the pages that read differently without reading better or worse.
+    further public papers (1,195 pages) 64 differ, none has more and 10 have fewer; on 61
+    more (1,114 pages) 87 differ, 2 have one element more and 8 have fewer. Three
+    displays read worse, the limits of displays on two pages are traded, one sentence
+    reads better at the cost of a stray equation and two programs of numbered lines in one
+    paper are cut in two; the entry below names them, and with them the pages that read
+    differently without reading better or worse.
   - Algorithms: a full-width algorithm whose short steps have comments at the right and whose
     long steps run past the gutter is one block (arXiv 2504.06207 page 13).
   - Scripts: a lowered script under a typewriter name is read before the name, not inside it
@@ -138,11 +140,15 @@
   smaller glyph under it and no limits, and the denominator of a fraction was read between
   the two terms of its numerator ("(V1(u) √tn −κ′1(θ)tn)"; three displays of arXiv
   2503.05994 page 19 and two of 2312.17566 page 7 read as at 0.5.19 again). And a piece
-  that the stacking of a display's lines gave to the display over its own goes back
-  (`display._return_stray_pieces`): the upper limit of a sum behind its opening bracket,
-  "(n", starts a little above its line and is met first, and equation (12) of arXiv
-  2408.09889 page 5 reached 12 pt into (13) and held that piece of it; the two have the
-  boxes of 0.5.19 again. Each of the five conditions of the rule since review 30 has a
+  that the stacking of a display's lines gave to the display over its own goes back, in
+  one configuration (`display._return_stray_pieces`: the last line of a display, of script
+  size, under every other line of that display and no limit of a sign in them, with a
+  full-size line of another display around it): the upper limit of a sum behind its opening
+  bracket, "(n", starts a little above its line and is met first, and equation (12) of
+  arXiv 2408.09889 page 5 reached 12 pt into (13) and held that piece of it; the two have
+  the boxes of 0.5.19 again. Where no such piece stands clear of the upper display, the two
+  numbered lines are still one equation (the known limit below); of the 4,480 pages
+  measured the pass moves this one. Each of the five conditions of the rule since review 30 has a
   display that fails without it on a page built with pdfTeX
   (`tests/fixtures/layout/latex/pdftex/sum_limits_pdftex.tex`: a Tectonic page shows none
   of them, its sum sign's glyph box reaches further down), and the display pass has a test
@@ -156,7 +162,10 @@
   from 79 to 77; on 60 further public papers (the first 25 pages of each, 1,195 pages) 64
   pages differ, none has more elements and 10 have fewer, and those displays go from 126 to
   115 (the lower limit of three displays of arXiv 2503.05994 that 0.5.19 read as equations
-  of their own is in its display). None of the 73
+  of their own is in its display); and on 61 more public papers, drawn by review 33 from
+  the ones no earlier round had read (the first 25 pages of each, 1,114 pages), 87 pages
+  differ, 2 have one element more and 8 have fewer, and those displays go from 159 to 153.
+  None of the 73
   recorded corpus uploads moved, the box score of the development papers is as it was, and
   neither `eval order` record has a page made wrong. The band rule is part of the region
   tree, which is on. The repairs in the rows and in the display pass have no switch: with
@@ -178,12 +187,23 @@
   - Read differently, neither reading better: the pieces of a display come in another
     order (a limit now at its sign and a numerator or a bracket out of its place, or the
     other way round) on arXiv 2203.14737 page 20, 2408.13045 page 22, 2409.12662 page 12,
-    2404.01333 page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22 and
-    `ax_csro_240306420` page 3 ("1n∑=1N"). On `ax_mathap_240306449`
+    2404.01333 page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22,
+    2411.16302 page 17 ("1 −x =∑∞k=0 1 xk": the sum at its place, the numerator after it),
+    2502.00994 page 9, 2504.00712 page 3 and
+    `ax_csro_240306420` page 3 ("1n∑=1N"); and among the 61 papers of review 33 on arXiv 2303.02529
+    pages 10, 18 and 21, 2308.00984 page 7, 2312.15494 page 18, 2405.04201 page 7,
+    2407.20419 page 9, 2501.02602 page 5 and 2505.03099 pages 6 and 7. On `ax_mathap_240306449`
     page 15 the first integral of the display's second line follows "= 2" now, where
     0.5.19 read that line's integrals in front of it; the rest of the line is out of
     order in both. `ax_cslg_240306366` page 2 reads as at 0.5.19 ("1 (∑ ) β lna∈𝒜
     exp(v(a)β)": the bracket and its sum in front of the "ln" they follow).
+  - Cut in two, among the 61 papers of review 33: two programs of numbered lines of arXiv 2407.20419.
+    Page 17, (17a): one equation at 0.5.19; now the objective with its number ("max ∑n
+    ∑T𝔼[…]yit") and under it the "s.t." line as an equation without a number. The lower
+    limits of the objective's two sums are read in the line under them ("s.t. ∑n ∑i=1
+    t=1Pr[…]"), out of place in both readings; the sums of the constraint are at their
+    place now. Page 15, (14a) to (14c): one display with three numbers at 0.5.19; now (14a)
+    alone and (14b) with (14c). No words are lost on either page.
   - Known limit: the limit under a sum set in display style in the item of a list is an
     equation of its own after the item ("Ekin = ∑n ki + Epot", then "i=1";
     `sum_limits.tex`, page 2). At 0.5.19 the whole sign with both limits stood alone and

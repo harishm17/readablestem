@@ -64,9 +64,9 @@ from readablestem.pipeline.layout.shared import (
 from readablestem.pipeline.parse import is_math_alphanumeric
 
 # Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$): the
-# signs that lead a fragment `_attach_big_operators` folds into its line. The root is one, and
-# the big union and intersection of `shared.LIMIT_SIGNS` are not: no real page has shown one
-# as a fragment of its own.
+# signs that lead a short fragment `_attach_big_operators` folds into its line. The root is one.
+# The big union and intersection of `shared.LIMIT_SIGNS` are not: one of them is folded only as
+# a sign with its limits (`_sign_of_limits`; arXiv 2308.00984 page 22).
 _BIG_OPERATORS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a")
 LINE_GLYPH_REACH = 24  # glyphs either side of the span `line_glyphs` keeps, nearest first
 LINE_GLYPH_ROW = 0.5  # x the span's height: how far off the span's row a neighbour may sit

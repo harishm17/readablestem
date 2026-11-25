@@ -4271,8 +4271,11 @@ Pipeline 0.5.20 turns no switch on or off: the four of 0.5.18 stay on, and
   of 11,258, 81.7%; displays 903 of 1,004. Both as at 0.5.19.
 - **Reading order.** `layout-dev-1`: 161 of 267 pages right and 81 faultless in the student
   page, 160 and 82 in the element list. The corpus: 83 of 91 and 42, 83 and 48 in the element
-  list. Every count of both records is the 0.5.19 one, and `--against` the 0.5.19 records
-  finds no page made wrong. Both records are re-made at 0.5.20; the production profile's hash
+  list. Every count of pages and of documents in both records is the 0.5.19 one, and
+  `--against` the 0.5.19 records finds no page made wrong. Two totals of the `layout-dev-1`
+  record moved, neither in a table here: `elements` from 6,031 to 6,032 and `flow_ok` from
+  89,395 to 89,400 in the student page (5,594 to 5,595 and 89,946 to 89,951 in the element
+  list). The corpus record changed only in version, commit and profile hash. Both records are re-made at 0.5.20; the production profile's hash
   is `ae2c92fb65cf` now because the profile names the new switch (off).
 - **Limits of a sign on real documents** (`layout.analyze` with production's switches, against
   0.5.19; the pages are named in docs/layout.md, "The cuts", and in the CHANGELOG entry):
@@ -4282,9 +4285,13 @@ Pipeline 0.5.20 turns no switch on or off: the four of 0.5.18 stay on, and
   | 62 public arXiv papers, the first 25 pages of each | 1,224 | 74 | 1 | 7 | 189 to 186 | 31 to 30 |
   | the 60 files of `layout-dev-1`, whole | 947 | 51 | 1 | 4 | 79 to 77 | 21 to 21 |
   | 60 further public arXiv papers, the first 25 pages of each | 1,195 | 64 | 0 | 10 | 126 to 115 | 20 to 19 |
+  | 61 more public arXiv papers that no earlier round had read, the first 25 pages of each (drawn and read by review 33) | 1,114 | 87 | 2 | 8 | 159 to 153 | 50 to 51 |
 
-  Three displays read worse, the limits of the displays on two pages are traded, and nine
-  pages read differently with neither reading the better one. With all four switches off, 23
+  In the first three sets three displays read worse, the limits of the displays on two pages
+  are traded, and twelve pages read differently with neither reading the better one. In the
+  fourth no page reads worse, two programs of numbered lines of one paper (arXiv 2407.20419
+  pages 15 and 17) are cut in two with no words lost, and ten pages read differently with
+  neither reading the better one. With all four switches off, 23
   pages of 9 of the 60 development files read differently from 0.5.19 (none with more
   elements, 3 with fewer): the repairs in the rows and in the display pass have no switch.
 - **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at

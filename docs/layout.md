@@ -567,7 +567,10 @@ changed nothing in production.
   fewer; the same two counts go from 79 to 77 and stay at 21. On 60 further public arXiv
   papers (the second sample of review 31, the first 25 pages of each, 1,195 pages) 64 pages
   differ, none has more elements and 10 have fewer; the two counts go from 126 to 115 and
-  from 20 to 19. Traded, on `ax_econem_240306657` page 49 and
+  from 20 to 19. On 61 more public arXiv papers (the sample of review 33, papers no earlier
+  round had read, the first 25 pages of each, 1,114 pages) 87 pages differ, 2 have one
+  element more and 8 have fewer; the two counts go from 159 to 153 and from 50 to 51.
+  Traded, on `ax_econem_240306657` page 49 and
   `ax_quantph_240306391` page 15: the upper limit now follows its sign and the lower is read
   after the line, where before the lower followed its sign and the upper stood in front of
   the display. Worse, on arXiv 2504.03499 page 25: the second line of a display has a note
@@ -584,8 +587,18 @@ changed nothing in production.
   clean now, the upper limit is at its sign and the lower is a short equation of its own.
   Read differently, with neither reading the better one (the pieces of a display in another
   order): arXiv 2203.14737 page 20, 2408.13045 page 22, 2409.12662 page 12, 2404.01333
-  page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22,
-  `ax_csro_240306420` page 3 and `ax_mathap_240306449` page 15. The
+  page 10, 2208.00350 page 4, 2405.05818 page 17, 2501.15793 page 22, 2411.16302 page 17,
+  2502.00994 page 9, 2504.00712 page 3, `ax_csro_240306420` page 3 and
+  `ax_mathap_240306449` page 15; and among the 61 papers of review 33 arXiv 2303.02529 pages 10, 18 and 21,
+  2308.00984 page 7, 2312.15494 page 18, 2405.04201 page 7, 2407.20419 page 9, 2501.02602
+  page 5 and 2505.03099 pages 6 and 7. Cut in two, among those 61 papers: two programs of
+  numbered lines of arXiv 2407.20419. On page 17 the objective of (17a) keeps the number and
+  its "s.t." line is an equation without a number under it; the lower limits of the
+  objective's two sums are read in that line, which is the fault `regions._at_sign` was
+  written against, one line further down (they were out of place at 0.5.19 too). On page 15,
+  (14a) stands alone and (14b) is with (14c), one display with three numbers before. This
+  is the shape to look at first if a later page shows a program of numbered lines cut
+  apart. The
   rule moves none of the 73 recorded corpus uploads (`hashrun full`: 0 differences), leaves the box
   score of the 21 development papers as it was (9,198 of 11,258 whole; displays 903 of
   1,004) and makes no page wrong in either `eval order` record, so it has no switch of its own (it is part of the region tree). The repairs it needed in the rows and in the display pass run with the tree off too: with all four switches off, 23 pages of 9 of the 60 development files read differently from 0.5.19 (none with more elements, 3 with fewer; the sign at its place where it was read before or after its line).
