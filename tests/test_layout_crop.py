@@ -84,6 +84,7 @@ def test_cached_documents_expire_after_a_while_without_use(monkeypatch):
 # ---------------------------------------------------------------- crash isolation
 
 FIXTURES = Path(__file__).parent / "fixtures" / "layout"
+TABLE_SLIDES = Path(__file__).parents[1] / "data" / "authored" / "tables" / "slides" / "slides.pdf"
 
 
 @pytest.fixture
@@ -122,3 +123,35 @@ def test_a_page_that_runs_out_of_the_childs_memory_is_too_complex(monkeypatch, u
     with pytest.raises(LayoutError) as exc:
         analyze(block_pdf())
     assert exc.value.code == "too_complex"
+
+
+@pytest.mark.parametrize("lives", ["copy", "none"])
+def test_a_page_whose_reading_kills_the_table_detector_is_read_another_way(monkeypatch, lives):
+    # arXiv 2501.02633, page 22: MuPDF ended the process inside the text extraction the
+    # detector asks for, and the job with it; a copy of the page alone was read. The child
+    # here dies on every page where it stands, and on the copy too when `lives` is "none".
+    monkeypatch.setattr(access, "_HUNTED", OrderedDict())
+    monkeypatch.setattr(
+        access,
+        "_HUNT_SCRIPT",
+        "import os, signal, sys\n"
+        f"if sys.argv[3] != {lives!r}: os.kill(os.getpid(), signal.SIGKILL)\n"
+        "print(sys.argv[1])",
+    )
+    read_in = []  # the page count of each document the detector read a page of, in process
+    find_tables = pymupdf.Page.find_tables
+
+    def watched(page: pymupdf.Page, *args, **kwargs):
+        read_in.append(page.parent.page_count)
+        return find_tables(page, *args, **kwargs)
+
+    monkeypatch.setattr(pymupdf.Page, "find_tables", watched)
+    slides = TABLE_SLIDES.read_bytes()
+    assert pymupdf.open(stream=slides).page_count > 1
+    found = analyze(slides, pages=[0]).elements
+    assert found
+    if lives == "copy":
+        assert set(read_in) == {1}  # the copy, never the page where it stands
+        assert any(e.kind is Kind.TABLE for e in found)
+    else:
+        assert read_in == []

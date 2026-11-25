@@ -1,5 +1,52 @@
 # Changelog
 
+## Unreleased: a page whose reading for the table detector ends the process (O-468)
+
+- **The fault.** arXiv 2501.02633 could not be converted: on its page 22 the conversion
+  child died with a segmentation fault, and the job ended as `conversion_crashed` (the
+  worker and the web process were not hurt: the conversion runs in a child of its own,
+  `web/isolated_convert.py`). `tables.find` promises that a job is never lost to table
+  detection; this one was.
+- **The cause, measured.** Not the layout model and not the drawing: the first thing
+  `page.find_tables` of `pymupdf-layout` 1.28.2 does is read the page's text with MuPDF's
+  own table hunt on (`page.get_textpage(flags=3209031)`), and MuPDF 1.28.2 dies there. The
+  probe, which draws the page and reads its plain text, passes the page. The fault needs
+  four of the flags together (`TEXT_COLLECT_VECTORS`, `TEXT_COLLECT_STRUCTURE`,
+  `TEXT_TABLE_HUNT`, `TEXT_LAZY_VECTORS`: those four alone die, and without any one of
+  them the page is read) and the document's structure tree: the PDF is tagged, and a copy
+  of the page alone in a new document (`insert_pdf`) is read without harm, as it is and
+  turned a quarter either way.
+- **The guard.** After the probe, `layout.analyze` has a second child make that reading on
+  every selected page the probe passed (`access.hunt_failures`, `access.HUNT_FLAGS`). A
+  page that kills the child is tried again as a one-page copy, and `tables.find` is told
+  where the detector may read each page (`detector`, a `tables.DetectorSource`): `"page"`
+  as always, `"copy"` (the detector reads the copy; its boxes are in the page's frame, and
+  arbitration, grid and fill read the page itself), or `"none"` when the copy dies too
+  (the detector is not run; the page's own lines and rules still propose tables). Bounds:
+  the children together have 30 s and 2 s for each page after the first, at most 8 pages
+  of a document may kill one (17 children at the most), and the pages not tried by then
+  are `"none"`.
+- **Measured.** Pages 21 to 23 of the paper are read (page 22: 18 elements, the detector on
+  a copy). On the paper's other 26 pages the detector proposes the same boxes on the page
+  and on its copy. The reading costs 10 to 50 ms a page (the slowest of four papers'
+  pages 0.11 s) and the child about 0.14 s to start, once for a document. A document with
+  no such page reads as before: the child's reading is thrown away.
+- **Not covered.** A page set sideways is read by the detector through a turned one-page
+  copy, which has no structure tree and is not tried. A page whose answer is `"none"` gets
+  a warning in the log and no notice of its own; none has been seen. Other MuPDF calls of
+  the analysis are guarded by the probe or not at all. The fault is MuPDF's and has not
+  been reported upstream yet; docs/tables.md, "Upgrade check", says what to try again when
+  the pin moves.
+- **Test.** `tests/test_layout_crop.py`: a hunt child that dies on the page where it is
+  (and, in a second case, on its copy too) leaves the page analysed, with the detector run
+  on a one-page document in the first case and not at all in the second. It fails when the
+  table step ignores the answer.
+- **The standing stop rule for held-out runs** is written into docs/eval.md ("Development
+  and held-out, and the two bars", rule 5): one run for a release; a row worse than its bar
+  means no release, no rule built for that row in that release and no second run.
+- docs/layout.md ("A page the table detector cannot read"), docs/tables.md ("Where it
+  runs, and what it costs"; "Upgrade check"), docs/dependencies.md.
+
 ## Pipeline 0.5.20, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.20 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

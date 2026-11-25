@@ -4586,6 +4586,48 @@ passed it crashed the detector.
 `make fuzz-tables` repeats that check on mutants of the fixtures; run it before any
 PyMuPDF, pymupdf-layout or onnxruntime upgrade ([tables.md](tables.md), "Upgrade check").
 
+**A page the table detector cannot read** is a second, smaller case (`access.hunt_failures`,
+2026-11-25). The detector's first step is not the drawing but a reading of the page's text
+with MuPDF's table hunt on (`page.get_textpage` with the flags the add-on asks for,
+`access.HUNT_FLAGS`), which the probe does not make. On page 22 of arXiv 2501.02633 that
+reading ends the process with a segmentation fault in MuPDF 1.28.2; the probe passes the
+page, and the plain text read and the drawing are fine. The fault needs four of the flags
+together (`TEXT_COLLECT_VECTORS`, `TEXT_COLLECT_STRUCTURE`, `TEXT_TABLE_HUNT`,
+`TEXT_LAZY_VECTORS`; those four alone die, any three do not) and the document's structure
+tree: the PDF is tagged, and a copy of the page alone in a new document
+(`Document.insert_pdf`, which carries the page's content, boxes and Rotate and leaves the
+tree behind) is read without harm, turned or not. So after the probe, `analyze` has a second
+child make that reading on every selected page the probe passed, one page after another,
+and write each page's number once the page is behind it. A child that dies names the page
+it died on (the first one it did not write); that page is tried again in a child of its
+own as a copy, and the rest go to a new child. The answer for each such page is
+`tables.DetectorSource`: `"copy"` (the detector reads a one-page copy; its proposals are in
+the page's own frame, and everything else, the page's lines, the arbitration, the grid and
+the fill, reads the page itself) or `"none"` (the copy dies too: the detector is not run on
+the page, and tables are proposed from the page's own lines and rules alone). `"page"`, the
+answer for every other page, is not stored in `_Document.detector_sources`. A page is
+tried once for a document (`_HUNTED`, by document hash, the last `PROBED_MEMORY`
+documents). The children have the probe's memory cap and environment. All of them together
+have `HUNT_TIMEOUT_S` (30 s) and `PROBE_PER_PAGE_S` (2 s) for each page after the first,
+and `HUNT_DEATHS_MAX` (8) pages of a document may kill one: past either, the pages not yet
+tried are `"none"`, so a file made to die on every page costs 17 children at most (one for
+each of 8 dying pages, one for the copy of each, and the one that dies on the ninth) and
+then reads without the detector. The log names the page and the answer, nothing of the
+page.
+
+What it costs: the reading takes 10 to 50 ms a page on the papers measured (the slowest
+0.11 s) and the child about 0.14 s to start, once for a document. What it changes: nothing
+for a document none of whose pages dies there (the child's reading is thrown away; the
+detector reads the page as before). On the paper's other 26 pages the detector proposes
+the same boxes on the page and on its copy. What it does not cover: a page turned on its
+side is read by the detector through a turned one-page copy (`tables._find_turned`), which
+has no structure tree and is not tried; a page whose answer is `"none"` gets a warning in
+the log and no notice of its own (none has been seen: the one page known reads as a copy);
+and any other MuPDF call the analysis makes in this process is guarded by the probe or not
+at all. In production the conversion runs in a child of the worker
+(`web/isolated_convert.py`), so before this the paper ended as `conversion_crashed`: the
+job failed, not the worker.
+
 What the probe does not cover: the analysis itself (Python code in this process) has no
 time limit. Fragment resolution, run building, column detection and script attachment are
 indexed so a crafted page of thousands of rows stays near-linear (a 16-column page of

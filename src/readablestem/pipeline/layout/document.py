@@ -37,6 +37,7 @@ from readablestem.pipeline.layout.access import (
     _open,
     _quiet_mupdf,
     _select_pages,
+    hunt_failures,
     probe_failures,
 )
 from readablestem.pipeline.layout.blocks import (
@@ -146,7 +147,10 @@ def analyze(
     the paragraph that contains it. `Element.order` is the position in the whole document.
     Pages are analysed in ascending order (duplicates ignored). Raises `LayoutError`.
 
-    The selected pages are first rendered once in a child process (see `_probe_pages`);
+    The selected pages are first rendered once in a child process (see `_probe_pages`),
+    and a second child reads each as the table detector will (`hunt_failures`): a page
+    that kills it is searched for tables on a copy of the page alone, or not by the
+    detector at all;
     the document is opened for this call only and closed again, so analysis leaves no
     user content in this module (only `crop` caches documents).
 
@@ -201,6 +205,15 @@ def analyze(
                 unrendered = probe_failures(pdf_bytes, _digest(pdf_bytes), selected)
                 for number, error in unrendered.items():  # the page and the code, no content
                     log.warning("layout could not draw page %d: %s", number + 1, error.code)
+                unhunted = hunt_failures(
+                    pdf_bytes, _digest(pdf_bytes), [n for n in selected if n not in unrendered]
+                )
+                for number, source in unhunted.items():
+                    log.warning(
+                        "the table detector cannot read page %d where it is: %s",
+                        number + 1,
+                        source,
+                    )
                 return _analyze_document(
                     doc,
                     selected,
@@ -213,6 +226,7 @@ def analyze(
                         figure_art=figure_art,
                         matching_under=matching_under,
                         detector=tables.DetectorBudget(None if table_search_limited else math.inf),
+                        detector_sources=unhunted,
                         trace=PageTrace(),
                     ),
                     on_page,

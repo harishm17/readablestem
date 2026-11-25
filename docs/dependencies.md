@@ -24,7 +24,7 @@ and never linked may carry another license.
 | `pillow` | pictures inside an upload | the conversion child; the pixel count of a picture is bounded before it is decoded | `tests/test_audit_uploads.py` |
 | `py3langid` | text of an upload | the worker; it reads plain text only | `tests/test_text_language.py` |
 | `pymupdf` | every uploaded PDF | the conversion child: a separate process with memory, time and file-size limits, so a file that crashes, hangs or balloons the parser costs that child and nothing else | `tests/test_audit_uploads.py`, `tests/workflows/test_wf49_hostile_input.py` |
-| `pymupdf-layout` | pages of an uploaded PDF | the conversion child, behind the probe that guards the table step | `tests/test_audit_uploads.py`, `tests/test_tables_fuzz.py` |
+| `pymupdf-layout` | pages of an uploaded PDF | the conversion child, behind the probe that guards the table step and a second child that makes the detector's own text reading first (`access.hunt_failures`) | `tests/test_audit_uploads.py`, `tests/test_tables_fuzz.py` |
 | `python-multipart` | the body of every upload request | the web process, behind the size limits that hold before anything is parsed | `tests/test_audit_uploads.py`, `tests/test_audit_fuzz.py` |
 | `latexml` (Debian package) | every uploaded LaTeX project | bubblewrap with no network, a read-only system and prlimit limits (core/sandbox.py); ImageMagick's policy allows PNG, JPEG and GIF only | `tests/test_source_escapes.py`, `tests/test_sandbox.py`, `tests/test_archive_intake.py`, `tests/workflows/test_wf49_hostile_input.py` |
 | `libreoffice-impress-nogui` (Debian package) | every uploaded PowerPoint file | a child process with memory, time and output limits and its own empty profile | `tests/test_office_convert.py` |

@@ -7,7 +7,7 @@ the layout package: pipeline/layout/__init__.py describes how a page is read.
 from __future__ import annotations
 
 import logging
-from collections.abc import Generator, Iterable
+from collections.abc import Generator, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from typing import Literal
@@ -76,6 +76,9 @@ class _Document:
     trace: PageTrace = field(default_factory=lambda: PageTrace(enabled=False))
     ink: page_type.InkBudget = field(default_factory=page_type.InkBudget)
     detector: tables.DetectorBudget = field(default_factory=tables.DetectorBudget)
+    # Pages the table detector cannot read where they are (`access.hunt_failures`), each
+    # with what it may read instead (`tables.DetectorSource`: "copy" or "none").
+    detector_sources: Mapping[int, tables.DetectorSource] = field(default_factory=dict)
 
 
 _PLAIN = _Document()  # never changed: the document of a caller that has none

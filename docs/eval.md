@@ -704,6 +704,18 @@ added from November 2026 on:
    bar is the figure the fix is built toward.
 4. A held-out set that was used to choose between designs is spent. Its documents are passed
    as `spent` and are development from then on; new ones are drawn.
+5. The stop rule, standing since 2026-11-25. A held-out set is scored once for a release, on
+   the head that is to be released. If a row is worse than its release bar, that release is
+   not made: the bar is not changed, no page is opened, no rule is built for the failed row
+   in that release, and there is no second run for it. What may follow is the next release,
+   judged by its own single run. The 0.5.20 release is why the rule is written here and not
+   per release: `layout-heldout-1` was scored for it twice, with a rule built between the
+   runs in knowledge of the first one's totals ("The held-out runs for 0.5.20", below). The
+   set has now been scored four times (0.5.18, 0.5.19 and twice for 0.5.20). No page of it
+   was looked at, so it is not spent by rule 4, but its furniture row and its count of right
+   pages are fitted to one fault, and each further run teaches the builders a little more of
+   its totals. Until a second held-out half is drawn and registered, a pass on it says that a
+   release is no worse than the last one on these pages, and no more than that.
 
 A report says four things about its run: `split.name` and `split.set_sha256`
 (`Split.stamp`), `profile.sha256` and `pipeline_version`.
@@ -3128,7 +3140,8 @@ being changed. Its record keeps totals and names no page, `--records`, `--from` 
 `--against` are refused for it, and a failing page is not looked at. The 0.5.20 release
 broke the "once" of this rule: `layout-heldout-1` was scored for it twice, with the reader
 changed between the two runs ("The held-out runs for 0.5.20", below, says why, and what
-the second run is worth).
+the second run is worth); rule 5 of "Development and held-out, and the two bars" above is the stop rule that
+stands since.
 
 `layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.20,
 source `800165e7`, under the production profile with the four layout switches on), the
