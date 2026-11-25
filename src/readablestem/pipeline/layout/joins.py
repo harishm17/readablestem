@@ -94,6 +94,28 @@ def _text_edges(page: _PageBlocks) -> dict[str, float]:
     return edges
 
 
+def _line_edges(page: _PageBlocks) -> dict[str, float]:
+    """Left edge of the body text of each column of a page, read from its lines: the x where
+    most of the column's paragraph lines start (within 2.5 pt; the leftmost on a tie).
+
+    `_text_edges` takes the leftmost x that three paragraphs start at, which is right for a
+    page of boxes (the text at the margin is the body's) and wrong for a page whose first
+    paragraphs are set in (an abstract, a quotation) while the body is not. The page join
+    reads both (`_join_page_splits`)."""
+    lines: dict[str, list[float]] = {}
+    for block in page.blocks:
+        if block.kind == Kind.PARAGRAPH and block.rows:
+            column = block.rows[0].column
+            lines.setdefault(column, []).extend(r.x0 for r in block.rows if r.column == column)
+    edges: dict[str, float] = {}
+    for column, xs in lines.items():
+        xs.sort()
+        edges[column] = max(
+            enumerate(xs), key=lambda ix: (bisect.bisect_right(xs, ix[1] + 2.5) - ix[0], -ix[1])
+        )[1]
+    return edges
+
+
 def _mark_run_in_labels(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
     """Mark the bold run-in labels that repeat (`REASON_RUN_IN_LABEL`).
 
@@ -431,7 +453,7 @@ def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
     `_to_elements` writes both parts as one element. A paragraph that runs over a second
     break joins again."""
     owner: dict[int, _Block] = {}
-    edges: dict[int, Mapping[str, float]] = {}
+    edges: dict[int, tuple[Mapping[str, float], Mapping[str, float]]] = {}
     for before, page in pairwise(pages):
         if page.number != before.number + 1 or not page.blocks:
             continue
@@ -439,8 +461,12 @@ def _join_page_splits(pages: Sequence[_PageBlocks], ctx: _Context) -> None:
         if last is None or part is None:
             continue
         for p in (before, page):
-            edges.setdefault(p.number, _text_edges(p))
-        if not _goes_on(last, part, edges[before.number], edges[page.number]):
+            edges.setdefault(p.number, (_text_edges(p), _line_edges(p)))
+        # The page's edge is read two ways (the page whose first paragraphs are set in has
+        # one of each): the paragraph goes on when it does under either.
+        if not any(
+            _goes_on(last, part, edges[before.number][i], edges[page.number][i]) for i in (0, 1)
+        ):
             continue
         host = owner.get(id(last), last)
         host.parts.append((page.number, part))
