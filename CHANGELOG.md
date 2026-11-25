@@ -91,6 +91,30 @@
   version; that half is still owed.
 - docs/layout.md ("A page the table detector cannot read"), docs/tables.md ("Where it
   runs, and what it costs"; "Upgrade check"), docs/dependencies.md.
+## Unreleased: a paragraph that goes on over a page, on a first page whose abstract is set in
+
+- A paragraph cut by a page break is joined when the two parts stand at one edge, and the
+  page's text edge (`joins._text_edges`: the leftmost x that three paragraphs of two lines
+  or more start at) was the abstract's on a first page whose abstract is set in left of the
+  body's column and whose column has two body paragraphs (arXiv 2505.05280 pages 1 to 2).
+  The page join now also reads the edge from the column's lines (`joins._line_edges`: the
+  x that most paragraph lines start at, three lines at least) and joins when either agrees.
+  The run-in labels read `_text_edges` as before.
+- Counted before the change on 365 public arXiv papers (25 pages each, 2 failed to open),
+  the 60 development files (whole) and the 72 corpus entries: 1,776, 193 and 24 breaks where a
+  page ends without sentence-final punctuation and the next starts in lower case; 1,564, 162
+  and 19 joined, 212, 31 and 5 refused, and 119, 25 and 4 of the refused by the place test.
+  Most of those are not the edge (list items whose lines wrap to the margin, a one-line
+  tail across columns). The edge is not the column's body edge on 763, 116 and 32 of the
+  7,965, 1,109 and 280 columns of pages.
+- Against 0.5.20: on the papers 16 pages of 7 papers differ, on the development files 4 pages of
+  2 files, in the corpus none. Each page is one join gained and every one is right (8 and 2
+  joins: a sentence cut by the page, a reference entry cut by the page); none is wrong, none is
+  lost. With the four switches off (`hashrun.py analyze`, 334 files in three variants) the same
+  joins come and one more: two index entries of `os_concepts_biology` (pages 17 and 18, a
+  wrong join the production switches do not make). `eval order` on `layout-dev-1` (267 pages) and the corpus gold pages (91) does not
+  move on either view. The corpus replay (73 uploads) is the same byte for byte, so no
+  recorded request stops matching. A pipeline raise is owed with the next release.
 
 ## Pipeline 0.5.20, render 11 (2026-11-25)
 

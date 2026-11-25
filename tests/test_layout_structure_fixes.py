@@ -395,6 +395,51 @@ def test_a_paragraph_that_ends_a_page_in_one_column_goes_on_in_the_next_pages_ot
     assert any("continues to speed up" in (e.text or "") for e in spanning) is joined
 
 
+def test_a_paragraph_goes_on_over_the_page_from_a_first_page_whose_abstract_is_set_in():
+    """A first page with a narrow column at the left, an abstract set in from the body's right
+    column (as far left as the body's edge, with as many paragraphs) and two body paragraphs
+    in the right column, the last of them cut by the page break."""
+    line = "The cart rolls down the ramp and speeds"
+    wide = line + " and then the cart keeps going on down the long ramp to the end"
+
+    def column(page, x, y, count, text=line):
+        for _ in range(count):
+            page.insert_text((x, y), text, fontsize=9.0, fontname="helv")
+            y += 12
+        return y + 8
+
+    def fill(number, page):
+        if number == 0:
+            page.insert_text((210, 172), "Abstract", fontsize=9.0, fontname="hebo")
+            y = 180.0
+            for _ in range(2):
+                y = column(page, 50, y, 3, "A sidebar of words set apart")
+            y = 180.0
+            for _ in range(2):
+                y = column(page, 210, y, 5, wide)
+            column(page, 312, 330, 12)
+            column(page, 312, 600, 2)
+            page.insert_text((312, 624), "the cart continues to", fontsize=9.0, fontname="helv")
+            for index in range(3):
+                column(page, 50, 330 + index * 68, 5)
+        else:
+            page.insert_text((50, 72), "speed up while the ramp stays level.", fontsize=9.0)
+            y = column(page, 50, 84, 3)
+            for _ in range(2):
+                y = column(page, 50, y, 5)
+            y = 72.0
+            for _ in range(3):
+                y = column(page, 312, y, 5)
+
+    doc = pymupdf.open()
+    for number in range(2):
+        fill(number, doc.new_page(width=612, height=792))
+    layout = analyze(doc.tobytes(), region_tree=True)
+    spanning = [e for e in paragraphs(layout) if e.last_page is not None]
+    assert [(e.page, e.last_page) for e in spanning] == [(0, 1)]
+    assert "continues to speed up" in (spanning[0].text or "")
+
+
 def test_a_hyphen_at_a_page_break_is_repaired_like_one_at_a_line_break():
     layout = analyze(split_pages("ity while the", first_last="and the cart gains veloc-"))
     assert any("gains velocity while" in (e.text or "") for e in paragraphs(layout))

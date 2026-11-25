@@ -489,7 +489,14 @@ so a heading is not, and a line that starts a block is not).
    x, or each at the text edge of its own column (`_text_edges` of its own page, so odd and
    even pages with other margins agree, and a two-column page that ends in the right column
    goes on in the left one; across columns the tail needs two rows or more, since a
-   one-line tail across columns is too often a license line). A last line that stands in by
+   one-line tail across columns is too often a license line). A page's text edge is read two
+   ways, and the paragraph goes on when it does under either: `_text_edges` (the leftmost x
+   that three paragraphs of two lines or more start at, which is the body's on a page of
+   boxes set in from the margin) and `_line_edges` (the x that most of the column's paragraph
+   lines start at, which is the body's on a first page whose abstract is set in left of the
+   column's body, with too few paragraphs for three to agree: arXiv 2505.05280 pages 1 to 2).
+   Only the page join reads the second; the run-in labels (`LABEL_INSET`) read the first as
+   before. A last line that stands in by
    a first-line indent (the one line of a paragraph, or the first line of the last paragraph
    of a block) counts as at the edge. A tail of two lines or more whose lines all stand
    twelve ems or more in from its page's text edge is in the other column of a page whose
