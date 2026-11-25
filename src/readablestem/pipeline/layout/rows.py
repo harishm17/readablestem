@@ -49,6 +49,8 @@ from readablestem.pipeline.layout.glyphs import (
 )
 from readablestem.pipeline.layout.shared import (
     _CHEM_DASHES,
+    _MATH_WORDS,
+    _MORE_MATH_WORDS,
     LIMIT_SIGNS,
     SCRIPT_MIN_RATIO,
     SCRIPT_RATIO,
@@ -1125,15 +1127,35 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
 
 
 def _starts_at(host: _Row, piece: _Row) -> bool:
-    """Does `host` begin where a sum, product or integral sign of `piece` ends, no further than
-    half an em beyond it? A sign that leads a line comes as a piece of its own, and the row of
-    what goes on starts with the lower limit TeX lowers to the baseline of the line, or with the
-    integrand, so that row seems to start a sign's width after the sign (arXiv 2411.02531 page 1,
-    2212.05955 page 13)."""
+    """Does `host`, a row that goes on in running words, begin where a sum, product or integral
+    sign of `piece` ends, no further than half an em beyond it? A sign that leads a line of a
+    paragraph comes as a piece of its own, and the row of what goes on starts with the lower
+    limit TeX lowers to the baseline of the line, or with the integrand, so that row seems to
+    start a sign's width after the sign (arXiv 2411.02531 page 1, 2212.05955 page 13). The
+    rows of a display are left as they were: their signs stand where the display's own lines
+    put them."""
     first = next((c for c in host.chars if not c.blank), None)
-    return first is not None and any(
-        c.c in LIMIT_SIGNS and c.x0 <= first.x0 <= c.x1 + 0.5 * host.size for c in piece.ink
+    return (
+        first is not None
+        and any(
+            c.c in LIMIT_SIGNS and c.x0 <= first.x0 <= c.x1 + 0.5 * host.size for c in piece.ink
+        )
+        and _runs_on_in_words(host)
     )
+
+
+def _runs_on_in_words(row: _Row) -> bool:
+    """Does the row hold a word of upright letters that is no function name ("for", "which")?"""
+    word: list[str] = []
+    for c in [*row.chars, None]:
+        if c is not None and _text_char(c) and c.c.isalpha():
+            word.append(c.c.lower())
+            continue
+        text = "".join(word)
+        word = []
+        if len(text) >= 3 and text not in _MATH_WORDS and text not in _MORE_MATH_WORDS:
+            return True
+    return False
 
 
 def _insert_script(
