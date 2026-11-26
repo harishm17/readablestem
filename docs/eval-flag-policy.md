@@ -3,7 +3,7 @@
 `FLAG_POLICY` (docs/steps.md, "Flag policy") asks for a decision on an accepted equation that looks
 like the readings that turned out wrong. This page says how it was fitted and what it does, measured on
 recorded runs only: no model call, no PDF, $0. The setting is off in code. It was on in production
-from 2026-11-03 to 2026-11-25 and is off again since the last section, which measures it on today's
+from 2026-11-03 until the 0.5.22 release (2026-11-26) and is off from that release, on the last section's evidence, which measures it on today's
 readings; the sections before it are the record of what was measured then.
 
 ## Method

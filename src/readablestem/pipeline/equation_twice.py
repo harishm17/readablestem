@@ -15,13 +15,23 @@ follow each other on one line (the boxes share a line, and nothing but text stan
 markers), and a window of two or more of them. A member's reading K says the whole window when
 the letters, digits and Greek letters of K's reading, in document order, are the window's own
 characters one for one and in order (each member's box, and the paragraph's text between two
-members in its place), and every other member's reading is a run inside K's (it says nothing K
+members in its place), every sign, bracket or comma of the text between two members stands in
+K's reading at that place, and every other member's reading is a run inside K's (it says nothing K
 does not say). The window is then written once: K's marker stands where the window began, and
 the other markers and the text between the first and the last go. So does a closing bracket
-right after the window that K's reading already holds (the window opened it and layout left its
-end in the paragraph). Which member is K: an accepted one before an asked one, then one whose box
-has characters, then the first. A window whose characters are K's letters in another order (a
-fraction, a matrix, a root that the file stores in another order) is left as it is.
+right after the window that the window's own characters opened and K's reading closes (layout
+left its end in the paragraph). Which member is K: an accepted one before an asked one, then the
+one with fewer failed checks, then one whose box has characters, then the first. A window whose
+characters are K's letters in another order (a fraction, a matrix, a root that the file stores
+in another order) is left as it is. So is a window with more than `MAX_BOXES` members, and one
+where two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`) and the one that would
+stay was accepted: nobody would see the other reading.
+
+K then stands for the whole formula, so its element takes the whole window: the box that holds
+every member's box, and their text with the text between them. The caller cuts its picture again
+from the page (`run._convert`), with no new request. A reviewer who keeps the original, or checks
+the reading against the picture, has the whole formula in front of them, and a decision made on
+an earlier upload about the part's picture is not carried onto it (`web.carry` matches pictures).
 
 Not built: an accent that layout boxed apart from its letter (one on the development papers),
 and an inline box inside a display's box. Where layout puts a block box over an inline one, the
@@ -38,7 +48,6 @@ stay what was spent. A change that would leave a paragraph empty is not made.
 
 from __future__ import annotations
 
-import itertools
 import unicodedata
 from dataclasses import dataclass
 
@@ -58,9 +67,32 @@ from readablestem.pipeline import text_layer_compare
 # The share of the shorter box's height that two boxes of one line share.
 SAME_LINE = 0.5
 
+# The most boxes one formula is cut into (real repeats are two or three): a longer window is
+# not looked at, so a line of hundreds of boxes costs no more than a short one.
+MAX_BOXES = 4
+
+# The room a closing bracket takes after the window, as a share of the line's height: the
+# bracket stands in the paragraph, outside every box, and the whole formula's box takes it in.
+BRACKET_WIDTH = 0.35
+
 _LEAVES = frozenset({"mi", "mn", "mo", "mtext", "ms"})
-_INVISIBLE = "\u2061\u2062\u2063\u2064"
+_WRAPPERS = frozenset({"math", "mrow", "mstyle", "semantics", "mpadded", "mphantom"})
+_INVISIBLE = "\u2061\u2062\u2063\u2064\u200b\u200c\u200d"
 _BRACKETS = {")": "(", "]": "[", "}": "{"}
+# Signs a text layer and a reading write with different characters, as one.
+_SAME_SIGN = str.maketrans(
+    {
+        "\u2212": "-",
+        "\u2013": "-",
+        "\u2014": "-",
+        "\u2010": "-",
+        "\u2011": "-",
+        "\u2217": "*",
+        "\u2032": "'",
+        "\u2019": "'",
+        "\u22c5": "\u00b7",
+    }
+)
 
 
 @dataclass(frozen=True)
@@ -70,6 +102,7 @@ class _Reading:
     reading: str  # letters, digits and Greek letters of the reading, in order
     box: str  # the same of the PDF's text in the box, in order
     tokens: tuple[str, ...]  # every symbol and operator of the reading, in order
+    shape: tuple[str, ...]  # how the reading is built: its tags and tokens, in order
 
 
 @dataclass(frozen=True)
@@ -79,6 +112,8 @@ class _Merge:
     first: str  # the marker of the window's first member, and of its last
     last: str
     tail: int  # the closing brackets right after the window that the kept reading holds
+    bbox: tuple[float, float, float, float]  # the box that holds every member's box
+    text: str  # the window's own text: each box's and the text between two boxes
 
 
 def _reading(element: Element, fix: Fix | None) -> _Reading | None:
@@ -91,23 +126,29 @@ def _reading(element: Element, fix: Fix | None) -> _Reading | None:
         return None
     try:
         reading = text_layer_compare.mathml_seq(fix.equation.mathml)
+        tokens, shape = _tokens(fix.equation.mathml)
     except Exception:  # (a MathML that does not parse is no reading to compare)
         return None
     box = text_layer_compare.symbol_seq(element.text or "")
-    return _Reading(element, fix, reading, box, _tokens(fix.equation.mathml))
+    return _Reading(element, fix, reading, box, tokens, shape)
 
 
-def _tokens(mathml: str) -> tuple[str, ...]:
+def _tokens(mathml: str) -> tuple[tuple[str, ...], tuple[str, ...]]:
     """The symbols and operators of a MathML in document order, as a text layer would hold them
-    (styled letters folded, invisible operators and spaces left out)."""
+    (styled letters folded, invisible operators and spaces left out), and its shape: the same
+    with the tag of every node that builds something (a script, a fraction, a root)."""
     root = DET.fromstring(mathml, forbid_dtd=True)
-    out = []
+    tokens, shape = [], []
     for node in root.iter():
-        if node.tag.rsplit("}", 1)[-1] in _LEAVES and node.text:
+        tag = node.tag.rsplit("}", 1)[-1]
+        if tag in _LEAVES and node.text:
             token = "".join(unicodedata.normalize("NFKC", node.text).casefold().split())
             if token.strip(_INVISIBLE):
-                out.append(token.strip(_INVISIBLE))
-    return tuple(out)
+                tokens.append(token.strip(_INVISIBLE))
+                shape.append(token.strip(_INVISIBLE))
+        elif tag not in _LEAVES and tag not in _WRAPPERS:
+            shape.append(f"<{tag}>")
+    return tuple(tokens), tuple(shape)
 
 
 def _within(small: tuple[str, ...], big: tuple[str, ...]) -> bool:
@@ -116,16 +157,17 @@ def _within(small: tuple[str, ...], big: tuple[str, ...]) -> bool:
     return n > 0 and any(big[i : i + n] == small for i in range(len(big) - n + 1))
 
 
-def _rank(r: _Reading, position: int) -> tuple[bool, bool, int]:
-    """Which reading stays: an accepted one before an asked one, then one whose box has
-    characters, then the first."""
-    return (r.fix.status is not Status.ACCEPTED, not r.box, position)
+def _rank(r: _Reading, position: int) -> tuple[bool, int, bool, int]:
+    """Which reading stays: an accepted one before an asked one, then the one with fewer failed
+    checks, then one whose box has characters, then the first."""
+    failed = sum(1 for c in r.fix.checks if not c.passed)
+    return (r.fix.status is not Status.ACCEPTED, failed, not r.box, position)
 
 
 def _same_line(a: Element, b: Element) -> bool:
     height = min(a.bbox[3] - a.bbox[1], b.bbox[3] - b.bbox[1])
     shared = min(a.bbox[3], b.bbox[3]) - max(a.bbox[1], b.bbox[1])
-    return height > 0 and shared / height >= SAME_LINE
+    return a.page == b.page and height > 0 and shared / height >= SAME_LINE
 
 
 Run = list[tuple[int, int, _Reading]]  # (where its marker starts, where it ends, its reading)
@@ -157,24 +199,79 @@ def _whole(text: str, run: Run, i: int, j: int) -> str:
     return out
 
 
-def _tail(text: str, members: Run, keep: _Reading) -> int:
-    """How many closing brackets right after the window the kept reading already holds: the
-    reading's brackets balance, the window's own characters (the boxes and the text between
-    them) leave that many open, and the paragraph closes them at once."""
-    said = "".join(keep.tokens)
+def _stream(text: str) -> list[tuple[bool, str]]:
+    """A text character by character: (True, a letter or digit as `symbol_seq` writes it) or
+    (False, a sign, bracket or comma); spaces and invisible characters left out."""
+    out: list[tuple[bool, str]] = []
+    for ch in text:
+        symbols = text_layer_compare.symbol_seq(ch)
+        if symbols:
+            out.extend((True, c) for c in symbols)
+            continue
+        for c in unicodedata.normalize("NFKC", ch).translate(_SAME_SIGN):
+            if not c.isspace() and c not in _INVISIBLE and unicodedata.category(c) != "Lm":
+                out.append((False, c))
+    return out
+
+
+def _says(keep: _Reading, text: str, members: Run) -> list[str] | None:
+    """Does the kept reading say the window with the signs between its boxes? The reading's
+    signs after its last letter when it does (a closing bracket among them, perhaps), else None.
+
+    The letters and digits are the window's one for one (the caller saw that). Here: every sign,
+    bracket or comma of the text between two boxes stands in the reading at that place, between
+    the letters either side of it. What the reading does not say would be lost with the text."""
+    said = _stream(" ".join(keep.tokens))
+    if "".join(c for symbol, c in said if symbol) != keep.reading:
+        said = None  # (the reading's signs cannot be placed: then the text may hold none)
+    at = 0
+    for k, (_, _, member) in enumerate(members):
+        pieces: list[tuple[bool, str]] = [(True, c) for c in member.box]
+        if k:
+            pieces = _stream(text[members[k - 1][1] : members[k][0]]) + pieces
+        for symbol, c in pieces:
+            if said is None:
+                if not symbol:
+                    return None
+                continue
+            if symbol:
+                while at < len(said) and not said[at][0]:
+                    at += 1
+                at += 1  # (the same letter: the reading's letters are the window's)
+                continue
+            while at < len(said) and said[at] != (False, c):
+                if said[at][0]:
+                    return None  # the next letter comes first: the reading has no such sign
+                at += 1
+            if at == len(said):
+                return None
+            at += 1
+    return [c for _, c in said[at:]] if said is not None else []
+
+
+def _tail(text: str, members: Run, after: list[str]) -> int:
+    """How many closing brackets right after the window go with it: brackets the window's own
+    characters (the boxes and the text between them) opened and did not close, which the kept
+    reading closes after its last letter (`after`). A bracket the sentence opened is not owed."""
     held = "".join(m[2].element.text or "" for m in members) + text[members[0][1] : members[-1][0]]
-    owed = {
-        close: said.count(close) - held.count(close)
-        for close, opener in _BRACKETS.items()
-        if said.count(opener) == said.count(close)
-    }
-    count = 0
+    owed = {close: held.count(opener) - held.count(close) for close, opener in _BRACKETS.items()}
+    count = at = 0
     for ch in text[members[-1][1] :]:
-        if owed.get(ch, 0) <= 0:
+        if owed.get(ch, 0) <= 0 or ch not in after[at:]:
             break
+        at = after.index(ch, at) + 1
         owed[ch] -= 1
         count += 1
     return count
+
+
+def _around(
+    boxes: list[tuple[float, float, float, float]], tail: int
+) -> tuple[float, float, float, float]:
+    """The box that holds every member's box, and the closing brackets after the last."""
+    top, bottom = min(b[1] for b in boxes), max(b[3] for b in boxes)
+    right = max(b[2] for b in boxes) + tail * BRACKET_WIDTH * (bottom - top)
+    return (min(b[0] for b in boxes), top, right, bottom)
 
 
 def _windows(text: str, run: Run) -> list[_Merge]:
@@ -183,13 +280,14 @@ def _windows(text: str, run: Run) -> list[_Merge]:
     n = len(run)
     taken: set[int] = set()
     merges: list[_Merge] = []
-    for i, j in sorted(itertools.combinations(range(n), 2), key=lambda w: (w[0] - w[1], w[0])):
+    spans = [(i, j) for i in range(n) for j in range(i + 1, min(n, i + MAX_BOXES))]
+    for i, j in sorted(spans, key=lambda w: (w[0] - w[1], w[0])):
         if taken.intersection(range(i, j + 1)):
             continue
         members = run[i : j + 1]
-        whole = _whole(text, run, i, j)
         if not any(m[2].box for m in members):
             continue  # no characters of the file in the window: nothing to compare with
+        whole = _whole(text, run, i, j)
         says = [
             (_rank(m[2], at), m[2])
             for at, m in enumerate(members)
@@ -202,13 +300,27 @@ def _windows(text: str, run: Run) -> list[_Merge]:
         if not says:
             continue
         keep = min(says, key=lambda s: s[0])[1]
+        if keep.fix.status is Status.ACCEPTED and any(r.shape != keep.shape for _, r in says):
+            continue  # a second reading of the whole says it another way, and nobody is asked
+        after = _says(keep, text, members)
+        if after is None:
+            continue
+        tail = _tail(text, members, after)
+        boxes = [m[2].element.bbox for m in members]
+        end = members[-1][1]
         merges.append(
             _Merge(
                 keep,
                 tuple(m[2] for m in members if m[2] is not keep),
                 inline_marker(members[0][2].element.id),
                 inline_marker(members[-1][2].element.id),
-                _tail(text, members, keep),
+                tail,
+                _around(boxes, tail),
+                "".join(
+                    (text[members[k - 1][1] : m[0]] if k else "") + (m[2].element.text or "")
+                    for k, m in enumerate(members)
+                )
+                + text[end : end + tail],
             )
         )
         taken.update(range(i, j + 1))
@@ -262,14 +374,17 @@ def _edit(parent: Element, start: int, end: int, insert: str) -> Element | None:
 
 def settle(
     elements: list[Element], fixes: dict[str, Fix]
-) -> tuple[list[Element], dict[str, Fix], list[tuple[int, Fix]]]:
-    """The elements and fixes with each repeated formula written once, and the dropped fixes
-    with their pages (their cost and calls were spent: the caller counts them)."""
+) -> tuple[list[Element], dict[str, Fix], list[tuple[int, Fix]], list[Element]]:
+    """The elements and fixes with each repeated formula written once, the dropped fixes with
+    their pages (their cost and calls were spent: the caller counts them), and the kept
+    elements, which now hold the whole formula's box and text (the caller cuts their pictures
+    again)."""
     merges = _plan(elements, fixes)
     if not merges:
-        return elements, fixes, []
+        return elements, fixes, [], []
     by_id = {e.id: e for e in elements}
     dropped: dict[str, Fix] = {}
+    widened: list[Element] = []
     for merge in merges:
         parent = by_id.get(merge.keep.element.parent_id or "")
         if parent is None or not parent.text:
@@ -282,14 +397,22 @@ def settle(
         if cut is None:
             continue
         by_id[cut.id] = cut
+        # The glyphs kept with the element were read under its own box: they are not the
+        # whole formula's, and no check reads them after this step.
+        whole = merge.keep.element.model_copy(
+            update={"bbox": merge.bbox, "text": merge.text, "glyphs": None}
+        )
+        by_id[whole.id] = whole
+        widened.append(whole)
         for d in merge.dropped:
             dropped[d.element.id] = d.fix
     if not dropped:
-        return elements, fixes, []
+        return elements, fixes, [], []
     page_of = {e.id: e.page for e in elements}
     kept = [by_id[e.id] for e in elements if e.id not in dropped]
     return (
         kept,
         {i: f for i, f in fixes.items() if i not in dropped},
         [(page_of[i], f) for i, f in dropped.items()],
+        widened,
     )

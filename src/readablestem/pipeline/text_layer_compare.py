@@ -335,7 +335,11 @@ class Trim:
 
     text: str
     glyphs: tuple[Glyph, ...]
-    dropped: int  # letters and digits of the run
+
+
+# A reading may leave out this many letters and digits at one end of the box whatever it keeps
+# (`∥·∥a` read without the `a`); more only when it keeps at least as many (`trim_text_layer`).
+TRIM_ANY = 2
 
 
 def _symbol_units(chars: Sequence[str]) -> list[tuple[int, Counter[str]]]:
@@ -360,13 +364,19 @@ def trim_text_layer(span_text: str | None, mathml: str, span: Sequence[Glyph]) -
     letters and digits are exactly the box's less a run at its start or at its end, the rest
     matching symbol for symbol, the box's text without that run (and the operators and brackets
     that stand between it and the rest) is what the reading is compared with. None when the
-    reading has anything the box lacks, drops from both ends or from either with equal right, or
-    leaves the box with no characters at all. The file does not say where the formula ends: this is
-    no evidence, and a caller that trusts it says so (`equation_step.BOX_ENDS_CODE`)."""
+    reading has anything the box lacks, drops from both ends or from either with equal right,
+    leaves the box with no characters at all, or leaves out more letters and digits than it keeps
+    and more than `TRIM_ANY` (a box that took in a word beside the formula loses a few; a reading
+    of one letter of a long box is another thing, and stays a mismatch). The file does not say
+    where the formula ends: this is no evidence, and a caller that trusts it says so
+    (`equation_step.BOX_ENDS_CODE`)."""
     if not span_text:
         return None
     have, want = symbol_bag(span_text), mathml_bag(mathml)
     if not (have - want) or (want - have):
+        return None
+    kept = sum(want.values())
+    if sum(have.values()) - kept > max(kept, TRIM_ANY):
         return None
     chars = list(span_text)
     units = _symbol_units(chars)
@@ -390,7 +400,7 @@ def trim_text_layer(span_text: str | None, mathml: str, span: Sequence[Glyph]) -
     if [sum(b.values()) for _, b in glyph_units] == [sum(b.values()) for _, b in units]:
         cut = _cut(glyph_units, side, k)
         glyphs = tuple(span[cut:] if side == "start" else span[:cut])
-    return Trim(text, glyphs, sum(sum(b.values()) for _, b in units) - sum(want.values()))
+    return Trim(text, glyphs)
 
 
 # ------------------------------------------------------------------------- styles

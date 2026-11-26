@@ -1502,6 +1502,17 @@ class _Run:
         self.futures[future] = element
         self.pages.add(element.page)
 
+    def cut_again(self, element: Element) -> None:
+        """The stored picture of an element whose box changed after its step: cut from the
+        page as the first one was, with no model call. A cut that fails leaves the old one."""
+        try:
+            png = layout.crop(self.pdf_bytes, element)
+        except Exception as exc:
+            log.warning("crop failed: %s", type(exc).__name__)
+            return
+        drawn = image_page_vector.element_picture(self.vector, element)
+        self.crops[element.id] = self.sharp_equation(element) or drawn or png
+
     def collect(self, *, block: bool) -> None:
         """Record finished tasks; cancel the queue once the budget is gone."""
         while self.futures:
@@ -2482,9 +2493,12 @@ def _convert(
             image_page.enforce_maths_required(elements, run.fixes)
         elements, run.fixes = table_math.settle(elements, run.fixes)
         # One formula that layout cut into two boxes, read twice, is written once.
-        elements, run.fixes, repeated = equation_twice.settle(elements, run.fixes)
+        # The copy that stays holds the whole formula's box: its picture is cut again.
+        elements, run.fixes, repeated, whole = equation_twice.settle(elements, run.fixes)
         for _, fix in repeated:
             run.crops.pop(fix.element_id, None)
+        for element in whole:
+            run.cut_again(element)
         # No empty alt text on content (WS6.4): decoration only with evidence, after every step.
         decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)
         # A paragraph or list item layout doubts (`option_labels`, `rtl_text`) gets its decision.

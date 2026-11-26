@@ -303,7 +303,8 @@ def run_two_models(element: Element, cheap: str, main: str):
     ("cheap", "main", "kept"),
     [
         (r"x = 2\frac{m}{k}", r"x = 2\frac{m}{k}", True),  # both left out the box's "is"
-        (r"x = 2\frac{m}{k}", r"y = 2\frac{m}{k}", False),  # the models disagree: a mismatch
+        (r"x = 3\frac{m}{k}", r"x = 2\frac{m}{k}", False),  # the models disagree: a mismatch
+        ("x", "x", False),  # both left out most of the box: that is no end of a box
     ],
 )
 def test_a_run_both_models_leave_out_at_the_boxs_end_is_not_a_symbol_mismatch(
@@ -320,5 +321,5 @@ def test_a_run_both_models_leave_out_at_the_boxs_end_is_not_a_symbol_mismatch(
         )  # the signs and letters were compared with the rest of the box
         assert fix.equation is not None
     else:
-        assert "symbol_mismatch" in codes
+        assert codes & {"symbol_mismatch", "text_layer_mismatch"}
         assert "box_ends" not in codes

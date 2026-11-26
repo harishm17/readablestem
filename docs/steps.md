@@ -502,8 +502,15 @@ at its end, the rest matching symbol for symbol (`text_layer_compare.trim_text_l
 text-layer check of the second reading compares it with the rest of the box. The file does not say
 where the formula ends, so this is no evidence from the file: the fix keeps the models' confidence but
 stays a decision, with the failed warning `equation.box_ends` (code `box_ends`; the reviewer is
-told the transcription leaves out a few characters stored right before or after the formula). A reading that drops from both ends, that the two models
-read differently, or that also reaches past the box is compared with the box as before.
+told the transcription leaves out a few characters stored at the start or the end of the formula,
+which may be the text beside it or a part of it, and to check that nothing of the formula is
+missing there). A reading that drops from both ends, that the two models
+read differently, or that also reaches past the box is compared with the box as before. So is one
+that leaves out more letters and digits than it keeps and more than two (`TRIM_ANY`): a box that
+took in a word loses a few characters, and a reading of one letter of a long box is a mismatch.
+What the rule cannot tell: when both models drop a real term at one end (`a = b - c` read as
+`a = b`), the reading is asked about under this reason at the models' confidence, where 0.5.21
+said a sign or a symbol differs and lowered the confidence. It is a decision either way.
 
 **Letter styles from the glyph fonts.** `glyph_style` names the style of each ASCII letter from its
 font: CMMI and any italic face (and the flags) are italic, CMR and the regular faces of
@@ -649,7 +656,7 @@ in a sentence (`web/messages.py`). A reviewer's edit is checked on its own, as b
 is not applied to an edit). Measured by replay of recorded runs, with the numbers and the limits, in
 docs/eval-flag-policy.md.
 
-Production runs it off since 2026-11-25: on today's readings it asked about 19 equations of 12
+Production runs it off from the 0.5.22 release (2026-11-26): on today's readings it asked about 19 equations of 12
 development papers and none was wrong (docs/eval-flag-policy.md, last section).
 
 ## Sign and relation check (equations)
@@ -1217,16 +1224,31 @@ The rule is a run of boxes on one line. Take the inline equations of one paragra
 follow each other on one line (the boxes share a line, and a marker that is no reading ends the
 run), and a window of two or more of them. A member's reading K says the whole window when the
 letters of K's reading, in order, are the window's characters one for one and in order (each
-member's box, and the paragraph's text between two members in its place), and every other member's
+member's box, and the paragraph's text between two members in its place), every sign, bracket or
+comma of the text between two members stands in K's reading at that place (what K does not say
+would be lost with the text: "x ≤ y" read as `xy` stays as it is), and every other member's
 reading is a run inside K's, symbols and operators both (`|v|` is not said by `v`). The window is
 written once: K's marker stands where the window began, and the other markers and the text between
-the first and the last go. A closing bracket right after the window goes too when K's reading
-already holds it: the reading's brackets balance, and the window's own characters leave one open
-(the first box holds "log(C" and the paragraph holds the bracket that closes it). K is an accepted
-one before an asked one, then one whose box has characters, then the first. A window of three is
-one step; longer windows are taken first and no member is in two. A member with no characters in
-its box is fine under that condition; a window with no box that has characters has nothing to
-compare with and is left alone (a handwritten page).
+the first and the last go. A closing bracket right after the window goes too when the window's own
+characters opened it and K's reading closes it after its last letter (the first box holds "log(C"
+and the paragraph holds the bracket that closes it); a bracket the sentence opened stays. K is an
+accepted one before an asked one, then the one with fewer failed checks, then one whose box has
+characters, then the first. A window has at most four members (`MAX_BOXES`; real repeats are two
+or three boxes, and a line of hundreds of boxes costs no more than a short one); longer windows
+are taken first and no member is in two. A member with no characters in its box is fine under that
+condition; a window with no box that has characters has nothing to compare with and is left alone
+(a handwritten page). When two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`: the
+same letters, built differently) and the one that would stay was accepted, the window is left as
+it is, since nobody would see the other reading; when the one that stays is asked, a person
+decides it with the whole formula in front of them.
+
+K then stands for the whole formula, so its element takes the whole window: the box that holds
+every member's box (with room for a closing bracket that went with it), and their text with the
+text between them. `run._convert` cuts its picture again from the page (`cut_again`, no request).
+A reviewer who compares the reading with the picture, or keeps the original, has the whole formula:
+the picture and the PDF's words for it are the whole, not K's part. A decision made on an earlier
+upload about the part's picture is not carried onto it (`web/carry.py` matches pictures). The
+glyphs kept with K were read under its own box and are dropped from the element.
 
 A symbol printed twice (each box says the whole reading), two formulas with the same letters, a
 window whose letters are K's in another order (a fraction, a matrix or a determinant that the file
@@ -1243,8 +1265,9 @@ formula in a sentence) are a fault of layout that this step does not mend.
 The kept marker stands in the window's place, so the spacing around it is what the paragraph had
 (a word never touches a formula it did not touch). The paragraph's
 links, colors and scripts move with the text (`core.inline.moved`). The dropped box leaves with
-its marker, its fix and its crop, and with its question: a person is asked once, about the copy that
-stays, and only when neither copy was accepted. The dropped fix's spend is added back to the
+its marker, its fix and its crop, and with its question: a person is asked once at most, about the
+copy that stays, whenever that copy was not accepted (an accepted copy that said only its part goes
+with the window when the only reading of the whole was asked). The dropped fix's spend is added back to the
 document's cost and calls, and its step facts are still measured. A block box is never dropped, and
 a change that would leave a paragraph empty is not made. No model call, request or setting is new.
 
