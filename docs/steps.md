@@ -1185,6 +1185,35 @@ full description is in [tables.md](tables.md). In short:
   after data cells, written with headers/id); the caption only from layout's "Table N"
   caption.
 
+## One formula in two boxes (`pipeline/equation_twice.py`)
+
+Layout sometimes cuts one formula into two equation boxes (an accent set apart from its letter, a
+radical or a big sign that is no glyph of the line, a ring operator next to an upright word). Each
+box is read with its line and the reading goes on past the box, so both come back as the whole
+formula and the page wrote it twice. `equation_twice.settle` runs once, in `run.py` right after
+`table_math.settle`, where the readings are put into the document. It looks for two inline boxes of
+one paragraph on one line with nothing but the formula's own characters between them (or an inline
+box lying inside a block box of the same page), and writes the formula once:
+
+- Both readings equal once styles and spacing are stripped: the formula is written once, in the
+  first box unless only the second one was accepted.
+- One reading goes past its box and holds all the symbols of the other box (counted by letter, digit
+  and Greek letter, `text_layer_compare.symbol_bag`): the box that holds the whole is kept and the
+  other is dropped.
+- A symbol printed twice, or two formulas that use the same letters, is left alone: a box counts
+  only when its reading covers the other box too, or when the two readings are the same formula;
+  readings that merely hold the same letters do not count. Two boxes with no characters
+  in the PDF (a handwritten page) have nothing to be compared with and are left alone.
+
+A formula in three boxes is read three times: the step runs up to four passes, one repeat
+taken out in each, until no pair is left.
+
+The dropped box leaves with its marker `⟦pN-eM⟧` (and the spaces around it; spans of links, colors
+and scripts move with `core.inline.moved`), its fix is removed, and so is its question: a person is
+asked once, about the copy that stays, and only when neither copy was accepted. The dropped fix's
+spend is added back to the document's cost and calls, and its step facts are still measured. A block
+box is never dropped. No model call and no setting is new.
+
 ## Comparing two readings
 
 `pipeline/math_canonical.py` decides whether two readings of one formula (each LaTeX or MathML)
