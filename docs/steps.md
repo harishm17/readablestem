@@ -492,6 +492,28 @@ box has) the box's text stands and the difference is a difference, so a wrong le
 extended part is still the `symbol_mismatch` decision. Not for a reading that agrees with the box,
 and not for a display equation (its box is its own).
 
+**A box that took in too much.** The line prompt also tells the model to leave out what the box took
+in by mistake (the box `τ1 + τ2 (∼17` holds the formula `\tau_1 + \tau_2` and the start of the next
+words). The checks compare a reading with the box as it is, so such a reading used to fail the symbol
+check and lose confidence to the sign check. When the main model's second reading has the same letters
+and digits as the cheap model's first (the first reading is still checked as before, so the second
+model is still asked), and those letters and digits are exactly the box's less a run at its start or
+at its end, the rest matching symbol for symbol (`text_layer_compare.trim_text_layer`), every
+text-layer check of the second reading compares it with the rest of the box. The file does not say
+where the formula ends, so this is no evidence from the file: the fix keeps the models' confidence but
+stays a decision, with the failed warning `equation.box_ends` (code `box_ends`; the reviewer is
+told the transcription leaves out characters stored at the start or the end of the formula,
+which may be the text beside it or a part of it, and to check that nothing of the formula is
+missing there). A reading that drops from both ends, that the two models
+read differently, or that also reaches past the box is compared with the box as before. So is one
+that leaves out more letters and digits than it keeps and more than two (`TRIM_ANY`): a box that
+took in a word loses a few characters, and a reading of one letter of a long box is a mismatch.
+The bound still lets a reading leave out as many letters and digits as it keeps (`x + y + z + w + v + u`
+read as `x + y + z`), which is why the message does not say how many.
+What the rule cannot tell: when both models drop a real term at one end (`a = b - c` read as
+`a = b`), the reading is asked about under this reason at the models' confidence, where 0.5.21
+said a sign or a symbol differs and lowered the confidence. It is a decision either way.
+
 **Letter styles from the glyph fonts.** `glyph_style` names the style of each ASCII letter from its
 font: CMMI and any italic face (and the flags) are italic, CMR and the regular faces of
 `layout._REGULAR_FACE` upright, CMBX bold, CMMIB or a face with both the bold and the italic flag
@@ -635,6 +657,9 @@ as it was and a failed warning `equation.flag_policy` (code `flag_policy`), whic
 in a sentence (`web/messages.py`). A reviewer's edit is checked on its own, as before (the policy
 is not applied to an edit). Measured by replay of recorded runs, with the numbers and the limits, in
 docs/eval-flag-policy.md.
+
+Production runs it off from the 0.5.22 release (2026-11-26): on today's readings it asked about 19 equations of 12
+development papers and none was wrong (docs/eval-flag-policy.md, last section).
 
 ## Sign and relation check (equations)
 
@@ -1184,6 +1209,88 @@ full description is in [tables.md](tables.md). In short:
   non-numeric, distinct labels the model marked (leading ones, or a second label column
   after data cells, written with headers/id); the caption only from layout's "Table N"
   caption.
+
+## One formula in two boxes (`pipeline/equation_twice.py`)
+
+Layout sometimes cuts one formula into two to four equation boxes (a blank in a text font between
+math glyphs, a radical that is no glyph of the line). Each box
+is read with its line and the reading goes on past the box, so more than one box comes back as the
+whole formula and the page wrote it twice. `equation_twice.settle` runs once, in `run.py` right
+after `table_math.settle`, where the readings are put into the document, and writes the formula
+once. The evidence is the file's own characters in the order they stand (the letters, digits and
+Greek letters of a text, `text_layer_compare.symbol_seq`; a reading's MathML in document order,
+`mathml_seq`), never a bag of letters: a bag cannot tell a repeat from a second formula that has
+the same letters.
+
+The rule is a run of boxes on one line. Take the inline equations of one paragraph whose markers
+follow each other on one line (the boxes share a line, and a marker that is no reading ends the
+run), and a window of two or more of them. A member's reading K says the whole window when the
+letters of K's reading, in order, are the window's characters one for one and in order (each
+member's box, and the paragraph's text between two members in its place), every sign, bracket or
+comma of the text between two members stands in K's reading at that place (what K does not say
+would be lost with the text: "x ≤ y" read as `xy` stays as it is), and every other member's
+reading is a run inside K's, symbols and operators both (`|v|` is not said by `v`). The window is
+written once: K's marker stands where the window began, and the other markers and the text between
+the first and the last go. A closing bracket right after the window (a space may stand before
+it) goes too when the window's own
+characters opened it and K's reading closes it after its last letter (the first box holds "log(C"
+and the paragraph holds the bracket that closes it); a bracket the sentence opened stays. K is an
+accepted one before an asked one, then the one with fewer failed checks, then one whose box has
+characters, then the first. A window has at most four members (`MAX_BOXES`; real repeats are two
+to four boxes, and a line of hundreds of boxes costs no more than a short one); longer windows
+are taken first and no member is in two. Another member whose box holds no letter or digit is held
+to the same as the text between two members: its signs must stand in K's reading at its place (an
+"=" that layout boxed alone and that K does not say there is a sign the paper prints, and the
+window stays as it is). K's own box is not placed, since K's reading was made of it (a public
+course file prints `|v|` with both bars in one box and the letter in the next: the file stores
+the bars first, and the bars' reading says the whole). The signs placed are the ones the text
+between two members gives: a box that holds only a modifier-letter accent (`ˆ` U+02C6, `ˇ` U+02C7,
+`ˉ` U+02C9, which is how a text layer usually stores a TeX hat) gives none and is not held to
+this, so when the letter's reading and the accent's reading both miss the accent, the window is
+written once without it and the accent's question goes with its copy (made by hand only; the one
+accent boxed apart on the development papers is not merged, see below). A sign the file and the
+reading write with two characters that `_SAME_SIGN` does not hold as one (`∣` and `|`, `⩽` and
+`≤`) keeps a real repeat on the page twice, which is the safe side. A member with no characters
+at all in its
+box is fine; a window with no box that has characters has nothing to compare with and is left alone
+(a handwritten page). When two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`: the
+same letters, built differently) and the one that would stay was accepted, the window is left as
+it is, since nobody would see the other reading; when the one that stays is asked, a person
+decides it with the whole formula in front of them.
+
+K then stands for the whole formula, so its element takes the whole window: the box that holds
+every member's box (with room for a closing bracket that went with it), and their text with the
+text between them. `run._convert` cuts its picture again from the page (`cut_again`, no request).
+A reviewer who compares the reading with the picture, or keeps the original, has the whole formula:
+the picture and the PDF's words for it are the whole, not K's part. A decision made on an earlier
+upload about the part's picture is not carried onto it (`web/carry.py` matches pictures). The
+glyphs kept with K were read under its own box and are dropped from the element. K's fix is not
+checked again: its checks, its confidence and the reason a reviewer is given were made against
+K's own box. A kept copy that was asked because its reading has letters its part lacks is
+still asked for that reason, while the review table, which compares the reading with the whole
+text, may show no difference (the three kept copies on the development papers are so). The
+question stands; its reason is the part's.
+
+A symbol printed twice (each box says the whole reading), two formulas with the same letters, a
+window whose letters are K's in another order (a fraction, a matrix or a determinant that the file
+stores in another order) and a reading that goes past the window (it also covers words of the
+sentence before or after the last box) are all left as they are: the repeat stays, which is the safe
+side. An accent that layout boxed apart from its letter is not built: the one on the development
+papers (arXiv 2305.06353 page 3) has two boxes that lie on each other by 48% and 51% of their areas, and no
+corpus upload has one. An inline box inside a display's box is not built: where layout puts a block box over an
+inline one, the inline formula belongs to its sentence, and taking it out left the sentence without
+it; those repeats (on the development papers 4, each a fragment paragraph of a display: "for i = j",
+"dR_α" twice, "with σ_t = σ"; on one corpus upload 26 pairs, most of them a block box over an inline
+formula in a sentence) are a fault of layout that this step does not mend.
+
+The kept marker stands in the window's place, so the spacing around it is what the paragraph had
+(a word never touches a formula it did not touch). The paragraph's
+links, colors and scripts move with the text (`core.inline.moved`). The dropped box leaves with
+its marker, its fix and its crop, and with its question: a person is asked once at most, about the
+copy that stays, whenever that copy was not accepted (an accepted copy that said only its part goes
+with the window when the only reading of the whole was asked). The dropped fix's spend is added back to the
+document's cost and calls, and its step facts are still measured. A block box is never dropped, and
+a change that would leave a paragraph empty is not made. No model call, request or setting is new.
 
 ## Comparing two readings
 

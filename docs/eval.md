@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.21 as of 2026-11-25; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.22 as of 2026-11-26; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-25 | 0.5.21 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-26 | 0.5.22 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -733,8 +733,9 @@ added from November 2026 on:
    The 0.5.20 release is why the rule is written here and not per release:
    `layout-heldout-1` was scored for it twice, with a rule built between the runs in
    knowledge of the first one's totals ("The held-out runs for 0.5.20", below). The set has
-   now been scored five times (0.5.18, 0.5.19, twice for 0.5.20, and once for 0.5.21, the
-   first release the command held to one run; its list starts with the first four). No
+   now been scored six times (0.5.18, 0.5.19, twice for 0.5.20, once for 0.5.21, the
+   first release the command held to one run, and once for 0.5.22; its list starts with
+   the first four). No
    page of it was looked at, so it is not spent by rule 4, but its furniture
    row and its count of right pages are fitted to one fault, and each further run teaches the
    builders a little more of its totals. A second held-out half is owed (new documents and
@@ -3098,19 +3099,23 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-25 at pipeline 0.5.21,
-production profile `ae2c92fb65cf`, every count as in the 0.5.20 record before it, 47 files
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-26 at pipeline 0.5.22,
+production profile `b0befdf78b1e`, 47 files
 and 91 gold pages, no answer missing, no step stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| edge | 13 | 11 | 6 | 3 (4) | 3 (4) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 2 | 0 |
+| edge | 13 | 12 | 6 | 3 (4) | 3 (4) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 1 | 0 |
 | real | 41 | 36 | 12 | 6 (8) | 11 (15) | 12 (16) | 10 (15) | 1 (1) | 1 of 2 | 4 | 1 |
 | self-made | 37 | 36 | 25 | 4 (4) | 8 (10) | 2 (20) | 2 (19) | 0 (0) | 0 of 2 | 0 | 0 |
 | real and self-made | 78 | 72 | 37 | 10 (12) | 19 (25) | 14 (36) | 12 (34) | 1 (1) | 1 of 4 | 4 | 1 |
-| all | 91 | 83 | 43 | 13 (16) | 22 (29) | 15 (37) | 15 (39) | 1 (1) | 1 of 4 | 6 | 1 |
+| all | 91 | 84 | 43 | 13 (16) | 22 (29) | 15 (37) | 15 (39) | 1 (1) | 1 of 4 | 5 | 1 |
 
-The element list reads 83 of 91 right and 49 faultless. (Until 0.5.21 this table still
+The element list reads 84 of 91 right and 49 faultless, and 40 of the 47 documents have every
+gold page right in the student page (39 at 0.5.21). Against the 0.5.21 record one page is made
+right and none wrong: page 1 of `e1_mc_columns`, where the line under a matching exercise is
+read after it (`LAYOUT_MATCHING_UNDER`, on in the profile since 0.5.22); with it one broken
+block fewer, and no other count of the table moves. (Until 0.5.21 this table still
 showed the 0.5.19 record: the stamp rule of 0.5.20 had made one edge page faultless and
 furniture is read on two pages fewer since, and the table was not made again then.) What changed against the first
 baseline, and how much of it the four switches of 0.5.18 did, is in "The switch release of
@@ -3171,26 +3176,33 @@ the second run is worth); rule 5 of "Development and held-out, and the two bars"
 the stop rule that stands since, and the command now refuses a second run for a pipeline
 version (the set's list of runs, `data/gold/layout/NAME.runs.json`).
 
-`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.21,
-under the production profile with the four layout switches on), the
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.22,
+under the production profile with its six layout switches on), the
 student page:
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 90 | 45 | 12 (12) | 93 (440) | 29 (37) | 45 (56) | 10 (13) | 0 of 0 | 18 | 7 |
+| paper | 119 | 90 | 45 | 12 (12) | 93 (439) | 29 (37) | 45 (56) | 10 (13) | 0 of 0 | 18 | 7 |
 | selfmade | 40 | 26 | 13 | 3 (7) | 16 (61) | 9 (66) | 13 (30) | 2 (4) | 0 of 5 | 4 | 2 |
-| textbook | 108 | 66 | 36 | 15 (15) | 77 (355) | 43 (269) | 5 (6) | 1 (1) | 0 of 0 | 28 | 0 |
-| all | 267 | 182 | 94 | 30 (34) | 186 (856) | 81 (372) | 63 (92) | 13 (18) | 0 of 5 | 50 | 9 |
+| textbook | 108 | 67 | 36 | 15 (15) | 77 (356) | 43 (270) | 5 (6) | 1 (1) | 0 of 0 | 27 | 0 |
+| all | 267 | 183 | 94 | 30 (34) | 186 (856) | 81 (373) | 63 (92) | 13 (18) | 0 of 5 | 49 | 9 |
 
-The element list reads 181 of 267 right and 95 faultless, and 20 of the 60 documents have
-every gold page right (12 at 0.5.19). Of the table's counts the one that moved from the
+The element list reads 182 of 267 right and 95 faultless, and 20 of the 60 documents have
+every gold page right (12 at 0.5.19). Against the 0.5.21 record (182 right in the student page,
+181 in the element list) one page is made right and none wrong: page 10 of
+`os_calculus_volume_1`, where two columns of exercises are no longer joined across
+(`LAYOUT_FIGURE_ART`, on in the profile since 0.5.22); with it the textbooks have one broken
+block fewer and one place more of a cut and of a stray (on no page more), and the papers
+one stray place fewer and one gold block more found (1,176 to 1,177). Faultless pages and
+documents are as at 0.5.21. The rest of this paragraph is the
+0.5.21 record against the 0.5.20 one, then the 0.5.20 one against the 0.5.19 one. Of the 0.5.21 table's counts the one that moved from the
 0.5.20 record is the merged places of the papers, 55 to 56 on one page more (a page that is
 not right in either record; the count moves with the sign rule of 0.5.21); every count of
 pages right, faultless and of documents is the 0.5.20 one. Outside the table one gold block
 of the textbooks is no longer found (2,377 to 2,376 in the student page, 2,443 to 2,442 in
 the element list): page 8 of `os_principles_data_science` opened with the end of a
 paragraph that is now read whole on page 7 (the page join of 0.5.21), and the scorer counts
-page by page; the page stays right. The rest of this paragraph is the 0.5.20 record against the 0.5.19 one. Against the 0.5.19 record (161 right and 81 faultless;
+page by page; the page stays right. Against the 0.5.19 record (161 right and 81 faultless;
 papers 69 and 32 with furniture read on 32 pages, 94 pages (460 places) of strays and 36
 (46) cut; in all furniture read on 51 pages (55 places), strays 187 (877), cut 89 (382)): 21
 pages are made right and none is made wrong, each the first page of a paper whose stamp was
@@ -3279,8 +3291,9 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
 release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
 four layout switches on, no model), once more for 0.5.19 after its release (2026-11-24,
 main `b8fb9ab7`, the same profile, no model), twice for 0.5.20 before its release
-(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run), and
-once for 0.5.21 before its release ("The held-out run for 0.5.21", below):
+(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run),
+once for 0.5.21 before its release ("The held-out run for 0.5.21", below), and once for
+0.5.22 before its release ("The held-out run for 0.5.22", below):
 
 ```bash
 uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
@@ -3426,6 +3439,25 @@ these documents the three changes of 0.5.21 move no page into or out of right or
 faultless. The totals say no more: which pages moved is not looked at, and whether the
 set holds a page of the kinds the changes mend is not known. The three release bars are
 met at exactly their figures (the ledger, below) and stay as registered.
+
+**The held-out run for 0.5.22.** The set was scored once for 0.5.22 before its release
+(2026-11-26, the release branch at `e0f784db`, clean, the production profile of this
+release, hash `b0befdf78b1e`, with `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER` on, no
+model), after the last change to the code, after the reviews of it were answered and after
+CI passed on that commit, and the command listed the run before it read a document (rule
+5). Every total of the record is the 0.5.21 run's, in both views and in each kind of
+document: 191 of 247 pages right and 113 faultless in the student page (course handouts 26
+and 17, papers 101 and 62, textbooks 64 and 34), 20 of 49 documents with every gold page
+right, furniture read on 20 pages (30 places), blocks cut on 52 pages (195 places), run
+together on 68 (135), strays on 180 (1,013), 4,927 elements and 502 places where a gold
+block is split; the element list reads 192 right and 115 faultless, with 4,707 elements
+and 527 such places. So on these documents the two switches move no total, where
+`layout-dev-1` and the corpus have one page each made right. The totals say no more: no
+page was looked at, so a page that changed and left its counts as they were (a figure's
+box drawn smaller, say) is not seen here, and whether the set holds a page of the kinds
+the switches mend is not known. The equation changes and the flag policy act on a model's
+readings, and this run asks no model, so it does not measure them. The three release bars
+are met at exactly their figures (the ledger, below) and stay as registered.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -3728,7 +3760,21 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-23 at pipeline 0.5.18 by
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-26 at pipeline 0.5.22 by
+`eval burden --out`, production profile `b0befdf78b1e`, all 73 uploads, 338 pages, 523
+decisions, 1.547 a page, no answer missing). Against the 0.5.18 record before it (536
+decisions, 1.586 a page) four uploads ask fewer and none asks more: `w_solutions_1802` 118
+where it asked 127, `w_notes_6042_ch2` 9 for 11, `w_lecture_560` 7 for 8 and
+`r15_openstax_chem_ch3` 8 for 9. Nine of the 13 are the questions of the flag policy, which
+is off in the profile since 0.5.22 (the reason `flag_policy` held 9 decisions and holds
+none), and four are questions about a copy of a formula that is written once now ("One
+formula in two boxes", docs/steps.md); five equations of `w_solutions_1802` that were a
+decision of band 2 are optional now (`--same` names them). Four decisions that
+carried `symbol_mismatch` carry `box_ends` (the same equations, still asked). The equations
+accepted with nothing to hold them against are 1,418 where they were 1,436: the 18 boxes
+taken out as copies. The two switches of 0.5.22 move no decision.
+
+**The 0.5.18 record** (made 2026-11-23 by
 `eval burden --out`, production profile, all 73 uploads, 338 pages, 536 decisions, 1.586 a
 page). The corpus was re-recorded under the switch release, so no answer is missing and no
 upload is left out; the 43 uploads of the record before it ask 51 decisions where they asked
@@ -3767,7 +3813,7 @@ stops matching. A paid recording of the
 answers was owed then (about 1,300 requests) to bring those uploads back into
 the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
 records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
-compare them; the order records were re-made at 0.5.18 and again at 0.5.19, 0.5.20 and 0.5.21.
+compare them; the order records were re-made at 0.5.18 and again at 0.5.19, 0.5.20, 0.5.21 and 0.5.22.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -4212,9 +4258,9 @@ theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_ou
 event's, so the admin page can set production's numbers of the same release (false flags
 per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
 
-**Today** (`data/eval/ledger.json`, release `0.5.21+ae2c92fb65cf`, made 2026-11-25 on a
+**Today** (`data/eval/ledger.json`, release `0.5.22+b0befdf78b1e`, made 2026-11-26 on a
 clean tree). The three page rows have a held-out line, from the one run of
-`layout-heldout-1` for 0.5.21, and each meets its release bar at the bar's own figure. The
+`layout-heldout-1` for 0.5.22, and each meets its release bar at the bar's own figure. The
 bars are the figures of the second run for 0.5.20 (`data/eval/ledger-bars.json`,
 registered again 2026-11-25 with `--replace-bar`): a later release may not read fewer of
 these pages right, give fewer documents with every gold page right, or read furniture
@@ -4222,18 +4268,19 @@ aloud on more pages. That run of 0.5.20 first passed the bars of 0.5.19 (72 of
 247 pages not right, 11 of 49 documents, 36 of 247 pages with furniture; the ledger of that
 pass is commit `3743f347`). The bars were replaced because the stamp rule left 16
 pages of slack on each of the two page rows, enough to hide a later loss. The held-out lines
-are not a first run's: the set has been scored five times, and `eval order`, "The held-out
-runs for 0.5.20" and "The held-out run for 0.5.21", says what they are worth. Every other line is a development score, or a record of an earlier
+are not a first run's: the set has been scored six times, and `eval order`, "The held-out
+runs for 0.5.20", "The held-out run for 0.5.21" and "The held-out run for 0.5.22", says
+what they are worth. Every other line is a development score, or a record of an earlier
 release.
 
 | Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
 |---|---|---|---|---|---|---|---|
-| Required decisions a page, the median document | corpus | 0.25 | 73 documents | 0.50 | earlier release (0.5.18+11fc9f366bea) | - | at most 1.00 |
+| Required decisions a page, the median document | corpus | 0.25 | 73 documents | 0.50 | development score | - | at most 1.00 |
 | Pages not read right in the student page, by the scorer | layout-heldout-1 | 22.7 per 100 | 56 of 247 pages | 27.5 per 100 | held-out | at most 22.7 per 100: met | - |
-| Pages not read right in the student page, by the scorer | corpus | 8.8 per 100 | 8 of 91 pages | 15.3 per 100 | development score | at most 22.7 per 100 | - |
-| Pages not read right in the student page, by the scorer | layout-dev-1 | 31.8 per 100 | 85 of 267 pages | 36.8 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
+| Pages not read right in the student page, by the scorer | corpus | 7.7 per 100 | 7 of 91 pages | 14.0 per 100 | development score | at most 22.7 per 100 | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 31.5 per 100 | 84 of 267 pages | 36.5 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
 | Documents with every gold page right | layout-heldout-1 | 40.8% | 20 of 49 documents | 28.9% | held-out | at least 40.8%: met | - |
-| Documents with every gold page right | corpus | 83.0% | 39 of 47 documents | 71.4% | development score | at least 40.8% | - |
+| Documents with every gold page right | corpus | 85.1% | 40 of 47 documents | 73.8% | development score | at least 40.8% | - |
 | Documents with every gold page right | layout-dev-1 | 33.3% | 20 of 60 documents | 23.3% | development score, 2 steps stopped early | at least 40.8% | - |
 | Pages that read a running head, a page number or a stamp aloud | layout-heldout-1 | 8.1 per 100 | 20 of 247 pages | 11.5 per 100 | held-out | at most 8.1 per 100: met | at most 2.0 per 100: not met |
 | Pages that read a running head, a page number or a stamp aloud | corpus | 14.3 per 100 | 13 of 91 pages | 21.8 per 100 | development score | at most 8.1 per 100 | at most 2.0 per 100 |
@@ -4250,9 +4297,9 @@ release.
 Read with care:
 
 - "Required decisions a page" is the median over documents of a document's decisions a
-  page, as production counts it. Its record was made at 0.5.18 (the re-recording of the
-  corpus) and is labeled so; 0.5.19 and 0.5.20 moved no recorded request, and `eval burden
-  --same` against it passed for both releases. Its bound is an order statistic of 73 documents of a
+  page, as production counts it. Its record was made again at 0.5.22 (523 decisions on 338
+  pages where the 0.5.18 record had 536; "Pipeline 0.5.22", below), so the line is a
+  development score of this release; the median document is where it was. Its bound is an order statistic of 73 documents of a
   set chosen to cover kinds of document, not sampled from what people upload.
 - The held-out lines count 247 gold pages of 49 documents; two more documents are too long
   for a job and are not measured. A release bar is held as measured, with no bound: 56 of
@@ -4263,7 +4310,7 @@ Read with care:
   numbers are not counted apart, and nothing says they are read less.
 - `layout-dev-1` has two documents in which a step stopped early (a limit on work, the same
   on every machine); its lines say so.
-- Every gold page is right in 39 of 47 corpus documents, 20 of 60 documents of
+- Every gold page is right in 40 of 47 corpus documents, 20 of 60 documents of
   `layout-dev-1` and 20 of 49 held-out documents. A document's gold pages are the ones
   labeled, which in a layout set is a sample of its pages.
 - The output rows are the 0.5.10 record (`eval outputs` has not been run again since). They
@@ -4362,7 +4409,7 @@ in a separate worktree):
 One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
 `data/eval/order-layout-dev-1.json` was the 0.5.18 one at this release; it is re-made at 0.5.19
 with the same right and faultless pages, at 0.5.20 with 182 and 94 (the stamp rule), and at
-0.5.21 with 182 and 94 again (its table is under `eval order`).
+0.5.21 with 182 and 94 again, and at 0.5.22 with 183 and 94 (its table is under `eval order`).
 
 **Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
 of 47 uploads, the student page):
@@ -4374,7 +4421,8 @@ of 47 uploads, the student page):
 | 0.5.18, all four on | 83 | 42 |
 | 0.5.19 (every count as at 0.5.18) | 83 | 42 |
 | 0.5.20 (page 1 of `b6_margin_identifier` is faultless, and furniture is read on 13 pages, from 15) | 83 | 43 |
-| 0.5.21 (`data/eval/order-corpus.json` now; every count as at 0.5.20) | 83 | 43 |
+| 0.5.21 (every count as at 0.5.20) | 83 | 43 |
+| 0.5.22 (`data/eval/order-corpus.json` now; `LAYOUT_MATCHING_UNDER` makes `e1_mc_columns` page 1 right) | 84 | 43 |
 
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
@@ -4565,6 +4613,293 @@ release branch:
   ledger --for-release` passes: no held-out figure is worse than its release bar (56 of 247
   pages not right, 20 of 49 documents, 20 of 247 pages with furniture; each met at the
   bar's own figure, so the release has no slack on these rows and none was used).
+
+## The switch release of 2026-11-26
+
+Pipeline 0.5.22 turns on two more layout switches in the production profile
+(`src/readablestem/ops/production.profile.toml`) that 0.5.21 shipped off: `LAYOUT_FIGURE_ART`
+(O-452) and `LAYOUT_MATCHING_UNDER` (O-460). Each was measured at $0 (no model call, no key)
+against the same tree with it off, and each can go back off alone. The code defaults stay off.
+Nothing here is a paid run: the measures below are the replay of the recorded corpus and the
+layout reader, so they say what the pages look like, not what a model reads from the moved
+crops.
+
+The measured tree is 0.5.21 at `712346b2`. The "off" tree is that commit unchanged (the four
+switches of 0.5.18 on); the other trees differ from it by one or two rows of the profile
+(`value = true`), made in separate worktrees because `eval order` reads the profile in child
+processes. To make the measures again, in a clone with the corpus recording:
+
+| Measure | Command (from the tree measured) |
+|---|---|
+| Reading order, layout development set | `readablestem eval order --set layout-dev-1` |
+| Reading order, corpus gold pages | `readablestem eval order` |
+| Formulas kept whole | the box-score tool of the 21 development papers (kept outside the repository), `--grouping --on inline_joins --on region_tree --on join_panels` and `--on figure_art`, `--on matching_under` |
+| Decisions | `readablestem eval burden --same --against data/eval/burden-corpus.json` |
+| Recording gaps | `scripts/corpus_refresh.py --check` |
+| Pages of the public files | `layout.analyze` over the 547 public PDFs (the `papers`, the layout development set and the PDFs of the repository), once per configuration, comparing kind, box and a hash of the text of every element: the first 25 pages of each paper and every page of the other files. The papers' pages past 25 in a second run (both switches against none), below |
+
+**Pages of the public files, to page 25 of each paper.** Of 547 files, the papers read to
+their page 25 and the other files whole (8,527 pages; three files the reader refuses are
+left out of every column; the papers' pages past 25 are under "Pages past 25" below),
+`LAYOUT_FIGURE_ART` changes 50 files and 95 pages, and
+`LAYOUT_MATCHING_UNDER` one file and one page (a self-made test PDF). Both together change 51
+files and 96 pages, the union. Figures go from 3,806 to 3,784 and captioned figures stay
+1,907. Every differing file was classed from the page itself (the elements drawn over the
+page, base against switch): better, the same reading, or worse. 24 files read better (23 by
+`LAYOUT_FIGURE_ART`, one by `LAYOUT_MATCHING_UNDER`), 26 the same, and one has one page that
+reads slightly worse (2504.14923 page 11, below). The 26 are files where a figure's edge moved
+by a few points, the elements are in another order, or the ids of the inline formulas are
+renumbered. A page counts as worse when text of a paragraph goes into a figure, body text is
+taken as a caption, or a figure loses part of its drawing.
+
+The classing was checked a second way, on the full text of every element of the 95 pages: the
+words of the page (every element kind and the figure captions) are the same with the switch on
+and off in all 50 files but for a word that is no longer cut at a line end and the characters
+of formulas that are now read as formulas; the words that leave paragraphs, list items and
+headings for a figure's text are panel names, axis labels and tick values, in every file but
+one (2504.14923 page 11: 15 words of a sentence); and words that a figure had taken go back to
+their paragraphs in three files (2401.11209, 2407.20815, 2504.03499). On 2407.20815 pages 15
+and 20 a page-sized figure is replaced by the drawings, with six small pieces of them boxed
+as figures of their own (tiny figures on the 95 pages: 45 before, 46 after).
+
+| Public file | Pages (1-based) | What moved | Class |
+|---|---|---|---|
+| papers/2209.12301 | 11, 16 | formula ids renumbered, order only | same |
+| papers/2212.03448 | 7, 8, 20 | panel label "(a)" read inside its figure instead of a loose paragraph | better |
+| papers/2301.08958 | 23 | element order only | same |
+| papers/2309.04589 | 2 | figure box 17 pt narrower, at the drawing's edge | same |
+| papers/2311.00882 | 16 | figure box cut to the drawing | better |
+| papers/2311.16176 | 6, 17, 18 | drawn panels read as figures with their titles (14 to 18 figures); empty equation boxes gone | better |
+| papers/2312.01530 | 14 | the row label "E)" that the drawing's edge cut goes to its own figure | better |
+| papers/2312.02215 | 6 | formula ids renumbered | same |
+| papers/2401.11209 | 6, 8, 9 | "(a)" into its figure; a page-wide figure that swallowed body text becomes two captioned figures (captions 19 to 21) | better |
+| papers/2401.13131 | 9 | figure top 20 pt lower | same |
+| papers/2402.06191 | 3, 18 | label "Disassemble chamber" read inside the figure | better |
+| papers/2404.02347 | 5 | figure 15 pt taller, equation re-cut | same |
+| papers/2405.05818 | 21 | element order only | same |
+| papers/2405.12131 | 3 | five slivers of hidden art merged into one figure (15 to 10) | better |
+| papers/2405.17131 | 17 | figure top 2 pt lower | same |
+| papers/2406.04133 | 3 | element order only | same |
+| papers/2406.12076 | 5, 6 | figure edge about 1 pt | same |
+| papers/2407.20815 | 8, 14, 15, 16, 19, 20, 22 | page-sized and overlapping figures replaced by the drawings themselves (28 to 21); the "Exercise" box no longer takes the figure caption | better |
+| papers/2408.01652 | 9, 18 | element order only | same |
+| papers/2409.02247 | 8 | formula ids renumbered | same |
+| papers/2409.05598 | 23 | formula ids renumbered | same |
+| papers/2410.04138 | 10 | axis labels read inside the figure | better |
+| papers/2410.05588 | 4 | a boxed formula drawing read as a figure with its text | same |
+| papers/2410.17311 | 9 | figure top 6 pt lower | same |
+| papers/2412.05104 | 5 | element order only | same |
+| papers/2412.07456 | 13 | figure no longer runs off the page top and right | better |
+| papers/2412.12101 | 4, 8, 14 | two touching figures read as one; a 13 pt sliver gone | better |
+| papers/2501.02602 | 6 | element order only | same |
+| papers/2501.05251 | 17, 18 | panel label "(e)" read inside its figure | better |
+| papers/2501.09629 | 17 | element order only | same |
+| papers/2502.09301 | 15 | axis label read inside the figure | better |
+| papers/2502.19272 | 2, 3, 4 | figure 3 gets its caption (captions 2 to 3); figure boxes at the drawing edge | better |
+| papers/2503.01126 | 10, 11 | figure top 20 pt lower | same |
+| papers/2503.17870 | 5 | page-spanning figure and four slivers become one figure (12 to 7) | better |
+| papers/2504.03499 | 5, 7, 10, 13, 14, 16, 18, 21 | boxes drawn over text by hidden art gone; meta-learning panels and their labels read as figures (26 to 20) | better |
+| papers/2504.14923 | 8, 11 | page 11 was already one page-tall figure that takes the first line of several paragraphs; it now takes the first line of one more; page 8 figure edge | one page slightly worse |
+| papers/2505.03022 | 14 | element order only | same |
+| papers/2505.06419 | 3 | two panels and their labels merged into figures | better |
+| papers/2505.12810 | 8, 9 | formula ids renumbered | same |
+| papers/2505.23940 | 13, 24 | panel labels "Re=40, Re=100" read inside the figure | better |
+| papers/2506.03289 | 3 | formula ids renumbered | same |
+| papers/2506.13076 | 13 | panel labels D., E., F. read in their own figures | better |
+| papers/2506.15579 | 11, 15 | figure edge 1 to 20 pt | same |
+| layout-dev-1/ax_astrophga_240306369.pdf | 3 | axis labels listed as paragraphs, not list items | same |
+| layout-dev-1/ax_astrophga_240306409.pdf | 5, 9, 10, 11, 12, 13, 15 | the two overlapping panels of figure 15 read as one captioned figure (19 to 16); figure edges | better |
+| layout-dev-1/ax_condmatmtrlsci_240306379.pdf | 2 | label "( b" read inside its figure | better |
+| layout-dev-1/ax_physicsoptics_240306439.pdf | 7, 13, 39, 40 | figure caption text no longer split off the figure | better |
+| layout-dev-1/os_algebra_and_trigonometry_2e.pdf | 20, 21 | element order only | same |
+| layout-dev-1/os_calculus_volume_1.pdf | 2, 6, 10 | "and both exist" joined into one paragraph; two exercise columns no longer joined across (page 10, made right in the reading order) | better |
+| repo/data/real-tables/2505.03022.pdf | 14 | element order only | same |
+| repo/tests/workflows/corpus/selfmade/e1_mc_columns.pdf (matching under only) | 1 | two columns of the matching exercise end at the label numbering | better |
+
+The one page that reads worse is page 11 of 2504.14923. The page has a figure as tall as the
+page in both runs, and that figure's text holds the first line of several paragraphs of the
+column; with the switch it also holds the first line of the paragraph under the caption (15
+words). A figure's own text is not written on the page (it is in the picture and is given to
+the model as labels), so those 15 words are no longer in the reading text. The fault is the
+page-tall figure, which the switch does not make and does not mend.
+
+**Pages past 25.** The papers' pages past 25 were read in a second run: 3,915 pages of 157
+papers, production's four switches against the same with both new ones on, the kind, box and
+text of every element compared (a scratch tool, one process for each paper). 20 pages of 12
+papers differ, every one by `LAYOUT_FIGURE_ART` alone (`LAYOUT_MATCHING_UNDER` changes no
+page), and figures go from 996 to 981. Each was read. Eight pages read better, eleven the
+same, and one slightly worse (2501.06896 page 31, below). No word leaves the page's elements:
+the words that differ are three words that were cut in two and are whole (by an empty box,
+or by a paragraph split at a line end), the numbers of five display formulas (kept as the
+formulas' numbers, checked on the elements), and one letter of a formula now read as the
+bold letter it is.
+
+| Paper | Pages past 25 (1-based) | What moved | Class |
+|---|---|---|---|
+| papers/1812.06627 | 55 | formula ids renumbered | same |
+| papers/2312.06402 | 43 | formula ids renumbered | same |
+| papers/2401.00649 | 239 | element order only | same |
+| papers/2401.01757 | 38 | an empty equation box that cut "curve" in two is gone | better |
+| papers/2407.20815 | 29, 32, 41 | boxes drawn over text by hidden art gone (16 figures to 3 on the three pages); three display formulas that were figures, and a fourth whose number was in a figure's box, are formulas with their numbers; a page-sized figure is the drawing itself. On page 32 the caption of figure 10, which stood on a formula's box, is a paragraph (the drawing has no caption in either run) | better |
+| papers/2408.05847 | 50 | element order only | same |
+| papers/2412.12319 | 27 | element order only | same |
+| papers/2412.19752 | 77, 84, 97, 98, 144, 145 | three empty boxes of hidden art gone (pages 77 and 97); figure edge 1 pt; order and ids | better |
+| papers/2501.06896 | 31, 32 | page 31: one captioned figure of four panels is read as three figures (the two upper panels each alone, the lower two with the caption) and the two axis titles between them as short paragraphs; page 32 figure edge 9 pt | one page slightly worse |
+| papers/2503.00504 | 36 | formula ids renumbered | same |
+| papers/2504.03499 | 26 | a display formula that was a figure is a formula with its number (56); an empty equation box over a paragraph gone | better |
+| papers/2505.23940 | 44 | panel label "tV/D=0" read inside its figure | better |
+
+With the pages to 25, `LAYOUT_FIGURE_ART` changes 115 pages of 59 public files (12,442 pages
+read): 25 files read better, 32 the same, and two have one page each that reads slightly
+worse. On 2501.06896 page 31 nothing is lost and the caption is kept, but a reader meets three
+figures and two loose axis titles where the page prints one figure; before, the one figure's
+box also reached up over the last line of the paragraph above it.
+
+**What the figure switch costs.** A drawing that was one page-sized box can come back as
+several figure elements, and each is a request to the model: on 2407.20815 page 15 two
+printed drawings are eight figure elements (an "=" sign and a dot among them), none with its
+caption, where there were two page-sized boxes; on page 19 of that paper a lone "∫" is boxed
+beside its formula. Both pages read better than before, and cost more figure calls than they
+have figures. The two pages that read slightly worse are named above.
+
+**Reading order** (`eval order`, the production profile edited in a separate worktree for each
+row; the page a student is given):
+
+| Profile | layout-dev-1, 267 pages: right | faultless | Corpus gold pages: right | faultless |
+|---|---|---|---|---|
+| all four of 0.5.18 on (0.5.21) | 182 | 94 | 83 of 91 | 43 |
+| `LAYOUT_FIGURE_ART` on | 183 | 94 | 83 of 91 | 43 |
+| `LAYOUT_MATCHING_UNDER` on | 182 | 94 | 84 of 91 | 43 |
+| both on | 183 | 94 | 84 of 91 | 43 |
+
+`LAYOUT_FIGURE_ART` makes one page right (`os_calculus_volume_1` page 10) and none wrong, on
+the elements the same page. `LAYOUT_MATCHING_UNDER` makes `e1_mc_columns` page 1 right and none
+wrong: the line under a matching exercise that was read inside it is the page the region tree
+made wrong in 0.5.18. The replay's printed headline of the corpus is 83 of 90 under both,
+because the upload has 2 answers missing from the recording and is left out of the printed
+count; the page lists above it count it.
+
+**Formulas kept whole** (box score of the 21 development papers, 11,258 formulas):
+
+| Profile | Whole | Made whole | Made not whole |
+|---|---|---|---|
+| all four of 0.5.18 on | 9,203 | | |
+| `LAYOUT_FIGURE_ART` on | 9,205 | 2 | 0 |
+| `LAYOUT_MATCHING_UNDER` on | 9,203 | 0 | 0 |
+| both on | 9,205 | 2 | 0 |
+
+Displays kept whole stay 903 of 1,004. The tool and its papers are kept outside the
+repository, so the table cannot be made again from a clone.
+
+**Recordings.** `scripts/corpus_refresh.py --check` with the profile of 0.5.21 passes except
+for the 6 answers of `s15_charts_figures` that were already missing (recorded at another
+effort or model than asked). With both switches on it lists 4 more answers missing from the
+recording: `e1_mc_columns` 2 and `w_lecture_5111` 2 ("no answer recorded for this picture" and
+"nearby text changed"), so 308 tests pass, 4 error in `tests/workflows/test_replay_complete.py`
+(the two uploads, each in two tests) and 13 are expected failures. They need the corpus to be
+recorded again under the switches. Nothing else moves: 3,318 answers are read from the
+recording at $8.3747 recorded cost, and 0 are paid. The recording was made in the release
+("Pipeline 0.5.22", below): with real answers the two uploads send one request each.
+
+**Decisions.** `eval burden --same --against data/eval/burden-corpus.json` with both on holds
+the record for every upload except the two with answers missing, so the bar is not met until
+they are recorded; no decision of the others changes.
+
+**What these numbers do not show.** The pages are development sets and the public files the
+rules were read on, so they say the switches make two pages of 12,442 slightly worse there,
+not how often a new document is read better or worse. The model reads a figure from its crop: where the box moves a
+few points or takes a label, the request changes and what the model returns for it was not
+measured. The `eval order` of the held-out set was not run.
+
+## Pipeline 0.5.22 (2026-11-26)
+
+Pipeline 0.5.22 is the switch release above (`LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER`
+on in the production profile) with three changes of the equation step: `FLAG_POLICY` off in
+the profile, a reading that leaves out what the box took in at one end keeps its confidence
+(`box_ends`), and one formula that layout cut into two to four boxes on a line is written
+once (CHANGELOG 0.5.22 and the four entries under it; docs/eval-flag-policy.md; docs/steps.md).
+The production profile's hash is `b0befdf78b1e` (three rows changed). Measured on the release
+branch:
+
+- **The recording.** `scripts/corpus_refresh.py --check` on the merged branch lists what the
+  switch release found and no more (2 answers each on `e1_mc_columns` and `w_lecture_5111`;
+  the 6 of `s15_charts_figures` belong to a test that asks with another effort on purpose):
+  the three equation changes move no request. One capped refresh call (`--live --max-usd
+  0.50`) sent 2 requests, one for each upload, and paid $0.03. The repository part of the
+  recording holds 442 answers and the kept-out part 1,955, and both uploads convert from the
+  recording again.
+- **The recorded corpus, upload by upload** (the replay of the 73 uploads at the release
+  against 0.5.21, each result hashed in parts; a scratch tool that is not in the repository).
+  65 uploads differ in nothing but the version the result and its page carry. Eight differ
+  in more, each for a cause named here: `e1_mc_columns` (the matching exercise; 36 elements
+  to 35) and `w_lecture_5111` (figures and the equations beside them) are the two uploads
+  that were recorded again; `w_solutions_1802` (896 elements to 879) and `w_notes_6042_ch2`
+  (551 to 550) lose the copies of formulas written twice and questions of the flag policy
+  (the copy that stays holds the whole formula's box and text), and on `w_solutions_1802`
+  two fixes carry `box_ends` for `symbol_mismatch`;
+  `r15_openstax_chem_ch3` and `w_lecture_560` differ in equation fixes only (the flag
+  policy), and `r17_arxiv_ligo` in one equation fix (`symbol_mismatch` is `box_ends`);
+  `r21_infographic_orcid` differs in one note of one figure (its drawing counts 866 paths
+  where it counted 867, a path no clip lets through; the box, the picture and the request are
+  the same).
+- **Decisions.** The record is re-made (`data/eval/burden-corpus.json`, under `eval burden`):
+  523 decisions on 338 pages where the 0.5.18 record had 536; four uploads ask fewer and none
+  asks more. Three decisions carry the reason `box_ends` (two on `w_solutions_1802`, one on
+  `r17_arxiv_ligo`).
+- **Reading order.** `layout-dev-1`: 183 of 267 pages right and 94 faultless in the student
+  page (182 and 94), 182 and 95 in the element list (181 and 95), 20 of 60 documents; one page
+  made right (`os_calculus_volume_1` page 10) and none wrong. The corpus: 84 of 91 right and
+  43 faultless (83 and 43), 84 and 49 in the element list; one page made right
+  (`e1_mc_columns` page 1) and none wrong. Both records are re-made at 0.5.22 and each is the
+  figure the switch release measured at 0.5.21 with both switches on.
+- **The equation step on the 12 development papers** (replay of the recorded answers with no
+  model; 932 equations paired with gold; a scratch harness that is not in the repository):
+
+  | | Right and accepted | Wrong and accepted | Asked and right | Asked and wrong |
+  |---|---|---|---|---|
+  | 0.5.21, its profile | 847 | 7 | 60 | 18 |
+  | the three equation changes, the two switches off | 866 | 7 | 42 | 17 |
+  | 0.5.22, its profile (the two switches on) | 868 | 7 | 41 | 16 |
+
+  The middle row is what the equation branches measured before the switches were merged. The
+  19 more accepted are the 19 the flag policy asked about, none wrong, and one equation goes
+  from asked and wrong to asked and right (2404.14123 `p1-e18`, the reading that mends the
+  box). The last row is the release as it ships. The switches change boxes on three of the
+  papers (2401.11209, 2407.20815, 2504.03499), and 12 readings of the new boxes had no
+  recorded answer: they were recorded once for $0.04 (a replay without them counts each
+  equation it cannot read as asked and wrong). Against the middle row
+  three equations move: a display of 2407.20815 that paired with nothing is read and right
+  (`eq-009`); a formula of 2504.03499 page 3 that was asked and right is accepted and right
+  (`eq-065`; layout makes it one box); and the kept copy of a formula written twice on
+  2504.03499 page 5 (`eq-130`, asked and wrong) is still a question, and is no longer paired
+  with its gold line by the harness, so it leaves the count without having become right. The
+  7 wrong and accepted are the same 7: 3 misreads and 4 faults of the gold or of the span
+  (docs/eval-flag-policy.md). Formulas written twice are not seen by these counts (the second
+  box pairs with no gold equation): 3 repeats on these papers are written once under the
+  release's profile (2305.06353 page 4, 2503.02792 page 3, 2504.03499 page 5; with the
+  switches off there were 4, and on 2504.03499 page 3 layout now makes the formula one box).
+  In each the copy that stays takes the whole formula's box, text and picture, and is a
+  question. Both `box_ends` readings are as before (2404.14123 `τ1 + τ2 (∼17`, where the
+  reading leaves out 2 of the box's 6 letters and digits, and 2504.03499 `∥·∥a`, where it
+  leaves out the one letter).
+- **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
+  0.5.22 on a clean tree, with every headline number as at 0.5.21, and `eval gate
+  --require-current` passes for both against their baselines.
+- **Held-out pages and the ledger.** `layout-heldout-1` was scored once, at `e0f784db`
+  (`eval order`, "The held-out run for 0.5.22"): 191 of 247 pages right, 113 faultless, 20
+  of 49 documents, furniture on 20 pages, and every other total of the record, each as at
+  0.5.21. `eval ledger --for-release` passes: no held-out figure is worse than its release
+  bar (56 of 247 pages not right, 20 of 49 documents, 20 of 247 pages with furniture; each
+  met at the bar's own figure, so the release has no slack on these rows and none was
+  used). The ledger's development lines move with the two pages made right: 7 of 91
+  corpus pages not right (8), 84 of 267 of `layout-dev-1` (85), and every gold page right
+  in 40 of 47 corpus documents (39).
+
+**What these numbers do not show.** The equation counts are 12 papers that were read while
+the rules were built, so "none of the 19 was wrong" is a small sample of the questions the
+flag policy asks: with it off, a misread of the kind it was fitted for, on a document unlike
+these, is accepted with no question. The held-out equation parts were not run for this
+release.
 
 ## What the numbers do not show
 

@@ -7,7 +7,7 @@
  },
  "profile": {
   "name": "production",
-  "sha256": "ae2c92fb65cf74c77d9676b56a42409d6bcb786163579dd8ac3a99befa5250ab",
+  "sha256": "b0befdf78b1ec294cb81975321d64fd67886334c8f045d229413689bf9021fe7",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.21",
- "commit": "45796822e9722af09128d7c9201b5c52a6048e1a",
+ "pipeline_version": "0.5.22",
+ "commit": "6ec221e3b709725fa68ddc139448cf01972a6647",
  "provenance": {
-  "commit": "45796822e9722af09128d7c9201b5c52a6048e1a",
+  "commit": "6ec221e3b709725fa68ddc139448cf01972a6647",
   "clean": true,
-  "pipeline_version": "0.5.21",
+  "pipeline_version": "0.5.22",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -50,12 +50,12 @@
      "lost": 34,
      "split": 144,
      "pairs": 1145,
-     "pairs_ok": 1117,
+     "pairs_ok": 1118,
      "stitched": 71,
      "dropped": 165,
      "leaked": 29,
      "blocks": 1271,
-     "elements": 1371,
+     "elements": 1370,
      "stray": 29,
      "cut": 37,
      "merged": 39,
@@ -64,22 +64,22 @@
      "caption_wrong": 1,
      "furniture": 16,
      "tau_tot": 11599,
-     "tau_ok": 11562,
+     "tau_ok": 11565,
      "flow_tot": 18001,
-     "flow_ok": 17222,
-     "broken": 6,
+     "flow_ok": 17224,
+     "broken": 5,
      "opairs": 1077,
-     "opairs_ok": 1071,
+     "opairs_ok": 1072,
      "xjoin": 1,
      "ejoin": 0,
      "entries": 0,
-     "clean": 83,
+     "clean": 84,
      "stamp_pages": 0,
      "stamp_read": 0,
      "stamp_in_text": 0,
      "numrun_pages": 0,
      "numrun_bad": 0,
-     "right": 83,
+     "right": 84,
      "faultless": 43,
      "pages": 91,
      "pages_with": {
@@ -91,7 +91,7 @@
       "caption_wrong": 1
      },
      "documents": 47,
-     "documents_right": 39
+     "documents_right": 40
     },
     "groups": {
      "edge": {
@@ -99,12 +99,12 @@
       "lost": 4,
       "split": 58,
       "pairs": 113,
-      "pairs_ok": 112,
+      "pairs_ok": 113,
       "stitched": 25,
       "dropped": 17,
       "leaked": 6,
       "blocks": 130,
-      "elements": 150,
+      "elements": 149,
       "stray": 4,
       "cut": 1,
       "merged": 5,
@@ -113,22 +113,22 @@
       "caption_wrong": 0,
       "furniture": 4,
       "tau_tot": 1050,
-      "tau_ok": 1047,
+      "tau_ok": 1050,
       "flow_tot": 1481,
-      "flow_ok": 1390,
-      "broken": 2,
+      "flow_ok": 1392,
+      "broken": 1,
       "opairs": 114,
-      "opairs_ok": 113,
+      "opairs_ok": 114,
       "xjoin": 0,
       "ejoin": 0,
       "entries": 0,
-      "clean": 11,
+      "clean": 12,
       "stamp_pages": 0,
       "stamp_read": 0,
       "stamp_in_text": 0,
       "numrun_pages": 0,
       "numrun_bad": 0,
-      "right": 11,
+      "right": 12,
       "faultless": 6,
       "pages": 13,
       "pages_with": {
@@ -140,7 +140,7 @@
        "caption_wrong": 0
       },
       "documents": 11,
-      "documents_right": 9
+      "documents_right": 10
      },
      "real": {
       "found": 579,
@@ -307,12 +307,12 @@
      "lost": 25,
      "split": 145,
      "pairs": 1154,
-     "pairs_ok": 1127,
+     "pairs_ok": 1128,
      "stitched": 70,
      "dropped": 165,
      "leaked": 29,
      "blocks": 1271,
-     "elements": 1330,
+     "elements": 1329,
      "stray": 22,
      "cut": 19,
      "merged": 38,
@@ -321,22 +321,22 @@
      "caption_wrong": 1,
      "furniture": 16,
      "tau_tot": 11676,
-     "tau_ok": 11620,
+     "tau_ok": 11623,
      "flow_tot": 18001,
-     "flow_ok": 17258,
-     "broken": 6,
+     "flow_ok": 17260,
+     "broken": 5,
      "opairs": 1080,
-     "opairs_ok": 1072,
+     "opairs_ok": 1073,
      "xjoin": 1,
      "ejoin": 0,
      "entries": 0,
-     "clean": 83,
+     "clean": 84,
      "stamp_pages": 0,
      "stamp_read": 0,
      "stamp_in_text": 0,
      "numrun_pages": 0,
      "numrun_bad": 0,
-     "right": 83,
+     "right": 84,
      "faultless": 49,
      "pages": 91,
      "pages_with": {
@@ -348,7 +348,7 @@
       "caption_wrong": 1
      },
      "documents": 47,
-     "documents_right": 40
+     "documents_right": 41
     },
     "groups": {
      "edge": {
@@ -356,12 +356,12 @@
       "lost": 4,
       "split": 58,
       "pairs": 113,
-      "pairs_ok": 112,
+      "pairs_ok": 113,
       "stitched": 24,
       "dropped": 17,
       "leaked": 6,
       "blocks": 130,
-      "elements": 140,
+      "elements": 139,
       "stray": 4,
       "cut": 1,
       "merged": 4,
@@ -370,22 +370,22 @@
       "caption_wrong": 0,
       "furniture": 4,
       "tau_tot": 1050,
-      "tau_ok": 1047,
+      "tau_ok": 1050,
       "flow_tot": 1481,
-      "flow_ok": 1390,
-      "broken": 2,
+      "flow_ok": 1392,
+      "broken": 1,
       "opairs": 114,
-      "opairs_ok": 113,
+      "opairs_ok": 114,
       "xjoin": 0,
       "ejoin": 0,
       "entries": 0,
-      "clean": 11,
+      "clean": 12,
       "stamp_pages": 0,
       "stamp_read": 0,
       "stamp_in_text": 0,
       "numrun_pages": 0,
       "numrun_bad": 0,
-      "right": 11,
+      "right": 12,
       "faultless": 6,
       "pages": 13,
       "pages_with": {
@@ -397,7 +397,7 @@
        "caption_wrong": 0
       },
       "documents": 11,
-      "documents_right": 9
+      "documents_right": 10
      },
      "real": {
       "found": 580,
@@ -886,34 +886,24 @@
     "group": "edge",
     "apart": false,
     "html": {
-     "right": 0,
+     "right": 1,
      "faultless": 0,
      "furniture": 0,
      "stray": 0,
      "cut": 0,
      "merged": 3,
      "heading_merged": 0,
-     "caption_wrong": 0,
-     "why": [
-      "blocks not found: 3",
-      "blocks broken: 1",
-      "neighbours out of order: 1"
-     ]
+     "caption_wrong": 0
     },
     "elements": {
-     "right": 0,
+     "right": 1,
      "faultless": 0,
      "furniture": 0,
      "stray": 0,
      "cut": 0,
      "merged": 2,
      "heading_merged": 0,
-     "caption_wrong": 0,
-     "why": [
-      "blocks not found: 3",
-      "blocks broken: 1",
-      "neighbours out of order: 1"
-     ]
+     "caption_wrong": 0
     }
    },
    {

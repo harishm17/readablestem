@@ -7,7 +7,7 @@
  },
  "profile": {
   "name": "production",
-  "sha256": "11fc9f366beafec6190c26aa0c3fcd7c560fd365838a8d08e29494f187ce0a4a",
+  "sha256": "b0befdf78b1ec294cb81975321d64fd67886334c8f045d229413689bf9021fe7",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.18",
- "commit": "5dd8e1c48bf72a7420467ba06557f4492f85d104",
+ "pipeline_version": "0.5.22",
+ "commit": "0c90aa81ebef4cf51dd15592a0a3455e2d0d8ec7",
  "provenance": {
-  "commit": "5dd8e1c48bf72a7420467ba06557f4492f85d104",
+  "commit": "0c90aa81ebef4cf51dd15592a0a3455e2d0d8ec7",
   "clean": true,
-  "pipeline_version": "0.5.18",
+  "pipeline_version": "0.5.22",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -41,43 +41,43 @@
    "not_measured": []
   },
   "pages": 338,
-  "decisions": 536,
-  "per_page": 1.5858,
+  "decisions": 523,
+  "per_page": 1.5473,
   "document": {
    "p50": 0.25,
    "p95": 7.0,
-   "mean": 1.0956,
-   "max": 9.0714
+   "mean": 1.0807,
+   "max": 8.4286
   },
   "page": {
    "p50": 0,
-   "p95": 9,
-   "mean": 1.5858,
+   "p95": 8,
+   "mean": 1.5473,
    "max": 26,
-   "none": 0.571
+   "none": 0.574
   },
   "kinds": {
    "dense_math": {
     "pages": 44,
     "documents": 12,
-    "decisions": 294,
-    "per_page": 6.6818,
+    "decisions": 282,
+    "per_page": 6.4091,
     "page": {
      "p50": 4,
      "p95": 18,
-     "mean": 6.6818,
+     "mean": 6.4091,
      "max": 26
     }
    },
    "figure": {
     "pages": 62,
     "documents": 18,
-    "decisions": 111,
-    "per_page": 1.7903,
+    "decisions": 110,
+    "per_page": 1.7742,
     "page": {
      "p50": 1,
      "p95": 7,
-     "mean": 1.7903,
+     "mean": 1.7742,
      "max": 10
     }
    },
@@ -131,7 +131,7 @@
    }
   },
   "items": {
-   "equation": 354,
+   "equation": 341,
    "figure": 115,
    "heading": 42,
    "table": 13,
@@ -139,12 +139,12 @@
   },
   "reasons": {
    "below_accept": {
-    "decisions": 153,
-    "per_100_pages": 45.27
+    "decisions": 149,
+    "per_100_pages": 44.08
    },
    "symbol_mismatch": {
-    "decisions": 91,
-    "per_100_pages": 26.92
+    "decisions": 88,
+    "per_100_pages": 26.04
    },
    "glyph_style_mismatch": {
     "decisions": 71,
@@ -171,22 +171,22 @@
     "per_100_pages": 7.1
    },
    "style_cosmetic": {
-    "decisions": 24,
-    "per_100_pages": 7.1
+    "decisions": 18,
+    "per_100_pages": 5.33
    },
    "style_mismatch": {
     "decisions": 18,
     "per_100_pages": 5.33
-   },
-   "text_layer_mismatch": {
-    "decisions": 17,
-    "per_100_pages": 5.03
    },
    "heading.repeated_label": {
     "decisions": 16,
     "per_100_pages": 4.73
    },
    "not_equation": {
+    "decisions": 16,
+    "per_100_pages": 4.73
+   },
+   "text_layer_mismatch": {
     "decisions": 16,
     "per_100_pages": 4.73
    },
@@ -198,10 +198,6 @@
     "decisions": 11,
     "per_100_pages": 3.25
    },
-   "flag_policy": {
-    "decisions": 9,
-    "per_100_pages": 2.66
-   },
    "heading.all_caps": {
     "decisions": 9,
     "per_100_pages": 2.66
@@ -210,13 +206,13 @@
     "decisions": 8,
     "per_100_pages": 2.37
    },
-   "unread_page": {
+   "decoration_unproven": {
     "decisions": 7,
     "per_100_pages": 2.07
    },
-   "decoration_unproven": {
-    "decisions": 6,
-    "per_100_pages": 1.78
+   "unread_page": {
+    "decisions": 7,
+    "per_100_pages": 2.07
    },
    "half_fraction": {
     "decisions": 6,
@@ -253,6 +249,10 @@
    "unsupported_ce": {
     "decisions": 4,
     "per_100_pages": 1.18
+   },
+   "box_ends": {
+    "decisions": 3,
+    "per_100_pages": 0.89
    },
    "handwriting_on_page": {
     "decisions": 3,
@@ -324,10 +324,10 @@
    }
   },
   "not_compared": {
-   "equations": 1436,
+   "equations": 1418,
    "tables_with_math": 8,
    "causes": {
-    "equation.not_compared:bold_letter": 81,
+    "equation.not_compared:bold_letter": 70,
     "equation.not_compared:no_characters": 2,
     "equation.not_compared:no_usable_characters": 28
    }
@@ -336,8 +336,8 @@
    {
     "upload": "w_solutions_1802",
     "pages": 14,
-    "decisions": 127,
-    "per_page": 9.0714,
+    "decisions": 118,
+    "per_page": 8.4286,
     "asked": [
      [
       "p1-e4",
@@ -356,19 +356,11 @@
       2
      ],
      [
-      "p1-e41",
-      2
-     ],
-     [
       "p1-e69",
       2
      ],
      [
       "p1-e84",
-      2
-     ],
-     [
-      "p2-e1",
       2
      ],
      [
@@ -390,10 +382,6 @@
      [
       "p2-e34",
       1
-     ],
-     [
-      "p2-e43",
-      2
      ],
      [
       "p2-e66",
@@ -442,10 +430,6 @@
      [
       "p3-e24",
       4
-     ],
-     [
-      "p3-e46",
-      2
      ],
      [
       "p4-e1",
@@ -748,10 +732,6 @@
       4
      ],
      [
-      "p10-e75",
-      4
-     ],
-     [
       "p10-e79",
       2
      ],
@@ -764,10 +744,6 @@
       1
      ],
      [
-      "p11-e15",
-      2
-     ],
-     [
       "p11-e37",
       2
      ],
@@ -778,14 +754,6 @@
      [
       "p11-e52",
       4
-     ],
-     [
-      "p11-e53",
-      4
-     ],
-     [
-      "p11-e54",
-      2
      ],
      [
       "p11-e64",
@@ -828,10 +796,6 @@
       4
      ],
      [
-      "p12-e31",
-      2
-     ],
-     [
       "p13-e1",
       2
      ],
@@ -856,6 +820,7 @@
      "p1-e25",
      "p1-e27",
      "p1-e34",
+     "p1-e41",
      "p1-e48",
      "p1-e50",
      "p1-e64",
@@ -865,12 +830,14 @@
      "p10-e41",
      "p10-e72",
      "p11-e0",
+     "p11-e15",
      "p11-e22",
      "p11-e63",
      "p11-e70",
      "p11-e71",
      "p12-e23",
      "p12-e26",
+     "p12-e31",
      "p13-e0",
      "p13-e15",
      "p13-e16",
@@ -878,7 +845,9 @@
      "p13-e27",
      "p13-e8",
      "p2-e0",
+     "p2-e1",
      "p2-e26",
+     "p2-e43",
      "p3-e32",
      "p3-e35",
      "p4-e0",
@@ -1729,7 +1698,7 @@
       2
      ],
      [
-      "p5-e25",
+      "p5-e26",
       2
      ],
      [
@@ -2029,8 +1998,8 @@
       2
      ],
      [
-      "p1-e34",
-      4
+      "p1-e33",
+      2
      ]
     ],
     "optional": [
@@ -2256,8 +2225,8 @@
    {
     "upload": "w_lecture_560",
     "pages": 5,
-    "decisions": 8,
-    "per_page": 1.6,
+    "decisions": 7,
+    "per_page": 1.4,
     "asked": [
      [
       "p2-e2",
@@ -2278,10 +2247,6 @@
      [
       "p3-e9",
       4
-     ],
-     [
-      "p3-e14",
-      2
      ],
      [
       "p3-e16",
@@ -2561,11 +2526,11 @@
     "per_page": 1.1667,
     "asked": [
      [
-      "p1-e14",
+      "p1-e12",
       1
      ],
      [
-      "p1-e16",
+      "p1-e14",
       1
      ],
      [
@@ -2591,7 +2556,7 @@
     ],
     "optional": [
      "p1-e5",
-     "p1-e9",
+     "p1-e7",
      "p2-e10",
      "p2-e11",
      "p2-e16",
@@ -2670,8 +2635,8 @@
    {
     "upload": "r15_openstax_chem_ch3",
     "pages": 10,
-    "decisions": 9,
-    "per_page": 0.9,
+    "decisions": 8,
+    "per_page": 0.8,
     "asked": [
      [
       "p3-e6",
@@ -2692,10 +2657,6 @@
      [
       "p8-e3",
       4
-     ],
-     [
-      "p8-e16",
-      2
      ],
      [
       "p9-e10",
@@ -2724,10 +2685,27 @@
     ]
    },
    {
+    "upload": "s18_exam_twocol",
+    "pages": 3,
+    "decisions": 2,
+    "per_page": 0.6667,
+    "asked": [
+     [
+      "p3-e10",
+      2
+     ],
+     [
+      "p3-e11",
+      2
+     ]
+    ],
+    "optional": []
+   },
+   {
     "upload": "w_notes_6042_ch2",
     "pages": 14,
-    "decisions": 11,
-    "per_page": 0.7857,
+    "decisions": 9,
+    "per_page": 0.6429,
     "asked": [
      [
       "p1-e25",
@@ -2735,10 +2713,6 @@
      ],
      [
       "p1-e26",
-      2
-     ],
-     [
-      "p3-e18",
       2
      ],
      [
@@ -2759,10 +2733,6 @@
      ],
      [
       "p9-e10",
-      4
-     ],
-     [
-      "p9-e11",
       4
      ],
      [
@@ -2814,23 +2784,6 @@
      "p8-e28",
      "p9-e17"
     ]
-   },
-   {
-    "upload": "s18_exam_twocol",
-    "pages": 3,
-    "decisions": 2,
-    "per_page": 0.6667,
-    "asked": [
-     [
-      "p3-e10",
-      2
-     ],
-     [
-      "p3-e11",
-      2
-     ]
-    ],
-    "optional": []
    },
    {
     "upload": "w_pset_801",

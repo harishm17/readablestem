@@ -1,5 +1,216 @@
 # Changelog
 
+## Pipeline 0.5.22, render 11 (2026-11-26)
+
+- `PIPELINE_VERSION` is 0.5.22 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  four "Unreleased" entries below down to the 0.5.21 entry (wave 8: two layout switches that
+  were built in waves 5 and 6 go on after each was measured with no model, one rule that only
+  cost questions goes off, and two fixes of the equation step that came out of reading every
+  recorded answer of 12 development papers). What changes for a reader, one line for each:
+  - A figure is the drawing a reader sees (`LAYOUT_FIGURE_ART` on in the production profile,
+    O-452): page-wide figures that took body text, slivers of hidden art and boxes drawn over
+    text are gone, and a panel or axis label the figure's edge cut is read in its figure. Of
+    547 public files (12,442 pages) 59 change (115 pages): 25 read better, 32 the same, and two
+    have one page each that reads slightly worse (arXiv 2504.14923 page 11, where a page-tall
+    figure takes 15 more words of a sentence into its picture, and 2501.06896 page 31, where a
+    figure of four panels is read as three). No word leaves the page's elements. A drawing
+    that was one page-sized box can come back as several figures, each a request (2407.20815
+    page 15: eight for two drawings).
+  - What stands under a matching exercise is read after it (`LAYOUT_MATCHING_UNDER` on,
+    O-460): the one page the region tree of 0.5.18 made wrong is right again; no other page of
+    the public files moves.
+  - Fewer questions about equations that are right (`FLAG_POLICY` off in the profile, O-480):
+    the rule asked about 19 accepted equations of the 12 development papers and none was
+    wrong.
+  - A right reading is no longer thrown away because the box took in a little too much at one
+    end (O-478): it keeps its confidence and stays a question that says why (`box_ends`).
+  - One formula that layout cut into two to four boxes on a line is written once, with the
+    whole formula's box, text and picture (O-479): 18 places on real documents under this
+    release's profile (15 in two public uploads of the corpus, 3 on the development papers),
+    each read.
+  - The equation step on the 12 development papers under this release's profile, by replay of
+    the recorded answers (932 equations paired with gold): 868 right and accepted (847 at
+    0.5.21), 7 wrong and accepted (7), 41 asked and right (60), 16 asked and wrong (18). The
+    12 readings that the boxes of the two switches ask for and no recording held were recorded
+    once for $0.04. One of the 18 asked and wrong did not become right: it is the kept copy of
+    a formula written twice (2504.03499 page 5), still a question, that the count no longer
+    pairs with its gold line.
+  - Measured and not built: the box drawn on the line image hides where a root's bar ends
+    (O-481; moving it changes every inline request), and maths in a table's header cell is
+    left as plain text (O-482). Both are open in the plan.
+- Stored results: the schema is the same. Results from 0.5.10 to 0.5.21 load unchanged, their
+  page is not made again, and 0.5.21 opens a 0.5.22 result. The roll-back limit stays at 0.5.12.
+- The corpus recording: the two switches move 2 requests (`e1_mc_columns` and
+  `w_lecture_5111`, one each; the replay check lists 4 missing, with real answers 2 are
+  sent), recorded again in one capped refresh call for $0.03. The repository part holds 442
+  answers and the kept-out part 1,955.
+  The equation changes and the flag policy move no request. The decision record
+  (`data/eval/burden-corpus.json`) is made again: 523 decisions on 338 pages where it had 536.
+  Four uploads ask 13 fewer (9 questions of the flag policy and 4 about copies of a formula
+  that are gone) and none asks more.
+- Held-out pages: `layout-heldout-1` was scored once for this release, at `e0f784db`, after
+  the last change to the code and after CI passed on it (rule 5; the run is listed in
+  `data/gold/layout/layout-heldout-1.runs.json`). Every total of the record is as at 0.5.21:
+  191 of 247 pages right and 113 faultless, 20 of 49 documents with every gold page right,
+  20 pages that read furniture aloud. So on these documents the two switches move no total;
+  the equation changes are not measured by this run, which asks no model. `eval ledger
+  --for-release` passes with each of the three release bars met at its own figure. No
+  held-out page was opened.
+- Railway, with the deploy: `LAYOUT_FIGURE_ART=true`, `LAYOUT_MATCHING_UNDER=true` and
+  `FLAG_POLICY=false` are set first (docs/deploy-railway.md, "Feature flags in production"), and
+  the start log must show no `profile_mismatch` line.
+
+## Unreleased: two layout switches on (0.5.22)
+
+- The production profile turns on `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER`, each measured
+  at $0 (no model call) at 0.5.21 against the same tree with it off (docs/eval.md, "The switch
+  release of 2026-11-26"). The code defaults stay off; the 0.5.22 raise of `PIPELINE_VERSION`
+  and the re-recording of the corpus under them are made in the release that carries this entry.
+  - `LAYOUT_FIGURE_ART`: of 547 public files, the papers read to their page 25 (8,527 pages),
+    50 files and 95 pages change, 23 files read better, 26 the same, and one page of one file
+    reads slightly worse (2504.14923 page 11: a figure as tall as the page, wrong before, takes
+    the first line of one more paragraph, 15 words that are then in the picture and not in the
+    reading text); no word leaves the elements of any of the 95 pages; the figures read 3,806
+    to 3,784 and the captioned figures stay 1,907. On the papers' pages past 25 (3,915 pages of
+    157 papers, read after an independent review asked for them) 20 more pages of 12 papers
+    change: 8 pages read better, 11 the same, and one slightly worse (2501.06896 page 31: one
+    captioned figure of four panels is read as three figures, with two axis titles as short
+    paragraphs between them); no word leaves a page's elements; the figures read 996 to 981.
+    In all 115 pages of 59 files change: 25 files better, 32 the same, two with one page each
+    slightly worse. What it costs besides: a drawing that was one page-sized box can come back
+    as several figure elements, each a request (2407.20815 page 15: eight for two drawings). Page-wide figures that took body text, slivers of hidden art
+    and boxes drawn over text are gone; a row the drawing's edge cut and a panel label are read in
+    their figure. Reading order of layout-dev-1: 183 of 267 pages right in the page a student is
+    given (was 182; `os_calculus_volume_1` page 10), 94 faultless as before, none made wrong.
+    Formulas kept whole on the 21 development papers: 9,205 of 11,258 (was 9,203), 2 made whole
+    and none made not whole. The corpus gold pages are unchanged (83 of 91 right).
+  - `LAYOUT_MATCHING_UNDER`: no page of the 547 public files (the papers' pages past 25
+    with them) and none of layout-dev-1 changes;
+    the self-made `e1_mc_columns` page 1 becomes right (corpus gold pages right 83 to 84 of
+    91), nothing is made wrong. The line under a matching exercise was the one known wrong page
+    of the region tree (0.5.18 entry below).
+  - What changes for a stored result: nothing is made again. For a new conversion the figure
+    box and the text beside a figure or a formula under a matching exercise can differ, so the
+    recorded model answers of the requests those pages make stop matching until they are
+    recorded again: in the corpus the replay check at 0.5.21 finds 2 answers missing on each
+    of `e1_mc_columns` and `w_lecture_5111`, and no other upload moves.
+  - Railway: set `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER` to `true` with the other
+    switches (`readablestem ops profile-check` compares them with the profile).
+
+## Unreleased: the flag policy is off in production
+
+- `FLAG_POLICY` is `false` in the production profile (it was `true` since 2026-11-03). The rule asked a
+  person about accepted equations that look like readings that used to be wrong. On the 12 development
+  papers read at 0.5.21 it asked about 19 of 873 accepted equations and none was wrong, while 7 were wrong
+  and accepted (3 real misreads, 4 faults of the gold or of the span) and ranked 90th to 561st by the
+  rule's own probability. A refit on today's readings, leaving one paper out, does no better (it ranks the
+  wrong ones below the right ones). So the rule only cost questions: 19 of the 49 asked in the equation
+  step on these papers. The code, the fitted constants and the fitting script stay; the code default was
+  already off. Numbers and method: docs/eval-flag-policy.md (last section), `scripts/flag_policy_arms.py`.
+  On the corpus replay 4 of 73 uploads ask fewer questions (9 fewer in all, 536 to 527; none asks
+  more) and no recorded request stops matching; `eval burden --same` stops on those 4 until its record is
+  made again. A new conversion asks fewer questions (the equation text and every request are as before), so it
+  goes in the next pipeline raise; production's `FLAG_POLICY` Railway variable must be set to `false` at
+  that release.
+
+## Unreleased: a reading that mends the box is no longer cut for it (O-478)
+
+- The line prompt tells the model to leave out what a box took in by mistake. The symbol and sign
+  checks then compared the reading with the box as it is, so a right reading was cut (arXiv
+  2404.14123 page 1: the box holds `τ1 + τ2 (∼17`, both models read `\tau_1 + \tau_2`, the sign
+  check cut 0.85 to 0.51 and 0.6 to 0.36, and the reading was abstained). Now, when the main
+  model's second reading has the same letters and digits as the first and they are exactly the box's
+  less a run at one end, the second reading is compared with the rest of the box, keeps its
+  confidence and stays a decision with a new reason, `box_ends` (the reviewer is told the
+  transcription leaves out characters the PDF stores at the start or the end of the
+  formula, that they may be the text beside it or a part of it, and to check in the image that
+  nothing of the formula is missing there). The rule cannot tell a real term both readings drop
+  at one end from text beside the formula, which is why the reading is never accepted by it; and
+  it does not apply when more is left out than is kept and more than 2 characters are left out.
+  The first reading is checked as before, so the main model is
+  still asked and no request changes (the 9 first-reading misreads the check caught are asked again
+  and end right, as before). `text_layer_compare.trim_text_layer`, `equation_step._evaluate`.
+- Measured by replay of the recorded answers on the 12 development papers (903 equations read by
+  the step): 2 equations move. 2404.14123 `p1-e18` goes from abstained and wrong to asked and
+  right; 2504.03499 `p2-e50` (`\|\cdot\|` for the box `∥·∥a`) stays asked, with the reason named.
+  Wrong and accepted stays 7. A reading that reaches past the box with letters the line's nearest
+  glyphs do not make up exactly (2 right equations, both already a decision) is left as it was: a
+  looser test would also pass 2 of the 9 first-reading misreads.
+- On the 73 uploads of the corpus replay, 2 differ and only in their equation fixes: arXiv LIGO
+  (`r17_arxiv_ligo`, 1 equation of 43) and a set of worked solutions (`w_solutions_1802`, 3 of
+  its equations on the rule's branch), each a fix that was already a decision, with the same LaTeX
+  and confidence, whose reason `symbol_mismatch` is now `box_ends`. With the bound of the release
+  one of the 3 is a symbol mismatch again, as at 0.5.21 and at the same confidence: the box
+  `1A-1 a) |A| = √3` took in the problem's label, and the right reading `|\mathbf{A}| = \sqrt{3}`
+  leaves out four letters and digits and keeps two. So 3 fixes of the corpus carry `box_ends` in
+  the release. No recorded request stops matching (every equation's readings are the same models
+  and answers), no second reading is saved, and `eval burden --same` meets its bar.
+
+## Unreleased: one formula that layout cut into two boxes is written once (O-479)
+
+- **The fault.** Layout sometimes puts one formula into two to four equation boxes. Each box is
+  read with its line, and the line prompt tells the model to read on past a box that stops early,
+  so more than one reading comes back as the whole formula and the page said it twice (arXiv
+  2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5, and a textbook of vector
+  problems, where a vector and its last component are two boxes). The cuts are shapes in layout (a
+  blank between math-font glyphs, a blank wider than a word space where a radical is drawn and no
+  glyph, an upright word after a ring operator); which
+  rule ends the run at each, and what a join in layout would cost in recorded requests, is in
+  `docs/layout.md` (inline joins, "Measured and not built in layout (wave 8, builder 03)"). Layout
+  is left as it is: a joined box is a new picture and a new request.
+- **The rule.** `pipeline/equation_twice.py`, run once in `run._convert` next to
+  `table_math.settle`, where the readings are put into the document. The evidence is the file's own
+  characters in order, never a bag of letters. Inline equations of one paragraph whose markers
+  follow each other on one line (two to four boxes): when one member's reading, in order, is exactly
+  the characters of the boxes and of the text between them, every sign, bracket or comma of the text
+  between two boxes (and of another member's box that holds only signs, an "=" boxed alone) stands in that reading
+  at its place, and every other member's reading is a run
+  inside it, the window is written once, with the reading that says it whole (an accepted one before
+  an asked one, then the one with fewer failed checks, then one whose box has characters, then the
+  first) where the window began; a closing bracket right after the window (a space may stand before it)
+  goes with the copy when
+  the window's own characters opened it and the reading closes it. The copy that stays then stands
+  for the whole formula: its element takes the box around every member, their text with the text
+  between them, and a picture cut again from the page with no request, so a reviewer who compares
+  the reading with the picture, or keeps the original, has the whole formula. The dropped copies
+  leave with their markers, their fixes and their crops; the spacing around the kept formula is what
+  the paragraph had; a question about a dropped copy goes with it and the copy that stays is asked
+  about once at most, whenever it was not accepted; what the dropped copies cost is kept in the
+  document's cost and calls. A symbol printed twice, two formulas with the same letters, a window
+  whose letters are in another order than the reading's (a matrix or determinant), a reading that
+  goes past the window into the sentence, a sign between two boxes or in another member's box of
+  its own that the reading does not say (a box of a modifier-letter accent alone, `ˆ`, is not
+  held to this),
+  two accepted readings that build the whole in two ways, and boxes with no characters in the PDF
+  are left as they are. Not built: an accent that
+  layout boxed apart from its letter (one on the development papers, 2305.06353 page 3, none in the
+  corpus). Not built: an inline box
+  inside a display's box (a block box over an inline formula in a sentence is a fault of layout;
+  taking the inline formula out for the display left the sentence without it): 4 such repeats on the
+  development papers, each a fragment paragraph of a display, and 26 pairs on one corpus upload.
+  No request, no prompt, no layout rule and no setting changes.
+- **On real documents.** The equation replay of the 12 development papers (offline), measured on
+  the rule's own branch with the two layout switches off: 4 repeats were written once (5 boxes taken
+  out; 2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5) and the four numbers did not
+  move (847 right and accepted, 7 wrong and accepted, 60 asked and right, 18 asked and wrong).
+  Under the release's profile (the switches on) there are 3: on 2504.03499 page 3 layout makes the
+  formula one box, so nothing is written twice there. Each of the 3 has two boxes, the copy that
+  stays was a question in all three, and its box grows to the whole formula (2305.06353 page 4:
+  50 pt wide to 82 pt and the room of the closing bracket, the text `t0 ≥log(C Lnρn)`). On
+  2504.03499 page 5 the copy that stays is now the reading with 2 failed checks, where the first
+  copy had 4. `dev2` (25 papers, the equations that have a recorded answer) held no more. The corpus
+  replay (73 uploads): 2 public uploads change and 71 are the same (18 boxes taken out in 15 places,
+  each read with its new box and text: 13 of two boxes, one of three and one of four; the repeat is
+  written once and nothing else in the paragraph changes; in one, and in one of the development
+  papers, the closing bracket goes with the copy; the copy that stays is a question in 6); the
+  replay misses 0 recorded requests with the rule on and off, and cost and calls are the same.
+  `eval burden --same` on the rule's branch: 532 required decisions where the record had 536 (4
+  questions about copies that are gone, on the two uploads); the record
+  (`data/eval/burden-corpus.json`) is re-made in the release.
+- **What it means for a stored document.** A document converted before keeps its repeated formulas
+  until it is converted again; `PIPELINE_VERSION` is not raised here (it is owed, with the
+  release that carries this). No migration, `RENDER_VERSION` is not owed.
+
 ## Pipeline 0.5.21, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.21 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

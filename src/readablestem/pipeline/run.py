@@ -145,6 +145,7 @@ from readablestem.pipeline import (
     decoration,
     equation_scale,
     equation_step,
+    equation_twice,
     figure_step,
     font_codes,
     heading_step,
@@ -420,7 +421,22 @@ log = logging.getLogger(__name__)
 # The result's schema is the same: results from 0.5.10 to 0.5.20 load unchanged and their page
 # is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.20 opens a 0.5.21 result.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.21"
+# 0.5.22 (2026-11-26): one raise for wave 8 (CHANGELOG.md has each change). Two switches go on
+# in the production profile, the code defaults stay off: LAYOUT_FIGURE_ART (a figure is the
+# drawing a reader sees: no paint a clip hides, a row the figure's edge cuts is its label) and
+# LAYOUT_MATCHING_UNDER (what stands under a matching exercise is read after it); a figure's box
+# and the text beside it can move, and 2 recorded requests of the corpus moved and are recorded
+# again. FLAG_POLICY goes off in the profile: an accepted equation is no longer asked about for
+# looking like an old misread. What a PDF's result holds also moves in two places of the
+# equation step, with no request changed: a reading that leaves out what the box took in at one
+# end keeps its confidence (reason `box_ends`), and one formula that layout cut into two to
+# four boxes on one line is written once (`equation_twice`): the copy that stays takes the whole
+# formula's box and text, and its picture is cut again from the page.
+# The result's schema is the same: results from 0.5.10 to 0.5.21 load unchanged and their page
+# is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.21 opens a 0.5.22 result.
+# Each switch goes back alone with its profile row and the Railway variable of the same name.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.22"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).
@@ -1487,6 +1503,17 @@ class _Run:
         self.futures[future] = element
         self.pages.add(element.page)
 
+    def cut_again(self, element: Element) -> None:
+        """The stored picture of an element whose box changed after its step: cut from the
+        page as the first one was, with no model call. A cut that fails leaves the old one."""
+        try:
+            png = layout.crop(self.pdf_bytes, element)
+        except Exception as exc:
+            log.warning("crop failed: %s", type(exc).__name__)
+            return
+        drawn = image_page_vector.element_picture(self.vector, element)
+        self.crops[element.id] = self.sharp_equation(element) or drawn or png
+
     def collect(self, *, block: bool) -> None:
         """Record finished tasks; cancel the queue once the budget is gone."""
         while self.futures:
@@ -2466,6 +2493,15 @@ def _convert(
         if settings.image_pages_maths_always_required and image_built:
             image_page.enforce_maths_required(elements, run.fixes)
         elements, run.fixes = table_math.settle(elements, run.fixes)
+        # One formula that layout cut into two boxes, read twice, is written once.
+        # The copy that stays holds the whole formula's box: its picture is cut again.
+        elements, run.fixes, repeated, whole = equation_twice.settle(elements, run.fixes)
+        for _, fix in repeated:
+            run.crops.pop(fix.element_id, None)
+        for element in whole:
+            run.cut_again(element)
+        if whole:  # (the cut opened the document again after its release)
+            _CachedDocument(pdf_bytes).release()
         # No empty alt text on content (WS6.4): decoration only with evidence, after every step.
         decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)
         # A paragraph or list item layout doubts (`option_labels`, `rtl_text`) gets its decision.
@@ -2477,6 +2513,8 @@ def _convert(
         page_of = {e.id: e.page for e in elements}
         for fix in ordered:
             measured.extend(step_facts.of_fix(fix, page_of.get(fix.element_id)))
+        for page, fix in repeated:  # (their requests were made and paid for)
+            measured.extend(step_facts.of_fix(fix, page))
         labels = _page_labels(pdf_bytes, page_list, [p for p in page_list if p not in readable])
         footnotes = [n.element_id for n in doc.notices if n.code == "footnote" and n.element_id]
         source_facts = _source_facts(pdf_bytes, readable, elements, ordered)
@@ -2531,6 +2569,23 @@ def _convert(
         )
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
+        if repeated:  # the formulas written once were read twice: that was spent
+            spent: dict[int, float] = {}
+            for page, fix in repeated:
+                spent[page] = spent.get(page, 0.0) + fix.cost_usd
+            stats = stats.model_copy(
+                update={
+                    "cost_usd": round(stats.cost_usd + sum(spent.values()), 8),
+                    "model_calls": stats.model_calls
+                    + sum(1 for _, f in repeated for c in f.calls if not c.shared),
+                    "per_page": [
+                        p.model_copy(
+                            update={"cost_usd": round(p.cost_usd + spent.get(p.page, 0.0), 8)}
+                        )
+                        for p in stats.per_page
+                    ],
+                }
+            )
         if page_math_summary is not None:
             stats = stats.model_copy(
                 update={

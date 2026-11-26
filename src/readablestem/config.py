@@ -163,17 +163,17 @@ class Settings(BaseSettings):
     # page are read without the paint no clip lets through, and a short row the edge of a figure's
     # box cuts through is its label unless it is a list item or a line of a column of text; a
     # hand-drawn figure that typed labels name is a figure, not handwriting ("Pen figures"). Off:
-    # output is byte-identical to before. Turning it on moves figure boxes and the text they
-    # take, so the recorded figure answers of the pages it moves stop matching and
-    # `PIPELINE_VERSION` must be bumped in the change that enables it.
+    # output is byte-identical to before. Production's value is in the profile (on since 0.5.22).
+    # Turning it on moves figure boxes and the text they take, so the recorded figure answers of
+    # the pages it moves stop matching; it came with a re-recording and a `PIPELINE_VERSION` bump.
     layout_figure_art: bool = False
     # What stands under a matching exercise is read after it (`layout.analyze(matching_under=True)`,
     # docs/layout.md "The region tree", rule 8), with `REGION_TREE` on: the exercise's two columns
     # end where the numbers of their labels stop counting, so the line under them ("8. ...") is no
-    # cell of the terms. Off: output is byte-identical to before. Turning it on changes the text
-    # that goes with the figure or the equation under such an exercise, so the recorded answers of
-    # the pages it moves stop matching and `PIPELINE_VERSION` must be bumped in the change that
-    # enables it.
+    # cell of the terms. Off: output is byte-identical to before. Production's value is in the
+    # profile (on since 0.5.22). Turning it on changes the text that goes with the figure or the
+    # equation under such an exercise, so the recorded answers of the pages it moves stop
+    # matching; it came with a re-recording and a `PIPELINE_VERSION` bump.
     layout_matching_under: bool = False
     # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
     # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
