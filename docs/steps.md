@@ -492,6 +492,19 @@ box has) the box's text stands and the difference is a difference, so a wrong le
 extended part is still the `symbol_mismatch` decision. Not for a reading that agrees with the box,
 and not for a display equation (its box is its own).
 
+**A box that took in too much.** The line prompt also tells the model to leave out what the box took
+in by mistake (the box `τ1 + τ2 (∼17` holds the formula `\tau_1 + \tau_2` and the start of the next
+words). The checks compare a reading with the box as it is, so such a reading used to fail the symbol
+check and lose confidence to the sign check. When the main model's second reading has the same letters
+and digits as the cheap model's first (the first reading is still checked as before, so the second
+model is still asked), and those letters and digits are exactly the box's less a run at its start or
+at its end, the rest matching symbol for symbol (`text_layer_compare.trim_text_layer`), every
+text-layer check of the second reading compares it with the rest of the box. The file does not say
+where the formula ends, so this is no evidence from the file: the fix keeps the models' confidence but
+stays a decision, with the failed warning `equation.box_ends` (code `box_ends`; the reviewer is
+told the transcription leaves out a few characters stored right before or after the formula). A reading that drops from both ends, that the two models
+read differently, or that also reaches past the box is compared with the box as before.
+
 **Letter styles from the glyph fonts.** `glyph_style` names the style of each ASCII letter from its
 font: CMMI and any italic face (and the flags) are italic, CMR and the regular faces of
 `layout._REGULAR_FACE` upright, CMBX bold, CMMIB or a face with both the bold and the italic flag
