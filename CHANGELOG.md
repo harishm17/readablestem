@@ -18,6 +18,11 @@
   Wrong and accepted stays 7. A reading that reaches past the box with letters the line's nearest
   glyphs do not make up exactly (2 right equations, both already a decision) is left as it was: a
   looser test would also pass 2 of the 9 first-reading misreads.
+- On the 73 uploads of the corpus replay, 2 differ and only in their equation fixes: arXiv LIGO
+  (`r17_arxiv_ligo`, 1 equation of 43) and one private upload (3 of 603), each a fix that was
+  already a decision, with the same LaTeX and confidence, whose reason `symbol_mismatch` is now
+  `box_ends`. No recorded request stops matching (every equation's readings are the same models
+  and answers), no second reading is saved, and `eval burden --same` meets its bar.
 
 ## Pipeline 0.5.21, render 11 (2026-11-25)
 
