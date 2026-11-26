@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-11-25",
-  "pipeline_version": "0.5.21",
+  "date": "2026-11-26",
+  "pipeline_version": "0.5.22",
   "profile": {
     "name": "development settings",
-    "sha256": "ae2c92fb65cf74c77d9676b56a42409d6bcb786163579dd8ac3a99befa5250ab",
+    "sha256": "b0befdf78b1ec294cb81975321d64fd67886334c8f045d229413689bf9021fe7",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -19,10 +19,11 @@
       "FEATURE_LONG_DESCRIPTIONS",
       "FEATURE_NOTATION_MEMORY",
       "FEATURE_TABLES",
-      "FLAG_POLICY",
       "LAYOUT_DISPLAY_GROUPING",
+      "LAYOUT_FIGURE_ART",
       "LAYOUT_INLINE_JOINS",
       "LAYOUT_JOIN_PANELS",
+      "LAYOUT_MATCHING_UNDER",
       "MAIN_MODEL",
       "MODEL_PROVIDER",
       "REGION_TREE"
@@ -248,9 +249,9 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "a202c34f991ef79890fc8c6851243d2a444703c0",
+    "commit": "d5bfc2fd1b22511f830b77921ffe1a40a4a965db",
     "clean": true,
-    "pipeline_version": "0.5.21",
+    "pipeline_version": "0.5.22",
     "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",
