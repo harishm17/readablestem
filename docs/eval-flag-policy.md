@@ -193,6 +193,13 @@ the fitting script are kept, as is every number above. The code default was alre
 (`flag_policy: bool = False` in `config.py`), and the profile is the only place production's value was
 stated, so nothing else changes.
 
+On the replay of the corpus (73 uploads, every answer recorded, production profile) against the record of
+0.5.18: the equation text, the elements and every request are as before, and 4 of the 73 uploads (one
+public OpenStax chapter, three private files) ask fewer questions: 9 fewer in all, 536 to 527 required
+decisions (1.586 to 1.559 a page); no upload asks more. No recorded request stops matching (the policy
+runs after the model's answer). `eval burden --same` therefore stops on those 4 uploads until the record
+is made again.
+
 What would tell if the policy is worth turning on again: a recorded reading of a new set of papers by
 today's models with at least 15 to 20 wrong and accepted equations (about 2,000 accepted equations, 15 to
 25 papers at today's 0.8%); with that many a rule that finds a third of them at 19 questions per 12 papers

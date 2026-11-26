@@ -10,7 +10,9 @@
   wrong ones below the right ones). So the rule only cost questions: 19 of the 49 asked in the equation
   step on these papers. The code, the fitted constants and the fitting script stay; the code default was
   already off. Numbers and method: docs/eval-flag-policy.md (last section), `scripts/flag_policy_arms.py`.
-  A new conversion asks fewer questions (the equation text and every request are as before), so it
+  On the corpus replay 4 of 73 uploads ask fewer questions (9 fewer in all, 536 to 527; none asks
+  more) and no recorded request stops matching; `eval burden --same` stops on those 4 until its record is
+  made again. A new conversion asks fewer questions (the equation text and every request are as before), so it
   goes in the next pipeline raise; production's `FLAG_POLICY` Railway variable must be set to `false` at
   that release.
 
