@@ -421,7 +421,21 @@ log = logging.getLogger(__name__)
 # The result's schema is the same: results from 0.5.10 to 0.5.20 load unchanged and their page
 # is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.20 opens a 0.5.21 result.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.21"
+# 0.5.22 (2026-11-26): one raise for wave 8 (CHANGELOG.md has each change). Two switches go on
+# in the production profile, the code defaults stay off: LAYOUT_FIGURE_ART (a figure is the
+# drawing a reader sees: no paint a clip hides, a row the figure's edge cuts is its label) and
+# LAYOUT_MATCHING_UNDER (what stands under a matching exercise is read after it); a figure's box
+# and the text beside it can move, and 2 recorded requests of the corpus moved and are recorded
+# again. FLAG_POLICY goes off in the profile: an accepted equation is no longer asked about for
+# looking like an old misread. What a PDF's result holds also moves in two places of the
+# equation step, with no request changed: a reading that leaves out what the box took in at one
+# end keeps its confidence (reason `box_ends`), and one formula that layout cut into two or
+# three boxes on one line is written once (`equation_twice`).
+# The result's schema is the same: results from 0.5.10 to 0.5.21 load unchanged and their page
+# is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.21 opens a 0.5.22 result.
+# Each switch goes back alone with its profile row and the Railway variable of the same name.
+# The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
+PIPELINE_VERSION = "0.5.22"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

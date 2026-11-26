@@ -1,5 +1,47 @@
 # Changelog
 
+## Pipeline 0.5.22, render 11 (2026-11-26)
+
+- `PIPELINE_VERSION` is 0.5.22 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
+  four "Unreleased" entries below down to the 0.5.21 entry (wave 8: two layout switches that
+  were built in waves 5 and 6 go on after each was measured with no model, one rule that only
+  cost questions goes off, and two fixes of the equation step that came out of reading every
+  recorded answer of 12 development papers). What changes for a reader, one line for each:
+  - A figure is the drawing a reader sees (`LAYOUT_FIGURE_ART` on in the production profile,
+    O-452): page-wide figures that took body text, slivers of hidden art and boxes drawn over
+    text are gone, and a panel or axis label the figure's edge cut is read in its figure. Of
+    547 public files 50 change (95 pages): 23 read better, 26 the same, one page slightly worse
+    (arXiv 2504.14923 page 11), no word lost.
+  - What stands under a matching exercise is read after it (`LAYOUT_MATCHING_UNDER` on,
+    O-460): the one page the region tree of 0.5.18 made wrong is right again; no other page of
+    the public files moves.
+  - Fewer questions about equations that are right (`FLAG_POLICY` off in the profile, O-480):
+    the rule asked about 19 accepted equations of the 12 development papers and none was
+    wrong.
+  - A right reading is no longer thrown away because the box took in a little too much at one
+    end (O-478): it keeps its confidence and says why (`box_ends`).
+  - One formula that layout cut into two or three boxes on a line is written once (O-479):
+    19 places on real documents, each read.
+  - The equation step on the 12 development papers, by replay of the recorded answers with all
+    three equation changes (932 equations paired with gold): 866 right and accepted (847
+    before), 7 wrong and accepted (7), 42 asked and right (60), 17 asked and wrong (18).
+  - Measured and not built: the box drawn on the line image hides where a root's bar ends
+    (O-481; moving it changes every inline request), and maths in a table's header cell is
+    left as plain text (O-482). Both are open in the plan.
+- Stored results: the schema is the same. Results from 0.5.10 to 0.5.21 load unchanged, their
+  page is not made again, and 0.5.21 opens a 0.5.22 result. The roll-back limit stays at 0.5.12.
+- The corpus recording: the two switches move 2 requests (`e1_mc_columns` and
+  `w_lecture_5111`, one each; the replay check lists 4 missing, with real answers 2 are
+  sent), recorded again in one capped refresh call for $0.03. The repository part holds 442
+  answers and the kept-out part 1,955.
+  The equation changes and the flag policy move no request. The decision record
+  (`data/eval/burden-corpus.json`) is made again: 523 decisions on 338 pages where it had 536.
+  Four uploads ask 13 fewer (9 questions of the flag policy and 4 about copies of a formula
+  that are gone) and none asks more.
+- Railway, with the deploy: `LAYOUT_FIGURE_ART=true`, `LAYOUT_MATCHING_UNDER=true` and
+  `FLAG_POLICY=false` are set first (docs/deploy-railway.md, "Feature flags in production"), and
+  the start log must show no `profile_mismatch` line.
+
 ## Unreleased: two layout switches on (0.5.22)
 
 - The production profile turns on `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER`, each measured
@@ -27,6 +69,7 @@
     of `e1_mc_columns` and `w_lecture_5111`, and no other upload moves.
   - Railway: set `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER` to `true` with the other
     switches (`readablestem ops profile-check` compares them with the profile).
+
 ## Unreleased: the flag policy is off in production
 
 - `FLAG_POLICY` is `false` in the production profile (it was `true` since 2026-11-03). The rule asked a
@@ -42,6 +85,7 @@
   made again. A new conversion asks fewer questions (the equation text and every request are as before), so it
   goes in the next pipeline raise; production's `FLAG_POLICY` Railway variable must be set to `false` at
   that release.
+
 ## Unreleased: a reading that mends the box is no longer cut for it (O-478)
 
 - The line prompt tells the model to leave out what a box took in by mistake. The symbol and sign
@@ -65,6 +109,7 @@
   already a decision, with the same LaTeX and confidence, whose reason `symbol_mismatch` is now
   `box_ends`. No recorded request stops matching (every equation's readings are the same models
   and answers), no second reading is saved, and `eval burden --same` meets its bar.
+
 ## Unreleased: one formula that layout cut into two boxes is written once (O-479)
 
 - **The fault.** Layout sometimes puts one formula into two or three equation boxes. Each box is
