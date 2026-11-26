@@ -43,7 +43,7 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-25 | 0.5.21 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-26 | 0.5.22 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
@@ -3098,19 +3098,23 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-25 at pipeline 0.5.21,
-production profile `ae2c92fb65cf`, every count as in the 0.5.20 record before it, 47 files
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-26 at pipeline 0.5.22,
+production profile `b0befdf78b1e`, 47 files
 and 91 gold pages, no answer missing, no step stopped early), the student page. A count is given as its pages and, in brackets, its places.
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| edge | 13 | 11 | 6 | 3 (4) | 3 (4) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 2 | 0 |
+| edge | 13 | 12 | 6 | 3 (4) | 3 (4) | 1 (1) | 3 (5) | 0 (0) | 0 of 0 | 1 | 0 |
 | real | 41 | 36 | 12 | 6 (8) | 11 (15) | 12 (16) | 10 (15) | 1 (1) | 1 of 2 | 4 | 1 |
 | self-made | 37 | 36 | 25 | 4 (4) | 8 (10) | 2 (20) | 2 (19) | 0 (0) | 0 of 2 | 0 | 0 |
 | real and self-made | 78 | 72 | 37 | 10 (12) | 19 (25) | 14 (36) | 12 (34) | 1 (1) | 1 of 4 | 4 | 1 |
-| all | 91 | 83 | 43 | 13 (16) | 22 (29) | 15 (37) | 15 (39) | 1 (1) | 1 of 4 | 6 | 1 |
+| all | 91 | 84 | 43 | 13 (16) | 22 (29) | 15 (37) | 15 (39) | 1 (1) | 1 of 4 | 5 | 1 |
 
-The element list reads 83 of 91 right and 49 faultless. (Until 0.5.21 this table still
+The element list reads 84 of 91 right and 49 faultless, and 40 of the 47 documents have every
+gold page right in the student page (39 at 0.5.21). Against the 0.5.21 record one page is made
+right and none wrong: page 1 of `e1_mc_columns`, where the line under a matching exercise is
+read after it (`LAYOUT_MATCHING_UNDER`, on in the profile since 0.5.22); with it one broken
+block fewer, and no other count of the table moves. (Until 0.5.21 this table still
 showed the 0.5.19 record: the stamp rule of 0.5.20 had made one edge page faultless and
 furniture is read on two pages fewer since, and the table was not made again then.) What changed against the first
 baseline, and how much of it the four switches of 0.5.18 did, is in "The switch release of
@@ -3171,26 +3175,33 @@ the second run is worth); rule 5 of "Development and held-out, and the two bars"
 the stop rule that stands since, and the command now refuses a second run for a pipeline
 version (the set's list of runs, `data/gold/layout/NAME.runs.json`).
 
-`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.21,
-under the production profile with the four layout switches on), the
+`layout-dev-1` (60 documents, 267 pages; `data/eval/order-layout-dev-1.json`, made at 0.5.22,
+under the production profile with its six layout switches on), the
 student page:
 
 | | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| paper | 119 | 90 | 45 | 12 (12) | 93 (440) | 29 (37) | 45 (56) | 10 (13) | 0 of 0 | 18 | 7 |
+| paper | 119 | 90 | 45 | 12 (12) | 93 (439) | 29 (37) | 45 (56) | 10 (13) | 0 of 0 | 18 | 7 |
 | selfmade | 40 | 26 | 13 | 3 (7) | 16 (61) | 9 (66) | 13 (30) | 2 (4) | 0 of 5 | 4 | 2 |
-| textbook | 108 | 66 | 36 | 15 (15) | 77 (355) | 43 (269) | 5 (6) | 1 (1) | 0 of 0 | 28 | 0 |
-| all | 267 | 182 | 94 | 30 (34) | 186 (856) | 81 (372) | 63 (92) | 13 (18) | 0 of 5 | 50 | 9 |
+| textbook | 108 | 67 | 36 | 15 (15) | 77 (356) | 43 (270) | 5 (6) | 1 (1) | 0 of 0 | 27 | 0 |
+| all | 267 | 183 | 94 | 30 (34) | 186 (856) | 81 (373) | 63 (92) | 13 (18) | 0 of 5 | 49 | 9 |
 
-The element list reads 181 of 267 right and 95 faultless, and 20 of the 60 documents have
-every gold page right (12 at 0.5.19). Of the table's counts the one that moved from the
+The element list reads 182 of 267 right and 95 faultless, and 20 of the 60 documents have
+every gold page right (12 at 0.5.19). Against the 0.5.21 record (182 right in the student page,
+181 in the element list) one page is made right and none wrong: page 10 of
+`os_calculus_volume_1`, where two columns of exercises are no longer joined across
+(`LAYOUT_FIGURE_ART`, on in the profile since 0.5.22); with it the textbooks have one broken
+block fewer and one place more of a cut and of a stray (on no page more), and the papers
+one stray place fewer and one gold block more found (1,176 to 1,177). Faultless pages and
+documents are as at 0.5.21. The rest of this paragraph is the
+0.5.21 record against the 0.5.20 one, then the 0.5.20 one against the 0.5.19 one. Of the 0.5.21 table's counts the one that moved from the
 0.5.20 record is the merged places of the papers, 55 to 56 on one page more (a page that is
 not right in either record; the count moves with the sign rule of 0.5.21); every count of
 pages right, faultless and of documents is the 0.5.20 one. Outside the table one gold block
 of the textbooks is no longer found (2,377 to 2,376 in the student page, 2,443 to 2,442 in
 the element list): page 8 of `os_principles_data_science` opened with the end of a
 paragraph that is now read whole on page 7 (the page join of 0.5.21), and the scorer counts
-page by page; the page stays right. The rest of this paragraph is the 0.5.20 record against the 0.5.19 one. Against the 0.5.19 record (161 right and 81 faultless;
+page by page; the page stays right. Against the 0.5.19 record (161 right and 81 faultless;
 papers 69 and 32 with furniture read on 32 pages, 94 pages (460 places) of strays and 36
 (46) cut; in all furniture read on 51 pages (55 places), strays 187 (877), cut 89 (382)): 21
 pages are made right and none is made wrong, each the first page of a paper whose stamp was
@@ -3728,7 +3739,21 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-23 at pipeline 0.5.18 by
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-26 at pipeline 0.5.22 by
+`eval burden --out`, production profile `b0befdf78b1e`, all 73 uploads, 338 pages, 523
+decisions, 1.547 a page, no answer missing). Against the 0.5.18 record before it (536
+decisions, 1.586 a page) four uploads ask fewer and none asks more: `w_solutions_1802` 118
+where it asked 127, `w_notes_6042_ch2` 9 for 11, `w_lecture_560` 7 for 8 and
+`r15_openstax_chem_ch3` 8 for 9. Nine of the 13 are the questions of the flag policy, which
+is off in the profile since 0.5.22 (the reason `flag_policy` held 9 decisions and holds
+none), and four are questions about a copy of a formula that is written once now ("One
+formula in two boxes", docs/steps.md); five equations of `w_solutions_1802` that were a
+decision of band 2 are optional now (`--same` names them). Four decisions that
+carried `symbol_mismatch` carry `box_ends` (the same equations, still asked). The equations
+accepted with nothing to hold them against are 1,418 where they were 1,436: the 18 boxes
+taken out as copies. The two switches of 0.5.22 move no decision.
+
+**The 0.5.18 record** (made 2026-11-23 by
 `eval burden --out`, production profile, all 73 uploads, 338 pages, 536 decisions, 1.586 a
 page). The corpus was re-recorded under the switch release, so no answer is missing and no
 upload is left out; the 43 uploads of the record before it ask 51 decisions where they asked
@@ -3767,7 +3792,7 @@ stops matching. A paid recording of the
 answers was owed then (about 1,300 requests) to bring those uploads back into
 the gate; it was made at 0.5.18 ("The switch release of 2026-11-23"). The cost and outputs
 records are still the 0.5.10 ones and the pictures record the 0.5.14 one, and CI does not
-compare them; the order records were re-made at 0.5.18 and again at 0.5.19, 0.5.20 and 0.5.21.
+compare them; the order records were re-made at 0.5.18 and again at 0.5.19, 0.5.20, 0.5.21 and 0.5.22.
 
 First baseline (2026-11-11, pipeline 0.5.10, production profile, 63 of the 73 uploads, 315
 pages; the figures below are that record's, no longer the file's). The ten uploads left out
@@ -4362,7 +4387,7 @@ in a separate worktree):
 One page stops being faultless and stays right (`ax_qbionc_240307089` page 8). The record
 `data/eval/order-layout-dev-1.json` was the 0.5.18 one at this release; it is re-made at 0.5.19
 with the same right and faultless pages, at 0.5.20 with 182 and 94 (the stamp rule), and at
-0.5.21 with 182 and 94 again (its table is under `eval order`).
+0.5.21 with 182 and 94 again, and at 0.5.22 with 183 and 94 (its table is under `eval order`).
 
 **Reading order on the corpus** (`eval order`, the replay of the recorded corpus; 91 gold pages
 of 47 uploads, the student page):
@@ -4374,7 +4399,8 @@ of 47 uploads, the student page):
 | 0.5.18, all four on | 83 | 42 |
 | 0.5.19 (every count as at 0.5.18) | 83 | 42 |
 | 0.5.20 (page 1 of `b6_margin_identifier` is faultless, and furniture is read on 13 pages, from 15) | 83 | 43 |
-| 0.5.21 (`data/eval/order-corpus.json` now; every count as at 0.5.20) | 83 | 43 |
+| 0.5.21 (every count as at 0.5.20) | 83 | 43 |
+| 0.5.22 (`data/eval/order-corpus.json` now; `LAYOUT_MATCHING_UNDER` makes `e1_mc_columns` page 1 right) | 84 | 43 |
 
 - The switches make 13 pages right and one wrong: `e1_mc_columns` page 1, a self-made page
   where a full-width line under a matching exercise is split between the columns. The tree's
@@ -4707,7 +4733,8 @@ recording: `e1_mc_columns` 2 and `w_lecture_5111` 2 ("no answer recorded for thi
 "nearby text changed"), so 308 tests pass, 4 error in `tests/workflows/test_replay_complete.py`
 (the two uploads, each in two tests) and 13 are expected failures. They need the corpus to be
 recorded again under the switches. Nothing else moves: 3,318 answers are read from the
-recording at $8.3747 recorded cost, and 0 are paid.
+recording at $8.3747 recorded cost, and 0 are paid. The recording was made in the release
+("Pipeline 0.5.22", below): with real answers the two uploads send one request each.
 
 **Decisions.** `eval burden --same --against data/eval/burden-corpus.json` with both on holds
 the record for every upload except the two with answers missing, so the bar is not met until
@@ -4718,6 +4745,68 @@ rules were read on, so they say the switches do not make a page worse there, not
 new document is read better. The model reads a figure from its crop: where the box moves a
 few points or takes a label, the request changes and what the model returns for it was not
 measured. The `eval order` of the held-out set was not run.
+
+## Pipeline 0.5.22 (2026-11-26)
+
+Pipeline 0.5.22 is the switch release above (`LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER`
+on in the production profile) with three changes of the equation step: `FLAG_POLICY` off in
+the profile, a reading that leaves out what the box took in at one end keeps its confidence
+(`box_ends`), and one formula that layout cut into two or three boxes on a line is written
+once (CHANGELOG 0.5.22 and the four entries under it; docs/eval-flag-policy.md; docs/steps.md).
+The production profile's hash is `b0befdf78b1e` (three rows changed). Measured on the release
+branch:
+
+- **The recording.** `scripts/corpus_refresh.py --check` on the merged branch lists what the
+  switch release found and no more (2 answers each on `e1_mc_columns` and `w_lecture_5111`;
+  the 6 of `s15_charts_figures` belong to a test that asks with another effort on purpose):
+  the three equation changes move no request. One capped refresh call (`--live --max-usd
+  0.50`) sent 2 requests, one for each upload, and paid $0.03. The repository part of the
+  recording holds 442 answers and the kept-out part 1,955, and both uploads convert from the
+  recording again.
+- **The recorded corpus, upload by upload** (the replay of the 73 uploads at the release
+  against 0.5.21, each result hashed in parts; a scratch tool that is not in the repository).
+  65 uploads differ in nothing but the version the result and its page carry. Eight differ
+  in more, each for a cause named here: `e1_mc_columns` (the matching exercise; 36 elements
+  to 35) and `w_lecture_5111` (figures and the equations beside them) are the two uploads
+  that were recorded again; `w_solutions_1802` (896 elements to 879) and `w_notes_6042_ch2`
+  (551 to 550) lose the copies of formulas written twice and questions of the flag policy,
+  and on one of the two three fixes carry `box_ends` for `symbol_mismatch`;
+  `r15_openstax_chem_ch3` and `w_lecture_560` differ in equation fixes only (the flag
+  policy), and `r17_arxiv_ligo` in one equation fix (`symbol_mismatch` is `box_ends`);
+  `r21_infographic_orcid` differs in one note of one figure (its drawing counts 866 paths
+  where it counted 867, a path no clip lets through; the box, the picture and the request are
+  the same).
+- **Decisions.** The record is re-made (`data/eval/burden-corpus.json`, under `eval burden`):
+  523 decisions on 338 pages where the 0.5.18 record had 536; four uploads ask fewer and none
+  asks more.
+- **Reading order.** `layout-dev-1`: 183 of 267 pages right and 94 faultless in the student
+  page (182 and 94), 182 and 95 in the element list (181 and 95), 20 of 60 documents; one page
+  made right (`os_calculus_volume_1` page 10) and none wrong. The corpus: 84 of 91 right and
+  43 faultless (83 and 43), 84 and 49 in the element list; one page made right
+  (`e1_mc_columns` page 1) and none wrong. Both records are re-made at 0.5.22 and each is the
+  figure the switch release measured at 0.5.21 with both switches on.
+- **The equation step on the 12 development papers** (replay of the recorded answers with no
+  model; 932 equations paired with gold; a scratch harness that is not in the repository):
+
+  | | Right and accepted | Wrong and accepted | Asked and right | Asked and wrong |
+  |---|---|---|---|---|
+  | 0.5.21 | 847 | 7 | 60 | 18 |
+  | 0.5.22 | 866 | 7 | 42 | 17 |
+
+  The 19 more accepted are the 19 the flag policy asked about, none wrong. One equation goes
+  from asked and wrong to asked and right (2404.14123 `p1-e18`, the reading that mends the
+  box). The 7 wrong and accepted are the same 7: 3 misreads and 4 faults of the gold or of
+  the span (docs/eval-flag-policy.md). Formulas written twice are not seen by these counts
+  (the second box pairs with no gold equation): 4 repeats on these papers are written once.
+- **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
+  0.5.22 on a clean tree, with every headline number as at 0.5.21, and `eval gate
+  --require-current` passes for both against their baselines.
+
+**What these numbers do not show.** The equation counts are 12 papers that were read while
+the rules were built, so "none of the 19 was wrong" is a small sample of the questions the
+flag policy asks: with it off, a misread of the kind it was fitted for, on a document unlike
+these, is accepted with no question. The held-out equation parts were not run for this
+release.
 
 ## What the numbers do not show
 
