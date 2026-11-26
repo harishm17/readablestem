@@ -1238,10 +1238,13 @@ and the paragraph holds the bracket that closes it); a bracket the sentence open
 accepted one before an asked one, then the one with fewer failed checks, then one whose box has
 characters, then the first. A window has at most four members (`MAX_BOXES`; real repeats are two
 to four boxes, and a line of hundreds of boxes costs no more than a short one); longer windows
-are taken first and no member is in two. A member whose box holds no letter or digit is held to
-the same as the text between two members: its signs must stand in K's reading at its place (an "="
-that layout boxed alone and that K does not say there is a sign the paper prints, and the window
-stays as it is); a member with no characters at all in its box is fine; a window with no box that has characters has nothing to compare with and is left alone
+are taken first and no member is in two. Another member whose box holds no letter or digit is held
+to the same as the text between two members: its signs must stand in K's reading at its place (an
+"=" that layout boxed alone and that K does not say there is a sign the paper prints, and the
+window stays as it is). K's own box is not placed, since K's reading was made of it (a public
+course file prints `|v|` with both bars in one box and the letter in the next: the file stores
+the bars first, and the bars' reading says the whole). A member with no characters at all in its
+box is fine; a window with no box that has characters has nothing to compare with and is left alone
 (a handwritten page). When two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`: the
 same letters, built differently) and the one that would stay was accepted, the window is left as
 it is, since nobody would see the other reading; when the one that stays is asked, a person

@@ -221,15 +221,17 @@ def _says(keep: _Reading, text: str, members: Run) -> list[str] | None:
 
     The letters and digits are the window's one for one (the caller saw that). Here: every sign,
     bracket or comma of the text between two boxes stands in the reading at that place, between
-    the letters either side of it, and so does a box that holds only signs (an "=" that layout
-    boxed alone). What the reading does not say would be lost with the text."""
+    the letters either side of it, and so does another member's box that holds only signs (an
+    "=" that layout boxed alone). What the reading does not say would be lost with the text. The
+    kept reading's own box is not placed: the reading was made of it (the bars of `|v|` in one
+    box and the letter in the next: the file stores both bars first)."""
     said = _stream(" ".join(keep.tokens))
     if "".join(c for symbol, c in said if symbol) != keep.reading:
         said = None  # (the reading's signs cannot be placed: then the text may hold none)
     at = 0
     for k, (_, _, member) in enumerate(members):
         pieces: list[tuple[bool, str]] = [(True, c) for c in member.box]
-        if not pieces:  # no letter or digit in the box: its signs are placed, as text would be
+        if not pieces and member is not keep:  # a box of signs alone: placed, as text would be
             pieces = [p for p in _stream(member.element.text or "") if not p[0]]
         if k:
             pieces = _stream(text[members[k - 1][1] : members[k][0]]) + pieces

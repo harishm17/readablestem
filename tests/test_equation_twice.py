@@ -105,7 +105,9 @@ def settled(elements: list[Element], readings: dict[int, tuple]):
         # the same two when the one that stays is asked: once, with its question
         (["x", "t"], [(SUB, ASKED), (SUP, ASKED)], 1, ["p1-e1"]),
         # an "=" boxed alone that the reading says at that place goes with the window
-        (["x", "=", "y"], [("x", OK), ("x = y", OK), ("y", OK)], 0, ["p1-e2"]),
+        (["x", "=", "y"], [("x = y", OK), ("=", OK), ("y", OK)], 0, ["p1-e1"]),
+        # the bars of |v| in one box and its letter in the next: the bars' reading says the whole
+        (["| |", "v"], [("|v|", OK), ("v", OK)], 0, ["p1-e1"]),
         # one the reading does not say there is a sign the paper prints: it stays
         (["x = y", "=", "z"], [("x = y", OK), ("=", OK), ("z", OK)], 0, None),
         # five boxes: longer than any real repeat, not looked at

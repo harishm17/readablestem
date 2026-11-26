@@ -155,7 +155,7 @@
   characters in order, never a bag of letters. Inline equations of one paragraph whose markers
   follow each other on one line (two to four boxes): when one member's reading, in order, is exactly
   the characters of the boxes and of the text between them, every sign, bracket or comma of the text
-  between two boxes (and of a box that holds only signs, an "=" boxed alone) stands in that reading
+  between two boxes (and of another member's box that holds only signs, an "=" boxed alone) stands in that reading
   at its place, and every other member's reading is a run
   inside it, the window is written once, with the reading that says it whole (an accepted one before
   an asked one, then the one with fewer failed checks, then one whose box has characters, then the
