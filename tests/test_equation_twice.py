@@ -104,6 +104,12 @@ def settled(elements: list[Element], readings: dict[int, tuple]):
         (["x", "t"], [(SUB, OK), (SUP, OK)], 0, None),
         # the same two when the one that stays is asked: once, with its question
         (["x", "t"], [(SUB, ASKED), (SUP, ASKED)], 1, ["p1-e1"]),
+        # an "=" boxed alone that the reading says at that place goes with the window
+        (["x", "=", "y"], [("x", OK), ("x = y", OK), ("y", OK)], 0, ["p1-e2"]),
+        # one the reading does not say there is a sign the paper prints: it stays
+        (["x = y", "=", "z"], [("x = y", OK), ("=", OK), ("z", OK)], 0, None),
+        # five boxes: longer than any real repeat, not looked at
+        (["x", "= 2", "p +", "3", "q"], [(WHOLE, OK)] * 5, 0, None),
     ],
 )
 def test_a_formula_cut_into_boxes_on_one_line_is_written_once(boxes, readings, decisions, kept):
@@ -135,7 +141,7 @@ def test_the_copy_that_stays_takes_the_whole_formula_and_the_text_around_stays()
         box(12, 200, "x", "p1-e4", 200),
         box(13, 240, "y", "p1-e4", 200),
         # the reading closes a bracket the first box opened; layout left its end in the text
-        paragraph("with ⟦p1-e8⟧ ⟦p1-e9⟧), and (see ⟦p1-e10⟧ ⟦p1-e11⟧) so", 7),
+        paragraph("with ⟦p1-e8⟧ ⟦p1-e9⟧ ), and (see ⟦p1-e10⟧ ⟦p1-e11⟧) so", 7),
         box(8, 100, "t = log(C", "p1-e7", 300),
         box(9, 140, "n", "p1-e7", 300),
         box(10, 200, "a + ", "p1-e7", 300),
@@ -166,8 +172,8 @@ def test_the_copy_that_stays_takes_the_whole_formula_and_the_text_around_stays()
     assert len(spent) == 5
     # the copy that stays holds the whole formula: what a kept original shows and says
     assert (by_id["p1-e3"].bbox, by_id["p1-e3"].text) == ((100, 100, 160, 110), "xt+1")
-    # (with room for the bracket, which stood outside both boxes)
-    assert (by_id["p1-e8"].bbox, by_id["p1-e8"].text) == ((100, 300, 173.5, 310), "t = log(C n)")
+    # (with room for the bracket, which stood outside both boxes, after a space)
+    assert (by_id["p1-e8"].bbox, by_id["p1-e8"].text) == ((100, 300, 173.5, 310), "t = log(C n )")
 
 
 def test_a_formula_inside_a_sentence_is_not_taken_out_for_a_display_over_it():
@@ -196,7 +202,10 @@ def test_the_run_writes_a_repeated_formula_once_with_its_whole_picture_and_what_
     from readablestem.pipeline import equation_step, figure_step, layout, run
     from readablestem.pipeline.layout import Layout
 
+    opened: list[str] = []  # what layout was asked for, in order
+
     def crop(pdf, element, **kw) -> bytes:  # a picture as wide as the element's box
+        opened.append("crop")
         width = round(element.bbox[2] - element.bbox[0])
         pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, width, 20), False)
         pixmap.set_rect(pixmap.irect, (30, 30, 30))
@@ -224,6 +233,7 @@ def test_the_run_writes_a_repeated_formula_once_with_its_whole_picture_and_what_
 
     monkeypatch.setattr(layout, "analyze", lambda pdf, **kw: document)
     monkeypatch.setattr(layout, "crop", crop)
+    monkeypatch.setattr(layout, "release", lambda pdf=None: opened.append("release"))
     monkeypatch.setattr(equation_step, "transcribe", transcribe)
     monkeypatch.setattr(figure_step, "describe", lambda *a, **k: None)
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
@@ -239,4 +249,5 @@ def test_the_run_writes_a_repeated_formula_once_with_its_whole_picture_and_what_
     # the picture of the copy that stays is cut again, as wide as both boxes
     assert set(out.crops) == {"p1-e1"}
     assert pymupdf.Pixmap(out.crops["p1-e1"]).width == 63
+    assert opened[-1] == "release"  # the second cut does not leave the file in layout's cache
     assert (result.stats.model_calls, result.stats.cost_usd) == (2, 0.02)  # both were paid for

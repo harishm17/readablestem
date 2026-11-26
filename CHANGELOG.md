@@ -114,7 +114,7 @@
   model's second reading has the same letters and digits as the first and they are exactly the box's
   less a run at one end, the second reading is compared with the rest of the box, keeps its
   confidence and stays a decision with a new reason, `box_ends` (the reviewer is told the
-  transcription leaves out a few characters the PDF stores at the start or the end of the
+  transcription leaves out characters the PDF stores at the start or the end of the
   formula, that they may be the text beside it or a part of it, and to check in the image that
   nothing of the formula is missing there). The rule cannot tell a real term both readings drop
   at one end from text beside the formula, which is why the reading is never accepted by it; and
@@ -155,10 +155,12 @@
   characters in order, never a bag of letters. Inline equations of one paragraph whose markers
   follow each other on one line (two to four boxes): when one member's reading, in order, is exactly
   the characters of the boxes and of the text between them, every sign, bracket or comma of the text
-  between two boxes stands in that reading at its place, and every other member's reading is a run
+  between two boxes (and of a box that holds only signs, an "=" boxed alone) stands in that reading
+  at its place, and every other member's reading is a run
   inside it, the window is written once, with the reading that says it whole (an accepted one before
   an asked one, then the one with fewer failed checks, then one whose box has characters, then the
-  first) where the window began; a closing bracket right after the window goes with the copy when
+  first) where the window began; a closing bracket right after the window (a space may stand before it)
+  goes with the copy when
   the window's own characters opened it and the reading closes it. The copy that stays then stands
   for the whole formula: its element takes the box around every member, their text with the text
   between them, and a picture cut again from the page with no request, so a reviewer who compares
@@ -168,7 +170,8 @@
   about once at most, whenever it was not accepted; what the dropped copies cost is kept in the
   document's cost and calls. A symbol printed twice, two formulas with the same letters, a window
   whose letters are in another order than the reading's (a matrix or determinant), a reading that
-  goes past the window into the sentence, a sign between two boxes that the reading does not say,
+  goes past the window into the sentence, a sign between two boxes or in a box of its own that
+  the reading does not say,
   two accepted readings that build the whole in two ways, and boxes with no characters in the PDF
   are left as they are. Not built: an accent that
   layout boxed apart from its letter (one on the development papers, 2305.06353 page 3, none in the

@@ -2500,6 +2500,8 @@ def _convert(
             run.crops.pop(fix.element_id, None)
         for element in whole:
             run.cut_again(element)
+        if whole:  # (the cut opened the document again after its release)
+            _CachedDocument(pdf_bytes).release()
         # No empty alt text on content (WS6.4): decoration only with evidence, after every step.
         decoration.settle(elements, run.fixes, run.crops, kept=assemble.KEPT_IMAGE_WORDS)
         # A paragraph or list item layout doubts (`option_labels`, `rtl_text`) gets its decision.

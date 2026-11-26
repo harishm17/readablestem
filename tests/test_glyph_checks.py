@@ -299,19 +299,24 @@ def run_two_models(element: Element, cheap: str, main: str):
     return transcribe(element, b"\x89PNG", client=client, settings=settings)
 
 
+FORMULA = r"x = 2\frac{m}{k}"
+
+
 @pytest.mark.parametrize(
-    ("cheap", "main", "kept"),
+    ("box", "cheap", "main", "kept"),
     [
-        (r"x = 2\frac{m}{k}", r"x = 2\frac{m}{k}", True),  # both left out the box's "is"
-        (r"x = 3\frac{m}{k}", r"x = 2\frac{m}{k}", False),  # the models disagree: a mismatch
-        ("x", "x", False),  # both left out most of the box: that is no end of a box
+        ("x = 2 m/k is", FORMULA, FORMULA, True),  # both left out the box's "is"
+        ("x = 2 m/k is", r"x = 3\frac{m}{k}", FORMULA, False),  # the models disagree: a mismatch
+        ("x = 2 m/k is", "x", "x", False),  # most of the box left out: that is no end of a box
+        ("x = 2 m/k is t", FORMULA, FORMULA, True),  # three left out, and fewer than are kept
+        ("k is", "k", "k", True),  # more left out than kept, but only two: a short formula
     ],
 )
 def test_a_run_both_models_leave_out_at_the_boxs_end_is_not_a_symbol_mismatch(
-    pdf, cheap, main, kept
+    pdf, box, cheap, main, kept
 ):
-    # the box is "x = 2 m/k is": the second word of the line is in it, the formula is not
-    fix = run_two_models(span_of(pdf, "x = 2 m/k is"), cheap, main)
+    # the box holds the second word of the line (or the start of the third); the formula does not
+    fix = run_two_models(span_of(pdf, box), cheap, main)
     codes = failed_codes(fix)
     if kept:
         assert codes == {"box_ends"}

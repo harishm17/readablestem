@@ -112,6 +112,7 @@ class _Merge:
     first: str  # the marker of the window's first member, and of its last
     last: str
     tail: int  # the closing brackets right after the window that the kept reading holds
+    after: int  # the characters of the paragraph they take (the brackets and spaces before them)
     bbox: tuple[float, float, float, float]  # the box that holds every member's box
     text: str  # the window's own text: each box's and the text between two boxes
 
@@ -220,13 +221,16 @@ def _says(keep: _Reading, text: str, members: Run) -> list[str] | None:
 
     The letters and digits are the window's one for one (the caller saw that). Here: every sign,
     bracket or comma of the text between two boxes stands in the reading at that place, between
-    the letters either side of it. What the reading does not say would be lost with the text."""
+    the letters either side of it, and so does a box that holds only signs (an "=" that layout
+    boxed alone). What the reading does not say would be lost with the text."""
     said = _stream(" ".join(keep.tokens))
     if "".join(c for symbol, c in said if symbol) != keep.reading:
         said = None  # (the reading's signs cannot be placed: then the text may hold none)
     at = 0
     for k, (_, _, member) in enumerate(members):
         pieces: list[tuple[bool, str]] = [(True, c) for c in member.box]
+        if not pieces:  # no letter or digit in the box: its signs are placed, as text would be
+            pieces = [p for p in _stream(member.element.text or "") if not p[0]]
         if k:
             pieces = _stream(text[members[k - 1][1] : members[k][0]]) + pieces
         for symbol, c in pieces:
@@ -249,20 +253,23 @@ def _says(keep: _Reading, text: str, members: Run) -> list[str] | None:
     return [c for _, c in said[at:]] if said is not None else []
 
 
-def _tail(text: str, members: Run, after: list[str]) -> int:
-    """How many closing brackets right after the window go with it: brackets the window's own
-    characters (the boxes and the text between them) opened and did not close, which the kept
-    reading closes after its last letter (`after`). A bracket the sentence opened is not owed."""
+def _tail(text: str, members: Run, after: list[str]) -> tuple[int, int]:
+    """How many closing brackets right after the window go with it, and how many characters of
+    the paragraph they take (a space may stand before one): brackets the window's own characters
+    (the boxes and the text between them) opened and did not close, which the kept reading
+    closes after its last letter (`after`). A bracket the sentence opened is not owed."""
     held = "".join(m[2].element.text or "" for m in members) + text[members[0][1] : members[-1][0]]
     owed = {close: held.count(opener) - held.count(close) for close, opener in _BRACKETS.items()}
-    count = at = 0
-    for ch in text[members[-1][1] :]:
+    count = at = length = 0
+    for k, ch in enumerate(text[members[-1][1] :]):
+        if ch.isspace():
+            continue
         if owed.get(ch, 0) <= 0 or ch not in after[at:]:
             break
         at = after.index(ch, at) + 1
         owed[ch] -= 1
-        count += 1
-    return count
+        count, length = count + 1, k + 1
+    return count, length
 
 
 def _around(
@@ -305,7 +312,7 @@ def _windows(text: str, run: Run) -> list[_Merge]:
         after = _says(keep, text, members)
         if after is None:
             continue
-        tail = _tail(text, members, after)
+        tail, length = _tail(text, members, after)
         boxes = [m[2].element.bbox for m in members]
         end = members[-1][1]
         merges.append(
@@ -315,12 +322,13 @@ def _windows(text: str, run: Run) -> list[_Merge]:
                 inline_marker(members[0][2].element.id),
                 inline_marker(members[-1][2].element.id),
                 tail,
+                length,
                 _around(boxes, tail),
                 "".join(
                     (text[members[k - 1][1] : m[0]] if k else "") + (m[2].element.text or "")
                     for k, m in enumerate(members)
                 )
-                + text[end : end + tail],
+                + text[end : end + length],
             )
         )
         taken.update(range(i, j + 1))
@@ -392,7 +400,7 @@ def settle(
         start, last = parent.text.find(merge.first), parent.text.find(merge.last)
         if start < 0 or last < start:
             continue
-        end = last + len(merge.last) + merge.tail
+        end = last + len(merge.last) + merge.after
         cut = _edit(parent, start, end, inline_marker(merge.keep.element.id))
         if cut is None:
             continue

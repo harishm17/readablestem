@@ -110,7 +110,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer", "symbol_mismatch"): "A letter, digit or Greek letter in this "
     "transcription differs from the text stored in the PDF (a wrong digit, a misread or "
     "missing symbol), so compare it with the image symbol by symbol.",
-    ("equation.box_ends", "box_ends"): "This transcription leaves out a few characters the "
+    ("equation.box_ends", "box_ends"): "This transcription leaves out characters the "
     "PDF stores at the start or the end of the formula. They may be the text beside it or a "
     "part of it, so check in the image that nothing of the formula is missing at its start or "
     "its end.",

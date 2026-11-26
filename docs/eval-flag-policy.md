@@ -195,7 +195,7 @@ stated, so nothing else changes.
 
 On the replay of the corpus (73 uploads, every answer recorded, production profile) against the record of
 0.5.18: the equation text, the elements and every request are as before, and 4 of the 73 uploads (one
-public OpenStax chapter, three private files) ask fewer questions: 9 fewer in all, 536 to 527 required
+public OpenStax chapter, three public course files) ask fewer questions: 9 fewer in all, 536 to 527 required
 decisions (1.586 to 1.559 a page); no upload asks more. No recorded request stops matching (the policy
 runs after the model's answer). `eval burden --same` therefore stops on those 4 uploads until the record
 is made again.

@@ -502,12 +502,14 @@ at its end, the rest matching symbol for symbol (`text_layer_compare.trim_text_l
 text-layer check of the second reading compares it with the rest of the box. The file does not say
 where the formula ends, so this is no evidence from the file: the fix keeps the models' confidence but
 stays a decision, with the failed warning `equation.box_ends` (code `box_ends`; the reviewer is
-told the transcription leaves out a few characters stored at the start or the end of the formula,
+told the transcription leaves out characters stored at the start or the end of the formula,
 which may be the text beside it or a part of it, and to check that nothing of the formula is
 missing there). A reading that drops from both ends, that the two models
 read differently, or that also reaches past the box is compared with the box as before. So is one
 that leaves out more letters and digits than it keeps and more than two (`TRIM_ANY`): a box that
 took in a word loses a few characters, and a reading of one letter of a long box is a mismatch.
+The bound still lets a reading leave out as many letters and digits as it keeps (`x + y + z + w + v + u`
+read as `x + y + z`), which is why the message does not say how many.
 What the rule cannot tell: when both models drop a real term at one end (`a = b - c` read as
 `a = b`), the reading is asked about under this reason at the models' confidence, where 0.5.21
 said a sign or a symbol differs and lowered the confidence. It is a decision either way.
@@ -1229,14 +1231,17 @@ comma of the text between two members stands in K's reading at that place (what 
 would be lost with the text: "x ≤ y" read as `xy` stays as it is), and every other member's
 reading is a run inside K's, symbols and operators both (`|v|` is not said by `v`). The window is
 written once: K's marker stands where the window began, and the other markers and the text between
-the first and the last go. A closing bracket right after the window goes too when the window's own
+the first and the last go. A closing bracket right after the window (a space may stand before
+it) goes too when the window's own
 characters opened it and K's reading closes it after its last letter (the first box holds "log(C"
 and the paragraph holds the bracket that closes it); a bracket the sentence opened stays. K is an
 accepted one before an asked one, then the one with fewer failed checks, then one whose box has
 characters, then the first. A window has at most four members (`MAX_BOXES`; real repeats are two
 to four boxes, and a line of hundreds of boxes costs no more than a short one); longer windows
-are taken first and no member is in two. A member with no characters in its box is fine under that
-condition; a window with no box that has characters has nothing to compare with and is left alone
+are taken first and no member is in two. A member whose box holds no letter or digit is held to
+the same as the text between two members: its signs must stand in K's reading at its place (an "="
+that layout boxed alone and that K does not say there is a sign the paper prints, and the window
+stays as it is); a member with no characters at all in its box is fine; a window with no box that has characters has nothing to compare with and is left alone
 (a handwritten page). When two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`: the
 same letters, built differently) and the one that would stay was accepted, the window is left as
 it is, since nobody would see the other reading; when the one that stays is asked, a person
@@ -1248,7 +1253,12 @@ text between them. `run._convert` cuts its picture again from the page (`cut_aga
 A reviewer who compares the reading with the picture, or keeps the original, has the whole formula:
 the picture and the PDF's words for it are the whole, not K's part. A decision made on an earlier
 upload about the part's picture is not carried onto it (`web/carry.py` matches pictures). The
-glyphs kept with K were read under its own box and are dropped from the element.
+glyphs kept with K were read under its own box and are dropped from the element. K's fix is not
+checked again: its checks, its confidence and the reason a reviewer is given were made against
+K's own box. A kept copy that was asked because its reading has letters its part lacks is
+still asked for that reason, while the review table, which compares the reading with the whole
+text, may show no difference (the three kept copies on the development papers are so). The
+question stands; its reason is the part's.
 
 A symbol printed twice (each box says the whole reading), two formulas with the same letters, a
 window whose letters are K's in another order (a fraction, a matrix or a determinant that the file
