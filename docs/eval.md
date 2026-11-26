@@ -733,8 +733,9 @@ added from November 2026 on:
    The 0.5.20 release is why the rule is written here and not per release:
    `layout-heldout-1` was scored for it twice, with a rule built between the runs in
    knowledge of the first one's totals ("The held-out runs for 0.5.20", below). The set has
-   now been scored five times (0.5.18, 0.5.19, twice for 0.5.20, and once for 0.5.21, the
-   first release the command held to one run; its list starts with the first four). No
+   now been scored six times (0.5.18, 0.5.19, twice for 0.5.20, once for 0.5.21, the
+   first release the command held to one run, and once for 0.5.22; its list starts with
+   the first four). No
    page of it was looked at, so it is not spent by rule 4, but its furniture
    row and its count of right pages are fitted to one fault, and each further run teaches the
    builders a little more of its totals. A second held-out half is owed (new documents and
@@ -3290,8 +3291,9 @@ What the reading-order record left open (O-420), settled on 2026-11-22:
 release, after it was deployed (2026-11-23, main `c4d9e719`, the production profile with the
 four layout switches on, no model), once more for 0.5.19 after its release (2026-11-24,
 main `b8fb9ab7`, the same profile, no model), twice for 0.5.20 before its release
-(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run), and
-once for 0.5.21 before its release ("The held-out run for 0.5.21", below):
+(2026-11-25; "The held-out runs for 0.5.20", below; the table has the second run),
+once for 0.5.21 before its release ("The held-out run for 0.5.21", below), and once for
+0.5.22 before its release ("The held-out run for 0.5.22", below):
 
 ```bash
 uv run readablestem eval order --set layout-heldout-1 --for-release --out data/eval/order-layout-heldout-1.json
@@ -3437,6 +3439,25 @@ these documents the three changes of 0.5.21 move no page into or out of right or
 faultless. The totals say no more: which pages moved is not looked at, and whether the
 set holds a page of the kinds the changes mend is not known. The three release bars are
 met at exactly their figures (the ledger, below) and stay as registered.
+
+**The held-out run for 0.5.22.** The set was scored once for 0.5.22 before its release
+(2026-11-26, the release branch at `e0f784db`, clean, the production profile of this
+release, hash `b0befdf78b1e`, with `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER` on, no
+model), after the last change to the code, after the reviews of it were answered and after
+CI passed on that commit, and the command listed the run before it read a document (rule
+5). Every total of the record is the 0.5.21 run's, in both views and in each kind of
+document: 191 of 247 pages right and 113 faultless in the student page (course handouts 26
+and 17, papers 101 and 62, textbooks 64 and 34), 20 of 49 documents with every gold page
+right, furniture read on 20 pages (30 places), blocks cut on 52 pages (195 places), run
+together on 68 (135), strays on 180 (1,013), 4,927 elements and 502 places where a gold
+block is split; the element list reads 192 right and 115 faultless, with 4,707 elements
+and 527 such places. So on these documents the two switches move no total, where
+`layout-dev-1` and the corpus have one page each made right. The totals say no more: no
+page was looked at, so a page that changed and left its counts as they were (a figure's
+box drawn smaller, say) is not seen here, and whether the set holds a page of the kinds
+the switches mend is not known. The equation changes and the flag policy act on a model's
+readings, and this run asks no model, so it does not measure them. The three release bars
+are met at exactly their figures (the ledger, below) and stay as registered.
 
 ## What a page costs, how long it takes, what it asks and what its files hold (`eval cost`, `eval speed`, `eval burden`, `eval outputs`)
 
@@ -4237,9 +4258,9 @@ theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_ou
 event's, so the admin page can set production's numbers of the same release (false flags
 per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
 
-**Today** (`data/eval/ledger.json`, release `0.5.21+ae2c92fb65cf`, made 2026-11-25 on a
+**Today** (`data/eval/ledger.json`, release `0.5.22+b0befdf78b1e`, made 2026-11-26 on a
 clean tree). The three page rows have a held-out line, from the one run of
-`layout-heldout-1` for 0.5.21, and each meets its release bar at the bar's own figure. The
+`layout-heldout-1` for 0.5.22, and each meets its release bar at the bar's own figure. The
 bars are the figures of the second run for 0.5.20 (`data/eval/ledger-bars.json`,
 registered again 2026-11-25 with `--replace-bar`): a later release may not read fewer of
 these pages right, give fewer documents with every gold page right, or read furniture
@@ -4247,18 +4268,19 @@ aloud on more pages. That run of 0.5.20 first passed the bars of 0.5.19 (72 of
 247 pages not right, 11 of 49 documents, 36 of 247 pages with furniture; the ledger of that
 pass is commit `3743f347`). The bars were replaced because the stamp rule left 16
 pages of slack on each of the two page rows, enough to hide a later loss. The held-out lines
-are not a first run's: the set has been scored five times, and `eval order`, "The held-out
-runs for 0.5.20" and "The held-out run for 0.5.21", says what they are worth. Every other line is a development score, or a record of an earlier
+are not a first run's: the set has been scored six times, and `eval order`, "The held-out
+runs for 0.5.20", "The held-out run for 0.5.21" and "The held-out run for 0.5.22", says
+what they are worth. Every other line is a development score, or a record of an earlier
 release.
 
 | Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
 |---|---|---|---|---|---|---|---|
-| Required decisions a page, the median document | corpus | 0.25 | 73 documents | 0.50 | earlier release (0.5.18+11fc9f366bea) | - | at most 1.00 |
+| Required decisions a page, the median document | corpus | 0.25 | 73 documents | 0.50 | development score | - | at most 1.00 |
 | Pages not read right in the student page, by the scorer | layout-heldout-1 | 22.7 per 100 | 56 of 247 pages | 27.5 per 100 | held-out | at most 22.7 per 100: met | - |
-| Pages not read right in the student page, by the scorer | corpus | 8.8 per 100 | 8 of 91 pages | 15.3 per 100 | development score | at most 22.7 per 100 | - |
-| Pages not read right in the student page, by the scorer | layout-dev-1 | 31.8 per 100 | 85 of 267 pages | 36.8 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
+| Pages not read right in the student page, by the scorer | corpus | 7.7 per 100 | 7 of 91 pages | 14.0 per 100 | development score | at most 22.7 per 100 | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 31.5 per 100 | 84 of 267 pages | 36.5 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
 | Documents with every gold page right | layout-heldout-1 | 40.8% | 20 of 49 documents | 28.9% | held-out | at least 40.8%: met | - |
-| Documents with every gold page right | corpus | 83.0% | 39 of 47 documents | 71.4% | development score | at least 40.8% | - |
+| Documents with every gold page right | corpus | 85.1% | 40 of 47 documents | 73.8% | development score | at least 40.8% | - |
 | Documents with every gold page right | layout-dev-1 | 33.3% | 20 of 60 documents | 23.3% | development score, 2 steps stopped early | at least 40.8% | - |
 | Pages that read a running head, a page number or a stamp aloud | layout-heldout-1 | 8.1 per 100 | 20 of 247 pages | 11.5 per 100 | held-out | at most 8.1 per 100: met | at most 2.0 per 100: not met |
 | Pages that read a running head, a page number or a stamp aloud | corpus | 14.3 per 100 | 13 of 91 pages | 21.8 per 100 | development score | at most 8.1 per 100 | at most 2.0 per 100 |
@@ -4275,9 +4297,9 @@ release.
 Read with care:
 
 - "Required decisions a page" is the median over documents of a document's decisions a
-  page, as production counts it. Its record was made at 0.5.18 (the re-recording of the
-  corpus) and is labeled so; 0.5.19 and 0.5.20 moved no recorded request, and `eval burden
-  --same` against it passed for both releases. Its bound is an order statistic of 73 documents of a
+  page, as production counts it. Its record was made again at 0.5.22 (523 decisions on 338
+  pages where the 0.5.18 record had 536; "Pipeline 0.5.22", below), so the line is a
+  development score of this release; the median document is where it was. Its bound is an order statistic of 73 documents of a
   set chosen to cover kinds of document, not sampled from what people upload.
 - The held-out lines count 247 gold pages of 49 documents; two more documents are too long
   for a job and are not measured. A release bar is held as measured, with no bound: 56 of
@@ -4288,7 +4310,7 @@ Read with care:
   numbers are not counted apart, and nothing says they are read less.
 - `layout-dev-1` has two documents in which a step stopped early (a limit on work, the same
   on every machine); its lines say so.
-- Every gold page is right in 39 of 47 corpus documents, 20 of 60 documents of
+- Every gold page is right in 40 of 47 corpus documents, 20 of 60 documents of
   `layout-dev-1` and 20 of 49 held-out documents. A document's gold pages are the ones
   labeled, which in a layout set is a sample of its pages.
 - The output rows are the 0.5.10 record (`eval outputs` has not been run again since). They
@@ -4863,6 +4885,15 @@ branch:
 - **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
   0.5.22 on a clean tree, with every headline number as at 0.5.21, and `eval gate
   --require-current` passes for both against their baselines.
+- **Held-out pages and the ledger.** `layout-heldout-1` was scored once, at `e0f784db`
+  (`eval order`, "The held-out run for 0.5.22"): 191 of 247 pages right, 113 faultless, 20
+  of 49 documents, furniture on 20 pages, and every other total of the record, each as at
+  0.5.21. `eval ledger --for-release` passes: no held-out figure is worse than its release
+  bar (56 of 247 pages not right, 20 of 49 documents, 20 of 247 pages with furniture; each
+  met at the bar's own figure, so the release has no slack on these rows and none was
+  used). The ledger's development lines move with the two pages made right: 7 of 91
+  corpus pages not right (8), 84 of 267 of `layout-dev-1` (85), and every gold page right
+  in 40 of 47 corpus documents (39).
 
 **What these numbers do not show.** The equation counts are 12 papers that were read while
 the rules were built, so "none of the 19 was wrong" is a small sample of the questions the

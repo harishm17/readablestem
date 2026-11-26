@@ -48,6 +48,14 @@
   (`data/eval/burden-corpus.json`) is made again: 523 decisions on 338 pages where it had 536.
   Four uploads ask 13 fewer (9 questions of the flag policy and 4 about copies of a formula
   that are gone) and none asks more.
+- Held-out pages: `layout-heldout-1` was scored once for this release, at `e0f784db`, after
+  the last change to the code and after CI passed on it (rule 5; the run is listed in
+  `data/gold/layout/layout-heldout-1.runs.json`). Every total of the record is as at 0.5.21:
+  191 of 247 pages right and 113 faultless, 20 of 49 documents with every gold page right,
+  20 pages that read furniture aloud. So on these documents the two switches move no total;
+  the equation changes are not measured by this run, which asks no model. `eval ledger
+  --for-release` passes with each of the three release bars met at its own figure. No
+  held-out page was opened.
 - Railway, with the deploy: `LAYOUT_FIGURE_ART=true`, `LAYOUT_MATCHING_UNDER=true` and
   `FLAG_POLICY=false` are set first (docs/deploy-railway.md, "Feature flags in production"), and
   the start log must show no `profile_mismatch` line.
