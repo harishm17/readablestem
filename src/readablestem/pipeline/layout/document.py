@@ -132,6 +132,7 @@ def analyze(
     pages: list[int] | None = None,
     max_pages: int | None = None,
     page_math: Any = None,
+    page_order: Any = None,
     display_grouping: bool = False,
     inline_joins: bool = False,
     region_tree: bool = False,
@@ -158,6 +159,11 @@ def analyze(
     `after_regions(number, rows)` (`pipeline.page_math_reconcile.PageMathHook`). It is shown
     each page's text rows before the display equations are grouped, and may return them
     cut and marked by a verified plan. None (the default) is layout's own rules alone.
+
+    `page_order` (an experiment, no caller in the product): an object with `on_rows(number,
+    items)` and `applied(number, said)`. It is shown each page's lines, equations, figures and
+    tables in the rules' order and may answer with its own blocks and order (`page._runs_by_
+    answer`). None (the default) is layout's own rules alone.
 
     `display_grouping` (`LAYOUT_DISPLAY_GROUPING`, off): the rules of "One printed display, one
     element" in docs/layout.md. Off, the output is what it was before they existed.
@@ -229,6 +235,7 @@ def analyze(
                     ),
                     on_page,
                     unrendered,
+                    page_order,
                 )
             except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
                 raise LayoutError("unreadable", "the PDF could not be parsed") from exc
@@ -431,6 +438,7 @@ def _analyze_document(
     document: _Document,
     on_page: Callable[[int, int], None] | None = None,
     unrendered: dict[int, LayoutError] | None = None,
+    page_order: Any = None,
 ) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
@@ -649,6 +657,7 @@ def _analyze_document(
                     label_keys=label_keys,
                     covers=_covered_points(doc[n], types[n]),
                     page_math=page_math,
+                    page_order=page_order,
                     source=sources.get(n),
                     document=document,
                 )

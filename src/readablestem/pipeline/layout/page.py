@@ -111,6 +111,7 @@ from readablestem.pipeline.layout.shared import (
     _Path,
     _Row,
     _RowIndex,
+    _Run,
 )
 from readablestem.pipeline.layout.tables import _key_term_lines, _table_blocks, _term_items
 
@@ -426,6 +427,7 @@ def _page_blocks(
     label_keys: Collection[tuple] = frozenset(),
     covers: Sequence[tuple[float, float]] = (),
     page_math: Any = None,
+    page_order: Any = None,
     source: say_once.PageSource | None = None,
     document: _Document,
 ) -> _PageBlocks:
@@ -513,8 +515,25 @@ def _page_blocks(
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
     lap("order")
-    runs = _split_options(_runs(ordered, ctx, document=document), document=document)
+    runs = _runs(ordered, ctx, document=document)
+    places: list[int | None] = []
+    figure_places: dict[BBox, int] = {}
+    if page_order is not None:
+        runs, places, figure_places = _runs_by_answer(
+            page_order, number, runs, figures, page_tables, gutter, ctx, source, document=document
+        )
+    if places:
+        split: list[_Run] = []
+        spread: list[int | None] = []
+        for run, place in zip(runs, places, strict=True):
+            pieces = _split_options([run], document=document)
+            split += pieces
+            spread += [place] * len(pieces)
+        runs, places = split, spread
+    else:
+        runs = _split_options(runs, document=document)
     blocks = [_classify_run(run, ctx, document=document) for run in runs]
+    placed_blocks = {id(b): p for b, p in zip(blocks, places, strict=False) if p is not None}
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
     _flag_text(blocks)
     for block in blocks:
@@ -605,7 +624,10 @@ def _page_blocks(
         earlier=document.figure_art,
     )
     lap("order")
-    final = _option_order(_merge_column_continuations([blocks[i] for i in order]))
+    in_order = [blocks[i] for i in order]
+    if places or figure_places:
+        in_order = _answer_order(in_order, placed_blocks, figure_places)
+    final = _option_order(_merge_column_continuations(in_order))
     edges = _RightEdges(text_rows)
     _label_abstracts(final, text_rows, edges)
     for block in final:
@@ -638,6 +660,173 @@ def _page_blocks(
     )
     lap("blocks")
     return _PageBlocks(number, size, final, left_out, unread)
+
+
+def _runs_by_answer(
+    page_order: Any,
+    number: int,
+    runs: list[_Run],
+    figures: Sequence[_Figure],
+    page_tables: Sequence[tables.PageTable],
+    gutter: Gutter,
+    ctx: _Context,
+    source: say_once.PageSource | None,
+    *,
+    document: _Document,
+) -> tuple[list[_Run], list[int | None], dict[BBox, int]]:
+    """The page's runs as a model's answer groups and orders them (an experiment: `analyze`
+    gives `page_order`, off by default).
+
+    The hook is shown the page as items in the rules' order (`page_order.on_rows(number,
+    items)`): each line of text (`r<k>`), each display equation (`e<k>`, the rules' own run),
+    each figure and table (`f<k>`, `t<k>`), a figure or table where its box falls among the
+    runs; a line or an equation also says which of the rules' runs it is in (`run`). It
+    answers `{"blocks": [{"items": [id, ...], "kind": str}], "furniture": [id, ...]}`
+    in reading order, or None for the rules' own runs. A block of lines is one run, its lines
+    in the answer's order; an equation, figure or table stands alone whatever its block holds
+    (`bad_join`); lines named as furniture are left out; lines the answer does not name are
+    kept at the end in the runs the rules made of them (`left_out`). The hook is told the
+    counts (`applied(number, said)`).
+
+    Returns the runs, each one's place in the answer (None: the answer does not place it) and
+    the place of each figure and table box."""
+    placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
+    sequence = _reading_order(
+        [*(run.box for run in runs), *placed],
+        gutter,
+        ctx.body,
+        blocks=True,
+        earlier=document.figure_art,
+    )
+    items: list[dict[str, Any]] = []
+    run_of: dict[str, _Run] = {}
+    line_of: dict[str, _Row] = {}
+    placed_of: dict[str, BBox] = {}
+    lines = equations = 0
+    for at in sequence:
+        if at >= len(runs):
+            k = at - len(runs)
+            name = f"f{k}" if k < len(figures) else f"t{k - len(figures)}"
+            kind = "figure" if k < len(figures) else "table"
+            items.append({"id": name, "kind": kind, "box": [round(v, 1) for v in placed[k]]})
+            placed_of[name] = placed[k]
+        elif runs[at].kind == "math":
+            run = runs[at]
+            name = f"e{equations}"
+            equations += 1
+            items.append(
+                {
+                    "id": name,
+                    "kind": "equation",
+                    "run": at,
+                    "box": [round(v, 1) for v in run.box],
+                    "text": " ".join(r.clean for r in run.rows),
+                }
+            )
+            run_of[name] = run
+        else:
+            for row in runs[at].rows:
+                name = f"r{lines}"
+                lines += 1
+                items.append(
+                    {
+                        "id": name,
+                        "kind": "line",
+                        "run": at,
+                        "box": [round(v, 1) for v in row.bbox],
+                        "size": round(row.size, 1),
+                        "rotated": bool(row.vertical or row.diagonal),
+                        "text": row.clean,
+                    }
+                )
+                line_of[name] = row
+    answer = page_order.on_rows(number, items)
+    if not isinstance(answer, dict):
+        return runs, [], {}
+    parents = {id(row): run for run in runs for row in run.rows}
+    said = {"bad_join": 0, "left_out": 0, "furniture": 0, "runs": 0}
+    used: set[str] = set()
+    furniture: list[_Row] = []
+    for name in answer.get("furniture") or ():
+        if name in line_of and name not in used:
+            used.add(name)
+            furniture.append(line_of[name])
+    said["furniture"] = len(furniture)
+    if source is not None and furniture:
+        source.leave_out_at("furniture", _cut_boxes(furniture, []))
+    made: list[tuple[_Run, int]] = []
+    figure_places: dict[BBox, int] = {}
+    for position, block in enumerate(answer.get("blocks") or ()):
+        names = []
+        for name in block.get("items") or ():
+            if name not in used and (name in line_of or name in run_of or name in placed_of):
+                used.add(name)
+                names.append(name)
+        if len(names) > 1 and any(name not in line_of for name in names):
+            said["bad_join"] += 1
+        group: list[_Row] = []
+        for name in (*names, ""):
+            if name in line_of:
+                group.append(line_of[name])
+                continue
+            if group:
+                made.append((_run_of_rows(group, parents), position))
+                group = []
+            if name in run_of:
+                made.append((run_of[name], position))
+            elif name in placed_of:
+                figure_places[placed_of[name]] = position
+    left = {id(row) for name, row in line_of.items() if name not in used}
+    said["left_out"] = len(left)
+    for run in runs:
+        rest = [row for row in run.rows if id(row) in left]
+        if rest:
+            made.append((_run_of_rows(rest, parents), -1))
+    made += [(run, -1) for name, run in run_of.items() if name not in used]
+    said["runs"] = len(made)
+    page_order.applied(number, said)
+    return [run for run, _ in made], [p if p >= 0 else None for _, p in made], figure_places
+
+
+def _run_of_rows(rows: list[_Row], parents: dict[int, _Run]) -> _Run:
+    """One run of `rows`, lines of the rules' runs: the run the rules made when the rows are all
+    of it; otherwise a new one that starts and ends a block and has each flag (code, steps of
+    an algorithm, a line of contents, a footnote) that the runs of all its rows have."""
+    first = parents[id(rows[0])]
+    if len(rows) == len(first.rows) and all(a is b for a, b in zip(rows, first.rows, strict=True)):
+        return first
+    held = [parents[id(row)] for row in rows]
+    return _Run(
+        list(rows),
+        first.kind,
+        block_start=True,
+        code=all(p.code for p in held),
+        algo=all(p.algo for p in held),
+        contents=all(p.contents for p in held),
+        note=all(p.note for p in held),
+    )
+
+
+def _answer_order(
+    blocks: list[_Block], placed: dict[int, int], boxes: dict[BBox, int]
+) -> list[_Block]:
+    """`blocks` (the rules' order) with the blocks the answer placed (`placed`: by block, or
+    `boxes`: a figure or table by its box) in the answer's order. A block it did not place stays
+    right behind the block before it in the rules' order, a leading one stays first."""
+    head: list[_Block] = []
+    groups: list[tuple[int, list[_Block]]] = []
+    for block in blocks:
+        at = placed.get(id(block))
+        if at is None and block.kind in (Kind.FIGURE, Kind.TABLE, Kind.EQUATION):
+            at = boxes.get(block.bbox)
+        if at is not None:
+            groups.append((at, [block]))
+        elif groups:
+            groups[-1][1].append(block)
+        else:
+            head.append(block)
+    groups.sort(key=lambda group: group[0])
+    return [*head, *(block for _, group in groups for block in group)]
 
 
 def _cut_boxes(before: Sequence[_Row], after: Sequence[_Row]) -> list[BBox]:
