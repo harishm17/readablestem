@@ -6,8 +6,10 @@
   at $0 (no model call) at 0.5.21 against the same tree with it off (docs/eval.md, "The switch
   release of 2026-11-26"). The code defaults stay off; the 0.5.22 raise of `PIPELINE_VERSION`
   and the re-recording of the corpus under them are made in the release that carries this entry.
-  - `LAYOUT_FIGURE_ART`: of 547 public files (8,527 pages) 50 files and 95 pages change, 22
-    files read better and 28 the same, none worse; the figures read 3,806 to 3,784 and the
+  - `LAYOUT_FIGURE_ART`: of 547 public files (8,527 pages) 50 files and 95 pages change, 23
+    files read better, 26 the same, and one page of one file reads slightly worse (2504.14923
+    page 11: a figure as tall as the page, wrong before, takes the first line of one more
+    paragraph); no word of any of the 95 pages is lost; the figures read 3,806 to 3,784 and the
     captioned figures stay 1,907. Page-wide figures that took body text, slivers of hidden art
     and boxes drawn over text are gone; a row the drawing's edge cut and a panel label are read in
     their figure. Reading order of layout-dev-1: 183 of 267 pages right in the page a student is

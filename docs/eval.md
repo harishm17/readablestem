@@ -4595,11 +4595,22 @@ left out of every column), `LAYOUT_FIGURE_ART` changes 50 files and 95 pages, an
 `LAYOUT_MATCHING_UNDER` one file and one page (a self-made test PDF). Both together change 51
 files and 96 pages, the union. Figures go from 3,806 to 3,784 and captioned figures stay
 1,907. Every differing file was classed from the page itself (the elements drawn over the
-page, base against switch): better, the same reading, or worse. 24 files read better, 27 the
-same and none worse. The 27 are files where a figure's edge moved by a few points, the
-elements are in another order, or the ids of the inline formulas are renumbered. A page counts
-as worse when text of a paragraph goes into a figure, body text is taken as a caption, or a
-figure loses part of its drawing.
+page, base against switch): better, the same reading, or worse. 24 files read better (23 by
+`LAYOUT_FIGURE_ART`, one by `LAYOUT_MATCHING_UNDER`), 26 the same, and one has one page that
+reads slightly worse (2504.14923 page 11, below). The 26 are files where a figure's edge moved
+by a few points, the elements are in another order, or the ids of the inline formulas are
+renumbered. A page counts as worse when text of a paragraph goes into a figure, body text is
+taken as a caption, or a figure loses part of its drawing.
+
+The classing was checked a second way, on the full text of every element of the 95 pages: the
+words of the page (every element kind and the figure captions) are the same with the switch on
+and off in all 50 files but for a word that is no longer cut at a line end and the characters
+of formulas that are now read as formulas; the words that leave paragraphs, list items and
+headings for a figure's text are panel names, axis labels and tick values, in every file but
+one (2504.14923 page 11: 15 words of a sentence); and words that a figure had taken go back to
+their paragraphs in three files (2401.11209, 2407.20815, 2504.03499). On 2407.20815 pages 15
+and 20 a page-sized figure is replaced by the drawings, with six small pieces of them boxed
+as figures of their own (tiny figures on the 95 pages: 45 before, 46 after).
 
 | Public file | Pages (1-based) | What moved | Class |
 |---|---|---|---|
@@ -4638,7 +4649,7 @@ figure loses part of its drawing.
 | papers/2503.01126 | 10, 11 | figure top 20 pt lower | same |
 | papers/2503.17870 | 5 | page-spanning figure and four slivers become one figure (12 to 7) | better |
 | papers/2504.03499 | 5, 7, 10, 13, 14, 16, 18, 21 | boxes drawn over text by hidden art gone; meta-learning panels and their labels read as figures (26 to 20) | better |
-| papers/2504.14923 | 8, 11 | page 11 was already one page-wide figure; its first body lines now sit in that figure (not worse than before); page 8 figure edge | same |
+| papers/2504.14923 | 8, 11 | page 11 was already one page-tall figure that takes the first line of several paragraphs; it now takes the first line of one more; page 8 figure edge | one page slightly worse |
 | papers/2505.03022 | 14 | element order only | same |
 | papers/2505.06419 | 3 | two panels and their labels merged into figures | better |
 | papers/2505.12810 | 8, 9 | formula ids renumbered | same |
@@ -4655,10 +4666,10 @@ figure loses part of its drawing.
 | repo/data/real-tables/2505.03022.pdf | 14 | element order only | same |
 | repo/tests/workflows/corpus/selfmade/e1_mc_columns.pdf (matching under only) | 1 | two columns of the matching exercise end at the label numbering | better |
 
-The one page that is the same and could be called worse is page 11 of 2504.14923: the page was
-a page-wide figure before the switch (it swallows the body text in both runs), and with the
-switch two lines of one paragraph sit in that figure's text where they sat in a paragraph.
-It is a rotated-text layout the figure rules already got wrong.
+The one page that reads worse is page 11 of 2504.14923. The page has a figure as tall as the
+page in both runs, and that figure's text holds the first line of several paragraphs of the
+column; with the switch it also holds the first line of the paragraph under the caption (15
+words). The fault is the page-tall figure, which the switch does not make and does not mend.
 
 **Reading order** (`eval order`, the production profile edited in a separate worktree for each
 row; the page a student is given):
