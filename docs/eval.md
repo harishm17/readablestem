@@ -4566,6 +4566,148 @@ release branch:
   pages not right, 20 of 49 documents, 20 of 247 pages with furniture; each met at the
   bar's own figure, so the release has no slack on these rows and none was used).
 
+## The switch release of 2026-11-26
+
+Pipeline 0.5.22 turns on two more layout switches in the production profile
+(`src/readablestem/ops/production.profile.toml`) that 0.5.21 shipped off: `LAYOUT_FIGURE_ART`
+(O-452) and `LAYOUT_MATCHING_UNDER` (O-460). Each was measured at $0 (no model call, no key)
+against the same tree with it off, and each can go back off alone. The code defaults stay off.
+Nothing here is a paid run: the measures below are the replay of the recorded corpus and the
+layout reader, so they say what the pages look like, not what a model reads from the moved
+crops.
+
+The measured tree is 0.5.21 at `712346b2`. The "off" tree is that commit unchanged (the four
+switches of 0.5.18 on); the other trees differ from it by one or two rows of the profile
+(`value = true`), made in separate worktrees because `eval order` reads the profile in child
+processes. To make the measures again, in a clone with the corpus recording:
+
+| Measure | Command (from the tree measured) |
+|---|---|
+| Reading order, layout development set | `readablestem eval order --set layout-dev-1` |
+| Reading order, corpus gold pages | `readablestem eval order` |
+| Formulas kept whole | the box-score tool of the 21 development papers (kept outside the repository), `--grouping --on inline_joins --on region_tree --on join_panels` and `--on figure_art`, `--on matching_under` |
+| Decisions | `readablestem eval burden --same --against data/eval/burden-corpus.json` |
+| Recording gaps | `scripts/corpus_refresh.py --check` |
+| Pages of the public files | `layout.analyze` page by page over the 547 public PDFs (the `papers`, the layout development set and the PDFs of the repository), once per configuration, comparing kind, box and a hash of the text of every element |
+
+**Pages of the public files.** Of 547 files (8,527 pages; three files the reader refuses are
+left out of every column), `LAYOUT_FIGURE_ART` changes 50 files and 95 pages, and
+`LAYOUT_MATCHING_UNDER` one file and one page (a self-made test PDF). Both together change 51
+files and 96 pages, the union. Figures go from 3,806 to 3,784 and captioned figures stay
+1,907. Every differing file was classed from the page itself (the elements drawn over the
+page, base against switch): better, the same reading, or worse. 24 files read better, 27 the
+same and none worse. The 27 are files where a figure's edge moved by a few points, the
+elements are in another order, or the ids of the inline formulas are renumbered. A page counts
+as worse when text of a paragraph goes into a figure, body text is taken as a caption, or a
+figure loses part of its drawing.
+
+| Public file | Pages (1-based) | What moved | Class |
+|---|---|---|---|
+| papers/2209.12301 | 11, 16 | formula ids renumbered, order only | same |
+| papers/2212.03448 | 7, 8, 20 | panel label "(a)" read inside its figure instead of a loose paragraph | better |
+| papers/2301.08958 | 23 | element order only | same |
+| papers/2309.04589 | 2 | figure box 17 pt narrower, at the drawing's edge | same |
+| papers/2311.00882 | 16 | figure box cut to the drawing | better |
+| papers/2311.16176 | 6, 17, 18 | drawn panels read as figures with their titles (14 to 18 figures); empty equation boxes gone | better |
+| papers/2312.01530 | 14 | the row label "E)" that the drawing's edge cut goes to its own figure | better |
+| papers/2312.02215 | 6 | formula ids renumbered | same |
+| papers/2401.11209 | 6, 8, 9 | "(a)" into its figure; a page-wide figure that swallowed body text becomes two captioned figures (captions 19 to 21) | better |
+| papers/2401.13131 | 9 | figure top 20 pt lower | same |
+| papers/2402.06191 | 3, 18 | label "Disassemble chamber" read inside the figure | better |
+| papers/2404.02347 | 5 | figure 15 pt taller, equation re-cut | same |
+| papers/2405.05818 | 21 | element order only | same |
+| papers/2405.12131 | 3 | five slivers of hidden art merged into one figure (15 to 10) | better |
+| papers/2405.17131 | 17 | figure top 2 pt lower | same |
+| papers/2406.04133 | 3 | element order only | same |
+| papers/2406.12076 | 5, 6 | figure edge about 1 pt | same |
+| papers/2407.20815 | 8, 14, 15, 16, 19, 20, 22 | page-sized and overlapping figures replaced by the drawings themselves (28 to 21); the "Exercise" box no longer takes the figure caption | better |
+| papers/2408.01652 | 9, 18 | element order only | same |
+| papers/2409.02247 | 8 | formula ids renumbered | same |
+| papers/2409.05598 | 23 | formula ids renumbered | same |
+| papers/2410.04138 | 10 | axis labels read inside the figure | better |
+| papers/2410.05588 | 4 | a boxed formula drawing read as a figure with its text | same |
+| papers/2410.17311 | 9 | figure top 6 pt lower | same |
+| papers/2412.05104 | 5 | element order only | same |
+| papers/2412.07456 | 13 | figure no longer runs off the page top and right | better |
+| papers/2412.12101 | 4, 8, 14 | two touching figures read as one; a 13 pt sliver gone | better |
+| papers/2501.02602 | 6 | element order only | same |
+| papers/2501.05251 | 17, 18 | panel label "(e)" read inside its figure | better |
+| papers/2501.09629 | 17 | element order only | same |
+| papers/2502.09301 | 15 | axis label read inside the figure | better |
+| papers/2502.19272 | 2, 3, 4 | figure 3 gets its caption (captions 2 to 3); figure boxes at the drawing edge | better |
+| papers/2503.01126 | 10, 11 | figure top 20 pt lower | same |
+| papers/2503.17870 | 5 | page-spanning figure and four slivers become one figure (12 to 7) | better |
+| papers/2504.03499 | 5, 7, 10, 13, 14, 16, 18, 21 | boxes drawn over text by hidden art gone; meta-learning panels and their labels read as figures (26 to 20) | better |
+| papers/2504.14923 | 8, 11 | page 11 was already one page-wide figure; its first body lines now sit in that figure (not worse than before); page 8 figure edge | same |
+| papers/2505.03022 | 14 | element order only | same |
+| papers/2505.06419 | 3 | two panels and their labels merged into figures | better |
+| papers/2505.12810 | 8, 9 | formula ids renumbered | same |
+| papers/2505.23940 | 13, 24 | panel labels "Re=40, Re=100" read inside the figure | better |
+| papers/2506.03289 | 3 | formula ids renumbered | same |
+| papers/2506.13076 | 13 | panel labels D., E., F. read in their own figures | better |
+| papers/2506.15579 | 11, 15 | figure edge 1 to 20 pt | same |
+| layout-dev-1/ax_astrophga_240306369.pdf | 3 | axis labels listed as paragraphs, not list items | same |
+| layout-dev-1/ax_astrophga_240306409.pdf | 5, 9, 10, 11, 12, 13, 15 | the two overlapping panels of figure 15 read as one captioned figure (19 to 16); figure edges | better |
+| layout-dev-1/ax_condmatmtrlsci_240306379.pdf | 2 | label "( b" read inside its figure | better |
+| layout-dev-1/ax_physicsoptics_240306439.pdf | 7, 13, 39, 40 | figure caption text no longer split off the figure | better |
+| layout-dev-1/os_algebra_and_trigonometry_2e.pdf | 20, 21 | element order only | same |
+| layout-dev-1/os_calculus_volume_1.pdf | 2, 6, 10 | "and both exist" joined into one paragraph; two exercise columns no longer joined across (page 10, made right in the reading order) | better |
+| repo/data/real-tables/2505.03022.pdf | 14 | element order only | same |
+| repo/tests/workflows/corpus/selfmade/e1_mc_columns.pdf (matching under only) | 1 | two columns of the matching exercise end at the label numbering | better |
+
+The one page that is the same and could be called worse is page 11 of 2504.14923: the page was
+a page-wide figure before the switch (it swallows the body text in both runs), and with the
+switch two lines of one paragraph sit in that figure's text where they sat in a paragraph.
+It is a rotated-text layout the figure rules already got wrong.
+
+**Reading order** (`eval order`, the production profile edited in a separate worktree for each
+row; the page a student is given):
+
+| Profile | layout-dev-1, 267 pages: right | faultless | Corpus gold pages: right | faultless |
+|---|---|---|---|---|
+| all four of 0.5.18 on (0.5.21) | 182 | 94 | 83 of 91 | 43 |
+| `LAYOUT_FIGURE_ART` on | 183 | 94 | 83 of 91 | 43 |
+| `LAYOUT_MATCHING_UNDER` on | 182 | 94 | 84 of 91 | 43 |
+| both on | 183 | 94 | 84 of 91 | 43 |
+
+`LAYOUT_FIGURE_ART` makes one page right (`os_calculus_volume_1` page 10) and none wrong, on
+the elements the same page. `LAYOUT_MATCHING_UNDER` makes `e1_mc_columns` page 1 right and none
+wrong: the line under a matching exercise that was read inside it is the page the region tree
+made wrong in 0.5.18. The replay's printed headline of the corpus is 83 of 90 under both,
+because the upload has 2 answers missing from the recording and is left out of the printed
+count; the page lists above it count it.
+
+**Formulas kept whole** (box score of the 21 development papers, 11,258 formulas):
+
+| Profile | Whole | Made whole | Made not whole |
+|---|---|---|---|
+| all four of 0.5.18 on | 9,203 | | |
+| `LAYOUT_FIGURE_ART` on | 9,205 | 2 | 0 |
+| `LAYOUT_MATCHING_UNDER` on | 9,203 | 0 | 0 |
+| both on | 9,205 | 2 | 0 |
+
+Displays kept whole stay 903 of 1,004. The tool and its papers are kept outside the
+repository, so the table cannot be made again from a clone.
+
+**Recordings.** `scripts/corpus_refresh.py --check` with the profile of 0.5.21 passes except
+for the 6 answers of `s15_charts_figures` that were already missing (recorded at another
+effort or model than asked). With both switches on it lists 4 more answers missing from the
+recording: `e1_mc_columns` 2 and `w_lecture_5111` 2 ("no answer recorded for this picture" and
+"nearby text changed"), so 308 tests pass, 4 error in `tests/workflows/test_replay_complete.py`
+(the two uploads, each in two tests) and 13 are expected failures. They need the corpus to be
+recorded again under the switches. Nothing else moves: 3,318 answers are read from the
+recording at $8.3747 recorded cost, and 0 are paid.
+
+**Decisions.** `eval burden --same --against data/eval/burden-corpus.json` with both on holds
+the record for every upload except the two with answers missing, so the bar is not met until
+they are recorded; no decision of the others changes.
+
+**What these numbers do not show.** The pages are development sets and the public files the
+rules were read on, so they say the switches do not make a page worse there, not how often a
+new document is read better. The model reads a figure from its crop: where the box moves a
+few points or takes a label, the request changes and what the model returns for it was not
+measured. The `eval order` of the held-out set was not run.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%

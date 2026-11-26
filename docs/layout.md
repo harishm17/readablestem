@@ -708,8 +708,8 @@ changed nothing in production.
    Name line; of the 332 PDFs counted (public files, the layout development set, the real-world
    development parts, the workflow corpus), only that page has a column with two kinds, and the
    two matching exercises (`e1_mc_columns`, `s04_worksheet`) are cut as before.
-   What stands under a matching exercise (`LAYOUT_MATCHING_UNDER`, off in code and in the
-   production profile, with `REGION_TREE` on): the line under it that goes on in a column ("8."
+   What stands under a matching exercise (`LAYOUT_MATCHING_UNDER`, off in code, on in the
+   production profile since 0.5.22, with `REGION_TREE` on): the line under it that goes on in a column ("8."
    under terms 1. 2. 3.) was a fourth term and was read between the terms and the definitions.
    With the switch on, each column's labels end where their count stops (`_run`: the first
    label, then the next number or letter of the same kind; at least two in each column, the two
@@ -719,7 +719,10 @@ changed nothing in production.
    (a), (b). Limit: a line under the exercise that goes on counting ("4." under terms 1. 2. 3.)
    is not told from a fourth term. Moving what is read before a figure or an equation under the
    exercise moves the text of its request, so the recorded answer of such an item stops
-   matching: that is why the switch is off until a re-recording.
+   matching: that is why the switch stayed off until the corpus was re-recorded under it.
+   Measured on 2026-11-26 at 0.5.21 (docs/eval.md "The switch release of 2026-11-26"): on the 547
+   public files and layout-dev-1 no page moves; `e1_mc_columns` page 1 becomes right (corpus
+   gold pages right 83 to 84 of 91).
 9. Index pages (`entries.starts_entry`, asked by `figures._continues` with `_Context.region_tree`
    on): on a page of 20 or more lines, half ending in a page number, median line seven words or
    fewer, a line at the entry margin after a line that ends in a number starts a new entry.
@@ -2217,8 +2220,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
   pairs of neighboring pixels differ by more than 16 levels, and what is seen, alpha
   above 13, covers all of it or nothing: a transparent spacer, a one-color block, a
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
-- **`LAYOUT_FIGURE_ART`** (`layout.analyze(figure_art=True)`, off in code and in the production
-  profile) holds the two rules below that moved a recorded figure request on the corpus, "Art a
+- **`LAYOUT_FIGURE_ART`** (`layout.analyze(figure_art=True)`, off in code, on in the production
+  profile since 0.5.22) holds the two rules below that moved a recorded figure request on the corpus, "Art a
   clip hides" and "A row cut by a drawing's edge", and "Pen figures", which is for the pages the
   first of them turns into ink pages. Off, the output is what it was before them.
   Measured by replay on the 73 uploads of the corpus against release 5d081fcc (0.5.18): with it
@@ -2232,7 +2235,8 @@ math by the document's evidence; the equation step's own tiers then decide it.
   on w_lecture_5111 (one figure and one equation of page 4), the same 2 as without the order
   change, and 2 uploads differ (that one and r21_infographic_orcid); with it off, 0 of 73
   uploads and 0 of 996 analyze entries differ. Turning it on
-  needs a re-recording of those 2 requests and a `PIPELINE_VERSION` bump. The three things that were owed before it
+  needed a re-recording of those requests and a `PIPELINE_VERSION` bump (0.5.22; measured with no
+  model call on 2026-11-26, docs/eval.md "The switch release of 2026-11-26"). The three things that were owed before it
   could go on are in (wave 6): the order of figures that stand side by side, the narrower label
   test for pen figures ("Pen figures") and the clip read in the readers of strike and highlight.
   - *Order*: with the switch on, `order._top_down` puts an item that goes to a new line only

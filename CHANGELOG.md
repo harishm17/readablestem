@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased: two layout switches on (0.5.22)
+
+- The production profile turns on `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER`, each measured
+  at $0 (no model call) at 0.5.21 against the same tree with it off (docs/eval.md, "The switch
+  release of 2026-11-26"). The code defaults stay off; the 0.5.22 raise of `PIPELINE_VERSION`
+  and the re-recording of the corpus under them are made in the release that carries this entry.
+  - `LAYOUT_FIGURE_ART`: of 547 public files (8,527 pages) 50 files and 95 pages change, 22
+    files read better and 28 the same, none worse; the figures read 3,806 to 3,784 and the
+    captioned figures stay 1,907. Page-wide figures that took body text, slivers of hidden art
+    and boxes drawn over text are gone; a row the drawing's edge cut and a panel label are read in
+    their figure. Reading order of layout-dev-1: 183 of 267 pages right in the page a student is
+    given (was 182; `os_calculus_volume_1` page 10), 94 faultless as before, none made wrong.
+    Formulas kept whole on the 21 development papers: 9,205 of 11,258 (was 9,203), 2 made whole
+    and none made not whole. The corpus gold pages are unchanged (83 of 91 right).
+  - `LAYOUT_MATCHING_UNDER`: no page of the 547 public files and none of layout-dev-1 changes;
+    the self-made `e1_mc_columns` page 1 becomes right (corpus gold pages right 83 to 84 of
+    91), nothing is made wrong. The line under a matching exercise was the one known wrong page
+    of the region tree (0.5.18 entry below).
+  - What changes for a stored result: nothing is made again. For a new conversion the figure
+    box and the text beside a figure or a formula under a matching exercise can differ, so the
+    recorded model answers of the requests those pages make stop matching until they are
+    recorded again: in the corpus the replay check at 0.5.21 finds 2 answers missing on each
+    of `e1_mc_columns` and `w_lecture_5111`, and no other upload moves.
+  - Railway: set `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER` to `true` with the other
+    switches (`readablestem ops profile-check` compares them with the profile).
+
 ## Pipeline 0.5.21, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.21 and `RENDER_VERSION` stays 11: one raise of the pipeline for the
