@@ -429,8 +429,9 @@ log = logging.getLogger(__name__)
 # again. FLAG_POLICY goes off in the profile: an accepted equation is no longer asked about for
 # looking like an old misread. What a PDF's result holds also moves in two places of the
 # equation step, with no request changed: a reading that leaves out what the box took in at one
-# end keeps its confidence (reason `box_ends`), and one formula that layout cut into two or
-# three boxes on one line is written once (`equation_twice`).
+# end keeps its confidence (reason `box_ends`), and one formula that layout cut into two to
+# four boxes on one line is written once (`equation_twice`): the copy that stays takes the whole
+# formula's box and text, and its picture is cut again from the page.
 # The result's schema is the same: results from 0.5.10 to 0.5.21 load unchanged and their page
 # is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.21 opens a 0.5.22 result.
 # Each switch goes back alone with its profile row and the Railway variable of the same name.

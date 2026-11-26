@@ -4790,14 +4790,31 @@ branch:
 
   | | Right and accepted | Wrong and accepted | Asked and right | Asked and wrong |
   |---|---|---|---|---|
-  | 0.5.21 | 847 | 7 | 60 | 18 |
-  | 0.5.22 | 866 | 7 | 42 | 17 |
+  | 0.5.21, its profile | 847 | 7 | 60 | 18 |
+  | the three equation changes, the two switches off | 866 | 7 | 42 | 17 |
+  | 0.5.22, its profile (the two switches on) | 868 | 7 | 41 | 16 |
 
-  The 19 more accepted are the 19 the flag policy asked about, none wrong. One equation goes
+  The middle row is what the equation branches measured before the switches were merged. The
+  19 more accepted are the 19 the flag policy asked about, none wrong, and one equation goes
   from asked and wrong to asked and right (2404.14123 `p1-e18`, the reading that mends the
-  box). The 7 wrong and accepted are the same 7: 3 misreads and 4 faults of the gold or of
-  the span (docs/eval-flag-policy.md). Formulas written twice are not seen by these counts
-  (the second box pairs with no gold equation): 4 repeats on these papers are written once.
+  box). The last row is the release as it ships. The switches change boxes on three of the
+  papers (2401.11209, 2407.20815, 2504.03499), and 12 readings of the new boxes had no
+  recorded answer: they were recorded once for $0.04 (a replay without them counts each
+  equation it cannot read as asked and wrong). Against the middle row
+  three equations move: a display of 2407.20815 that paired with nothing is read and right
+  (`eq-009`); a formula of 2504.03499 page 3 that was asked and right is accepted and right
+  (`eq-065`; layout makes it one box); and the kept copy of a formula written twice on
+  2504.03499 page 5 (`eq-130`, asked and wrong) is still a question, and is no longer paired
+  with its gold line by the harness, so it leaves the count without having become right. The
+  7 wrong and accepted are the same 7: 3 misreads and 4 faults of the gold or of the span
+  (docs/eval-flag-policy.md). Formulas written twice are not seen by these counts (the second
+  box pairs with no gold equation): 3 repeats on these papers are written once under the
+  release's profile (2305.06353 page 4, 2503.02792 page 3, 2504.03499 page 5; with the
+  switches off there were 4, and on 2504.03499 page 3 layout now makes the formula one box).
+  In each the copy that stays takes the whole formula's box, text and picture, and is a
+  question. Both `box_ends` readings are as before (2404.14123 `τ1 + τ2 (∼17`, where the
+  reading leaves out 2 of the box's 6 letters and digits, and 2504.03499 `∥·∥a`, where it
+  leaves out the one letter).
 - **The gate reports.** `latest-headings.json` and `latest-tables-local.json` are re-made at
   0.5.22 on a clean tree, with every headline number as at 0.5.21, and `eval gate
   --require-current` passes for both against their baselines.

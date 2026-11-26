@@ -19,12 +19,18 @@
     the rule asked about 19 accepted equations of the 12 development papers and none was
     wrong.
   - A right reading is no longer thrown away because the box took in a little too much at one
-    end (O-478): it keeps its confidence and says why (`box_ends`).
-  - One formula that layout cut into two or three boxes on a line is written once (O-479):
-    19 places on real documents, each read.
-  - The equation step on the 12 development papers, by replay of the recorded answers with all
-    three equation changes (932 equations paired with gold): 866 right and accepted (847
-    before), 7 wrong and accepted (7), 42 asked and right (60), 17 asked and wrong (18).
+    end (O-478): it keeps its confidence and stays a question that says why (`box_ends`).
+  - One formula that layout cut into two to four boxes on a line is written once, with the
+    whole formula's box, text and picture (O-479): 18 places on real documents under this
+    release's profile (15 in two public uploads of the corpus, 3 on the development papers),
+    each read.
+  - The equation step on the 12 development papers under this release's profile, by replay of
+    the recorded answers (932 equations paired with gold): 868 right and accepted (847 at
+    0.5.21), 7 wrong and accepted (7), 41 asked and right (60), 16 asked and wrong (18). The
+    12 readings that the boxes of the two switches ask for and no recording held were recorded
+    once for $0.04. One of the 18 asked and wrong did not become right: it is the kept copy of
+    a formula written twice (2504.03499 page 5), still a question, that the count no longer
+    pairs with its gold line.
   - Measured and not built: the box drawn on the line image hides where a root's bar ends
     (O-481; moving it changes every inline request), and maths in a table's header cell is
     left as plain text (O-482). Both are open in the plan.
@@ -95,7 +101,12 @@
   model's second reading has the same letters and digits as the first and they are exactly the box's
   less a run at one end, the second reading is compared with the rest of the box, keeps its
   confidence and stays a decision with a new reason, `box_ends` (the reviewer is told the
-  transcription leaves out a few characters stored right before or after the formula). The first reading is checked as before, so the main model is
+  transcription leaves out a few characters the PDF stores at the start or the end of the
+  formula, that they may be the text beside it or a part of it, and to check in the image that
+  nothing of the formula is missing there). The rule cannot tell a real term both readings drop
+  at one end from text beside the formula, which is why the reading is never accepted by it; and
+  it does not apply when more is left out than is kept and more than 2 characters are left out.
+  The first reading is checked as before, so the main model is
   still asked and no request changes (the 9 first-reading misreads the check caught are asked again
   and end right, as before). `text_layer_compare.trim_text_layer`, `equation_step._evaluate`.
 - Measured by replay of the recorded answers on the 12 development papers (903 equations read by
@@ -125,36 +136,48 @@
 - **The rule.** `pipeline/equation_twice.py`, run once in `run._convert` next to
   `table_math.settle`, where the readings are put into the document. The evidence is the file's own
   characters in order, never a bag of letters. Inline equations of one paragraph whose markers
-  follow each other on one line: when one member's reading, in order, is exactly the characters of
-  the boxes and of the text between them, and every other member's reading is a run inside it, the
-  window is written once, with the reading that says it whole (an accepted one before an asked one,
-  then one whose box has characters, then the first) where the window began; a closing bracket right
-  after the window that the reading already holds goes with the copy. The dropped copies leave with
-  their markers, their fixes and their crops; the spacing around the kept formula is what the
-  paragraph had; a question about a dropped copy goes with it and a question about the copy that
-  stays is asked once; what the dropped copies cost is kept in the document's cost and calls. A
-  symbol printed twice, two formulas with the same letters, a window whose letters are in another
-  order than the reading's (a matrix or determinant), a reading that goes past the window into the
-  sentence, and boxes with no characters in the PDF are left as they are. Not built: an accent that
+  follow each other on one line (two to four boxes): when one member's reading, in order, is exactly
+  the characters of the boxes and of the text between them, every sign, bracket or comma of the text
+  between two boxes stands in that reading at its place, and every other member's reading is a run
+  inside it, the window is written once, with the reading that says it whole (an accepted one before
+  an asked one, then the one with fewer failed checks, then one whose box has characters, then the
+  first) where the window began; a closing bracket right after the window goes with the copy when
+  the window's own characters opened it and the reading closes it. The copy that stays then stands
+  for the whole formula: its element takes the box around every member, their text with the text
+  between them, and a picture cut again from the page with no request, so a reviewer who compares
+  the reading with the picture, or keeps the original, has the whole formula. The dropped copies
+  leave with their markers, their fixes and their crops; the spacing around the kept formula is what
+  the paragraph had; a question about a dropped copy goes with it and the copy that stays is asked
+  about once at most, whenever it was not accepted; what the dropped copies cost is kept in the
+  document's cost and calls. A symbol printed twice, two formulas with the same letters, a window
+  whose letters are in another order than the reading's (a matrix or determinant), a reading that
+  goes past the window into the sentence, a sign between two boxes that the reading does not say,
+  two accepted readings that build the whole in two ways, and boxes with no characters in the PDF
+  are left as they are. Not built: an accent that
   layout boxed apart from its letter (one on the development papers, 2305.06353 page 3, none in the
   corpus). Not built: an inline box
   inside a display's box (a block box over an inline formula in a sentence is a fault of layout;
   taking the inline formula out for the display left the sentence without it): 4 such repeats on the
   development papers, each a fragment paragraph of a display, and 26 pairs on one corpus upload.
   No request, no prompt, no layout rule and no setting changes.
-- **On real documents.** The equation replay of the 12 development papers (offline): 4 repeats are
-  written once (5 boxes taken out; 2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5)
-  and the four numbers do not move (847 right and accepted, 7 wrong and accepted, 60 asked and
-  right, 18 asked and wrong); one equation's number moves (the kept box of a repeat is the first,
-  `p5-e31` for `p5-e32`) and none changes outcome. `dev2` (25 papers, the equations that have a
-  recorded answer) holds no more. The corpus
+- **On real documents.** The equation replay of the 12 development papers (offline), measured on
+  the rule's own branch with the two layout switches off: 4 repeats were written once (5 boxes taken
+  out; 2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5) and the four numbers did not
+  move (847 right and accepted, 7 wrong and accepted, 60 asked and right, 18 asked and wrong).
+  Under the release's profile (the switches on) there are 3: on 2504.03499 page 3 layout makes the
+  formula one box, so nothing is written twice there. Each of the 3 has two boxes, the copy that
+  stays was a question in all three, and its box grows to the whole formula (2305.06353 page 4:
+  50 pt wide to 82 pt and the room of the closing bracket, the text `t0 ≥log(C Lnρn)`). On
+  2504.03499 page 5 the copy that stays is now the reading with 2 failed checks, where the first
+  copy had 4. `dev2` (25 papers, the equations that have a recorded answer) held no more. The corpus
   replay (73 uploads): 2 public uploads change and 71 are the same (18 boxes taken out in 15 places,
-  each read: the repeat is written once and nothing else in the paragraph changes; in one, and in
-  one of the development papers, the closing bracket the reading holds goes with the copy); the
-  replay misses 0 recorded
-  requests with the rule on and off, and cost and calls are the same. `eval burden --same`: 532
-  required decisions where the record has 536 (4 questions about copies that are gone, on the
-  two uploads); the record (`data/eval/burden-corpus.json`) is not re-made here.
+  each read with its new box and text: 13 of two boxes, one of three and one of four; the repeat is
+  written once and nothing else in the paragraph changes; in one, and in one of the development
+  papers, the closing bracket goes with the copy; the copy that stays is a question in 6); the
+  replay misses 0 recorded requests with the rule on and off, and cost and calls are the same.
+  `eval burden --same` on the rule's branch: 532 required decisions where the record had 536 (4
+  questions about copies that are gone, on the two uploads); the record
+  (`data/eval/burden-corpus.json`) is re-made in the release.
 - **What it means for a stored document.** A document converted before keeps its repeated formulas
   until it is converted again; `PIPELINE_VERSION` is not raised here (it is owed, with the
   release that carries this). No migration, `RENDER_VERSION` is not owed.
