@@ -170,8 +170,9 @@
   about once at most, whenever it was not accepted; what the dropped copies cost is kept in the
   document's cost and calls. A symbol printed twice, two formulas with the same letters, a window
   whose letters are in another order than the reading's (a matrix or determinant), a reading that
-  goes past the window into the sentence, a sign between two boxes or in a box of its own that
-  the reading does not say,
+  goes past the window into the sentence, a sign between two boxes or in another member's box of
+  its own that the reading does not say (a box of a modifier-letter accent alone, `ˆ`, is not
+  held to this),
   two accepted readings that build the whole in two ways, and boxes with no characters in the PDF
   are left as they are. Not built: an accent that
   layout boxed apart from its letter (one on the development papers, 2305.06353 page 3, none in the

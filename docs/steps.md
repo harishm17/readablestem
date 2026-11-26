@@ -1243,7 +1243,15 @@ to the same as the text between two members: its signs must stand in K's reading
 "=" that layout boxed alone and that K does not say there is a sign the paper prints, and the
 window stays as it is). K's own box is not placed, since K's reading was made of it (a public
 course file prints `|v|` with both bars in one box and the letter in the next: the file stores
-the bars first, and the bars' reading says the whole). A member with no characters at all in its
+the bars first, and the bars' reading says the whole). The signs placed are the ones the text
+between two members gives: a box that holds only a modifier-letter accent (`ˆ` U+02C6, `ˇ` U+02C7,
+`ˉ` U+02C9, which is how a text layer usually stores a TeX hat) gives none and is not held to
+this, so when the letter's reading and the accent's reading both miss the accent, the window is
+written once without it and the accent's question goes with its copy (made by hand only; the one
+accent boxed apart on the development papers is not merged, see below). A sign the file and the
+reading write with two characters that `_SAME_SIGN` does not hold as one (`∣` and `|`, `⩽` and
+`≤`) keeps a real repeat on the page twice, which is the safe side. A member with no characters
+at all in its
 box is fine; a window with no box that has characters has nothing to compare with and is left alone
 (a handwritten page). When two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`: the
 same letters, built differently) and the one that would stay was accepted, the window is left as
