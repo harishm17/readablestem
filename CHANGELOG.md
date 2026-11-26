@@ -140,7 +140,7 @@
 
 ## Unreleased: one formula that layout cut into two boxes is written once (O-479)
 
-- **The fault.** Layout sometimes puts one formula into two or three equation boxes. Each box is
+- **The fault.** Layout sometimes puts one formula into two to four equation boxes. Each box is
   read with its line, and the line prompt tells the model to read on past a box that stops early,
   so more than one reading comes back as the whole formula and the page said it twice (arXiv
   2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5, and a textbook of vector

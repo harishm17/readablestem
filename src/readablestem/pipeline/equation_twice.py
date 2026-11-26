@@ -1,6 +1,6 @@
 """One formula that layout cut into two boxes is written once.
 
-Layout sometimes puts one inline formula into two or three boxes (it is cut at a wide space).
+Layout sometimes puts one inline formula into two to four boxes (it is cut at a wide space).
 Each box is read with a picture of its line, and the line prompt tells the model to read on past
 a box that stops early, so a reading can come back as the whole formula while the next box says
 its own part again, and the page said it twice. Layout is left alone (a joined box is a new crop

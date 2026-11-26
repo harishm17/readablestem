@@ -1210,7 +1210,7 @@ full description is in [tables.md](tables.md). In short:
 
 ## One formula in two boxes (`pipeline/equation_twice.py`)
 
-Layout sometimes cuts one formula into two or three equation boxes (a blank in a text font between
+Layout sometimes cuts one formula into two to four equation boxes (a blank in a text font between
 math glyphs, a radical that is no glyph of the line). Each box
 is read with its line and the reading goes on past the box, so more than one box comes back as the
 whole formula and the page wrote it twice. `equation_twice.settle` runs once, in `run.py` right
@@ -1234,7 +1234,7 @@ characters opened it and K's reading closes it after its last letter (the first 
 and the paragraph holds the bracket that closes it); a bracket the sentence opened stays. K is an
 accepted one before an asked one, then the one with fewer failed checks, then one whose box has
 characters, then the first. A window has at most four members (`MAX_BOXES`; real repeats are two
-or three boxes, and a line of hundreds of boxes costs no more than a short one); longer windows
+to four boxes, and a line of hundreds of boxes costs no more than a short one); longer windows
 are taken first and no member is in two. A member with no characters in its box is fine under that
 condition; a window with no box that has characters has nothing to compare with and is left alone
 (a handwritten page). When two members say the whole in two ways (`x_{t+1}` and `x^{t+1}`: the

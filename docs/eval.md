@@ -4794,7 +4794,7 @@ measured. The `eval order` of the held-out set was not run.
 Pipeline 0.5.22 is the switch release above (`LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER`
 on in the production profile) with three changes of the equation step: `FLAG_POLICY` off in
 the profile, a reading that leaves out what the box took in at one end keeps its confidence
-(`box_ends`), and one formula that layout cut into two or three boxes on a line is written
+(`box_ends`), and one formula that layout cut into two to four boxes on a line is written
 once (CHANGELOG 0.5.22 and the four entries under it; docs/eval-flag-policy.md; docs/steps.md).
 The production profile's hash is `b0befdf78b1e` (three rows changed). Measured on the release
 branch:
