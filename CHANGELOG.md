@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: the flag policy is off in production
+
+- `FLAG_POLICY` is `false` in the production profile (it was `true` since 2026-11-03). The rule asked a
+  person about accepted equations that look like readings that used to be wrong. On the 12 development
+  papers read at 0.5.21 it asked about 19 of 873 accepted equations and none was wrong, while 7 were wrong
+  and accepted (3 real misreads, 4 faults of the gold or of the span) and ranked 90th to 561st by the
+  rule's own probability. A refit on today's readings, leaving one paper out, does no better (it ranks the
+  wrong ones below the right ones). So the rule only cost questions: 19 of the 49 asked in the equation
+  step on these papers. The code, the fitted constants and the fitting script stay; the code default was
+  already off. Numbers and method: docs/eval-flag-policy.md (last section), `scripts/flag_policy_arms.py`.
+  On the corpus replay 4 of 73 uploads ask fewer questions (9 fewer in all, 536 to 527; none asks
+  more) and no recorded request stops matching; `eval burden --same` stops on those 4 until its record is
+  made again. A new conversion asks fewer questions (the equation text and every request are as before), so it
+  goes in the next pipeline raise; production's `FLAG_POLICY` Railway variable must be set to `false` at
+  that release.
+
 ## Pipeline 0.5.21, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.21 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

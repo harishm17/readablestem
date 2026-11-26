@@ -636,6 +636,9 @@ in a sentence (`web/messages.py`). A reviewer's edit is checked on its own, as b
 is not applied to an edit). Measured by replay of recorded runs, with the numbers and the limits, in
 docs/eval-flag-policy.md.
 
+Production runs it off since 2026-11-25: on today's readings it asked about 19 equations of 12
+development papers and none was wrong (docs/eval-flag-policy.md, last section).
+
 ## Sign and relation check (equations)
 
 The symbol check compares letters, digits and Greek letters, so before pipeline 0.3.0 a
