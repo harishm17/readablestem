@@ -4614,10 +4614,12 @@ processes. To make the measures again, in a clone with the corpus recording:
 | Formulas kept whole | the box-score tool of the 21 development papers (kept outside the repository), `--grouping --on inline_joins --on region_tree --on join_panels` and `--on figure_art`, `--on matching_under` |
 | Decisions | `readablestem eval burden --same --against data/eval/burden-corpus.json` |
 | Recording gaps | `scripts/corpus_refresh.py --check` |
-| Pages of the public files | `layout.analyze` page by page over the 547 public PDFs (the `papers`, the layout development set and the PDFs of the repository), once per configuration, comparing kind, box and a hash of the text of every element |
+| Pages of the public files | `layout.analyze` over the 547 public PDFs (the `papers`, the layout development set and the PDFs of the repository), once per configuration, comparing kind, box and a hash of the text of every element: the first 25 pages of each paper and every page of the other files. The papers' pages past 25 in a second run (both switches against none), below |
 
-**Pages of the public files.** Of 547 files (8,527 pages; three files the reader refuses are
-left out of every column), `LAYOUT_FIGURE_ART` changes 50 files and 95 pages, and
+**Pages of the public files, to page 25 of each paper.** Of 547 files, the papers read to
+their page 25 and the other files whole (8,527 pages; three files the reader refuses are
+left out of every column; the papers' pages past 25 are under "Pages past 25" below),
+`LAYOUT_FIGURE_ART` changes 50 files and 95 pages, and
 `LAYOUT_MATCHING_UNDER` one file and one page (a self-made test PDF). Both together change 51
 files and 96 pages, the union. Figures go from 3,806 to 3,784 and captioned figures stay
 1,907. Every differing file was classed from the page itself (the elements drawn over the
@@ -4695,7 +4697,48 @@ as figures of their own (tiny figures on the 95 pages: 45 before, 46 after).
 The one page that reads worse is page 11 of 2504.14923. The page has a figure as tall as the
 page in both runs, and that figure's text holds the first line of several paragraphs of the
 column; with the switch it also holds the first line of the paragraph under the caption (15
-words). The fault is the page-tall figure, which the switch does not make and does not mend.
+words). A figure's own text is not written on the page (it is in the picture and is given to
+the model as labels), so those 15 words are no longer in the reading text. The fault is the
+page-tall figure, which the switch does not make and does not mend.
+
+**Pages past 25.** The papers' pages past 25 were read in a second run: 3,915 pages of 157
+papers, production's four switches against the same with both new ones on, the kind, box and
+text of every element compared (a scratch tool, one process for each paper). 20 pages of 12
+papers differ, every one by `LAYOUT_FIGURE_ART` alone (`LAYOUT_MATCHING_UNDER` changes no
+page), and figures go from 996 to 981. Each was read. Eight pages read better, eleven the
+same, and one slightly worse (2501.06896 page 31, below). No word leaves the page's elements:
+the words that differ are three words that were cut in two and are whole (by an empty box,
+or by a paragraph split at a line end), the numbers of five display formulas (kept as the
+formulas' numbers, checked on the elements), and one letter of a formula now read as the
+bold letter it is.
+
+| Paper | Pages past 25 (1-based) | What moved | Class |
+|---|---|---|---|
+| papers/1812.06627 | 55 | formula ids renumbered | same |
+| papers/2312.06402 | 43 | formula ids renumbered | same |
+| papers/2401.00649 | 239 | element order only | same |
+| papers/2401.01757 | 38 | an empty equation box that cut "curve" in two is gone | better |
+| papers/2407.20815 | 29, 32, 41 | boxes drawn over text by hidden art gone (16 figures to 3 on the three pages); three display formulas that were figures, and a fourth whose number was in a figure's box, are formulas with their numbers; a page-sized figure is the drawing itself. On page 32 the caption of figure 10, which stood on a formula's box, is a paragraph (the drawing has no caption in either run) | better |
+| papers/2408.05847 | 50 | element order only | same |
+| papers/2412.12319 | 27 | element order only | same |
+| papers/2412.19752 | 77, 84, 97, 98, 144, 145 | three empty boxes of hidden art gone (pages 77 and 97); figure edge 1 pt; order and ids | better |
+| papers/2501.06896 | 31, 32 | page 31: one captioned figure of four panels is read as three figures (the two upper panels each alone, the lower two with the caption) and the two axis titles between them as short paragraphs; page 32 figure edge 9 pt | one page slightly worse |
+| papers/2503.00504 | 36 | formula ids renumbered | same |
+| papers/2504.03499 | 26 | a display formula that was a figure is a formula with its number (56); an empty equation box over a paragraph gone | better |
+| papers/2505.23940 | 44 | panel label "tV/D=0" read inside its figure | better |
+
+With the pages to 25, `LAYOUT_FIGURE_ART` changes 115 pages of 59 public files (12,442 pages
+read): 25 files read better, 32 the same, and two have one page each that reads slightly
+worse. On 2501.06896 page 31 nothing is lost and the caption is kept, but a reader meets three
+figures and two loose axis titles where the page prints one figure; before, the one figure's
+box also reached up over the last line of the paragraph above it.
+
+**What the figure switch costs.** A drawing that was one page-sized box can come back as
+several figure elements, and each is a request to the model: on 2407.20815 page 15 two
+printed drawings are eight figure elements (an "=" sign and a dot among them), none with its
+caption, where there were two page-sized boxes; on page 19 of that paper a lone "∫" is boxed
+beside its formula. Both pages read better than before, and cost more figure calls than they
+have figures. The two pages that read slightly worse are named above.
 
 **Reading order** (`eval order`, the production profile edited in a separate worktree for each
 row; the page a student is given):
@@ -4741,8 +4784,8 @@ the record for every upload except the two with answers missing, so the bar is n
 they are recorded; no decision of the others changes.
 
 **What these numbers do not show.** The pages are development sets and the public files the
-rules were read on, so they say the switches do not make a page worse there, not how often a
-new document is read better. The model reads a figure from its crop: where the box moves a
+rules were read on, so they say the switches make two pages of 12,442 slightly worse there,
+not how often a new document is read better or worse. The model reads a figure from its crop: where the box moves a
 few points or takes a label, the request changes and what the model returns for it was not
 measured. The `eval order` of the held-out set was not run.
 
@@ -4769,8 +4812,9 @@ branch:
   in more, each for a cause named here: `e1_mc_columns` (the matching exercise; 36 elements
   to 35) and `w_lecture_5111` (figures and the equations beside them) are the two uploads
   that were recorded again; `w_solutions_1802` (896 elements to 879) and `w_notes_6042_ch2`
-  (551 to 550) lose the copies of formulas written twice and questions of the flag policy,
-  and on one of the two three fixes carry `box_ends` for `symbol_mismatch`;
+  (551 to 550) lose the copies of formulas written twice and questions of the flag policy
+  (the copy that stays holds the whole formula's box and text), and on `w_solutions_1802`
+  two fixes carry `box_ends` for `symbol_mismatch`;
   `r15_openstax_chem_ch3` and `w_lecture_560` differ in equation fixes only (the flag
   policy), and `r17_arxiv_ligo` in one equation fix (`symbol_mismatch` is `box_ends`);
   `r21_infographic_orcid` differs in one note of one figure (its drawing counts 866 paths
@@ -4778,7 +4822,8 @@ branch:
   the same).
 - **Decisions.** The record is re-made (`data/eval/burden-corpus.json`, under `eval burden`):
   523 decisions on 338 pages where the 0.5.18 record had 536; four uploads ask fewer and none
-  asks more.
+  asks more. Three decisions carry the reason `box_ends` (two on `w_solutions_1802`, one on
+  `r17_arxiv_ligo`).
 - **Reading order.** `layout-dev-1`: 183 of 267 pages right and 94 faultless in the student
   page (182 and 94), 182 and 95 in the element list (181 and 95), 20 of 60 documents; one page
   made right (`os_calculus_volume_1` page 10) and none wrong. The corpus: 84 of 91 right and

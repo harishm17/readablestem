@@ -10,8 +10,12 @@
   - A figure is the drawing a reader sees (`LAYOUT_FIGURE_ART` on in the production profile,
     O-452): page-wide figures that took body text, slivers of hidden art and boxes drawn over
     text are gone, and a panel or axis label the figure's edge cut is read in its figure. Of
-    547 public files 50 change (95 pages): 23 read better, 26 the same, one page slightly worse
-    (arXiv 2504.14923 page 11), no word lost.
+    547 public files (12,442 pages) 59 change (115 pages): 25 read better, 32 the same, and two
+    have one page each that reads slightly worse (arXiv 2504.14923 page 11, where a page-tall
+    figure takes 15 more words of a sentence into its picture, and 2501.06896 page 31, where a
+    figure of four panels is read as three). No word leaves the page's elements. A drawing
+    that was one page-sized box can come back as several figures, each a request (2407.20815
+    page 15: eight for two drawings).
   - What stands under a matching exercise is read after it (`LAYOUT_MATCHING_UNDER` on,
     O-460): the one page the region tree of 0.5.18 made wrong is right again; no other page of
     the public files moves.
@@ -54,17 +58,26 @@
   at $0 (no model call) at 0.5.21 against the same tree with it off (docs/eval.md, "The switch
   release of 2026-11-26"). The code defaults stay off; the 0.5.22 raise of `PIPELINE_VERSION`
   and the re-recording of the corpus under them are made in the release that carries this entry.
-  - `LAYOUT_FIGURE_ART`: of 547 public files (8,527 pages) 50 files and 95 pages change, 23
-    files read better, 26 the same, and one page of one file reads slightly worse (2504.14923
-    page 11: a figure as tall as the page, wrong before, takes the first line of one more
-    paragraph); no word of any of the 95 pages is lost; the figures read 3,806 to 3,784 and the
-    captioned figures stay 1,907. Page-wide figures that took body text, slivers of hidden art
+  - `LAYOUT_FIGURE_ART`: of 547 public files, the papers read to their page 25 (8,527 pages),
+    50 files and 95 pages change, 23 files read better, 26 the same, and one page of one file
+    reads slightly worse (2504.14923 page 11: a figure as tall as the page, wrong before, takes
+    the first line of one more paragraph, 15 words that are then in the picture and not in the
+    reading text); no word leaves the elements of any of the 95 pages; the figures read 3,806
+    to 3,784 and the captioned figures stay 1,907. On the papers' pages past 25 (3,915 pages of
+    157 papers, read after an independent review asked for them) 20 more pages of 12 papers
+    change: 8 pages read better, 11 the same, and one slightly worse (2501.06896 page 31: one
+    captioned figure of four panels is read as three figures, with two axis titles as short
+    paragraphs between them); no word leaves a page's elements; the figures read 996 to 981.
+    In all 115 pages of 59 files change: 25 files better, 32 the same, two with one page each
+    slightly worse. What it costs besides: a drawing that was one page-sized box can come back
+    as several figure elements, each a request (2407.20815 page 15: eight for two drawings). Page-wide figures that took body text, slivers of hidden art
     and boxes drawn over text are gone; a row the drawing's edge cut and a panel label are read in
     their figure. Reading order of layout-dev-1: 183 of 267 pages right in the page a student is
     given (was 182; `os_calculus_volume_1` page 10), 94 faultless as before, none made wrong.
     Formulas kept whole on the 21 development papers: 9,205 of 11,258 (was 9,203), 2 made whole
     and none made not whole. The corpus gold pages are unchanged (83 of 91 right).
-  - `LAYOUT_MATCHING_UNDER`: no page of the 547 public files and none of layout-dev-1 changes;
+  - `LAYOUT_MATCHING_UNDER`: no page of the 547 public files (the papers' pages past 25
+    with them) and none of layout-dev-1 changes;
     the self-made `e1_mc_columns` page 1 becomes right (corpus gold pages right 83 to 84 of
     91), nothing is made wrong. The line under a matching exercise was the one known wrong page
     of the region tree (0.5.18 entry below).
