@@ -16,9 +16,9 @@
   ]
  },
  "pipeline_version": "0.5.22",
- "commit": "948828d3c7c262798a90829e81ba4d10d5bcff76",
+ "commit": "0c90aa81ebef4cf51dd15592a0a3455e2d0d8ec7",
  "provenance": {
-  "commit": "948828d3c7c262798a90829e81ba4d10d5bcff76",
+  "commit": "0c90aa81ebef4cf51dd15592a0a3455e2d0d8ec7",
   "clean": true,
   "pipeline_version": "0.5.22",
   "render_version": 11,
@@ -143,8 +143,8 @@
     "per_100_pages": 44.08
    },
    "symbol_mismatch": {
-    "decisions": 87,
-    "per_100_pages": 25.74
+    "decisions": 88,
+    "per_100_pages": 26.04
    },
    "glyph_style_mismatch": {
     "decisions": 71,
@@ -170,13 +170,13 @@
     "decisions": 24,
     "per_100_pages": 7.1
    },
-   "style_mismatch": {
+   "style_cosmetic": {
     "decisions": 18,
     "per_100_pages": 5.33
    },
-   "style_cosmetic": {
-    "decisions": 17,
-    "per_100_pages": 5.03
+   "style_mismatch": {
+    "decisions": 18,
+    "per_100_pages": 5.33
    },
    "heading.repeated_label": {
     "decisions": 16,
@@ -238,10 +238,6 @@
     "decisions": 6,
     "per_100_pages": 1.78
    },
-   "box_ends": {
-    "decisions": 4,
-    "per_100_pages": 1.18
-   },
    "empty_argument": {
     "decisions": 4,
     "per_100_pages": 1.18
@@ -253,6 +249,10 @@
    "unsupported_ce": {
     "decisions": 4,
     "per_100_pages": 1.18
+   },
+   "box_ends": {
+    "decisions": 3,
+    "per_100_pages": 0.89
    },
    "handwriting_on_page": {
     "decisions": 3,
