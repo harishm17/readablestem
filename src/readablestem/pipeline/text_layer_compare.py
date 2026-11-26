@@ -318,6 +318,70 @@ def extend_text_layer(
     )
 
 
+@dataclass(frozen=True)
+class Trim:
+    """The box's text and glyphs with the run a reading leaves out at one end taken off."""
+
+    text: str
+    glyphs: tuple[Glyph, ...]
+    dropped: int  # letters and digits of the run
+
+
+def _symbol_units(chars: Sequence[str]) -> list[tuple[int, Counter[str]]]:
+    return [(i, bag) for i, ch in enumerate(chars) if (bag := symbol_bag(ch))]
+
+
+def _cut(units: list[tuple[int, Counter[str]]], side: str, k: int) -> int:
+    """The index in the characters where the run of the last (`end`) or first (`start`) `k`
+    symbol units is cut off, with the operators between it and the rest: the text after the cut
+    at the start, before it at the end. With nothing kept, the cut is at the run's edge."""
+    if side == "end":
+        kept = len(units) - k
+        return units[kept - 1][0] + 1 if kept else units[0][0]
+    return units[k][0] if k < len(units) else units[-1][0] + 1
+
+
+def trim_text_layer(span_text: str | None, mathml: str, span: Sequence[Glyph]) -> Trim | None:
+    """The box's text without the run a reading leaves out at one end, or None.
+
+    The box of an inline equation can take in more than the formula (`T = 2\\pi (see`), and the
+    line prompt tells the model to leave out what the box took in by mistake. When the reading's
+    letters and digits are exactly the box's less a run at its start or at its end, the rest
+    matching symbol for symbol, the box's text without that run (and the operators and brackets
+    that stand between it and the rest) is what the reading is compared with. None when the
+    reading has anything the box lacks, drops from both ends or from either with equal right, or
+    leaves the box with no characters at all. The file does not say where the formula ends: this is
+    no evidence, and a caller that trusts it says so (`equation_step.BOX_ENDS_CODE`)."""
+    if not span_text:
+        return None
+    have, want = symbol_bag(span_text), mathml_bag(mathml)
+    if not (have - want) or (want - have):
+        return None
+    chars = list(span_text)
+    units = _symbol_units(chars)
+    found: list[tuple[str, int, str]] = []
+    for side in ("start", "end"):
+        for k in range(1, len(units) + 1):
+            rest = units[k:] if side == "start" else units[: len(units) - k]
+            if sum((bag for _, bag in rest), Counter()) != want:
+                continue
+            cut = _cut(units, side, k)
+            text = (span_text[cut:] if side == "start" else span_text[:cut]).strip()
+            if text:
+                found.append((side, k, text))
+            break
+    if len(found) != 1:
+        return None
+    side, k, text = found[0]
+    glyph_chars = [c for c, _ in span]
+    glyph_units = _symbol_units(glyph_chars)
+    glyphs: tuple[Glyph, ...] = ()
+    if [sum(b.values()) for _, b in glyph_units] == [sum(b.values()) for _, b in units]:
+        cut = _cut(glyph_units, side, k)
+        glyphs = tuple(span[cut:] if side == "start" else span[:cut])
+    return Trim(text, glyphs, sum(sum(b.values()) for _, b in units) - sum(want.values()))
+
+
 # ------------------------------------------------------------------------- styles
 
 ITALIC, UPRIGHT, BOLD, BOLD_ITALIC = "italic", "upright", "bold", "bold-italic"

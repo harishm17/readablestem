@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased: a reading that mends the box is no longer cut for it (O-478)
+
+- The line prompt tells the model to leave out what a box took in by mistake. The symbol and sign
+  checks then compared the reading with the box as it is, so a right reading was cut (arXiv
+  2404.14123 page 1: the box holds `τ1 + τ2 (∼17`, both models read `\tau_1 + \tau_2`, the sign
+  check cut 0.85 to 0.51 and 0.6 to 0.36, and the reading was abstained). Now, when the main
+  model's second reading has the same letters and digits as the first and they are exactly the box's
+  less a run at one end, the second reading is compared with the rest of the box, keeps its
+  confidence and stays a decision with a new reason, `box_ends` ("both readings leave out some
+  characters at one end of the box"). The first reading is checked as before, so the main model is
+  still asked and no request changes (the 9 first-reading misreads the check caught are asked again
+  and end right, as before). `text_layer_compare.trim_text_layer`, `equation_step._evaluate`.
+- Measured by replay of the recorded answers on the 12 development papers (903 equations read by
+  the step): 2 equations move. 2404.14123 `p1-e18` goes from abstained and wrong to asked and
+  right; 2504.03499 `p2-e50` (`\|\cdot\|` for the box `∥·∥a`) stays asked, with the reason named.
+  Wrong and accepted stays 7. A reading that reaches past the box with letters the line's nearest
+  glyphs do not make up exactly (2 right equations, both already a decision) is left as it was: a
+  looser test would also pass 2 of the 9 first-reading misreads.
+
 ## Pipeline 0.5.21, render 11 (2026-11-25)
 
 - `PIPELINE_VERSION` is 0.5.21 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

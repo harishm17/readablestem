@@ -125,7 +125,9 @@ from readablestem.pipeline.text_layer_compare import (
     compare_case,
     compare_letter_styles,
     extend_text_layer,
+    mathml_bag,
     numbers_differ,
+    trim_text_layer,
 )
 from readablestem.pipeline.validate import (
     LatexConversionError,
@@ -545,6 +547,12 @@ BOLD_LETTER_CAUSE = "bold_letter"
 # a fraction, so whatever is read from it cannot be trusted. Never accepted without a
 # decision, and its confidence is held under the auto-accept bar.
 HALF_FRACTION_CODE = "half_fraction"
+# Both models left out the same run at one end of the box (`text_layer_compare.trim_text_layer`):
+# the line prompt tells them to, when the box took in more than the formula. The reading is then
+# compared with the rest of the box and keeps the models' confidence, but the file does not say
+# where the formula ends, so it stays a decision, with this as its reason.
+BOX_ENDS_CHECK = "equation.box_ends"
+BOX_ENDS_CODE = "box_ends"
 _MATHML_TOKENS = {"mi", "mn", "mo", "mtext", "ms"}
 # Children after the first are scripts (sub/superscripts, limits, a root's index).
 _SCRIPTED = {"msub", "msup", "msubsup", "munder", "mover", "munderover", "mmultiscripts", "mroot"}
@@ -1069,7 +1077,11 @@ def _evaluate(
     course_bold: frozenset[str] = frozenset(),
     spoken: dict[str, str] | None = None,
     reconcile: bool = False,
+    first: _Candidate | None = None,
 ) -> _Candidate:
+    """One reading, validated and checked against the PDF. `first`: the cheap model's reading,
+    when this is the main model's second one. If it has the same letters and digits as this one,
+    a run both leave out at one end of the box is no mismatch, and is said as `BOX_ENDS_CODE`."""
     if output is None:
         return _Candidate(output, calls)
     candidate = _Candidate(output, calls, confidence=output.confidence)
@@ -1105,6 +1117,16 @@ def _evaluate(
     meaning = False  # a meaning-level difference from the text layer
     mismatch = False  # the strong symbol mismatch: the text layer is no use for signs
     layer = reading_layer(element, candidate.mathml)
+    trim = (
+        trim_text_layer(layer.text, candidate.mathml, layer.glyphs)
+        if first is not None and not layer.extended and _read_the_same_symbols(first, candidate)
+        else None
+    )
+    if trim is not None:
+        layer = TextLayer(trim.text, trim.glyphs)
+        candidate.checks.append(
+            Check(name=BOX_ENDS_CHECK, passed=False, severity="warning", code=BOX_ENDS_CODE)
+        )
     differ = text_layer_symbols_differ(layer.text, candidate.mathml)
     if differ is not None:
         similarity = text_layer_similarity(layer.text, candidate.mathml)
@@ -1310,6 +1332,16 @@ def _canonical(latex: str) -> str:
     """LaTeX without whitespace and without braces around a single symbol after `_` or `^`
     (`d_{0}` and `d_0` are one reading)."""
     return _SINGLE_BRACED.sub(r"\1\2", "".join(latex.split()))
+
+
+def _read_the_same_symbols(first: _Candidate, second: _Candidate) -> bool:
+    """Do two attempts have the same letters and digits? Two models that agree on them are
+    what lets a run left out at one end of the box stand (`_evaluate`, `first`)."""
+    return (
+        first.mathml is not None
+        and second.mathml is not None
+        and mathml_bag(first.mathml) == mathml_bag(second.mathml)
+    )
 
 
 def _same_reading(first: _Candidate, second: _Candidate) -> bool:
@@ -1593,7 +1625,9 @@ def transcribe(
     def with_account(text: str | None) -> str | None:
         return text if account is None else f"{account}\n\n{text}" if text else account
 
-    def attempt(model: str, *, escalation: bool = False) -> _Candidate:
+    def attempt(
+        model: str, *, escalation: bool = False, cheap: _Candidate | None = None
+    ) -> _Candidate:
         request = VisionRequest(
             step="equation",
             model=model,
@@ -1619,6 +1653,7 @@ def transcribe(
             course_bold=course_bold,
             spoken=spoken,
             reconcile=settings.equation_glyph_reconcile,
+            first=cheap,
         )
 
     first_model = first_model or _first_model(element, settings)
@@ -1636,7 +1671,7 @@ def transcribe(
     if first_agrees and settings.page_math_agreement_lift:
         _lift(first)
     if cheap_start and (_needs_escalation(candidate, settings) or first_agrees is False):
-        reread = attempt(settings.main_model, escalation=True)
+        reread = attempt(settings.main_model, escalation=True, cheap=first)
         calls += reread.calls
         candidate = _prefer(reread, candidate)
     answered_cheaply = not first.calls or first.calls[-1].model != settings.main_model
