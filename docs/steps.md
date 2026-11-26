@@ -1201,6 +1201,53 @@ full description is in [tables.md](tables.md). In short:
   after data cells, written with headers/id); the caption only from layout's "Table N"
   caption.
 
+## One formula in two boxes (`pipeline/equation_twice.py`)
+
+Layout sometimes cuts one formula into two or three equation boxes (a blank in a text font between
+math glyphs, a radical that is no glyph of the line). Each box
+is read with its line and the reading goes on past the box, so more than one box comes back as the
+whole formula and the page wrote it twice. `equation_twice.settle` runs once, in `run.py` right
+after `table_math.settle`, where the readings are put into the document, and writes the formula
+once. The evidence is the file's own characters in the order they stand (the letters, digits and
+Greek letters of a text, `text_layer_compare.symbol_seq`; a reading's MathML in document order,
+`mathml_seq`), never a bag of letters: a bag cannot tell a repeat from a second formula that has
+the same letters.
+
+The rule is a run of boxes on one line. Take the inline equations of one paragraph whose markers
+follow each other on one line (the boxes share a line, and a marker that is no reading ends the
+run), and a window of two or more of them. A member's reading K says the whole window when the
+letters of K's reading, in order, are the window's characters one for one and in order (each
+member's box, and the paragraph's text between two members in its place), and every other member's
+reading is a run inside K's, symbols and operators both (`|v|` is not said by `v`). The window is
+written once: K's marker stands where the window began, and the other markers and the text between
+the first and the last go. A closing bracket right after the window goes too when K's reading
+already holds it: the reading's brackets balance, and the window's own characters leave one open
+(the first box holds "log(C" and the paragraph holds the bracket that closes it). K is an accepted
+one before an asked one, then one whose box has characters, then the first. A window of three is
+one step; longer windows are taken first and no member is in two. A member with no characters in
+its box is fine under that condition; a window with no box that has characters has nothing to
+compare with and is left alone (a handwritten page).
+
+A symbol printed twice (each box says the whole reading), two formulas with the same letters, a
+window whose letters are K's in another order (a fraction, a matrix or a determinant that the file
+stores in another order) and a reading that goes past the window (it also covers words of the
+sentence before or after the last box) are all left as they are: the repeat stays, which is the safe
+side. An accent that layout boxed apart from its letter is not built: the one on the development
+papers (arXiv 2305.06353 page 3) has two boxes that lie on each other by 48% and 51% of their areas, and no
+corpus upload has one. An inline box inside a display's box is not built: where layout puts a block box over an
+inline one, the inline formula belongs to its sentence, and taking it out left the sentence without
+it; those repeats (on the development papers 4, each a fragment paragraph of a display: "for i = j",
+"dR_α" twice, "with σ_t = σ"; on one corpus upload 26 pairs, most of them a block box over an inline
+formula in a sentence) are a fault of layout that this step does not mend.
+
+The kept marker stands in the window's place, so the spacing around it is what the paragraph had
+(a word never touches a formula it did not touch). The paragraph's
+links, colors and scripts move with the text (`core.inline.moved`). The dropped box leaves with
+its marker, its fix and its crop, and with its question: a person is asked once, about the copy that
+stays, and only when neither copy was accepted. The dropped fix's spend is added back to the
+document's cost and calls, and its step facts are still measured. A block box is never dropped, and
+a change that would leave a paragraph empty is not made. No model call, request or setting is new.
+
 ## Comparing two readings
 
 `pipeline/math_canonical.py` decides whether two readings of one formula (each LaTeX or MathML)
