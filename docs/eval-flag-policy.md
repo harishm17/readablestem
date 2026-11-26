@@ -2,7 +2,9 @@
 
 `FLAG_POLICY` (docs/steps.md, "Flag policy") asks for a decision on an accepted equation that looks
 like the readings that turned out wrong. This page says how it was fitted and what it does, measured on
-recorded runs only: no model call, no PDF, $0. The setting is off.
+recorded runs only: no model call, no PDF, $0. The setting is off in code. It was on in production
+from 2026-11-03 to 2026-11-25 and is off again since the last section, which measures it on today's
+readings; the sections before it are the record of what was measured then.
 
 ## Method
 
@@ -112,6 +114,98 @@ What this says.
   policy has no per-page cap, so the page budget is a property of the threshold on dev, not a guarantee for
   every document.
 
+## 2026-11-25: asked on today's readings (the setting goes off)
+
+The sections above were measured on readings of the models of October and early November. The policy has
+been on in production since 2026-11-03 (`FLAG_POLICY` in the production profile; the line "The setting is
+off" at the top was true of the code default only). This section measures it again on today's readings, at
+$0, and the profile now says off. The code, the fitted constants (`flag-policy-1`) and the fitting script
+stay as they are: the setting is a switch that exists.
+
+### What was measured
+
+- **Readings.** The 12 development papers (`dev`, public arXiv papers, 1,096 gold equations) converted at
+  pipeline 0.5.21 under the production profile with every reading logged and every answer recorded
+  (`dbg_eq.py ARM --offline`, docs/eval.md). Of the 932 equations paired with the gold, 873 were accepted
+  before the policy (854 accepted now and the 19 the policy turned into questions). The other 59 were asked
+  about by other checks and are not the policy's business. It is the same replay as the baseline of the
+  equation step (847 right and accepted, 7 wrong and accepted, 39 asked and right, 10 asked and wrong, over
+  the 903 that the equation step read; the 19 are among the 39 and 10 asked).
+- **`dev2`.** Its equations were read the same way, offline: 876 of its 947 paired equations have no
+  recorded answer of today's requests (the answers date from October), so the run is not a reading by today's
+  models. It adds nothing; the numbers here are `dev` alone.
+- **Label.** Wrong is the scorer's `exact_printed`. Of the 7 wrong and accepted, 4 are faults of the gold or
+  of the span, not of the reading, and 3 are real misreads (page images were not opened; the call is made
+  from the gold, the reading and the text layer):
+
+| equation | what differs | call |
+|---|---|---|
+| 2305.06353 eq-015 | the reading sets the number 1 in bold (`x^\top \mathbf{1} = 1`), the gold has it plain | real: a style the page may not have |
+| 2305.06353 eq-158 | the reading puts the root over `Ln\rho_n`, the gold over `L` only | real: the extent of a root |
+| 2506.13076 eq-017 | the model read `(T = 0)` and the result is `T = 0`; the gold has the brackets | real: a check dropped printed brackets |
+| 2305.06353 eq-191 | the gold has a misplaced brace; the reading is right | artefact of the gold |
+| 2401.11209 eq-023 | the gold stops before the closing bracket; the reading has it | artefact of the gold |
+| 2407.09859 eq-037 | the reading has a bracket the text layer has and the gold lacks | artefact of the span |
+| 2504.04210 eq-014 | the gold begins with a symbol outside the span | artefact of the span |
+
+- **What the 19 were.** Each had four to eight notation features on, all of them scripted or styled forms:
+  scripts in 19, big operators in 14, upright text in 10, delimiters in 9, bold in 7, calligraphic in 7,
+  accents in 5, a root in 3; 14 of the 19 are display equations. The probabilities are 0.459 to 0.692 against
+  the threshold 0.4541. None is wrong.
+- **The arms.** The standing policy is the constants as they are (they were fitted on other readings of
+  papers that include these 12, so this is generous to it, not a test on unseen papers). The refit is the
+  fitting script's own steps (`choose_l2`, `fit_logistic`, `choose_threshold`, unchanged) run on today's
+  readings leaving one paper out: each paper is scored by a model fitted on the other 11, with the threshold
+  the script chooses on those 11. A half-and-half split (alternate papers, both ways) gives the same. No
+  policy is the accepted set as it is. Reproduce: `scripts/flag_policy_arms.py REPLAY_FOLDER`.
+
+| arm | questions added | of those, wrong (real) | wrong accepted left (real) | chance of that if picked blind |
+|---|---|---|---|---|
+| standing policy | 19 | 0 (0) | 7 (3) | 0 in 19 by picking blind: 86 in 100 (94 in 100 for the 3 real) |
+| refit, threshold the script chooses | 5 | 0 (0) | 7 (3) | 0 in 5: 96 in 100 |
+| refit, as many as the standing policy (top 19) | 19 | 0 (0) | 7 (3) | 0 in 19: 86 in 100 |
+| no policy | 0 | 0 | 7 (3) | |
+
+- **Ranking.** Under the standing probabilities the 7 wrong ones rank 90th, 122nd, 161st, 309th, 450th, 521st
+  and 561st of 873 (the real ones 122nd, 161st and 561st); the cut is at rank 19. The area under the ROC
+  curve is 0.64 for the 7 and 0.69 for the 3 real ones, from so few that it says nothing. The refit
+  ranks the wrong ones below the right ones out of paper (area 0.17 for the 7, 0.09 for the real ones; 0.27
+  and 0.09 when fitted on the real ones alone): with 3 to 7 errors in 873 the fit learns the papers it was
+  given, and it does not carry over. Flagging the top 5% or 10% of the refit's probabilities (44 or 87
+  questions) catches none of the 7.
+- **What the numbers allow.** The policy asked 19 questions and found nothing, 1.6 a paper and 19 of the 49
+  questions of the equation step on these papers. A rule no better than picking blind would have found
+  nothing in 19 picks about 86 times in 100, so the run cannot say the rule is useless. It does say that
+  its precision on today's readings is not the 33% to 67% of the validation above: if it were as low as 15%
+  (the 95% upper bound for 0 in 19), it would still be 18 times the blind rate of 0.8%, but 19 questions for
+  at most 3 wrong readings is the most it could be.
+- **Why the fit does not carry.** It was made on readings where 13% of the accepted equations were wrong
+  (497 of 3,285); today 0.8% are (7 of 873), and the checks and the glyph facts that came after catch most of
+  what the policy used to find. The styled letters it asks about most (bold, calligraphic, upright text) are
+  read right now: the 7 questions that had bold in them were all on right readings.
+
+### Decision
+
+`FLAG_POLICY` is `false` in the production profile. Neither the standing policy nor a refit on today's
+readings found a real misread in papers it was not fitted on, at any count of questions (0 of 19, 0 of 5,
+0 of 44, 0 of 87), and the standing policy costs 19 questions on 12 papers. The code, `flag-policy-1` and
+the fitting script are kept, as is every number above. The code default was already off
+(`flag_policy: bool = False` in `config.py`), and the profile is the only place production's value was
+stated, so nothing else changes.
+
+On the replay of the corpus (73 uploads, every answer recorded, production profile) against the record of
+0.5.18: the equation text, the elements and every request are as before, and 4 of the 73 uploads (one
+public OpenStax chapter, three private files) ask fewer questions: 9 fewer in all, 536 to 527 required
+decisions (1.586 to 1.559 a page); no upload asks more. No recorded request stops matching (the policy
+runs after the model's answer). `eval burden --same` therefore stops on those 4 uploads until the record
+is made again.
+
+What would tell if the policy is worth turning on again: a recorded reading of a new set of papers by
+today's models with at least 15 to 20 wrong and accepted equations (about 2,000 accepted equations, 15 to
+25 papers at today's 0.8%); with that many a rule that finds a third of them at 19 questions per 12 papers
+stands out from picking blind, and one that finds none does not. That is a paid recording and a fresh set;
+it is not made here.
+
 ## Reproduce
 
 ```
@@ -119,6 +213,9 @@ uv run python -m readablestem.eval.flag_features fit --json fit.json
 uv run python -m readablestem.eval.flag_features report --json report.json
 uv run python -m readablestem.eval.flag_features dump rows.jsonl
 ```
+
+The three arms of the last section: `uv run --no-sync python scripts/flag_policy_arms.py REPLAY_FOLDER`,
+on the folder of an equation replay of the development papers (docs/eval.md).
 
 Needs the cached runs (`~/.cache/readablestem/realworld/runs`, `~/.cache/a11y-stem/round4/on.jsonl`), which are
 not in the repository. `report` says whether the constants in `flag_policy.py` equal the fit it just made.

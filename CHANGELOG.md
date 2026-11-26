@@ -27,6 +27,92 @@
     of `e1_mc_columns` and `w_lecture_5111`, and no other upload moves.
   - Railway: set `LAYOUT_FIGURE_ART` and `LAYOUT_MATCHING_UNDER` to `true` with the other
     switches (`readablestem ops profile-check` compares them with the profile).
+## Unreleased: the flag policy is off in production
+
+- `FLAG_POLICY` is `false` in the production profile (it was `true` since 2026-11-03). The rule asked a
+  person about accepted equations that look like readings that used to be wrong. On the 12 development
+  papers read at 0.5.21 it asked about 19 of 873 accepted equations and none was wrong, while 7 were wrong
+  and accepted (3 real misreads, 4 faults of the gold or of the span) and ranked 90th to 561st by the
+  rule's own probability. A refit on today's readings, leaving one paper out, does no better (it ranks the
+  wrong ones below the right ones). So the rule only cost questions: 19 of the 49 asked in the equation
+  step on these papers. The code, the fitted constants and the fitting script stay; the code default was
+  already off. Numbers and method: docs/eval-flag-policy.md (last section), `scripts/flag_policy_arms.py`.
+  On the corpus replay 4 of 73 uploads ask fewer questions (9 fewer in all, 536 to 527; none asks
+  more) and no recorded request stops matching; `eval burden --same` stops on those 4 until its record is
+  made again. A new conversion asks fewer questions (the equation text and every request are as before), so it
+  goes in the next pipeline raise; production's `FLAG_POLICY` Railway variable must be set to `false` at
+  that release.
+## Unreleased: a reading that mends the box is no longer cut for it (O-478)
+
+- The line prompt tells the model to leave out what a box took in by mistake. The symbol and sign
+  checks then compared the reading with the box as it is, so a right reading was cut (arXiv
+  2404.14123 page 1: the box holds `τ1 + τ2 (∼17`, both models read `\tau_1 + \tau_2`, the sign
+  check cut 0.85 to 0.51 and 0.6 to 0.36, and the reading was abstained). Now, when the main
+  model's second reading has the same letters and digits as the first and they are exactly the box's
+  less a run at one end, the second reading is compared with the rest of the box, keeps its
+  confidence and stays a decision with a new reason, `box_ends` (the reviewer is told the
+  transcription leaves out a few characters stored right before or after the formula). The first reading is checked as before, so the main model is
+  still asked and no request changes (the 9 first-reading misreads the check caught are asked again
+  and end right, as before). `text_layer_compare.trim_text_layer`, `equation_step._evaluate`.
+- Measured by replay of the recorded answers on the 12 development papers (903 equations read by
+  the step): 2 equations move. 2404.14123 `p1-e18` goes from abstained and wrong to asked and
+  right; 2504.03499 `p2-e50` (`\|\cdot\|` for the box `∥·∥a`) stays asked, with the reason named.
+  Wrong and accepted stays 7. A reading that reaches past the box with letters the line's nearest
+  glyphs do not make up exactly (2 right equations, both already a decision) is left as it was: a
+  looser test would also pass 2 of the 9 first-reading misreads.
+- On the 73 uploads of the corpus replay, 2 differ and only in their equation fixes: arXiv LIGO
+  (`r17_arxiv_ligo`, 1 equation of 43) and one private upload (3 of 603), each a fix that was
+  already a decision, with the same LaTeX and confidence, whose reason `symbol_mismatch` is now
+  `box_ends`. No recorded request stops matching (every equation's readings are the same models
+  and answers), no second reading is saved, and `eval burden --same` meets its bar.
+## Unreleased: one formula that layout cut into two boxes is written once (O-479)
+
+- **The fault.** Layout sometimes puts one formula into two or three equation boxes. Each box is
+  read with its line, and the line prompt tells the model to read on past a box that stops early,
+  so more than one reading comes back as the whole formula and the page said it twice (arXiv
+  2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5, and a textbook of vector
+  problems, where a vector and its last component are two boxes). The cuts are shapes in layout (a
+  blank between math-font glyphs, a blank wider than a word space where a radical is drawn and no
+  glyph, an upright word after a ring operator); which
+  rule ends the run at each, and what a join in layout would cost in recorded requests, is in
+  `docs/layout.md` (inline joins, "Measured and not built in layout (wave 8, builder 03)"). Layout
+  is left as it is: a joined box is a new picture and a new request.
+- **The rule.** `pipeline/equation_twice.py`, run once in `run._convert` next to
+  `table_math.settle`, where the readings are put into the document. The evidence is the file's own
+  characters in order, never a bag of letters. Inline equations of one paragraph whose markers
+  follow each other on one line: when one member's reading, in order, is exactly the characters of
+  the boxes and of the text between them, and every other member's reading is a run inside it, the
+  window is written once, with the reading that says it whole (an accepted one before an asked one,
+  then one whose box has characters, then the first) where the window began; a closing bracket right
+  after the window that the reading already holds goes with the copy. The dropped copies leave with
+  their markers, their fixes and their crops; the spacing around the kept formula is what the
+  paragraph had; a question about a dropped copy goes with it and a question about the copy that
+  stays is asked once; what the dropped copies cost is kept in the document's cost and calls. A
+  symbol printed twice, two formulas with the same letters, a window whose letters are in another
+  order than the reading's (a matrix or determinant), a reading that goes past the window into the
+  sentence, and boxes with no characters in the PDF are left as they are. Not built: an accent that
+  layout boxed apart from its letter (one on the development papers, 2305.06353 page 3, none in the
+  corpus). Not built: an inline box
+  inside a display's box (a block box over an inline formula in a sentence is a fault of layout;
+  taking the inline formula out for the display left the sentence without it): 4 such repeats on the
+  development papers, each a fragment paragraph of a display, and 26 pairs on one corpus upload.
+  No request, no prompt, no layout rule and no setting changes.
+- **On real documents.** The equation replay of the 12 development papers (offline): 4 repeats are
+  written once (5 boxes taken out; 2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5)
+  and the four numbers do not move (847 right and accepted, 7 wrong and accepted, 60 asked and
+  right, 18 asked and wrong); one equation's number moves (the kept box of a repeat is the first,
+  `p5-e31` for `p5-e32`) and none changes outcome. `dev2` (25 papers, the equations that have a
+  recorded answer) holds no more. The corpus
+  replay (73 uploads): 2 public uploads change and 71 are the same (18 boxes taken out in 15 places,
+  each read: the repeat is written once and nothing else in the paragraph changes; in one, and in
+  one of the development papers, the closing bracket the reading holds goes with the copy); the
+  replay misses 0 recorded
+  requests with the rule on and off, and cost and calls are the same. `eval burden --same`: 532
+  required decisions where the record has 536 (4 questions about copies that are gone, on the
+  two uploads); the record (`data/eval/burden-corpus.json`) is not re-made here.
+- **What it means for a stored document.** A document converted before keeps its repeated formulas
+  until it is converted again; `PIPELINE_VERSION` is not raised here (it is owed, with the
+  release that carries this). No migration, `RENDER_VERSION` is not owed.
 
 ## Pipeline 0.5.21, render 11 (2026-11-25)
 

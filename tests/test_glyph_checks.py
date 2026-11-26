@@ -278,3 +278,47 @@ def test_a_lone_bold_letter_in_a_bold_italic_face_is_fixed_without_a_model():
     fix = notation_memory.bold_letter_fix(element.model_copy(update={"glyphs": glyphs}))
     assert fix is not None and fix.equation is not None
     assert fix.equation.latex == r"\boldsymbol{w}"
+
+
+# ---------------------------------------------------- a box that took in more than the formula
+
+
+def run_two_models(element: Element, cheap: str, main: str):
+    """The cheap model reads first; its reading fails the box check, so the main model reads too."""
+    settings = make_settings()
+    answers = {settings.cheap_model: cheap, settings.main_model: main}
+    client = FakeVisionClient(
+        responders={
+            "equation": lambda req: {
+                "is_equation": True,
+                "latex": answers[req.model],
+                "confidence": 0.85,
+            }
+        }
+    )
+    return transcribe(element, b"\x89PNG", client=client, settings=settings)
+
+
+@pytest.mark.parametrize(
+    ("cheap", "main", "kept"),
+    [
+        (r"x = 2\frac{m}{k}", r"x = 2\frac{m}{k}", True),  # both left out the box's "is"
+        (r"x = 2\frac{m}{k}", r"y = 2\frac{m}{k}", False),  # the models disagree: a mismatch
+    ],
+)
+def test_a_run_both_models_leave_out_at_the_boxs_end_is_not_a_symbol_mismatch(
+    pdf, cheap, main, kept
+):
+    # the box is "x = 2 m/k is": the second word of the line is in it, the formula is not
+    fix = run_two_models(span_of(pdf, "x = 2 m/k is"), cheap, main)
+    codes = failed_codes(fix)
+    if kept:
+        assert codes == {"box_ends"}
+        assert fix.review == "required"
+        assert (
+            fix.confidence == 0.85
+        )  # the signs and letters were compared with the rest of the box
+        assert fix.equation is not None
+    else:
+        assert "symbol_mismatch" in codes
+        assert "box_ends" not in codes
