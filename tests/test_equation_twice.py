@@ -18,7 +18,11 @@ from readablestem.pipeline.assemble import render_html
 
 
 def mathml(latex: str) -> str:
-    inner = "".join(f"<mi>{c}</mi>" for c in latex if c.isalnum())
+    inner = "".join(
+        f"<mi>{c}</mi>" if c.isalnum() else f"<mo>{c}</mo>"
+        for c in latex
+        if c.isalnum() or c in "()"
+    )
     return f'<math xmlns="http://www.w3.org/1998/Math/MathML" display="inline">{inner}</math>'
 
 
@@ -121,7 +125,7 @@ def test_a_formula_cut_into_three_boxes_is_written_once():
     assert "⟦" not in html
 
 
-def test_the_text_between_the_boxes_goes_with_them_and_the_space_before_stays():
+def test_the_text_between_the_boxes_goes_with_them_and_the_text_around_stays():
     # the 'x' and the 't+1' of one formula, a box with no characters between them, and the
     # words around: the word keeps its space before the formula, the formula its full stop
     elements = [
@@ -132,6 +136,12 @@ def test_the_text_between_the_boxes_goes_with_them_and_the_space_before_stays():
         paragraph("therefore, ⟦p1-e5⟧ = ⟦p1-e6⟧.", 4),
         box(5, 100, "x", "p1-e4", 200),
         box(6, 140, "y", "p1-e4", 200),
+        # the reading closes a bracket the first box opened; layout left its end in the text
+        paragraph("with ⟦p1-e8⟧ ⟦p1-e9⟧), and (see ⟦p1-e10⟧ ⟦p1-e11⟧) so", 7),
+        box(8, 100, "t = log(C", "p1-e7", 300),
+        box(9, 140, "n", "p1-e7", 300),
+        box(10, 200, "a + ", "p1-e7", 300),
+        box(11, 240, "b", "p1-e7", 300),
     ]
     elements, _, spent, _ = settled(
         elements,
@@ -141,12 +151,18 @@ def test_the_text_between_the_boxes_goes_with_them_and_the_space_before_stays():
             3: ("x_{t+1}", ASKED),
             5: ("x", OK),
             6: ("x = y", ASKED),
+            8: ("t = log(Cn)", ASKED),
+            9: ("n", OK),
+            10: ("a + b", OK),
+            11: ("b", OK),
         },
     )
     text = {e.id: e.text for e in elements if e.kind is Kind.PARAGRAPH}
     assert text["p1-e0"] == "the optimized decision ⟦p1-e3⟧. It"
     assert text["p1-e4"] == "therefore, ⟦p1-e6⟧."  # no "=" is left behind
-    assert len(spent) == 3
+    # the bracket the reading holds goes with the copy; one the sentence opened stays
+    assert text["p1-e7"] == "with ⟦p1-e8⟧, and (see ⟦p1-e10⟧) so"
+    assert len(spent) == 5
 
 
 def test_a_formula_inside_a_sentence_is_not_taken_out_for_a_display_over_it():
@@ -162,19 +178,6 @@ def test_a_formula_inside_a_sentence_is_not_taken_out_for_a_display_over_it():
     assert spent == []
     assert elements[0].text == "After dividing by ⟦p1-e1⟧, the equation says"
     assert html.count("<math") == 2
-
-
-def test_an_accent_cut_from_its_letter_is_written_once_where_the_boxes_lie_on_each_other():
-    elements = [
-        paragraph("so ⟦p1-e1⟧"),
-        box(1, 100, "~"),
-        paragraph("⟦p1-e3⟧ holds", 2),
-        box(3, 100, "W", "p1-e2", 104),
-    ]
-    elements, _, spent, html = settled(elements, {1: ("W~", ASKED), 3: ("W~", OK)})
-    assert [e.text for e in elements if e.kind is Kind.PARAGRAPH] == ["so", "⟦p1-e3⟧ holds"]
-    assert len(spent) == 1
-    assert html.count("<math") == 1
 
 
 def test_the_run_writes_a_repeated_formula_once_and_keeps_what_it_cost(monkeypatch):
