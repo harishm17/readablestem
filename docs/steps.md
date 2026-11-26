@@ -1187,32 +1187,49 @@ full description is in [tables.md](tables.md). In short:
 
 ## One formula in two boxes (`pipeline/equation_twice.py`)
 
-Layout sometimes cuts one formula into two equation boxes (an accent set apart from its letter, a
-radical or a big sign that is no glyph of the line, a ring operator next to an upright word). Each
-box is read with its line and the reading goes on past the box, so both come back as the whole
-formula and the page wrote it twice. `equation_twice.settle` runs once, in `run.py` right after
-`table_math.settle`, where the readings are put into the document. It looks for two inline boxes of
-one paragraph on one line with nothing but the formula's own characters between them (or an inline
-box lying inside a block box of the same page), and writes the formula once:
+Layout sometimes cuts one formula into two or three equation boxes (a blank in a text font between
+math glyphs, a radical that is no glyph of the line, an accent set apart from its letter). Each box
+is read with its line and the reading goes on past the box, so more than one box comes back as the
+whole formula and the page wrote it twice. `equation_twice.settle` runs once, in `run.py` right
+after `table_math.settle`, where the readings are put into the document, and writes the formula
+once. The evidence is the file's own characters in the order they stand (the letters, digits and
+Greek letters of a text, `text_layer_compare.symbol_seq`; a reading's MathML in document order,
+`mathml_seq`), never a bag of letters: a bag cannot tell a repeat from a second formula that has
+the same letters. There are two rules.
 
-- Both readings equal once styles and spacing are stripped: the formula is written once, in the
-  first box unless only the second one was accepted.
-- One reading goes past its box and holds all the symbols of the other box (counted by letter, digit
-  and Greek letter, `text_layer_compare.symbol_bag`): the box that holds the whole is kept and the
-  other is dropped.
-- A symbol printed twice, or two formulas that use the same letters, is left alone: a box counts
-  only when its reading covers the other box too, or when the two readings are the same formula;
-  readings that merely hold the same letters do not count. Two boxes with no characters
-  in the PDF (a handwritten page) have nothing to be compared with and are left alone.
+- **A run of boxes on one line.** The inline equations of one paragraph whose markers follow each
+  other on one line (the boxes share a line, and a marker that is no reading ends the run). Take a
+  window of two or more of them. A member's reading K says the whole window when the letters of K's
+  reading, in order, are the window's characters one for one and in order (each member's box, and
+  the paragraph's text between two members in its place), and every other member's reading is a run
+  inside K's, symbols and operators both (`|v|` is not said by `v`). The window is written once: K's
+  marker stands where the window began, and the other markers and the text between the first and the
+  last go. K is an accepted one before an asked one, then one whose box has characters, then the
+  first. A window of three is one step; longer windows are taken first and no member is in two.
+  A member with no characters in its box is fine under that condition; a window with no box that has
+  characters has nothing to compare with and is left alone (a handwritten page).
+- **An accent cut from its letter.** Two inline equations whose boxes each lie half or more on the
+  other, whose readings are equal once styles and spacing are stripped, and whose two boxes'
+  characters together are exactly the reading's letters. The accepted one stays, else the first.
 
-A formula in three boxes is read three times: the step runs up to four passes, one repeat
-taken out in each, until no pair is left.
+A symbol printed twice (each box says the whole reading), two formulas with the same letters, a
+window whose letters are K's in another order (a fraction, a matrix or a determinant that the file
+stores in another order) and a reading that goes past the window (it also covers words of the
+sentence before or after the last box) are all left as they are: the repeat stays, which is the safe
+side. An inline box inside a display's box is not built: where layout puts a block box over an
+inline one, the inline formula belongs to its sentence, and taking it out left the sentence without
+it; those repeats (on the development papers 4, each a fragment paragraph of a display: "for i = j",
+"dR_α" twice, "with σ_t = σ"; on one corpus upload 26 pairs, most of them a block box over an inline
+formula in a sentence) are a fault of layout that this step does not mend.
 
-The dropped box leaves with its marker `⟦pN-eM⟧` (and the spaces around it; spans of links, colors
-and scripts move with `core.inline.moved`), its fix is removed, and so is its question: a person is
-asked once, about the copy that stays, and only when neither copy was accepted. The dropped fix's
-spend is added back to the document's cost and calls, and its step facts are still measured. A block
-box is never dropped. No model call and no setting is new.
+Taking a formula out leaves the spacing a reader expects (`_spaced`): one space between two words,
+or a word and a formula, where there was a space on either side; none before closing punctuation or
+after an opening bracket; and a word never touches a formula it did not touch. The paragraph's
+links, colors and scripts move with the text (`core.inline.moved`). The dropped box leaves with
+its marker, its fix and its crop, and with its question: a person is asked once, about the copy that
+stays, and only when neither copy was accepted. The dropped fix's spend is added back to the
+document's cost and calls, and its step facts are still measured. A block box is never dropped, and
+a change that would leave a paragraph empty is not made. No model call, request or setting is new.
 
 ## Comparing two readings
 

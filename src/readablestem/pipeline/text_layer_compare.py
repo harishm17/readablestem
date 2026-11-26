@@ -232,18 +232,29 @@ def compare_case(text_layer: str | None, mathml: str) -> tuple[CaseRow, ...]:
 EXTENT_REACH = 40
 
 
+def symbol_seq(text: str) -> str:
+    """Letters, digits and Greek letters of a text in the order they stand, case-folded:
+    `symbol_bag` without the counting. Modifier letters (the accent a LaTeX hat leaves in a text
+    layer) are accents, not symbols."""
+    folded = unicodedata.normalize("NFKC", text).translate(_DOTLESS).casefold()
+    return "".join(ch for ch in folded if ch.isalnum() and unicodedata.category(ch) != "Lm")
+
+
 def symbol_bag(text: str) -> Counter[str]:
     """Letters, digits and Greek letters of a text, case-folded and counted: what the symbol
-    check compares (`equation_step.text_layer_symbols_differ`). Modifier letters (the accent a
-    LaTeX hat leaves in a text layer) are accents, not symbols."""
-    folded = unicodedata.normalize("NFKC", text).translate(_DOTLESS).casefold()
-    return Counter(ch for ch in folded if ch.isalnum() and unicodedata.category(ch) != "Lm")
+    check compares (`equation_step.text_layer_symbols_differ`)."""
+    return Counter(symbol_seq(text))
+
+
+def mathml_seq(mathml: str) -> str:
+    """`symbol_seq` of a MathML's text, in document order."""
+    root = DET.fromstring(mathml, forbid_dtd=True)
+    return symbol_seq(" ".join(root.itertext()))
 
 
 def mathml_bag(mathml: str) -> Counter[str]:
     """`symbol_bag` of a MathML's text."""
-    root = DET.fromstring(mathml, forbid_dtd=True)
-    return symbol_bag(" ".join(root.itertext()))
+    return Counter(mathml_seq(mathml))
 
 
 Glyph = tuple[str, str | None]  # (character as the text layer writes it, letter style)

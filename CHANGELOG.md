@@ -2,40 +2,48 @@
 
 ## Unreleased: one formula that layout cut into two boxes is written once (O-479)
 
-- **The fault.** Layout sometimes puts one formula into two equation boxes. Each box is read with
-  its line, and the line prompt tells the model to read on past a box that stops early, so both
-  readings come back as the whole formula and the page said it twice (arXiv 2305.06353 pages 3
-  and 4, 2410.12036 page 3, 2503.02792 page 3, 2504.03499 pages 3 and 5). The cuts are four
-  shapes in layout (a blank between math-font glyphs, a blank wider than a word space where a
-  radical is drawn and no glyph, an upright word after a ring operator, an accent in the row above
-  its letter or a display line taken as a paragraph too); which rule ends the run at each, and what
-  a join in layout would cost in recorded requests, is in `docs/layout.md` (inline joins, "Measured
-  and not built in layout (wave 8, builder 03)"). Layout is left as it is: a joined box is a new
-  picture and a new request.
+- **The fault.** Layout sometimes puts one formula into two or three equation boxes. Each box is
+  read with its line, and the line prompt tells the model to read on past a box that stops early,
+  so more than one reading comes back as the whole formula and the page said it twice (arXiv
+  2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5, and a textbook of vector
+  problems, where a vector and its last component are two boxes). The cuts are shapes in layout (a
+  blank between math-font glyphs, a blank wider than a word space where a radical is drawn and no
+  glyph, an upright word after a ring operator, an accent in the row above its letter); which
+  rule ends the run at each, and what a join in layout would cost in recorded requests, is in
+  `docs/layout.md` (inline joins, "Measured and not built in layout (wave 8, builder 03)"). Layout
+  is left as it is: a joined box is a new picture and a new request.
 - **The rule.** `pipeline/equation_twice.py`, run once in `run._convert` next to
-  `table_math.settle`, where the readings are put into the document. Two inline boxes of one
-  paragraph on one line with nothing between them but the formula's own characters, two boxes on the
-  same ink, or an inline box inside a display's box, whose readings are the same formula and each
-  box alone holds only part of it, or where one reading goes past its box and holds the characters
-  of the other box (the letters, digits and Greek letters of the PDF's text there), are one
-  formula. It is written once: the copy that holds the other's characters stays, else the accepted
-  one, else the first. The other is taken out with its marker, its fix and its crop; a person's
-  question about it goes with it, and a question about the copy that stays is asked once. A symbol
-  printed twice, two formulas with the same letters, and boxes with no characters in the PDF are
-  left alone. A formula in three boxes takes up to four passes. What the dropped copy cost is kept
-  in the document's cost and calls; its step facts are still measured. No request, no prompt, no
-  layout rule and no setting changes.
-- **On real documents.** The equation replay of the 12 development papers (offline): 11 repeats
-  are written once (the six places of the brief and five more) and 24 neighbours that look alike
-  stay twice (a symbol printed twice, the same letters in two formulas). The four numbers do not
-  move (847 right and accepted, 7 wrong and accepted, 60 asked and right, 18 asked and wrong), no
-  equation changes outcome, and 3 of the 10 gold equations written across two boxes are written
-  once. On `dev2` (25 papers, the equations that have a recorded answer) 26 repeats on 8
-  papers. The corpus replay (73 uploads): 6 uploads change (5 public files, one of them in two
-  uploads, and 1 committed file) and 67 are the same; the replay misses 0 recorded requests with
-  the rule on and off, and cost and calls are the same. `eval burden --same`: 502 required
-  decisions where the record has 536 (a question about a copy that is gone goes with it); the
-  record (`data/eval/burden-corpus.json`) is not re-made here.
+  `table_math.settle`, where the readings are put into the document. The evidence is the file's own
+  characters in order, never a bag of letters. (1) Inline equations of one paragraph whose markers
+  follow each other on one line: when one member's reading, in order, is exactly the characters of
+  the boxes and of the text between them, and every other member's reading is a run inside it, the
+  window is written once, with the reading that says it whole (an accepted one before an asked one,
+  then one whose box has characters, then the first) where the window began. (2) Two boxes that lie
+  half or more on each other, with the same reading and together exactly its letters (an accent cut
+  from its letter): the accepted one stays. The dropped copies leave with their markers, their
+  fixes and their crops; the paragraph keeps the spacing a reader expects (no word touches a formula
+  it did not touch); a question about a dropped copy goes with it and a question about the copy that
+  stays is asked once; what the dropped copies cost is kept in the document's cost and calls. A
+  symbol printed twice, two formulas with the same letters, a window whose letters are in another
+  order than the reading's (a matrix or determinant), a reading that goes past the window into the
+  sentence, and boxes with no characters in the PDF are left as they are. Not built: an inline box
+  inside a display's box (a block box over an inline formula in a sentence is a fault of layout;
+  taking the inline formula out for the display left the sentence without it): 4 such repeats on the
+  development papers, each a fragment paragraph of a display, and 26 pairs on one corpus upload.
+  No request, no prompt, no layout rule and no setting changes.
+- **On real documents.** The equation replay of the 12 development papers (offline): 4 repeats are
+  written once (5 boxes taken out; 2305.06353 page 4, 2503.02792 page 3, 2504.03499 pages 3 and 5)
+  and the four numbers do not move (847 right and accepted, 7 wrong and accepted, 60 asked and
+  right, 18 asked and wrong); one equation's number moves (the kept box of a repeat is the first,
+  `p5-e31` for `p5-e32`) and none changes outcome. `dev2` (25 papers, the equations that have a
+  recorded answer) holds no more. The accent of 2305.06353 page 3 is left twice: its two boxes lie
+  on each other by 48 and 51 per cent of their areas, under the half the rule asks. The corpus
+  replay (73 uploads): 2 public uploads change and 71 are the same (18 boxes taken out in 15 places,
+  each read: the repeat is written once and nothing else in the paragraph changes; one leaves a
+  closing bracket that the reading and the paragraph both hold); the replay misses 0 recorded
+  requests with the rule on and off, and cost and calls are the same. `eval burden --same`: 532
+  required decisions where the record has 536 (4 questions about copies that are gone, on the
+  two uploads); the record (`data/eval/burden-corpus.json`) is not re-made here.
 - **What it means for a stored document.** A document converted before keeps its repeated formulas
   until it is converted again; `PIPELINE_VERSION` is not raised here (it is owed, with the
   release that carries this). No migration, `RENDER_VERSION` is not owed.
