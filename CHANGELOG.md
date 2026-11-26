@@ -8,8 +8,8 @@
   check cut 0.85 to 0.51 and 0.6 to 0.36, and the reading was abstained). Now, when the main
   model's second reading has the same letters and digits as the first and they are exactly the box's
   less a run at one end, the second reading is compared with the rest of the box, keeps its
-  confidence and stays a decision with a new reason, `box_ends` ("both readings leave out some
-  characters at one end of the box"). The first reading is checked as before, so the main model is
+  confidence and stays a decision with a new reason, `box_ends` (the reviewer is told the
+  transcription leaves out a few characters stored right before or after the formula). The first reading is checked as before, so the main model is
   still asked and no request changes (the 9 first-reading misreads the check caught are asked again
   and end right, as before). `text_layer_compare.trim_text_layer`, `equation_step._evaluate`.
 - Measured by replay of the recorded answers on the 12 development papers (903 equations read by

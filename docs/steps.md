@@ -501,8 +501,8 @@ model is still asked), and those letters and digits are exactly the box's less a
 at its end, the rest matching symbol for symbol (`text_layer_compare.trim_text_layer`), every
 text-layer check of the second reading compares it with the rest of the box. The file does not say
 where the formula ends, so this is no evidence from the file: the fix keeps the models' confidence but
-stays a decision, with the failed warning `equation.box_ends` (code `box_ends`, "both readings leave
-out some characters at one end of the box"). A reading that drops from both ends, that the two models
+stays a decision, with the failed warning `equation.box_ends` (code `box_ends`; the reviewer is
+told the transcription leaves out a few characters stored right before or after the formula). A reading that drops from both ends, that the two models
 read differently, or that also reaches past the box is compared with the box as before.
 
 **Letter styles from the glyph fonts.** `glyph_style` names the style of each ASCII letter from its
