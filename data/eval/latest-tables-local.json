@@ -6,7 +6,7 @@
   "pipeline_version": "0.5.22",
   "profile": {
     "name": "development settings",
-    "sha256": "b0befdf78b1ec294cb81975321d64fd67886334c8f045d229413689bf9021fe7",
+    "sha256": "4c3b67046ae10c774f9ffe06077ca48c07689d422d74f38f420d4a967af82e32",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -43,6 +43,7 @@
     "ANTHROPIC_EFFORT_MAIN": "medium",
     "ANTHROPIC_EFFORT_PAGE_AUDIT": null,
     "ANTHROPIC_EFFORT_PAGE_MATH": null,
+    "ANTHROPIC_EFFORT_PAGE_ORDER": null,
     "ANTHROPIC_EFFORT_PAGE_WITNESS": null,
     "ANTHROPIC_NOTICE_IN_SYSTEM": true,
     "ANTHROPIC_REFUSAL_FALLBACK": true,
@@ -64,6 +65,7 @@
     "EQUATION_GLYPH_RECONCILE": false,
     "EQUATION_LINE_CONTEXT": false,
     "FEATURE_IMAGE_PAGES": false,
+    "FEATURE_LAYOUT_MODEL_ORDER": false,
     "FEATURE_LONG_DESCRIPTIONS": false,
     "FEATURE_NOTATION_MEMORY": false,
     "FEATURE_PAGE_MATH": false,
@@ -101,6 +103,8 @@
     "PAGE_MATH_MAX_OUTPUT_TOKENS": 4096,
     "PAGE_MATH_MODEL": null,
     "PAGE_MATH_UNCONFIRMED_FACTOR": 1.0,
+    "PAGE_ORDER_MAX_OUTPUT_TOKENS": 16000,
+    "PAGE_ORDER_MODEL": null,
     "PAGE_WITNESS_MAX_OUTPUT_TOKENS": 12288,
     "PAGE_WITNESS_MODEL": "claude-opus-5-5",
     "REGION_TREE": "off",
@@ -220,6 +224,9 @@
     "pipeline.page_math_reconcile.ATTACHED_LETTERS": 4,
     "pipeline.page_math_reconcile.CONSISTENT_FROM": 0.8,
     "pipeline.page_math_reconcile.RULE_MARGIN": 2.0,
+    "pipeline.page_order.CONTEXT_CHARS": 30000,
+    "pipeline.page_order.DEFAULT_EFFORT": "medium",
+    "pipeline.page_order.EQUATION_CHARS": 200,
     "pipeline.page_witness.DEFAULT_EFFORT": "medium",
     "pipeline.page_witness.IMAGE_DPI": 200,
     "pipeline.page_witness.IMAGE_MAX_SIDE_PX": 2576,
@@ -250,8 +257,8 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "ba7f0dcb0fb12d23ef3f596e718ba52a022f73ab",
-    "clean": true,
+    "commit": "41532d4cdaf2f8f4675e30e323c771a8a8daee68",
+    "clean": false,
     "pipeline_version": "0.5.22",
     "render_version": 11,
     "tools": {
@@ -497,8 +504,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 3930.0,
-    "p95": 10541.599999999982,
+    "p50": 4095.0,
+    "p95": 10332.599999999986,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }
