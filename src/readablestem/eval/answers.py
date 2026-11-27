@@ -113,8 +113,7 @@ class CachedClient:
         self.second_check: CachedClient | None = None
         self.hits = 0
         self.misses = 0
-        # Of the misses, those this client then answered live and wrote down: the requests that
-        # ended unanswered are `misses - answered_live`.
+        # Of the misses, those this client then answered live and wrote down (`unanswered`).
         self.answered_live = 0
         self.rekeyed = 0
         self.missed_because: Counter[str] = Counter()
@@ -229,6 +228,11 @@ class CachedClient:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as handle:
                 handle.write(dump_line(row) + "\n")
+
+    @property
+    def unanswered(self) -> int:
+        """Requests that ended with no answer: not in the file and not answered live."""
+        return self.misses - self.answered_live
 
     def reset(self) -> None:
         """Zero the counters (a staged run counts its last pass only)."""

@@ -44,7 +44,7 @@ def test_a_request_is_asked_once_and_replayed_with_its_recorded_cost(tmp_path: P
     assert parsed is not None and parsed.latex == "x^2"
     assert len(inner.requests) == 1 and first.misses == 1
     # Answered live, so not unanswered: a live held-out run once set every document apart.
-    assert first.misses - first.answered_live == 0
+    assert first.unanswered == 0
 
     again = CachedClient(inner, path, settings())  # a later run, same file
     parsed2, call2 = again.run(request(), EquationOutput)
@@ -155,4 +155,4 @@ def test_an_answer_lost_to_an_outage_is_not_kept(tmp_path: Path) -> None:
     inner = FakeVisionClient(fail_models={"claude-opus-5-5": "api_error"})
     lost = CachedClient(inner, path, settings())
     lost.run(request(), EquationOutput)
-    assert load_rows(path) == [] and lost.misses - lost.answered_live == 1
+    assert load_rows(path) == [] and lost.unanswered == 1
