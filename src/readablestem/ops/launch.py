@@ -137,7 +137,8 @@ def sent_material_problems(settings: Settings, *, today: date | None = None) -> 
     """What stops these settings from sending what they send: for each kind of material that
     is on (`web.recipients.sent_material`), the rendered privacy notice must state it in its
     own words, the rendered vendor line must carry its words, and the row must be dated with
-    the day it was first stated in public, not later than `today` (UTC). A setting that sends
+    the day it was first stated in public, not later than `today` (UTC), and `today` must not be
+    before the day the row says it starts (`starts`, when it has one). A setting that sends
     something new therefore cannot start in production before the page says so with its date
     (privacy.html, "Changes to this notice"). Empty when all is stated."""
     from readablestem.web.recipients import html_text, sent_material, vendor_line_text
@@ -171,6 +172,11 @@ def sent_material_problems(settings: Settings, *, today: date | None = None) -> 
             problems.append(
                 f"web/recipients.py: {sends} but its row is dated {m.stated.isoformat()}, "
                 "a day still to come"
+            )
+        elif m.starts is not None and m.starts > today:
+            problems.append(
+                f"web/recipients.py: {sends} before the day the privacy notice says it starts "
+                f"({m.starts.isoformat()})"
             )
         elif m.stated_text not in notice:
             problems.append(

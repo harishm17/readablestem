@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import dataclasses
 import shutil
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -21,6 +22,7 @@ from fixtures.web.support import ALICE, WebEnv, login, make_settings
 from readablestem.config import ConfigError
 from readablestem.ops import launch
 from readablestem.web import offices, recipients
+from readablestem.web.dates import format_day
 from readablestem.web.recipients import MATERIALS, html_text, notice_text, vendor_sentence
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,8 +71,11 @@ def test_each_sending_setting_moves_every_place_together(tmp_path, switch):
     for name in ("upload", "landing"):
         assert line in on[name], name
         assert ONLY_CUTOUTS not in on[name], name  # it no longer says only cut-outs go
+    # A row stated as coming is on the privacy page before it is on, with its start day.
+    coming = {m.key for m in recipients.coming_material(base_env.settings)}
     for name in ("privacy", "offices", "summary"):
-        assert row.what in on[name] and row.what not in base[name], name
+        before = name == "privacy" and row.key in coming
+        assert row.what in on[name] and (row.what in base[name]) == before, name
     # The one-line notes: the drawing's description and the account deletion notes.
     short = f"{row.short} " if row.short else ""
     assert short and short in on["offices"] and short not in base["offices"]
@@ -98,8 +103,10 @@ def prod(tmp_path, **kw):
     return make_settings(tmp_path, **{**PROD, **kw})
 
 
-def dated(monkeypatch, key: str, stated: date | None) -> None:
-    rows = tuple(dataclasses.replace(m, stated=stated) if m.key == key else m for m in MATERIALS)
+def dated(monkeypatch, key: str, stated: date | None, **more: Any) -> None:
+    rows = tuple(
+        dataclasses.replace(m, stated=stated, **more) if m.key == key else m for m in MATERIALS
+    )
     monkeypatch.setattr(recipients, "MATERIALS", rows)
 
 
@@ -119,6 +126,7 @@ def silent_page(tmp_path, monkeypatch) -> None:
         ("no sentence", "FEATURE_TABLES sends pictures of tables but the privacy notice does not"),
         ("no date", "FEATURE_PAGE_WITNESS sends .* has no date it was first stated"),
         ("future date", "FEATURE_TABLES sends .* dated .*, a day still to come"),
+        ("before its start", "FEATURE_TABLES sends .* before the day the privacy notice says"),
     ],
 )
 def test_production_refuses_a_sending_setting_the_pages_do_not_state(
@@ -132,8 +140,15 @@ def test_production_refuses_a_sending_setting_the_pages_do_not_state(
         silent_page(tmp_path, monkeypatch)
     elif case == "no date":
         settings = prod(tmp_path, feature_page_witness=True)
+    elif case == "before its start":
+        # Stated today as a coming change: the notice lists it while it is off.
+        start = datetime.now(UTC).date() + timedelta(days=1)
+        dated(monkeypatch, "tables", start - timedelta(days=1), starts=start)
+        tables = next(m for m in MATERIALS if m.key == "tables")
+        coming = launch.rendered_notice(prod(tmp_path, feature_tables=False)) or ""
+        assert f"Not before {format_day(start)}" in coming and html_text(tables.what) in coming
     else:
-        dated(monkeypatch, "tables", date.today() + timedelta(days=2))
+        dated(monkeypatch, "tables", datetime.now(UTC).date() + timedelta(days=2))
     with pytest.raises(ConfigError, match=f"production start refused: .*{match}"):
         settings.check_production()
     assert any(match.split(" ")[0] in item for item in launch.launch_blockers(settings=settings))
