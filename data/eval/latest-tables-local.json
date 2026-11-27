@@ -2,11 +2,11 @@
   "schema_version": 1,
   "task": "tables",
   "mode": "local",
-  "date": "2026-11-26",
-  "pipeline_version": "0.5.22",
+  "date": "2026-11-27",
+  "pipeline_version": "0.5.23",
   "profile": {
     "name": "development settings",
-    "sha256": "4c3b67046ae10c774f9ffe06077ca48c07689d422d74f38f420d4a967af82e32",
+    "sha256": "5c69095dc28d3df9ff493fb66904649c749f87d1cf2480db2162ded1cc9b8e39",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -17,6 +17,7 @@
       "EQUATION_LINE_CONTEXT",
       "FEATURE_IMAGE_PAGES",
       "FEATURE_LATEX_SOURCE",
+      "FEATURE_LAYOUT_MODEL_ORDER",
       "FEATURE_LONG_DESCRIPTIONS",
       "FEATURE_NOTATION_MEMORY",
       "FEATURE_TABLES",
@@ -259,9 +260,9 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "25aa7a236e8e2350117a8df88ceedc58e37082da",
+    "commit": "b58e78d3b1587ae554e7e5c15c0d3395a5552ebe",
     "clean": true,
-    "pipeline_version": "0.5.22",
+    "pipeline_version": "0.5.23",
     "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",
@@ -506,8 +507,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 3916.0,
-    "p95": 10027.399999999985,
+    "p50": 3908.0,
+    "p95": 9915.199999999984,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }
