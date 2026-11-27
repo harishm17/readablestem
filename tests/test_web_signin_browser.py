@@ -63,6 +63,12 @@ def request_link(page, site, address: str = ALICE) -> None:
 
 
 def emailed_link(site) -> str:
+    # The live server sends the message after it has answered the page (`_send_link`, a
+    # background task), so it may arrive a moment after the page does.
+    deadline = time.monotonic() + 10
+    while not OutboxSender.sent and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert OutboxSender.sent, "no message was sent"
     found = re.search(r"/login/email/confirm\?token=[A-Za-z0-9_-]+", OutboxSender.sent[-1].body)
     assert found, "no link in the message"
     return site.base + found.group(0)
