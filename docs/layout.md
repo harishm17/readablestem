@@ -4602,17 +4602,24 @@ order pass applies last. A page the page math pass has laid out differently from
 pass is a stale page and keeps the rules. Each pass keeps its own summary and costs.
 
 **What it was measured to do.** On the 267 development pages of layout-dev-1,
-claude-haiku-5-5 at medium effort, through the hook, against the rules:
+claude-haiku-5-5 at medium effort, replayed through the product (`eval order --model-order`,
+commit `95cde25d`) against the rules (0.5.22, `data/eval/order-layout-dev-1.json`), in the
+page a student is given and, in brackets, in the elements before the page is written:
 
 | | model's page order | rules |
 |---|---|---|
-| pages read right | 187 | 182 |
-| pages with no fault | 148 | 95 |
-| pages with furniture kept | 11 | 25 |
-| pages with a paragraph cut | 24 | 69 |
-| pages with paragraphs merged | 41 | 73 |
+| pages read right | 184 (188) | 183 (182) |
+| pages with no fault | 140 (148) | 94 (95) |
+| pages with furniture read aloud | 17 (12) | 30 (25) |
+| pages with a paragraph cut | 41 (26) | 81 (69) |
+| pages with paragraphs merged | 33 (41) | 63 (73) |
 
-At about $0.0012 a page. These are development pages: they say the switch is worth deciding
+So on what the student hears the step mostly fixes grouping (paragraphs cut or run together,
+running heads read aloud), and the count of pages read right in order barely moves. 258 pages
+had the model's answer; 7 pages whose item list differs from the one the recording was made
+from, and 2 whose answer named an item twice, kept the rules. About $0.0011 a page ($0.2754
+recorded for the 260 pages the recording answers). A conversion asks every page, not only the
+gold ones: about 933 on this set, so a live run of the whole set costs about $1. These are development pages: they say the switch is worth deciding
 about, not that it is better. The decision is one run on held-out pages (the owner's), and
 until it is made the switch stays off. Turning it on needs `PIPELINE_VERSION` raised in the
 same change (the text of every page the reading is made from can change), a statement on the

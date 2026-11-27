@@ -11,10 +11,15 @@
   a page whose answer does not hold is read by the rules, and each reason is counted. New
   settings: `FEATURE_LAYOUT_MODEL_ORDER`, `PAGE_ORDER_MODEL`, `ANTHROPIC_EFFORT_PAGE_ORDER`
   (medium), `PAGE_ORDER_MAX_OUTPUT_TOKENS`.
-- Development numbers (267 pages of layout-dev-1, claude-haiku-5-5, medium effort): 187 pages
-  right against the rules' 182, 148 with no fault against 95, furniture on 11 pages against
-  25, a paragraph cut on 24 against 69, paragraphs merged on 41 against 73, about $0.0012 a
-  page. Not a held-out result: the switch stays off until one is run.
+- Development numbers (267 pages of layout-dev-1, claude-haiku-5-5, medium effort, replayed
+  through the product), in the page a student is given: 184 pages right against the rules' 183,
+  140 with no fault against 94, furniture read aloud on 17 pages against 30, a paragraph cut on
+  41 against 81, paragraphs merged on 33 against 63; about $0.0011 a page. It mostly fixes
+  grouping, not order. Not a held-out result: the switch stays off until one is run.
+- The fence around document text keeps as many characters as a request asks for. It kept
+  8,000 whatever was asked, which cut the page audit's listings (allowed 30,000; the audit runs
+  in no job yet) without a word, and would have cut 18 of the 267 development pages' lists
+  for this step. Requests that ask for 8,000 or fewer are sent exactly as before.
 - `readablestem eval order --set NAME --model-order` measures it from a recording, offline
   (`--live --max-usd` asks the model for what the recording lacks).
 - A privacy row is added (`web/recipients.py`, `reading_order`): a production start with the
