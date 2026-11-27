@@ -88,7 +88,8 @@ CASES: tuple[Case, ...] = (
     # Each page's picture asks a model twice. Nothing is recorded for a gray square, and a
     # live job stops asking at its spending limit. With the model's page order on (pipeline
     # 0.5.23) every page of a typed file asks it once more, and with nothing recorded the
-    # router asks again: two unanswered a page, here and in each typed file below.
+    # router asks again: two unanswered a page, here and in the typed files below whose pages
+    # are no corpus file's (a page the corpus also has replays its recorded order).
     done("shared-image-under-limit-100-pages.pdf", unanswered=400),
     done("pages-100.pdf", unanswered=200),
     Case("pages-500.pdf", held=True, seconds=UPLOAD_S),
@@ -100,8 +101,8 @@ CASES: tuple[Case, ...] = (
     refused("empty.pdf", "empty"),
     # What the instructor is told about a cut-off file is WF19's (F-505); here it only has
     # to end.
-    done("truncated.pdf", unanswered=6),
-    done("xref-damaged.pdf", unanswered=12),
+    done("truncated.pdf"),
+    done("xref-damaged.pdf"),
     done("page-tree-deep.pdf", unanswered=2),
     # One page that inflates to 256 MB of content: refused by the content budget before
     # anything parses it (F-559; it took 7 s of the upload request and 24 s of a worker).
@@ -110,7 +111,6 @@ CASES: tuple[Case, ...] = (
     done(
         "javascript.pdf",
         never=("ZS2-JS-MARKER", "ZS2-LAUNCH-MARKER", "evil.example", "cmd.exe"),
-        unanswered=4,
     ),
     done("markup.pdf", never=MARKUP_NEVER, as_text=MARKUP_AS_TEXT, unanswered=2),
     # Text on the page that tells a model what to write. That the model was not steered is
