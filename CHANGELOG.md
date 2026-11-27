@@ -12,6 +12,9 @@
   student is given: 192 of 247 pages right (191), 140 with no fault (113), 21 of 49 documents
   with every gold page right (20), furniture read aloud on 13 pages (20), a paragraph cut on 36
   (52), paragraphs run together on 30 (68). Every release bar of the ledger is met with slack.
+  Known fault: on a few corpus layouts of columns of short items (a two-column exam, options
+  in columns, a worksheet, slides three to a page) the model runs more blocks together (39
+  places to 112 on the corpus pages), and one exam page is now read wrong; an open item.
   [docs/eval.md](docs/eval.md) "The switch release of 2026-11-27";
   [ADR 0010](docs/decisions/0010-reading-order-rules-first.md) is amended.
 - The privacy page states, from this release, that pictures of whole pages with their lines go
