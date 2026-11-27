@@ -75,6 +75,21 @@ and the PDF's own tag order) are kept offline in the layout eval (`readablestem 
 so they can be run again without a model. A margin that appears on development pages only does
 not count; neither does one that needs a model call on every page.
 
+## Revisit in progress
+
+2026-11-26: the model's page order is built as a product step behind an off-by-default switch
+(`FEATURE_LAYOUT_MODEL_ORDER`, docs/layout.md "The model's page order"), because on the 267
+development pages of layout-dev-1 a cheap model's grouping and order, replayed through the
+product (`eval order --model-order`), gave the student 184 pages right where the rules gave
+183, and 140 with no fault where the rules had 94 (in the elements before the page is written:
+188 against 182, and 148 against 95). That is development evidence only, which "What would
+change this" above does not count. That section also does not count a margin that needs a
+model call on every page; this step needs one. The owner asked on 2026-11-26 for the harder
+steps to be tried with a model before more rules are built, so turning the switch on would
+amend this record, not meet it: the amendment states the held-out margin and the price per
+page. Nothing changes here until one run on held-out real pages decides whether the switch goes
+on; until then reading order is found by rules and checked, and the public pages still say so.
+
 ## Consequences
 
 The public pages say that order is found by rules and checked, and they claim nothing about a

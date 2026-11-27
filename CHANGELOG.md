@@ -1,5 +1,33 @@
 # Changelog
 
+## Unreleased: the model's page order (off)
+
+- A model can group and order each page's text before the rules build the reading
+  (`FEATURE_LAYOUT_MODEL_ORDER`, `pipeline/page_order.py`, [docs/layout.md](docs/layout.md) "The
+  model's page order"). It is off in the production profile and asks nothing while it is off:
+  every file converts byte-identically to the release before (checked over the corpus with the
+  switch off). Same two-pass shape as the page math pass. One call a page (picture and the
+  numbered items layout found), an answer that must name only items of the page, none twice;
+  a page whose answer does not hold is read by the rules, and each reason is counted. New
+  settings: `FEATURE_LAYOUT_MODEL_ORDER`, `PAGE_ORDER_MODEL`, `ANTHROPIC_EFFORT_PAGE_ORDER`
+  (medium), `PAGE_ORDER_MAX_OUTPUT_TOKENS`.
+- Development numbers (267 pages of layout-dev-1, claude-haiku-5-5, medium effort, replayed
+  through the product), in the page a student is given: 184 pages right against the rules' 183,
+  140 with no fault against 94, furniture read aloud on 17 pages against 30, a paragraph cut on
+  41 against 81, paragraphs merged on 33 against 63; about $0.0011 a page. It mostly fixes
+  grouping, not order. Not a held-out result: the switch stays off until one is run.
+- The fence around document text keeps as many characters as a request asks for. It kept
+  8,000 whatever was asked, which cut the page audit's listings (allowed 30,000; the audit runs
+  in no job yet) without a word, and would have cut 18 of the 267 development pages' lists
+  for this step. Requests that ask for 8,000 or fewer are sent exactly as before.
+- `readablestem eval order --set NAME --model-order` measures it from a recording, offline
+  (`--live --max-usd` asks the model for what the recording lacks).
+- A privacy row is added (`web/recipients.py`, `reading_order`): a production start with the
+  switch on is refused until the privacy page states it with its date. The vendor sheet and
+  `docs/security.md` list the setting.
+- `PIPELINE_VERSION` is not raised by this change (nothing it makes differs with the switch off);
+  it is raised in the change that turns the switch on.
+
 ## Pipeline 0.5.22, render 11 (2026-11-26)
 
 - `PIPELINE_VERSION` is 0.5.22 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

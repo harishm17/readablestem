@@ -52,8 +52,8 @@ ROLES: tuple[str, ...] = (
     "not_math_but_looks_like_it",
 )
 
-# Characters of text layer sent for one page. The fence scans 8,000 characters for tag names
-# (`openai_client._CONTEXT_SCAN_CHARS`); rows past this many are not offered to the model.
+# Characters of text layer sent for one page (the limit measured; the fence keeps as many as a
+# request asks for, `models.base.sent_context`); rows past this many are not offered.
 CONTEXT_CHARS = 7600
 MAX_OUTPUT_TOKENS = 4096  # the default of `Settings.page_math_max_output_tokens`
 # A page with less text than this has nothing to place.

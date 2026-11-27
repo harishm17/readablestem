@@ -68,6 +68,7 @@ ANSWER_SETTINGS = frozenset(
         "claude_check_model",
         "claude_check_effort",
         "page_math_model",
+        "page_order_model",
         "page_witness_model",
         "page_audit_model",
         "image_pages_model",

@@ -126,6 +126,7 @@ from readablestem.core.types import (
     NotFinished,
     Notice,
     PageMathSummary,
+    PageOrderSummary,
     PageStageFact,
     PageStats,
     PageWitnessSummary,
@@ -158,6 +159,7 @@ from readablestem.pipeline import (
     page_labels,
     page_math,
     page_math_reconcile,
+    page_order,
     page_type,
     page_witness,
     say_once,
@@ -1935,6 +1937,28 @@ def _second_readings(
         return None
 
 
+def _layout_switches(settings: Settings) -> dict[str, Any]:
+    """The layout switches of `settings` as `layout.analyze` takes them: every layout run of a
+    conversion (the first, and the later ones that lay a model's answer over the rules) is made
+    with the same ones."""
+    switches: dict[str, Any] = {}
+    if settings.layout_display_grouping:
+        switches["display_grouping"] = True
+    if settings.layout_inline_joins:
+        switches["inline_joins"] = True
+    if settings.region_tree == "on":
+        switches["region_tree"] = True
+    if settings.layout_join_panels:
+        switches["join_panels"] = True
+    if settings.layout_figure_art:
+        switches["figure_art"] = True
+    if settings.layout_matching_under:
+        switches["matching_under"] = True
+    if settings.table_search_unlimited:
+        switches["table_search_limited"] = False
+    return switches
+
+
 def _page_math_pass(
     pdf_bytes: bytes,
     doc: Any,
@@ -1946,11 +1970,15 @@ def _page_math_pass(
     concurrency: int,
     tracer: Tracer,
     measured: list[CallFact],
-) -> tuple[Any, PageMathSummary]:
+    order_collector: page_order.PageOrderHook | None = None,
+) -> tuple[Any, PageMathSummary, page_math_reconcile.PageMathHook]:
     """The page math pass (ADR 0006) and the second layout run that lays its verified plan
-    over layout's rules. Fails open: a page the model could not answer, a cap that stopped
+    over layout's rules; the hook with the plan is returned too (with no plan when the second
+    run did not happen). Fails open: a page the model could not answer, a cap that stopped
     the pass, or a second run that fails leaves the pages as the first run has them.
-    `ConfigError` and `UnknownModelError` propagate like they do from every step."""
+    `ConfigError` and `UnknownModelError` propagate like they do from every step.
+    `order_collector` is shown the second run's items too: the page order step asks about the
+    page as the plan leaves it."""
     kept = set(getattr(doc, "kept_pages", None) or {})
     offered = {
         number: (rows, partial(layout.render_page, pdf_bytes, number))
@@ -1966,21 +1994,11 @@ def _page_math_pass(
         applied = page_math_reconcile.PageMathHook(plan)
         answered = [n for n, p in plan.pages.items() if p.failed is None]
         if answered:
-            grouping: dict[str, Any] = (
-                {"display_grouping": True} if settings.layout_display_grouping else {}
-            )
-            if settings.layout_inline_joins:
-                grouping["inline_joins"] = True
-            if settings.region_tree == "on":
-                grouping["region_tree"] = True
-            if settings.layout_join_panels:
-                grouping["join_panels"] = True
-            if settings.layout_figure_art:
-                grouping["figure_art"] = True
-            if settings.layout_matching_under:
-                grouping["matching_under"] = True
-            if settings.table_search_unlimited:
-                grouping["table_search_limited"] = False
+            grouping = _layout_switches(settings)
+            first_items = None
+            if order_collector is not None:
+                grouping["page_order"] = order_collector
+                first_items = dict(order_collector.items)
             try:
                 doc = layout.analyze(
                     pdf_bytes,
@@ -1992,6 +2010,10 @@ def _page_math_pass(
             except Exception as exc:  # the first run's pages stand
                 log.warning("page math: the second layout run failed: %s", type(exc).__name__)
                 applied = page_math_reconcile.PageMathHook()
+                if order_collector is not None and first_items is not None:
+                    # and so do the items the page order asks about (a page the failed run
+                    # reached would be asked about as that run had it, and then be stale)
+                    order_collector.items = first_items
         stats, hook = plan.stats, applied.stats
         summary = PageMathSummary(
             pages=len(plan.pages),
@@ -2020,6 +2042,86 @@ def _page_math_pass(
             calls=summary.calls,
             verified=summary.verified,
             dropped=summary.dropped,
+        )
+    return doc, summary, applied
+
+
+def _page_order_pass(
+    pdf_bytes: bytes,
+    doc: Any,
+    collector: page_order.PageOrderHook,
+    *,
+    client: VisionClient,
+    settings: Settings,
+    pages: list[int] | None,
+    concurrency: int,
+    tracer: Tracer,
+    measured: list[CallFact],
+    page_math_hook: page_math_reconcile.PageMathHook | None = None,
+) -> tuple[Any, PageOrderSummary]:
+    """The page order step (`pipeline/page_order.py`) and the layout run that lays its verified
+    answers over layout's rules. Fails open: a page the model could not answer, an answer that
+    did not hold, a cap that stopped the pass, or a layout run that fails leaves the pages as the
+    run before has them. `page_math_hook` is the page math pass's hook when it laid a plan over
+    layout: the run here lays it again, so a page keeps its maths. `ConfigError` and
+    `UnknownModelError` propagate like they do from every step."""
+    kept = set(getattr(doc, "kept_pages", None) or {})
+    sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
+    offered = {
+        number: (items, sizes[number], partial(layout.render_page, pdf_bytes, number))
+        for number, items in collector.items.items()
+        if number not in kept and number in sizes
+    }
+    with _span(tracer, "page_order", pages=len(offered)) as span:
+        result = page_order.run(client, settings, offered, concurrency=concurrency)
+        plan = result.plan
+        calls = result.calls
+        for number, asked in plan.pages.items():
+            measured.extend(step_facts.of_calls(asked.calls, number))
+        applied = page_order.PageOrderHook(plan)
+        answered = [n for n, p in plan.pages.items() if p.answer is not None]
+        if answered:
+            more: dict[str, Any] = {}
+            if page_math_hook is not None and page_math_hook.plan is not None:
+                more["page_math"] = page_math_hook
+            try:
+                doc = layout.analyze(
+                    pdf_bytes,
+                    pages=pages,
+                    max_pages=settings.max_pages_per_job,
+                    page_order=applied,
+                    **_layout_switches(settings),
+                    **more,
+                )
+            except Exception as exc:  # the earlier run's pages stand
+                log.warning("page order: the layout run failed: %s", type(exc).__name__)
+                applied = page_order.PageOrderHook(plan)
+        failed = Counter(p.failed for p in plan.pages.values() if p.failed is not None)
+        hook = applied.stats
+        summary = PageOrderSummary(
+            pages=len(plan.pages),
+            failed=sum(failed.values()),
+            calls=len(calls),
+            cost_usd=round(sum(c.cost_usd for c in calls), 8),
+            unknown_number=failed["unknown_number"],
+            repeated_number=failed["repeated_number"],
+            too_much_furniture=failed["too_much_furniture"],
+            no_numbers=failed["no_numbers"],
+            unoffered_items=sum(p.unoffered for p in plan.pages.values()),
+            applied_pages=hook.applied_pages,
+            stale_pages=hook.stale_pages,
+            runs=hook.runs,
+            furniture=hook.furniture,
+            left_out=hook.left_out,
+            bad_join=hook.bad_join,
+            stopped_by=result.stopped.scope if result.stopped is not None else None,
+        )
+        _annotate(
+            span,
+            cost_usd=summary.cost_usd,
+            calls=summary.calls,
+            answered=len(answered),
+            failed=summary.failed,
         )
     return doc, summary
 
@@ -2263,22 +2365,15 @@ def _convert(
                 if options.page_math or options.page_witness
                 else None
             )
-            # (`page_math` only when asked for: stand-ins for `analyze` take no such argument)
+            # (`page_math` only when asked for: stand-ins for `analyze` take no such argument,
+            # and none takes `page_order` unless the switch is on)
             extra: dict[str, Any] = {} if collector is None else {"page_math": collector}
-            if settings.layout_display_grouping:
-                extra["display_grouping"] = True
-            if settings.layout_inline_joins:
-                extra["inline_joins"] = True
-            if settings.region_tree == "on":
-                extra["region_tree"] = True
-            if settings.layout_join_panels:
-                extra["join_panels"] = True
-            if settings.layout_figure_art:
-                extra["figure_art"] = True
-            if settings.layout_matching_under:
-                extra["matching_under"] = True
-            if settings.table_search_unlimited:
-                extra["table_search_limited"] = False
+            order_collector = (
+                page_order.PageOrderHook() if settings.feature_layout_model_order else None
+            )
+            if order_collector is not None:
+                extra["page_order"] = order_collector
+            extra.update(_layout_switches(settings))
             if stage_progress is not None:
                 # the table search is most of the layout's time: its pages are the count
                 extra["on_page"] = lambda done, total: _send(stage_progress, "layout", done, total)
@@ -2293,11 +2388,13 @@ def _convert(
             # (the second layout run of the page math pass is not in the trace)
             page_steps.extend(getattr(doc, "page_steps", None) or [])
             page_math_summary: PageMathSummary | None = None
+            order_summary: PageOrderSummary | None = None
+            math_hook: page_math_reconcile.PageMathHook | None = None
             witness_summary: PageWitnessSummary | None = None
             witnessed: list[Element] | None = None
             if collector is not None and options.page_math:
                 watch.stage("page_math")
-                doc, page_math_summary = _page_math_pass(
+                doc, page_math_summary, math_hook = _page_math_pass(
                     pdf_bytes,
                     doc,
                     collector,
@@ -2307,8 +2404,28 @@ def _convert(
                     concurrency=concurrency,
                     tracer=tracer,
                     measured=measured,
+                    order_collector=order_collector,
                 )
                 # (the pass lays the plan over a second layout run, which types the pages again)
+                ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
+                tables_late.update(getattr(doc, "tables_not_searched", None) or ())
+            if order_collector is not None:
+                # With the page math pass on, its second layout run is the run the items were
+                # last collected from: the page order step asks about the page as that run
+                # leaves it, and its own run lays the maths plan over layout again.
+                watch.stage("page_order")
+                doc, order_summary = _page_order_pass(
+                    pdf_bytes,
+                    doc,
+                    order_collector,
+                    client=page_client,
+                    settings=settings,
+                    pages=pages,
+                    concurrency=concurrency,
+                    tracer=tracer,
+                    measured=measured,
+                    page_math_hook=math_hook,
+                )
                 ink_late.update(page_type.ink_stops(getattr(doc, "page_types", None) or {}))
                 tables_late.update(getattr(doc, "tables_not_searched", None) or ())
             if collector is not None and options.page_witness:
@@ -2593,6 +2710,13 @@ def _convert(
                     "model_calls": stats.model_calls + page_math_summary.calls,
                 }
             )
+        if order_summary is not None:
+            stats = stats.model_copy(
+                update={
+                    "cost_usd": round(stats.cost_usd + order_summary.cost_usd, 8),
+                    "model_calls": stats.model_calls + order_summary.calls,
+                }
+            )
         if witness_summary is not None:
             stats = stats.model_copy(
                 update={
@@ -2675,11 +2799,14 @@ def _convert(
             for page, kind in sorted((getattr(doc, "page_types", None) or {}).items())
         ],
         page_math=page_math_summary,
+        page_order=order_summary,
         page_witness=witness_summary,
         image_pages=image_summary,
     )
     if page_math_summary is not None:
         result.prompt_versions["page_math"] = page_math.PROMPT_VERSION
+    if order_summary is not None:
+        result.prompt_versions["page_order"] = page_order.PROMPT_VERSION
     if witness_summary is not None:
         result.prompt_versions["page_witness"] = page_witness.PROMPT_VERSION
     if image_summary is not None:

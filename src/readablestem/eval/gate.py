@@ -409,6 +409,13 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "DEFAULT_EFFORT",
         "MIN_PAGE_CHARS",
     ),
+    "readablestem.pipeline.page_order": (
+        "CONTEXT_CHARS",
+        "DEFAULT_EFFORT",
+        "EQUATION_CHARS",
+        "FURNITURE_CHARS",
+        "FURNITURE_SHARE",
+    ),
     "readablestem.pipeline.page_math_reconcile": (
         "CONSISTENT_FROM",
         "RULE_MARGIN",
@@ -492,6 +499,9 @@ UNGUARDED_CONSTANTS: dict[str, dict[str, str]] = {
     },
     "readablestem.pipeline.page_math": {
         "MAX_OUTPUT_TOKENS": _DEFAULT_OF_A_SETTING,
+        "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
+    },
+    "readablestem.pipeline.page_order": {
         "DEFAULT_CONCURRENCY": "how many pages are in flight, not what is asked or accepted",
     },
     "readablestem.pipeline.page_witness": {

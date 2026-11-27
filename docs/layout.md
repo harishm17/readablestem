@@ -4553,6 +4553,93 @@ disagree is dropped (`inconsistent`); an exception in the hook leaves the page a
 The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
 [eval-page-math.md](eval-page-math.md).
 
+## The model's page order (`pipeline/page_order.py`, `FEATURE_LAYOUT_MODEL_ORDER`, off)
+
+A model groups and orders each page's text; layout's rules then run on its answer. It is the
+shape of the page math pass ([ADR 0006](decisions/0006-page-math-pass.md)): a collecting first
+pass, one call a page, a verified plan, an applying second pass. Off in production
+(`production.profile.toml`, `eval = "none"`): with the switch off nothing is asked and the
+output of every file is byte-identical to the release before it.
+
+**The first pass.** `layout.analyze(page_order=hook)` calls `hook.on_rows(number, items)` for
+each page once the rules have its lines, equations, figures and tables, in the rules' reading
+order. `items` are the lines of text (`r<k>`), each display equation (`e<k>`), each figure
+(`f<k>`) and each table (`t<k>`). The collecting hook answers None, so the first pass is the
+rules' own.
+
+**The call.** One request a page, step `page_order`, `PAGE_ORDER_MODEL` (the cheap model when
+unset) at `ANTHROPIC_EFFORT_PAGE_ORDER` (medium), `PAGE_ORDER_MAX_OUTPUT_TOKENS` (16,000, the
+measured value, thinking included). It carries the page picture and the items as a numbered
+list (`<number> | <left>,<top> | line | <size>pt | <text>`, the edges as a percentage of the
+page), fenced as untrusted context: the item text never enters the instructions
+(`models/prompts/page_order.md`). The list is cut at 30,000 characters (the longest of the 267
+development pages is about 10,600) and items beyond it are not offered (`unoffered_items`; the
+rules keep them, each behind the block that comes before it in the rules' order). The fence keeps as many characters as a
+request asks for; before this step it scanned and kept 8,000 whatever the request asked, which
+also cut the page audit's listings (allowed 30,000) without a word. Pages are asked `model_concurrency` at once,
+a refusal or a service error is asked once more of the other model (`models.router`), and the
+calls count against the job's budget and its call count like any other step.
+
+**The answer and its check.** The model answers with blocks (a kind and item numbers, in
+reading order) and the numbers of the lines that are furniture. `verify` accepts an answer
+only when every number is an item of the list it was shown, none is named twice, and at least
+one is named, and its furniture does not hold more than 8% of the page's line text and more
+than 200 characters (furniture is left out, so this is how an answer could take text from the
+student; on the development pages furniture held at most 5.7%). Otherwise the page has no
+answer and the rules read it; each reason is counted (`unknown_number`, `repeated_number`,
+`no_numbers`, `too_much_furniture`), and so are calls that gave nothing
+(`failed`). A reply that does not parse against the strict schema is an `invalid_output` call.
+Nothing the model says becomes text: it chooses which of layout's lines go together, in what
+order, and which are left out; every line is still the PDF's and every equation, figure and
+table is still the item layout found. An equation, a figure or a table named in a block with
+other items is counted (`bad_join`) and read alone.
+
+**The second pass.** The verified answer goes back to `layout.analyze` (`_runs_by_answer`,
+`_answer_order`): layout builds its runs and its order from it and runs every later step of
+the rules on them, so kinds, markers and checks are still layout's. An answer whose page
+changed in between (the item fingerprint differs) is not applied (`stale_pages`).
+
+**With page math.** Both on is three layout passes: the page math pass makes its second run
+on the page the first collected, the order items are collected again on that page, and the
+order pass applies last, laying the math plan over layout again. A page whose items differ
+between the page math pass's run and that last run is a stale page and keeps the rules; if
+the page math pass's run fails, the items of the first run are asked about. Each pass keeps
+its own summary and costs.
+
+**What it was measured to do.** On the 267 development pages of layout-dev-1,
+claude-haiku-5-5 at medium effort, replayed through the product (`eval order --model-order`,
+commit `95cde25d`) against the rules (0.5.22, `data/eval/order-layout-dev-1.json`), in the
+page a student is given and, in brackets, in the elements before the page is written:
+
+| | model's page order | rules |
+|---|---|---|
+| pages read right | 184 (188) | 183 (182) |
+| pages with no fault | 140 (148) | 94 (95) |
+| pages with furniture read aloud | 17 (12) | 30 (25) |
+| pages with a paragraph cut | 41 (26) | 81 (69) |
+| pages with paragraphs merged | 33 (41) | 63 (73) |
+
+So on what the student hears the step mostly fixes grouping (paragraphs cut or run together,
+running heads read aloud), and the count of pages read right in order barely moves. 258 pages
+had the model's answer; 7 pages whose item list differs from the one the recording was made
+from, and 2 whose answer named an item twice, kept the rules. About $0.0011 a page ($0.2754
+recorded for the 260 pages the recording answers). A conversion asks every page, not only the
+gold ones: about 933 on this set, so a live run of the whole set costs about $1. These are development pages: they say the switch is worth deciding
+about, not that it is better. The decision is one run on held-out pages (the owner's), and
+until it is made the switch stays off. Turning it on needs `PIPELINE_VERSION` raised in the
+same change (the text of every page the reading is made from can change), a statement on the
+privacy page with its date (`web/recipients.py`, `reading_order`), and a look at the
+vendor sheet.
+
+**Measuring it again with no spend.** `readablestem eval order --set NAME --model-order`
+converts a layout gold set with the switch on and answers the page order's requests from a
+recording (`<cache>/layout-gold/NAME-order-answers.jsonl`, or `--order-answers FILE`),
+replayed offline; every other model step is refused and counted, as with no model. A request
+the recording does not hold is counted as a miss and the rules read that page. `--live
+--max-usd N` asks the model for the answers the recording lacks and adds them to it, one
+document at a time, up to `N` dollars for the whole run (the cap bounds reservations, not
+spend: set it several times the expected cost).
+
 ## Errors
 
 `LayoutError.code` is a category, safe to log; messages never contain document text.

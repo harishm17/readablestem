@@ -1142,12 +1142,59 @@ def _scored_set(
     def said(done: Any) -> None:
         print(f"{done.upload}: {done.error or f'{done.pages} pages'}", file=sys.stderr, flush=True)
 
-    run = order_report.set_run(root, only=args.only or (), at_once=args.at_once, said=said)
+    answers = _order_answers(args)
+    if isinstance(answers, str):
+        return _error(answers)
+    run = order_report.set_run(
+        root, only=args.only or (), at_once=args.at_once, said=said, answers=answers
+    )
     if args.records is not None:
         args.records.parent.mkdir(parents=True, exist_ok=True)
         kept = {"runs": [[done.as_dict() for done in run]]}
         args.records.write_text(json.dumps(kept), encoding="utf-8")
     return run, registry, source
+
+
+def _order_answers(args: argparse.Namespace) -> Any:
+    """`eval order --set --model-order`: where the page order step's answers come from, or the
+    error (a str) that says why the options do not make a run. The recording is replayed;
+    `--live` asks the model for what it lacks, up to `--max-usd` dollars for the whole run."""
+    from readablestem.eval import order_report
+
+    if not args.model_order:
+        if args.live or args.order_answers is not None or args.max_usd is not None:
+            return "--live, --order-answers and --max-usd are for --model-order"
+        return None
+    if args.set is None:
+        return "--model-order is for a layout gold set (--set NAME)"
+    if args.live:
+        if args.max_usd is None:
+            return "--live asks the model: it needs --max-usd (a cap in dollars for the run)"
+    elif args.max_usd is not None:
+        return "--max-usd is for --live"
+    path = args.order_answers or _order_answers_path(args)
+    if not args.live and not path.is_file():
+        return f"no recording at {path}: replay needs one (--order-answers FILE)"
+    if args.live:
+        from readablestem.config import get_settings
+        from readablestem.ops.limits import run_cap_problem
+
+        settings = order_report.set_settings(model_order=True, live=True)
+        if settings.model_provider != "anthropic":
+            return "the page order is asked of a Claude model: MODEL_PROVIDER must be anthropic"
+        # (the page order asks a call at a time per page, `model_concurrency` pages at once)
+        if problem := run_cap_problem(get_settings(), args.max_usd, settings.model_concurrency):
+            return f"--max-usd: {problem}"
+    return order_report.OrderAnswers(str(path), args.max_usd if args.live else None)
+
+
+def _order_answers_path(args: argparse.Namespace) -> Path:
+    """Beside the set's folder: `<cache>/layout-gold/<set>-order-answers.jsonl`. Answers are
+    kept outside the repository and outside the set's own folder."""
+    from readablestem.cli import layout_gold as sets
+
+    root = sets.set_root(args.set, args.root)
+    return root.parent / f"{args.set}-order-answers.jsonl"
 
 
 def _note_release_run(listed: Path, name: str) -> tuple[str, bool] | str:
@@ -1250,14 +1297,19 @@ def _cmd_order(args: argparse.Namespace) -> int:
         if isinstance(scored, int):
             return scored
         run, registry, source = scored
-        settings = order_report.set_settings()
+        settings = order_report.set_settings(model_order=args.model_order)
         from readablestem.cli import layout_gold as sets
 
         held_out = sets.held_out(registry)
         metrics = order_report.report(run, order_report.set_groups(registry), listed=not held_out)
         of_set = order_report.set_stamp(registry, [done.upload for done in run])
+        client = (
+            "none"
+            if not args.model_order
+            else ("page-order-live" if args.live else "page-order-replay")
+        )
         record = measure.record(
-            run, settings, metrics, of_set=of_set | {"client": "none"}, source=source
+            run, settings, metrics, of_set=of_set | {"client": client}, source=source
         )
     else:
         if not (args.only or args.records_from):
@@ -2324,6 +2376,32 @@ def register(
     )
     order.add_argument("--root", type=Path, help="the set's folder (default: the cache's)")
     order.add_argument("--registry", type=Path, help="default: data/gold/layout/<set>.json")
+    order.add_argument(
+        "--model-order",
+        action="store_true",
+        help="with --set: convert with the model's page order on, its answers replayed from a "
+        "recording (--order-answers); every other model step stays off. Spends nothing "
+        "unless --live",
+    )
+    order.add_argument(
+        "--order-answers",
+        type=Path,
+        metavar="FILE",
+        help="the page order's recording (default: <cache>/layout-gold/<set>-order-answers.jsonl)",
+    )
+    order.add_argument(
+        "--live",
+        action="store_true",
+        help="with --model-order: ask the model for the answers the recording lacks and add "
+        "them to it; one document at a time, and it needs --max-usd. Not for a builder",
+    )
+    order.add_argument(
+        "--max-usd",
+        type=float,
+        metavar="USD",
+        help="with --live: the cap in dollars for the whole run (it bounds reservations, not "
+        "spend: several times the expected cost)",
+    )
     order.add_argument(
         "--for-release",
         action="store_true",

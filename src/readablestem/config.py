@@ -99,6 +99,8 @@ class Settings(BaseSettings):
     anthropic_effort_page_math: Effort | None = None
     # Effort of the page witness pass (`pipeline/page_witness.py`). Unset: medium.
     anthropic_effort_page_witness: Effort | None = None
+    # Effort of the page order step (`pipeline/page_order.py`). Unset: medium.
+    anthropic_effort_page_order: Effort | None = None
     # Effort of the page audit (`pipeline/page_audit.py`). Unset: low.
     anthropic_effort_page_audit: Effort | None = None
     # Effort of the image page pass (ADR 0007). Unset: `pipeline.image_page.DEFAULT_EFFORT`.
@@ -175,6 +177,19 @@ class Settings(BaseSettings):
     # equation under such an exercise, so the recorded answers of the pages it moves stop
     # matching; it came with a re-recording and a `PIPELINE_VERSION` bump.
     layout_matching_under: bool = False
+    # A model groups and orders each page's text (`pipeline/page_order.py`, docs/layout.md "The
+    # model's page order"): one call a page with the page picture and the items layout found,
+    # whose answer is checked and then laid over layout's rules (`layout.analyze(page_order=...)`).
+    # Off: nothing is asked and output is byte-identical to before. It is a switch of the
+    # kind that sends whole pages to a model, so it is listed with what is sent
+    # (`web.recipients`); turning it on changes the text of the page the reading is made from,
+    # and `PIPELINE_VERSION` must be bumped in the change that enables it. `page_order_model`
+    # None: the cheap model.
+    feature_layout_model_order: bool = False
+    page_order_model: str | None = None
+    # Output limit of one page's call, thinking included: 16,000 is what the development
+    # measurement ran with (a page of a hundred lines answers with about as many numbers).
+    page_order_max_output_tokens: int = Field(default=16000, ge=1024, le=32000)
     # How the reader finds columns (`layout.analyze(region_tree=True)`, docs/layout.md "The
     # region tree"): "off" looks for one gutter on the page and merges lines; "on" builds a
     # tree of regions from the unmerged line fragments first and orders the pages by it. Off:

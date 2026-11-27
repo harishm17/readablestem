@@ -52,6 +52,7 @@ from collections import Counter
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 from typing import Any
 
@@ -98,30 +99,96 @@ def set_stamp(registry: Mapping[str, Any], names: Iterable[str]) -> dict[str, An
     return {"set": registry["set"], "split": chosen.stamp(registry["side"])}
 
 
-def set_settings() -> Any:
+def set_settings(*, model_order: bool = False, live: bool = False) -> Any:
     """Production's behavior settings for a conversion that asks no model, with a job's
-    own limits: a document longer than a job may be is not measured, and is named."""
-    from readablestem.config import Settings
+    own limits: a document longer than a job may be is not measured, and is named.
+
+    `model_order` turns the model's page order on (`pipeline.page_order`, off in production);
+    `live` starts from the environment's settings, which hold the key a live run asks with."""
+    from readablestem.config import Settings, get_settings
     from readablestem.ops import profile
 
-    base = Settings(_env_file=None, env="test")  # type: ignore[call-arg]
-    return profile.load().apply(base)
+    base = get_settings() if live else Settings(_env_file=None, env="test")  # type: ignore[call-arg]
+    settings = profile.load().apply(base)
+    if model_order:
+        settings = settings.model_copy(update={"feature_layout_model_order": True})
+    return settings
 
 
-def convert_document(pdf: bytes) -> Any:
-    """One document of a set converted with no model, as a job converts it under
-    `set_settings()`: its output, or the code of the error it ended with (a file the reader
-    refuses or cannot finish ends as a job's does)."""
+@dataclass(frozen=True)
+class OrderAnswers:
+    """Where the page order step's answers come from when a set is converted with the step on
+    (`eval order --model-order`): the recording `path`, replayed offline. `max_usd` set: what
+    the recording lacks is asked of the model, up to that many dollars for the whole run
+    (the caps of `docs/eval.md`: it bounds reservations, not spend). Only page order requests
+    are answered; any other request is refused, as with no model."""
+
+    path: str
+    max_usd: float | None = None
+
+    @property
+    def live(self) -> bool:
+        return self.max_usd is not None
+
+
+# One call a page, and a set holds a few hundred pages: the dollar cap is what stops a run.
+MAX_CALLS = 5000
+
+
+@cache
+def _live_budget(max_usd: float) -> Any:
+    """One budget for every conversion of this process: the cap is the run's."""
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+
+    return JobBudget(InMemorySpendGuard(cap_usd=max_usd), max_usd=max_usd, max_calls=MAX_CALLS)
+
+
+class PageOrderOnly:
+    """A `VisionClient` that answers page order requests from the recording (or, with `live`,
+    from the model for what it lacks) and refuses every other request, counting them."""
+
+    verifier = None
+
+    def __init__(self, settings: Any, answers: OrderAnswers) -> None:
+        from readablestem.eval.answers import CachedClient
+
+        inner = None
+        if answers.max_usd is not None:
+            from readablestem.models import make_live_client
+
+            inner = make_live_client(settings, _live_budget(answers.max_usd), second_check=False)
+        self.cached = CachedClient(
+            inner, Path(answers.path), settings, live_limit_usd=answers.max_usd
+        )
+        self.refused: Counter[str] = Counter()
+
+    def run(self, request: Any, schema: Any, *, is_fallback: bool = False) -> Any:
+        if request.step == "page_order":
+            return self.cached.run(request, schema, is_fallback=is_fallback)
+        from readablestem.core.types import ModelCall
+
+        self.refused[request.step] += 1
+        call = ModelCall(
+            step=request.step,
+            model=request.model,
+            prompt_version=request.prompt_version,
+            is_fallback=is_fallback,
+            outcome="refused",
+        )
+        return None, call
+
+
+def _convert(pdf: bytes, settings: Any, client: Any) -> Any:
+    """`pdf` converted as a job converts it under `settings` and asking `client`: its output,
+    or the code of the error it ended with."""
     from readablestem.core.types import ConversionOptions
-    from readablestem.models.fake import FakeVisionClient
     from readablestem.web.isolated_convert import convert_isolated
 
-    settings = set_settings()
     try:
         return convert_isolated(
             pdf,
             settings=settings,
-            client=FakeVisionClient(),
+            client=client,
             options=ConversionOptions.from_settings(settings),
             concurrency=settings.model_concurrency,
         )
@@ -131,20 +198,49 @@ def convert_document(pdf: bytes) -> Any:
         return error_code_for(exc)
 
 
-def _set_document(pdf_path: str, gold_path: str) -> dict[str, Any]:
-    """One document of a set, converted with no model and scored (a process of `set_run`)."""
+def convert_document(pdf: bytes) -> Any:
+    """One document of a set converted with no model, as a job converts it under
+    `set_settings()`: its output, or the code of the error it ended with (a file the reader
+    refuses or cannot finish ends as a job's does)."""
+    from readablestem.models.fake import FakeVisionClient
+
+    return _convert(pdf, set_settings(), FakeVisionClient())
+
+
+def _set_document(
+    pdf_path: str, gold_path: str, answers: OrderAnswers | None = None
+) -> dict[str, Any]:
+    """One document of a set, converted with no model (or with the page order's recorded
+    answers) and scored (a process of `set_run`)."""
     from readablestem.core.types import StepFacts
 
     gold = json.loads(Path(gold_path).read_text(encoding="utf-8"))
     pdf = Path(pdf_path).read_bytes()
-    output = convert_document(pdf)
+    client: PageOrderOnly | None = None
+    if answers is None:
+        output = convert_document(pdf)
+    else:
+        settings = set_settings(model_order=True, live=answers.live)
+        client = PageOrderOnly(settings, answers)
+        output = _convert(pdf, settings, client)
     if isinstance(output, str):
         return Converted(gold["id"], error=output).as_dict()
+    extra: dict[str, Any] = {}
+    if client is not None:
+        summary = output.result.page_order
+        extra = {
+            "page_order": (summary.model_dump() if summary is not None else {})
+            | {"other_steps_refused": dict(client.refused)},
+            "missed": client.cached.misses,  # requests the recording did not hold
+            "usd": output.result.stats.cost_usd,
+            "calls": output.result.stats.model_calls,
+        }
     done = Converted(
         gold["id"],
         pages=output.result.stats.pages,
         facts=output.facts or StepFacts(),
         order=measure.order_of(gold, pdf, output.result),
+        **extra,
     )
     return done.as_dict()
 
@@ -155,10 +251,13 @@ def set_run(
     only: Sequence[str] = (),
     at_once: int = 1,
     said: Callable[[Converted], None] | None = None,
+    answers: OrderAnswers | None = None,
 ) -> list[Converted]:
     """Each document of a layout gold set's folder (`files/<id>.pdf`, `gold/<id>.json`)
     converted as a job converts it, with no model, and scored: `at_once` at a time, each in
-    a process of its own. `said` is called as each one ends."""
+    a process of its own. `said` is called as each one ends. `answers`: the model's page order
+    is on and answers from that recording. A live run (`answers.live`) converts one document
+    at a time in this process, so that its cap is the run's."""
     from readablestem.gold import layout_gold
 
     wanted = [
@@ -167,8 +266,18 @@ def set_run(
         if not only or doc_id in only
     ]
     measured = []
+    if answers is not None and answers.live:
+        for pdf_path, gold_path in wanted:
+            measured.append(Converted.from_dict(_set_document(pdf_path, gold_path, answers)))
+            if said is not None:
+                said(measured[-1])
+        return measured
     with ProcessPoolExecutor(max_workers=max(1, at_once), max_tasks_per_child=1) as pool:
-        for raw in pool.map(_set_document, *zip(*wanted, strict=True)) if wanted else ():
+        for raw in (
+            pool.map(_set_document, *zip(*wanted, strict=True), [answers] * len(wanted))
+            if wanted
+            else ()
+        ):
             measured.append(Converted.from_dict(raw))
             if said is not None:
                 said(measured[-1])
@@ -186,6 +295,22 @@ def _sums(rows: Sequence[dict[str, Any]]) -> dict[str, Any]:
     sums["documents"] = len(by_document)
     sums["documents_right"] = sum(all(pages) for pages in by_document.values())
     return sums
+
+
+def _model_order(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """What the page order step did over the documents, added up (`PageOrderSummary`, and the
+    requests of other steps that were refused); empty when it was off."""
+    total: Counter[str] = Counter()
+    refused: Counter[str] = Counter()
+    for run in runs:
+        for name, value in run.items():
+            if name == "other_steps_refused":
+                refused.update(value)
+            elif isinstance(value, (int, float)) and not isinstance(value, bool):
+                total[name] += value
+    if not runs:
+        return {}
+    return {**total, "documents": len(runs), "other_steps_refused": dict(refused)}
 
 
 def _why(row: dict[str, Any]) -> list[str]:
@@ -253,9 +378,11 @@ def report(
             )
             kept = {key: row[key] for key in ("right", "faultless", *BESIDE)}
             page[source] = kept | ({} if row["right"] else {"why": _why(row)})
+    model_order = _model_order([done.page_order for done in scored if done.page_order is not None])
     return {
         "scorer": order.VERSION,
         "listed": listed,
+        **({"model_order": model_order} if model_order else {}),
         "uploads": {
             "measured": len(whole),
             "answers_missing": dict(sorted(short.items())),
@@ -363,6 +490,26 @@ def _source_table(made: dict[str, Any]) -> list[str]:
     return measure.table(("", *_HEAD), rows)
 
 
+def _model_order_lines(done: dict[str, Any] | None) -> list[str]:
+    """The lines that say the model's page order was on, and what it did."""
+    if not done:
+        return []
+    refused = sum(done.get("other_steps_refused", {}).values())
+    return [
+        f"the model's page order was on: {done['pages']} pages asked, {done['failed']} of them "
+        f"with no usable answer ({done['unknown_number']} named a number that is no item, "
+        f"{done['repeated_number']} named one twice, {done['no_numbers']} named none, "
+        f"{done.get('too_much_furniture', 0)} left out too much as furniture), "
+        f"the verified answer laid over {done['applied_pages']} pages "
+        f"({done['stale_pages']} pages changed in between and kept the rules); "
+        f"{done['furniture']} lines left out as furniture, {done['left_out']} lines it did not "
+        f"name, {done['bad_join']} blocks that held an equation, figure or table with other "
+        f"items; ${done['cost_usd']:.4f} in {done['calls']} calls "
+        f"(recorded prices; {done['unoffered_items']} items were beyond the list's length). "
+        f"{refused} requests of other steps were refused, as with no model."
+    ]
+
+
 def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
     """An order record as the lines `readablestem eval order` prints."""
     made = record["metrics"]
@@ -381,6 +528,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
         )
     if uploads["not_measured"]:
         lines.append("not measured: " + ", ".join(uploads["not_measured"]))
+    lines += _model_order_lines(made.get("model_order"))
     with_ = student["pages_with"]
     lines += [
         "",
