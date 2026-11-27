@@ -227,6 +227,8 @@
     "pipeline.page_order.CONTEXT_CHARS": 30000,
     "pipeline.page_order.DEFAULT_EFFORT": "medium",
     "pipeline.page_order.EQUATION_CHARS": 200,
+    "pipeline.page_order.FURNITURE_CHARS": 200,
+    "pipeline.page_order.FURNITURE_SHARE": 0.08,
     "pipeline.page_witness.DEFAULT_EFFORT": "medium",
     "pipeline.page_witness.IMAGE_DPI": 200,
     "pipeline.page_witness.IMAGE_MAX_SIDE_PX": 2576,
@@ -257,7 +259,7 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "2e6145360e3156184d98593b60fb04461e0537a3",
+    "commit": "25aa7a236e8e2350117a8df88ceedc58e37082da",
     "clean": true,
     "pipeline_version": "0.5.22",
     "render_version": 11,
@@ -504,8 +506,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 4159.0,
-    "p95": 10177.399999999985,
+    "p50": 3916.0,
+    "p95": 10027.399999999985,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }
