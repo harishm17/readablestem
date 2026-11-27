@@ -4580,6 +4580,16 @@ also cut the page audit's listings (allowed 30,000) without a word. Pages are as
 a refusal or a service error is asked once more of the other model (`models.router`), and the
 calls count against the job's budget and its call count like any other step.
 
+**What a fallback costs.** The other model is the main one, Opus, at 40 times Haiku's price
+a token. The step has no measured reservation row (`models.pricing.RESERVATIONS`), so a call
+holds its worst case with 16,000 output tokens: about $0.01 on Haiku and $0.52 to $0.61 on
+Opus. On the held-out run no call fell back (1,013 calls for 1,013 pages, $0.00088 a page).
+A page Haiku refuses costs about 40 times that on Opus. In a Haiku outage a 100-page job would
+hold up to eight Opus calls at once (about $4.9 of the $6.00 job cap) and, at roughly $0.035 a
+page, stop on the cap after about 30 pages. The pass fails open, so those pages keep the
+rules' order; the holds are released, and the job's later steps have the rest of the cap
+(a dense 100-page document spends about $1.50). The daily cap still bounds the day.
+
 **The answer and its check.** The model answers with blocks (a kind and item numbers, in
 reading order) and the numbers of the lines that are furniture. `verify` accepts an answer
 only when every number is an item of the list it was shown, none is named twice, and at least
@@ -4597,7 +4607,10 @@ other items is counted (`bad_join`) and read alone.
 **The second pass.** The verified answer goes back to `layout.analyze` (`_runs_by_answer`,
 `_answer_order`): layout builds its runs and its order from it and runs every later step of
 the rules on them, so kinds, markers and checks are still layout's. An answer whose page
-changed in between (the item fingerprint differs) is not applied (`stale_pages`).
+changed in between (the item fingerprint differs) is not applied (`stale_pages`). The second
+run is a whole layout run: on the 100-page bench document (`scripts/bench_runtime.py`, offline
+client, production profile, one core, 2026-11-27) the conversion took 54.7 s and 568 MB peak
+with the step on and 30.8 s and 523 MB with it off, the layout runs 20.2 s and 18.8 s.
 
 **With page math.** Both on is three layout passes: the page math pass makes its second run
 on the page the first collected, the order items are collected again on that page, and the
