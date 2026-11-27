@@ -124,6 +124,11 @@ def test_a_held_out_figure_worse_than_its_release_bar_fails_the_release(
         not written.is_file()
         or "whole.silent_errors" not in json.loads(written.read_text())["bars"]
     )
+    # Nor is it held against a bar: a figure of part of the set cannot pass a release.
+    _ledger(tmp_path, _record(_whole((1, 1, 0))), "--register-bars")
+    code, made = _ledger(tmp_path, part, "--for-release")
+    assert code == 1
+    assert _line(made, "whole.silent_errors")["release_bar"].startswith("not judged")
 
 
 def test_a_record_without_the_production_profile_hash_is_refused(

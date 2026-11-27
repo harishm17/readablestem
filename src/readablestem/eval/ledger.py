@@ -523,6 +523,9 @@ def _release(row: Row, found: Mapping[str, Any], bar: Mapping[str, Any] | None) 
         return "none yet"
     if bar["set_sha256"] != found["set_sha256"]:
         return "not judged: the bar is of another set"
+    if found["stopped_early"] or found["set_apart"]:
+        # The figure is of part of the set, so it is held against no bar.
+        return "not judged: part of the set was not measured"
     if found["value"] is None:
         return "worse"
     return "met" if _within(row, found["value"], bar["value"]) else "worse"
@@ -651,7 +654,11 @@ def failures(ledger: Mapping[str, Any], *, for_release: bool = False) -> list[st
         ]
         judged = [line for line in held if line["release_bar"] in ("met", "worse")]
         if for_release and row["release_bar"] is not None and not judged:
-            found.append(f"{row['name']}: no held-out figure of this release on its bar's set")
+            partial = [line for line in held if line["stopped_early"] or line["set_apart"]]
+            found.append(
+                f"{row['name']}: no held-out figure of this release on its bar's set"
+                + (" (a step stopped early or uploads were set apart)" if partial else "")
+            )
     return found
 
 

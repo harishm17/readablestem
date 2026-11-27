@@ -4271,7 +4271,9 @@ measured, with no bound. Only a held-out line is held against either bar.
 
 Exit code 0: no held-out line is worse than its release bar. 1: one is, or, with
 `--for-release`, a row that has a release bar has no held-out figure of this release on the
-bar's set. 2: refused. A record that does not say its split, its set's hash, the profile's
+bar's set. A held-out figure from a run in which a step stopped early, or that set uploads
+apart, is of part of the set: it is held against no bar, so it cannot pass a release. 2:
+refused. A record that does not say its split, its set's hash, the profile's
 hash and the pipeline version is not read around: the run stops and names the file.
 
 **The whole-document record** (`whole-<set>.json`) is what the top rows are made of. Its
