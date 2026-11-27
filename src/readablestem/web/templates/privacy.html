@@ -300,6 +300,15 @@
   <li>{{ m.label }}: {{ m.stated_text or "not yet dated" }}.</li>
   {% endfor %}
 </ul>
+{% if coming_material %}
+<p>Coming changes, stated here before they take effect:</p>
+<ul>
+  {% for m in coming_material %}
+  <li>Not before {{ m.starts_text }} (UTC), and not sent yet; to be sent to
+    {{ m.to|join(" and ") }}: {{ m.what }} {{ m.stored }} Stated here on {{ m.stated_text }} (UTC).</li>
+  {% endfor %}
+</ul>
+{% endif %}
 
 <h2>Requests, takedowns and rights</h2>
 <p>You can delete your account and everything in it yourself, any time you are signed in
