@@ -147,6 +147,10 @@ class Converted:
     # How many formulas the conversion accepted with nothing to hold them against, and why
     # (`held_against_nothing`). Counts only. None in a record made before this was kept.
     not_compared: dict[str, Any] | None = None
+    # What the page order step did when the replay turned it on (`pipeline.page_order`,
+    # `eval order --model-order`): its summary's counts, and the requests of the other steps
+    # that were refused. Counts only. None when it was off.
+    page_order: dict[str, Any] | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return asdict(self) | {"facts": self.facts.model_dump(mode="json")}

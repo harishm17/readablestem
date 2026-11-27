@@ -75,6 +75,16 @@ and the PDF's own tag order) are kept offline in the layout eval (`readablestem 
 so they can be run again without a model. A margin that appears on development pages only does
 not count; neither does one that needs a model call on every page.
 
+## Revisit in progress
+
+2026-11-26: the model's page order is built as a product step behind an off-by-default switch
+(`FEATURE_LAYOUT_MODEL_ORDER`, docs/layout.md "The model's page order"), because on the 267
+development pages of layout-dev-1 a cheap model's grouping and order read 187 pages right
+where the rules read 182, and 148 with no fault where the rules had 95. That is development
+evidence only, which "What would change this" above does not count. Nothing changes here until
+one run on held-out real pages decides whether the switch goes on; until then reading order is
+found by rules and checked, and the public pages still say so.
+
 ## Consequences
 
 The public pages say that order is found by rules and checked, and they claim nothing about a

@@ -148,6 +148,7 @@ Step = Literal[
     "check",
     "page_math",
     "page_witness",
+    "page_order",
     "image_page",
     "page_audit",
 ]
@@ -1245,6 +1246,27 @@ class PageWitnessSummary(BaseModel):
     stopped_by: str | None = None  # a spend cap that ended the pass early
 
 
+class PageOrderSummary(BaseModel):
+    """What the page order step did for one document (`pipeline.page_order`). Content-free:
+    counts and cost only. `cost_usd` is also in `DocumentStats.cost_usd`."""
+
+    pages: int = 0  # pages the model was asked about
+    failed: int = 0  # pages with no usable answer: refused, invalid, or not verified
+    calls: int = 0
+    cost_usd: float = 0.0
+    unknown_number: int = 0  # answers dropped: a number that is no item of the page
+    repeated_number: int = 0  # answers dropped: a number named twice
+    no_numbers: int = 0  # answers dropped: no number named
+    unoffered_items: int = 0  # items of a long page left out of the list the model saw
+    applied_pages: int = 0  # pages the verified answer was laid over layout's rules
+    stale_pages: int = 0  # pages whose items changed between the two layout runs: rules kept
+    runs: int = 0  # runs the applied answers made
+    furniture: int = 0  # lines the answers named as furniture
+    left_out: int = 0  # lines the answers did not name (kept at the end, in the rules' order)
+    bad_join: int = 0  # blocks that mixed an equation, figure or table with other items
+    stopped_by: str | None = None  # a spend cap that ended the pass early
+
+
 class ImagePageRecord(BaseModel):
     """What the image page pass did for one page (ADR 0007). Content-free: a code, counts,
     cost. `outcome` is "converted" or why the page stayed an image: a `ModelCall.outcome`
@@ -1435,6 +1457,8 @@ class DocumentResult(BaseModel):
     page_math: PageMathSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # The page witness (`pipeline.page_witness`); None when the flag was off.
     page_witness: PageWitnessSummary | None = Field(default=None, exclude_if=lambda v: v is None)
+    # The page order step (`pipeline.page_order`); None when the switch was off.
+    page_order: PageOrderSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # The image page pass (ADR 0007); None when the flag was off, and left out of the JSON.
     image_pages: ImagePagesSummary | None = Field(default=None, exclude_if=lambda v: v is None)
     # Where the document came from: "pdf" (every result before this field), "latex" (a LaTeX

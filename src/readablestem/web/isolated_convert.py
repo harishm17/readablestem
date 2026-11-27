@@ -123,6 +123,7 @@ _SCHEMA_MODULES = frozenset(
         "table_step",
         "page_math",
         "page_witness",
+        "page_order",
         "image_page",
         "image_page_check",
     )

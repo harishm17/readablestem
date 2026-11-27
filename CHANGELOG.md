@@ -1,5 +1,28 @@
 # Changelog
 
+## Unreleased: the model's page order (off)
+
+- A model can group and order each page's text before the rules build the reading
+  (`FEATURE_LAYOUT_MODEL_ORDER`, `pipeline/page_order.py`, [docs/layout.md](docs/layout.md) "The
+  model's page order"). It is off in the production profile and asks nothing while it is off:
+  every file converts byte-identically to the release before (checked over the corpus with the
+  switch off). Same two-pass shape as the page math pass. One call a page (picture and the
+  numbered items layout found), an answer that must name only items of the page, none twice;
+  a page whose answer does not hold is read by the rules, and each reason is counted. New
+  settings: `FEATURE_LAYOUT_MODEL_ORDER`, `PAGE_ORDER_MODEL`, `ANTHROPIC_EFFORT_PAGE_ORDER`
+  (medium), `PAGE_ORDER_MAX_OUTPUT_TOKENS`.
+- Development numbers (267 pages of layout-dev-1, claude-haiku-5-5, medium effort): 187 pages
+  right against the rules' 182, 148 with no fault against 95, furniture on 11 pages against
+  25, a paragraph cut on 24 against 69, paragraphs merged on 41 against 73, about $0.0012 a
+  page. Not a held-out result: the switch stays off until one is run.
+- `readablestem eval order --set NAME --model-order` measures it from a recording, offline
+  (`--live --max-usd` asks the model for what the recording lacks).
+- A privacy row is added (`web/recipients.py`, `reading_order`): a production start with the
+  switch on is refused until the privacy page states it with its date. The vendor sheet and
+  `docs/security.md` list the setting.
+- `PIPELINE_VERSION` is not raised by this change (nothing it makes differs with the switch off);
+  it is raised in the change that turns the switch on.
+
 ## Pipeline 0.5.22, render 11 (2026-11-26)
 
 - `PIPELINE_VERSION` is 0.5.22 and `RENDER_VERSION` stays 11: one raise of the pipeline for the

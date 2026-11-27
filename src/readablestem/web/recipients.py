@@ -179,6 +179,22 @@ MATERIALS: tuple[Material, ...] = (
         whole_pages=True,
     ),
     Material(
+        key="reading_order",
+        switches=("feature_layout_model_order",),
+        what="A picture of each whole page, with its lines of text as a numbered list, so a "
+        "model can say which lines belong together and in what order to read them.",
+        stored="Only the grouping and the order that come back are used; the text of your "
+        "document stays the text of your file, and what is kept is counts.",
+        short="page pictures",
+        label="Pictures of whole pages, with their lines of text, to group and order the text",
+        vendor=(("also", "whole pages, to say in what order to read them"),),
+        # Never stated in public before this row: a production start with the switch on is
+        # refused until this is the day the sentence went live (privacy.html, "Changes to
+        # this notice": the change is stated, with its date, before it takes effect).
+        stated=None,
+        whole_pages=True,
+    ),
+    Material(
         key="scanned_pages",
         switches=("feature_image_pages",),
         what="If you check “Convert scanned or handwritten pages”, a picture of each scanned "
