@@ -30,7 +30,7 @@
    "pymupdf": "1.28.2",
    "fonts": "fonts-liberation=1:2.1.5-3build1 fonts-noto-core=20201225-2build1"
   },
-  "corrected": "2026-11-27, after the run, by scripts/heldout_correct_0523.py (totals only), on the record as written: each source's 'apart' totals moved to 'all' and the uploads set as measured, because the order report at e3737ac4 counted requests answered live as unanswered (fixed in 70e2a851). Every request was answered (1013 calls for 1013 pages). The per-group totals could not be rebuilt and are empty."
+  "corrected": "2026-11-27, after the run, by scripts/heldout_correct_0523.py (totals only), on the record as written: each source's 'apart' totals moved to 'all' and the uploads set as measured, because the order report at e3737ac4 counted requests answered live as unanswered (fixed in 70e2a851). Every request was answered (1013 calls for 1013 pages; 987 answers applied, 26 that failed the check). The per-group totals could not be rebuilt and are empty."
  },
  "machine": {
   "cpu": "AMD Ryzen 7 5800H with Radeon Graphics",
