@@ -231,7 +231,8 @@ def _set_document(
         extra = {
             "page_order": (summary.model_dump() if summary is not None else {})
             | {"other_steps_refused": dict(client.refused)},
-            "missed": client.cached.misses,  # requests the recording did not hold
+            # requests that ended unanswered: not in the recording and not answered live
+            "missed": client.cached.misses - client.cached.answered_live,
             "usd": output.result.stats.cost_usd,
             "calls": output.result.stats.model_calls,
         }
