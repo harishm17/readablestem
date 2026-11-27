@@ -4901,6 +4901,77 @@ flag policy asks: with it off, a misread of the kind it was fitted for, on a doc
 these, is accepted with no question. The held-out equation parts were not run for this
 release.
 
+## The switch release of 2026-11-27 (pipeline 0.5.23)
+
+Pipeline 0.5.23 turns on the model's page order in the production profile
+(`FEATURE_LAYOUT_MODEL_ORDER`, docs/layout.md "The model's page order"; the code default stays
+off). Every page of a typed file now asks claude-haiku-5-5 once (about $0.0011 a page), so the
+corpus was recorded again under it, and the switch went on only after one paid run on the
+held-out layout pages agreed with development. The production profile's hash is
+`5c69095dc28d`. Measured on the release branch:
+
+- **The recording.** `scripts/corpus_refresh.py --live --max-usd 1.00` asked for 127 answers
+  of the repository's files (page orders, and the crops whose nearby text the new grouping
+  moved) and paid $0.2721. The repository part holds 569 answers and the kept-out part 1,982.
+  The 25 kept-out files were not sent: their 26 uploads owe 436 answers and are listed as
+  owed (`data/eval/burden-corpus.json`, `answers_missing`), so the corpus measures below are
+  of the 47 other uploads.
+- **Decisions.** `data/eval/burden-corpus.json` is re-made with 47 uploads measured. The bar
+  was not judged (73 uploads then, 47 now); the median document asks 0 decisions a page in
+  the ledger, against 0.25 over the 73.
+- **Reading order, development.** `layout-dev-1` with the recorded answers replayed
+  (`eval order --set layout-dev-1 --model-order`, `data/eval/order-layout-dev-1.json`): 184 of
+  267 pages right and 140 faultless in the student page (183 and 94 at 0.5.22), 21 of 60
+  documents with every gold page right (20). Page by page against 0.5.22: 9 pages made right
+  and 8 made wrong; 53 made faultless and 7 no longer so.
+- **Reading order, corpus.** `data/eval/order-corpus.json`: of the 62 gold pages of the
+  uploads that hold every answer, 56 right and 37 faultless; 29 pages are set apart as
+  owing answers. Against 0.5.22 on the same pages, 2 pages are made wrong and none right
+  (`s13_textbook_margin` page 1, a margin note read out of place, and `s18_exam_twocol`
+  page 2, lines joined across its two columns), and pages with no fault go from 43 to 47.
+- **The held-out run.** `layout-heldout-1` was scored once for 0.5.23 (2026-11-27, the
+  release branch at `e3737ac4`, clean, the production profile of this release, `eval order
+  --set layout-heldout-1 --for-release --model-order --live --max-usd 1.6`), after the
+  development and corpus records were made and before anything else was changed; the
+  command listed the run before it read a document (rule 5). It asked the model once for each
+  of the 1,013 pages the 49 documents convert (gold or not) and paid $0.8895; 987 answers
+  were applied, and 26 failed the check (24 named an item twice, 2 named a number that is no
+  item) and kept the rules. Every other model step was refused, as in the 0.5.22 run, so the
+  two are compared like for like. In the student page, 0.5.22 in brackets:
+
+  | | 0.5.23 | 0.5.22 | release bar |
+  |---|---|---|---|
+  | pages right, of 247 | 192 | 191 | at most 56 not right |
+  | pages with no fault | 140 | 113 | |
+  | documents with every gold page right, of 49 | 21 | 20 | at least 20 |
+  | pages with furniture read aloud | 13 (16 places) | 20 (30) | at most 20 |
+  | pages with a paragraph cut | 36 (169 places) | 52 (195) | |
+  | pages with paragraphs run together | 30 (106 places) | 68 (135) | |
+  | pages with stray elements | 168 (789 places) | 180 (1,013) | |
+
+  The element list reads 193 right and 150 faultless (192 and 115). So on new pages, as on the
+  development pages, the step mends grouping (cut and merged paragraphs, running heads read
+  aloud) and barely moves the count of pages read right in order. `eval ledger --for-release`
+  passes, now with slack on all three rows: 55 of 247 not right, 21 of 49 documents, 13 of
+  247 with furniture.
+- **A correction to the held-out record.** At `e3737ac4` the order report counted a request
+  the model answered live as one the recording lacked, so the record as written set all 49
+  documents apart under "answers missing" and its headline was empty. A second run is
+  refused by the stop rule. `scripts/heldout_correct_0523.py` moved each view's `apart`
+  totals to `all` and set the uploads as measured, on totals only (the record keeps no
+  page); the per-kind totals (course handouts, papers, textbooks) could not be rebuilt and
+  are empty in this record. The report is fixed (`eval/answers.py` counts the answers it
+  recorded live).
+
+**What these numbers do not show.** One held-out run is 247 gold pages of 49 documents: the
+step's gain in grouping is large against that sample, and its one page more read right is
+not a gain. No page of the held-out set was looked at, so which pages moved is not known.
+The 25 kept-out files were not converted with the step, so their pages are not in the
+corpus measures. The public files' layout comparison of the earlier switch releases was not
+made, because it would ask the model about 8,527 pages. The model reads only the page
+picture and the line list: what its grouping does to the crops a later step sends (an
+equation's nearby text, a figure's caption) was recorded, not measured.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%

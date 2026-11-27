@@ -4553,13 +4553,13 @@ disagree is dropped (`inconsistent`); an exception in the hook leaves the page a
 The design and its measurements: [ADR 0006](decisions/0006-page-math-pass.md),
 [eval-page-math.md](eval-page-math.md).
 
-## The model's page order (`pipeline/page_order.py`, `FEATURE_LAYOUT_MODEL_ORDER`, off)
+## The model's page order (`pipeline/page_order.py`, `FEATURE_LAYOUT_MODEL_ORDER`, on in production)
 
 A model groups and orders each page's text; layout's rules then run on its answer. It is the
 shape of the page math pass ([ADR 0006](decisions/0006-page-math-pass.md)): a collecting first
-pass, one call a page, a verified plan, an applying second pass. Off in production
-(`production.profile.toml`, `eval = "none"`): with the switch off nothing is asked and the
-output of every file is byte-identical to the release before it.
+pass, one call a page, a verified plan, an applying second pass. On in production since
+pipeline 0.5.23 (`production.profile.toml`; the code default stays off, and with the switch
+off nothing is asked and every file converts as at 0.5.22).
 
 **The first pass.** `layout.analyze(page_order=hook)` calls `hook.on_rows(number, items)` for
 each page once the rules have its lines, equations, figures and tables, in the rules' reading
@@ -4624,12 +4624,18 @@ running heads read aloud), and the count of pages read right in order barely mov
 had the model's answer; 7 pages whose item list differs from the one the recording was made
 from, and 2 whose answer named an item twice, kept the rules. About $0.0011 a page ($0.2754
 recorded for the 260 pages the recording answers). A conversion asks every page, not only the
-gold ones: about 933 on this set, so a live run of the whole set costs about $1. These are development pages: they say the switch is worth deciding
-about, not that it is better. The decision is one run on held-out pages (the owner's), and
-until it is made the switch stays off. Turning it on needs `PIPELINE_VERSION` raised in the
-same change (the text of every page the reading is made from can change), a statement on the
-privacy page with its date (`web/recipients.py`, `reading_order`), and a look at the
-vendor sheet.
+gold ones: about 933 on this set, so a live run of the whole set costs about $1.
+
+**On held-out pages** (`layout-heldout-1`, one run for 0.5.23, 2026-11-27; docs/eval.md "The
+switch release of 2026-11-27"), against the rules of 0.5.22 on the same 247 gold pages of 49
+documents, in the student page: 192 pages right against 191, 140 with no fault against 113,
+furniture read aloud on 13 pages against 20, a paragraph cut on 36 against 52, paragraphs
+run together on 30 against 68; 21 documents with every gold page right against 20. The run
+asked about 1,013 pages for $0.8895 (about $0.0009 a page); 26 answers failed the check and
+those pages kept the rules. So the held-out pages agree with development: the step mends
+grouping, and the order of pages read right barely moves. The switch went on with
+`PIPELINE_VERSION` raised to 0.5.23, the corpus recorded again under it, the privacy page
+stating it with its date (`web/recipients.py`, `reading_order`) and the vendor sheet's line.
 
 **Measuring it again with no spend.** `readablestem eval order --set NAME --model-order`
 converts a layout gold set with the switch on and answers the page order's requests from a

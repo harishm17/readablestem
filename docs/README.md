@@ -124,7 +124,7 @@ Each decision record ends with its consequences.
 | [0007](decisions/0007-image-pages.md) | Converting scanned and handwritten pages |
 | [0008](decisions/0008-latex-source.md) | LaTeX source uploads converted by LaTeXML in a sandbox (see also [web.md](web.md), "LaTeX source", and [security.md](security.md), "Running uploaded TeX") |
 | [0009](decisions/0009-formats-not-offered.md) | Why there is no tagged PDF, audio file, braille file or LMS tool |
-| [0010](decisions/0010-reading-order-rules-first.md) | Why reading order is found by rules, with no learned layout reader |
+| [0010](decisions/0010-reading-order-rules-first.md) | Why reading order is found by rules, with no learned layout reader (amended 2026-11-27: a model groups and orders each page, the rules run on its answer) |
 
 ## Running it as a service
 

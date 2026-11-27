@@ -1,5 +1,29 @@
 # Changelog
 
+## Pipeline 0.5.23, render 11 (2026-11-27)
+
+- `PIPELINE_VERSION` is 0.5.23 and `RENDER_VERSION` stays 11. The model's page order (the entry
+  below) goes on in the production profile: every page of a typed file asks
+  claude-haiku-5-5 once to group and order its lines, and the rules build the reading on the
+  answer when it passes the check. For a reader: fewer paragraphs cut in two or run together,
+  and fewer running heads and page furniture read aloud. A page whose answer fails the check
+  is read by the rules as before. About $0.001 a page. The code default stays off.
+- On held-out pages (`layout-heldout-1`, one run, $0.89), against 0.5.22 in the page a
+  student is given: 192 of 247 pages right (191), 140 with no fault (113), 21 of 49 documents
+  with every gold page right (20), furniture read aloud on 13 pages (20), a paragraph cut on 36
+  (52), paragraphs run together on 30 (68). Every release bar of the ledger is met with slack.
+  [docs/eval.md](docs/eval.md) "The switch release of 2026-11-27";
+  [ADR 0010](docs/decisions/0010-reading-order-rules-first.md) is amended.
+- The privacy page states, from this release, that pictures of whole pages with their lines go
+  to the model for grouping and order (`web/recipients.py`, `reading_order`).
+- The corpus is recorded again under the switch ($0.27). The 25 files kept out of the
+  repository were not sent, so their 26 uploads owe answers and the corpus measures are of the
+  other 47.
+- `eval order` no longer counts a request it answered live as one the recording lacked: a live
+  run set every document apart under "answers missing". The held-out record of this release
+  was made before the fix, and its totals were moved back to the headline
+  (`scripts/heldout_correct_0523.py`, totals only).
+
 ## Unreleased: the model's page order (off)
 
 - A model can group and order each page's text before the rules build the reading
