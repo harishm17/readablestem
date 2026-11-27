@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: the privacy notice states a coming change before it takes effect
+
+- The privacy notice promises to state a change in who receives what "with the date, before
+  the change takes effect". The page listed only what the running settings send, so a new
+  material appeared on the page in the same deploy that began sending it. A row of
+  `web/recipients.py` can now carry `starts`, the day it starts being sent: from its `stated`
+  day until it is on, the privacy page lists it under "Coming changes" with that day, and a
+  production start that turns it on earlier is refused (`ops.launch.sent_material_problems`).
+- The model's page order (`reading_order`) is stated as coming on 2026-11-27 and starts on
+  2026-11-28; nothing is sent until its switch is on.
+
 ## Unreleased: the model's page order (off)
 
 - A model can group and order each page's text before the rules build the reading

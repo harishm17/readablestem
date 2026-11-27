@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, replace
-from datetime import date
+from datetime import UTC, date, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -99,7 +99,10 @@ class Material:
     "sentence" is a sentence of its own ("{to}" is replaced by the companies). `stated` is the
     day the row was first stated in public (its sentence on the privacy page): a production
     start is refused while a row that is on has no date or a date still to come
-    (`ops.launch.sent_material_problems`). `reader`: it goes to the handwriting readers'
+    (`ops.launch.sent_material_problems`). `starts`: the day it starts being sent in
+    production, for a row stated before it is on; from `stated` until it is on, the privacy
+    page lists it as a coming change with this day, and a production start that turns it on
+    earlier is refused. `reader`: it goes to the handwriting readers'
     companies, not to the model provider. `whole_pages`: it is a picture of a whole page, not
     of a part of one. `to` is filled by `sent_material`."""
 
@@ -114,10 +117,15 @@ class Material:
     reader: bool = False
     whole_pages: bool = False
     to: tuple[str, ...] = ()
+    starts: date | None = None
 
     @property
     def stated_text(self) -> str:
         return format_day(self.stated)
+
+    @property
+    def starts_text(self) -> str:
+        return format_day(self.starts)
 
 
 # Every kind of material a conversion or a review sends to a model, in the order the lists
@@ -188,10 +196,10 @@ MATERIALS: tuple[Material, ...] = (
         short="page pictures",
         label="Pictures of whole pages, with their lines of text, to group and order the text",
         vendor=(("also", "whole pages, to say in what order to read them"),),
-        # Never stated in public before this row: a production start with the switch on is
-        # refused until this is the day the sentence went live (privacy.html, "Changes to
-        # this notice": the change is stated, with its date, before it takes effect).
-        stated=None,
+        # Stated in public as a coming change on 2026-11-27, a day before the switch goes on in
+        # production (privacy.html, "Changes to this notice": before it takes effect).
+        stated=date(2026, 11, 27),
+        starts=date(2026, 11, 28),
         whole_pages=True,
     ),
     Material(
@@ -265,6 +273,21 @@ def sent_material(settings: Settings) -> list[Material]:
     ]
 
 
+def coming_material(settings: Settings, *, today: date | None = None) -> list[Material]:
+    """The kinds of material these settings do not send yet that the privacy page already
+    states as coming: stated by `today` (UTC), with the day they start."""
+    today = today or datetime.now(UTC).date()
+    vendor = model_vendor(settings)
+    return [
+        replace(m, to=(vendor,))
+        for m in MATERIALS
+        if not material_on(m, settings)
+        and m.starts is not None
+        and m.stated is not None
+        and m.stated <= today
+    ]
+
+
 def vendor_sentence(settings: Settings) -> str:
     """The one line beside the upload button and on the landing page, built from
     `sent_material`. With the cut-outs, the tables and the scanned pages on it is the
@@ -319,6 +342,7 @@ def material_context(settings: Settings) -> dict[str, Any]:
     sent = sent_material(settings)
     return {
         "sent_material": sent,
+        "coming_material": coming_material(settings),
         "vendor_sentence": vendor_sentence(settings),
         # The short names, for the one-line notes: "equation and figure images and nearby
         # text and page pictures".

@@ -172,6 +172,11 @@ def sent_material_problems(settings: Settings, *, today: date | None = None) -> 
                 f"web/recipients.py: {sends} but its row is dated {m.stated.isoformat()}, "
                 "a day still to come"
             )
+        elif m.starts is not None and m.starts > today:
+            problems.append(
+                f"web/recipients.py: {sends} before the day the privacy notice says it starts "
+                f"({m.starts.isoformat()})"
+            )
         elif m.stated_text not in notice:
             problems.append(
                 f"web/templates/privacy.html: {sends} but the notice does not show the day "
