@@ -122,14 +122,15 @@ GUIDES = (
     ),
 )
 _T = "src/readablestem/web/templates/"
-# Who receives what, and from when: the rows the privacy, security and offices pages print.
+# Who receives what, and from when: the rows the privacy, security and offices pages and the
+# landing page's vendor line print.
 _RECIPIENTS = "src/readablestem/web/recipients.py"
 PUBLIC_PAGES = (
     PublicPage(
         "/",
         "Home",
         "what it handles, what you download, how accurate it is, who can use it",
-        (_T + "landing.html", _T + "_proof_chart.html", _T + "_vendor_line.html"),
+        (_T + "landing.html", _T + "_proof_chart.html", _T + "_vendor_line.html", _RECIPIENTS),
     ),
     PublicPage(
         "/demo",
