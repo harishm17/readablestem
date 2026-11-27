@@ -122,6 +122,8 @@ GUIDES = (
     ),
 )
 _T = "src/readablestem/web/templates/"
+# Who receives what, and from when: the rows the privacy, security and offices pages print.
+_RECIPIENTS = "src/readablestem/web/recipients.py"
 PUBLIC_PAGES = (
     PublicPage(
         "/",
@@ -151,7 +153,7 @@ PUBLIC_PAGES = (
         "/security",
         "Security",
         "what is stored and where, who receives it, how long it is kept, how it is protected",
-        (_T + "security.html", "docs/security.md"),
+        (_T + "security.html", "docs/security.md", _RECIPIENTS),
     ),
     PublicPage(GUIDES_INDEX, "Guides", "the guides", (_T + "guides.html",)),
     PublicPage(
@@ -182,7 +184,7 @@ PUBLIC_PAGES = (
         "/privacy",
         "Privacy",
         "what happens to uploaded documents",
-        (_T + "privacy.html", _T + "_retention_table.html", _T + "_recipients.html"),
+        (_T + "privacy.html", _T + "_retention_table.html", _T + "_recipients.html", _RECIPIENTS),
     ),
     PublicPage("/terms", "Terms", "the terms of use", (_T + "terms.html",)),
     PublicPage(
@@ -190,7 +192,7 @@ PUBLIC_PAGES = (
         "For accessibility offices",
         "where a document goes, who receives it, how long it is kept, and what the tool "
         "does not do",
-        (_T + "offices.html", _T + "_data_flow.html", _T + "_data_matrix.html"),
+        (_T + "offices.html", _T + "_data_flow.html", _T + "_data_matrix.html", _RECIPIENTS),
     ),
     PublicPage(
         "/status",
