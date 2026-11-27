@@ -518,8 +518,9 @@ def _page_blocks(
     runs = _runs(ordered, ctx, document=document)
     places: list[int | None] = []
     figure_places: dict[BBox, int] = {}
+    continues: dict[int, int] = {}
     if page_order is not None:
-        runs, places, figure_places = _runs_by_answer(
+        runs, places, figure_places, continues = _runs_by_answer(
             page_order, number, runs, figures, page_tables, gutter, ctx, source, document=document
         )
     if places:
@@ -533,7 +534,14 @@ def _page_blocks(
     else:
         runs = _split_options(runs, document=document)
     blocks = [_classify_run(run, ctx, document=document) for run in runs]
-    placed_blocks = {id(b): p for b, p in zip(blocks, places, strict=False) if p is not None}
+    # By row, not by block: the merges below make new blocks (and a new block can take a
+    # freed one's id), while the rows live as long as the page.
+    placed_rows = {
+        id(row): p
+        for run, p in zip(runs, places, strict=False)
+        if p is not None
+        for row in run.rows
+    }
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
     _flag_text(blocks)
     for block in blocks:
@@ -626,7 +634,9 @@ def _page_blocks(
     lap("order")
     in_order = [blocks[i] for i in order]
     if places or figure_places:
-        in_order = _answer_order(in_order, placed_blocks, figure_places)
+        in_order = _answer_order(in_order, placed_rows, figure_places)
+    if continues:
+        in_order = _join_answer_pieces(in_order, continues)
     final = _option_order(_merge_column_continuations(in_order))
     edges = _RightEdges(text_rows)
     _label_abstracts(final, text_rows, edges)
@@ -673,7 +683,7 @@ def _runs_by_answer(
     source: say_once.PageSource | None,
     *,
     document: _Document,
-) -> tuple[list[_Run], list[int | None], dict[BBox, int]]:
+) -> tuple[list[_Run], list[int | None], dict[BBox, int], dict[int, int]]:
     """The page's runs as a model's answer groups and orders them (an experiment: `analyze`
     gives `page_order`, off by default).
 
@@ -743,7 +753,7 @@ def _runs_by_answer(
                 line_of[name] = row
     answer = page_order.on_rows(number, items)
     if not isinstance(answer, dict):
-        return runs, [], {}
+        return runs, [], {}, {}
     parents = {id(row): run for run in runs for row in run.rows}
     said = {"bad_join": 0, "left_out": 0, "furniture": 0, "runs": 0}
     used: set[str] = set()
@@ -756,6 +766,7 @@ def _runs_by_answer(
     if source is not None and furniture:
         source.leave_out_at("furniture", _cut_boxes(furniture, []))
     made: list[tuple[_Run, int]] = []
+    continues: dict[int, int] = {}  # a later piece's first row: the last row before it
     answered: list[str] = []
     figure_places: dict[BBox, int] = {}
     for position, block in enumerate(answer.get("blocks") or ()):
@@ -772,9 +783,13 @@ def _runs_by_answer(
             if name in line_of:
                 group.append(line_of[name])
                 continue
-            if group:
-                made.append((_run_of_rows(group, parents), position))
-                group = []
+            last: _Row | None = None
+            for piece in _column_pieces(group):
+                if last is not None:  # the paragraph goes on in the next column
+                    continues[id(piece[0])] = id(last)
+                made.append((_run_of_rows(piece, parents), position))
+                last = piece[-1]
+            group = []
             if name in run_of:
                 made.append((run_of[name], position))
             elif name in placed_of:
@@ -795,7 +810,7 @@ def _runs_by_answer(
         # stays the rules' own (`_reading_order` on the finished blocks, with the captions),
         # which the items' order only approximates.
         places, figure_places = [None] * len(made), {}
-    return [run for run, _ in made], places, figure_places
+    return [run for run, _ in made], places, figure_places, continues
 
 
 def _run_of_rows(rows: list[_Row], parents: dict[int, _Run]) -> _Run:
@@ -817,16 +832,53 @@ def _run_of_rows(rows: list[_Row], parents: dict[int, _Run]) -> _Run:
     )
 
 
+def _column_pieces(rows: list[_Row]) -> list[list[_Row]]:
+    """An answer's block of lines cut where it goes on higher on the page (the top of the next
+    column): each piece is ordered by its own box, as the rules' runs are, and joined again
+    after the order (`_join_answer_pieces`). One piece when the block stays in one column."""
+    pieces: list[list[_Row]] = []
+    for row in rows:
+        if pieces and row.bbox[1] < pieces[-1][-1].bbox[1] - row.height:
+            pieces.append([row])
+        elif pieces:
+            pieces[-1].append(row)
+        else:
+            pieces.append([row])
+    return pieces
+
+
+def _join_answer_pieces(blocks: list[_Block], continues: dict[int, int]) -> list[_Block]:
+    """The pieces of one answer block joined again in the finished order: a text block whose
+    first row goes on from a row of another text block is added to that block, wherever the
+    order put it, as `_merge_column_continuations` joins a paragraph cut by a column."""
+    holder: dict[int, _Block] = {}
+    out: list[_Block] = []
+    for block in blocks:
+        rows = block.rows or []
+        head = holder.get(continues.get(id(rows[0]), -1)) if rows else None
+        if head is not None and head.kind in _TEXT_BLOCKS and block.kind in _TEXT_BLOCKS:
+            head.rows.extend(rows)
+            head.bbox = _union([head.bbox, block.bbox])
+            for row in rows:
+                holder[id(row)] = head
+            continue
+        out.append(block)
+        for row in rows:
+            holder[id(row)] = block
+    return out
+
+
 def _answer_order(
     blocks: list[_Block], placed: dict[int, int], boxes: dict[BBox, int]
 ) -> list[_Block]:
-    """`blocks` (the rules' order) with the blocks the answer placed (`placed`: by block, or
-    `boxes`: a figure or table by its box) in the answer's order. A block it did not place stays
-    right behind the block before it in the rules' order, a leading one stays first."""
+    """`blocks` (the rules' order) with the blocks the answer placed (`placed`: by row, a block
+    at the first place of its rows; or `boxes`: a figure or table by its box) in the answer's
+    order. A block it did not place stays right behind the block before it in the rules' order,
+    a leading one stays first."""
     head: list[_Block] = []
     groups: list[tuple[int, list[_Block]]] = []
     for block in blocks:
-        at = placed.get(id(block))
+        at = min((placed[id(r)] for r in block.rows or () if id(r) in placed), default=None)
         if at is None and block.kind in (Kind.FIGURE, Kind.TABLE, Kind.EQUATION):
             at = boxes.get(block.bbox)
         if at is not None:
