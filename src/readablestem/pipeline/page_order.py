@@ -48,10 +48,10 @@ log = logging.getLogger(__name__)
 PROMPT_NAME = "page_order"
 PROMPT_VERSION = load_prompt(PROMPT_NAME).version
 
-# Characters of item list sent for one page. The fence scans 8,000 characters for tag names
-# (`models.base._CONTEXT_SCAN_CHARS`); items past this many are not offered to the model (the
-# rules keep them, after the ones that are named).
-CONTEXT_CHARS = 7600
+# Characters of item list sent for one page (the fence keeps as many as a request asks for).
+# The longest list of the 267 development pages is about 10,600; items past this many are not
+# offered to the model (the rules keep them, after the ones that are named).
+CONTEXT_CHARS = 30_000
 # Measured on the 267 development pages of layout-dev-1 (docs/layout.md): the cheap model at this
 # effort answered 187 pages right where the rules' 182 were, for about $0.0012 a page.
 DEFAULT_EFFORT = "medium"

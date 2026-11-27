@@ -173,7 +173,7 @@ _FENCE_NAME: Final = re.compile(r"document[\s_\-]*text", re.IGNORECASE)
 _CONTEXT_SCAN_CHARS: Final = 8000
 
 
-def defang_context(text: str) -> str:
+def defang_context(text: str, keep: int = _CONTEXT_SCAN_CHARS) -> str:
     """Document text with every spelling of the fence tag's name removed.
 
     `fence_untrusted` deletes the exact tags once, so '</document_te</document_text>xt>'
@@ -182,10 +182,11 @@ def defang_context(text: str) -> str:
     instructions. Removing the tag *name* in any case and spacing, after dropping invisible
     format characters (zero-width spaces, Unicode tag characters) that could hide inside it,
     and repeating until nothing changes, leaves no way to spell either tag whatever brackets
-    or entities surround it. Only the start of a long text is scanned: the fence keeps 2,000
-    characters anyway.
+    or entities surround it. Only the first `keep` characters are scanned and kept: the
+    fence keeps 2,000 unless a request asks for more (`sent_context` passes a longer limit
+    through, so a request is never cut shorter than it asked).
     """
-    text = text[:_CONTEXT_SCAN_CHARS]
+    text = text[:keep]
     text = "".join(ch for ch in text if unicodedata.category(ch) != "Cf")
     while True:
         cleaned = _FENCE_NAME.sub("", text)
@@ -204,7 +205,7 @@ def sent_context(
     when the fence does."""
     if not text:
         return None
-    cleaned = defang_context(text)
+    cleaned = defang_context(text, max(_CONTEXT_SCAN_CHARS, limit or 0))
     if limit is None:
         return fence_untrusted(cleaned, notice=not notice_in_system)
     return fence_untrusted(cleaned, limit, notice=not notice_in_system)

@@ -4572,9 +4572,11 @@ unset) at `ANTHROPIC_EFFORT_PAGE_ORDER` (medium), `PAGE_ORDER_MAX_OUTPUT_TOKENS`
 measured value, thinking included). It carries the page picture and the items as a numbered
 list (`<number> | <left>,<top> | line | <size>pt | <text>`, the edges as a percentage of the
 page), fenced as untrusted context: the item text never enters the instructions
-(`models/prompts/page_order.md`). The fence scans 8,000 characters for tag names, so the list
-is cut at 7,600 characters and the items beyond it are not offered (`unoffered_items`; the
-rules keep them, after the ones the model named). Pages are asked `model_concurrency` at once,
+(`models/prompts/page_order.md`). The list is cut at 30,000 characters (the longest of the 267
+development pages is about 10,600) and items beyond it are not offered (`unoffered_items`; the
+rules keep them, after the ones the model named). The fence keeps as many characters as a
+request asks for; before this step it scanned and kept 8,000 whatever the request asked, which
+also cut the page audit's listings (allowed 30,000) without a word. Pages are asked `model_concurrency` at once,
 a refusal or a service error is asked once more of the other model (`models.router`), and the
 calls count against the job's budget and its call count like any other step.
 
