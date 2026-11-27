@@ -16,7 +16,9 @@ of material (`MATERIALS`), tied to the settings that send it, with what is kept 
 answer and the day the row was first stated in public. The privacy page, the vendor line
 (`vendor_sentence`), the offices page, its summary and drawing and the account deletion notes
 are written from it, and a production start is refused while a row that is on is not stated
-on the rendered page or has no date (`ops.launch.sent_material_problems`).
+on the rendered page or has no date, or before the day its `starts` names
+(`ops.launch.sent_material_problems`); until then the privacy page lists it as coming
+(`coming_material`).
 """
 
 from __future__ import annotations
@@ -280,9 +282,17 @@ def coming_material(settings: Settings) -> list[Material]:
     states as coming: stated by today (UTC), with the first day they may start."""
     today = datetime.now(UTC).date()
     vendor = model_vendor(settings)
-    readers = tuple(dict.fromkeys(READER_COMPANIES[r] for r in settings.math_readers_on))
+
+    def receivers(m: Material) -> tuple[str, ...]:
+        # A reader row that is coming is off, so no reader is on: its companies are those of
+        # the switches the row names (`math_reader_<name>_enabled`).
+        if not m.reader:
+            return (vendor,)
+        names = (s.removeprefix("math_reader_").removesuffix("_enabled") for s in m.switches)
+        return tuple(dict.fromkeys(READER_COMPANIES[n] for n in names if n in READER_COMPANIES))
+
     return [
-        replace(m, to=readers if m.reader else (vendor,))
+        replace(m, to=receivers(m))
         for m in MATERIALS
         if not material_on(m, settings)
         and m.starts is not None

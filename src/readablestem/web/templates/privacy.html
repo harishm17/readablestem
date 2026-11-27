@@ -305,7 +305,7 @@
 <ul>
   {% for m in coming_material %}
   <li>Not before {{ m.starts_text }} (UTC), and not sent yet; to be sent to
-    {{ m.to|join(" and ") }}: {{ m.what }} {{ m.stored }} Stated here on {{ m.stated_text }}.</li>
+    {{ m.to|join(" and ") }}: {{ m.what }} {{ m.stored }} Stated here on {{ m.stated_text }} (UTC).</li>
   {% endfor %}
 </ul>
 {% endif %}
