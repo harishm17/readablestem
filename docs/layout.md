@@ -4574,7 +4574,7 @@ list (`<number> | <left>,<top> | line | <size>pt | <text>`, the edges as a perce
 page), fenced as untrusted context: the item text never enters the instructions
 (`models/prompts/page_order.md`). The list is cut at 30,000 characters (the longest of the 267
 development pages is about 10,600) and items beyond it are not offered (`unoffered_items`; the
-rules keep them, after the ones the model named). The fence keeps as many characters as a
+rules keep them, each behind the block that comes before it in the rules' order). The fence keeps as many characters as a
 request asks for; before this step it scanned and kept 8,000 whatever the request asked, which
 also cut the page audit's listings (allowed 30,000) without a word. Pages are asked `model_concurrency` at once,
 a refusal or a service error is asked once more of the other model (`models.router`), and the
@@ -4583,8 +4583,11 @@ calls count against the job's budget and its call count like any other step.
 **The answer and its check.** The model answers with blocks (a kind and item numbers, in
 reading order) and the numbers of the lines that are furniture. `verify` accepts an answer
 only when every number is an item of the list it was shown, none is named twice, and at least
-one is named. Otherwise the page has no answer and the rules read it; each reason is counted
-(`unknown_number`, `repeated_number`, `no_numbers`), and so are calls that gave nothing
+one is named, and its furniture does not hold more than 15% of the page's line text and more
+than 200 characters (furniture is left out, so this is how an answer could take text from the
+student; on the development pages furniture held at most 5.7%). Otherwise the page has no
+answer and the rules read it; each reason is counted (`unknown_number`, `repeated_number`,
+`no_numbers`, `too_much_furniture`), and so are calls that gave nothing
 (`failed`). A reply that does not parse against the strict schema is an `invalid_output` call.
 Nothing the model says becomes text: it chooses which of layout's lines go together, in what
 order, and which are left out; every line is still the PDF's and every equation, figure and
@@ -4598,8 +4601,10 @@ changed in between (the item fingerprint differs) is not applied (`stale_pages`)
 
 **With page math.** Both on is three layout passes: the page math pass makes its second run
 on the page the first collected, the order items are collected again on that page, and the
-order pass applies last. A page the page math pass has laid out differently from the first
-pass is a stale page and keeps the rules. Each pass keeps its own summary and costs.
+order pass applies last, laying the math plan over layout again. A page whose items differ
+between the page math pass's run and that last run is a stale page and keeps the rules; if
+the page math pass's run fails, the items of the first run are asked about. Each pass keeps
+its own summary and costs.
 
 **What it was measured to do.** On the 267 development pages of layout-dev-1,
 claude-haiku-5-5 at medium effort, replayed through the product (`eval order --model-order`,

@@ -517,7 +517,7 @@ def _page_blocks(
     lap("order")
     runs = _runs(ordered, ctx, document=document)
     places: list[int | None] = []
-    figure_places: dict[BBox, int] = {}
+    figure_places: dict[int, int] = {}  # by the figure's or table's id()
     continues: dict[int, int] = {}
     if page_order is not None:
         runs, places, figure_places, continues = _runs_by_answer(
@@ -634,7 +634,13 @@ def _page_blocks(
     lap("order")
     in_order = [blocks[i] for i in order]
     if places or figure_places:
-        in_order = _answer_order(in_order, placed_rows, figure_places)
+        # The boxes the figures and tables have now, after joining panels and adding labels.
+        boxes = {
+            thing.bbox: figure_places[id(thing)]
+            for thing in (*figures, *page_tables)
+            if id(thing) in figure_places
+        }
+        in_order = _answer_order(in_order, placed_rows, boxes)
     if continues:
         in_order = _join_answer_pieces(in_order, continues)
     final = _option_order(_merge_column_continuations(in_order))
@@ -683,7 +689,7 @@ def _runs_by_answer(
     source: say_once.PageSource | None,
     *,
     document: _Document,
-) -> tuple[list[_Run], list[int | None], dict[BBox, int], dict[int, int]]:
+) -> tuple[list[_Run], list[int | None], dict[int, int], dict[int, int]]:
     """The page's runs as a model's answer groups and orders them (an experiment: `analyze`
     gives `page_order`, off by default).
 
@@ -695,12 +701,15 @@ def _runs_by_answer(
     in reading order, or None for the rules' own runs. A block of lines is one run, its lines
     in the answer's order; an equation, figure or table stands alone whatever its block holds
     (`bad_join`); lines named as furniture are left out; lines the answer does not name are
-    kept at the end in the runs the rules made of them (`left_out`). The hook is told the
+    kept in the runs the rules made of them, each behind the block before it in the rules'
+    order (`left_out`, `_answer_order`). The hook is told the
     counts (`applied(number, said)`). An answer that reads the items in the order they were
     shown changes the grouping only: the order of the blocks is then the rules' own.
 
-    Returns the runs, each one's place in the answer (None: the answer does not place it) and
-    the place of each figure and table box."""
+    Returns the runs, each one's place in the answer (None: the answer does not place it), the
+    place of each figure and table (by `id()`: joining panels and adding labels grow a
+    figure's box later, `_join_panels`) and the pieces of a block cut by a column."""
+    boxed: list[Any] = [*figures, *page_tables]
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
     sequence = _reading_order(
         [*(run.box for run in runs), *placed],
@@ -712,7 +721,7 @@ def _runs_by_answer(
     items: list[dict[str, Any]] = []
     run_of: dict[str, _Run] = {}
     line_of: dict[str, _Row] = {}
-    placed_of: dict[str, BBox] = {}
+    placed_of: dict[str, int] = {}  # a figure's or table's id(): its box can still change
     lines = equations = 0
     for at in sequence:
         if at >= len(runs):
@@ -720,7 +729,7 @@ def _runs_by_answer(
             name = f"f{k}" if k < len(figures) else f"t{k - len(figures)}"
             kind = "figure" if k < len(figures) else "table"
             items.append({"id": name, "kind": kind, "box": [round(v, 1) for v in placed[k]]})
-            placed_of[name] = placed[k]
+            placed_of[name] = id(boxed[k])
         elif runs[at].kind == "math":
             run = runs[at]
             name = f"e{equations}"
@@ -768,7 +777,7 @@ def _runs_by_answer(
     made: list[tuple[_Run, int]] = []
     continues: dict[int, int] = {}  # a later piece's first row: the last row before it
     answered: list[str] = []
-    figure_places: dict[BBox, int] = {}
+    figure_places: dict[int, int] = {}
     for position, block in enumerate(answer.get("blocks") or ()):
         names = []
         for name in block.get("items") or ():

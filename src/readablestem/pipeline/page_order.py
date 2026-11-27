@@ -59,6 +59,13 @@ DEFAULT_EFFORT = "medium"
 DEFAULT_CONCURRENCY = 4
 # Characters of an equation's text shown (the rest says nothing about where it goes).
 EQUATION_CHARS = 200
+# Furniture is left out of the page, so an answer can take text from the student: one whose
+# furniture lines hold more than this share of the page's line text and more than
+# `FURNITURE_CHARS` characters is no answer. On the 267 development pages the most was 5.7%
+# (running heads, page numbers, stamps); a model misled into calling paragraphs furniture
+# passes neither.
+FURNITURE_SHARE = 0.15
+FURNITURE_CHARS = 200
 
 Size = tuple[float, float]  # a page's width and height
 
@@ -174,10 +181,15 @@ class OrderPlan:
         return [c for page in self.pages.values() for c in page.calls]
 
 
-def verify(output: PageOrderOutput, ids: Sequence[str]) -> tuple[dict[str, Any] | None, str | None]:
+def verify(
+    output: PageOrderOutput, items: Sequence[Mapping[str, Any]]
+) -> tuple[dict[str, Any] | None, str | None]:
     """The model's answer in the items' own ids, or why it is no answer: a number that is no
-    item of the list shown (`unknown_number`), one named twice (`repeated_number`), or none
-    named (`no_numbers`). `ids` are the items the model was shown, in the order shown."""
+    item of the list shown (`unknown_number`), one named twice (`repeated_number`), none
+    named (`no_numbers`), or furniture that holds more of the page's line text than running
+    heads, page numbers and stamps do (`too_much_furniture`, see `FURNITURE_SHARE`). `items`
+    are the items the model was shown, in the order shown."""
+    ids = [str(item["id"]) for item in items]
     named = [number for block in output.blocks for number in block.items] + output.furniture
     if not named:
         return None, "no_numbers"
@@ -185,6 +197,12 @@ def verify(output: PageOrderOutput, ids: Sequence[str]) -> tuple[dict[str, Any] 
         return None, "unknown_number"
     if len(set(named)) != len(named):
         return None, "repeated_number"
+    lines = [len(item.get("text") or "") for item in items if item["kind"] == "line"]
+    left = sum(
+        len(items[n].get("text") or "") for n in output.furniture if items[n]["kind"] == "line"
+    )
+    if left > FURNITURE_CHARS and left > FURNITURE_SHARE * sum(lines):
+        return None, "too_much_furniture"
     return {
         "blocks": [
             {"kind": block.kind, "items": [ids[number] for number in block.items]}
@@ -236,7 +254,7 @@ def run_page(
     if parsed is None:
         plan.failed = calls[-1].outcome
         return plan
-    plan.answer, plan.failed = verify(parsed, ids[:offered])
+    plan.answer, plan.failed = verify(parsed, items[:offered])
     return plan
 
 

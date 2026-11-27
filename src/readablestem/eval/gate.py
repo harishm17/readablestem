@@ -413,6 +413,8 @@ GUARDED_CONSTANTS: dict[str, tuple[str, ...]] = {
         "CONTEXT_CHARS",
         "DEFAULT_EFFORT",
         "EQUATION_CHARS",
+        "FURNITURE_CHARS",
+        "FURNITURE_SHARE",
     ),
     "readablestem.pipeline.page_math_reconcile": (
         "CONSISTENT_FROM",

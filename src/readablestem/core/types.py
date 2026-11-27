@@ -1257,12 +1257,14 @@ class PageOrderSummary(BaseModel):
     unknown_number: int = 0  # answers dropped: a number that is no item of the page
     repeated_number: int = 0  # answers dropped: a number named twice
     no_numbers: int = 0  # answers dropped: no number named
+    too_much_furniture: int = 0  # answers dropped: furniture that holds too much of the text
     unoffered_items: int = 0  # items of a long page left out of the list the model saw
     applied_pages: int = 0  # pages the verified answer was laid over layout's rules
     stale_pages: int = 0  # pages whose items changed between the two layout runs: rules kept
     runs: int = 0  # runs the applied answers made
     furniture: int = 0  # lines the answers named as furniture
-    left_out: int = 0  # lines the answers did not name (kept at the end, in the rules' order)
+    # lines the answers did not name (kept, each behind the block before it in the rules' order)
+    left_out: int = 0
     bad_join: int = 0  # blocks that mixed an equation, figure or table with other items
     stopped_by: str | None = None  # a spend cap that ended the pass early
 

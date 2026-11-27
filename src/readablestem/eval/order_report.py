@@ -498,7 +498,8 @@ def _model_order_lines(done: dict[str, Any] | None) -> list[str]:
     return [
         f"the model's page order was on: {done['pages']} pages asked, {done['failed']} of them "
         f"with no usable answer ({done['unknown_number']} named a number that is no item, "
-        f"{done['repeated_number']} named one twice, {done['no_numbers']} named none), "
+        f"{done['repeated_number']} named one twice, {done['no_numbers']} named none, "
+        f"{done.get('too_much_furniture', 0)} left out too much as furniture), "
         f"the verified answer laid over {done['applied_pages']} pages "
         f"({done['stale_pages']} pages changed in between and kept the rules); "
         f"{done['furniture']} lines left out as furniture, {done['left_out']} lines it did not "

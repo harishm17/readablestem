@@ -1995,8 +1995,10 @@ def _page_math_pass(
         answered = [n for n, p in plan.pages.items() if p.failed is None]
         if answered:
             grouping = _layout_switches(settings)
+            first_items = None
             if order_collector is not None:
                 grouping["page_order"] = order_collector
+                first_items = dict(order_collector.items)
             try:
                 doc = layout.analyze(
                     pdf_bytes,
@@ -2008,6 +2010,10 @@ def _page_math_pass(
             except Exception as exc:  # the first run's pages stand
                 log.warning("page math: the second layout run failed: %s", type(exc).__name__)
                 applied = page_math_reconcile.PageMathHook()
+                if order_collector is not None and first_items is not None:
+                    # and so do the items the page order asks about (a page the failed run
+                    # reached would be asked about as that run had it, and then be stale)
+                    order_collector.items = first_items
         stats, hook = plan.stats, applied.stats
         summary = PageMathSummary(
             pages=len(plan.pages),
@@ -2099,6 +2105,7 @@ def _page_order_pass(
             cost_usd=round(sum(c.cost_usd for c in calls), 8),
             unknown_number=failed["unknown_number"],
             repeated_number=failed["repeated_number"],
+            too_much_furniture=failed["too_much_furniture"],
             no_numbers=failed["no_numbers"],
             unoffered_items=sum(p.unoffered for p in plan.pages.values()),
             applied_pages=hook.applied_pages,

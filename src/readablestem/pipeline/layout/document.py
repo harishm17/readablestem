@@ -160,7 +160,8 @@ def analyze(
     each page's text rows before the display equations are grouped, and may return them
     cut and marked by a verified plan. None (the default) is layout's own rules alone.
 
-    `page_order` (an experiment, no caller in the product): an object with `on_rows(number,
+    `page_order` (`pipeline.page_order.PageOrderHook`, given only with
+    `FEATURE_LAYOUT_MODEL_ORDER` on): an object with `on_rows(number,
     items)` and `applied(number, said)`. It is shown each page's lines, equations, figures and
     tables in the rules' order and may answer with its own blocks and order (`page._runs_by_
     answer`). None (the default) is layout's own rules alone.

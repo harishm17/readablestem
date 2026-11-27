@@ -14,7 +14,12 @@ from readablestem.models.fake import FakeVisionClient
 from readablestem.pipeline.page_order import PageOrderOutput, verify
 from readablestem.pipeline.run import convert_pdf
 
-IDS = ["r0", "r1", "r2", "e0"]
+ITEMS = [
+    {"id": "r0", "kind": "line", "text": "Chapter 2 Motion 41"},
+    {"id": "r1", "kind": "line", "text": "A ball dropped from rest falls " * 10},
+    {"id": "r2", "kind": "line", "text": "with the acceleration of gravity." * 10},
+    {"id": "e0", "kind": "equation", "text": "y = g t^2 / 2"},
+]
 TWO_COLUMNS = Path(__file__).parent / "fixtures" / "layout" / "two_column.pdf"
 
 
@@ -49,9 +54,9 @@ TWO_COLUMNS = Path(__file__).parent / "fixtures" / "layout" / "two_column.pdf"
             id="a number that is no item",
         ),
         pytest.param(
-            {"blocks": [{"kind": "paragraph", "items": [-1]}], "furniture": []},
-            "unknown_number",
-            id="a negative number",
+            {"blocks": [{"kind": "paragraph", "items": [0]}], "furniture": [1, 2]},
+            "too_much_furniture",
+            id="paragraphs called furniture",
         ),
         pytest.param(
             {"blocks": [{"kind": "paragraph", "items": [1, 2]}], "furniture": [2]},
@@ -81,7 +86,7 @@ def test_reply_becomes_an_answer_or_no_answer(reply: dict, expected: dict | str)
         with pytest.raises(ValidationError):
             PageOrderOutput.model_validate(reply)
         return
-    answer, reason = verify(PageOrderOutput.model_validate(reply), IDS)
+    answer, reason = verify(PageOrderOutput.model_validate(reply), ITEMS)
     if isinstance(expected, str):
         assert (answer, reason) == (None, expected)
     else:
