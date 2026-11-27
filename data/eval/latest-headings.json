@@ -226,6 +226,8 @@
     "pipeline.page_order.CONTEXT_CHARS": 30000,
     "pipeline.page_order.DEFAULT_EFFORT": "medium",
     "pipeline.page_order.EQUATION_CHARS": 200,
+    "pipeline.page_order.FURNITURE_CHARS": 200,
+    "pipeline.page_order.FURNITURE_SHARE": 0.08,
     "pipeline.page_witness.DEFAULT_EFFORT": "medium",
     "pipeline.page_witness.IMAGE_DPI": 200,
     "pipeline.page_witness.IMAGE_MAX_SIDE_PX": 2576,
@@ -256,7 +258,7 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "41532d4cdaf2f8f4675e30e323c771a8a8daee68",
+    "commit": "6aaad2f60afe82232cf49045411798c36445c458",
     "clean": true,
     "pipeline_version": "0.5.22",
     "render_version": 11,
