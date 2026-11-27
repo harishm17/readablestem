@@ -12,7 +12,7 @@ from __future__ import annotations
 
 import dataclasses
 import shutil
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -142,13 +142,13 @@ def test_production_refuses_a_sending_setting_the_pages_do_not_state(
         settings = prod(tmp_path, feature_page_witness=True)
     elif case == "before its start":
         # Stated today as a coming change: the notice lists it while it is off.
-        start = date.today() + timedelta(days=1)
-        dated(monkeypatch, "tables", date.today(), starts=start)
+        start = datetime.now(UTC).date() + timedelta(days=1)
+        dated(monkeypatch, "tables", start - timedelta(days=1), starts=start)
         tables = next(m for m in MATERIALS if m.key == "tables")
         coming = launch.rendered_notice(prod(tmp_path, feature_tables=False)) or ""
-        assert f"From {format_day(start)}" in coming and html_text(tables.what) in coming
+        assert f"Not before {format_day(start)}" in coming and html_text(tables.what) in coming
     else:
-        dated(monkeypatch, "tables", date.today() + timedelta(days=2))
+        dated(monkeypatch, "tables", datetime.now(UTC).date() + timedelta(days=2))
     with pytest.raises(ConfigError, match=f"production start refused: .*{match}"):
         settings.check_production()
     assert any(match.split(" ")[0] in item for item in launch.launch_blockers(settings=settings))

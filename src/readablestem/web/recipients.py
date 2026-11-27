@@ -198,6 +198,8 @@ MATERIALS: tuple[Material, ...] = (
         vendor=(("also", "whole pages, to say in what order to read them"),),
         # Stated in public as a coming change on 2026-11-27, a day before the switch goes on in
         # production (privacy.html, "Changes to this notice": before it takes effect).
+        # `stated` must be the day (UTC) the page saying so went live in production: if the
+        # deploy slips, move both days in the same commit.
         stated=date(2026, 11, 27),
         starts=date(2026, 11, 28),
         whole_pages=True,
@@ -273,13 +275,14 @@ def sent_material(settings: Settings) -> list[Material]:
     ]
 
 
-def coming_material(settings: Settings, *, today: date | None = None) -> list[Material]:
+def coming_material(settings: Settings) -> list[Material]:
     """The kinds of material these settings do not send yet that the privacy page already
-    states as coming: stated by `today` (UTC), with the day they start."""
-    today = today or datetime.now(UTC).date()
+    states as coming: stated by today (UTC), with the first day they may start."""
+    today = datetime.now(UTC).date()
     vendor = model_vendor(settings)
+    readers = tuple(dict.fromkeys(READER_COMPANIES[r] for r in settings.math_readers_on))
     return [
-        replace(m, to=(vendor,))
+        replace(m, to=readers if m.reader else (vendor,))
         for m in MATERIALS
         if not material_on(m, settings)
         and m.starts is not None

@@ -304,8 +304,8 @@
 <p>Coming changes, stated here before they take effect:</p>
 <ul>
   {% for m in coming_material %}
-  <li>From {{ m.starts_text }}, sent to {{ m.to|join(" and ") }}: {{ m.what }} {{ m.stored }}
-    Stated here on {{ m.stated_text }}.</li>
+  <li>Not before {{ m.starts_text }} (UTC), and not sent yet; to be sent to
+    {{ m.to|join(" and ") }}: {{ m.what }} {{ m.stored }} Stated here on {{ m.stated_text }}.</li>
   {% endfor %}
 </ul>
 {% endif %}
