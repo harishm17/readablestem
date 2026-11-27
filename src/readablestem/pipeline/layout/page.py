@@ -686,7 +686,8 @@ def _runs_by_answer(
     in the answer's order; an equation, figure or table stands alone whatever its block holds
     (`bad_join`); lines named as furniture are left out; lines the answer does not name are
     kept at the end in the runs the rules made of them (`left_out`). The hook is told the
-    counts (`applied(number, said)`).
+    counts (`applied(number, said)`). An answer that reads the items in the order they were
+    shown changes the grouping only: the order of the blocks is then the rules' own.
 
     Returns the runs, each one's place in the answer (None: the answer does not place it) and
     the place of each figure and table box."""
@@ -755,12 +756,14 @@ def _runs_by_answer(
     if source is not None and furniture:
         source.leave_out_at("furniture", _cut_boxes(furniture, []))
     made: list[tuple[_Run, int]] = []
+    answered: list[str] = []
     figure_places: dict[BBox, int] = {}
     for position, block in enumerate(answer.get("blocks") or ()):
         names = []
         for name in block.get("items") or ():
             if name not in used and (name in line_of or name in run_of or name in placed_of):
                 used.add(name)
+                answered.append(name)
                 names.append(name)
         if len(names) > 1 and any(name not in line_of for name in names):
             said["bad_join"] += 1
@@ -785,7 +788,14 @@ def _runs_by_answer(
     made += [(run, -1) for name, run in run_of.items() if name not in used]
     said["runs"] = len(made)
     page_order.applied(number, said)
-    return [run for run, _ in made], [p if p >= 0 else None for _, p in made], figure_places
+    places = [p if p >= 0 else None for _, p in made]
+    named = set(answered)
+    if answered == [item["id"] for item in items if item["id"] in named]:
+        # The answer reads the items in the order they were shown: the order of the blocks
+        # stays the rules' own (`_reading_order` on the finished blocks, with the captions),
+        # which the items' order only approximates.
+        places, figure_places = [None] * len(made), {}
+    return [run for run, _ in made], places, figure_places
 
 
 def _run_of_rows(rows: list[_Row], parents: dict[int, _Run]) -> _Run:
