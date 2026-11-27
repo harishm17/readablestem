@@ -195,6 +195,13 @@ def upload_and_work(
                 if job is not None and job.status in (JobStatus.QUEUED, JobStatus.RUNNING):
                     job.status = JobStatus.FAILED
                     job.error_code = "left_by_the_test"
+        # The files are made for the test (`builders`), so what they read may be committed.
+        harness.log_conversion(
+            case.file,
+            commit=True,
+            missed={"unanswered": run.worked.missed.get(job_id, 0)},
+            keys=run.worked.used.get(job_id, ()),
+        )
         run.job, run.other = site.job(job_id), site.job(behind)
         run.outputs = outputs(site, job_id)
     lines = site.logged[logged:]
