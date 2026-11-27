@@ -188,10 +188,9 @@ MATERIALS: tuple[Material, ...] = (
         short="page pictures",
         label="Pictures of whole pages, with their lines of text, to group and order the text",
         vendor=(("also", "whole pages, to say in what order to read them"),),
-        # Never stated in public before this row: a production start with the switch on is
-        # refused until this is the day the sentence went live (privacy.html, "Changes to
-        # this notice": the change is stated, with its date, before it takes effect).
-        stated=None,
+        # First stated in public with the switch release of 0.5.23 (the privacy page and the
+        # vendor line say it in the same deploy that turns the switch on).
+        stated=date(2026, 11, 27),
         whole_pages=True,
     ),
     Material(
