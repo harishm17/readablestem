@@ -64,7 +64,7 @@ EQUATION_CHARS = 200
 # `FURNITURE_CHARS` characters is no answer. On the 267 development pages the most was 5.7%
 # (running heads, page numbers, stamps); a model misled into calling paragraphs furniture
 # passes neither.
-FURNITURE_SHARE = 0.15
+FURNITURE_SHARE = 0.08
 FURNITURE_CHARS = 200
 
 Size = tuple[float, float]  # a page's width and height

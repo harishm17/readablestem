@@ -4583,7 +4583,7 @@ calls count against the job's budget and its call count like any other step.
 **The answer and its check.** The model answers with blocks (a kind and item numbers, in
 reading order) and the numbers of the lines that are furniture. `verify` accepts an answer
 only when every number is an item of the list it was shown, none is named twice, and at least
-one is named, and its furniture does not hold more than 15% of the page's line text and more
+one is named, and its furniture does not hold more than 8% of the page's line text and more
 than 200 characters (furniture is left out, so this is how an answer could take text from the
 student; on the development pages furniture held at most 5.7%). Otherwise the page has no
 answer and the rules read it; each reason is counted (`unknown_number`, `repeated_number`,

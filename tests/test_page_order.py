@@ -54,6 +54,11 @@ TWO_COLUMNS = Path(__file__).parent / "fixtures" / "layout" / "two_column.pdf"
             id="a number that is no item",
         ),
         pytest.param(
+            {"blocks": [{"kind": "paragraph", "items": [-1]}], "furniture": []},
+            "unknown_number",
+            id="a negative number",
+        ),
+        pytest.param(
             {"blocks": [{"kind": "paragraph", "items": [0]}], "furniture": [1, 2]},
             "too_much_furniture",
             id="paragraphs called furniture",
