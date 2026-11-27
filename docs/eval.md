@@ -4312,24 +4312,24 @@ release.
 
 | Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
 |---|---|---|---|---|---|---|---|
-| Required decisions a page, the median document | corpus | 0.00 | 47 documents | 0.00 | development score | - | at most 1.00 |
+| Required decisions a page, the median document | corpus | 0.00 | 47 documents | 0.00 | development score, 26 uploads set apart (answers owed) | - | at most 1.00 |
 | Pages not read right in the student page, by the scorer | layout-heldout-1 | 22.3 per 100 | 55 of 247 pages | 27.1 per 100 | held-out | at most 22.7 per 100: met | - |
-| Pages not read right in the student page, by the scorer | corpus | 9.7 per 100 | 6 of 62 pages | 18.2 per 100 | development score | at most 22.7 per 100 | - |
+| Pages not read right in the student page, by the scorer | corpus | 9.7 per 100 | 6 of 62 pages | 18.2 per 100 | development score, 13 uploads set apart (answers owed) | at most 22.7 per 100 | - |
 | Pages not read right in the student page, by the scorer | layout-dev-1 | 31.1 per 100 | 83 of 267 pages | 36.1 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
 | Documents with every gold page right | layout-heldout-1 | 42.9% | 21 of 49 documents | 30.8% | held-out | at least 40.8%: met | - |
-| Documents with every gold page right | corpus | 82.4% | 28 of 34 documents | 68.1% | development score | at least 40.8% | - |
+| Documents with every gold page right | corpus | 82.4% | 28 of 34 documents | 68.1% | development score, 13 uploads set apart (answers owed) | at least 40.8% | - |
 | Documents with every gold page right | layout-dev-1 | 35.0% | 21 of 60 documents | 24.8% | development score, 2 steps stopped early | at least 40.8% | - |
 | Pages that read a running head, a page number or a stamp aloud | layout-heldout-1 | 5.3 per 100 | 13 of 247 pages | 8.2 per 100 | held-out | at most 8.1 per 100: met | at most 2.0 per 100: not met |
-| Pages that read a running head, a page number or a stamp aloud | corpus | 4.8 per 100 | 3 of 62 pages | 12.0 per 100 | development score | at most 8.1 per 100 | at most 2.0 per 100 |
+| Pages that read a running head, a page number or a stamp aloud | corpus | 4.8 per 100 | 3 of 62 pages | 12.0 per 100 | development score, 13 uploads set apart (answers owed) | at most 8.1 per 100 | at most 2.0 per 100 |
 | Pages that read a running head, a page number or a stamp aloud | layout-dev-1 | 6.4 per 100 | 17 of 267 pages | 9.4 per 100 | development score, 2 steps stopped early | at most 8.1 per 100 | at most 2.0 per 100 |
-| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36) | - | - |
-| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | earlier release (0.5.10+62b4f1678d36) | - | none |
+| Wrong places in the html file | corpus | 182.9 per 100 | 576 in 315 pages | 195.9 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Wrong places in the docx file | corpus | 44.4 per 100 | 140 in 315 pages | 51.1 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Wrong places in the epub file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Wrong places in the canvas_index file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Wrong places in the canvas_page file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Wrong places in the cartridge file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Wrong places in the transcript file | corpus | 17.8 per 100 | 56 in 315 pages | 22.2 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | - |
+| Files that could not be built | corpus | 0.0 per 100 | 0 of 441 files | 0.7 per 100 | earlier release (0.5.10+62b4f1678d36), 10 uploads set apart (answers owed) | - | none |
 
 Read with care:
 
@@ -4992,7 +4992,13 @@ held-out layout pages agreed with development. The production profile's hash is
   | pages with paragraphs run together | 30 (106 places) | 68 (135) | |
   | pages with stray elements | 168 (789 places) | 180 (1,013) | |
 
-  The element list reads 193 right and 150 faultless (192 and 115). So on new pages, as on the
+  With 95% intervals (Wilson, each run on its own, so loose for two runs over the same
+  pages): pages right 77.7% [72.1, 82.5] against 77.3% [71.7, 82.1], no difference; documents
+  42.9% [30.0, 56.7] against 40.8% [28.2, 54.8], none; faultless 56.7% [50.4, 62.7] against
+  45.7% [39.6, 52.0]; paragraphs run together 12.1% [8.6, 16.8] against 27.5% [22.3, 33.4];
+  cut 14.6% [10.7, 19.5] against 21.1% [16.4, 26.6]; furniture 5.3% [3.1, 8.8] against 8.1%
+  [5.3, 12.2]. Only the faultless and run-together intervals do not overlap. The element list
+  reads 193 right and 150 faultless (192 and 115). So on new pages, as on the
   development pages, the step mends grouping (cut and merged paragraphs, running heads read
   aloud) and barely moves the count of pages read right in order. `eval ledger --for-release`
   passes, now with slack on all three rows: 55 of 247 not right, 21 of 49 documents, 13 of

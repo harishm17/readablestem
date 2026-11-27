@@ -11,10 +11,10 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "commit": "1f3e8cbf91345910d17147ee62c6f98711f8d6f7",
+ "commit": "4f478638eb87d6c70876b9bba246e255297d1704+changes",
  "provenance": {
-  "commit": "1f3e8cbf91345910d17147ee62c6f98711f8d6f7",
-  "clean": true,
+  "commit": "4f478638eb87d6c70876b9bba246e255297d1704",
+  "clean": false,
   "pipeline_version": "0.5.23",
   "render_version": 11,
   "tools": {
@@ -70,6 +70,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "burden-corpus.json",
      "stopped_early": 0,
+     "set_apart": 26,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -125,6 +126,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": "met"
     },
@@ -140,6 +142,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-corpus.json",
      "stopped_early": 0,
+     "set_apart": 13,
      "goal_bar": "",
      "release_bar": ""
     },
@@ -155,6 +158,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -188,6 +192,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": "met"
     },
@@ -203,6 +208,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-corpus.json",
      "stopped_early": 0,
+     "set_apart": 13,
      "goal_bar": "",
      "release_bar": ""
     },
@@ -218,6 +224,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -251,6 +258,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
+     "set_apart": 0,
      "goal_bar": "not met",
      "release_bar": "met"
     },
@@ -266,6 +274,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-corpus.json",
      "stopped_early": 0,
+     "set_apart": 13,
      "goal_bar": "",
      "release_bar": ""
     },
@@ -281,6 +290,7 @@
      "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -418,6 +428,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -445,6 +456,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -472,6 +484,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -499,6 +512,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -526,6 +540,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -553,6 +568,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -580,6 +596,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -607,6 +624,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }

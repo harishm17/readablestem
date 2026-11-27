@@ -607,6 +607,11 @@ def build(
                 "release": release_of(record),
                 "record": file,
                 "stopped_early": len(record.get("not_finished") or []),
+                # Uploads the record measured nothing of because they owe recorded answers:
+                # the figure is of the rest of the set, not of the whole set its hash names.
+                "set_apart": len(
+                    (record["metrics"].get("uploads") or {}).get("answers_missing") or {}
+                ),
             }
             judged = label == HELD_OUT
             found["goal_bar"] = _goal(row, found) if judged else ""
@@ -658,7 +663,7 @@ def register(
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """The release bars with this ledger's held-out figures written in where a row has no
     bar, or is named in `replace`; and the keys written. A figure from a run in which a step
-    stopped early is no baseline and is not written."""
+    stopped early, or that set uploads apart, is no baseline and is not written."""
     unknown = sorted(set(replace) - {row["key"] for row in ledger["rows"]})
     if unknown:
         raise Refused(f"no such row: {', '.join(unknown)}")
@@ -669,6 +674,8 @@ def register(
             continue
         for line in row["measured"]:
             if line["label"] != HELD_OUT or line["value"] is None or line["stopped_early"]:
+                continue
+            if line.get("set_apart"):
                 continue
             kept[row["key"]] = {
                 "value": line["value"],
@@ -731,6 +738,7 @@ def render(ledger: Mapping[str, Any], failed: Sequence[str] = ()) -> str:
             bar = row["release_bar"]
             for line in row["measured"]:
                 early = f", {line['stopped_early']} steps stopped early"
+                apart = f", {line.get('set_apart')} uploads set apart (answers owed)"
                 cells.append(
                     (
                         row["name"],
@@ -740,7 +748,8 @@ def render(ledger: Mapping[str, Any], failed: Sequence[str] = ()) -> str:
                         _shown(row, line["bound"]),
                         line["label"]
                         + (f" ({line['release']})" if line["label"] == EARLIER else "")
-                        + (early if line["stopped_early"] else ""),
+                        + (early if line["stopped_early"] else "")
+                        + (apart if line.get("set_apart") else ""),
                         _bar_cell(row, bar["value"] if bar else None, line["release_bar"]),
                         _bar_cell(row, row["goal"], line["goal_bar"]),
                     )

@@ -112,6 +112,19 @@ def test_a_held_out_figure_worse_than_its_release_bar_fails_the_release(
     code, made = _ledger(tmp_path, earlier, "--for-release")
     assert code == 1 and _line(made, "whole.silent_errors")["label"] == ledger.EARLIER
 
+    # A record that set uploads apart (their answers owed) measured part of its set: the
+    # ledger says so, and its figure is no new bar.
+    (tmp_path / ledger.BARS_FILE).unlink()
+    part = _record(_whole((0, 0, 0)) | {"uploads": {"answers_missing": {"a": 4, "b": 2}}})
+    code, made = _ledger(tmp_path, part, "--register-bars")
+    assert _line(made, "whole.silent_errors")["set_apart"] == 2
+    assert "2 uploads set apart" in capsys.readouterr().out
+    written = tmp_path / ledger.BARS_FILE
+    assert (
+        not written.is_file()
+        or "whole.silent_errors" not in json.loads(written.read_text())["bars"]
+    )
+
 
 def test_a_record_without_the_production_profile_hash_is_refused(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]

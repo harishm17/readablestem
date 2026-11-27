@@ -11,7 +11,10 @@
 - On held-out pages (`layout-heldout-1`, one run, $0.89), against 0.5.22 in the page a
   student is given: 192 of 247 pages right (191), 140 with no fault (113), 21 of 49 documents
   with every gold page right (20), furniture read aloud on 13 pages (20), a paragraph cut on 36
-  (52), paragraphs run together on 30 (68). Every release bar of the ledger is met with slack.
+  (52), paragraphs run together on 30 (68). Only the faultless pages (56.7% [50.4, 62.7]
+  against 45.7% [39.6, 52.0]) and the pages with paragraphs run together (12.1% [8.6, 16.8]
+  against 27.5% [22.3, 33.4]) move beyond their 95% intervals; pages right do not. Every
+  release bar of the ledger is met.
   Known fault: on a few corpus layouts of columns of short items (a two-column exam, options
   in columns, a worksheet, slides three to a page) the model runs more blocks together (39
   places to 112 on the corpus pages), and one exam page is now read wrong; an open item.
