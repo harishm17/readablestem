@@ -181,6 +181,21 @@ def test_cosmetic_difference_is_accepted_with_a_note(monkeypatch):
     assert [c.code for c in fix.failed_checks] == ["style_cosmetic"]
 
 
+def test_a_fallback_answer_the_main_model_would_have_re_read_is_a_decision(monkeypatch):
+    use_fallback_router(monkeypatch)
+    element = equation_element(display="block", text=f"{BOLD_D}\U0001d7ce")
+    client = FakeVisionClient(
+        fail_models={MAIN_MODEL: "api_error"},
+        defaults={"equation": {"is_equation": True, "latex": r"\mathbf{d}_0", "confidence": 0.97}},
+    )
+    fix = transcribe(element, b"png", client=client, settings=make_settings())
+    # Started cheap, this answer would have gone to the main model; with the main model's
+    # request failed there is no second reading to make, so a person decides.
+    assert [c.model for c in fix.calls] == [MAIN_MODEL, CHEAP_MODEL]
+    assert fix.status is Status.NEEDS_REVIEW and fix.review == "required"
+    assert {c.code for c in fix.failed_checks} == {"style_cosmetic", "fallback_not_reread"}
+
+
 def test_meaning_level_difference_needs_a_decision(monkeypatch):
     use_fallback_router(monkeypatch)
     element = equation_element(display="block", text=BOLD_OMEGA)

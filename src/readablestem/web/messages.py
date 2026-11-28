@@ -233,6 +233,12 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.single_reading", "single_reading"): "The model read this equation once, "
     "and its answer passed every check, so no second reading was made and it was accepted "
     "as it stands.",
+    ("equation.fallback_reading", "fallback_answer"): "The main model could not answer, so "
+    "the smaller model read this equation. Its answer passed every check, so it was accepted, "
+    "but it is worth a look.",
+    ("equation.fallback_reading", "fallback_not_reread"): "The main model could not answer, so "
+    "the smaller model read this equation, and a check wanted a second reading from the main "
+    "model that could not be made: compare it with the image symbol by symbol.",
     # Alt text (pipeline.validate.check_alt)
     ("alt.decorative", "decorative_with_text"): "A decorative figure must have empty alt "
     "text, so clear the text or uncheck Decorative.",
@@ -327,6 +333,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)
     ("figure.data_values", "values_from_image"): "A data table was read from the chart "
     "image, so its values may be off; it is added only if you choose to after looking at them.",
+    ("figure.fallback_reading", "fallback_answer"): "The main model could not answer, so the "
+    "smaller model described this figure. Its answer passed every check, so it was accepted, "
+    "but it is worth a look.",
     ("figure.long_description", "long_description_unsure"): "Part of the figure was hard "
     "to read, so the longer description may be wrong in places; worth a look.",
     ("figure.source_alt", "source_alt_unchecked"): "No description from the model was usable, "

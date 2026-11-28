@@ -190,6 +190,8 @@ def test_main_outage_falls_back_to_cheap():
     assert models(client) == [MAIN_MODEL, CHEAP_MODEL]
     assert [c.outcome for c in fix.calls] == ["timeout", "ok"]
     assert fix.calls[1].is_fallback and fix.status == Status.ACCEPTED
+    # A main-model request the cheap model answered says so (an optional note, no decision).
+    assert fix.review == "optional" and codes(fix) == {"fallback_answer"}
 
 
 @pytest.mark.parametrize("outcome", ["timeout", "api_error"])

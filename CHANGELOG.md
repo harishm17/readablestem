@@ -17,6 +17,20 @@
   (`gold/layout_gold.py`), and the student page counts `levels` and `levels_ok`. `right` and
   `faultless` are as before. No reader changes. Order records made before this version are not
   comparable on these counts, so the development and corpus records are re-made.
+## Unreleased: an answer from the fallback model says so
+
+- When the main model fails a request and the router's fallback (the cheap model) answers, an
+  equation or figure reading was accepted as if it were the main model's, with no note and no
+  second reading. It now carries the note `fallback_answer` (accepted, shown as an optional
+  item), and an equation whose cheap answer would have gone to the main model (a failed
+  text-layer check or a page-pass disagreement) becomes a decision (`fallback_not_reread`), since
+  no second reading can be made. No model call is added and no request changes. Counted on the 12
+  development papers (1,018 equation readings) and the 73 recorded corpus uploads: no main-model
+  request was answered by the cheap model, so no recorded result changes.
+- Equations whose text-layer comparison did not run were counted and not changed: on the 12
+  development papers 3 of 966 accepted equations (two bold letters, one with operators only), all
+  right; on the corpus 84 of 1,077 (70 bold letters read from the file with no model call, 14 with
+  operators or marks only), none with an unmapped font and none with no characters.
 
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 
