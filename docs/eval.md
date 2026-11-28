@@ -2927,7 +2927,7 @@ the same way. Its counts per page:
 | Count | Meaning |
 |---|---|
 | found | at least half of a gold block's words are on the page |
-| moved | a block not found on the page, whose words are whole in the paragraph the page next to it keeps across the break (the first block of the page and the page before, or its last and the page after) |
+| moved | a block not found on the page, whose words are whole in the paragraph the page next to it keeps across the break (the page's first block and the last three text elements of the page before, or its last block and the first three of the page after) |
 | lost | a block neither found nor moved |
 | flow | the block's word 4-grams that appear unbroken in the page's word stream |
 | broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |

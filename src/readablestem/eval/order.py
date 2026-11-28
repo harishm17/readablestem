@@ -11,8 +11,9 @@ Per page, over the gold blocks whose role is not `dropped`:
 - `moved`: a block that is not found on the page but is whole in the output of the page next
   to it, in a paragraph that runs across the break (a paragraph layout rightly joins to the one
   it continues from, which the output keeps on the page where it starts). Only a block that
-  stands first on its page (the page before) or last (the page after) can be moved. `lost`
-  is the blocks that are neither found nor moved.
+  stands first on its page (looked for among the last three text elements of the page before:
+  a footnote can follow the paragraph) or last (among the first three of the page after) can
+  be moved. `lost` is the blocks that are neither found nor moved.
 - `flow_ok` of `flow_tot`: the block's word 4-grams that appear, unbroken, in the page's
   word stream (every element's words, in output order). A sentence cut by another column's
   line, or read in the wrong order inside a block, loses 4-grams.
@@ -85,7 +86,7 @@ import re
 import statistics
 import unicodedata
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
 VERSION = 6
@@ -415,30 +416,38 @@ def _prepared(elements: Iterable[Element]) -> list[dict[str, Any]]:
     return heard
 
 
-def _edge(heard: list[dict[str, Any]], *, last: bool) -> dict | None:
-    """The last (or first) element of a page that holds text, or None."""
+EDGE = 3  # elements at a page's end that can hold a paragraph that runs across the break
+
+
+def _edge(heard: list[dict[str, Any]], *, last: bool) -> list[dict[str, Any]]:
+    """The last (or first) few elements of a page that hold text: a paragraph that runs
+    across the break can be followed on its page by a footnote or an address."""
     texty = [e for e in heard if e["tk"] and e["kind"] not in NOT_TEXT]
-    return (texty[-1] if last else texty[0]) if texty else None
+    return texty[-EDGE:] if last else texty[:EDGE]
 
 
-def _runs_across(tokens: list[str], edge: dict | None) -> bool:
-    """Whether `edge`, the output element standing next to a page break, holds a block's
-    text and more: the paragraph that runs across the break."""
-    if edge is None or len(edge["tk"]) <= len(tokens):
-        return False
-    if len(tokens) <= 3:
-        return _holds(edge["tk"], tokens)
+def _runs_across(tokens: list[str], edge: Sequence[dict[str, Any]]) -> bool:
+    """Whether one of `edge`, the output elements standing next to a page break, holds a
+    block's text and more: the paragraph that runs across the break."""
     shingles = _shingles(tokens)
-    return bool(shingles) and len(shingles & edge["sh"]) / len(shingles) >= 0.5
+    return any(
+        len(element["tk"]) > len(tokens)
+        and (
+            _holds(element["tk"], tokens)
+            if len(tokens) <= 3
+            else bool(shingles) and len(shingles & element["sh"]) / len(shingles) >= 0.5
+        )
+        for element in edge
+    )
 
 
 def _element_counts(
     blocks: list[dict],
     elements: list[dict],
-    before: dict | None = None,
-    after: dict | None = None,
+    before: Sequence[dict[str, Any]] = (),
+    after: Sequence[dict[str, Any]] = (),
 ) -> dict:
-    """The first scorer's counts. `before` and `after` are the last text element of the page
+    """The first scorer's counts. `before` and `after` are the last text elements of the page
     before and the first of the page after, for a block that is moved."""
     read = [b for b in blocks if b["role"] != "dropped"]
     row = dict.fromkeys(
