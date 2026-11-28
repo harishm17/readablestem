@@ -447,7 +447,16 @@ log = logging.getLogger(__name__)
 # opens a 0.5.23 result, and results from 0.5.10 to 0.5.22 load unchanged
 # (`assemble.RENDER_VERSION` stays 11). The switch goes back alone with its profile row and the
 # Railway variable of the same name. The roll-back limit stays at 0.5.12.
-PIPELINE_VERSION = "0.5.23"
+# 0.5.24 (2026-11-28): one raise for wave 10 (CHANGELOG.md has each change). FLAG_POLICY goes
+# back on in the production profile (docs/eval-flag-policy.md, held-out equations), so an
+# accepted equation that looks like an old misread is asked about again. A page that carries the
+# model's page order answer can read differently: a block of a question and its options is cut
+# at each printed item, and a note the model names, small and low on the page, is read last. A
+# main-model request that the fallback model answered carries a note or a decision. No request
+# changes; the result's schema is the same, so 0.5.23 opens a 0.5.24 result, results from 0.5.10
+# to 0.5.23 load unchanged (`assemble.RENDER_VERSION` stays 11), and the roll-back limit stays
+# at 0.5.12.
+PIPELINE_VERSION = "0.5.24"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

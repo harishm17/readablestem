@@ -3,8 +3,9 @@
 `FLAG_POLICY` (docs/steps.md, "Flag policy") asks for a decision on an accepted equation that looks
 like the readings that turned out wrong. This page says how it was fitted and what it does, measured on
 recorded runs only: no model call, no PDF, $0. The setting is off in code. It was on in production
-from 2026-11-03 until the 0.5.22 release (2026-11-26) and is off from that release, on the last section's evidence, which measures it on today's
-readings; the sections before it are the record of what was measured then.
+from 2026-11-03 until the 0.5.22 release (2026-11-26), off in 0.5.22 and 0.5.23 on the evidence of the
+development papers, and on again from 0.5.24 (2026-11-28) on the evidence of held-out papers (the last
+section before "Reproduce"); the sections before it are the record of what was measured then.
 
 ## Method
 
@@ -205,6 +206,34 @@ today's models with at least 15 to 20 wrong and accepted equations (about 2,000 
 25 papers at today's 0.8%); with that many a rule that finds a third of them at 19 questions per 12 papers
 stands out from picking blind, and one that finds none does not. That is a paid recording and a fresh set;
 it is not made here.
+
+## 2026-11-27: asked on held-out papers (the setting goes on again)
+
+The held-out equation parts were read once at 0.5.23 under the production profile. They are strata A to
+C of the fresh set, with 26 units, 1,715 gold equations and 131 PDF pages, and the run paid $1.54. The
+same answers were then replayed with `FLAG_POLICY` on, at $0 and with no request unanswered. The
+readings are the same in both arms, because the policy only adds questions. The scores are 0.848
+spoken-equal end to end in both arms, against 0.833 for the Opus chatbot. The intervals are 95% cluster
+bootstraps over units.
+
+| Held-out, strata A to C | Off (0.5.23) | On |
+|---|---|---|
+| Silent errors per 100 gold (wrong, not asked) | 5.71 [3.44, 8.05] | 4.78 [3.07, 6.48] |
+| Flag recall | 0.395 | 0.483 |
+| Required decisions per PDF page | 2.01 | 2.36 |
+
+On minus off for silent errors: -0.93, 95% [-1.88, -0.20], sign-flip p 0.031 (A -0.64, B -3.70, C 0).
+About 16 misreads become questions for about 46 more questions. That is about one in three, inside the 33%
+to 67% of the first validation.
+
+### Decision
+
+`FLAG_POLICY` is `true` in the production profile from 0.5.24. Its 0 of 19 on the development papers came
+from a set with too few wrong readings to judge the policy; the section above said so. This set has enough,
+and the policy finds about a third of them at about one more question every three pages. The two bars of
+the equation claim that this run does not meet stay unmet: silent errors at most 4.0 a hundred, and flag
+recall at least 0.60 at 4 decisions a page. The decision is about the setting, not about that claim. The
+fresh set has now settled this decision, so it is no longer a fresh test of the policy.
 
 ## Reproduce
 
