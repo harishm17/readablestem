@@ -1644,9 +1644,12 @@ class Worker:
                         .values(
                             lease_until=self.clock(),
                             # The attempt was cut short by us, not by the job: it is given back,
-                            # or a job met by three deploys would fail (`requeue_expired`). A
-                            # crash never gets here and still counts.
-                            attempts=Job.attempts - 1,
+                            # or a job met by three deploys would fail (`requeue_expired` counts
+                            # `attempts - attempts_at_retry`). `attempts` itself is left alone so
+                            # each claim keeps its own number and `_owned` never matches a
+                            # stopped worker's late write. A crash never gets here and still
+                            # counts.
+                            attempts_at_retry=Job.attempts_at_retry + 1,
                         )
                         .execution_options(synchronize_session=False)
                     )

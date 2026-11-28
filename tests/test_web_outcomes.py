@@ -384,7 +384,8 @@ def test_a_job_stopped_by_shutdown_keeps_its_attempts(env):
         assert env.worker().requeue_expired() == (1, 0)
     assert env.job(job_id).status == "queued"
     claim = env.worker().claim()
-    assert claim is not None and claim.attempt == 1  # the stopped attempts were given back
+    # The stopped attempts were given back, and each claim kept a number of its own.
+    assert claim is not None and claim.attempt == MAX_ATTEMPTS + 2
 
 
 # --------------------------------------------------------------------------- scanned pages
