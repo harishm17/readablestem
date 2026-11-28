@@ -69,15 +69,15 @@
   with a model answer change; with the switch off nothing does.
 - Measured by replaying the recorded answers (`eval order --model-order`, no model call), against
   0.5.23: on the corpus, places where neighbouring blocks are read as one go from 112 to 24
-  (62 pages: 56 to 58 right, 37 to 40 with no fault, no heading read into its neighbour) and the
-  two-column exam page is read right. On `layout-dev-1`: 184 pages right to 186, 140 with no
-  fault to 141, cut 325 places as before, run together 67 places to 65, heading run together 16
-  as before. No recorded answer is missed on either set. A version bump is owed when this is
-  released: the output of pages that carry a model answer changes.
+  (62 pages: 56 to 57 right, 37 to 39 with no fault, no heading read into its neighbour) and the
+  two-column exam page is read right. On `layout-dev-1`: 184 pages right as before, cut 325
+  places as before, run together 67 places to 65, heading run together 16 as before. No
+  recorded answer is missed on either set. Released in 0.5.24.
 - A note the model names a footnote, and that is small and low on the page, is read at the end
   of the page, after the other blocks, as a source's notes are. In two columns the model had
   left it where its column ends, in the middle of the page; two pages of `layout-dev-1` and one
-  corpus page are read right now.
+  corpus page are read right now. With the item cut: `layout-dev-1` 184 to 186 pages right and
+  140 to 141 with no fault; the corpus 56 to 58 and 37 to 40.
 ## Unreleased: olmOCR-Bench with the model's page order
 
 - `eval parsing-bench --model-order` runs the benchmark with the model's page order on, as
@@ -88,9 +88,11 @@
   and stops asking once N dollars are spent; the pages left are counted as missed. The run
   record (`run.model_order`) and the printed table say how many pages were asked, answered,
   missed and failed, and the dollars paid. A page file made in the other mode is converted
-  again, so one run folder never mixes them. The committed record
-  (`data/eval/parsing-bench-olmocr.json`, made with no model at 0.5.16) is unchanged; the
-  live run that remakes it is the integrating session's.
+  again, so one run folder never mixes them. A live run resumed after its cap asks again the
+  pages the cap left missed. The committed record (`data/eval/parsing-bench-olmocr.json`) is
+  re-made with the model's page order at 0.5.23 ($0.68): multi_column 77.5, headers_footers
+  84.0, long_tiny_text 65.1, tables 70.6 (75.1, 47.9, 61.4 and 70.6 with no model; the record
+  it replaces, with no model at 0.5.16, read 70.2, 38.4, 37.3).
 
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 

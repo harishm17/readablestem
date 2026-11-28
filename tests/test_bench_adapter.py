@@ -168,3 +168,35 @@ def test_a_page_order_answer_the_recording_lacks_is_counted_and_never_asked(
         0,
     )
     assert bench.order_summary({"x.pdf": bench.convert_page(document.tobytes())})["on"] is False
+
+
+def test_a_live_run_asks_again_the_pages_an_earlier_cap_left_missed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A live run stopped by its cap writes the rest of its pages with `missed`; resuming it
+    # must ask those again, and leave the answered ones alone.
+    category = bench.CATEGORIES[0]
+    pdfs = tmp_path / "bench" / "bench_data" / "pdfs" / category.folder
+    pages = tmp_path / "run" / "pages" / category.folder
+    pdfs.mkdir(parents=True)
+    pages.mkdir(parents=True)
+    for name, missed in (("answered", 0), ("missed", 1)):
+        (pdfs / f"{name}.pdf").write_bytes(b"%PDF")
+        (pages / f"{name}.json").write_text(json.dumps({"model_order": {"missed": missed}}))
+    converted: list[str] = []
+    monkeypatch.setattr(
+        bench,
+        "_convert_file",
+        lambda pdf, page, answers=None: converted.append(Path(pdf).stem) or "",
+    )
+
+    class Live:
+        live = True
+
+    assert (
+        bench.convert_all(
+            tmp_path / "bench", tmp_path / "run", [category], at_once=1, answers=Live()
+        )
+        == 1
+    )
+    assert converted == ["missed"]

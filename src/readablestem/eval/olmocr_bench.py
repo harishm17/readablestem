@@ -556,17 +556,26 @@ def convert_all(
     answers: Any = None,
 ) -> int:
     """Convert every PDF of `categories` whose page file is not in `run_dir/pages` yet (or
-    was made with the page order in the other mode), at most `at_once` at a time, each in a
+    was made with the page order in the other mode, or, in a live run, missed an answer
+    because an earlier run's cap stopped asking), at most `at_once` at a time, each in a
     process of its own. A live run (`answers.live`) converts one page at a time in this
     process, so that its dollar cap is the run's. Returns how many were converted now."""
+    live = answers is not None and answers.live
     todo: list[tuple[str, str]] = []
     for category in categories:
         names = pdfs_of(folder, category)[:limit]
         for name in names:
             page = (run_dir / "pages" / name.removesuffix(".pdf")).with_suffix(".json")
-            if not page.is_file() or bool(
+            order = (
                 json.loads(page.read_text(encoding="utf-8")).get("model_order")
-            ) != (answers is not None):
+                if page.is_file()
+                else None
+            )
+            if (
+                not page.is_file()
+                or bool(order) != (answers is not None)
+                or (live and order and order.get("missed", 0) > 0)
+            ):
                 todo.append((str(folder / "bench_data" / "pdfs" / name), str(page)))
     if not todo:
         return 0

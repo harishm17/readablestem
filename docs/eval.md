@@ -817,11 +817,12 @@ uv run readablestem eval parsing-bench --model-order --live --max-usd 1.0 \
 ```
 
 A stopped live run resumes with the same `--run-dir` and `--order-answers`: the pages it
-converted keep their answers, and only the rest are asked. The cap is per run, so give the rest a
+converted keep their answers, and only the rest are asked, among them the pages an earlier
+run's cap left with a missed answer. The cap is per run, so give the rest a
 cap of its own. A cap below eight worst-case reservations ($0.52) is refused before anything is
 converted.
 
-Measured on 2026-11-28 at 0.5.23. Both rows ran on the same pages, 747 converted and 161 scans
+Measured on 2026-11-27 at 0.5.23. Both rows ran on the same pages, 747 converted and 161 scans
 dropped. The live pass asked about 589 pages: 558 answers held, 31 did not pass the check, and
 it paid $0.68. The record is `data/eval/parsing-bench-olmocr.json`.
 
@@ -3911,7 +3912,7 @@ not reset. `eval burden --same` against this record passes.
 
 **The 0.5.23 record** (made 2026-11-27 by `eval burden --out`, production profile
 `5c69095dc28d`, the model's page order on): 47 uploads,
-110 pages, 71 decisions, 0.646 a page. The 26 uploads of the 25 files kept out of the
+110 pages, 71 decisions, 0.645 a page. The 26 uploads of the 25 files kept out of the
 repository owe 436 answers under the new grouping (page orders, and crops whose nearby text
 moved) and are listed as owed, not measured; they hold the equation-heavy uploads, so the
 figures are not comparable with the record below. The bar was not judged (73 uploads then,
@@ -4470,15 +4471,16 @@ Read with care:
 - The held-out lines count 247 gold pages of 49 documents; two more documents are too long
   for a job and are not measured. A release bar is held as measured, with no bound: 56 of
   247 pages not right allows up to 27.5 in 100 at 95%.
-- The furniture row meets its release bar and not its goal: 20 of 247 held-out pages read a
+- The furniture row meets its release bar and not its goal: 13 of 247 held-out pages read a
   running head, a page number or a stamp aloud, and the goal is 2 in 100. The fall from 36
-  fits arXiv's stamp alone (24 stamps no longer read in the text); running heads and page
-  numbers are not counted apart, and nothing says they are read less.
+  to 20 (0.5.19 to 0.5.20) fits arXiv's stamp alone (24 stamps no longer read in the text);
+  the fall from 20 to 13 came with the model's page order (0.5.23), which names running heads
+  as furniture. Running heads and page numbers are not counted apart.
 - `layout-dev-1` has two documents in which a step stopped early (a limit on work, the same
   on every machine); its lines say so.
-- Every gold page is right in 40 of 47 corpus documents, 20 of 60 documents of
-  `layout-dev-1` and 20 of 49 held-out documents. A document's gold pages are the ones
-  labeled, which in a layout set is a sample of its pages.
+- Every gold page is right in 30 of 34 corpus documents (the 13 that owe answers are set
+  apart), 21 of 60 documents of `layout-dev-1` and 22 of 49 held-out documents. A document's
+  gold pages are the ones labeled, which in a layout set is a sample of its pages.
 - The output rows are the 0.5.10 record (`eval outputs` has not been run again since). They
   count places, and one fault can be many places: most of the HTML file's are proposals
   still open that the page does not mark (`eval outputs`, above).
@@ -5156,7 +5158,8 @@ and changes how the rules use the model's page order: a model block is cut at ea
 item marker under a short, indented or differently set line, and a block the model calls a
 footnote, set in small type in the lower part of the page, is read last. An equation or a
 figure read by the fallback model now says so (`equation.fallback_reading`,
-`figure.fallback_reading`, a note). No request to a model changes, so every recording
+`figure.fallback_reading`: a note; an equation whose fallback reading is not read again
+becomes a decision). No request to a model changes, so every recording
 replays and this release paid nothing for its own measures. The production profile's hash
 is `4e6db211ccc1`. Measured on the release branch, with the scorer at version 6 (`eval
 order`, "Why a page is not right"):
@@ -5177,7 +5180,7 @@ order`, "Why a page is not right"):
   go from 112 to 24: the open item of the last release is closed by the item cut.
 - **The held-out run.** `layout-heldout-1` for 0.5.24 (2026-11-27, `eval order --set
   layout-heldout-1 --for-release --model-order --live --max-usd 1.6`, the same command as
-  0.5.23's). It asked for the 1,013 page orders and every one was in the recording of
+  0.5.23's, with `FLAG_POLICY` on as in the profile of this release). It asked for the 1,013 page orders and every one was in the recording of
   0.5.23's run, so it paid $0; 26 answers failed the check and kept the rules, as in
   0.5.23. **It was run twice.** The first run (the release branch at `732a9968`, clean) was
   given no `--out`, so it printed its totals and wrote no record; the stop rule had listed it.
@@ -5216,6 +5219,11 @@ order`, "Why a page is not right"):
   more call that asks the model for heading levels (248 of 338 at the right level against 250
   for the reader's own). Box heights as a heading-level signal were worse than the reader's
   levels and are a note in docs/eval-image-pages.md.
+
+**The deploy.** Production reads `FLAG_POLICY` from its Railway variable, not from the
+profile, and a profile not yet confirmed against the dashboard only warns on a difference. So
+the release sets the variable (`railway variable set -s web --skip-deploys FLAG_POLICY=true`)
+before the deploy, and after it the start-up log has no `profile_mismatch` line.
 
 **What these numbers do not show.** The held-out run is the same 247 pages of 49 documents
 as 0.5.23's, with the same recorded answers, so what changed between the two runs is the

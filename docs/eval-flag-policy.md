@@ -4,7 +4,7 @@
 like the readings that turned out wrong. This page says how it was fitted and what it does, measured on
 recorded runs only: no model call, no PDF, $0. The setting is off in code. It was on in production
 from 2026-11-03 until the 0.5.22 release (2026-11-26), off in 0.5.22 and 0.5.23 on the evidence of the
-development papers, and on again from 0.5.24 (2026-11-28) on the evidence of held-out papers (the last
+development papers, and on again from 0.5.24 (2026-11-27) on the evidence of held-out papers (the last
 section before "Reproduce"); the sections before it are the record of what was measured then.
 
 ## Method
@@ -219,8 +219,8 @@ bootstraps over units.
 | Held-out, strata A to C | Off (0.5.23) | On |
 |---|---|---|
 | Silent errors per 100 gold (wrong, not asked) | 5.71 [3.44, 8.05] | 4.78 [3.07, 6.48] |
-| Flag recall | 0.395 | 0.483 |
-| Required decisions per PDF page | 2.01 | 2.36 |
+| Flag recall | 0.395 [0.234, 0.569] | 0.483 [0.342, 0.633] |
+| Required decisions per PDF page | 2.01 [1.15, 3.43] | 2.36 [1.50, 3.74] |
 
 On minus off for silent errors: -0.93, 95% [-1.88, -0.20], sign-flip p 0.031 (A -0.64, B -3.70, C 0).
 About 16 misreads become questions for about 46 more questions. That is about one in three, inside the 33%
@@ -243,8 +243,14 @@ uv run python -m readablestem.eval.flag_features report --json report.json
 uv run python -m readablestem.eval.flag_features dump rows.jsonl
 ```
 
-The three arms of the last section: `uv run --no-sync python scripts/flag_policy_arms.py REPLAY_FOLDER`,
-on the folder of an equation replay of the development papers (docs/eval.md).
+The three arms of the development papers: `uv run --no-sync python scripts/flag_policy_arms.py
+REPLAY_FOLDER`, on the folder of an equation replay of the development papers (docs/eval.md).
+
+The held-out section: `uv run --no-sync python -I scripts/flag_policy_heldout.py TAG --part fresh5a
+[--flag-policy]` for each of the parts `fresh5a` to `fresh5c` (a live run with a cap, `--max-usd`; the
+second arm replays the first's answers at $0). Its totals, both arms with their intervals and the
+paired differences, scored as the registered fresh5 arms are (docs/eval-equation-fresh5.md), are
+`data/eval/flag-policy-heldout.json` (counts only: no unit is named).
 
 Needs the cached runs (`~/.cache/readablestem/realworld/runs`, `~/.cache/a11y-stem/round4/on.jsonl`), which are
 not in the repository. `report` says whether the constants in `flag_policy.py` equal the fit it just made.
