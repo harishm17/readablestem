@@ -10,11 +10,15 @@
   with a model answer change; with the switch off nothing does.
 - Measured by replaying the recorded answers (`eval order --model-order`, no model call), against
   0.5.23: on the corpus, places where neighbouring blocks are read as one go from 112 to 24
-  (62 pages: 56 to 57 right, 37 to 39 with no fault, no heading read into its neighbour) and the
-  two-column exam page is read right. On `layout-dev-1`: 184 pages right as before, cut 325
-  places as before, run together 67 places to 65, heading run together 16 as before. No
-  recorded answer is missed on either set. A version bump is owed when this is released: the
-  output of pages that carry a model answer changes.
+  (62 pages: 56 to 58 right, 37 to 40 with no fault, no heading read into its neighbour) and the
+  two-column exam page is read right. On `layout-dev-1`: 184 pages right to 186, 140 with no
+  fault to 141, cut 325 places as before, run together 67 places to 65, heading run together 16
+  as before. No recorded answer is missed on either set. A version bump is owed when this is
+  released: the output of pages that carry a model answer changes.
+- A note the model names a footnote, and that is small and low on the page, is read at the end
+  of the page, after the other blocks, as a source's notes are. In two columns the model had
+  left it where its column ends, in the middle of the page; two pages of `layout-dev-1` and one
+  corpus page are read right now.
 
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 

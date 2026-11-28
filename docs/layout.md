@@ -4622,6 +4622,14 @@ the column before it. A row that only looks like an item (a wrapped line that op
 "(b)", a formula that opens with a bullet glyph) is not cut, because it continues the line
 above at the same edge and weight.
 
+**Notes at the end of the page.** A block the model names a `footnote` is placed after every
+other block of the page, in the order the notes were named, when layout agrees: every line of
+it is set smaller than the body (`FOOTNOTE_SIZE`) and starts low on the page
+(`FOOTNOTE_ZONE`). The model reads a note at the foot of its column, which in two columns is
+the middle of the page; a source's notes come last. A block named a footnote that is not
+small and low keeps the place the model gave it. Neither the rules nor the model's order did
+this before; on `layout-dev-1` four pages had a note read mid-page.
+
 **With page math.** Both on is three layout passes: the page math pass makes its second run
 on the page the first collected, the order items are collected again on that page, and the
 order pass applies last, laying the math plan over layout again. A page whose items differ
