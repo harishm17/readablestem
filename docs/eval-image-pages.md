@@ -128,7 +128,7 @@ did not run ($0.24 of the $0.77).
   the best tolerance tried (15 %) gets 40, and the reader's own level is still the better one (fixes
   7, breaks 15). The reader's two common faults are not size faults: it numbers "Answer:" one level
   deeper than "Check your learning" although both are set in the same size, and it numbers the equal
-  "Part A" to "Part D" headings 1 or 2 by whim.
+  "Part A" to "Part D" headings 1 or 2 inconsistently.
 - **Review load.** 3.5 to 3.8 required decisions per page: 116 display equations, 9 tables and 2 to 4
   figures, nothing else, in every arm (prose and headings were optional notes unless a model said
   `medium`: 3 to 5 blocks of 600). It is the design, not a finding: all of them are the tier "required for
