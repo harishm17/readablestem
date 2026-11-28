@@ -7,7 +7,7 @@
  },
  "profile": {
   "name": "production",
-  "sha256": "5c69095dc28d3df9ff493fb66904649c749f87d1cf2480db2162ded1cc9b8e39",
+  "sha256": "4e6db211ccc1c3326f5a00ecdd25283f9c15cf9ea0948b970bff2b5729308de4",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.23",
- "commit": "38dd78672e7202e76688c0468b598f464e6245fe",
+ "pipeline_version": "0.5.24",
+ "commit": "b9b7168081dd30333f05b50c21f3b77bf02e8f61+changes",
  "provenance": {
-  "commit": "38dd78672e7202e76688c0468b598f464e6245fe",
-  "clean": true,
-  "pipeline_version": "0.5.23",
+  "commit": "b9b7168081dd30333f05b50c21f3b77bf02e8f61",
+  "clean": false,
+  "pipeline_version": "0.5.24",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -68,20 +68,20 @@
    "not_measured": []
   },
   "pages": 110,
-  "decisions": 71,
-  "per_page": 0.6455,
+  "decisions": 72,
+  "per_page": 0.6545,
   "document": {
    "p50": 0.0,
-   "p95": 5.0,
-   "mean": 0.7358,
+   "p95": 4.5,
+   "mean": 0.7238,
    "max": 8.0
   },
   "page": {
    "p50": 0,
    "p95": 4,
-   "mean": 0.6455,
+   "mean": 0.6545,
    "max": 9,
-   "none": 0.7273
+   "none": 0.7182
   },
   "kinds": {
    "dense_math": {
@@ -99,12 +99,12 @@
    "figure": {
     "pages": 20,
     "documents": 7,
-    "decisions": 19,
-    "per_page": 0.95,
+    "decisions": 20,
+    "per_page": 1.0,
     "page": {
      "p50": 1,
      "p95": 3,
-     "mean": 0.95,
+     "mean": 1.0,
      "max": 3
     }
    },
@@ -135,31 +135,31 @@
    "table": {
     "pages": 20,
     "documents": 16,
-    "decisions": 9,
-    "per_page": 0.45,
+    "decisions": 8,
+    "per_page": 0.4,
     "page": {
      "p50": 0,
      "p95": 2,
-     "mean": 0.45,
-     "max": 5
+     "mean": 0.4,
+     "max": 4
     }
    },
    "typical": {
     "pages": 49,
     "documents": 29,
-    "decisions": 13,
-    "per_page": 0.2653,
+    "decisions": 14,
+    "per_page": 0.2857,
     "page": {
      "p50": 0,
      "p95": 2,
-     "mean": 0.2653,
+     "mean": 0.2857,
      "max": 5
     }
    }
   },
   "items": {
    "figure": 29,
-   "equation": 18,
+   "equation": 19,
    "paragraph": 12,
    "heading": 6,
    "list_item": 3,
@@ -239,6 +239,10 @@
     "per_100_pages": 1.82
    },
    "empty": {
+    "decisions": 1,
+    "per_100_pages": 0.91
+   },
+   "flag_policy": {
     "decisions": 1,
     "per_100_pages": 0.91
    },
@@ -377,37 +381,6 @@
     "optional": []
    },
    {
-    "upload": "e1_mc_columns",
-    "pages": 1,
-    "decisions": 5,
-    "per_page": 5.0,
-    "asked": [
-     [
-      "p1-e2",
-      2
-     ],
-     [
-      "p1-e4",
-      2
-     ],
-     [
-      "p1-e6",
-      2
-     ],
-     [
-      "p1-e10",
-      2
-     ],
-     [
-      "p1-e16",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e12"
-    ]
-   },
-   {
     "upload": "f1_notation",
     "pages": 2,
     "decisions": 9,
@@ -457,6 +430,33 @@
      "p1-e20",
      "p1-e22",
      "p2-e0"
+    ]
+   },
+   {
+    "upload": "e1_mc_columns",
+    "pages": 1,
+    "decisions": 4,
+    "per_page": 4.0,
+    "asked": [
+     [
+      "p1-e3",
+      2
+     ],
+     [
+      "p1-e11",
+      2
+     ],
+     [
+      "p1-e17",
+      2
+     ],
+     [
+      "p1-e27",
+      2
+     ]
+    ],
+    "optional": [
+     "p1-e19"
     ]
    },
    {
@@ -630,10 +630,31 @@
     "optional": []
    },
    {
+    "upload": "s18_exam_twocol",
+    "pages": 3,
+    "decisions": 3,
+    "per_page": 1.0,
+    "asked": [
+     [
+      "p2-e7",
+      2
+     ],
+     [
+      "p3-e10",
+      2
+     ],
+     [
+      "p3-e11",
+      2
+     ]
+    ],
+    "optional": []
+   },
+   {
     "upload": "r15_openstax_chem_ch3",
     "pages": 10,
-    "decisions": 8,
-    "per_page": 0.8,
+    "decisions": 9,
+    "per_page": 0.9,
     "asked": [
      [
       "p3-e6",
@@ -654,6 +675,10 @@
      [
       "p8-e3",
       4
+     ],
+     [
+      "p8-e16",
+      2
      ],
      [
       "p9-e10",
@@ -680,23 +705,6 @@
      "p5-e1",
      "p5-e14"
     ]
-   },
-   {
-    "upload": "s18_exam_twocol",
-    "pages": 3,
-    "decisions": 2,
-    "per_page": 0.6667,
-    "asked": [
-     [
-      "p3-e10",
-      2
-     ],
-     [
-      "p3-e11",
-      2
-     ]
-    ],
-    "optional": []
    },
    {
     "upload": "r20_newsletter_drp",

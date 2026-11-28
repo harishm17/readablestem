@@ -2,10 +2,10 @@
   "schema_version": 1,
   "task": "headings",
   "date": "2026-11-27",
-  "pipeline_version": "0.5.23",
+  "pipeline_version": "0.5.24",
   "profile": {
     "name": "development settings",
-    "sha256": "5c69095dc28d3df9ff493fb66904649c749f87d1cf2480db2162ded1cc9b8e39",
+    "sha256": "4e6db211ccc1c3326f5a00ecdd25283f9c15cf9ea0948b970bff2b5729308de4",
     "confirmed": false,
     "differs": [
       "CHEAP_MODEL",
@@ -20,6 +20,7 @@
       "FEATURE_LONG_DESCRIPTIONS",
       "FEATURE_NOTATION_MEMORY",
       "FEATURE_TABLES",
+      "FLAG_POLICY",
       "LAYOUT_DISPLAY_GROUPING",
       "LAYOUT_FIGURE_ART",
       "LAYOUT_INLINE_JOINS",
@@ -132,6 +133,7 @@
     "pipeline.equation_step.MAX_OUTPUT_TOKENS": 2048,
     "pipeline.equation_step.MEANING_MISMATCH_FACTOR": 0.6,
     "pipeline.equation_step.NOTE_CODES": [
+      "fallback_answer",
       "glyph_reconciled",
       "number_dropped",
       "single_reading",
@@ -151,6 +153,7 @@
     "pipeline.figure_step.MAX_LABEL_CHARS": 600,
     "pipeline.figure_step.MAX_OUTPUT_TOKENS": 1024,
     "pipeline.figure_step.NOTE_CODES": [
+      "fallback_answer",
       "long_description_unsure",
       "redundant_prefix",
       "second_check_mismatch",
@@ -259,9 +262,9 @@
     "pipeline.witness_reconcile.TIE_BELOW": 0.05
   },
   "provenance": {
-    "commit": "13f0f63123130030d8ee0eee0b88d8f626249f03",
+    "commit": "3ae1132b19f31f6005d787e938f99ee30c368492",
     "clean": true,
-    "pipeline_version": "0.5.23",
+    "pipeline_version": "0.5.24",
     "render_version": 11,
     "tools": {
       "pandoc": "pandoc 3.7.0.2",

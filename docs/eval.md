@@ -31,7 +31,7 @@ system.
 Two version numbers exist and they are not the same thing. `__version__` in
 `src/readablestem/__init__.py` (0.1.0) is the package's own and has not been bumped for
 pipeline changes. The version a result is measured under is the **pipeline version**,
-`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.23 as of 2026-11-27; its comment lists what
+`PIPELINE_VERSION` in `src/readablestem/pipeline/run.py` (0.5.24 as of 2026-11-27; its comment lists what
 each bump changed). Every report records it as `pipeline_version`, and so does a converted
 document (`DocumentResult.pipeline_version`); `eval gate` lists a change of it under the
 table. A number in these docs is quoted with the pipeline version that produced it, and a
@@ -43,14 +43,14 @@ The committed development-set reports (checked against the files by `tests/test_
 | File | Run date | Pipeline | Models |
 |---|---|---|---|
 | `baseline-equations.json`, `baseline-figures.json`, `baseline-headings.json`, `baseline-document.json`, `baseline-tables-local.json` | 2026-10-14 | 0.5.0 | claude-opus-5-5, claude-haiku-5-5 (figure judge: claude-opus-5-5; tables local calls no model) |
-| `latest-headings.json`, `latest-tables-local.json` | 2026-11-27 | 0.5.23 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
+| `latest-headings.json`, `latest-tables-local.json` | 2026-11-27 | 0.5.24 | headings: the fake client (`eval pipeline --task headings --fake`; the task calls no model, so the model names in the file are only the defaults of a checkout with no settings); tables local: no model. `make reproduce-rerun` makes both again with no key and compares the headline numbers |
 | `latest-figures.json` | 2026-10-14 | 0.5.0 | same. **Historical record**: not gated |
 | `latest-equations.json`, `latest-document.json` | 2026-10-21 | 0.5.0 | same (the equation prompt changed after the baseline: `equation-df0e12f1` to `equation-68ebbbf9`). **Historical record**: not gated |
 
 **What CI holds a pull request to.** The gate measures the code as it is: a `latest-*.json`
 report is held to its baseline only when this pipeline version made it (`eval gate
 --require-current` refuses `pipeline X (code: Y)`). Headings and tables-local cost nothing,
-so CI's `eval-gate` job gates those two, re-made at 0.5.16. Equations, figures and document
+so CI's `eval-gate` job gates those two, re-made at 0.5.24. Equations, figures and document
 need a paid run: their latest and baseline reports are historical records of the 0.5.0
 system and no PR gate reads them. A recording could not stand in for a paid run: a replay of
 the recorded answers held none of the requests those three tasks make (0 of 60, 26 and 114
@@ -797,6 +797,43 @@ resumes. At most 3 conversions run at once. The record (`data/eval/parsing-bench
 holds scores per category with n, the benchmark revision, the pipeline version and the profile
 hash. Results and the failures by cause: `docs/eval-parsing-benchmark.md`. The adapter is
 `eval/olmocr_bench.py`; the checker's runner is `proof/parsers/runners/olmocr_check.py`.
+
+**With the model's page order** (`--model-order`). The product reads each typed page in the
+order the model gives (production profile), so the no-model figures understate it. `--model-order`
+converts with that step on and replays its answers from a recording (`--order-answers FILE`,
+default `page-order-answers.jsonl` in `--run-dir`, outside the repository); every other model
+step is still refused. A page whose request the recording lacks is a *miss*: it keeps the
+rules' order, is counted, and nothing is asked. `--live --max-usd N` asks the provider for each
+missing request, one page at a time in one process, writes the answer to the recording, and once
+N dollars are paid asks no more (the pages left are misses). The record's `run.model_order`
+holds `on`, `pages_asked`, `answered`, `missed` (no answer and none asked, or the cap),
+`failed` (an answer that did not pass the check), `answered_live` and `usd`. A `--run-dir`
+page made in the other mode is converted again. The live pass is run once by the person who
+integrates, never by a builder:
+
+```bash
+uv run readablestem eval parsing-bench --model-order --live --max-usd 1.0 \
+  --out data/eval/parsing-bench-olmocr.json
+```
+
+A stopped live run resumes with the same `--run-dir` and `--order-answers`: the pages it
+converted keep their answers, and only the rest are asked, among them the pages an earlier
+run's cap left with a missed answer. The cap is per run, so give the rest a
+cap of its own. A cap below eight worst-case reservations ($0.52) is refused before anything is
+converted.
+
+Measured on 2026-11-27 at 0.5.23. Both rows ran on the same pages, 747 converted and 161 scans
+dropped. The live pass asked about 589 pages: 558 answers held, 31 did not pass the check, and
+it paid $0.68. The record is `data/eval/parsing-bench-olmocr.json`.
+
+| olmOCR-Bench, 0.5.23 | Multi-column | Headers, footers | Tiny text | Tables | Baseline |
+|---|---|---|---|---|---|
+| No model | 75.1 | 47.9 | 61.4 | 70.6 | 100.0 |
+| The model's page order | 77.5 | 84.0 | 65.1 | 70.6 | 100.0 |
+
+The headers-and-footers gain comes from the page order alone: every file is one page, so the
+rules' repeats across pages never find a running head. The record of 0.5.16 (38.4 and 70.2)
+came before the rules changes of 0.5.17 to 0.5.23, which account for the rest of the gap.
 
 ## How to rerun
 
@@ -2927,6 +2964,8 @@ the same way. Its counts per page:
 | Count | Meaning |
 |---|---|
 | found | at least half of a gold block's words are on the page |
+| moved | a block not found on the page, whose words are whole in the paragraph the page next to it keeps across the break (the page's first block and the last three text elements of the page before, or its last block and the first three of the page after) |
+| lost | a block neither found nor moved |
 | flow | the block's word 4-grams that appear unbroken in the page's word stream |
 | broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |
 | neighbors in order | consecutive gold blocks whose places in the stream are in gold order |
@@ -2940,8 +2979,14 @@ the same way. Its counts per page:
 | merged | neighboring gold blocks heard in one element; `heading merged` is the part where one of the two is a heading |
 | caption wrong | a caption heard with, or nearest to, another picture or table than its own |
 | faultless page | a right page with none of the five |
+| why | the conditions of a right page that failed, by name: `found_under_half`, `broken`, `order`, `xjoin`, `stamp_in_text`, `entries_joined`, `numbers_out_of_order` |
+| levels | the gold headings that carry a source level, and `levels_ok`, those read as a heading (`h1` to `h6`) at the document's usual level against the source's; the student page only |
 
-The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
+The module text gives the exact rules. A paragraph that layout joins across a page break
+(the right reading) is kept in the output on the page where it starts, so the gold block of
+its second part is not on its own page. It is `moved`, not `lost`: the paragraph is whole and
+read once, and a page only loses a block that is on no page next to it. `moved` does not
+change `found`, `clean` or `right`, so a page's right is the same with it or without. A "clean page" is strict: one cut sentence or one
 swapped pair fails the page. A right page can still read a running head aloud, cut a
 paragraph in two, run two list items together or put a caption on the wrong picture, which
 is what the last six rows count, so pages right is never reported alone. Two kinds of gold
@@ -2974,9 +3019,55 @@ layout output of the main branch as stored on 2026-11-10, both give 59 clean pag
 Those numbers describe that stored output, read from a layout dump; they were not measured
 under the production profile and are not the registered baseline, which `eval order`
 records (below). Version 5 added the five further counts and `faultless`; for the same
-elements its other counts are those of version 4. The first scorer (version 2) was not
+elements its other counts are those of version 4. Version 6 (wave 10) added `moved` (and `lost`
+now leaves the moved blocks out), a `why` list on every page, and the heading levels; it
+changes none of the counts that decide `clean`, `right` and `faultless`. Order records made
+before version 6 were scored without these counts: their `lost` includes the blocks version 6
+calls moved, they have no `why` for a page they call right, and the bar (`--against`) does
+not compare them with a version 6 record, so a development or corpus record is re-made when
+the version is raised. The first scorer (version 2) was not
 moved: its element-level counts are still reported by this one (`pairs`, `stitched`,
 `split`, `lost`).
+
+**Why a page is not right, and heading levels (version 6).** A page's record in the order
+file keeps `found`, `lost`, `moved`, `broken`, `xjoin`, `pairs` and `pairs_ok` (neighboring
+blocks and those in gold order), and for a page that is not right, `why`. The reasons are
+the conditions of `right` that failed, so every page that is not right has at least one.
+Heading levels are scored against the level the source gives a heading in the gold: the
+depth of its LaTeXML title (`h1` for the document, `h2` for a section, and so on) or its
+OpenStax `h1` to `h6`. Headings the source does not give a level (an abstract, a theorem's
+or proof's title, a run-in paragraph title, an index group label) and a block that only
+carries a title's note carry none. The page counts the headings that have a level
+(`levels`) and those read as a heading at the document's usual difference from the source
+(`levels_ok`): a document whose headings are all one level lower than the source's is not
+wrong, a heading off that is. The difference is the most common one over the document's
+gold pages, read from the same output, so a reader that gets most headings wrong still
+scores its most common level right. Only the student page has levels; the pipeline's
+elements hold none. Gold made before levels existed scores as before, with no level counts.
+Self-made files have none: the unit list that was written next to each file is not kept.
+
+**What version 6 shows on `layout-dev-1`** (`data/eval/order-layout-dev-1.json`, the model's
+page order on with its recorded answers replayed; pipeline 0.5.23, no reader changed). Of
+267 pages, 184 are right in the student page (as at version 5) and 83 are not. Why the 83 are
+not right (a page can have several reasons):
+
+| Reason | Pages |
+|---|---|
+| `order` (neighboring blocks out of order) | 52 |
+| `broken` (a block with other text inside it) | 37 |
+| `entries_joined` (index or glossary entries run together) | 17 |
+| `xjoin` (a cross-join of blocks that are not neighbors) | 5 |
+| `found_under_half`, `stamp_in_text`, `numbers_out_of_order` | 1 each |
+
+Of the 4,460 gold blocks: 4,296 found, 110 lost and 54 moved (version 5 counted the 54
+as lost, 164 lost in all). With the model's order off (a run with no `--model-order`) 4,302
+are found, 113 lost and 45 moved, and 183 pages are right. On the pipeline's elements, with
+the model's order on, 4,365 are found, 42 lost and 53 moved. The seven paragraphs joined
+across a page break that version 5 counted as lost with the model's order on are moved. Heading levels: 338 gold headings carry a
+level (162 in papers, 176 in books), and 250 of them are read as a heading at their
+document's usual level (134 of 162 in papers, 116 of 176 in books); with the model's order
+off, 252. The corpus record (`data/eval/order-corpus.json`) is the same 56 right and 37
+faultless pages of 62, with 13 lost and 2 moved blocks (15 lost at version 5).
 
 ### Gold built from sources (`gold/layout_gold.py`)
 
@@ -3099,8 +3190,31 @@ then must be scored now. Exit code 0: the bar is met, or none was asked; 1: a pa
 wrong; 2: the two records cannot be compared, or nothing could be measured. The record
 keeps counts per page and no word of any document.
 
-**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-27 at pipeline 0.5.23,
-production profile `5c69095dc28d`, the model's page order on with its recorded answers): 34
+**The record now kept** (`data/eval/order-corpus.json`, made 2026-11-27 at pipeline 0.5.24,
+production profile `4e6db211ccc1`, scorer version 6, the model's page order on with its
+recorded answers): the same 34 documents and 62 gold pages as the 0.5.23 record below, and
+the same 29 pages set apart. The student page; a count is given as its pages and, in
+brackets, its places.
+
+| | Pages | Right | Faultless | Furniture read | Stray | Cut | Merged | Heading merged | Caption wrong | Broken blocks | Cross-joins |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| edge | 13 | 12 | 9 | 1 (1) | 1 (1) | 0 (0) | 2 (14) | 0 (0) | 0 of 0 | 1 | 0 |
+| real | 12 | 10 | 2 | 0 (0) | 1 (1) | 4 (5) | 6 (9) | 0 (0) | 0 of 0 | 3 | 1 |
+| self-made | 37 | 36 | 29 | 2 (2) | 5 (5) | 1 (18) | 1 (1) | 0 (0) | 0 of 2 | 0 | 0 |
+| real and self-made | 49 | 46 | 31 | 2 (2) | 6 (6) | 5 (23) | 7 (10) | 0 (0) | 0 of 2 | 3 | 1 |
+| all | 62 | 58 | 40 | 3 (3) | 7 (7) | 5 (23) | 9 (24) | 0 (0) | 0 of 2 | 4 | 1 |
+
+The element list reads 58 right and 42 faultless, and 30 of the 34 documents have every gold
+page right (28). Against 0.5.23 two pages are made right and none wrong: `s13_textbook_margin`
+page 1 and `s18_exam_twocol` page 2, the two pages 0.5.23 had made wrong. The places where
+blocks run together go from 112 to 24 (pages with any, 11 to 9): a model block is now cut at
+each printed item marker, and a small-type footnote low on the page is read last. The
+uploads whose elements change against 0.5.23 are the ones the 0.5.23 record names
+(`a8_handout_3up`, `e1_mc_columns`, `s04_worksheet`, `s13_textbook_margin`,
+`s18_exam_twocol`); no other upload's elements move.
+
+**The 0.5.23 record** (made 2026-11-27, production profile `5c69095dc28d`, scorer version 5,
+the model's page order on with its recorded answers): 34
 documents and 62 gold pages hold every answer; the 13 documents and 29 gold pages that owe
 answers (files kept out of the repository) are set apart and are not in the table. The
 student page; a count is given as its pages and, in brackets, its places.
@@ -3786,9 +3900,19 @@ upload's decisions, and passes when the record was re-made in the same pull requ
 eval guard (`eval-guard.yml`) asks for the re-made record when a change touches a rule that
 decides acceptance ("Eval guard"); the replay finds the change the guard could not name.
 
-**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-27 at pipeline 0.5.23 by
-`eval burden --out`, production profile `5c69095dc28d`, the model's page order on): 47 uploads,
-110 pages, 71 decisions, 0.646 a page. The 26 uploads of the 25 files kept out of the
+**The record now kept** (`data/eval/burden-corpus.json`, made 2026-11-27 at pipeline 0.5.24 by
+`eval burden --out`, production profile `4e6db211ccc1`, the flag policy on): the same 47
+uploads and 110 pages, 72 decisions, 0.654 a page. Against 0.5.23, three uploads move:
+`r15_openstax_chem_ch3` asks one more (an accepted equation the flag policy asks about
+again), `s18_exam_twocol` one more (`text.option_labels`), and `e1_mc_columns` one fewer (5
+to 4); the last two are uploads the item cut changes. The bar at an allowance of 0 is not
+met (0.645 to 0.654 a page over the set, the typical upload 0.265 to 0.286); the flag policy's cost is
+measured on held-out papers (docs/eval-flag-policy.md) and is accepted there, so the bar is
+not reset. `eval burden --same` against this record passes.
+
+**The 0.5.23 record** (made 2026-11-27 by `eval burden --out`, production profile
+`5c69095dc28d`, the model's page order on): 47 uploads,
+110 pages, 71 decisions, 0.645 a page. The 26 uploads of the 25 files kept out of the
 repository owe 436 answers under the new grouping (page orders, and crops whose nearby text
 moved) and are listed as owed, not measured; they hold the equation-heavy uploads, so the
 figures are not comparable with the record below. The bar was not judged (73 uploads then,
@@ -4294,12 +4418,13 @@ theirs (`web/events.py`, `LANES`) and its `release` is spelled as a `decision_ou
 event's, so the admin page can set production's numbers of the same release (false flags
 per true flag, edits of things nobody flagged, decisions a page) beside a lane's.
 
-**Today** (`data/eval/ledger.json`, release `0.5.23+5c69095dc28d`, made 2026-11-27 on a
-clean tree). The three page rows have a held-out line, from the one run of
-`layout-heldout-1` for 0.5.23 (the model's page order on), and each meets its release bar
-with slack: 55 of 247 pages not right (bar 56), 21 of 49 documents (bar 20), furniture on 13
+**Today** (`data/eval/ledger.json`, release `0.5.24+4e6db211ccc1`, made 2026-11-27 on a
+clean tree at `44e5eb16`). The three page rows have a held-out line, from the run of
+`layout-heldout-1` for 0.5.24 (the model's page order on; scored twice with the same
+totals, "The release of 2026-11-27 (pipeline 0.5.24)"), and each meets its release bar
+with slack: 51 of 247 pages not right (bar 56), 22 of 49 documents (bar 20), furniture on 13
 pages (bar 20). The corpus lines are of the 47 uploads that hold every answer (the 26 that
-owe answers are left out), so they are not comparable with the 0.5.22 lines. The
+owe answers are left out), as at 0.5.23. The
 bars are the figures of the second run for 0.5.20 (`data/eval/ledger-bars.json`,
 registered again 2026-11-25 with `--replace-bar`): a later release may not read fewer of
 these pages right, give fewer documents with every gold page right, or read furniture
@@ -4307,19 +4432,20 @@ aloud on more pages. That run of 0.5.20 first passed the bars of 0.5.19 (72 of
 247 pages not right, 11 of 49 documents, 36 of 247 pages with furniture; the ledger of that
 pass is commit `3743f347`). The bars were replaced because the stamp rule left 16
 pages of slack on each of the two page rows, enough to hide a later loss. The held-out lines
-are not a first run's: the set has been scored seven times, and `eval order`, "The held-out
-runs for 0.5.20", "The held-out run for 0.5.21", "The held-out run for 0.5.22" and "The switch release of 2026-11-27" say
+are not a first run's: the set has been scored nine times, and `eval order`, "The held-out
+runs for 0.5.20", "The held-out run for 0.5.21", "The held-out run for 0.5.22", "The switch
+release of 2026-11-27" and "The release of 2026-11-27 (pipeline 0.5.24)" say
 what they are worth. Every other line is a development score, or a record of an earlier
 release.
 
 | Row | Set | Figure | Counts | 95% bound | Label | Release bar | Goal bar |
 |---|---|---|---|---|---|---|---|
 | Required decisions a page, the median document | corpus | 0.00 | 47 documents | 0.00 | development score, 26 uploads set apart (answers owed) | - | at most 1.00 |
-| Pages not read right in the student page, by the scorer | layout-heldout-1 | 22.3 per 100 | 55 of 247 pages | 27.1 per 100 | held-out | at most 22.7 per 100: met | - |
-| Pages not read right in the student page, by the scorer | corpus | 9.7 per 100 | 6 of 62 pages | 18.2 per 100 | development score, 13 uploads set apart (answers owed) | at most 22.7 per 100 | - |
-| Pages not read right in the student page, by the scorer | layout-dev-1 | 31.1 per 100 | 83 of 267 pages | 36.1 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
-| Documents with every gold page right | layout-heldout-1 | 42.9% | 21 of 49 documents | 30.8% | held-out | at least 40.8%: met | - |
-| Documents with every gold page right | corpus | 82.4% | 28 of 34 documents | 68.1% | development score, 13 uploads set apart (answers owed) | at least 40.8% | - |
+| Pages not read right in the student page, by the scorer | layout-heldout-1 | 20.6 per 100 | 51 of 247 pages | 25.3 per 100 | held-out | at most 22.7 per 100: met | - |
+| Pages not read right in the student page, by the scorer | corpus | 6.5 per 100 | 4 of 62 pages | 14.2 per 100 | development score, 13 uploads set apart (answers owed) | at most 22.7 per 100 | - |
+| Pages not read right in the student page, by the scorer | layout-dev-1 | 30.3 per 100 | 81 of 267 pages | 35.3 per 100 | development score, 2 steps stopped early | at most 22.7 per 100 | - |
+| Documents with every gold page right | layout-heldout-1 | 44.9% | 22 of 49 documents | 32.7% | held-out | at least 40.8%: met | - |
+| Documents with every gold page right | corpus | 88.2% | 30 of 34 documents | 75.1% | development score, 13 uploads set apart (answers owed) | at least 40.8% | - |
 | Documents with every gold page right | layout-dev-1 | 35.0% | 21 of 60 documents | 24.8% | development score, 2 steps stopped early | at least 40.8% | - |
 | Pages that read a running head, a page number or a stamp aloud | layout-heldout-1 | 5.3 per 100 | 13 of 247 pages | 8.2 per 100 | held-out | at most 8.1 per 100: met | at most 2.0 per 100: not met |
 | Pages that read a running head, a page number or a stamp aloud | corpus | 4.8 per 100 | 3 of 62 pages | 12.0 per 100 | development score, 13 uploads set apart (answers owed) | at most 8.1 per 100 | at most 2.0 per 100 |
@@ -4336,8 +4462,8 @@ release.
 Read with care:
 
 - "Required decisions a page" is the median over documents of a document's decisions a
-  page, as production counts it. Its record was made again at 0.5.23 with 47 uploads (71
-  decisions on 110 pages): the 26 uploads that owe answers, among them every equation-heavy
+  page, as production counts it. Its record was made again at 0.5.24 with 47 uploads (72
+  decisions on 110 pages; 71 at 0.5.23): the 26 uploads that owe answers, among them every equation-heavy
   one, are left out, so the 0.00 is not comparable with the 0.25 of 0.5.22 over 73 and says
   nothing of those documents ("The switch release of 2026-11-27", below). Its bound is an
   order statistic of 47 documents of a set chosen to cover kinds of document, not sampled
@@ -4345,15 +4471,16 @@ Read with care:
 - The held-out lines count 247 gold pages of 49 documents; two more documents are too long
   for a job and are not measured. A release bar is held as measured, with no bound: 56 of
   247 pages not right allows up to 27.5 in 100 at 95%.
-- The furniture row meets its release bar and not its goal: 20 of 247 held-out pages read a
+- The furniture row meets its release bar and not its goal: 13 of 247 held-out pages read a
   running head, a page number or a stamp aloud, and the goal is 2 in 100. The fall from 36
-  fits arXiv's stamp alone (24 stamps no longer read in the text); running heads and page
-  numbers are not counted apart, and nothing says they are read less.
+  to 20 (0.5.19 to 0.5.20) fits arXiv's stamp alone (24 stamps no longer read in the text);
+  the fall from 20 to 13 came with the model's page order (0.5.23), which names running heads
+  as furniture. Running heads and page numbers are not counted apart.
 - `layout-dev-1` has two documents in which a step stopped early (a limit on work, the same
   on every machine); its lines say so.
-- Every gold page is right in 40 of 47 corpus documents, 20 of 60 documents of
-  `layout-dev-1` and 20 of 49 held-out documents. A document's gold pages are the ones
-  labeled, which in a layout set is a sample of its pages.
+- Every gold page is right in 30 of 34 corpus documents (the 13 that owe answers are set
+  apart), 21 of 60 documents of `layout-dev-1` and 22 of 49 held-out documents. A document's
+  gold pages are the ones labeled, which in a layout set is a sample of its pages.
 - The output rows are the 0.5.10 record (`eval outputs` has not been run again since). They
   count places, and one fault can be many places: most of the HTML file's are proposals
   still open that the page does not mark (`eval outputs`, above).
@@ -5022,6 +5149,100 @@ corpus measures. The public files' layout comparison of the earlier switch relea
 made, because it would ask the model about 8,527 pages. The model reads only the page
 picture and the line list: what its grouping does to the crops a later step sends (an
 equation's nearby text, a figure's caption) was recorded, not measured.
+
+## The release of 2026-11-27 (pipeline 0.5.24)
+
+Pipeline 0.5.24 turns the flag policy on again in the production profile (`FLAG_POLICY`,
+docs/eval-flag-policy.md "2026-11-27: asked on held-out papers"; the code default stays off),
+and changes how the rules use the model's page order: a model block is cut at each printed
+item marker under a short, indented or differently set line, and a block the model calls a
+footnote, set in small type in the lower part of the page, is read last. An equation or a
+figure read by the fallback model now says so (`equation.fallback_reading`,
+`figure.fallback_reading`: a note; an equation whose fallback reading is not read again
+becomes a decision). No request to a model changes, so every recording
+replays and this release paid nothing for its own measures. The production profile's hash
+is `4e6db211ccc1`. Measured on the release branch, with the scorer at version 6 (`eval
+order`, "Why a page is not right"):
+
+- **Decisions.** `data/eval/burden-corpus.json`: 47 uploads, 110 pages, 72 decisions (71 at
+  0.5.23). The bar at an allowance of 0 is not met, by the one decision the flag policy asks
+  on `r15_openstax_chem_ch3` and one more on `s18_exam_twocol`, less one on `e1_mc_columns`
+  (`eval burden`, the record now kept). The flag policy's cost was measured on
+  held-out papers before the switch (2.01 [1.15, 3.43] to 2.36 [1.50, 3.74] required decisions a page, for silent
+  errors from 5.71 to 4.78 per 100 gold equations, paired -0.93 [-1.88, -0.20]) and is accepted there.
+- **Reading order, development.** `data/eval/order-layout-dev-1.json`: 186 of 267 pages right
+  and 141 faultless in the student page (184 and 140 at 0.5.23), 21 of 60 documents with every
+  gold page right (21). Two pages are made right and none wrong. Heading levels, new in
+  scorer version 6: 250 of 338 gold headings at the right level.
+- **Reading order, corpus.** `data/eval/order-corpus.json`: of the same 62 gold pages, 58
+  right and 40 faultless (56 and 37), 30 of 34 documents with every gold page right (28).
+  The two pages 0.5.23 made wrong are right again, and the places where blocks run together
+  go from 112 to 24: the open item of the last release is closed by the item cut.
+- **The held-out run.** `layout-heldout-1` for 0.5.24 (2026-11-27, `eval order --set
+  layout-heldout-1 --for-release --model-order --live --max-usd 1.6`, the same command as
+  0.5.23's, with `FLAG_POLICY` on as in the profile of this release). It asked for the 1,013 page orders and every one was in the recording of
+  0.5.23's run, so it paid $0; 26 answers failed the check and kept the rules, as in
+  0.5.23. **It was run twice.** The first run (the release branch at `732a9968`, clean) was
+  given no `--out`, so it printed its totals and wrote no record; the stop rule had listed it.
+  Its entry was set aside in a commit of its own (`89e8da03`), the run was repeated on the
+  same code with `--out`, and every printed total of the repeat is the same as the first
+  run's. Both runs are in `data/gold/layout/layout-heldout-1.runs.json`, each with a note. In
+  the student page, 0.5.23 in brackets:
+
+  | | 0.5.24 | 0.5.23 | release bar |
+  |---|---|---|---|
+  | pages right, of 247 | 196 | 192 | at most 56 not right |
+  | pages with no fault | 143 | 140 | |
+  | documents with every gold page right, of 49 | 22 | 21 | at least 20 |
+  | pages with furniture read aloud | 13 (16 places) | 13 (16) | at most 20 |
+  | pages with a paragraph cut | 36 (169 places) | 36 (169) | |
+  | pages with paragraphs run together | 28 (75 places) | 30 (106) | |
+  | pages with stray elements | 170 (848 places) | 168 (789) | |
+
+  With 95% intervals (Wilson, each run on its own): pages right 79.4% [73.9, 83.9] against
+  77.7% [72.1, 82.5]; faultless 57.9% [51.7, 63.9] against 56.7% [50.4, 62.7]; documents
+  44.9% [31.9, 58.7] against 42.9% [30.0, 56.7]; run together 11.3% [8.0, 15.9] against
+  12.1% [8.6, 16.8]. Every interval overlaps its pair: no figure moves beyond its interval.
+  The element list reads 197 right and 154 faultless (193 and 150). `eval ledger
+  --for-release` passes with slack on all three rows: 51 of 247 not right, 22 of 49
+  documents, 13 of 247 with furniture. The 0.5.23 figures were scored by version 5 of the
+  scorer and these by version 6, which changes none of the counts that decide `right` and
+  `faultless`; its new counts (blocks lost or moved, heading levels; the held-out gold has
+  no levels) have no 0.5.23 figure to stand beside.
+- **olmOCR-Bench.** `data/eval/parsing-bench-olmocr.json` is re-made with the model's page
+  order (at 0.5.23, before the item cut; 589 pages asked, 558 answered, 31 failed the check,
+  $0.68): multi_column 77.5, headers_footers 84.0, long_tiny_text 65.1, tables 70.6, baseline
+  100.0. With no model at 0.5.23 the same categories read 75.1, 47.9, 61.4, 70.6 and 100.0
+  ("Public benchmark at $0", the run with and without the model).
+- **Measured and not shipped.** A repair of the model's answer before the check (on
+  injected slips 176 pages right against 179 for the rules, and no real page gained), and one
+  more call that asks the model for heading levels (248 of 338 at the right level against 250
+  for the reader's own). Box heights as a heading-level signal were worse than the reader's
+  levels and are a note in docs/eval-image-pages.md.
+
+**The deploy.** Production reads `FLAG_POLICY` from its Railway variable, not from the
+profile, and a profile not yet confirmed against the dashboard only warns on a difference. So
+the release sets the variable (`railway variable set -s web --skip-deploys FLAG_POLICY=true`)
+before the deploy, and after it the start-up log has no `profile_mismatch` line naming
+`FLAG_POLICY`.
+
+**Open after this release.** Two points of the independent review are kept as they are. When
+a note the model names is moved to the end of the page, the whole page takes the model's
+places, also on a page where the rules' own order would otherwise stand; the held-out run
+measured that code and no measured page got worse, and a per-page check that no page read in
+the rules' order changes apart from its note is owed. And a job given back by a stopped worker
+(a deploy) reads "Waiting for its turn." on its page while it waits to be claimed, where a job
+put back after a lost attempt reads that it is being started again; telling the two apart needs
+a signal the job does not keep yet. A page of olmOCR-Bench that ended in an error is converted
+again by every run with the model's page order (it keeps no page-order facts), so a live run
+resumed after an error asks for it again.
+
+**What these numbers do not show.** The held-out run is the same 247 pages of 49 documents
+as 0.5.23's, with the same recorded answers, so what changed between the two runs is the
+code alone; four pages more read right is not a measured gain against that sample. No page
+of the held-out set was looked at. The stray count rises (789 places to 848) and the
+pages it touches were not looked at, because they are held out; on the corpus it does not
+move. The fallback note is checked by the tests, not counted on a recorded run.
 
 ## What the numbers do not show
 

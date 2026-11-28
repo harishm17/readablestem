@@ -139,3 +139,64 @@ def test_switch_on_changes_the_page_and_off_asks_nothing() -> None:
     assert (summary.pages, summary.applied_pages, summary.failed) == (1, 1, 0)
     assert summary.furniture == 1
     assert summary.calls == 1
+
+
+def test_a_model_block_of_a_question_and_its_options_stays_a_question_and_its_options() -> None:
+    """The model may hold a question and its options in one block; the page keeps each printed
+    option as its own item, as it does with the switch off."""
+    import pymupdf
+
+    document = pymupdf.open()
+    page = document.new_page(width=612, height=792)
+    page.insert_text((72, 100), "1. Which gas do plants take in?", fontsize=11)
+    for k, option in enumerate(["a. Oxygen", "b. Carbon dioxide", "c. Nitrogen", "d. Helium"]):
+        page.insert_text((90, 120 + 15 * k), option, fontsize=11)
+    page.insert_text((72, 200), "2. Name the organelle that makes ATP.", fontsize=11)
+    pdf = document.tobytes()
+
+    def reply(request: object) -> dict:
+        count = len(request.context_text.split("\n"))  # type: ignore[attr-defined]
+        return {"blocks": [{"kind": "paragraph", "items": list(range(count))}], "furniture": []}
+
+    settings = Settings(_env_file=None, env="test", feature_layout_model_order=True)  # type: ignore[call-arg]
+    output = convert_pdf(
+        pdf,
+        settings=settings,
+        client=FakeVisionClient(responders={"page_order": reply}),
+        options=ConversionOptions.from_settings(settings),
+        concurrency=1,
+    )
+    texts = [e.text or "" for e in output.result.elements]
+    assert not any("Which gas" in t and "Oxygen" in t for t in texts)
+    assert any(t.strip().endswith("Carbon dioxide") for t in texts)
+
+
+def test_a_footnote_the_model_names_is_read_at_the_end_of_the_page() -> None:
+    import pymupdf
+
+    document = pymupdf.open()
+    page = document.new_page(width=612, height=792)
+    for k in range(3):
+        page.insert_text((72, 100 + 60 * k), f"Paragraph number {k} of the body text.", fontsize=11)
+    page.insert_text((72, 740), "1 A note printed small at the foot of the page.", fontsize=8)
+    pdf = document.tobytes()
+
+    def reply(request: object) -> dict:
+        lines = request.context_text.split("\n")  # type: ignore[attr-defined]
+        note = next(n for n, line in enumerate(lines) if "A note printed" in line)
+        body = [n for n in range(len(lines)) if n != note]
+        blocks = [{"kind": "paragraph", "items": [n]} for n in body[:-1]]
+        blocks.append({"kind": "footnote", "items": [note]})  # named before the last paragraph
+        blocks.append({"kind": "paragraph", "items": [body[-1]]})
+        return {"blocks": blocks, "furniture": []}
+
+    settings = Settings(_env_file=None, env="test", feature_layout_model_order=True)  # type: ignore[call-arg]
+    output = convert_pdf(
+        pdf,
+        settings=settings,
+        client=FakeVisionClient(responders={"page_order": reply}),
+        options=ConversionOptions.from_settings(settings),
+        concurrency=1,
+    )
+    texts = [e.text or "" for e in output.result.elements]
+    assert "A note printed" in texts[-1]

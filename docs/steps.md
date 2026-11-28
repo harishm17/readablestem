@@ -89,6 +89,20 @@ hallucinations.
 | Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `number_mismatch`, `case_mismatch`, `style_mismatch`, `glyph_style_mismatch`, `sign_mismatch`, `species_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
+**A main-model request that the fallback answered (equations and figures).** The router
+tries the other model when a call fails, so a request that went to `main_model` can come back
+from `cheap_model`. Such an answer is held to what a cheap answer is held to (its own accept
+bar and checks) and says so: the check `equation.fallback_reading` / `figure.fallback_reading`
+with the note code `fallback_answer` (ACCEPTED, review `optional`). For an equation whose
+cheap answer would have been sent to the main model (a failed text-layer check, even the
+cosmetic one, or a page-pass disagreement) the second reading cannot be made, since the main
+model has just failed and no new call is made: the code is `fallback_not_reread` and the fix
+is a decision. A figure has no such case, because every reason to re-read one already keeps
+it from being accepted. Measured on the 12 development papers (1,018 equation readings) and
+the 73 recorded corpus uploads: no main-model request was answered by the cheap model, so the
+rule changes no recorded result; it covers a path that production can take during a main-model
+outage.
+
 **The skipped second reading (equations).** A cheap answer whose only reason to be asked
 again is a confidence from 0.80 (`equation_step.SKIP_ESCALATION_FROM`) up to the accept
 bar, with every check passing (a failed speech note counts as a failed check), keeps the

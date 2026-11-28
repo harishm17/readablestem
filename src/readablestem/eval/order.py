@@ -8,6 +8,12 @@ scorer never looks at boxes or at how the output was produced, so any reader can
 Per page, over the gold blocks whose role is not `dropped`:
 
 - `found` of `blocks`: at least half of the block's words are on the page.
+- `moved`: a block that is not found on the page but is whole in the output of the page next
+  to it, in a paragraph that runs across the break (a paragraph layout rightly joins to the one
+  it continues from, which the output keeps on the page where it starts). Only a block that
+  stands first on its page (looked for among the last three text elements of the page before:
+  a footnote can follow the paragraph) or last (among the first three of the page after) can
+  be moved. `lost` is the blocks that are neither found nor moved.
 - `flow_ok` of `flow_tot`: the block's word 4-grams that appear, unbroken, in the page's
   word stream (every element's words, in output order). A sentence cut by another column's
   line, or read in the wrong order inside a block, loses 4-grams.
@@ -23,6 +29,15 @@ Per page, over the gold blocks whose role is not `dropped`:
   at least half of the blocks found.
 - `right`: clean, and also no margin stamp read inside the text, no index or glossary
   entries joined, and numbered blanks in order, on pages whose gold lists those things.
+- `why`: the conditions of `right` that failed, by name (`found_under_half`, `broken`,
+  `order`, `xjoin`, `stamp_in_text`, `entries_joined`, `numbers_out_of_order`); empty on a
+  right page.
+- `levels` of `levels_ok` (counted by `score_document` when it is asked for levels, on gold
+  whose headings carry a source level): the gold headings that have a level, and those read
+  as a heading (`h1` to `h6`) at the level the document's headings usually keep against the
+  gold's (the most common difference over the document's pages). A document whose headings
+  all start one level lower than the source's is not wrong; a heading one step off the rest
+  is.
 
 Five further counts name what a page that is `right` can still have wrong. Each is counted
 on every page, and `faultless` is `right` with none of them (on gold made from a source,
@@ -71,11 +86,12 @@ import re
 import statistics
 import unicodedata
 from collections import Counter, defaultdict
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from typing import Any
 
-VERSION = 5
+VERSION = 6
 MASK = "zqzq"
+_HEADING_TAG = re.compile(r"h([1-6])")
 COARSE_ROLES = ("table", "figure", "form")
 EQUATIONS = ("equation", "math")
 PICTURES = ("figure", "image")
@@ -392,12 +408,59 @@ def _is_coarse(block: dict) -> bool:
     return bool(block.get("coarse")) or block["role"] in COARSE_ROLES
 
 
-def _element_counts(blocks: list[dict], elements: list[dict]) -> dict:
+def _prepared(elements: Iterable[Element]) -> list[dict[str, Any]]:
+    heard: list[dict[str, Any]] = []
+    for order, element in enumerate(elements):
+        tokens = _plain_words(element["text"])
+        heard.append({**element, "order": order, "tk": tokens, "sh": _shingles(tokens)})
+    return heard
+
+
+EDGE = 3  # elements at a page's end that can hold a paragraph that runs across the break
+
+
+def _edge(heard: list[dict[str, Any]], *, last: bool) -> list[dict[str, Any]]:
+    """The last (or first) few elements of a page that hold text: a paragraph that runs
+    across the break can be followed on its page by a footnote or an address."""
+    texty = [e for e in heard if e["tk"] and e["kind"] not in NOT_TEXT]
+    return texty[-EDGE:] if last else texty[:EDGE]
+
+
+def _runs_across(tokens: list[str], edge: Sequence[dict[str, Any]]) -> bool:
+    """Whether one of `edge`, the output elements standing next to a page break, holds a
+    block's text and more: the paragraph that runs across the break."""
+    shingles = _shingles(tokens)
+    return any(
+        len(element["tk"]) > len(tokens)
+        and (
+            _holds(element["tk"], tokens)
+            if len(tokens) <= 3
+            else bool(shingles) and len(shingles & element["sh"]) / len(shingles) >= 0.5
+        )
+        for element in edge
+    )
+
+
+def _element_counts(
+    blocks: list[dict],
+    elements: list[dict],
+    before: Sequence[dict[str, Any]] = (),
+    after: Sequence[dict[str, Any]] = (),
+) -> dict:
+    """The first scorer's counts. `before` and `after` are the last text elements of the page
+    before and the first of the page after, for a block that is moved."""
     read = [b for b in blocks if b["role"] != "dropped"]
     row = dict.fromkeys(
-        ("found", "lost", "split", "pairs", "pairs_ok", "stitched", "dropped", "leaked"), 0
+        ("found", "lost", "moved", "split", "pairs", "pairs_ok", "stitched", "dropped", "leaked"),
+        0,
     )
     row.update(blocks=len(read), elements=len(elements))
+    flowing = [
+        b
+        for b in read
+        if b["role"] != "footnote" and not b.get("float") and not _is_coarse(b) and _gold_words(b)
+    ]
+    first, last = (flowing[0], flowing[-1]) if flowing else (None, None)
     page_words = {t for e in elements for t in e["tk"]}
     pictures = [e for e in elements if e["kind"] in ("figure", "image")]
     all_shingles = set().union(*[e["sh"] for e in elements]) if elements else set()
@@ -441,7 +504,11 @@ def _element_counts(blocks: list[dict], elements: list[dict]) -> dict:
                     owner = min(first)
                 if sum(1 for share, _ in shares if share >= 0.2) >= 2:
                     row["split"] += 1
-        row["found" if found else "lost"] += 1
+        moved = not found and (
+            (block is first and _runs_across(tokens, before))
+            or (block is last and _runs_across(tokens, after))
+        )
+        row["found" if found else "moved" if moved else "lost"] += 1
         owners.append(owner if found else None)
     placed = [owner for owner in owners if owner is not None]
     for a, b in itertools.pairwise(placed):
@@ -480,16 +547,22 @@ def score_blocks(
     *,
     by_hand: bool = False,
     margins: Iterable[str] = (),
+    page_before: Iterable[Element] = (),
+    page_after: Iterable[Element] = (),
 ) -> dict:
     """One page's counts (see the module text). `detail` lists each fault found.
 
-    `margins` are the lines printed in the page's margins.
+    `margins` are the lines printed in the page's margins. `page_before` and `page_after` are the
+    elements of the page before and the page after, where a block is looked for that its own
+    page does not hold (`moved`).
     """
-    heard: list[dict[str, Any]] = []
-    for order, element in enumerate(elements):
-        tokens = _plain_words(element["text"])
-        heard.append({**element, "order": order, "tk": tokens, "sh": _shingles(tokens)})
-    row = _element_counts(blocks, heard)
+    heard = _prepared(elements)
+    row = _element_counts(
+        blocks,
+        heard,
+        _edge(_prepared(page_before), last=True),
+        _edge(_prepared(page_after), last=False),
+    )
 
     stream: list[str] = []
     owner: list[int] = []
@@ -673,7 +746,36 @@ def score_blocks(
     )
     found_enough = row["found"] >= 0.5 * max(1, row["blocks"])
     row["clean"] = int(found_enough and broken == 0 and opairs_ok == opairs and xjoin == 0)
+    row["why"] = [
+        name
+        for name, failed in (
+            ("found_under_half", not found_enough),
+            ("broken", broken),
+            ("order", opairs_ok != opairs),
+            ("xjoin", xjoin),
+        )
+        if failed
+    ]
+    row["level_pairs"] = _level_pairs(read, heard, owner, claims)
     return row
+
+
+def _level_pairs(
+    read: list[dict], heard: list[dict], owner: list[int], claims: dict[int, list[int]]
+) -> list[list[int | None]]:
+    """For each gold heading that has a source level: [that level, the level of the heading
+    element that holds it in the output], the second None when no `h1` to `h6` holds it."""
+    pairs: list[list[int | None]] = []
+    for index, block in enumerate(read):
+        if block["role"] != "heading" or not block.get("level"):
+            continue
+        said = None
+        held = Counter(owner[at] for at in claims.get(index, ()) if at < len(owner))
+        if held:
+            tag = _HEADING_TAG.fullmatch(heard[held.most_common(1)[0][0]]["kind"])
+            said = int(tag.group(1)) if tag else None
+        pairs.append([block["level"], said])
+    return pairs
 
 
 def _one_line(said: list[str], line: list[str]) -> bool:
@@ -852,26 +954,71 @@ def _number_run(page: dict, elements: list[Element]) -> dict:
     return out
 
 
-def score_page(page: dict, elements: list[Element], *, by_hand: bool = False) -> dict:
-    """Every count for one gold page against the elements heard on it."""
+def score_page(
+    page: dict,
+    elements: list[Element],
+    *,
+    by_hand: bool = False,
+    before: Iterable[Element] = (),
+    after: Iterable[Element] = (),
+) -> dict:
+    """Every count for one gold page against the elements heard on it. `before` and `after`
+    are the elements of the pages either side, for a block that is `moved`."""
     margins = page.get("margins") or ()
-    row = score_blocks(page["blocks"], elements, by_hand=by_hand, margins=margins)
+    row = score_blocks(
+        page["blocks"],
+        elements,
+        by_hand=by_hand,
+        margins=margins,
+        page_before=before,
+        page_after=after,
+    )
     row.update(_stamps(page, elements))
     row.update(_number_run(page, elements))
     faults = row["stamp_in_text"] or row["ejoin"] or row["numrun_bad"]
     row["right"] = int(row["clean"] and not faults)
+    row["why"] += [
+        name
+        for name, failed in (
+            ("stamp_in_text", row["stamp_in_text"]),
+            ("entries_joined", row["ejoin"]),
+            ("numbers_out_of_order", row["numrun_bad"]),
+        )
+        if failed
+    ]
     # Gold made from a source does not hold every word of the page: stray text is no fault.
     further = ("furniture" if "coverage" in page else "stray", *FURTHER[1:])
     row["faultless"] = int(row["right"] and not any(row[count] for count in further))
     return row
 
 
-def score_document(gold: dict, pages: Pages) -> list[dict]:
-    """One row per gold page of a document; a page the output lacks scores as empty."""
+def score_document(gold: dict, pages: Pages, *, levels: bool = False) -> list[dict]:
+    """One row per gold page of a document; a page the output lacks scores as empty. A block
+    a page lacks is looked for in the output of the pages either side (`moved`).
+
+    `levels`: also count `levels` and `levels_ok` on each page, for output whose headings
+    carry a level (the student page). Absent when the gold has no heading with a level."""
     rows = []
     for page in gold["pages"]:
-        row = score_page(page, pages.get(page["page"], []), by_hand=bool(gold.get("by_hand")))
-        rows.append({**row, "id": gold["id"], "page": page["page"]})
+        number = page["page"]
+        row = score_page(
+            page,
+            pages.get(number, []),
+            by_hand=bool(gold.get("by_hand")),
+            before=pages.get(number - 1, []),
+            after=pages.get(number + 1, []),
+        )
+        rows.append({**row, "id": gold["id"], "page": number})
+    pairs = [pair for row in rows for pair in row["level_pairs"]]
+    offsets = Counter(said - level for level, said in pairs if said is not None)
+    usual = min(offsets, key=lambda k: (-offsets[k], abs(k))) if offsets else 0
+    for row in rows:
+        mine = row.pop("level_pairs")
+        if levels and pairs:
+            row["levels"] = len(mine)
+            row["levels_ok"] = sum(
+                said is not None and said - level == usual for level, said in mine
+            )
     return rows
 
 

@@ -6,7 +6,7 @@ the definitions; each result's own report is linked from its section.
 
 | Result set | Run on | Pipeline | Seen before the run? | Report |
 |---|---|---|---|---|
-| [fresh5](#latest-registered-result-fresh5-2026-11-04): 26 documents, 1,715 equations | 2026-11-04 | 0.5.9 | No: registered, run once | [eval-equation-fresh5.md](eval-equation-fresh5.md) |
+| [fresh5](#latest-registered-result-fresh5-2026-11-04): 26 documents, 1,715 equations | 2026-11-04 | 0.5.9 | No: registered, run once; strata A to C read again at 0.5.23 (2026-11-27) to decide the flag policy ([eval-flag-policy.md](eval-flag-policy.md)) | [eval-equation-fresh5.md](eval-equation-fresh5.md) |
 | [First registered held-out run](#first-registered-held-out-result-2026-10-14): 15 OpenStax sections, 242 pages | 2026-10-14 | 0.4.0 | No: registered | [PROOF.md](../PROOF.md) |
 | [Re-measurement on the same 15 sections](#re-measurement-on-the-same-sections-2026-10-21-not-a-blind-result) | 2026-10-21 | 0.5.0 and later | Yes: not a blind result | [remeasurement-2026-10-21.md](remeasurement-2026-10-21.md) |
 | [Scanned and handwritten pages](#scanned-and-handwritten-pages-converted-on-request-2026-10-21) | 2026-10-21 and later | 0.5.0 and later | Partly: said in the section | [eval-image-pages.md](eval-image-pages.md), [eval-handwriting.md](eval-handwriting.md) |

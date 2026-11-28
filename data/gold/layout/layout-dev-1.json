@@ -1,7 +1,7 @@
 {
  "set": "layout-dev-1",
  "side": "development",
- "note": "Development set. 267 pages of 60 documents: 28 arXiv papers (units from the HTML ar5iv makes of the LaTeX source with LaTeXML), 10 OpenStax books (units from the archive XHTML of the pinned version) and 22 files made with LaTeX from a written unit list. Built in the second measuring round of November 2026 and rebuilt value for value by gold/layout_gold.py. Half of it was scored once as a sealed half; its failing pages were then used as cases, so every document here is development.",
+ "note": "Development set. 267 pages of 60 documents: 28 arXiv papers (units from the HTML ar5iv makes of the LaTeX source with LaTeXML), 10 OpenStax books (units from the archive XHTML of the pinned version) and 22 files made with LaTeX from a written unit list. Built in the second measuring round of November 2026 and rebuilt value for value by gold/layout_gold.py. Half of it was scored once as a sealed half; its failing pages were then used as cases, so every document here is development. Headings of the papers and books that the source gives a level (LaTeXML title depth, OpenStax h1 to h6) carry it as `level` (added for scorer version 6); no other block changed.",
  "documents": [
   {
    "id": "ax_astrophga_240306369",
@@ -10,7 +10,7 @@
    "pages": 4,
    "blocks": 30,
    "pdf_sha256": "24b6628aaebe390f5aa2277e1a4b58465e864090430c0f860f8c97d0e5350854",
-   "gold_sha256": "18893a7b158acb5c64c2ca9444e3fbf57f4152db1a14e095f46fcc9384bc4f83"
+   "gold_sha256": "a00b76688fba840293b57d4e1e2a1a2dbbb22c0a4d4118f9ac3d1d1e943515e1"
   },
   {
    "id": "ax_astrophga_240306409",
@@ -19,7 +19,7 @@
    "pages": 4,
    "blocks": 47,
    "pdf_sha256": "c9461bfbcada0874990378f320f4ffc8c0a2c17383bb56c7fca6bd4d8fc304db",
-   "gold_sha256": "2ea9573154ae0b2f87018d6a00fd34c7225e9abfe4e616614b762e95a65709bd"
+   "gold_sha256": "f232f7d7fc9d7c66e5851d6047ab8cb04d5da868d685a17bb7101a3ef571d718"
   },
   {
    "id": "ax_condmatmtrlsci_240306379",
@@ -28,7 +28,7 @@
    "pages": 5,
    "blocks": 38,
    "pdf_sha256": "98080cb5c9aa71f104f55527145e500c4a27de8c098630702224ed5ac7184176",
-   "gold_sha256": "b283537aac51825b8fa9695226f3132a944f8fbc20613ccbdd8fd9079c9bafd4"
+   "gold_sha256": "f6769031e8bd8e49b245cbde246a3208a4348ee8b4a7d73ade5336437a5e041e"
   },
   {
    "id": "ax_condmatmtrlsci_240306389",
@@ -37,7 +37,7 @@
    "pages": 4,
    "blocks": 29,
    "pdf_sha256": "0e08beb0791c88bc6a5bb83ca2fe950511e1fb0e358c7cc9c631702d10163010",
-   "gold_sha256": "fa0908fdd1467dc1e503e095e14b64e61254821c43d89c65f06aaab290f1fd5c"
+   "gold_sha256": "67e32e6201810afb0a1073e5d3849e972a227868668bfd65263d39a01a3697d2"
   },
   {
    "id": "ax_cscl_240306350",
@@ -46,7 +46,7 @@
    "pages": 4,
    "blocks": 31,
    "pdf_sha256": "5e72778957a0269a890b3e9e6407a21fbea87c5c9f34a5dd53248a81807c7956",
-   "gold_sha256": "0bd5fb2af997295f04a911a556661c059ba3b694d708b1e88e3b4fbfb16c49f8"
+   "gold_sha256": "0027de4e0a615f21426cb352364730e3c5a92ffcfbad9f635f2e42314c359e96"
   },
   {
    "id": "ax_cscl_240306355",
@@ -55,7 +55,7 @@
    "pages": 5,
    "blocks": 74,
    "pdf_sha256": "29767402454abcfae2376210a3fe08c06029ec7a14ae28e023bbcfec53f56253",
-   "gold_sha256": "361ce644a675e0547410cf1bdcafed8152fd02f9f6d24d792f390fae5612a9f6"
+   "gold_sha256": "9eb8fef56eda57fd3226f80a9d906f02f0e3e36f9c34abce834a2458ba0798e5"
   },
   {
    "id": "ax_cscv_240306351",
@@ -64,7 +64,7 @@
    "pages": 4,
    "blocks": 55,
    "pdf_sha256": "6f307a70805e582a11be96ef7c2f69b6d15c2239abf4c093144702089dd5145f",
-   "gold_sha256": "743d8c6e97367ced171b7dc17352503398ccefaa5ab2f061124689fcff269900"
+   "gold_sha256": "7a878734800241aa004356090bdcfb6c38393c5ee17b8ad2dd047859549ce505"
   },
   {
    "id": "ax_cscv_240306361",
@@ -73,7 +73,7 @@
    "pages": 4,
    "blocks": 33,
    "pdf_sha256": "98720951de896f483af03e01915fd28522796662f7cb47f645ab215b3a479c6f",
-   "gold_sha256": "81daadff7976796d070c9948ed85dddf19ec68dd39ceb5a91d9594468c50a070"
+   "gold_sha256": "a09f7bc3b7dd3ae4802cd5682f4c0e1fc79a97caada3199551b5b7d4c8797668"
   },
   {
    "id": "ax_cslg_240306366",
@@ -82,7 +82,7 @@
    "pages": 4,
    "blocks": 84,
    "pdf_sha256": "fd6e841a68d90fc6ccff9b96d1be6d620fde0df5b0b6848216766ed8fd0fd384",
-   "gold_sha256": "1caa6d2334a7f43963d47902a56fd9f71f4d8b4a37ebed392e837c7c3c594eef"
+   "gold_sha256": "89f9036c61a7ca754815e898bec1a54c6ce95565aeca15891bbcb9fb16e838ec"
   },
   {
    "id": "ax_cslg_240306367",
@@ -91,7 +91,7 @@
    "pages": 5,
    "blocks": 80,
    "pdf_sha256": "b9b830541ca66c0ac1f4421ad806a90c539e15fbc912e28cb0e64fe9a17973c7",
-   "gold_sha256": "4e6565fd47f47f6aeb5cfd8adbe79812a37a9098ecf378d7952b0336b0e22588"
+   "gold_sha256": "e5beaa375f930031969130b08c189cb8dc275709b05d9228a554946085d46c65"
   },
   {
    "id": "ax_csro_240306420",
@@ -100,7 +100,7 @@
    "pages": 3,
    "blocks": 42,
    "pdf_sha256": "3c1095367b7b3d54b3838109f520b6dd9fc179ac53e6afdbc51f77448a77d105",
-   "gold_sha256": "503019f2011eb6ffc0e27c4e02da3cd192c305e4bdaac0db53dd6f9f6e907eff"
+   "gold_sha256": "6708415ae290fa4ee2a7320bea563e612a54431030aaf70065a5664bdf142daf"
   },
   {
    "id": "ax_csro_240306533",
@@ -109,7 +109,7 @@
    "pages": 5,
    "blocks": 71,
    "pdf_sha256": "17eb5b2c1f8e89525bab82e30154ff79550de1c8e6d53cfe3d1dd0d2e699b090",
-   "gold_sha256": "92b68f0c1c0766b5eef4708f3f4b6343c33693512ece5c1b0e9b95bd2987a18e"
+   "gold_sha256": "8b9eb9889968eeb46764517fb82d3e7144461a74577e11d7527b1e5ad1e78e96"
   },
   {
    "id": "ax_econem_240306657",
@@ -118,7 +118,7 @@
    "pages": 4,
    "blocks": 16,
    "pdf_sha256": "670b9be19384fe2a57ac2658c5763dd7ba739011897e002f3d1b3d197a749927",
-   "gold_sha256": "ff9a52ff769cd92c0f94afdd55c36f7432d625f0c84656efd31856a2769281cd"
+   "gold_sha256": "2b06ceba365e0f97f829d21901951ac09a8a27012781a1c929f20763df0478c2"
   },
   {
    "id": "ax_eesssp_240306423",
@@ -127,7 +127,7 @@
    "pages": 5,
    "blocks": 68,
    "pdf_sha256": "7da51d556739f2154b677e35e5af1f0b4ac6ce10a2f2e6a7ac8a4dc54e1a2c82",
-   "gold_sha256": "b1c93f5b062ee52377f0e5a48c1b7659b28647ff2398f17f44674621b9bfeb6b"
+   "gold_sha256": "8d5ccb91014e947d834e79b95da07379b3c0a594fa0d1bcc09afa24d034c9c75"
   },
   {
    "id": "ax_eesssp_240306460",
@@ -136,7 +136,7 @@
    "pages": 5,
    "blocks": 78,
    "pdf_sha256": "6f7bdc94040320b0044bc67c9282a0282021dba3148203d81eda5b42e7a87385",
-   "gold_sha256": "bfe002e30941144f38050ae657c11eb60de6572101b3eecb408340146d3e8220"
+   "gold_sha256": "8f73ad4046c67b5ec81d404bf73b7ab626a8b6d52ded3d144ab32a28c390f4b1"
   },
   {
    "id": "ax_hepth_240306509",
@@ -145,7 +145,7 @@
    "pages": 4,
    "blocks": 42,
    "pdf_sha256": "7e590e7a30d4b5d4536b4593073156085f1d05cf123d6c4aef9ec46a4ece9d91",
-   "gold_sha256": "eb740eb7eb1c394060226df17f682733dca756b63d03d8b764a46b99a822ea5d"
+   "gold_sha256": "14a4f78e3f8e2f5916cedfce7f3909f17024fe1116f88be2fd940e770f3105a3"
   },
   {
    "id": "ax_hepth_240306652",
@@ -154,7 +154,7 @@
    "pages": 5,
    "blocks": 35,
    "pdf_sha256": "89908ca31f444c3a606dbd064fb42296522d78784203c6a673e0e6f7f4695668",
-   "gold_sha256": "1718da2b96a2282008ca7365ec7115feea28d98f5c40c68f743644fd4ed78187"
+   "gold_sha256": "a2e9b8e12ff3eb47b12411737e61d5e1cd5919f66f2b208103dd526cbd814554"
   },
   {
    "id": "ax_mathap_240306449",
@@ -163,7 +163,7 @@
    "pages": 4,
    "blocks": 25,
    "pdf_sha256": "991b25974114f8facfb78cab89fdcd8ece9d5c244b31717361d072adc6ee7278",
-   "gold_sha256": "95ea9ca1ec930846d1bfb314d78b3e13b4a9c6a77e75f42b8fa9fc2548246ea4"
+   "gold_sha256": "1099c147d96a5e23b20d5a6115a73efdb835cdff481d3dd7da3d60423d94132d"
   },
   {
    "id": "ax_mathap_240306464",
@@ -172,7 +172,7 @@
    "pages": 5,
    "blocks": 36,
    "pdf_sha256": "639be4c6165e43ea754011231e2c881352494d494085671a51bb55dcebae0f90",
-   "gold_sha256": "d4c7f0079f2a5bc346847f3db9867268450dcd20a6badc5237328244c9114b28"
+   "gold_sha256": "1dce59b1c58b1d01417b77d2d42653939b4597bd6bb1a7463e54ae581ea18c08"
   },
   {
    "id": "ax_mathco_240306383",
@@ -181,7 +181,7 @@
    "pages": 5,
    "blocks": 49,
    "pdf_sha256": "c6a198389b8f6eb234bff3ed50624b355e7e863dad869651fe36efaec7ba2b26",
-   "gold_sha256": "40e518322ba06a0928cb480d2840c15cd8a3e84495b441d107b4abaa8e18f53e"
+   "gold_sha256": "8ce32c1c5383c5bc5c9a4e2b208115e1a6d51012039f618febf86ee7fdb4a1a7"
   },
   {
    "id": "ax_mathco_240306468",
@@ -190,7 +190,7 @@
    "pages": 4,
    "blocks": 33,
    "pdf_sha256": "44a7648dc6a8f087e810a23b535b6e55e5a9979dcfd0816f64252dace9c0f60c",
-   "gold_sha256": "3fd4304ce6d99a36e997947e600d9629ceffb9da894f5da840dbef3e95f9076a"
+   "gold_sha256": "5df02f67f95c8858d2bd45446c8f26a3bd817f995799c1b5e49c1045751ba0d1"
   },
   {
    "id": "ax_physicsoptics_240306439",
@@ -199,7 +199,7 @@
    "pages": 3,
    "blocks": 17,
    "pdf_sha256": "13c7d23d17710b9a3ae538a0110ae709e572b408608188a16d6aaad2a58341d3",
-   "gold_sha256": "30446f6bd2eb619c33d7f2f612faea8b86bef464c0e7e6da97e6a032dd71ebd3"
+   "gold_sha256": "6311fdf6a0f1db98eafe7e1c7ef00da8a45ee357c7e74ae45349ba6a216fa2ce"
   },
   {
    "id": "ax_qbionc_240306496",
@@ -208,7 +208,7 @@
    "pages": 4,
    "blocks": 27,
    "pdf_sha256": "c72638930bd586d6b0eeac2d66586cbd99e47d142e7defc81f3c507b42a6abfa",
-   "gold_sha256": "1d676fe5e44c795018d54cb12d5b3af81d1ca98a1e2a2a18b4996ea9a97e5333"
+   "gold_sha256": "e6c66eac19356d69ae9f76a7287ebd43b0db9d99e303f2858568ba7fa4380390"
   },
   {
    "id": "ax_qbionc_240307089",
@@ -217,7 +217,7 @@
    "pages": 5,
    "blocks": 65,
    "pdf_sha256": "ef49dddc08a01d358513a1b0efc2c1727b2f14e5cb054be141185c3f9a12fcf5",
-   "gold_sha256": "eb47c705b6a0dc3f89b57f74ee3b86d58ae86865e6be37ea0d7fa815932c0e47"
+   "gold_sha256": "d44d0cb3ed47cb1559b253e9d8ea6d61fb59c6c2a1c42460cf7351a6a09da9c6"
   },
   {
    "id": "ax_quantph_240306377",
@@ -226,7 +226,7 @@
    "pages": 5,
    "blocks": 48,
    "pdf_sha256": "4fe5f7e3fe7d7cacd1dbdeb21043b611e881d8584b4893361c5d6752b21b9836",
-   "gold_sha256": "b568d601fca7e10136a468b6d3f094e13afd5a5a329134779cd4d3cf845b65c9"
+   "gold_sha256": "712ddde2278b03769e9b6d055e7b6beb2bb056f35f890dc696585c1b0ee086b8"
   },
   {
    "id": "ax_quantph_240306391",
@@ -235,7 +235,7 @@
    "pages": 3,
    "blocks": 20,
    "pdf_sha256": "dc9a30de75269e38666b559ff930e70cb6e2b4624a5f559d9e110f3f00e8b9a9",
-   "gold_sha256": "f459cb4e1ec9de92d641744d3a9fa4d29255283552d30a0cb4a798ccadc10b2d"
+   "gold_sha256": "7e1ee17ade5255834cfc1109a1058a7bec1f88050fba6833bfb05b9b40155a73"
   },
   {
    "id": "ax_statme_240307124",
@@ -244,7 +244,7 @@
    "pages": 2,
    "blocks": 10,
    "pdf_sha256": "0edb3097d509969f480a21dd8b24ec7431952a1d0db4c4982658bcafd5f9f8d5",
-   "gold_sha256": "00357d7119271889dfad24be9d7ca7781ddb9c8fca507e1114a7dfbda25b98c2"
+   "gold_sha256": "a3ce3a7cadccafefd065c93c9a153c6be67834aafbc20b120cc241f6e3ac6ae2"
   },
   {
    "id": "ax_statme_240307158",
@@ -253,7 +253,7 @@
    "pages": 5,
    "blocks": 36,
    "pdf_sha256": "2dd2becc649a40a1413334dbe1bee1e0301a0f09f1201f7dbd053eb29845ed79",
-   "gold_sha256": "d2b21cf4d8970c64c1c663079a2f7bb26783717f6c7873b4f8ad394f6f3a5050"
+   "gold_sha256": "09357a7ced1bc0ca77c6052f5efb2b2f53207a44b217079ca0aa706cc770498a"
   },
   {
    "id": "os_algebra_and_trigonometry_2e",
@@ -262,7 +262,7 @@
    "pages": 11,
    "blocks": 172,
    "pdf_sha256": "ec503abd05d8bd5deb86f7f9d13b3bdf69d60dda9872ac8b1e61f5b4bea0ec21",
-   "gold_sha256": "ecb4f4d6872555fb0623f6c0b382dd989b77f624dbbd0b16639fce3551b63d15"
+   "gold_sha256": "ca2bb6dc284330e89ed98148540006c8f6001e33b7291b83b03b342489840a2a"
   },
   {
    "id": "os_astronomy_2e",
@@ -271,7 +271,7 @@
    "pages": 11,
    "blocks": 234,
    "pdf_sha256": "8972f29e1ff066e681fe9354d3840553b2868f1e57f127d0f66f4ce3b3f1a053",
-   "gold_sha256": "5eb18cae77359a5943945620c452ee465a24e3ea40c649351a774c9fb8d76b04"
+   "gold_sha256": "2438b742c32ba21fec231815e86f7d3990465f69bcea1b42c16f2720ff9ce129"
   },
   {
    "id": "os_calculus_volume_1",
@@ -280,7 +280,7 @@
    "pages": 11,
    "blocks": 261,
    "pdf_sha256": "930a1d07250c3637132067a2959e7bce7da0129b72543ab341e731dd9d187eb2",
-   "gold_sha256": "5d18cfafe1aa85073beff54e57f7e70d44e3139e5f4d29ec46860db74827a63e"
+   "gold_sha256": "2716154f33ef371254f48edd269e36192b9805bea4355592dbe04acd4540a487"
   },
   {
    "id": "os_concepts_biology",
@@ -289,7 +289,7 @@
    "pages": 10,
    "blocks": 251,
    "pdf_sha256": "13ad9c31c6e0d94431edc652e1a3aec5c0064e2d7d6b358076d9808e873a297d",
-   "gold_sha256": "fad54ff8da65f3ff441a4dff8dcd5cabe263adce45ad8730fac3fef6b8b24633"
+   "gold_sha256": "70828d4fd1673b1b9594f83b04fe284d6770aed41b8031427fee7c3fb8a716c2"
   },
   {
    "id": "os_contemporary_mathematics",
@@ -298,7 +298,7 @@
    "pages": 11,
    "blocks": 255,
    "pdf_sha256": "faf79b24d897259a6ea0e9898c854d9617936926885900cda4c53eeef1610c5e",
-   "gold_sha256": "fbd4fe9ad8f6de8b72799bb4c0ed83ffdf31e8324d7c4a8261467a08e7f8beb7"
+   "gold_sha256": "bb2f809d806dbfcc9e9994025e441f6dbc9a452a972cf07fe394086ff51d1df0"
   },
   {
    "id": "os_introduction_computer_science",
@@ -307,7 +307,7 @@
    "pages": 11,
    "blocks": 286,
    "pdf_sha256": "c61c3583c30de5a66d2a4f4e72a860091c3c9610be2c799106bf38b13716c8c6",
-   "gold_sha256": "59c022eb74e26b1838932c762e8462f4ede185a75b3d9945875b5994b3f74f87"
+   "gold_sha256": "2fe0d96c854d39ff82e2791889946545c3769bcf33ce7263c37bc33fdeaae3f5"
   },
   {
    "id": "os_introductory_statistics_2e",
@@ -316,7 +316,7 @@
    "pages": 11,
    "blocks": 251,
    "pdf_sha256": "72a4fa2072e790ca94f7d8e5ddcc8810ff087a048d5c4717ec6838f8e30244b0",
-   "gold_sha256": "5d5c70a4006d1c803262726ed0944f495ab89c7eec8b61b16377378eb0905fd9"
+   "gold_sha256": "55ead30c385e5c6f94faf316aa0f427e732e9d7ce6c1345e01b3102a9f336f72"
   },
   {
    "id": "os_organic_chemistry",
@@ -325,7 +325,7 @@
    "pages": 10,
    "blocks": 206,
    "pdf_sha256": "2e9b306de59fdc1bad3c8c5fd00f20db3c42a212e3a1d1dfa84cb4f056ac3dd5",
-   "gold_sha256": "2d604a056b11d9e67a8ad921104f1d7c870f04b988a404b88a54b5129f6c4ccb"
+   "gold_sha256": "ddeca561c033ff8db7d8030679f41c1cef9bca07921f6beb73cbff3f1f73bedf"
   },
   {
    "id": "os_principles_data_science",
@@ -334,7 +334,7 @@
    "pages": 11,
    "blocks": 275,
    "pdf_sha256": "4af55026d80c866b7a5cc25acd2094c03ac70158f5553510ba309346864aa40e",
-   "gold_sha256": "9ded5584637520599f164d5dc976ec94729a4be029b1348a8fc5c17324f1fc2b"
+   "gold_sha256": "b487bc77c8c459ff1de3aa6351340a0830564b18731f30ac19442954af4a36f1"
   },
   {
    "id": "os_university_physics_volume_2",
@@ -343,7 +343,7 @@
    "pages": 11,
    "blocks": 272,
    "pdf_sha256": "c45b4c6a5dabbb0244030cb9499068f0b372418a84ae1ab248074baaf3da678b",
-   "gold_sha256": "cd3ebf394c5ec50de1103d16285263c4472677a966193057cd443d0ca82ce7b5"
+   "gold_sha256": "0ebe317970a59432e23efe775e3b151c153914380df220e1629796242cbf52ab"
   },
   {
    "id": "sm_answers_a",

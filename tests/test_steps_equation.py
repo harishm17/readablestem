@@ -227,7 +227,9 @@ def test_main_outage_falls_back_to_cheap():
     assert models(client) == [MAIN_MODEL, CHEAP_MODEL]
     assert [c.outcome for c in fix.calls] == ["api_error", "ok"]
     assert [c.is_fallback for c in fix.calls] == [False, True]
-    assert fix.status == Status.ACCEPTED
+    # A main-model request the cheap model answered says so (an optional note, no decision).
+    assert fix.status == Status.ACCEPTED and fix.review == "optional"
+    assert codes(fix) == {"fallback_answer"}
 
 
 def test_no_escalation_when_the_fallback_already_was_the_main_model():

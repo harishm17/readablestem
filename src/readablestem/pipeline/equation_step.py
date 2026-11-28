@@ -530,8 +530,20 @@ MEANING_MISMATCH_FACTOR = 0.6
 SPEECH_CODES = frozenset({"speech_failed", "speech_empty"})
 # The cheap answer was not read a second time (see `SKIP_ESCALATION_FROM`): a note only.
 SINGLE_READING_CODE = "single_reading"
+# A main-model request that the router's fallback (the cheap model) answered. The answer is
+# held to what a cheap answer is held to, but the second reading a cheap answer may be owed
+# cannot be made (the main model has just failed): when none was owed the fix says so in a
+# note, when one was owed (`_needs_escalation`) it is a decision.
+FALLBACK_NOTE_CODE = "fallback_answer"
+FALLBACK_DECISION_CODE = "fallback_not_reread"
 NOTE_CODES = frozenset(
-    {"style_cosmetic", SINGLE_READING_CODE, *SPEECH_CODES, *glyph_reconcile.CODES}
+    {
+        "style_cosmetic",
+        SINGLE_READING_CODE,
+        FALLBACK_NOTE_CODE,
+        *SPEECH_CODES,
+        *glyph_reconcile.CODES,
+    }
 )
 # A picture of an equation: no text layer to check the reading against, so a person decides.
 NO_TEXT_LAYER_CODE = "no_text_layer"
@@ -1685,6 +1697,23 @@ def transcribe(
                 passed=False,
                 severity="warning",
                 code=SINGLE_READING_CODE,
+            )
+        )
+    if (
+        not cheap_start
+        and candidate.output is not None
+        and first.calls
+        and first.calls[-1].model != settings.main_model
+    ):
+        # The main model was asked first and the router's fallback answered. It is judged as
+        # an answer that started cheap (`_needs_escalation`), but it cannot be re-read.
+        owed = _needs_escalation(first, settings) or first_agrees is False
+        candidate.checks.append(
+            Check(
+                name="equation.fallback_reading",
+                passed=False,
+                severity="warning",
+                code=FALLBACK_DECISION_CODE if owed else FALLBACK_NOTE_CODE,
             )
         )
     if (

@@ -1,5 +1,99 @@
 # Changelog
 
+## Pipeline 0.5.24, render 11 (2026-11-27)
+
+- `PIPELINE_VERSION` is 0.5.24 and `RENDER_VERSION` stays 11. The flag policy is on again in the
+  production profile (the entry below), and the rules cut the model's page order at printed item
+  markers and read a small-type footnote low on the page last (below). An equation or figure read
+  by the fallback model says so. No request to a model changes; 0.5.23 opens 0.5.24 results.
+- On held-out pages (`layout-heldout-1`, answers replayed, $0), against 0.5.23 in the page a
+  student is given: 196 of 247 pages right (192), 143 with no fault (140), 22 of 49 documents with
+  every gold page right (21), paragraphs run together on 28 pages (30); furniture (13) and cut
+  paragraphs (36) are unchanged. No figure moves beyond its 95% interval. Every release bar of
+  the ledger is met. The set was scored twice for this release with the same totals, because the
+  first run wrote no record.
+- On the corpus, the two pages 0.5.23 read wrong are right again (58 of 62), and the places
+  where blocks run together go from 112 to 24: the known fault of 0.5.23 is fixed.
+- Decisions on the corpus go from 71 to 72 on 110 pages: one more asked by the flag policy, and
+  one more and one fewer on two uploads the item cut changes. The flag policy's cost is measured
+  on held-out papers and accepted.
+  [docs/eval.md](docs/eval.md) "The release of 2026-11-27 (pipeline 0.5.24)".
+
+## Unreleased: the flag policy is on again
+
+- `FLAG_POLICY` is `true` in the production profile. The code default stays off. An accepted equation that
+  looks like the readings that turned out wrong is asked about again. Measured on held-out papers at
+  0.5.23 (26 units, 1,715 gold equations): silent errors fall from 5.71 to 4.78 per 100 gold (paired
+  -0.93, 95% [-1.88, -0.20]), and required decisions rise from 2.01 [1.15, 3.43] to 2.36 [1.50, 3.74] a page. The readings are the
+  same. See docs/eval-flag-policy.md, the last section. No request changes, because the policy runs after
+  the model's answer.
+
+## Unreleased: a job stopped by a deploy keeps its attempts
+
+- `Worker.stop` (SIGTERM, a deploy, the app's shutdown) ended the running job's lease but
+  left the attempt counted, so a job met by three deploys failed with "lease_expired" though
+  nothing was wrong with it. The stopped attempt is now given back in the same update that ends
+  the lease. A worker that crashes or is killed still counts its attempt, and a job the owner
+  cancels is failed as canceled, not requeued, as before.
+## Unreleased: the order scorer says why a page is not right
+
+- `eval/order.py` is version 6. Each gold page now counts `moved`: a block its own page lacks
+  whose words are whole in the paragraph the page next to it keeps across the break. Such a
+  block was counted `lost`; it is no longer. A page's record keeps `found`, `lost`, `moved`,
+  `broken`, `xjoin`, `pairs` and `pairs_ok`, and a `why` list of the conditions of `right`
+  that failed. Heading levels: a gold heading carries the source's level where there is one
+  (`gold/layout_gold.py`), and the student page counts `levels` and `levels_ok`. `right` and
+  `faultless` are as before. No reader changes. Order records made before this version are not
+  comparable on these counts, so the development and corpus records are re-made.
+## Unreleased: an answer from the fallback model says so
+
+- When the main model fails a request and the router's fallback (the cheap model) answers, an
+  equation or figure reading was accepted as if it were the main model's, with no note and no
+  second reading. It now carries the note `fallback_answer` (accepted, shown as an optional
+  item), and an equation whose cheap answer would have gone to the main model (a failed
+  text-layer check or a page-pass disagreement) becomes a decision (`fallback_not_reread`), since
+  no second reading can be made. No model call is added and no request changes. Counted on the 12
+  development papers (1,018 equation readings) and the 73 recorded corpus uploads: no main-model
+  request was answered by the cheap model, so no recorded result changes.
+- Equations whose text-layer comparison did not run were counted and not changed: on the 12
+  development papers 3 of 966 accepted equations (two bold letters, one with operators only), all
+  right; on the corpus 84 of 1,077 (70 bold letters read from the file with no model call, 14 with
+  operators or marks only), none with an unmapped font and none with no characters.
+## Unreleased: the model's page order keeps the items of a question or a slide apart
+
+- When the model's page order names a question and its options (or a slide's title and its
+  bullets) as one block, each printed item is now its own item again, as with the switch off.
+  A block is cut where a row opens with its printed marker and stands under a line that stopped
+  short of the block's right edge, or set further left, or in another weight or size. A wrapped
+  line that opens with "(b)" or a formula that opens with a bullet glyph is not cut. Only pages
+  with a model answer change; with the switch off nothing does.
+- Measured by replaying the recorded answers (`eval order --model-order`, no model call), against
+  0.5.23: on the corpus, places where neighbouring blocks are read as one go from 112 to 24
+  (62 pages: 56 to 57 right, 37 to 39 with no fault, no heading read into its neighbour) and the
+  two-column exam page is read right. On `layout-dev-1`: 184 pages right as before, cut 325
+  places as before, run together 67 places to 65, heading run together 16 as before. No
+  recorded answer is missed on either set. Released in 0.5.24.
+- A note the model names a footnote, and that is small and low on the page, is read at the end
+  of the page, after the other blocks, as a source's notes are. In two columns the model had
+  left it where its column ends, in the middle of the page; two pages of `layout-dev-1` and one
+  corpus page are read right now. With the item cut: `layout-dev-1` 184 to 186 pages right and
+  140 to 141 with no fault; the corpus 56 to 58 and 37 to 40.
+## Unreleased: olmOCR-Bench with the model's page order
+
+- `eval parsing-bench --model-order` runs the benchmark with the model's page order on, as
+  production does, its answers replayed from a recording (`--order-answers FILE`, default
+  `page-order-answers.jsonl` in the run's folder). A page the recording lacks keeps the rules'
+  order and is counted as missed; nothing is asked without `--live`. `--live --max-usd N`
+  answers a missing request from the provider one page at a time, writes it to the recording
+  and stops asking once N dollars are spent; the pages left are counted as missed. The run
+  record (`run.model_order`) and the printed table say how many pages were asked, answered,
+  missed and failed, and the dollars paid. A page file made in the other mode is converted
+  again, so one run folder never mixes them. A live run resumed after its cap asks again the
+  pages the cap left missed. The committed record (`data/eval/parsing-bench-olmocr.json`) is
+  re-made with the model's page order at 0.5.23 ($0.68): multi_column 77.5, headers_footers
+  84.0, long_tiny_text 65.1, tables 70.6 (75.1, 47.9, 61.4 and 70.6 with no model; the record
+  it replaces, with no model at 0.5.16, read 70.2, 38.4, 37.3).
+
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 
 - `PIPELINE_VERSION` is 0.5.23 and `RENDER_VERSION` stays 11. The model's page order (the entry

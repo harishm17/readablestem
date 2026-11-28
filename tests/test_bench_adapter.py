@@ -8,9 +8,11 @@ import json
 import os
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from readablestem.eval import olmocr_bench as bench
+from readablestem.eval.order_report import OrderAnswers
 
 WRITERS = (
     '<section class="notice readablestem"><p>This version has not been reviewed by a '
@@ -134,3 +136,67 @@ def test_the_checker_scores_the_five_pages_as_built(tmp_path: Path) -> None:
     got = {row["id"]: row["passed"] for row in rows if row["type"] != "baseline"}
     assert got == {name: wanted for name, (_, _, wanted) in PAGES.items()}
     assert sum(got.values()) == 4
+
+
+def test_a_page_order_answer_the_recording_lacks_is_counted_and_never_asked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No `--live`: the recording is all there is, so a client built to ask the model is a fault.
+    def no_client(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the provider was asked")
+
+    monkeypatch.setattr("readablestem.models.make_live_client", no_client)
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 100), "First paragraph of the page, long enough to be text.")
+    page.insert_text((72, 130), "Second paragraph of the page, also long enough to read.")
+    recording = tmp_path / "answers.jsonl"
+    recording.write_text("")
+
+    done = bench.convert_page(document.tobytes(), OrderAnswers(str(recording)))
+
+    asked = done["model_order"]
+    assert done["error"] == "" and not done["scan"]
+    assert (asked["pages"], asked["answered_live"], asked["usd"]) == (1, 0, 0)
+    assert asked["missed"] > 0  # requests: a refused one is asked once more, and missed again
+    assert recording.read_text() == ""
+    summary = bench.order_summary({"x.pdf": done})
+    assert (summary["on"], summary["answered"], summary["missed"], summary["failed"]) == (
+        True,
+        0,
+        1,
+        0,
+    )
+    assert bench.order_summary({"x.pdf": bench.convert_page(document.tobytes())})["on"] is False
+
+
+def test_a_live_run_asks_again_the_pages_an_earlier_cap_left_missed(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # A live run stopped by its cap writes the rest of its pages with `missed`; resuming it
+    # must ask those again, and leave the answered ones alone.
+    category = bench.CATEGORIES[0]
+    pdfs = tmp_path / "bench" / "bench_data" / "pdfs" / category.folder
+    pages = tmp_path / "run" / "pages" / category.folder
+    pdfs.mkdir(parents=True)
+    pages.mkdir(parents=True)
+    for name, missed in (("answered", 0), ("missed", 1)):
+        (pdfs / f"{name}.pdf").write_bytes(b"%PDF")
+        (pages / f"{name}.json").write_text(json.dumps({"model_order": {"missed": missed}}))
+    converted: list[str] = []
+    monkeypatch.setattr(
+        bench,
+        "_convert_file",
+        lambda pdf, page, answers=None: converted.append(Path(pdf).stem) or "",
+    )
+
+    class Live:
+        live = True
+
+    assert (
+        bench.convert_all(
+            tmp_path / "bench", tmp_path / "run", [category], at_once=1, answers=Live()
+        )
+        == 1
+    )
+    assert converted == ["missed"]
