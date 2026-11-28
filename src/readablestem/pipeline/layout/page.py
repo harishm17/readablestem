@@ -794,10 +794,11 @@ def _runs_by_answer(
                 continue
             last: _Row | None = None
             for piece in _column_pieces(group):
-                if last is not None:  # the paragraph goes on in the next column
-                    continues[id(piece[0])] = id(last)
-                made.append((_run_of_rows(piece, parents), position))
-                last = piece[-1]
+                for k, part in enumerate(_item_pieces(piece)):
+                    if last is not None and k == 0:  # the paragraph goes on in the next column
+                        continues[id(part[0])] = id(last)
+                    made.append((_run_of_rows(part, parents), position))
+                    last = part[-1]
             group = []
             if name in run_of:
                 made.append((run_of[name], position))
@@ -854,6 +855,42 @@ def _column_pieces(rows: list[_Row]) -> list[list[_Row]]:
         else:
             pieces.append([row])
     return pieces
+
+
+def _item_pieces(rows: list[_Row]) -> list[list[_Row]]:
+    """A piece of an answer's block cut at each row that starts a list item
+    (`_starts_item`): the model puts a question and its options, or a slide's title and its
+    bullets, in one block, where the rules' runs never take a marker row into the block above
+    it (`_continues`). The rows before the first item stay together as the block's head."""
+    right: dict[str, float] = {}
+    for row in rows:
+        right[row.column] = max(row.x1, right.get(row.column, row.x1))
+    parts: list[list[_Row]] = []
+    for row in rows:
+        if parts and _starts_item(parts[-1][-1], row, right[parts[-1][-1].column]):
+            parts.append([row])
+        elif parts:
+            parts[-1].append(row)
+        else:
+            parts.append([row])
+    return parts
+
+
+def _starts_item(prev: _Row, row: _Row, right: float) -> bool:
+    """Does `row`, under `prev` in an answer's block, start an item of its own? It has a marker
+    printed at its start (not the drawn dot of a formula that opens a wrapped line), and the
+    line before it is no wrapped line: that one stops short of the longest line of the block in
+    its column (`right`), or `row` stands further in ("a) Coal" under its question), or is set
+    in another weight or size (a slide's title over its bullets)."""
+    marker = row.marker
+    if marker is None or marker.text.strip() not in row.clean[: marker.start + len(marker.text) + 4]:
+        return False
+    return (
+        prev.x1 < right - 1.5 * prev.size
+        or row.x0 > prev.x0 + prev.size
+        or prev.bold != row.bold
+        or abs(prev.size - row.size) > 0.5
+    )
 
 
 def _join_answer_pieces(blocks: list[_Block], continues: dict[int, int]) -> list[_Block]:
