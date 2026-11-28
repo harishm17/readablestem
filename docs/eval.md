@@ -3009,6 +3009,29 @@ scores its most common level right. Only the student page has levels; the pipeli
 elements hold none. Gold made before levels existed scores as before, with no level counts.
 Self-made files have none: the unit list that was written next to each file is not kept.
 
+**What version 6 shows on `layout-dev-1`** (`data/eval/order-layout-dev-1.json`, the model's
+page order on with its recorded answers replayed; pipeline 0.5.23, no reader changed). Of
+267 pages, 184 are right in the student page (as at version 5) and 83 are not. Why the 83 are
+not right (a page can have several reasons):
+
+| Reason | Pages |
+|---|---|
+| `order` (neighboring blocks out of order) | 52 |
+| `broken` (a block with other text inside it) | 37 |
+| `entries_joined` (index or glossary entries run together) | 17 |
+| `xjoin` (a cross-join of blocks that are not neighbors) | 5 |
+| `found_under_half`, `stamp_in_text`, `numbers_out_of_order` | 1 each |
+
+Of the 4,460 gold blocks: 4,296 found, 110 lost and 54 moved (version 5 counted the 54
+as lost, 164 lost in all). With the model's order off (a run with no `--model-order`) 4,302
+are found, 113 lost and 45 moved, and 183 pages are right. On the pipeline's elements, with
+the model's order on, 4,365 are found, 42 lost and 53 moved. The seven paragraphs joined
+across a page break that version 5 counted as lost with the model's order on are moved. Heading levels: 338 gold headings carry a
+level (162 in papers, 176 in books), and 250 of them are read as a heading at their
+document's usual level (134 of 162 in papers, 116 of 176 in books); with the model's order
+off, 252. The corpus record (`data/eval/order-corpus.json`) is the same 56 right and 37
+faultless pages of 62, with 13 lost and 2 moved blocks (15 lost at version 5).
+
 ### Gold built from sources (`gold/layout_gold.py`)
 
 Hand labeling cannot supply held-out pages in number: the 78 hand-labeled pages of the
