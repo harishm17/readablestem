@@ -521,7 +521,16 @@ def _page_blocks(
     continues: dict[int, int] = {}
     if page_order is not None:
         runs, places, figure_places, continues = _runs_by_answer(
-            page_order, number, runs, figures, page_tables, gutter, ctx, source, document=document
+            page_order,
+            number,
+            runs,
+            figures,
+            page_tables,
+            gutter,
+            ctx,
+            source,
+            document=document,
+            height=page_rect.height,
         )
     if places:
         split: list[_Run] = []
@@ -689,6 +698,7 @@ def _runs_by_answer(
     source: say_once.PageSource | None,
     *,
     document: _Document,
+    height: float,
 ) -> tuple[list[_Run], list[int | None], dict[int, int], dict[int, int]]:
     """The page's runs as a model's answer groups and orders them (an experiment: `analyze`
     gives `page_order`, off by default).
@@ -778,6 +788,8 @@ def _runs_by_answer(
     continues: dict[int, int] = {}  # a later piece's first row: the last row before it
     answered: list[str] = []
     figure_places: dict[int, int] = {}
+    last_place = 0
+    moved = False
     for position, block in enumerate(answer.get("blocks") or ()):
         names = []
         for name in block.get("items") or ():
@@ -787,6 +799,21 @@ def _runs_by_answer(
                 names.append(name)
         if len(names) > 1 and any(name not in line_of for name in names):
             said["bad_join"] += 1
+        if (
+            block.get("kind") == "footnote"
+            and names
+            and all(
+                name in line_of
+                and line_of[name].size < FOOTNOTE_SIZE * ctx.body
+                and line_of[name].y0 >= FOOTNOTE_ZONE * height
+                for name in names
+            )
+        ):
+            # A note the model named, and that is small and low on the page: read at the end of
+            # the page, in the order the notes were named, as a source's notes are.
+            last_place += 1
+            moved = True
+            position = len(answer.get("blocks") or ()) + last_place
         group: list[_Row] = []
         for name in (*names, ""):
             if name in line_of:
@@ -815,7 +842,7 @@ def _runs_by_answer(
     page_order.applied(number, said)
     places = [p if p >= 0 else None for _, p in made]
     named = set(answered)
-    if answered == [item["id"] for item in items if item["id"] in named]:
+    if not moved and answered == [item["id"] for item in items if item["id"] in named]:
         # The answer reads the items in the order they were shown: the order of the blocks
         # stays the rules' own (`_reading_order` on the finished blocks, with the captions),
         # which the items' order only approximates.
