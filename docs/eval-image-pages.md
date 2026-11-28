@@ -120,6 +120,15 @@ did not run ($0.24 of the $0.77).
 - **Headings.** The reader finds the headings (F1 0.93 to 0.96 against 0.97 typed) but not their
   levels: 63 to 74 % of matched headings have the right relative level against 100 % from layout's
   font sizes. A level is one option on the review card; the outline repair keeps the document valid.
+  Levels from the reader's heading boxes (box height as the type size, clustered per document the way
+  `heading_levels` clusters font sizes) were measured on the recorded Opus answers of the 36 development
+  pages (78 heading blocks, 73 matched to one gold level, the reader right on 48) and not built. A heading
+  box is one line of 11 to 27 units on a 1000-unit page and the same heading's height differs by 2 to 3
+  units between boxes, so a 5 % tolerance gives 11 levels on the four chemistry documents pooled and gets 13 of 73 right;
+  the best tolerance tried (15 %) gets 40, and the reader's own level is still the better one (fixes
+  7, breaks 15). The reader's two common faults are not size faults: it numbers "Answer:" one level
+  deeper than "Check your learning" although both are set in the same size, and it numbers the equal
+  "Part A" to "Part D" headings 1 or 2 by whim.
 - **Review load.** 3.5 to 3.8 required decisions per page: 116 display equations, 9 tables and 2 to 4
   figures, nothing else, in every arm (prose and headings were optional notes unless a model said
   `medium`: 3 to 5 blocks of 600). It is the design, not a finding: all of them are the tier "required for
