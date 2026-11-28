@@ -816,6 +816,24 @@ uv run readablestem eval parsing-bench --model-order --live --max-usd 1.0 \
   --out data/eval/parsing-bench-olmocr.json
 ```
 
+A stopped live run resumes with the same `--run-dir` and `--order-answers`: the pages it
+converted keep their answers, and only the rest are asked. The cap is per run, so give the rest a
+cap of its own. A cap below eight worst-case reservations ($0.52) is refused before anything is
+converted.
+
+Measured on 2026-11-28 at 0.5.23. Both rows ran on the same pages, 747 converted and 161 scans
+dropped. The live pass asked about 589 pages: 558 answers held, 31 did not pass the check, and
+it paid $0.68. The record is `data/eval/parsing-bench-olmocr.json`.
+
+| olmOCR-Bench, 0.5.23 | Multi-column | Headers, footers | Tiny text | Tables | Baseline |
+|---|---|---|---|---|---|
+| No model | 75.1 | 47.9 | 61.4 | 70.6 | 100.0 |
+| The model's page order | 77.5 | 84.0 | 65.1 | 70.6 | 100.0 |
+
+The headers-and-footers gain comes from the page order alone: every file is one page, so the
+rules' repeats across pages never find a running head. The record of 0.5.16 (38.4 and 70.2)
+came before the rules changes of 0.5.17 to 0.5.23, which account for the rest of the gap.
+
 ## How to rerun
 
 Without a key, a network or a browser: `make reproduce` checks the gold files against their
