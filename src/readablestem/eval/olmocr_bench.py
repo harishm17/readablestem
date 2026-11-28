@@ -28,6 +28,12 @@ Categories, and what is left out and why (`CATEGORIES`):
   category: its text is not in the file, a model reads its picture.
 - A page the conversion refuses or cannot finish is dropped and named with its code.
 
+With `--model-order` the model's page order is on, as in production: its answers are replayed
+from a recording (`OrderAnswers`), and a page whose answer the recording lacks keeps the rules'
+order and is counted as missed, never asked. `--live` with a dollar cap answers a missing
+request from the provider, writes it to the recording, and stops asking once the cap is spent;
+every other model step stays refused. Page files and the run record say which mode made them.
+
 A page that asks the model for something at $0 (an equation or a figure) is still scored: its
 text checks do not depend on the answer unless the check holds the equation. Its requests are
 counted per step so that a failure can be put down to them.
@@ -451,16 +457,24 @@ def _page_facts(result: Any, facts: Any) -> dict[str, Any]:
     }
 
 
-def convert_page(pdf: bytes) -> dict[str, Any]:
+def convert_page(pdf: bytes, answers: Any = None) -> dict[str, Any]:
     """One one-page PDF through the product's conversion with no model: what it came to, as
-    plain data (`html` is the page's text and stays out of any record)."""
+    plain data (`html` is the page's text and stays out of any record). `answers`
+    (`order_report.OrderAnswers`): the model's page order is on and answers from that
+    recording; any other request is refused."""
     from readablestem.core.types import ConversionOptions, StepFacts
     from readablestem.eval import order_report
     from readablestem.models.fake import FakeVisionClient
     from readablestem.web.isolated_convert import convert_isolated
 
-    settings = order_report.set_settings()
-    client = FakeVisionClient()  # refuses every request: no model is called
+    settings = order_report.set_settings(
+        model_order=answers is not None, live=answers is not None and answers.live
+    )
+    client: FakeVisionClient | order_report.PageOrderOnly
+    if answers is None:
+        client = FakeVisionClient()  # refuses every request: no model is called
+    else:
+        client = order_report.PageOrderOnly(settings, answers)
     started = time.monotonic()
     try:
         output = convert_isolated(
@@ -475,11 +489,18 @@ def convert_page(pdf: bytes) -> dict[str, Any]:
 
         return {"error": error_code_for(exc), "seconds": round(time.monotonic() - started, 2)}
     result = output.result
+    if isinstance(client, order_report.PageOrderOnly):
+        asked = dict(client.refused)
+        model_order = {"model_order": _order_facts(result, client)}
+    else:
+        asked = dict(Counter(request.step for request in client.requests))
+        model_order = {}
     return {
         "error": "",
         "pages": result.stats.pages,
         **_page_facts(result, output.facts or StepFacts()),
-        "asked": dict(Counter(request.step for request in client.requests)),
+        **model_order,
+        "asked": asked,
         "stopped": [stop.step for stop in (output.facts or StepFacts()).not_finished],
         "seconds": round(time.monotonic() - started, 2),
         # The student page itself, kept so the adapter can change and the run be scored again
@@ -488,10 +509,27 @@ def convert_page(pdf: bytes) -> dict[str, Any]:
     }
 
 
-def _convert_file(pdf_path: str, page_path: str) -> str:
+def _order_facts(result: Any, client: Any) -> dict[str, Any]:
+    """What the page order step did for one page, counts only: pages asked, those with no
+    usable answer (`failed`, which includes `missed`), requests the recording lacked and
+    nothing answered (`missed`: `--live` stopped by its cap, or no `--live`), requests
+    answered live and written down, and the dollars this page paid."""
+    summary = result.page_order
+    asked = summary.pages if summary is not None else 0
+    return {
+        "pages": asked,
+        "failed": summary.failed if summary is not None else 0,
+        "applied_pages": summary.applied_pages if summary is not None else 0,
+        "missed": client.cached.unanswered,
+        "answered_live": client.cached.answered_live,
+        "usd": result.stats.cost_usd,
+    }
+
+
+def _convert_file(pdf_path: str, page_path: str, answers: Any = None) -> str:
     """A process of `convert_all`: one PDF converted and its page file written."""
     pdf = Path(pdf_path).read_bytes()
-    done = convert_page(pdf) | {"pdf_sha256": hashlib.sha256(pdf).hexdigest()}
+    done = convert_page(pdf, answers) | {"pdf_sha256": hashlib.sha256(pdf).hexdigest()}
     target = Path(page_path)
     target.parent.mkdir(parents=True, exist_ok=True)
     part = target.with_name(target.name + ".part")
@@ -514,25 +552,35 @@ def convert_all(
     at_once: int,
     limit: int | None = None,
     said: Callable[[str], None] | None = None,
+    answers: Any = None,
 ) -> int:
-    """Convert every PDF of `categories` whose page file is not in `run_dir/pages` yet, at
-    most `at_once` at a time, each in a process of its own. Returns how many were converted
-    now."""
+    """Convert every PDF of `categories` whose page file is not in `run_dir/pages` yet (or
+    was made with the page order in the other mode), at most `at_once` at a time, each in a
+    process of its own. A live run (`answers.live`) converts one page at a time in this
+    process, so that its dollar cap is the run's. Returns how many were converted now."""
     todo: list[tuple[str, str]] = []
     for category in categories:
         names = pdfs_of(folder, category)[:limit]
         for name in names:
-            page = run_dir / "pages" / name.removesuffix(".pdf")
-            if not page.with_suffix(".json").is_file():
-                todo.append(
-                    (str(folder / "bench_data" / "pdfs" / name), str(page.with_suffix(".json")))
-                )
+            page = (run_dir / "pages" / name.removesuffix(".pdf")).with_suffix(".json")
+            if not page.is_file() or bool(
+                json.loads(page.read_text(encoding="utf-8")).get("model_order")
+            ) != (answers is not None):
+                todo.append((str(folder / "bench_data" / "pdfs" / name), str(page)))
     if not todo:
         return 0
+    if answers is not None and answers.live:
+        for number, (pdf_path, page_path) in enumerate(todo, 1):
+            error = _convert_file(pdf_path, page_path, answers)
+            if said is not None and (error or number % 25 == 0):
+                said(f"{number}/{len(todo)}" + (f" ({error})" if error else ""))
+        return len(todo)
     with ProcessPoolExecutor(
         max_workers=min(max(1, at_once), MAX_AT_ONCE), max_tasks_per_child=1
     ) as pool:
-        for number, error in enumerate(pool.map(_convert_file, *zip(*todo, strict=True)), 1):
+        for number, error in enumerate(
+            pool.map(_convert_file, *zip(*todo, strict=True), [answers] * len(todo)), 1
+        ):
             if said is not None and (error or number % 25 == 0):
                 said(f"{number}/{len(todo)}" + (f" ({error})" if error else ""))
     return len(todo)
@@ -655,6 +703,28 @@ def page_files(run_dir: Path) -> dict[str, dict[str, Any]]:
     return out
 
 
+def order_summary(pages: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """The model's page order over a run, counts only: whether it was on, the pages asked
+    about, those with a usable answer, those whose answer the recording lacked and was not
+    asked for (`missed`), those whose answer came and was unusable (`failed`), and the
+    dollars paid. Empty counts when it was off."""
+    ours = [page["model_order"] for page in pages.values() if page.get("model_order")]
+    asked = sum(page["pages"] for page in ours)
+    missed = sum(page["missed"] > 0 for page in ours)
+    failed = sum(page["failed"] for page in ours)
+    return {
+        "on": bool(ours),
+        "documents": len(ours),
+        "pages_asked": asked,
+        "answered": asked - failed,
+        "missed": missed,
+        "failed": failed - missed,
+        "applied_pages": sum(page["applied_pages"] for page in ours),
+        "answered_live": sum(page["answered_live"] for page in ours),
+        "usd": round(sum(page["usd"] for page in ours), 6),
+    }
+
+
 def run_summary(pages: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """What the conversions came to, without any page's text: how many were scans or were
     refused, which steps asked a model, and how long they took."""
@@ -665,6 +735,7 @@ def run_summary(pages: dict[str, dict[str, Any]]) -> dict[str, Any]:
         with_requests += bool(page.get("asked"))
     seconds = sorted(page["seconds"] for page in pages.values())
     return {
+        "model_order": order_summary(pages),
         "pages": len(pages),
         "scans": sum(bool(page.get("scan")) for page in pages.values()),
         "refused": dict(Counter(page["error"] for page in pages.values() if page["error"])),
@@ -678,7 +749,11 @@ def run_summary(pages: dict[str, dict[str, Any]]) -> dict[str, Any]:
 
 
 def make_record(
-    folder: Path, run_dir: Path, categories: list[Category], rows: list[dict[str, Any]]
+    folder: Path,
+    run_dir: Path,
+    categories: list[Category],
+    rows: list[dict[str, Any]],
+    answers: Any = None,
 ) -> dict[str, Any]:
     """The run record: what ran, on which revision and code, the scores with n, what was
     left out. Counts only; no PDF name, no text of any page."""
@@ -694,8 +769,11 @@ def make_record(
         "split": chosen.stamp(split.DEVELOPMENT),
         "client": "none",
     }
+    ordered = order_summary(pages)
+    if answers is not None:
+        of_set["client"] = "page-order-live" if answers.live else "page-order-replay"
     metrics = score(rows, pages, categories)
-    return measure.stamps([], set_settings(), of_set=of_set) | {
+    return measure.stamps([], set_settings(model_order=answers is not None), of_set=of_set) | {
         "benchmark": {
             "dataset": DATASET,
             "revision": REVISION,
@@ -703,8 +781,8 @@ def make_record(
             "checker": CHECKER,
             "page": "olmOCR-Bench, Allen Institute for AI; fetched outside the repository",
         },
-        "model_calls": 0,
-        "usd": 0.0,
+        "model_calls": ordered["answered_live"],
+        "usd": ordered["usd"],
         "run": run_summary(pages),
         "metrics": metrics,
         "not_run": not_run(folder, categories),
@@ -720,13 +798,23 @@ def make_record(
     }
 
 
+def _order_line(done: dict[str, Any]) -> str:
+    return (
+        f"The model's page order was on: {done['pages_asked']} pages asked, {done['answered']} "
+        f"answered, {done['missed']} missed (no answer in the recording, none asked: these "
+        f"keep the rules' order), {done['failed']} failed; ${done['usd']:.4f} paid for "
+        f"{done['answered_live']} answers asked of the model."
+    )
+
+
 def render(record: dict[str, Any]) -> str:
     """The record as the table a person reads, with the published rows beside it."""
+    ordered = record["run"].get("model_order", {})
     lines = [
         f"olmOCR-Bench {record['benchmark']['revision'][:12]} ({record['benchmark']['license']}), "
         f"checker {record['benchmark']['checker']}; pipeline {record['pipeline_version']}, "
         f"commit {record['commit']}; profile {record['profile']['sha256'][:12]}. "
-        "$0, no model call.",
+        + (_order_line(ordered) if ordered.get("on") else "$0, no model call."),
         f"{record['run']['pages']} pages converted, {record['run']['scans']} typed as scans "
         f"(dropped), {sum(record['run']['refused'].values())} refused; "
         f"{record['run']['pages_that_asked_a_model']} asked a model for something "
@@ -748,7 +836,8 @@ def render(record: dict[str, Any]) -> str:
         f"{m['score']:>7}" if m["score"] is not None else f"{'-':>7}"
         for m in record["metrics"].values()
     )
-    lines.append(f"  {'ReadableSTEM (no model)':<27}{ours}")
+    name = "ReadableSTEM (model order)" if ordered.get("on") else "ReadableSTEM (no model)"
+    lines.append(f"  {name:<27}{ours}")
     return "\n".join(lines)
 
 
@@ -760,12 +849,16 @@ def run(
     only: list[str] | None = None,
     limit: int | None = None,
     said: Callable[[str], None] | None = None,
+    answers: Any = None,
 ) -> dict[str, Any]:
-    """Convert (resuming), score with the benchmark's checker, and return the run record."""
+    """Convert (resuming), score with the benchmark's checker, and return the run record.
+    `answers`: the model's page order is on, replayed from that recording (`convert_page`)."""
     categories = [c for c in CATEGORIES if not c.skipped and (not only or c.name in only)]
     if not categories:
         raise ValueError("no category to run")
-    convert_all(folder, run_dir, categories, at_once=at_once, limit=limit, said=said)
+    convert_all(
+        folder, run_dir, categories, at_once=at_once, limit=limit, said=said, answers=answers
+    )
     write_markdown(run_dir)
     rows = run_checker(folder, run_dir, categories)
     if limit is not None:
@@ -773,7 +866,7 @@ def run(
         # counted as dropped.
         converted = set(page_files(run_dir))
         rows = [row for row in rows if row["pdf"] in converted]
-    return make_record(folder, run_dir, categories, rows)
+    return make_record(folder, run_dir, categories, rows, answers)
 
 
 def new_run_dir(folder: Path) -> Path:

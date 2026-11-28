@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased: olmOCR-Bench with the model's page order
+
+- `eval parsing-bench --model-order` runs the benchmark with the model's page order on, as
+  production does, its answers replayed from a recording (`--order-answers FILE`, default
+  `page-order-answers.jsonl` in the run's folder). A page the recording lacks keeps the rules'
+  order and is counted as missed; nothing is asked without `--live`. `--live --max-usd N`
+  answers a missing request from the provider one page at a time, writes it to the recording
+  and stops asking once N dollars are spent; the pages left are counted as missed. The run
+  record (`run.model_order`) and the printed table say how many pages were asked, answered,
+  missed and failed, and the dollars paid. A page file made in the other mode is converted
+  again, so one run folder never mixes them. The committed record
+  (`data/eval/parsing-bench-olmocr.json`, made with no model at 0.5.16) is unchanged; the
+  live run that remakes it is the integrating session's.
+
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 
 - `PIPELINE_VERSION` is 0.5.23 and `RENDER_VERSION` stays 11. The model's page order (the entry

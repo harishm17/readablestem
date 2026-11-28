@@ -1175,16 +1175,46 @@ def _order_answers(args: argparse.Namespace) -> Any:
     path = args.order_answers or _order_answers_path(args)
     if not args.live and not path.is_file():
         return f"no recording at {path}: replay needs one (--order-answers FILE)"
-    if args.live:
-        from readablestem.config import get_settings
-        from readablestem.ops.limits import run_cap_problem
+    if args.live and (problem := _live_order_problem(args.max_usd)):
+        return problem
+    return order_report.OrderAnswers(str(path), args.max_usd if args.live else None)
 
-        settings = order_report.set_settings(model_order=True, live=True)
-        if settings.model_provider != "anthropic":
-            return "the page order is asked of a Claude model: MODEL_PROVIDER must be anthropic"
-        # (the page order asks a call at a time per page, `model_concurrency` pages at once)
-        if problem := run_cap_problem(get_settings(), args.max_usd, settings.model_concurrency):
-            return f"--max-usd: {problem}"
+
+def _live_order_problem(max_usd: float) -> str | None:
+    """Why a live page order run with this cap cannot start, or None."""
+    from readablestem.config import get_settings
+    from readablestem.eval import order_report
+    from readablestem.ops.limits import run_cap_problem
+
+    settings = order_report.set_settings(model_order=True, live=True)
+    if settings.model_provider != "anthropic":
+        return "the page order is asked of a Claude model: MODEL_PROVIDER must be anthropic"
+    # (the page order asks a call at a time per page, `model_concurrency` pages at once)
+    if problem := run_cap_problem(get_settings(), max_usd, settings.model_concurrency):
+        return f"--max-usd: {problem}"
+    return None
+
+
+def _bench_answers(args: argparse.Namespace, run_dir: Path) -> Any:
+    """`eval parsing-bench --model-order`: where the page order step's answers come from, or
+    the error (a str) that says why the options do not make a run. The recording is replayed
+    (default `<run folder>/page-order-answers.jsonl`); `--live` asks the model for what it
+    lacks, up to `--max-usd` dollars for the whole run."""
+    from readablestem.eval import order_report
+
+    if not args.model_order:
+        if args.live or args.order_answers is not None or args.max_usd is not None:
+            return "--live, --order-answers and --max-usd are for --model-order"
+        return None
+    if args.live and args.max_usd is None:
+        return "--live asks the model: it needs --max-usd (a cap in dollars for the run)"
+    if not args.live and args.max_usd is not None:
+        return "--max-usd is for --live"
+    path = args.order_answers or run_dir / "page-order-answers.jsonl"
+    if not args.live and not path.is_file():
+        return f"no recording at {path}: replay needs one (--order-answers FILE)"
+    if args.live and (problem := _live_order_problem(args.max_usd)):
+        return problem
     return order_report.OrderAnswers(str(path), args.max_usd if args.live else None)
 
 
@@ -1245,9 +1275,9 @@ def _note_release_run(listed: Path, name: str) -> tuple[str, bool] | str:
 
 def _cmd_parsing_bench(args: argparse.Namespace) -> int:
     """`eval parsing-bench`: the reader on the categories of olmOCR-Bench that need no model,
-    scored by the benchmark's own checker (`eval.olmocr_bench`). Spends nothing. The
-    benchmark is fetched outside the repository (`--fetch`) and a run keeps one file per page
-    there; `--run-dir` resumes or repeats a run from them."""
+    scored by the benchmark's own checker (`eval.olmocr_bench`). Spends nothing unless
+    `--model-order --live`. The benchmark is fetched outside the repository (`--fetch`) and a
+    run keeps one file per page there; `--run-dir` resumes or repeats a run from them."""
     from readablestem.eval import olmocr_bench
 
     folder = args.folder or olmocr_bench.default_folder()
@@ -1256,6 +1286,9 @@ def _cmd_parsing_bench(args: argparse.Namespace) -> int:
     if not (folder / "bench_data").is_dir():
         return _error(f"no benchmark at {folder}: run with --fetch")
     run_dir = args.run_dir or olmocr_bench.new_run_dir(folder)
+    answers = _bench_answers(args, run_dir)
+    if isinstance(answers, str):
+        return _error(f"parsing-bench: {answers}")
 
     def said(line: str) -> None:
         print(line, file=sys.stderr, flush=True)
@@ -1268,6 +1301,7 @@ def _cmd_parsing_bench(args: argparse.Namespace) -> int:
             only=args.only,
             limit=args.limit,
             said=said,
+            answers=answers,
         )
     except (OSError, ValueError, subprocess.CalledProcessError) as exc:
         return _error(f"parsing-bench: {exc}")
@@ -2425,6 +2459,32 @@ def register(
     parsing.add_argument("--only", action="append", help="one category (repeat); default: all")
     parsing.add_argument("--limit", type=_positive_int, help="the first N PDFs of each category")
     parsing.add_argument("--out", type=Path, help="write the run record as JSON")
+    parsing.add_argument(
+        "--model-order",
+        action="store_true",
+        help="convert with the model's page order on, its answers replayed from a recording "
+        "(--order-answers); every other model step stays refused. A page the recording lacks "
+        "keeps the rules' order and is counted as missed. Spends nothing unless --live",
+    )
+    parsing.add_argument(
+        "--order-answers",
+        type=Path,
+        metavar="FILE",
+        help="the page order's recording (default: <run folder>/page-order-answers.jsonl)",
+    )
+    parsing.add_argument(
+        "--live",
+        action="store_true",
+        help="with --model-order: ask the model for the answers the recording lacks and add "
+        "them to it, one page at a time; it needs --max-usd. Not for a builder",
+    )
+    parsing.add_argument(
+        "--max-usd",
+        type=float,
+        metavar="USD",
+        help="with --live: the cap in dollars for the whole run; once spent, the pages left "
+        "keep the rules' order and are counted as missed",
+    )
     parsing.set_defaults(func=_cmd_parsing_bench)
 
     outputs = group.add_parser(

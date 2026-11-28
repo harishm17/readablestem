@@ -798,6 +798,24 @@ holds scores per category with n, the benchmark revision, the pipeline version a
 hash. Results and the failures by cause: `docs/eval-parsing-benchmark.md`. The adapter is
 `eval/olmocr_bench.py`; the checker's runner is `proof/parsers/runners/olmocr_check.py`.
 
+**With the model's page order** (`--model-order`). The product reads each typed page in the
+order the model gives (production profile), so the no-model figures understate it. `--model-order`
+converts with that step on and replays its answers from a recording (`--order-answers FILE`,
+default `page-order-answers.jsonl` in `--run-dir`, outside the repository); every other model
+step is still refused. A page whose request the recording lacks is a *miss*: it keeps the
+rules' order, is counted, and nothing is asked. `--live --max-usd N` asks the provider for each
+missing request, one page at a time in one process, writes the answer to the recording, and once
+N dollars are paid asks no more (the pages left are misses). The record's `run.model_order`
+holds `on`, `pages_asked`, `answered`, `missed` (no answer and none asked, or the cap),
+`failed` (an answer that did not pass the check), `answered_live` and `usd`. A `--run-dir`
+page made in the other mode is converted again. The live pass is run once by the person who
+integrates, never by a builder:
+
+```bash
+uv run readablestem eval parsing-bench --model-order --live --max-usd 1.0 \
+  --out data/eval/parsing-bench-olmocr.json
+```
+
 ## How to rerun
 
 Without a key, a network or a browser: `make reproduce` checks the gold files against their

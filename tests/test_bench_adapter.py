@@ -8,9 +8,11 @@ import json
 import os
 from pathlib import Path
 
+import pymupdf
 import pytest
 
 from readablestem.eval import olmocr_bench as bench
+from readablestem.eval.order_report import OrderAnswers
 
 WRITERS = (
     '<section class="notice readablestem"><p>This version has not been reviewed by a '
@@ -134,3 +136,35 @@ def test_the_checker_scores_the_five_pages_as_built(tmp_path: Path) -> None:
     got = {row["id"]: row["passed"] for row in rows if row["type"] != "baseline"}
     assert got == {name: wanted for name, (_, _, wanted) in PAGES.items()}
     assert sum(got.values()) == 4
+
+
+def test_a_page_order_answer_the_recording_lacks_is_counted_and_never_asked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # No `--live`: the recording is all there is, so a client built to ask the model is a fault.
+    def no_client(*args: object, **kwargs: object) -> None:
+        raise AssertionError("the provider was asked")
+
+    monkeypatch.setattr("readablestem.models.make_live_client", no_client)
+    document = pymupdf.open()
+    page = document.new_page()
+    page.insert_text((72, 100), "First paragraph of the page, long enough to be text.")
+    page.insert_text((72, 130), "Second paragraph of the page, also long enough to read.")
+    recording = tmp_path / "answers.jsonl"
+    recording.write_text("")
+
+    done = bench.convert_page(document.tobytes(), OrderAnswers(str(recording)))
+
+    asked = done["model_order"]
+    assert done["error"] == "" and not done["scan"]
+    assert (asked["pages"], asked["answered_live"], asked["usd"]) == (1, 0, 0)
+    assert asked["missed"] > 0  # requests: a refused one is asked once more, and missed again
+    assert recording.read_text() == ""
+    summary = bench.order_summary({"x.pdf": done})
+    assert (summary["on"], summary["answered"], summary["missed"], summary["failed"]) == (
+        True,
+        0,
+        1,
+        0,
+    )
+    assert bench.order_summary({"x.pdf": bench.convert_page(document.tobytes())})["on"] is False
