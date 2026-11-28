@@ -157,6 +157,7 @@ NOTE_CODES = frozenset(
         "second_check_mismatch",
         "long_description_unsure",
         "values_from_image",
+        "fallback_answer",
     }
 )
 
@@ -544,6 +545,23 @@ def describe(
         escalated = attempt(settings.main_model, escalation=True)
         calls += escalated.calls
         candidate = _prefer(escalated, candidate)
+    elif (
+        first_model == settings.main_model
+        and candidate.output is not None
+        and candidate.calls
+        and candidate.calls[-1].model != settings.main_model
+    ):
+        # The main model was asked and the router's fallback answered: held to the cheap
+        # model's bar and checks (`_accept_bar`, which a cheap answer that failed them
+        # already does not pass), and the fix says so.
+        candidate.checks.append(
+            Check(
+                name="figure.fallback_reading",
+                passed=False,
+                severity="warning",
+                code="fallback_answer",
+            )
+        )
     fix = _fix(element, candidate, calls, settings)
     return second_check(fix, element, png, client=client, settings=settings)
 
