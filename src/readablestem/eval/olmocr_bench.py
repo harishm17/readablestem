@@ -513,7 +513,8 @@ def _order_facts(result: Any, client: Any) -> dict[str, Any]:
     """What the page order step did for one page, counts only: pages asked, those with no
     usable answer (`failed`, which includes `missed`), requests the recording lacked and
     nothing answered (`missed`: `--live` stopped by its cap, or no `--live`), requests
-    answered live and written down, and the dollars this page paid."""
+    answered live and written down, and the dollars this page paid for answers asked now (a
+    replayed answer carries what it cost when it was recorded, and that is not paid again)."""
     summary = result.page_order
     asked = summary.pages if summary is not None else 0
     return {
@@ -522,7 +523,7 @@ def _order_facts(result: Any, client: Any) -> dict[str, Any]:
         "applied_pages": summary.applied_pages if summary is not None else 0,
         "missed": client.cached.unanswered,
         "answered_live": client.cached.answered_live,
-        "usd": result.stats.cost_usd,
+        "usd": round(client.cached.live_cost_usd, 6),
     }
 
 
