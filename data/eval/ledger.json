@@ -1,9 +1,9 @@
 {
- "date": "2026-11-26",
- "pipeline_version": "0.5.22",
+ "date": "2026-11-27",
+ "pipeline_version": "0.5.23",
  "profile": {
   "name": "production",
-  "sha256": "b0befdf78b1ec294cb81975321d64fd67886334c8f045d229413689bf9021fe7",
+  "sha256": "5c69095dc28d3df9ff493fb66904649c749f87d1cf2480db2162ded1cc9b8e39",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -11,11 +11,11 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "commit": "8e273819a9470bc13cc656ed894e79ce86becfb2",
+ "commit": "4f478638eb87d6c70876b9bba246e255297d1704+changes",
  "provenance": {
-  "commit": "8e273819a9470bc13cc656ed894e79ce86becfb2",
-  "clean": true,
-  "pipeline_version": "0.5.22",
+  "commit": "4f478638eb87d6c70876b9bba246e255297d1704",
+  "clean": false,
+  "pipeline_version": "0.5.23",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -24,7 +24,7 @@
    "fonts": "fonts-liberation=1:2.1.5-3build1 fonts-noto-core=20201225-2build1"
   }
  },
- "release": "0.5.22+b0befdf78b1e",
+ "release": "0.5.23+5c69095dc28d",
  "level": 0.95,
  "rows": [
   {
@@ -60,16 +60,17 @@
    "owed": "`eval burden` on a replay of held-out whole documents",
    "measured": [
     {
-     "value": 0.25,
-     "bound": 0.5,
-     "n": 73,
-     "counts": "73 documents",
+     "value": 0.0,
+     "bound": 0.0,
+     "n": 47,
+     "counts": "47 documents",
      "set": "corpus",
      "set_sha256": "84a76a99c535293f452328bd3c7d17745a8be1859e24005be724f23157141bc0",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "burden-corpus.json",
      "stopped_early": 0,
+     "set_apart": 26,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -114,47 +115,50 @@
    "owed": "`eval order --for-release` on the held-out layout set, once, when the reader is ported",
    "measured": [
     {
-     "value": 22.672064777327936,
-     "bound": 27.4913608128865,
-     "k": 56,
+     "value": 22.267206477732792,
+     "bound": 27.06257454269352,
+     "k": 55,
      "n": 247,
-     "counts": "56 of 247 pages",
+     "counts": "55 of 247 pages",
      "set": "layout-heldout-1",
      "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
      "label": "held-out",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": "met"
     },
     {
-     "value": 7.6923076923076925,
-     "bound": 13.962859359724966,
-     "k": 7,
-     "n": 91,
-     "counts": "7 of 91 pages",
+     "value": 9.67741935483871,
+     "bound": 18.20918694643956,
+     "k": 6,
+     "n": 62,
+     "counts": "6 of 62 pages",
      "set": "corpus",
      "set_sha256": "be00b35e6e4645a7bd115711ae909fc51dd0b7b14e8760cf3cf8566d31479bb0",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-corpus.json",
      "stopped_early": 0,
+     "set_apart": 13,
      "goal_bar": "",
      "release_bar": ""
     },
     {
-     "value": 31.46067415730337,
-     "bound": 36.46124909130409,
-     "k": 84,
+     "value": 31.086142322097377,
+     "bound": 36.07476351078785,
+     "k": 83,
      "n": 267,
-     "counts": "84 of 267 pages",
+     "counts": "83 of 267 pages",
      "set": "layout-dev-1",
      "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -177,47 +181,50 @@
    "owed": "the same run as the row above",
    "measured": [
     {
-     "value": 40.816326530612244,
-     "bound": 28.936208870913728,
-     "k": 20,
+     "value": 42.857142857142854,
+     "bound": 30.804221771277128,
+     "k": 21,
      "n": 49,
-     "counts": "20 of 49 documents",
+     "counts": "21 of 49 documents",
      "set": "layout-heldout-1",
      "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
      "label": "held-out",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": "met"
     },
     {
-     "value": 85.1063829787234,
-     "bound": 73.83826479889915,
-     "k": 40,
-     "n": 47,
-     "counts": "40 of 47 documents",
+     "value": 82.3529411764706,
+     "bound": 68.11306606936809,
+     "k": 28,
+     "n": 34,
+     "counts": "28 of 34 documents",
      "set": "corpus",
      "set_sha256": "be00b35e6e4645a7bd115711ae909fc51dd0b7b14e8760cf3cf8566d31479bb0",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-corpus.json",
      "stopped_early": 0,
+     "set_apart": 13,
      "goal_bar": "",
      "release_bar": ""
     },
     {
-     "value": 33.333333333333336,
-     "bound": 23.303698490238094,
-     "k": 20,
+     "value": 35.0,
+     "bound": 24.791307441833222,
+     "k": 21,
      "n": 60,
-     "counts": "20 of 60 documents",
+     "counts": "21 of 60 documents",
      "set": "layout-dev-1",
      "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -240,47 +247,50 @@
    "owed": "the same run as the two rows above",
    "measured": [
     {
-     "value": 8.097165991902834,
-     "bound": 11.548655841140699,
-     "k": 20,
+     "value": 5.2631578947368425,
+     "bound": 8.237706504972333,
+     "k": 13,
      "n": 247,
-     "counts": "20 of 247 pages",
+     "counts": "13 of 247 pages",
      "set": "layout-heldout-1",
      "set_sha256": "dcefd08318f0e10bedcc52f53f758808db0fe19151964ff3e8e1bda8987624cf",
      "label": "held-out",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-heldout-1.json",
      "stopped_early": 0,
+     "set_apart": 0,
      "goal_bar": "not met",
      "release_bar": "met"
     },
     {
-     "value": 14.285714285714286,
-     "bound": 21.750154238398185,
-     "k": 13,
-     "n": 91,
-     "counts": "13 of 91 pages",
+     "value": 4.838709677419355,
+     "bound": 12.03361796075356,
+     "k": 3,
+     "n": 62,
+     "counts": "3 of 62 pages",
      "set": "corpus",
      "set_sha256": "be00b35e6e4645a7bd115711ae909fc51dd0b7b14e8760cf3cf8566d31479bb0",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-corpus.json",
      "stopped_early": 0,
+     "set_apart": 13,
      "goal_bar": "",
      "release_bar": ""
     },
     {
-     "value": 11.235955056179776,
-     "bound": 14.93052216128553,
-     "k": 30,
+     "value": 6.367041198501872,
+     "bound": 9.397612758943326,
+     "k": 17,
      "n": 267,
-     "counts": "30 of 267 pages",
+     "counts": "17 of 267 pages",
      "set": "layout-dev-1",
      "set_sha256": "714a653e00157ec91d80677bb1342768500c1178250b8d6cc39e081c3870b106",
      "label": "development score",
-     "release": "0.5.22+b0befdf78b1e",
+     "release": "0.5.23+5c69095dc28d",
      "record": "order-layout-dev-1.json",
      "stopped_early": 2,
+     "set_apart": 0,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -418,6 +428,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -445,6 +456,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -472,6 +484,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -499,6 +512,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -526,6 +540,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -553,6 +568,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -580,6 +596,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }
@@ -607,6 +624,7 @@
      "release": "0.5.10+62b4f1678d36",
      "record": "outputs-corpus.json",
      "stopped_early": 0,
+     "set_apart": 10,
      "goal_bar": "",
      "release_bar": ""
     }

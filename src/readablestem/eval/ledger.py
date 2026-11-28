@@ -523,6 +523,9 @@ def _release(row: Row, found: Mapping[str, Any], bar: Mapping[str, Any] | None) 
         return "none yet"
     if bar["set_sha256"] != found["set_sha256"]:
         return "not judged: the bar is of another set"
+    if found["stopped_early"] or found["set_apart"]:
+        # The figure is of part of the set, so it is held against no bar.
+        return "not judged: part of the set was not measured"
     if found["value"] is None:
         return "worse"
     return "met" if _within(row, found["value"], bar["value"]) else "worse"
@@ -607,6 +610,11 @@ def build(
                 "release": release_of(record),
                 "record": file,
                 "stopped_early": len(record.get("not_finished") or []),
+                # Uploads the record measured nothing of because they owe recorded answers:
+                # the figure is of the rest of the set, not of the whole set its hash names.
+                "set_apart": len(
+                    (record["metrics"].get("uploads") or {}).get("answers_missing") or {}
+                ),
             }
             judged = label == HELD_OUT
             found["goal_bar"] = _goal(row, found) if judged else ""
@@ -646,7 +654,11 @@ def failures(ledger: Mapping[str, Any], *, for_release: bool = False) -> list[st
         ]
         judged = [line for line in held if line["release_bar"] in ("met", "worse")]
         if for_release and row["release_bar"] is not None and not judged:
-            found.append(f"{row['name']}: no held-out figure of this release on its bar's set")
+            partial = [line for line in held if line["stopped_early"] or line["set_apart"]]
+            found.append(
+                f"{row['name']}: no held-out figure of this release on its bar's set"
+                + (" (a step stopped early or uploads were set apart)" if partial else "")
+            )
     return found
 
 
@@ -658,7 +670,7 @@ def register(
 ) -> tuple[dict[str, dict[str, Any]], list[str]]:
     """The release bars with this ledger's held-out figures written in where a row has no
     bar, or is named in `replace`; and the keys written. A figure from a run in which a step
-    stopped early is no baseline and is not written."""
+    stopped early, or that set uploads apart, is no baseline and is not written."""
     unknown = sorted(set(replace) - {row["key"] for row in ledger["rows"]})
     if unknown:
         raise Refused(f"no such row: {', '.join(unknown)}")
@@ -669,6 +681,8 @@ def register(
             continue
         for line in row["measured"]:
             if line["label"] != HELD_OUT or line["value"] is None or line["stopped_early"]:
+                continue
+            if line.get("set_apart"):
                 continue
             kept[row["key"]] = {
                 "value": line["value"],
@@ -731,6 +745,7 @@ def render(ledger: Mapping[str, Any], failed: Sequence[str] = ()) -> str:
             bar = row["release_bar"]
             for line in row["measured"]:
                 early = f", {line['stopped_early']} steps stopped early"
+                apart = f", {line.get('set_apart')} uploads set apart (answers owed)"
                 cells.append(
                     (
                         row["name"],
@@ -740,7 +755,8 @@ def render(ledger: Mapping[str, Any], failed: Sequence[str] = ()) -> str:
                         _shown(row, line["bound"]),
                         line["label"]
                         + (f" ({line['release']})" if line["label"] == EARLIER else "")
-                        + (early if line["stopped_early"] else ""),
+                        + (early if line["stopped_early"] else "")
+                        + (apart if line.get("set_apart") else ""),
                         _bar_cell(row, bar["value"] if bar else None, line["release_bar"]),
                         _bar_cell(row, row["goal"], line["goal_bar"]),
                     )

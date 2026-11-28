@@ -200,8 +200,8 @@ MATERIALS: tuple[Material, ...] = (
         vendor=(("also", "whole pages, to say in what order to read them"),),
         # Stated in public as a coming change on 2026-11-27, a day before the switch goes on in
         # production (privacy.html, "Changes to this notice": before it takes effect).
-        # `stated` must be the day (UTC) the page saying so went live in production: if the
-        # deploy slips, move both days in the same commit.
+        # `stated` is the day (UTC) the page saying so went live in production (main
+        # f47e0ecc, deployed 2026-11-27).
         stated=date(2026, 11, 27),
         starts=date(2026, 11, 28),
         whole_pages=True,

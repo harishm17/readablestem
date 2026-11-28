@@ -113,6 +113,8 @@ class CachedClient:
         self.second_check: CachedClient | None = None
         self.hits = 0
         self.misses = 0
+        # Of the misses, those this client then answered live and wrote down (`unanswered`).
+        self.answered_live = 0
         self.rekeyed = 0
         self.missed_because: Counter[str] = Counter()
         # The keys this client answered from the file or wrote to it: what a refresh keeps.
@@ -187,6 +189,8 @@ class CachedClient:
         # An answer lost to an outage or a budget stop is not worth keeping: ask again later.
         if call.outcome in ("ok", "invalid_output", "refused"):
             self.record(key, request.step, parsed, call, parts)
+            with self._lock:
+                self.answered_live += 1
         return parsed, call
 
     def _limit_spent(self) -> bool:
@@ -225,9 +229,14 @@ class CachedClient:
             with self._path.open("a", encoding="utf-8") as handle:
                 handle.write(dump_line(row) + "\n")
 
+    @property
+    def unanswered(self) -> int:
+        """Requests that ended with no answer: not in the file and not answered live."""
+        return self.misses - self.answered_live
+
     def reset(self) -> None:
         """Zero the counters (a staged run counts its last pass only)."""
-        self.hits = self.misses = self.rekeyed = 0
+        self.hits = self.misses = self.answered_live = self.rekeyed = 0
         self.missed_because = Counter()
         self.live_cost_usd = self.replayed_cost_usd = 0.0
         self._steps = {}

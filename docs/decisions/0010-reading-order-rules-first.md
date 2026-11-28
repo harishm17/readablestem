@@ -2,7 +2,7 @@
 
 | Field | Value |
 |---|---|
-| Status | **Accepted 2026-11-19** |
+| Status | **Accepted 2026-11-19**, amended 2026-11-27 (the model's page order) |
 | Date | 2026-11-19 |
 | Decider | Harish handed product and build decisions for ReadableSTEM to the maintainer of the plan on 2026-11-10; this is one of them |
 | Revisits | when a learned reader beats the rules on held-out real pages (see "What would change this") |
@@ -88,12 +88,34 @@ model call on every page; this step needs one. The owner asked on 2026-11-26 for
 steps to be tried with a model before more rules are built, so turning the switch on would
 amend this record, not meet it: the amendment states the held-out margin and the price per
 page. Nothing changes here until one run on held-out real pages decides whether the switch goes
-on; until then reading order is found by rules and checked, and the public pages still say so.
+on; until then reading order is found by rules and checked.
+
+## Amendment 2026-11-27: the model's page order is on in production
+
+The run on held-out real pages was made once, for pipeline 0.5.23 (`layout-heldout-1`, 247
+gold pages of 49 documents; [eval.md](../eval.md), "The switch release of 2026-11-27"). With
+the step on, against the rules of 0.5.22, in the page a student is given: 192 pages right
+against 191, 140 with no fault against 113, 21 documents with every gold page right against 20,
+furniture read aloud on 13 pages against 20, a paragraph cut on 36 against 52, and paragraphs
+run together on 30 against 68. It cost $0.8895 for the 1,013 pages the documents convert,
+about $0.0009 a page, one call each.
+
+So the margin is in grouping, not in order: the count of pages read in the right order moves
+by one page, which is no margin. By the test of "What would change this" the rules are not
+beaten on order, and that section stands for learned layout readers. The switch goes on
+because the owner directed on 2026-11-26 that the harder steps be tried with a model before
+more rules are built, and the held-out pages show what development showed: fewer cut and
+merged paragraphs and fewer running heads read aloud, at a price of about a tenth of a cent a
+page. What this amends: a model call on every page of a typed file is part of a conversion, and
+the rules run on the model's grouping and order where it passes the check (docs/layout.md,
+"The model's page order"). The rules still find every line, equation, figure and table, still
+read every page whose answer fails the check, and the switch can go back off alone.
 
 ## Consequences
 
-The public pages say that order is found by rules and checked, and they claim nothing about a
-learned reader. No test fails on an import of a learned reader: the rule is kept by this
+The public pages make no claim about how the order is found and none about a learned reader;
+the privacy page states that whole pages and their lines go to the model for grouping and
+order (since 0.5.23). No test fails on an import of a learned reader: the rule is kept by this
 record and by review, not by a guard. Nothing in the product changes.
 
 Each figure above is dated and has its scorer version, so the next person to read this can tell

@@ -438,7 +438,16 @@ log = logging.getLogger(__name__)
 # is not made again (`assemble.RENDER_VERSION` stays 11), and 0.5.21 opens a 0.5.22 result.
 # Each switch goes back alone with its profile row and the Railway variable of the same name.
 # The roll-back limit stays at 0.5.12 (docs/deploy.md "Roll back").
-PIPELINE_VERSION = "0.5.22"
+# 0.5.23 (2026-11-27): FEATURE_LAYOUT_MODEL_ORDER goes on in the production profile (the code
+# default stays off): a cheap model is shown each page with its lines as a numbered list and
+# says which lines belong together and in what order (`pipeline.page_order`); a verified answer
+# groups and orders the page, and every later rule still runs. One request a page, and the
+# corpus is recorded again under it. With the switch off nothing differs from 0.5.22.
+# The result gains one optional field, `page_order` (counts only); 0.5.22 ignores it, so it
+# opens a 0.5.23 result, and results from 0.5.10 to 0.5.22 load unchanged
+# (`assemble.RENDER_VERSION` stays 11). The switch goes back alone with its profile row and the
+# Railway variable of the same name. The roll-back limit stays at 0.5.12.
+PIPELINE_VERSION = "0.5.23"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

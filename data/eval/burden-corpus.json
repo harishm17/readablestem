@@ -7,7 +7,7 @@
  },
  "profile": {
   "name": "production",
-  "sha256": "b0befdf78b1ec294cb81975321d64fd67886334c8f045d229413689bf9021fe7",
+  "sha256": "5c69095dc28d3df9ff493fb66904649c749f87d1cf2480db2162ded1cc9b8e39",
   "confirmed": false,
   "differs": [],
   "counted_off": [
@@ -15,12 +15,12 @@
    "OFFICE_INPUT_ENABLED"
   ]
  },
- "pipeline_version": "0.5.22",
- "commit": "0c90aa81ebef4cf51dd15592a0a3455e2d0d8ec7",
+ "pipeline_version": "0.5.23",
+ "commit": "38dd78672e7202e76688c0468b598f464e6245fe",
  "provenance": {
-  "commit": "0c90aa81ebef4cf51dd15592a0a3455e2d0d8ec7",
+  "commit": "38dd78672e7202e76688c0468b598f464e6245fe",
   "clean": true,
-  "pipeline_version": "0.5.22",
+  "pipeline_version": "0.5.23",
   "render_version": 11,
   "tools": {
    "pandoc": "pandoc 3.7.0.2",
@@ -36,838 +36,249 @@
  "not_finished": [],
  "metrics": {
   "uploads": {
-   "measured": 73,
-   "answers_missing": {},
+   "measured": 47,
+   "answers_missing": {
+    "r01_syllabus_16851": 14,
+    "r02_syllabus_21l704": 4,
+    "r03_syllabus_21l708": 8,
+    "r04_grading_5310": 8,
+    "r05_labmanual_5310_lab1": 16,
+    "r06_labsafety_5310": 10,
+    "r07_labnotebook_5310": 6,
+    "r08_labhandout_2996": 2,
+    "r09_handout_14451": 10,
+    "r10_handout_4241": 2,
+    "r11_recitation_2003sc": 12,
+    "r12_exam_900sc": 12,
+    "r13_exam_3044": 8,
+    "r14_exam_513": 4,
+    "r17_arxiv_ligo": 16,
+    "r18_arxiv_opt": 12,
+    "w_exam_5111": 18,
+    "w_exam_5111+exam": 18,
+    "w_lecture_5111": 16,
+    "w_lecture_560": 10,
+    "w_mixed_slides+image_pages": 10,
+    "w_notes_6042_ch2": 28,
+    "w_pset_801": 16,
+    "w_slides_60001_lec1": 68,
+    "w_slides_60001_lec10": 80,
+    "w_solutions_1802": 28
+   },
    "not_measured": []
   },
-  "pages": 338,
-  "decisions": 523,
-  "per_page": 1.5473,
+  "pages": 110,
+  "decisions": 71,
+  "per_page": 0.6455,
   "document": {
-   "p50": 0.25,
-   "p95": 7.0,
-   "mean": 1.0807,
-   "max": 8.4286
+   "p50": 0.0,
+   "p95": 5.0,
+   "mean": 0.7358,
+   "max": 8.0
   },
   "page": {
    "p50": 0,
-   "p95": 8,
-   "mean": 1.5473,
-   "max": 26,
-   "none": 0.574
+   "p95": 4,
+   "mean": 0.6455,
+   "max": 9,
+   "none": 0.7273
   },
   "kinds": {
    "dense_math": {
-    "pages": 44,
-    "documents": 12,
-    "decisions": 282,
-    "per_page": 6.4091,
+    "pages": 2,
+    "documents": 2,
+    "decisions": 10,
+    "per_page": 5.0,
     "page": {
-     "p50": 4,
-     "p95": 18,
-     "mean": 6.4091,
-     "max": 26
+     "p50": 1,
+     "p95": 9,
+     "mean": 5.0,
+     "max": 9
     }
    },
    "figure": {
-    "pages": 62,
-    "documents": 18,
-    "decisions": 110,
-    "per_page": 1.7742,
+    "pages": 20,
+    "documents": 7,
+    "decisions": 19,
+    "per_page": 0.95,
     "page": {
      "p50": 1,
-     "p95": 7,
-     "mean": 1.7742,
-     "max": 10
+     "p95": 3,
+     "mean": 0.95,
+     "max": 3
     }
    },
    "scan": {
-    "pages": 24,
-    "documents": 9,
-    "decisions": 23,
-    "per_page": 0.9583,
+    "pages": 13,
+    "documents": 5,
+    "decisions": 17,
+    "per_page": 1.3077,
     "page": {
      "p50": 0,
-     "p95": 4,
-     "mean": 0.9583,
+     "p95": 8,
+     "mean": 1.3077,
      "max": 8
     }
    },
    "slide": {
-    "pages": 45,
-    "documents": 3,
-    "decisions": 22,
-    "per_page": 0.4889,
-    "page": {
-     "p50": 0,
-     "p95": 3,
-     "mean": 0.4889,
-     "max": 9
-    }
-   },
-   "table": {
-    "pages": 33,
-    "documents": 24,
-    "decisions": 21,
-    "per_page": 0.6364,
-    "page": {
-     "p50": 0,
-     "p95": 2,
-     "mean": 0.6364,
-     "max": 2
-    }
-   },
-   "typical": {
-    "pages": 130,
-    "documents": 50,
-    "decisions": 65,
+    "pages": 6,
+    "documents": 1,
+    "decisions": 3,
     "per_page": 0.5,
     "page": {
      "p50": 0,
      "p95": 3,
      "mean": 0.5,
-     "max": 8
+     "max": 3
+    }
+   },
+   "table": {
+    "pages": 20,
+    "documents": 16,
+    "decisions": 9,
+    "per_page": 0.45,
+    "page": {
+     "p50": 0,
+     "p95": 2,
+     "mean": 0.45,
+     "max": 5
+    }
+   },
+   "typical": {
+    "pages": 49,
+    "documents": 29,
+    "decisions": 13,
+    "per_page": 0.2653,
+    "page": {
+     "p50": 0,
+     "p95": 2,
+     "mean": 0.2653,
+     "max": 5
     }
    }
   },
   "items": {
-   "equation": 341,
-   "figure": 115,
-   "heading": 42,
-   "table": 13,
-   "paragraph": 12
+   "figure": 29,
+   "equation": 18,
+   "paragraph": 12,
+   "heading": 6,
+   "list_item": 3,
+   "table": 3
   },
   "reasons": {
    "below_accept": {
-    "decisions": 149,
-    "per_100_pages": 44.08
-   },
-   "symbol_mismatch": {
-    "decisions": 88,
-    "per_100_pages": 26.04
-   },
-   "glyph_style_mismatch": {
-    "decisions": 71,
-    "per_100_pages": 21.01
-   },
-   "sign_mismatch": {
-    "decisions": 39,
-    "per_100_pages": 11.54
-   },
-   "heading.weak_evidence": {
-    "decisions": 36,
-    "per_100_pages": 10.65
-   },
-   "low_confidence": {
-    "decisions": 33,
-    "per_100_pages": 9.76
-   },
-   "heading.sentence_like": {
-    "decisions": 26,
-    "per_100_pages": 7.69
-   },
-   "long_description_unsure": {
-    "decisions": 24,
-    "per_100_pages": 7.1
-   },
-   "style_cosmetic": {
-    "decisions": 18,
-    "per_100_pages": 5.33
-   },
-   "style_mismatch": {
-    "decisions": 18,
-    "per_100_pages": 5.33
-   },
-   "heading.repeated_label": {
-    "decisions": 16,
-    "per_100_pages": 4.73
-   },
-   "not_equation": {
-    "decisions": 16,
-    "per_100_pages": 4.73
-   },
-   "text_layer_mismatch": {
-    "decisions": 16,
-    "per_100_pages": 4.73
-   },
-   "too_long": {
-    "decisions": 15,
-    "per_100_pages": 4.44
-   },
-   "invalid_latex": {
-    "decisions": 11,
-    "per_100_pages": 3.25
-   },
-   "heading.all_caps": {
-    "decisions": 9,
-    "per_100_pages": 2.66
-   },
-   "species_mismatch": {
-    "decisions": 8,
-    "per_100_pages": 2.37
-   },
-   "decoration_unproven": {
-    "decisions": 7,
-    "per_100_pages": 2.07
-   },
-   "unread_page": {
-    "decisions": 7,
-    "per_100_pages": 2.07
-   },
-   "half_fraction": {
-    "decisions": 6,
-    "per_100_pages": 1.78
-   },
-   "image_page": {
-    "decisions": 6,
-    "per_100_pages": 1.78
-   },
-   "maths_checked": {
-    "decisions": 6,
-    "per_100_pages": 1.78
-   },
-   "no_headers": {
-    "decisions": 6,
-    "per_100_pages": 1.78
-   },
-   "numbers_not_a_table": {
-    "decisions": 6,
-    "per_100_pages": 1.78
+    "decisions": 14,
+    "per_100_pages": 12.73
    },
    "text.rtl_order": {
+    "decisions": 8,
+    "per_100_pages": 7.27
+   },
+   "decoration_unproven": {
     "decisions": 6,
-    "per_100_pages": 1.78
+    "per_100_pages": 5.45
    },
-   "empty_argument": {
+   "heading.weak_evidence": {
+    "decisions": 6,
+    "per_100_pages": 5.45
+   },
+   "low_confidence": {
+    "decisions": 6,
+    "per_100_pages": 5.45
+   },
+   "glyph_style_mismatch": {
+    "decisions": 5,
+    "per_100_pages": 4.55
+   },
+   "heading.sentence_like": {
     "decisions": 4,
-    "per_100_pages": 1.18
+    "per_100_pages": 3.64
    },
-   "heading.list_like": {
+   "image_page": {
     "decisions": 4,
-    "per_100_pages": 1.18
+    "per_100_pages": 3.64
    },
-   "unsupported_ce": {
+   "long_description_unsure": {
     "decisions": 4,
-    "per_100_pages": 1.18
+    "per_100_pages": 3.64
    },
-   "box_ends": {
-    "decisions": 3,
-    "per_100_pages": 0.89
+   "maths_checked": {
+    "decisions": 4,
+    "per_100_pages": 3.64
    },
-   "handwriting_on_page": {
-    "decisions": 3,
-    "per_100_pages": 0.89
+   "symbol_mismatch": {
+    "decisions": 4,
+    "per_100_pages": 3.64
    },
-   "spans_differ": {
-    "decisions": 3,
-    "per_100_pages": 0.89
+   "unread_page": {
+    "decisions": 4,
+    "per_100_pages": 3.64
    },
-   "values_from_image": {
+   "numbers_not_a_table": {
     "decisions": 3,
-    "per_100_pages": 0.89
+    "per_100_pages": 2.73
+   },
+   "text.option_labels": {
+    "decisions": 3,
+    "per_100_pages": 2.73
    },
    "heading.level_repaired": {
     "decisions": 2,
-    "per_100_pages": 0.59
+    "per_100_pages": 1.82
    },
-   "no_text_layer": {
+   "heading.repeated_label": {
     "decisions": 2,
-    "per_100_pages": 0.59
+    "per_100_pages": 1.82
    },
-   "number_mismatch": {
+   "no_headers": {
     "decisions": 2,
-    "per_100_pages": 0.59
+    "per_100_pages": 1.82
    },
-   "text_mismatch": {
+   "too_long": {
     "decisions": 2,
-    "per_100_pages": 0.59
-   },
-   "unknown_command": {
-    "decisions": 2,
-    "per_100_pages": 0.59
-   },
-   "accent_mismatch": {
-    "decisions": 1,
-    "per_100_pages": 0.3
-   },
-   "bad_arity": {
-    "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 1.82
    },
    "empty": {
     "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 0.91
    },
-   "grid_size_differs": {
+   "handwriting_on_page": {
     "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 0.91
+   },
+   "invalid_latex": {
+    "decisions": 1,
+    "per_100_pages": 0.91
+   },
+   "not_equation": {
+    "decisions": 1,
+    "per_100_pages": 0.91
    },
    "omitted_region": {
     "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 0.91
    },
-   "row_mismatch": {
+   "sign_mismatch": {
     "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 0.91
    },
-   "scanned_page": {
+   "style_mismatch": {
     "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 0.91
    },
-   "text_at_edge": {
+   "unknown_command": {
     "decisions": 1,
-    "per_100_pages": 0.3
-   },
-   "unit_dropped": {
-    "decisions": 1,
-    "per_100_pages": 0.3
+    "per_100_pages": 0.91
    }
   },
   "not_compared": {
-   "equations": 1418,
-   "tables_with_math": 8,
+   "equations": 93,
+   "tables_with_math": 1,
    "causes": {
-    "equation.not_compared:bold_letter": 70,
-    "equation.not_compared:no_characters": 2,
-    "equation.not_compared:no_usable_characters": 28
+    "equation.not_compared:no_usable_characters": 2
    }
   },
   "documents": [
-   {
-    "upload": "w_solutions_1802",
-    "pages": 14,
-    "decisions": 118,
-    "per_page": 8.4286,
-    "asked": [
-     [
-      "p1-e4",
-      2
-     ],
-     [
-      "p1-e6",
-      2
-     ],
-     [
-      "p1-e30",
-      2
-     ],
-     [
-      "p1-e37",
-      2
-     ],
-     [
-      "p1-e69",
-      2
-     ],
-     [
-      "p1-e84",
-      2
-     ],
-     [
-      "p2-e8",
-      2
-     ],
-     [
-      "p2-e18",
-      2
-     ],
-     [
-      "p2-e22",
-      2
-     ],
-     [
-      "p2-e24",
-      2
-     ],
-     [
-      "p2-e34",
-      1
-     ],
-     [
-      "p2-e66",
-      2
-     ],
-     [
-      "p2-e68",
-      2
-     ],
-     [
-      "p2-e74",
-      1
-     ],
-     [
-      "p2-e76",
-      4
-     ],
-     [
-      "p2-e77",
-      4
-     ],
-     [
-      "p2-e82",
-      2
-     ],
-     [
-      "p2-e88",
-      1
-     ],
-     [
-      "p2-e89",
-      2
-     ],
-     [
-      "p2-e97",
-      2
-     ],
-     [
-      "p3-e1",
-      1
-     ],
-     [
-      "p3-e2",
-      2
-     ],
-     [
-      "p3-e24",
-      4
-     ],
-     [
-      "p4-e1",
-      2
-     ],
-     [
-      "p4-e2",
-      1
-     ],
-     [
-      "p4-e4",
-      1
-     ],
-     [
-      "p4-e6",
-      2
-     ],
-     [
-      "p4-e8",
-      2
-     ],
-     [
-      "p4-e9",
-      2
-     ],
-     [
-      "p4-e11",
-      2
-     ],
-     [
-      "p4-e14",
-      2
-     ],
-     [
-      "p4-e16",
-      1
-     ],
-     [
-      "p4-e17",
-      2
-     ],
-     [
-      "p4-e23",
-      4
-     ],
-     [
-      "p4-e28",
-      2
-     ],
-     [
-      "p4-e29",
-      2
-     ],
-     [
-      "p4-e30",
-      2
-     ],
-     [
-      "p4-e33",
-      2
-     ],
-     [
-      "p5-e1",
-      2
-     ],
-     [
-      "p5-e3",
-      2
-     ],
-     [
-      "p5-e5",
-      1
-     ],
-     [
-      "p5-e6",
-      2
-     ],
-     [
-      "p5-e30",
-      2
-     ],
-     [
-      "p5-e35",
-      2
-     ],
-     [
-      "p5-e37",
-      2
-     ],
-     [
-      "p5-e38",
-      1
-     ],
-     [
-      "p5-e41",
-      2
-     ],
-     [
-      "p5-e44",
-      1
-     ],
-     [
-      "p5-e72",
-      4
-     ],
-     [
-      "p6-e6",
-      2
-     ],
-     [
-      "p6-e8",
-      2
-     ],
-     [
-      "p6-e9",
-      2
-     ],
-     [
-      "p6-e29",
-      2
-     ],
-     [
-      "p6-e30",
-      2
-     ],
-     [
-      "p6-e35",
-      2
-     ],
-     [
-      "p6-e41",
-      2
-     ],
-     [
-      "p6-e44",
-      2
-     ],
-     [
-      "p7-e20",
-      2
-     ],
-     [
-      "p7-e22",
-      1
-     ],
-     [
-      "p7-e30",
-      2
-     ],
-     [
-      "p7-e42",
-      2
-     ],
-     [
-      "p7-e44",
-      1
-     ],
-     [
-      "p8-e1",
-      2
-     ],
-     [
-      "p8-e2",
-      4
-     ],
-     [
-      "p8-e3",
-      2
-     ],
-     [
-      "p8-e4",
-      2
-     ],
-     [
-      "p8-e5",
-      4
-     ],
-     [
-      "p8-e6",
-      2
-     ],
-     [
-      "p8-e7",
-      2
-     ],
-     [
-      "p8-e9",
-      2
-     ],
-     [
-      "p8-e10",
-      2
-     ],
-     [
-      "p8-e11",
-      2
-     ],
-     [
-      "p8-e16",
-      2
-     ],
-     [
-      "p8-e20",
-      1
-     ],
-     [
-      "p8-e21",
-      2
-     ],
-     [
-      "p8-e23",
-      1
-     ],
-     [
-      "p8-e33",
-      2
-     ],
-     [
-      "p8-e45",
-      2
-     ],
-     [
-      "p8-e46",
-      2
-     ],
-     [
-      "p8-e47",
-      2
-     ],
-     [
-      "p9-e0",
-      2
-     ],
-     [
-      "p9-e2",
-      2
-     ],
-     [
-      "p9-e3",
-      2
-     ],
-     [
-      "p9-e7",
-      2
-     ],
-     [
-      "p9-e30",
-      2
-     ],
-     [
-      "p9-e32",
-      2
-     ],
-     [
-      "p9-e34",
-      2
-     ],
-     [
-      "p9-e35",
-      2
-     ],
-     [
-      "p9-e39",
-      2
-     ],
-     [
-      "p9-e41",
-      1
-     ],
-     [
-      "p9-e56",
-      4
-     ],
-     [
-      "p10-e31",
-      2
-     ],
-     [
-      "p10-e37",
-      4
-     ],
-     [
-      "p10-e42",
-      4
-     ],
-     [
-      "p10-e53",
-      2
-     ],
-     [
-      "p10-e59",
-      2
-     ],
-     [
-      "p10-e62",
-      2
-     ],
-     [
-      "p10-e74",
-      4
-     ],
-     [
-      "p10-e79",
-      2
-     ],
-     [
-      "p11-e1",
-      2
-     ],
-     [
-      "p11-e7",
-      1
-     ],
-     [
-      "p11-e37",
-      2
-     ],
-     [
-      "p11-e39",
-      4
-     ],
-     [
-      "p11-e52",
-      4
-     ],
-     [
-      "p11-e64",
-      4
-     ],
-     [
-      "p11-e67",
-      1
-     ],
-     [
-      "p11-e69",
-      1
-     ],
-     [
-      "p11-e76",
-      2
-     ],
-     [
-      "p11-e77",
-      1
-     ],
-     [
-      "p11-e85",
-      2
-     ],
-     [
-      "p11-e86",
-      4
-     ],
-     [
-      "p12-e15",
-      1
-     ],
-     [
-      "p12-e27",
-      4
-     ],
-     [
-      "p12-e28",
-      4
-     ],
-     [
-      "p13-e1",
-      2
-     ],
-     [
-      "p13-e3",
-      2
-     ],
-     [
-      "p13-e4",
-      1
-     ],
-     [
-      "p13-e25",
-      1
-     ]
-    ],
-    "optional": [
-     "p1-e13",
-     "p1-e16",
-     "p1-e2",
-     "p1-e22",
-     "p1-e25",
-     "p1-e27",
-     "p1-e34",
-     "p1-e41",
-     "p1-e48",
-     "p1-e50",
-     "p1-e64",
-     "p1-e66",
-     "p1-e80",
-     "p10-e20",
-     "p10-e41",
-     "p10-e72",
-     "p11-e0",
-     "p11-e15",
-     "p11-e22",
-     "p11-e63",
-     "p11-e70",
-     "p11-e71",
-     "p12-e23",
-     "p12-e26",
-     "p12-e31",
-     "p13-e0",
-     "p13-e15",
-     "p13-e16",
-     "p13-e23",
-     "p13-e27",
-     "p13-e8",
-     "p2-e0",
-     "p2-e1",
-     "p2-e26",
-     "p2-e43",
-     "p3-e32",
-     "p3-e35",
-     "p4-e0",
-     "p4-e35",
-     "p5-e0",
-     "p5-e16",
-     "p5-e78",
-     "p6-e42",
-     "p6-e45",
-     "p6-e5",
-     "p7-e24",
-     "p8-e34",
-     "p8-e35",
-     "p8-e53",
-     "p8-e56",
-     "p8-e57",
-     "p9-e21",
-     "p9-e53"
-    ]
-   },
    {
     "upload": "r21_infographic_orcid",
     "pages": 1,
@@ -937,630 +348,63 @@
     ]
    },
    {
-    "upload": "w_exam_5111",
-    "pages": 9,
-    "decisions": 63,
-    "per_page": 7.0,
+    "upload": "d3_arabic_doc",
+    "pages": 1,
+    "decisions": 5,
+    "per_page": 5.0,
     "asked": [
      [
-      "p1-e8",
+      "p1-e1",
       2
      ],
      [
-      "p2-e2",
+      "p1-e3",
       2
      ],
      [
-      "p3-e0",
-      5
-     ],
-     [
-      "p3-e2",
+      "p1-e4",
       2
      ],
      [
-      "p3-e5",
-      4
-     ],
-     [
-      "p3-e11",
-      4
-     ],
-     [
-      "p3-e17",
-      4
-     ],
-     [
-      "p4-e8",
-      1
-     ],
-     [
-      "p4-e9",
-      1
-     ],
-     [
-      "p4-e12",
+      "p1-e5",
       2
      ],
      [
-      "p4-e13",
-      5
-     ],
-     [
-      "p4-e18",
-      4
-     ],
-     [
-      "p4-e19",
-      4
-     ],
-     [
-      "p4-e21",
-      1
-     ],
-     [
-      "p4-e25",
-      4
-     ],
-     [
-      "p4-e29",
-      4
-     ],
-     [
-      "p4-e30",
-      4
-     ],
-     [
-      "p4-e31",
-      4
-     ],
-     [
-      "p5-e2",
-      2
-     ],
-     [
-      "p7-e2",
-      2
-     ],
-     [
-      "p7-e3",
-      4
-     ],
-     [
-      "p7-e4",
-      2
-     ],
-     [
-      "p7-e11",
-      4
-     ],
-     [
-      "p7-e13",
-      4
-     ],
-     [
-      "p7-e14",
-      4
-     ],
-     [
-      "p7-e16",
-      4
-     ],
-     [
-      "p7-e23",
-      1
-     ],
-     [
-      "p7-e25",
-      1
-     ],
-     [
-      "p7-e33",
-      4
-     ],
-     [
-      "p7-e35",
-      4
-     ],
-     [
-      "p7-e37",
-      4
-     ],
-     [
-      "p7-e39",
-      4
-     ],
-     [
-      "p7-e50",
-      4
-     ],
-     [
-      "p7-e52",
-      2
-     ],
-     [
-      "p7-e54",
-      4
-     ],
-     [
-      "p7-e56",
-      4
-     ],
-     [
-      "p7-e59",
-      4
-     ],
-     [
-      "p8-e1",
-      2
-     ],
-     [
-      "p8-e2",
-      2
-     ],
-     [
-      "p8-e3",
-      2
-     ],
-     [
-      "p8-e4",
-      2
-     ],
-     [
-      "p8-e6",
-      1
-     ],
-     [
-      "p8-e7",
-      2
-     ],
-     [
-      "p8-e9",
-      2
-     ],
-     [
-      "p8-e10",
-      2
-     ],
-     [
-      "p8-e11",
-      2
-     ],
-     [
-      "p8-e13",
-      2
-     ],
-     [
-      "p8-e14",
-      2
-     ],
-     [
-      "p8-e15",
-      2
-     ],
-     [
-      "p8-e16",
-      2
-     ],
-     [
-      "p8-e17",
-      2
-     ],
-     [
-      "p8-e18",
-      2
-     ],
-     [
-      "p8-e19",
-      2
-     ],
-     [
-      "p8-e20",
-      2
-     ],
-     [
-      "p8-e22",
-      2
-     ],
-     [
-      "p8-e24",
-      2
-     ],
-     [
-      "p8-e25",
-      2
-     ],
-     [
-      "p8-e26",
-      2
-     ],
-     [
-      "p8-e31",
-      2
-     ],
-     [
-      "p8-e33",
-      2
-     ],
-     [
-      "p8-e34",
-      2
-     ],
-     [
-      "p8-e35",
-      2
-     ],
-     [
-      "p8-e36",
+      "p1-e6",
       2
      ]
     ],
-    "optional": [
-     "p1-e0",
-     "p2-e0",
-     "p4-e11",
-     "p4-e3",
-     "p4-e4",
-     "p6-e0",
-     "p6-e2",
-     "p7-e17",
-     "p7-e27",
-     "p8-e29"
-    ]
+    "optional": []
    },
    {
-    "upload": "w_exam_5111+exam",
-    "pages": 9,
-    "decisions": 63,
-    "per_page": 7.0,
+    "upload": "e1_mc_columns",
+    "pages": 1,
+    "decisions": 5,
+    "per_page": 5.0,
     "asked": [
      [
-      "p1-e8",
+      "p1-e2",
       2
      ],
      [
-      "p2-e2",
+      "p1-e4",
       2
      ],
      [
-      "p3-e0",
-      5
-     ],
-     [
-      "p3-e2",
+      "p1-e6",
       2
      ],
      [
-      "p3-e5",
-      4
-     ],
-     [
-      "p3-e11",
-      4
-     ],
-     [
-      "p3-e17",
-      4
-     ],
-     [
-      "p4-e8",
-      1
-     ],
-     [
-      "p4-e9",
-      1
-     ],
-     [
-      "p4-e12",
+      "p1-e10",
       2
      ],
      [
-      "p4-e13",
-      5
-     ],
-     [
-      "p4-e18",
-      4
-     ],
-     [
-      "p4-e19",
-      4
-     ],
-     [
-      "p4-e21",
-      1
-     ],
-     [
-      "p4-e25",
-      4
-     ],
-     [
-      "p4-e29",
-      4
-     ],
-     [
-      "p4-e30",
-      4
-     ],
-     [
-      "p4-e31",
-      2
-     ],
-     [
-      "p5-e2",
-      2
-     ],
-     [
-      "p7-e2",
-      2
-     ],
-     [
-      "p7-e3",
-      4
-     ],
-     [
-      "p7-e4",
-      2
-     ],
-     [
-      "p7-e11",
-      4
-     ],
-     [
-      "p7-e13",
-      4
-     ],
-     [
-      "p7-e14",
-      4
-     ],
-     [
-      "p7-e16",
-      4
-     ],
-     [
-      "p7-e23",
-      1
-     ],
-     [
-      "p7-e25",
-      1
-     ],
-     [
-      "p7-e33",
-      4
-     ],
-     [
-      "p7-e35",
-      4
-     ],
-     [
-      "p7-e37",
-      4
-     ],
-     [
-      "p7-e39",
-      4
-     ],
-     [
-      "p7-e50",
-      4
-     ],
-     [
-      "p7-e52",
-      2
-     ],
-     [
-      "p7-e54",
-      4
-     ],
-     [
-      "p7-e56",
-      4
-     ],
-     [
-      "p7-e59",
-      4
-     ],
-     [
-      "p8-e1",
-      2
-     ],
-     [
-      "p8-e2",
-      2
-     ],
-     [
-      "p8-e3",
-      2
-     ],
-     [
-      "p8-e4",
-      2
-     ],
-     [
-      "p8-e6",
-      1
-     ],
-     [
-      "p8-e7",
-      2
-     ],
-     [
-      "p8-e9",
-      2
-     ],
-     [
-      "p8-e10",
-      2
-     ],
-     [
-      "p8-e11",
-      2
-     ],
-     [
-      "p8-e13",
-      2
-     ],
-     [
-      "p8-e14",
-      2
-     ],
-     [
-      "p8-e15",
-      2
-     ],
-     [
-      "p8-e16",
-      2
-     ],
-     [
-      "p8-e17",
-      2
-     ],
-     [
-      "p8-e18",
-      2
-     ],
-     [
-      "p8-e19",
-      2
-     ],
-     [
-      "p8-e20",
-      2
-     ],
-     [
-      "p8-e22",
-      2
-     ],
-     [
-      "p8-e24",
-      2
-     ],
-     [
-      "p8-e25",
-      2
-     ],
-     [
-      "p8-e26",
-      2
-     ],
-     [
-      "p8-e31",
-      2
-     ],
-     [
-      "p8-e33",
-      2
-     ],
-     [
-      "p8-e34",
-      2
-     ],
-     [
-      "p8-e35",
-      2
-     ],
-     [
-      "p8-e36",
+      "p1-e16",
       2
      ]
     ],
     "optional": [
-     "p1-e0",
-     "p2-e0",
-     "p4-e11",
-     "p4-e3",
-     "p4-e4",
-     "p6-e0",
-     "p6-e2",
-     "p7-e17",
-     "p7-e27",
-     "p8-e29"
-    ]
-   },
-   {
-    "upload": "r14_exam_513",
-    "pages": 3,
-    "decisions": 18,
-    "per_page": 6.0,
-    "asked": [
-     [
-      "p1-e0",
-      1
-     ],
-     [
-      "p2-e3",
-      4
-     ],
-     [
-      "p2-e4",
-      4
-     ],
-     [
-      "p2-e5",
-      4
-     ],
-     [
-      "p2-e6",
-      4
-     ],
-     [
-      "p2-e7",
-      4
-     ],
-     [
-      "p2-e11",
-      2
-     ],
-     [
-      "p2-e13",
-      4
-     ],
-     [
-      "p3-e1",
-      4
-     ],
-     [
-      "p3-e3",
-      2
-     ],
-     [
-      "p3-e5",
-      4
-     ],
-     [
-      "p3-e7",
-      4
-     ],
-     [
-      "p3-e11",
-      2
-     ],
-     [
-      "p3-e13",
-      4
-     ],
-     [
-      "p3-e15",
-      4
-     ],
-     [
-      "p3-e17",
-      4
-     ],
-     [
-      "p3-e19",
-      4
-     ],
-     [
-      "p3-e22",
-      4
-     ]
-    ],
-    "optional": [
-     "p2-e9"
+     "p1-e12"
     ]
    },
    {
@@ -1616,353 +460,6 @@
     ]
    },
    {
-    "upload": "w_lecture_5111",
-    "pages": 8,
-    "decisions": 26,
-    "per_page": 3.25,
-    "asked": [
-     [
-      "p1-e3",
-      1
-     ],
-     [
-      "p1-e10",
-      4
-     ],
-     [
-      "p1-e13",
-      2
-     ],
-     [
-      "p1-e14",
-      2
-     ],
-     [
-      "p1-e17",
-      4
-     ],
-     [
-      "p1-e20",
-      4
-     ],
-     [
-      "p1-e22",
-      2
-     ],
-     [
-      "p1-e26",
-      2
-     ],
-     [
-      "p2-e9",
-      2
-     ],
-     [
-      "p2-e10",
-      2
-     ],
-     [
-      "p3-e3",
-      2
-     ],
-     [
-      "p3-e8",
-      2
-     ],
-     [
-      "p3-e9",
-      2
-     ],
-     [
-      "p3-e10",
-      2
-     ],
-     [
-      "p3-e15",
-      2
-     ],
-     [
-      "p4-e2",
-      1
-     ],
-     [
-      "p4-e4",
-      2
-     ],
-     [
-      "p4-e15",
-      4
-     ],
-     [
-      "p5-e24",
-      2
-     ],
-     [
-      "p5-e26",
-      2
-     ],
-     [
-      "p5-e30",
-      4
-     ],
-     [
-      "p5-e31",
-      4
-     ],
-     [
-      "p6-e1",
-      2
-     ],
-     [
-      "p7-e1",
-      2
-     ],
-     [
-      "p7-e2",
-      4
-     ],
-     [
-      "p7-e8",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p1-e30",
-     "p1-e37",
-     "p1-e38",
-     "p1-e39",
-     "p1-e40",
-     "p1-e42",
-     "p1-e8",
-     "p2-e2",
-     "p2-e7",
-     "p3-e0",
-     "p3-e6",
-     "p4-e12",
-     "p5-e11",
-     "p5-e3",
-     "p6-e0",
-     "p6-e6",
-     "p7-e5"
-    ]
-   },
-   {
-    "upload": "d3_arabic_doc",
-    "pages": 1,
-    "decisions": 3,
-    "per_page": 3.0,
-    "asked": [
-     [
-      "p1-e1",
-      2
-     ],
-     [
-      "p1-e3",
-      2
-     ],
-     [
-      "p1-e4",
-      2
-     ]
-    ],
-    "optional": []
-   },
-   {
-    "upload": "r11_recitation_2003sc",
-    "pages": 6,
-    "decisions": 17,
-    "per_page": 2.8333,
-    "asked": [
-     [
-      "p1-e3",
-      5
-     ],
-     [
-      "p1-e5",
-      5
-     ],
-     [
-      "p3-e0",
-      5
-     ],
-     [
-      "p3-e2",
-      5
-     ],
-     [
-      "p3-e3",
-      5
-     ],
-     [
-      "p3-e4",
-      5
-     ],
-     [
-      "p3-e8",
-      5
-     ],
-     [
-      "p3-e9",
-      5
-     ],
-     [
-      "p3-e10",
-      5
-     ],
-     [
-      "p3-e14",
-      5
-     ],
-     [
-      "p4-e3",
-      5
-     ],
-     [
-      "p5-e0",
-      5
-     ],
-     [
-      "p5-e1",
-      5
-     ],
-     [
-      "p5-e5",
-      5
-     ],
-     [
-      "p6-e2",
-      5
-     ],
-     [
-      "p6-e4",
-      5
-     ],
-     [
-      "p6-e6",
-      5
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p1-e4",
-     "p1-e9",
-     "p2-e4",
-     "p3-e1",
-     "p3-e12",
-     "p3-e5",
-     "p5-e4",
-     "p6-e3"
-    ]
-   },
-   {
-    "upload": "r05_labmanual_5310_lab1",
-    "pages": 8,
-    "decisions": 21,
-    "per_page": 2.625,
-    "asked": [
-     [
-      "p1-e8",
-      2
-     ],
-     [
-      "p2-e0",
-      2
-     ],
-     [
-      "p2-e3",
-      2
-     ],
-     [
-      "p2-e4",
-      2
-     ],
-     [
-      "p2-e12",
-      1
-     ],
-     [
-      "p2-e14",
-      2
-     ],
-     [
-      "p2-e17",
-      2
-     ],
-     [
-      "p2-e19",
-      2
-     ],
-     [
-      "p2-e21",
-      2
-     ],
-     [
-      "p3-e1",
-      2
-     ],
-     [
-      "p3-e3",
-      2
-     ],
-     [
-      "p3-e4",
-      2
-     ],
-     [
-      "p3-e5",
-      2
-     ],
-     [
-      "p3-e7",
-      2
-     ],
-     [
-      "p3-e9",
-      2
-     ],
-     [
-      "p3-e11",
-      2
-     ],
-     [
-      "p3-e13",
-      1
-     ],
-     [
-      "p3-e14",
-      1
-     ],
-     [
-      "p6-e0",
-      2
-     ],
-     [
-      "p6-e2",
-      2
-     ],
-     [
-      "p7-e4",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e1",
-     "p1-e12",
-     "p1-e3",
-     "p1-e4",
-     "p1-e5",
-     "p2-e7",
-     "p4-e0",
-     "p4-e18",
-     "p4-e20",
-     "p5-e1",
-     "p7-e1",
-     "p8-e4",
-     "p8-e7"
-    ]
-   },
-   {
     "upload": "d1_scripts",
     "pages": 2,
     "decisions": 4,
@@ -1973,38 +470,19 @@
       2
      ],
      [
-      "p1-e13",
+      "p1-e12",
       2
      ],
      [
-      "p1-e17",
+      "p1-e16",
       2
      ],
      [
-      "p1-e20",
+      "p1-e19",
       1
      ]
     ],
     "optional": []
-   },
-   {
-    "upload": "e1_mc_columns",
-    "pages": 1,
-    "decisions": 2,
-    "per_page": 2.0,
-    "asked": [
-     [
-      "p1-e22",
-      2
-     ],
-     [
-      "p1-e33",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e24"
-    ]
    },
    {
     "upload": "e2_solutions_rubric",
@@ -2022,250 +500,6 @@
      ]
     ],
     "optional": []
-   },
-   {
-    "upload": "r17_arxiv_ligo",
-    "pages": 8,
-    "decisions": 14,
-    "per_page": 1.75,
-    "asked": [
-     [
-      "p1-e1",
-      1
-     ],
-     [
-      "p1-e13",
-      1
-     ],
-     [
-      "p3-e2",
-      2
-     ],
-     [
-      "p3-e9",
-      2
-     ],
-     [
-      "p3-e10",
-      2
-     ],
-     [
-      "p4-e2",
-      4
-     ],
-     [
-      "p4-e4",
-      4
-     ],
-     [
-      "p5-e1",
-      2
-     ],
-     [
-      "p6-e5",
-      2
-     ],
-     [
-      "p7-e10",
-      2
-     ],
-     [
-      "p7-e12",
-      2
-     ],
-     [
-      "p7-e27",
-      2
-     ],
-     [
-      "p8-e1",
-      2
-     ],
-     [
-      "p8-e4",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e10",
-     "p2-e1",
-     "p2-e3",
-     "p3-e6",
-     "p3-e8",
-     "p4-e0",
-     "p5-e3",
-     "p5-e6",
-     "p6-e16",
-     "p7-e11",
-     "p7-e13",
-     "p7-e14",
-     "p7-e23",
-     "p8-e7",
-     "p8-e9"
-    ]
-   },
-   {
-    "upload": "r07_labnotebook_5310",
-    "pages": 3,
-    "decisions": 5,
-    "per_page": 1.6667,
-    "asked": [
-     [
-      "p1-e6",
-      5
-     ],
-     [
-      "p1-e17",
-      5
-     ],
-     [
-      "p2-e14",
-      5
-     ],
-     [
-      "p3-e6",
-      2
-     ],
-     [
-      "p3-e10",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p1-e1",
-     "p1-e16"
-    ]
-   },
-   {
-    "upload": "r16_openstax_physics_ch4_end",
-    "pages": 10,
-    "decisions": 16,
-    "per_page": 1.6,
-    "asked": [
-     [
-      "p2-e33",
-      1
-     ],
-     [
-      "p4-e10",
-      4
-     ],
-     [
-      "p4-e18",
-      5
-     ],
-     [
-      "p4-e25",
-      1
-     ],
-     [
-      "p5-e30",
-      4
-     ],
-     [
-      "p6-e9",
-      4
-     ],
-     [
-      "p6-e12",
-      4
-     ],
-     [
-      "p7-e2",
-      4
-     ],
-     [
-      "p7-e3",
-      4
-     ],
-     [
-      "p7-e21",
-      4
-     ],
-     [
-      "p7-e27",
-      2
-     ],
-     [
-      "p8-e4",
-      4
-     ],
-     [
-      "p8-e8",
-      1
-     ],
-     [
-      "p8-e21",
-      4
-     ],
-     [
-      "p9-e4",
-      1
-     ],
-     [
-      "p9-e7",
-      4
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p1-e23",
-     "p3-e3",
-     "p4-e16",
-     "p4-e2",
-     "p6-e18",
-     "p6-e20",
-     "p7-e19",
-     "p7-e22",
-     "p8-e0",
-     "p9-e2"
-    ]
-   },
-   {
-    "upload": "w_lecture_560",
-    "pages": 5,
-    "decisions": 7,
-    "per_page": 1.4,
-    "asked": [
-     [
-      "p2-e2",
-      4
-     ],
-     [
-      "p2-e5",
-      4
-     ],
-     [
-      "p3-e0",
-      4
-     ],
-     [
-      "p3-e6",
-      4
-     ],
-     [
-      "p3-e9",
-      4
-     ],
-     [
-      "p3-e16",
-      4
-     ],
-     [
-      "p4-e4",
-      4
-     ]
-    ],
-    "optional": [
-     "p3-e4",
-     "p4-e1",
-     "p4-e11",
-     "p4-e12",
-     "p4-e20",
-     "p5-e2",
-     "p5-e6"
-    ]
    },
    {
     "upload": "w_handwritten_6006+image_pages",
@@ -2302,308 +536,71 @@
     ]
    },
    {
-    "upload": "w_slides_60001_lec10",
-    "pages": 39,
-    "decisions": 46,
-    "per_page": 1.1795,
+    "upload": "r16_openstax_physics_ch4_end",
+    "pages": 10,
+    "decisions": 12,
+    "per_page": 1.2,
     "asked": [
      [
-      "p3-e0",
+      "p2-e33",
+      1
+     ],
+     [
+      "p4-e6",
+      4
+     ],
+     [
+      "p4-e14",
       5
      ],
      [
-      "p5-e3",
-      4
-     ],
-     [
-      "p6-e8",
-      4
-     ],
-     [
-      "p6-e11",
+      "p4-e16",
       1
+     ],
+     [
+      "p6-e4",
+      4
+     ],
+     [
+      "p6-e6",
+      4
+     ],
+     [
+      "p6-e13",
+      2
      ],
      [
       "p7-e2",
       4
      ],
      [
-      "p7-e8",
+      "p8-e1",
       4
      ],
      [
-      "p8-e8",
-      4
-     ],
-     [
-      "p8-e13",
-      4
-     ],
-     [
-      "p8-e16",
-      2
-     ],
-     [
-      "p9-e2",
-      4
-     ],
-     [
-      "p9-e8",
-      4
-     ],
-     [
-      "p10-e0",
-      5
-     ],
-     [
-      "p13-e4",
-      4
-     ],
-     [
-      "p13-e8",
-      4
-     ],
-     [
-      "p17-e2",
-      4
-     ],
-     [
-      "p20-e3",
-      4
-     ],
-     [
-      "p20-e4",
-      2
-     ],
-     [
-      "p20-e5",
-      2
-     ],
-     [
-      "p20-e6",
-      2
-     ],
-     [
-      "p21-e0",
-      5
-     ],
-     [
-      "p21-e9",
-      4
-     ],
-     [
-      "p21-e10",
-      4
-     ],
-     [
-      "p21-e13",
-      2
-     ],
-     [
-      "p22-e7",
-      2
-     ],
-     [
-      "p22-e11",
-      2
-     ],
-     [
-      "p24-e1",
-      4
-     ],
-     [
-      "p24-e4",
-      4
-     ],
-     [
-      "p24-e5",
+      "p8-e6",
       1
      ],
      [
-      "p24-e10",
+      "p9-e4",
       1
      ],
      [
-      "p24-e11",
+      "p9-e5",
       1
-     ],
-     [
-      "p24-e13",
-      4
-     ],
-     [
-      "p24-e15",
-      1
-     ],
-     [
-      "p24-e16",
-      1
-     ],
-     [
-      "p25-e1",
-      4
-     ],
-     [
-      "p26-e0",
-      5
-     ],
-     [
-      "p27-e5",
-      2
-     ],
-     [
-      "p27-e7",
-      2
-     ],
-     [
-      "p27-e9",
-      2
-     ],
-     [
-      "p28-e3",
-      4
-     ],
-     [
-      "p29-e2",
-      4
-     ],
-     [
-      "p29-e5",
-      2
-     ],
-     [
-      "p31-e6",
-      2
-     ],
-     [
-      "p33-e0",
-      5
-     ],
-     [
-      "p34-e4",
-      2
-     ],
-     [
-      "p36-e10",
-      2
-     ],
-     [
-      "p37-e6",
-      2
      ]
     ],
     "optional": [
      "p1-e0",
-     "p12-e0",
-     "p13-e0",
-     "p14-e0",
-     "p14-e6",
-     "p15-e0",
-     "p16-e0",
-     "p18-e0",
-     "p19-e0",
-     "p20-e0",
-     "p23-e0",
-     "p24-e0",
-     "p25-e0",
-     "p27-e0",
-     "p28-e0",
-     "p29-e0",
-     "p32-e0",
-     "p37-e0",
-     "p38-e0",
-     "p5-e0",
-     "p6-e0",
-     "p7-e0",
+     "p1-e22",
+     "p3-e3",
+     "p4-e12",
+     "p5-e4",
+     "p6-e11",
+     "p7-e10",
+     "p7-e12",
      "p8-e0",
-     "p9-e0"
-    ]
-   },
-   {
-    "upload": "r18_arxiv_opt",
-    "pages": 6,
-    "decisions": 7,
-    "per_page": 1.1667,
-    "asked": [
-     [
-      "p1-e12",
-      1
-     ],
-     [
-      "p1-e14",
-      1
-     ],
-     [
-      "p2-e1",
-      4
-     ],
-     [
-      "p2-e17",
-      2
-     ],
-     [
-      "p2-e24",
-      1
-     ],
-     [
-      "p2-e26",
-      2
-     ],
-     [
-      "p6-e0",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e5",
-     "p1-e7",
-     "p2-e10",
-     "p2-e11",
-     "p2-e16",
-     "p2-e30",
-     "p2-e6",
-     "p2-e7",
-     "p3-e12",
-     "p3-e7",
-     "p3-e8",
-     "p4-e0",
-     "p4-e7",
-     "p4-e9",
-     "p5-e5"
-    ]
-   },
-   {
-    "upload": "r13_exam_3044",
-    "pages": 4,
-    "decisions": 4,
-    "per_page": 1.0,
-    "asked": [
-     [
-      "p2-e3",
-      5
-     ],
-     [
-      "p3-e4",
-      4
-     ],
-     [
-      "p3-e8",
-      2
-     ],
-     [
-      "p4-e3",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e1",
-     "p1-e2",
-     "p2-e0",
-     "p3-e0",
-     "p4-e0",
-     "p4-e1",
-     "p4-e13",
-     "p4-e9"
+     "p9-e2"
     ]
    },
    {
@@ -2613,7 +610,7 @@
     "per_page": 1.0,
     "asked": [
      [
-      "p1-e7",
+      "p1-e6",
       4
      ]
     ],
@@ -2626,7 +623,7 @@
     "per_page": 1.0,
     "asked": [
      [
-      "p1-e3",
+      "p1-e2",
       2
      ]
     ],
@@ -2702,270 +699,6 @@
     "optional": []
    },
    {
-    "upload": "w_notes_6042_ch2",
-    "pages": 14,
-    "decisions": 9,
-    "per_page": 0.6429,
-    "asked": [
-     [
-      "p1-e25",
-      2
-     ],
-     [
-      "p1-e26",
-      2
-     ],
-     [
-      "p6-e14",
-      4
-     ],
-     [
-      "p7-e7",
-      2
-     ],
-     [
-      "p7-e12",
-      5
-     ],
-     [
-      "p9-e7",
-      4
-     ],
-     [
-      "p9-e10",
-      4
-     ],
-     [
-      "p10-e7",
-      5
-     ],
-     [
-      "p10-e28",
-      5
-     ]
-    ],
-    "optional": [
-     "p10-e13",
-     "p10-e16",
-     "p10-e29",
-     "p10-e8",
-     "p11-e13",
-     "p11-e19",
-     "p11-e20",
-     "p11-e27",
-     "p11-e29",
-     "p11-e3",
-     "p11-e30",
-     "p12-e19",
-     "p12-e20",
-     "p13-e10",
-     "p13-e16",
-     "p13-e21",
-     "p13-e5",
-     "p14-e10",
-     "p14-e6",
-     "p14-e7",
-     "p2-e44",
-     "p3-e1",
-     "p3-e3",
-     "p4-e18",
-     "p5-e1",
-     "p5-e30",
-     "p6-e17",
-     "p6-e23",
-     "p6-e31",
-     "p6-e33",
-     "p6-e52",
-     "p6-e61",
-     "p6-e64",
-     "p7-e13",
-     "p7-e22",
-     "p8-e14",
-     "p8-e28",
-     "p9-e17"
-    ]
-   },
-   {
-    "upload": "w_pset_801",
-    "pages": 8,
-    "decisions": 5,
-    "per_page": 0.625,
-    "asked": [
-     [
-      "p2-e20",
-      2
-     ],
-     [
-      "p6-e5",
-      1
-     ],
-     [
-      "p6-e6",
-      1
-     ],
-     [
-      "p6-e13",
-      4
-     ],
-     [
-      "p6-e14",
-      4
-     ]
-    ],
-    "optional": [
-     "p2-e11",
-     "p4-e3"
-    ]
-   },
-   {
-    "upload": "w_slides_60001_lec1",
-    "pages": 35,
-    "decisions": 20,
-    "per_page": 0.5714,
-    "asked": [
-     [
-      "p7-e6",
-      1
-     ],
-     [
-      "p18-e0",
-      5
-     ],
-     [
-      "p18-e4",
-      4
-     ],
-     [
-      "p19-e3",
-      1
-     ],
-     [
-      "p19-e4",
-      4
-     ],
-     [
-      "p19-e6",
-      4
-     ],
-     [
-      "p19-e7",
-      4
-     ],
-     [
-      "p20-e3",
-      4
-     ],
-     [
-      "p20-e5",
-      1
-     ],
-     [
-      "p25-e7",
-      4
-     ],
-     [
-      "p29-e2",
-      4
-     ],
-     [
-      "p29-e3",
-      1
-     ],
-     [
-      "p29-e6",
-      4
-     ],
-     [
-      "p29-e7",
-      2
-     ],
-     [
-      "p29-e9",
-      4
-     ],
-     [
-      "p29-e11",
-      4
-     ],
-     [
-      "p29-e12",
-      4
-     ],
-     [
-      "p29-e15",
-      4
-     ],
-     [
-      "p29-e17",
-      4
-     ],
-     [
-      "p31-e2",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p10-e0",
-     "p11-e0",
-     "p12-e0",
-     "p13-e0",
-     "p14-e0",
-     "p15-e0",
-     "p16-e0",
-     "p17-e0",
-     "p2-e0",
-     "p20-e6",
-     "p22-e0",
-     "p23-e0",
-     "p24-e0",
-     "p25-e0",
-     "p26-e0",
-     "p27-e0",
-     "p28-e0",
-     "p3-e0",
-     "p30-e0",
-     "p31-e0",
-     "p32-e0",
-     "p33-e3",
-     "p34-e0",
-     "p4-e0",
-     "p5-e0",
-     "p6-e0",
-     "p7-e1",
-     "p8-e0",
-     "p9-e0"
-    ]
-   },
-   {
-    "upload": "r04_grading_5310",
-    "pages": 4,
-    "decisions": 2,
-    "per_page": 0.5,
-    "asked": [
-     [
-      "p1-e8",
-      5
-     ],
-     [
-      "p2-e0",
-      5
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p1-e2",
-     "p1-e6",
-     "p2-e3",
-     "p2-e4",
-     "p3-e0",
-     "p3-e17",
-     "p3-e2",
-     "p3-e5",
-     "p4-e1"
-    ]
-   },
-   {
     "upload": "r20_newsletter_drp",
     "pages": 6,
     "decisions": 3,
@@ -2997,8 +730,7 @@
      "p4-e2",
      "p5-e0",
      "p6-e0",
-     "p6-e4",
-     "p6-e6"
+     "p6-e5"
     ]
    },
    {
@@ -3025,11 +757,11 @@
       4
      ],
      [
-      "p5-e2",
+      "p5-e3",
       4
      ],
      [
-      "p5-e3",
+      "p5-e5",
       4
      ]
     ],
@@ -3046,144 +778,11 @@
     "per_page": 0.5,
     "asked": [
      [
-      "p1-e6",
-      2
-     ]
-    ],
-    "optional": []
-   },
-   {
-    "upload": "r09_handout_14451",
-    "pages": 5,
-    "decisions": 2,
-    "per_page": 0.4,
-    "asked": [
-     [
       "p1-e7",
       2
-     ],
-     [
-      "p5-e3",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e5",
-     "p2-e0",
-     "p3-e1",
-     "p3-e3",
-     "p4-e0",
-     "p4-e4",
-     "p5-e1"
-    ]
-   },
-   {
-    "upload": "r10_handout_4241",
-    "pages": 3,
-    "decisions": 1,
-    "per_page": 0.3333,
-    "asked": [
-     [
-      "p1-e0",
-      1
      ]
     ],
     "optional": []
-   },
-   {
-    "upload": "r01_syllabus_16851",
-    "pages": 7,
-    "decisions": 2,
-    "per_page": 0.2857,
-    "asked": [
-     [
-      "p4-e8",
-      2
-     ],
-     [
-      "p5-e0",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p3-e5"
-    ]
-   },
-   {
-    "upload": "w_mixed_slides+image_pages",
-    "pages": 12,
-    "decisions": 3,
-    "per_page": 0.25,
-    "asked": [
-     [
-      "p7-e6",
-      1
-     ],
-     [
-      "p10-e7",
-      2
-     ],
-     [
-      "p12-e5",
-      2
-     ]
-    ],
-    "optional": [
-     "p1-e0",
-     "p10-e1",
-     "p10-e10",
-     "p10-e2",
-     "p10-e3",
-     "p10-e4",
-     "p10-e5",
-     "p10-e6",
-     "p11-e0",
-     "p12-e1",
-     "p12-e2",
-     "p12-e3",
-     "p12-e4",
-     "p2-e1",
-     "p2-e10",
-     "p2-e2",
-     "p2-e3",
-     "p2-e4",
-     "p2-e5",
-     "p2-e6",
-     "p2-e7",
-     "p2-e8",
-     "p2-e9",
-     "p3-e0",
-     "p4-e1",
-     "p4-e10",
-     "p4-e2",
-     "p4-e3",
-     "p4-e4",
-     "p4-e5",
-     "p4-e6",
-     "p4-e7",
-     "p4-e8",
-     "p4-e9",
-     "p5-e0",
-     "p6-e1",
-     "p6-e2",
-     "p6-e3",
-     "p6-e4",
-     "p6-e5",
-     "p6-e6",
-     "p6-e7",
-     "p6-e8",
-     "p6-e9",
-     "p7-e1",
-     "p8-e1",
-     "p8-e2",
-     "p8-e3",
-     "p8-e4",
-     "p8-e5",
-     "p8-e6",
-     "p8-e7",
-     "p9-e0"
-    ]
    },
    {
     "upload": "w_scan_slides+image_pages",
@@ -3255,11 +854,7 @@
     "decisions": 0,
     "per_page": 0.0,
     "asked": [],
-    "optional": [
-     "p2-e2",
-     "p2-e3",
-     "p2-e4"
-    ]
+    "optional": []
    },
    {
     "upload": "a3b_sideways_270",
@@ -3267,11 +862,7 @@
     "decisions": 0,
     "per_page": 0.0,
     "asked": [],
-    "optional": [
-     "p2-e2",
-     "p2-e3",
-     "p2-e4"
-    ]
+    "optional": []
    },
    {
     "upload": "a6_two_up",
@@ -3287,10 +878,7 @@
     "decisions": 0,
     "per_page": 0.0,
     "asked": [],
-    "optional": [
-     "p1-e12",
-     "p2-e12"
-    ]
+    "optional": []
    },
    {
     "upload": "a9_handout_6up",
@@ -3389,75 +977,6 @@
    {
     "upload": "f4_matrices",
     "pages": 1,
-    "decisions": 0,
-    "per_page": 0.0,
-    "asked": [],
-    "optional": []
-   },
-   {
-    "upload": "r02_syllabus_21l704",
-    "pages": 2,
-    "decisions": 0,
-    "per_page": 0.0,
-    "asked": [],
-    "optional": []
-   },
-   {
-    "upload": "r03_syllabus_21l708",
-    "pages": 4,
-    "decisions": 0,
-    "per_page": 0.0,
-    "asked": [],
-    "optional": [
-     "p1-e4",
-     "p1-e7",
-     "p3-e7",
-     "p4-e1",
-     "p4-e3",
-     "p4-e5"
-    ]
-   },
-   {
-    "upload": "r06_labsafety_5310",
-    "pages": 5,
-    "decisions": 0,
-    "per_page": 0.0,
-    "asked": [],
-    "optional": [
-     "p1-e0",
-     "p1-e14",
-     "p1-e17",
-     "p1-e19",
-     "p1-e2",
-     "p1-e5",
-     "p1-e7",
-     "p2-e0",
-     "p2-e12",
-     "p2-e16",
-     "p2-e19",
-     "p2-e5",
-     "p2-e8",
-     "p3-e1",
-     "p3-e16",
-     "p3-e4",
-     "p3-e8",
-     "p3-e9",
-     "p4-e3",
-     "p4-e6",
-     "p4-e8"
-    ]
-   },
-   {
-    "upload": "r08_labhandout_2996",
-    "pages": 1,
-    "decisions": 0,
-    "per_page": 0.0,
-    "asked": [],
-    "optional": []
-   },
-   {
-    "upload": "r12_exam_900sc",
-    "pages": 6,
     "decisions": 0,
     "per_page": 0.0,
     "asked": [],

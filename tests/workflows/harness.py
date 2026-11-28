@@ -32,6 +32,7 @@ import signal
 import subprocess
 import sys
 from collections import Counter
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -162,6 +163,36 @@ def answers_file(folder: Path) -> Path:
     return path
 
 
+def log_conversion(
+    entry: str,
+    *,
+    commit: bool,
+    missed: Mapping[str, int],
+    clients: Sequence[Any] = (),
+    keys: Iterable[str] = (),
+    ticked: Sequence[str] = (),
+) -> None:
+    """With `CORPUS_ANSWERS_LOG`, adds the line `scripts/corpus_refresh.py` sorts the answers
+    by: the answers a conversion read (`keys`, and those `clients` read) and whether they may
+    be committed. A file made for a test (`builders`) is the repository's own, so its answers
+    are committed; one the refresh cannot place stays out of the repository."""
+    if not LOG:
+        return
+    line = {
+        "entry": entry,
+        "ticked": list(ticked),
+        "commit": commit,
+        "hits": sum(c.hits for c in clients),
+        "moved": sum(c.rekeyed for c in clients),
+        "missed": dict(missed),
+        "replayed_usd": sum(c.replayed_cost_usd for c in clients),
+        "paid_usd": sum(c.live_cost_usd for c in clients),
+        "keys": sorted(set(keys).union(*(c.used for c in clients))),
+    }
+    with (Path(LOG) / f"{os.getpid()}.jsonl").open("a", encoding="utf-8") as out:
+        out.write(json.dumps(line) + "\n")
+
+
 def replayable(entry_id: str) -> None:
     """Skips the test where this machine cannot replay the conversion of `entry_id`."""
     entry = corpus.load_manifest()[entry_id]
@@ -184,6 +215,7 @@ class Ran:
 
     ended: str  # "finished", "stopped" (at the time limit) or "died"
     missed: dict[str, int]  # per job: the model answers the recording did not hold
+    used: dict[str, list[str]]  # per job: the keys of the recorded answers it read
     own_mb: float  # the most memory the process held
     started_mb: float  # the most held by a program it started (a sandboxed one)
     log: str  # every line it wrote
@@ -278,6 +310,7 @@ class ReplaySite:
         return Ran(
             ended=ended,
             missed=said.get("missed", {}),
+            used=said.get("used", {}),
             own_mb=said.get("own_kb", 0) / 1024,
             started_mb=said.get("started_kb", 0) / 1024,
             log=log.read_text(encoding="utf-8", errors="replace"),
@@ -323,20 +356,10 @@ class ReplaySite:
             assert sent.status_code == 303, sent.text[-300:]
         job_id = job_id_from(sent)
         clients, missed = self._run_queued(job_id, before)
-        if LOG:
-            line = {
-                "entry": entry_id,
-                "ticked": [box for box, on in (("scan", image_pages), ("exam", exam)) if on],
-                "commit": entry.may_commit,
-                "hits": sum(c.hits for c in clients),
-                "moved": sum(c.rekeyed for c in clients),
-                "missed": dict(missed),
-                "replayed_usd": sum(c.replayed_cost_usd for c in clients),
-                "paid_usd": sum(c.live_cost_usd for c in clients),
-                "keys": sorted(set().union(*(c.used for c in clients))),
-            }
-            with (Path(LOG) / f"{os.getpid()}.jsonl").open("a", encoding="utf-8") as out:
-                out.write(json.dumps(line) + "\n")
+        ticked = [box for box, on in (("scan", image_pages), ("exam", exam)) if on]
+        log_conversion(
+            entry_id, commit=entry.may_commit, clients=clients, missed=missed, ticked=ticked
+        )
         owed = self.owed(entry_id)
         if MODE != "live" and sum(missed.values()) != owed:
             lines = "".join(f"\n  {count} x {why}" for why, count in missed.most_common())
@@ -378,7 +401,8 @@ class ReplaySite:
             said = " ".join(sent.text.split())
             pytest.fail(f"{filename}: the upload was refused ({sent.status_code}): {said[-600:]}")
         job_id = job_id_from(sent)
-        self._run_queued(job_id, before)
+        clients, missed = self._run_queued(job_id, before)
+        log_conversion(filename, commit=True, clients=clients, missed=missed)
         return job_id
 
     def convert_parts(self, filename: str, data: bytes, parts: list[str]) -> list[str]:
@@ -397,6 +421,7 @@ class ReplaySite:
             rows = session.scalars(select(Job).where(Job.part_group == location.rsplit("/", 1)[-1]))
             by_label = {job.part_label: job.id for job in rows}
         for _ in parts:
+            before = len(self._clients)
             worker = Worker(
                 self.settings,
                 self.ctx.factory,
@@ -404,6 +429,11 @@ class ReplaySite:
                 client_factory=self._client,
             )
             assert worker.run_once() in by_label.values()
+            clients = self._clients[before:]
+            missed: Counter[str] = Counter()
+            for client in clients:
+                missed.update(client.missed_because)
+            log_conversion(filename, commit=True, clients=clients, missed=missed)
         return [by_label[label] for label in parts]
 
     def page(self, path: str) -> lxml.html.HtmlElement:

@@ -26,7 +26,7 @@ screen is for.
 **Status.** Beta, built and maintained by Harish Manoharan. Anyone with a Google account can sign
 in at https://readablestem.com (the beta runs `SIGNUP_MODE=open`; the code's default is
 `allowlist`, invitation only), with daily limits for new accounts.
-The pipeline is version 0.5.22 (`PIPELINE_VERSION`). Questions go to hello@readablestem.com.
+The pipeline is version 0.5.23 (`PIPELINE_VERSION`). Questions go to hello@readablestem.com.
 
 ## What it does
 
