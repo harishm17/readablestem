@@ -447,9 +447,10 @@ What follows from it:
   reservations; the CPU is not the limit).
   `WORKER_POLL_S=2`. The job time limit is 180 s plus 30 s a page (18 minutes for 30
   pages: 20x the measurement); it was 300 s plus 90 s a page. A job claimed again after a
-  restart counts an attempt; three attempts end in `lease_expired`. On SIGTERM the worker
-  stops claiming at once and ends the running job's lease, so the other instance (or the
-  new revision) picks it up without waiting two minutes.
+  crash counts an attempt; three attempts end in `lease_expired`. On SIGTERM the worker
+  stops claiming at once and ends the running job's lease and gives its attempt back, so the
+  other instance (or the new revision) picks it up without waiting two minutes, and deploys
+  do not use up the job's attempts.
 - Cloud Run settings: `CPU=1 MEMORY=1Gi MIN_INSTANCES=1 MAX_INSTANCES=2 CONCURRENCY=20
   REQUEST_TIMEOUT=300`, all overridable in `deploy/.env.deploy`; CPU always allocated
   (`--no-cpu-throttling`), because the worker thread runs between requests.

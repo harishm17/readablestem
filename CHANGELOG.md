@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased: a job stopped by a deploy keeps its attempts
+
+- `Worker.stop` (SIGTERM, a deploy, the app's shutdown) ended the running job's lease but
+  left the attempt counted, so a job met by three deploys failed with "lease_expired" though
+  nothing was wrong with it. The stopped attempt is now given back in the same update that ends
+  the lease. A worker that crashes or is killed still counts its attempt, and a job the owner
+  cancels is failed as canceled, not requeued, as before.
+
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 
 - `PIPELINE_VERSION` is 0.5.23 and `RENDER_VERSION` stays 11. The model's page order (the entry

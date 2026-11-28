@@ -23,8 +23,8 @@ queue is safe with several workers or instances:
   job's lease (`lease_until`) every `lease_s / 3`. If the process dies, the lease runs
   out and the next worker requeues the job; after `MAX_ATTEMPTS` claims it is failed
   with "lease_expired" instead of retried forever. `Worker.stop` (process shutdown)
-  cancels the running attempt and ends its lease at once, so another instance can
-  requeue the job without waiting for the lease to run out.
+  cancels the running attempt, gives its attempt back and ends its lease at once, so another
+  instance can requeue the job without waiting for the lease to run out.
 - The converter is `web.isolated_convert.convert_isolated`: the conversion runs in a child
   process that this thread's converter call kills when the attempt is cancelled (so a crash,
   an out of memory or a hang in MuPDF fails the job, never the web process; a crash fails it
@@ -1641,7 +1641,13 @@ class Worker:
                     session.execute(
                         update(Job)
                         .where(*self._owned(attempt.claim))
-                        .values(lease_until=self.clock())
+                        .values(
+                            lease_until=self.clock(),
+                            # The attempt was cut short by us, not by the job: it is given back,
+                            # or a job met by three deploys would fail (`requeue_expired`). A
+                            # crash never gets here and still counts.
+                            attempts=Job.attempts - 1,
+                        )
                         .execution_options(synchronize_session=False)
                     )
             except Exception as exc:  # the lease still runs out on its own

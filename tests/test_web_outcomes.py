@@ -55,6 +55,7 @@ from readablestem.web.routes import jobs as jobs_routes
 from readablestem.web.spend import largest_reservation_usd
 from readablestem.web.uploads import UploadRejected
 from readablestem.web.worker import (
+    MAX_ATTEMPTS,
     JobCancelled,
     Worker,
     default_client_factory,
@@ -358,6 +359,32 @@ def test_stopping_the_worker_cancels_the_running_job_and_ends_its_lease(env):
     assert seen == {"refused": True}  # no model call after shutdown began
     assert env.job(job_id).status == "running"  # left for the next worker, which ...
     assert env.worker().requeue_expired() == (1, 0)  # ... requeues it at once
+
+
+def test_a_job_stopped_by_shutdown_keeps_its_attempts(env):
+    job_id = job_id_from(upload(env.browser, make_pdf(1)))
+    started, release = threading.Event(), threading.Event()
+
+    def converter(pdf_bytes, /, *, settings, client, progress=None):
+        started.set()
+        release.wait(5)
+        return fake_output()
+
+    for _ in range(MAX_ATTEMPTS + 1):  # one deploy more than a job has attempts
+        started.clear()
+        release.clear()
+        worker = env.worker(lease_s=60)
+        worker.converter = converter
+        runner = threading.Thread(target=worker.run_once)
+        runner.start()
+        assert started.wait(5)
+        worker.stop(timeout=1)
+        release.set()
+        runner.join(10)
+        assert env.worker().requeue_expired() == (1, 0)
+    assert env.job(job_id).status == "queued"
+    claim = env.worker().claim()
+    assert claim is not None and claim.attempt == 1  # the stopped attempts were given back
 
 
 # --------------------------------------------------------------------------- scanned pages

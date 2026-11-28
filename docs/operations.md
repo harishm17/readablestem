@@ -641,9 +641,10 @@ worker as its own service"):
 - **Stopping.** SIGTERM or SIGINT: no new job is claimed, the running conversions are cancelled
   and their leases end at once, and the process exits within 20 seconds (`DRAIN_S`; the host's
   draining window must be longer, 30 on `worker`). The job goes back to the queue when a worker
-  next looks (the lease is already over), and runs again from its start: the attempt counts, and
-  three attempts end in `lease_expired`, as when the worker was a thread. A worker that is killed
-  instead leaves the job to the same rule when its lease (two minutes) runs out. Look for
+  next looks (the lease is already over), and runs again from its start: the stopped attempt is given back, so any number of deploys
+  leaves the job its three attempts (three attempts end in `lease_expired`). A worker that is
+  killed instead leaves the job to the attempt rule when its lease (two minutes) runs out: that
+  attempt counts. Look for
   `worker_service_started`, `worker_service_stopping`, `job_cancelled reason=shutdown` and
   `worker_service_stopped`.
 - **Rolling back** is one setting: set `WORKER_MODE=inline` on `web` and redeploy it (the web
@@ -690,7 +691,8 @@ lease ends now so another run requeues it immediately instead of after two minut
 drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the app's shutdown
 makes sure the worker is stopped (3 seconds). If the process is killed before the lease is
 ended, the lease runs out and the job is requeued by the next worker. The requeued job restarts
-from the beginning on another attempt (three attempts end in `lease_expired`). Look for
+from the beginning on another attempt (three attempts end in `lease_expired`; a worker that
+shut down cleanly gives its attempt back). Look for
 `sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs. A conversion
 runs in a child process (below): cancelling it kills the child within 0.2 seconds, so shutdown
 leaves nothing running.
