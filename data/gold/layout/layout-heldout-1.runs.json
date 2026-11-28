@@ -33,5 +33,17 @@
     "pipeline_version": "0.5.23",
     "source": "e3737ac4",
     "date": "2026-11-27"
+  },
+  {
+    "pipeline_version": "0.5.24",
+    "source": "732a9968",
+    "date": "2026-11-27",
+    "note": "wrote no record (no --out); totals printed only"
+  },
+  {
+    "pipeline_version": "0.5.24",
+    "source": "89e8da03",
+    "date": "2026-11-27",
+    "note": "repeat of the run above to write the record: same code, every answer replayed, $0; every printed total identical"
   }
 ]
