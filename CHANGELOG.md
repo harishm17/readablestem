@@ -1,5 +1,24 @@
 # Changelog
 
+## Pipeline 0.5.24, render 11 (2026-11-27)
+
+- `PIPELINE_VERSION` is 0.5.24 and `RENDER_VERSION` stays 11. The flag policy is on again in the
+  production profile (the entry below), and the rules cut the model's page order at printed item
+  markers and read a small-type footnote low on the page last (below). An equation or figure read
+  by the fallback model says so. No request to a model changes; 0.5.23 opens 0.5.24 results.
+- On held-out pages (`layout-heldout-1`, answers replayed, $0), against 0.5.23 in the page a
+  student is given: 196 of 247 pages right (192), 143 with no fault (140), 22 of 49 documents with
+  every gold page right (21), paragraphs run together on 28 pages (30); furniture (13) and cut
+  paragraphs (36) are unchanged. No figure moves beyond its 95% interval. Every release bar of
+  the ledger is met. The set was scored twice for this release with the same totals, because the
+  first run wrote no record.
+- On the corpus, the two pages 0.5.23 read wrong are right again (58 of 62), and the places
+  where blocks run together go from 112 to 24: the known fault of 0.5.23 is fixed.
+- Decisions on the corpus go from 71 to 72 on 110 pages: one more asked by the flag policy, and
+  one more and one fewer on two uploads the item cut changes. The flag policy's cost is measured
+  on held-out papers and accepted.
+  [docs/eval.md](docs/eval.md) "The release of 2026-11-27 (pipeline 0.5.24)".
+
 ## Unreleased: the flag policy is on again
 
 - `FLAG_POLICY` is `true` in the production profile. The code default stays off. An accepted equation that
