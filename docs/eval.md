@@ -5168,8 +5168,8 @@ order`, "Why a page is not right"):
   0.5.23). The bar at an allowance of 0 is not met, by the one decision the flag policy asks
   on `r15_openstax_chem_ch3` and one more on `s18_exam_twocol`, less one on `e1_mc_columns`
   (`eval burden`, the record now kept). The flag policy's cost was measured on
-  held-out papers before the switch (2.01 to 2.36 required decisions a page, for silent
-  errors from 5.71 to 4.78 per 100 gold equations) and is accepted there.
+  held-out papers before the switch (2.01 [1.15, 3.43] to 2.36 [1.50, 3.74] required decisions a page, for silent
+  errors from 5.71 to 4.78 per 100 gold equations, paired -0.93 [-1.88, -0.20]) and is accepted there.
 - **Reading order, development.** `data/eval/order-layout-dev-1.json`: 186 of 267 pages right
   and 141 faultless in the student page (184 and 140 at 0.5.23), 21 of 60 documents with every
   gold page right (21). Two pages are made right and none wrong. Heading levels, new in
@@ -5223,7 +5223,19 @@ order`, "Why a page is not right"):
 **The deploy.** Production reads `FLAG_POLICY` from its Railway variable, not from the
 profile, and a profile not yet confirmed against the dashboard only warns on a difference. So
 the release sets the variable (`railway variable set -s web --skip-deploys FLAG_POLICY=true`)
-before the deploy, and after it the start-up log has no `profile_mismatch` line.
+before the deploy, and after it the start-up log has no `profile_mismatch` line naming
+`FLAG_POLICY`.
+
+**Open after this release.** Two points of the independent review are kept as they are. When
+a note the model names is moved to the end of the page, the whole page takes the model's
+places, also on a page where the rules' own order would otherwise stand; the held-out run
+measured that code and no measured page got worse, and a per-page check that no page read in
+the rules' order changes apart from its note is owed. And a job given back by a stopped worker
+(a deploy) reads "Waiting for its turn." on its page while it waits to be claimed, where a job
+put back after a lost attempt reads that it is being started again; telling the two apart needs
+a signal the job does not keep yet. A page of olmOCR-Bench that ended in an error is converted
+again by every run with the model's page order (it keeps no page-order facts), so a live run
+resumed after an error asks for it again.
 
 **What these numbers do not show.** The held-out run is the same 247 pages of 49 documents
 as 0.5.23's, with the same recorded answers, so what changed between the two runs is the

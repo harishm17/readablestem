@@ -24,7 +24,7 @@
 - `FLAG_POLICY` is `true` in the production profile. The code default stays off. An accepted equation that
   looks like the readings that turned out wrong is asked about again. Measured on held-out papers at
   0.5.23 (26 units, 1,715 gold equations): silent errors fall from 5.71 to 4.78 per 100 gold (paired
-  -0.93, 95% [-1.88, -0.20]), and required decisions rise from 2.01 to 2.36 a page. The readings are the
+  -0.93, 95% [-1.88, -0.20]), and required decisions rise from 2.01 [1.15, 3.43] to 2.36 [1.50, 3.74] a page. The readings are the
   same. See docs/eval-flag-policy.md, the last section. No request changes, because the policy runs after
   the model's answer.
 

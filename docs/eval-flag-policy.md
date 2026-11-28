@@ -246,11 +246,19 @@ uv run python -m readablestem.eval.flag_features dump rows.jsonl
 The three arms of the development papers: `uv run --no-sync python scripts/flag_policy_arms.py
 REPLAY_FOLDER`, on the folder of an equation replay of the development papers (docs/eval.md).
 
-The held-out section: `uv run --no-sync python -I scripts/flag_policy_heldout.py TAG --part fresh5a
-[--flag-policy]` for each of the parts `fresh5a` to `fresh5c` (a live run with a cap, `--max-usd`; the
-second arm replays the first's answers at $0). Its totals, both arms with their intervals and the
-paired differences, scored as the registered fresh5 arms are (docs/eval-equation-fresh5.md), are
-`data/eval/flag-policy-heldout.json` (counts only: no unit is named).
+The held-out section, for each of the parts `fresh5a` to `fresh5c`:
+
+```
+uv run --no-sync python -I scripts/flag_policy_heldout.py OFF --part fresh5a --max-usd X
+uv run --no-sync python -I scripts/flag_policy_heldout.py ON --part fresh5a --seed-from OFF --offline --flag-policy
+uv run --no-sync python scripts/fresh5_report.py --control-tag OFF --candidate-tag ON --out FILE
+```
+
+The first is the paid run (with the key; the cap is per part), the second replays its answers
+with the setting on at $0, and the third scores both as the registered fresh5 arms are
+(docs/eval-equation-fresh5.md). `FILE` names units, so it is written outside the repository; the
+committed record, `data/eval/flag-policy-heldout.json`, is that file with every list of unit
+names replaced by its length and the `wording` notes left out.
 
 Needs the cached runs (`~/.cache/readablestem/realworld/runs`, `~/.cache/a11y-stem/round4/on.jsonl`), which are
 not in the repository. `report` says whether the constants in `flag_policy.py` equal the fit it just made.
