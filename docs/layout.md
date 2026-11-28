@@ -4612,6 +4612,16 @@ run is a whole layout run: on the 100-page bench document (`scripts/bench_runtim
 client, production profile, one core, 2026-11-27) the conversion took 54.7 s and 568 MB peak
 with the step on and 30.8 s and 523 MB with it off, the layout runs 20.2 s and 18.8 s.
 
+**A block that holds several items.** The model may name a question and its options, or a
+slide's title and its bullets, as one block. `_item_pieces` cuts a block's piece at each row
+that starts a list item as printed (`_starts_item`: the marker stands in the row's first
+characters) under a row that stopped short of the block's right edge, or one set further
+left, or in another weight or size. Each part is its own run, so the later steps (options,
+lists, kinds) see what they see with the switch off; a part that opens a column still joins
+the column before it. A row that only looks like an item (a wrapped line that opens with
+"(b)", a formula that opens with a bullet glyph) is not cut, because it continues the line
+above at the same edge and weight.
+
 **With page math.** Both on is three layout passes: the page math pass makes its second run
 on the page the first collected, the order items are collected again on that page, and the
 order pass applies last, laying the math plan over layout again. A page whose items differ

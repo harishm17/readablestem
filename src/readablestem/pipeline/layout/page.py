@@ -883,7 +883,10 @@ def _starts_item(prev: _Row, row: _Row, right: float) -> bool:
     its column (`right`), or `row` stands further in ("a) Coal" under its question), or is set
     in another weight or size (a slide's title over its bullets)."""
     marker = row.marker
-    if marker is None or marker.text.strip() not in row.clean[: marker.start + len(marker.text) + 4]:
+    if (
+        marker is None
+        or marker.text.strip() not in row.clean[: marker.start + len(marker.text) + 4]
+    ):
         return False
     return (
         prev.x1 < right - 1.5 * prev.size

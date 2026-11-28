@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased: the model's page order keeps the items of a question or a slide apart
+
+- When the model's page order names a question and its options (or a slide's title and its
+  bullets) as one block, each printed item is now its own item again, as with the switch off.
+  A block is cut where a row opens with its printed marker and stands under a line that stopped
+  short of the block's right edge, or set further left, or in another weight or size. A wrapped
+  line that opens with "(b)" or a formula that opens with a bullet glyph is not cut. Only pages
+  with a model answer change; with the switch off nothing does.
+- Measured by replaying the recorded answers (`eval order --model-order`, no model call), against
+  0.5.23: on the corpus, places where neighbouring blocks are read as one go from 112 to 24
+  (62 pages: 56 to 57 right, 37 to 39 with no fault, no heading read into its neighbour) and the
+  two-column exam page is read right. On `layout-dev-1`: 184 pages right as before, cut 325
+  places as before, run together 67 places to 65, heading run together 16 as before. No
+  recorded answer is missed on either set. A version bump is owed when this is released: the
+  output of pages that carry a model answer changes.
+
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 
 - `PIPELINE_VERSION` is 0.5.23 and `RENDER_VERSION` stays 11. The model's page order (the entry
