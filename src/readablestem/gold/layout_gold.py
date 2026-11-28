@@ -17,7 +17,11 @@ Each block carries
 - `mtext`: the same with every token that is not a source word replaced by `zqzq` (the glyphs
   of an inline formula, a list number the source generates), which the scorer skips;
 - `boxes`: its line boxes, for the overlay a person checks (`overlay`);
-- `unit` and `pos`: where in the source it stands.
+- `unit` and `pos`: where in the source it stands;
+- `level` (a heading only, where the source gives one): the source's heading depth, the tag
+  LaTeXML or the OpenStax archive gives it (1 to 6). It is a depth, not what a reader should
+  write: `eval/order.py` compares it with the heading levels of the student page by the
+  difference the document keeps, so a document that starts at `h2` is not wrong.
 
 `eval/order.py` scores a reader's output against these pages. The builders (`paper_gold`,
 `textbook_gold`, `generated_gold`) choose pages by rules that look only at the gold's own
@@ -144,6 +148,15 @@ _LTX_RUN_IN = {
 }
 _LTX_PLACED = {"ltx_keywords", "ltx_classification", "ltx_dates"}
 _HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
+# Titles whose tag says nothing of the document's outline (LaTeXML makes "Abstract" an h6),
+# and run-in titles, which stand inside their paragraph.
+_LTX_NO_LEVEL = {
+    "ltx_title_abstract",
+    "ltx_title_acknowledgements",
+    "ltx_title_keywords",
+    "ltx_title_theorem",
+    "ltx_title_proof",
+}
 
 
 def _ltx_text(element: lxml.html.HtmlElement, notes: list | None = None) -> str:
@@ -208,7 +221,8 @@ def units_latexml(html: str) -> list[Unit]:
             if in_float:
                 return
             notes = []
-            add("heading", _ltx_text(node, notes), runin=bool(classes & _LTX_RUN_IN))
+            more = {} if classes & (_LTX_NO_LEVEL | _LTX_RUN_IN) else {"level": int(tag[1])}
+            add("heading", _ltx_text(node, notes), runin=bool(classes & _LTX_RUN_IN), **more)
             add_notes(notes)
             return
         if tag == "figcaption":
@@ -338,7 +352,7 @@ def units_openstax(xhtml: str, section: str) -> list[Unit]:
             add("heading", _os_text(node), index=True)
             return
         if tag in _HEADINGS:
-            add("heading", _os_text(node))
+            add("heading", _os_text(node), level=int(tag[1]))
             return
         if tag == "dl":
             for child in node:
@@ -888,6 +902,8 @@ def gold_page(
             )
             if unit.get("coarse"):
                 block["coarse"] = True
+            if role == "heading" and unit.get("level") and not extra_heading:
+                block["level"] = unit["level"]
             if unit.get("index") or unit.get("term") or unit.get("entry"):
                 block["entry"] = True
             if role == "front" or extra_heading:

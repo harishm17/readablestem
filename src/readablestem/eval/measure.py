@@ -411,7 +411,8 @@ def order_of(gold: dict[str, Any], pdf: bytes, result: DocumentResult) -> dict[s
     conversion of its file: under `elements` for what the pipeline holds and under `html`
     for the page a student is given. The `detail` of a row holds the document's words and
     is left out. Each gold page is given the lines printed in its margins, so that a
-    running head that is read is counted as furniture."""
+    running head that is read is counted as furniture. Heading levels are counted for the
+    student page only: the pipeline's elements carry none."""
     import pymupdf
 
     from readablestem.eval import order
@@ -430,7 +431,7 @@ def order_of(gold: dict[str, Any], pdf: bytes, result: DocumentResult) -> dict[s
     return {
         source: [
             {key: value for key, value in row.items() if key != "detail"}
-            for row in order.score_document(gold, pages)
+            for row in order.score_document(gold, pages, levels=source == "html")
         ]
         for source, pages in heard.items()
     }

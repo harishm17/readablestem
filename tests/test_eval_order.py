@@ -161,6 +161,61 @@ def test_a_caption_heard_with_the_other_picture_is_on_the_wrong_one() -> None:
     assert row["caption_wrong"] == 1 and not row["faultless"]
 
 
+def test_a_paragraph_the_page_before_keeps_is_moved_and_not_lost() -> None:
+    opening = "the survey asked every household how often the bus ran in the evening"
+    tail = "most answered that it came twice an hour and was rarely late in winter"
+    next_one = "a second round of visits followed in spring to check the first answers"
+    gold = {
+        "id": "two_pages",
+        "pages": [
+            {"page": 1, "blocks": [{"role": "body", "text": opening + " " + tail}]},
+            {
+                "page": 2,
+                "blocks": [{"role": "body", "text": tail}, {"role": "body", "text": next_one}],
+            },
+        ],
+    }
+    joined = {
+        1: [{"kind": "p", "text": opening + " " + tail}],
+        2: [{"kind": "p", "text": next_one}],
+    }
+    _, here = order.score_document(gold, joined)
+    assert (here["moved"], here["lost"], here["found"]) == (1, 0, 1)
+    # The same words on no page next to it are lost.
+    _, here = order.score_document(gold, {2: [{"kind": "p", "text": next_one}]})
+    assert (here["moved"], here["lost"]) == (0, 1)
+
+
+def test_headings_are_counted_at_the_level_the_document_keeps() -> None:
+    def heading(text: str, level: int | None) -> dict:
+        return {"role": "heading", "text": text, **({"level": level} if level else {})}
+
+    body = {"role": "body", "text": "the first part says how the work was done in the field"}
+    titles = [("Introduction", 1), ("Methods", 2), ("Results", 2), ("Limits", 1)]
+    leveled = {"id": "d", "pages": [{"page": 1, "blocks": [body, *(heading(*t) for t in titles)]}]}
+    plain = {
+        "id": "d",
+        "pages": [{"page": 1, "blocks": [body, *(heading(t, None) for t, _ in titles)]}],
+    }
+
+    def heard(tags: list[str]) -> dict:
+        elements = [{"kind": "p", "text": body["text"]}]
+        return {
+            1: elements
+            + [{"kind": tag, "text": t} for tag, (t, _) in zip(tags, titles, strict=True)]
+        }
+
+    # Every heading one level lower than the source's: the document keeps that.
+    (row,) = order.score_document(leveled, heard(["h2", "h3", "h3", "h2"]), levels=True)
+    assert (row["levels"], row["levels_ok"]) == (4, 4)
+    # One heading off the document's usual level, and one not read as a heading.
+    (row,) = order.score_document(leveled, heard(["h2", "h3", "h4", "p"]), levels=True)
+    assert (row["levels"], row["levels_ok"]) == (4, 2)
+    # Gold with no levels, or a view that has none, has no level counts.
+    assert "levels" not in order.score_document(plain, heard(["h2"] * 4), levels=True)[0]
+    assert "levels" not in order.score_document(leveled, heard(["h2"] * 4))[0]
+
+
 def test_a_page_missing_from_the_output_finds_nothing() -> None:
     gold = corpus.load_gold(ENTRIES["s01_newsletter_3col"])
     (row,) = order.score_document(gold, {})

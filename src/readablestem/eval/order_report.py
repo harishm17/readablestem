@@ -66,6 +66,11 @@ SAID = {
 }
 # The counts printed beside pages right: on how many pages, and how many in all.
 BESIDE = ("furniture", "stray", "cut", "merged", "heading_merged", "caption_wrong")
+# What a page keeps of its blocks, as the scorer counts them: found, lost (neither found nor
+# moved), moved (found on a page next to it), broken, cross-joins, and the headings with a
+# source level and those at the document's usual level. The page's `pairs` are the
+# neighbouring blocks whose places come out in gold order.
+KEPT = ("found", "lost", "moved", "broken", "xjoin", "levels", "levels_ok")
 OTHER = "other"
 
 
@@ -313,24 +318,6 @@ def _model_order(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
     return {**total, "documents": len(runs), "other_steps_refused": dict(refused)}
 
 
-def _why(row: dict[str, Any]) -> list[str]:
-    """What keeps a page from being right, as the names of its counts."""
-    found: list[str] = []
-    out_of_order = row.get("opairs", 0) - row.get("opairs_ok", 0)
-    for count, said in (
-        (row.get("lost"), "blocks not found"),
-        (row.get("broken"), "blocks broken"),
-        (out_of_order, "neighbours out of order"),
-        (row.get("xjoin"), "joins across columns"),
-        (row.get("ejoin"), "entries joined"),
-        (row.get("stamp_in_text"), "stamps read in the text"),
-        (row.get("numrun_bad"), "numbered runs out of order"),
-    ):
-        if count:
-            found.append(f"{said}: {count}")
-    return found or ["not clean"]
-
-
 def report(
     measured: Sequence[Converted],
     groups: Mapping[str, str] | None = None,
@@ -377,7 +364,10 @@ def report(
                 },
             )
             kept = {key: row[key] for key in ("right", "faultless", *BESIDE)}
-            page[source] = kept | ({} if row["right"] else {"why": _why(row)})
+            kept |= {key: row[key] for key in KEPT if key in row}
+            if "opairs" in row:
+                kept |= {"pairs": row["opairs"], "pairs_ok": row["opairs_ok"]}
+            page[source] = kept | ({} if row["right"] else {"why": row.get("why") or ["not clean"]})
     model_order = _model_order([done.page_order for done in scored if done.page_order is not None])
     return {
         "scorer": order.VERSION,
@@ -457,6 +447,9 @@ _HEAD = (
     "caption wrong",
     "broken",
     "joined across",
+    "lost",
+    "moved",
+    "levels right",
 )
 
 
@@ -477,6 +470,9 @@ def _line(name: str, sums: dict[str, Any]) -> tuple[Any, ...]:
         f"{sums.get('caption_wrong', 0)} of {sums.get('caption_judged', 0)}",
         sums.get("broken", 0),
         sums.get("xjoin", 0),
+        sums.get("lost", 0),
+        sums.get("moved", 0),
+        f"{sums['levels_ok']} of {sums['levels']}" if "levels" in sums else "-",
     )
 
 
@@ -543,7 +539,7 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
     for source in SOURCES:
         lines += ["", f"{SAID[source]} (a count as pages, and places in brackets):"]
         lines += _source_table(sources[source])
-    lines += ["", "the same pages by the counts of scorer version 4:", order.HEADER]
+    lines += ["", "the same pages by the first scorer's counts:", order.HEADER]
     for source in SOURCES:
         lines.append(order.table_row(source, Counter(sources[source]["all"])))
     wrong = [page for page in made["pages"] if "html" in page and not page["html"]["right"]]
@@ -554,7 +550,12 @@ def render(record: dict[str, Any], verdict: Verdict | None = None) -> str:
             "not looked at.",
         ]
     if wrong:
+        reasons = Counter(why for page in wrong for why in page["html"]["why"])
         lines += ["", f"the {len(wrong)} pages not right in the page a student is given:"]
+        lines.append(
+            "by reason (a page can have several): "
+            + ", ".join(f"{n} {why}" for why, n in reasons.most_common())
+        )
         lines += measure.table(
             ("upload", "page", "group", "why", "in the elements"),
             [

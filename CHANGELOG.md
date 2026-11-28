@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased: the order scorer says why a page is not right
+
+- `eval/order.py` is version 6. Each gold page now counts `moved`: a block its own page lacks
+  whose words are whole in the paragraph the page next to it keeps across the break. Such a
+  block was counted `lost`; it is no longer. A page's record keeps `found`, `lost`, `moved`,
+  `broken`, `xjoin`, `pairs` and `pairs_ok`, and a `why` list of the conditions of `right`
+  that failed. Heading levels: a gold heading carries the source's level where there is one
+  (`gold/layout_gold.py`), and the student page counts `levels` and `levels_ok`. `right` and
+  `faultless` are as before. No reader changes. Order records made before this version are not
+  comparable on these counts, so the development and corpus records are re-made.
+
 ## Pipeline 0.5.23, render 11 (2026-11-27)
 
 - `PIPELINE_VERSION` is 0.5.23 and `RENDER_VERSION` stays 11. The model's page order (the entry
