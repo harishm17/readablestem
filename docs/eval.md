@@ -2927,6 +2927,8 @@ the same way. Its counts per page:
 | Count | Meaning |
 |---|---|
 | found | at least half of a gold block's words are on the page |
+| moved | a block not found on the page, whose words are whole in the paragraph the page next to it keeps across the break (the page's first block and the last three text elements of the page before, or its last block and the first three of the page after) |
+| lost | a block neither found nor moved |
 | flow | the block's word 4-grams that appear unbroken in the page's word stream |
 | broken | a block of 6 or more words with other text inside it, or under 80% of its 4-grams kept |
 | neighbors in order | consecutive gold blocks whose places in the stream are in gold order |
@@ -2940,8 +2942,14 @@ the same way. Its counts per page:
 | merged | neighboring gold blocks heard in one element; `heading merged` is the part where one of the two is a heading |
 | caption wrong | a caption heard with, or nearest to, another picture or table than its own |
 | faultless page | a right page with none of the five |
+| why | the conditions of a right page that failed, by name: `found_under_half`, `broken`, `order`, `xjoin`, `stamp_in_text`, `entries_joined`, `numbers_out_of_order` |
+| levels | the gold headings that carry a source level, and `levels_ok`, those read as a heading (`h1` to `h6`) at the document's usual level against the source's; the student page only |
 
-The module text gives the exact rules. A "clean page" is strict: one cut sentence or one
+The module text gives the exact rules. A paragraph that layout joins across a page break
+(the right reading) is kept in the output on the page where it starts, so the gold block of
+its second part is not on its own page. It is `moved`, not `lost`: the paragraph is whole and
+read once, and a page only loses a block that is on no page next to it. `moved` does not
+change `found`, `clean` or `right`, so a page's right is the same with it or without. A "clean page" is strict: one cut sentence or one
 swapped pair fails the page. A right page can still read a running head aloud, cut a
 paragraph in two, run two list items together or put a caption on the wrong picture, which
 is what the last six rows count, so pages right is never reported alone. Two kinds of gold
@@ -2974,9 +2982,55 @@ layout output of the main branch as stored on 2026-11-10, both give 59 clean pag
 Those numbers describe that stored output, read from a layout dump; they were not measured
 under the production profile and are not the registered baseline, which `eval order`
 records (below). Version 5 added the five further counts and `faultless`; for the same
-elements its other counts are those of version 4. The first scorer (version 2) was not
+elements its other counts are those of version 4. Version 6 (wave 10) added `moved` (and `lost`
+now leaves the moved blocks out), a `why` list on every page, and the heading levels; it
+changes none of the counts that decide `clean`, `right` and `faultless`. Order records made
+before version 6 were scored without these counts: their `lost` includes the blocks version 6
+calls moved, they have no `why` for a page they call right, and the bar (`--against`) does
+not compare them with a version 6 record, so a development or corpus record is re-made when
+the version is raised. The first scorer (version 2) was not
 moved: its element-level counts are still reported by this one (`pairs`, `stitched`,
 `split`, `lost`).
+
+**Why a page is not right, and heading levels (version 6).** A page's record in the order
+file keeps `found`, `lost`, `moved`, `broken`, `xjoin`, `pairs` and `pairs_ok` (neighboring
+blocks and those in gold order), and for a page that is not right, `why`. The reasons are
+the conditions of `right` that failed, so every page that is not right has at least one.
+Heading levels are scored against the level the source gives a heading in the gold: the
+depth of its LaTeXML title (`h1` for the document, `h2` for a section, and so on) or its
+OpenStax `h1` to `h6`. Headings the source does not give a level (an abstract, a theorem's
+or proof's title, a run-in paragraph title, an index group label) and a block that only
+carries a title's note carry none. The page counts the headings that have a level
+(`levels`) and those read as a heading at the document's usual difference from the source
+(`levels_ok`): a document whose headings are all one level lower than the source's is not
+wrong, a heading off that is. The difference is the most common one over the document's
+gold pages, read from the same output, so a reader that gets most headings wrong still
+scores its most common level right. Only the student page has levels; the pipeline's
+elements hold none. Gold made before levels existed scores as before, with no level counts.
+Self-made files have none: the unit list that was written next to each file is not kept.
+
+**What version 6 shows on `layout-dev-1`** (`data/eval/order-layout-dev-1.json`, the model's
+page order on with its recorded answers replayed; pipeline 0.5.23, no reader changed). Of
+267 pages, 184 are right in the student page (as at version 5) and 83 are not. Why the 83 are
+not right (a page can have several reasons):
+
+| Reason | Pages |
+|---|---|
+| `order` (neighboring blocks out of order) | 52 |
+| `broken` (a block with other text inside it) | 37 |
+| `entries_joined` (index or glossary entries run together) | 17 |
+| `xjoin` (a cross-join of blocks that are not neighbors) | 5 |
+| `found_under_half`, `stamp_in_text`, `numbers_out_of_order` | 1 each |
+
+Of the 4,460 gold blocks: 4,296 found, 110 lost and 54 moved (version 5 counted the 54
+as lost, 164 lost in all). With the model's order off (a run with no `--model-order`) 4,302
+are found, 113 lost and 45 moved, and 183 pages are right. On the pipeline's elements, with
+the model's order on, 4,365 are found, 42 lost and 53 moved. The seven paragraphs joined
+across a page break that version 5 counted as lost with the model's order on are moved. Heading levels: 338 gold headings carry a
+level (162 in papers, 176 in books), and 250 of them are read as a heading at their
+document's usual level (134 of 162 in papers, 116 of 176 in books); with the model's order
+off, 252. The corpus record (`data/eval/order-corpus.json`) is the same 56 right and 37
+faultless pages of 62, with 13 lost and 2 moved blocks (15 lost at version 5).
 
 ### Gold built from sources (`gold/layout_gold.py`)
 
